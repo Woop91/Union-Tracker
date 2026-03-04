@@ -79,6 +79,10 @@ beforeEach(function () {
 describe('Auth.resolveUser', function () {
 
   test('returns null for empty/undefined event', function () {
+    // Override SSO so no auth signal is present
+    Session.getActiveUser = jest.fn(function () {
+      return { getEmail: jest.fn(function () { return ''; }) };
+    });
     expect(Auth.resolveUser(undefined)).toBeNull();
     expect(Auth.resolveUser(null)).toBeNull();
   });
@@ -287,9 +291,13 @@ describe('Auth.sendMagicLink', function () {
   });
 
   test('rate limits at 3 per email per 15 min', function () {
-    // Simulate cache already having count of 3
-    var mockCache = CacheService.getScriptCache();
-    mockCache.get = jest.fn(function () { return '3'; });
+    // Make getScriptCache return a singleton so the source code sees count '3'
+    var rateLimitCache = {
+      get: jest.fn(function () { return '3'; }),
+      put: jest.fn(),
+      remove: jest.fn()
+    };
+    CacheService.getScriptCache.mockReturnValueOnce(rateLimitCache);
 
     var result = Auth.sendMagicLink('user@test.com', false);
     // Should silently succeed (no enumeration) but not send email

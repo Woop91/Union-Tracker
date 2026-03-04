@@ -543,6 +543,7 @@ var DataService = (function () {
 
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName('Grievance Log');
       if (!sheet) return { success: false, message: 'Grievance sheet not found.' };
 
@@ -590,6 +591,7 @@ var DataService = (function () {
     if (!email) return { success: false, message: 'Email is required.' };
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName('Grievance Log');
       if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'No grievances found.' };
 
@@ -639,6 +641,7 @@ var DataService = (function () {
 
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { hasCompleted: false, lastCompleted: null };
       var trackSheet = ss.getSheetByName('_Survey_Tracking');
       if (!trackSheet || trackSheet.getLastRow() <= 1) {
         return { hasCompleted: false, lastCompleted: null };
@@ -691,6 +694,7 @@ var DataService = (function () {
 
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var folderName = ss.getName();
 
       // Search for existing folder with same name owned by this user
@@ -922,6 +926,7 @@ var DataService = (function () {
   function getSurveyResults() {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { available: false, count: 0, threshold: 30, sections: [] };
       var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
       if (!satSheet) return { available: false, count: 0, threshold: 30, sections: [] };
 
@@ -1231,6 +1236,7 @@ var DataService = (function () {
 
   function _ensureContactLog() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
     var sheet = ss.getSheetByName(SHEETS.CONTACT_LOG);
     if (!sheet) {
       sheet = ss.insertSheet(SHEETS.CONTACT_LOG);
@@ -1286,6 +1292,7 @@ var DataService = (function () {
 
   function _ensureStewardTasks() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
     var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
     if (!sheet) {
       sheet = ss.insertSheet(SHEETS.STEWARD_TASKS);
@@ -1476,6 +1483,7 @@ var DataService = (function () {
       var email = '';
       if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.CHIEF_STEWARD_EMAIL) {
         var ss = SpreadsheetApp.getActiveSpreadsheet();
+        if (!ss) return null;
         var cfgSheet = ss.getSheetByName('Config');
         if (cfgSheet) email = String(cfgSheet.getRange(3, CONFIG_COLS.CHIEF_STEWARD_EMAIL).getValue() || '').toLowerCase().trim();
       }
@@ -1888,6 +1896,7 @@ var DataService = (function () {
     email = String(email).trim().toLowerCase();
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return [];
     var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
     if (!sheet || sheet.getLastRow() <= 1) return [];
 
@@ -2129,6 +2138,7 @@ var DataService = (function () {
       email = String(email).trim().toLowerCase();
 
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return {};
       var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
       if (!sheet || sheet.getLastRow() <= 1) return {};
 
@@ -2163,6 +2173,7 @@ var DataService = (function () {
   function getAllStewardPerformance() {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return [];
       var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
       if (!sheet || sheet.getLastRow() <= 1) return [];
 
@@ -2206,6 +2217,7 @@ var DataService = (function () {
       caseId = String(caseId).trim();
 
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return [];
       var sheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
       if (!sheet || sheet.getLastRow() <= 1) return [];
 
@@ -2282,6 +2294,7 @@ var DataService = (function () {
       if (!checklistId) return { success: false, message: 'Missing checklist ID.' };
 
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
       if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Checklist not found.' };
 
@@ -2320,6 +2333,7 @@ var DataService = (function () {
       email = String(email).trim().toLowerCase();
 
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return [];
       var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
       if (!sheet || sheet.getLastRow() <= 1) return [];
 
@@ -2353,6 +2367,7 @@ var DataService = (function () {
   function getMeetingStats() {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { totalMeetings: 0, totalCheckins: 0, uniqueAttendees: 0, avgAttendance: 0 };
       var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
       if (!sheet || sheet.getLastRow() <= 1) {
         return { totalMeetings: 0, totalCheckins: 0, uniqueAttendees: 0, avgAttendance: 0 };
@@ -2393,6 +2408,7 @@ var DataService = (function () {
   function getSatisfactionTrends() {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return {};
       var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
       if (!sheet || sheet.getLastRow() <= 1) return {};
 
@@ -2451,6 +2467,7 @@ var DataService = (function () {
       email = String(email).trim().toLowerCase();
 
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
       if (!sheet) return { success: false, message: 'Feedback sheet not found.' };
 

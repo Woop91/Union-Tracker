@@ -194,6 +194,7 @@ var WorkloadService = (function() {
 
   function _refreshReportingData() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
     var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
     var report = ss.getSheetByName(SHEETS.WORKLOAD_REPORTING);
     if (!vault || !report) return;
@@ -304,7 +305,9 @@ var WorkloadService = (function() {
   // ── Reminder Helpers (private) ────────────────────────────────────────────
 
   function _saveReminderPreference(prefs) {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
+    var sheet = ss.getSheetByName(SHEETS.WORKLOAD_REMINDERS);
     if (!sheet) return;
     var emailLower = prefs.email.toLowerCase().trim();
     var data = sheet.getDataRange().getValues();
@@ -330,6 +333,7 @@ var WorkloadService = (function() {
 
   function initSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
 
     // Workload Vault (hidden raw data, 24 columns)
     var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
@@ -441,7 +445,9 @@ var WorkloadService = (function() {
     }
 
     return _withLock(function() {
-      var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return 'Error: Workload sheets not initialized. Run Setup > Initialize Dashboard first.';
+      var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
       if (!vault) {
         return 'Error: Workload sheets not initialized. Run Setup > Initialize Dashboard first.';
       }
@@ -541,7 +547,9 @@ var WorkloadService = (function() {
   function getHistorySSO(email) {
     if (!email) return { success: false, history: [], message: 'Email required.' };
 
-    var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: true, history: [], message: '' };
+    var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
     if (!vault || vault.getLastRow() <= 1) {
       return { success: true, history: [], message: '' };
     }
@@ -632,6 +640,7 @@ var WorkloadService = (function() {
     if (!email) return { success: false, data: null, message: 'Email required.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, data: null, message: 'Spreadsheet unavailable.' };
     var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
     if (!vault || vault.getLastRow() <= 1) {
       return { success: true, data: { totalSubmissions: 0, members: 0, categories: {}, averages: {} }, message: '' };
@@ -765,7 +774,9 @@ var WorkloadService = (function() {
 
   function getReminderSSO(email) {
     if (!email) return { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
+    var sheet = ss.getSheetByName(SHEETS.WORKLOAD_REMINDERS);
     if (!sheet || sheet.getLastRow() <= 1) {
       return { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
     }
@@ -832,7 +843,9 @@ var WorkloadService = (function() {
   // ── Process Reminders (daily trigger) ─────────────────────────────────────
 
   function processReminders() {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
+    var sheet = ss.getSheetByName(SHEETS.WORKLOAD_REMINDERS);
     if (!sheet || sheet.getLastRow() <= 1) return;
 
     var data = sheet.getDataRange().getValues();
@@ -898,7 +911,9 @@ var WorkloadService = (function() {
   function createBackup() {
     var ui = SpreadsheetApp.getUi();
     try {
-      var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) { ui.alert('Spreadsheet unavailable.'); return; }
+      var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
       if (!vault) { ui.alert('Workload Vault sheet not found.'); return; }
 
       var data = vault.getDataRange().getValues();
@@ -947,6 +962,7 @@ var WorkloadService = (function() {
     if (response !== ui.Button.YES) return;
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) { ui.alert('Spreadsheet unavailable.'); return; }
     var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
     if (!vault) { ui.alert('Workload Vault not found.'); return; }
 
@@ -990,6 +1006,7 @@ var WorkloadService = (function() {
 
   function cleanVault() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
     var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
     if (!vault) return;
 
@@ -1046,6 +1063,7 @@ var WorkloadService = (function() {
   function getHealthStatus() {
     var ui = SpreadsheetApp.getUi();
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) { ui.alert('Spreadsheet unavailable.'); return; }
     var sheetNames = [
       SHEETS.WORKLOAD_VAULT, SHEETS.WORKLOAD_REPORTING,
       SHEETS.WORKLOAD_REMINDERS, SHEETS.WORKLOAD_USERMETA

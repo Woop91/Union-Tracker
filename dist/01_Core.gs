@@ -501,7 +501,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.20.0",
+  VERSION: "4.20.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -654,11 +654,11 @@ function getLocalNumberFromConfig_() {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 20,
-  PATCH: 0,
-  BUILD: 'v4.20.0',
-  CURRENT: '4.20.0',
+  PATCH: 1,
+  BUILD: 'v4.20.1',
+  CURRENT: '4.20.1',
   BUILD_DATE: '2026-03-03',
-  CODENAME: 'WorkloadTracker SPA Integration'
+  CODENAME: 'Test Suite 100% Pass'
 };
 
 /**
@@ -668,6 +668,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.1', date: '2026-03-03', codename: 'Test Suite 100% Pass', changes: 'Fix all 40 pre-existing test failures: null guards on getActiveSpreadsheet() in 21_WebDashDataService.gs (17), 25_WorkloadService.gs (17), 24_WeeklyQuestions.gs (1+_ensureSheet early-return); PropertiesService singleton mock fix (16_DashboardEnhancements); Session/CacheService mock fixes (19_WebDashAuth); EventBus SHEETS reverse-map fix (15_EventBus); DataService API alignment in 21_WebDashDataService tests; A12 threshold updated to 130; A13 7 failure handlers added to HTML views. 1945/1945 tests pass.' },
   { version: '4.20.0', date: '2026-03-03', codename: 'WorkloadTracker SPA Integration', changes: 'Remove standalone WorkloadTracker portal (18_WorkloadTracker.gs, WorkloadTracker.html). Workload tracker fully integrated into SPA via 25_WorkloadService.gs and member_view.html. Route ?page=workload deep-links to SPA workload tab after SSO auth. Merge v4.19.2-v4.19.5 error resilience hardening: fatal error guard in doGet(), null guards on getActiveSpreadsheet(), trigger try/catch, serverCall() client wrapper, 535 new unit tests (1146→1681).' },
   { version: '4.19.5', date: '2026-03-03', codename: 'Full Coverage Expansion', changes: '535 new unit tests across 14 test files covering all previously untested source modules: EventBus (15), DashboardEnhancements (16), CorrelationEngine (17), WorkloadTracker (18), WebDashAuth (19), WebDashConfigReader (20), WebDashDataService (21), WebDashApp (22), PortalSheets (23), WeeklyQuestions (24), WorkloadService (25), QAForum (26), TimelineService (27), FailsafeService (28). Test count increased from 1146 to 1681 (+46.6%). Gas-mock.js enhanced with createTemplateFromFile, MimeType, ScriptApp.WeekDay, MailApp.getRemainingDailyQuota, and corrected XFrameOptionsMode enum.' },
   { version: '4.19.4', date: '2026-03-03', codename: 'Regression Test Suite', changes: 'Architecture tests A9-A15 covering UI tab wiring, formula injection, auth enforcement, XSS prevention, google.script.run failure handler tracking, GAS enum validation, and error handler cascade detection. Fixed invalid XFrameOptions DENY enum usage in 00_Security.gs (DENY is not a valid GAS enum value — changed to DEFAULT).' },

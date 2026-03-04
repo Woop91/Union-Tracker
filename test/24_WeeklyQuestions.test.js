@@ -20,7 +20,7 @@ let mockSs;
 function setupSheets(questionsData, responsesData, poolData) {
   mockQuestionsSheet = createMockSheet(SHEETS.WEEKLY_QUESTIONS || '_Weekly_Questions', questionsData || [['header']]);
   mockResponsesSheet = createMockSheet(SHEETS.WEEKLY_RESPONSES || '_Weekly_Responses', responsesData || [['header']]);
-  mockPoolSheet = createMockSheet('_WQ_Pool', poolData || [['header']]);
+  mockPoolSheet = createMockSheet(SHEETS.QUESTION_POOL || '_Question_Pool', poolData || [['header']]);
 
   // Custom getRange for questions sheet
   mockQuestionsSheet.getRange = jest.fn((row, col, numRows, numCols) => {
@@ -87,8 +87,10 @@ describe('WeeklyQuestions module', () => {
 
 describe('WeeklyQuestions.initWeeklyQuestionSheets', () => {
   test('creates sheets if missing', () => {
+    const emptySs = createMockSpreadsheet([]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => emptySs);
     WeeklyQuestions.initWeeklyQuestionSheets();
-    expect(mockSs.insertSheet).toHaveBeenCalled();
+    expect(emptySs.insertSheet).toHaveBeenCalled();
   });
 
   test('does not recreate existing sheets', () => {

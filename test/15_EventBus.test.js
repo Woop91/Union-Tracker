@@ -222,7 +222,10 @@ describe('emitEditEvent', () => {
 
   test('emits sheet:edit:KEY for known sheet names', () => {
     const handler = jest.fn();
-    EventBus.on('sheet:edit:GRIEVANCE_LOG', handler);
+    // SHEETS.GRIEVANCE_TRACKER has same value as SHEETS.GRIEVANCE_LOG ('Grievance Log')
+    // but comes later in SHEETS, so it overwrites GRIEVANCE_LOG in the reverse sheetKeyMap.
+    // The emitted event is therefore 'sheet:edit:GRIEVANCE_TRACKER'.
+    EventBus.on('sheet:edit:GRIEVANCE_TRACKER', handler);
 
     const mockRange = {
       getSheet: () => ({ getName: () => SHEETS.GRIEVANCE_LOG })

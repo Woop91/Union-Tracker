@@ -26,10 +26,42 @@ global.getUserRole_ = jest.fn(() => 'steward');
 
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '15_EventBus.gs', '16_DashboardEnhancements.gs']);
 
+// Singleton PropertiesService mocks — the source code and tests must share the
+// same jest.fn() instance so that spy.mock.calls reflects source-code calls.
+let mockScriptProps, mockUserProps;
+
 // Reset EventBus and properties between tests
 beforeEach(() => {
   EventBus.reset();
   jest.clearAllMocks();
+
+  // Create fresh singletons AFTER clearAllMocks so spy histories start clean
+  const scriptStore = {};
+  mockScriptProps = {
+    setProperty: jest.fn((k, v) => { scriptStore[k] = v; }),
+    getProperty: jest.fn(k => scriptStore[k] || null),
+    deleteProperty: jest.fn(k => { delete scriptStore[k]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in scriptStore) delete scriptStore[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, scriptStore))
+  };
+  PropertiesService.getScriptProperties = jest.fn(() => mockScriptProps);
+
+  const userStore = {};
+  mockUserProps = {
+    setProperty: jest.fn((k, v) => { userStore[k] = v; }),
+    getProperty: jest.fn(k => userStore[k] || null),
+    deleteProperty: jest.fn(k => { delete userStore[k]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in userStore) delete userStore[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, userStore))
+  };
+  PropertiesService.getUserProperties = jest.fn(() => mockUserProps);
+
+  // Reset Session — clearAllMocks() clears call history but not implementations,
+  // so tests that set mockImplementation on Session can leak into later tests.
+  Session.getActiveUser = jest.fn(() => ({
+    getEmail: jest.fn(() => 'test@example.com')
+  }));
+
   // Re-set the default mock implementations after clearAllMocks
   getUnifiedDashboardData.mockImplementation(() => JSON.stringify({
     totalMembers: 100, openCases: 10, winRate: 60, moraleScore: 7,

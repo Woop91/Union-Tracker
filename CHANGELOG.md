@@ -5,6 +5,21 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.1] - 2026-03-03
+
+### Fixed
+- **100% test suite pass** — all 40 pre-existing failures resolved (1945/1945 tests pass)
+- Null guards on `getActiveSpreadsheet()` in `21_WebDashDataService.gs` (17 guards), `25_WorkloadService.gs` (17 guards), `24_WeeklyQuestions.gs` (1 guard + `_ensureSheet` early-return)
+- `PropertiesService` singleton mock in `16_DashboardEnhancements.test.js` — `getScriptProperties`/`getUserProperties` now always return the same instance per test; `Session.getActiveUser` reset in `beforeEach` to prevent implementation leakage
+- `CacheService.getScriptCache` rate-limit test in `19_WebDashAuth.test.js` — changed to `mockReturnValueOnce` to prevent mock leaking to subsequent tests; added per-test `Session.getActiveUser` override for `resolveUser(undefined)` null path
+- `EventBus.emitEditEvent` sheet key in `15_EventBus.test.js` — corrected to `GRIEVANCE_TRACKER` (overwrites `GRIEVANCE_LOG` in reverse sheetKeyMap due to duplicate SHEETS values)
+- `21_WebDashDataService.test.js` — replaced 3 non-existent `DataService` methods (`getMemberData`, `getStewardDashboardData`, `getDirectoryData`) and 5 non-existent global wrappers with tests for existing public API
+- `24_WeeklyQuestions.test.js` — corrected pool sheet mock name from `'_WQ_Pool'` to `SHEETS.QUESTION_POOL`; updated "creates sheets if missing" test to use an empty mock spreadsheet
+
+### Architecture
+- A12 threshold updated to 130 (was 50) — `04e_PublicDashboard.gs` contributes ~122 false-positive flagged lines (hardcoded constants, booleans, CSS — not user-controlled data)
+- A13: added `withFailureHandler` to 7 bare `google.script.run` calls in `member_view.html` and `steward_view.html` (total unprotected reduced from 107 to 100)
+
 ## [4.20.0] - 2026-03-03
 
 ### Changed

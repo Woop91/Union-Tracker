@@ -30,7 +30,7 @@ function initStewardView(container) {
   // Fallback: load individually (batch unavailable)
   google.script.run.withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
-  }).getWebAppNotificationCount(CURRENT_USER.email, 'steward');
+  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(CURRENT_USER.email, 'steward');
 
   google.script.run
     .withSuccessHandler(function(cases) {
@@ -286,7 +286,7 @@ function _dismissWelcome(cardEl) {
     cardEl.style.transition = 'opacity 0.3s ease';
     setTimeout(function() { cardEl.remove(); }, 300);
   }
-  google.script.run.dataMarkWelcomeDismissed(CURRENT_USER.email);
+  google.script.run.withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
 }
 
 function renderCaseList(container, filter) {

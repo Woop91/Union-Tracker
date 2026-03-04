@@ -22,6 +22,7 @@ var WeeklyQuestions = (function() {
 
   function initWeeklyQuestionSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('Spreadsheet unavailable — cannot initialize weekly question sheets.');
 
     _ensureSheet(ss, SHEETS.WEEKLY_QUESTIONS, [
       'ID', 'Text', 'Source', 'Submitted By', 'Week Start', 'Active', 'Created'
@@ -36,11 +37,10 @@ var WeeklyQuestions = (function() {
 
   function _ensureSheet(ss, name, headers) {
     var sheet = ss.getSheetByName(name);
-    if (!sheet) {
-      sheet = ss.insertSheet(name);
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.hideSheet();
-    }
+    if (sheet) return sheet;
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.hideSheet();
     return sheet;
   }
 

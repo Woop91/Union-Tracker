@@ -34,7 +34,7 @@ function initMemberView(container) {
   // Fallback: load individually (batch unavailable)
   google.script.run.withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
-  }).getWebAppNotificationCount(CURRENT_USER.email, 'member');
+  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(CURRENT_USER.email, 'member');
 
   google.script.run
     .withSuccessHandler(function(grievances) {
@@ -736,7 +736,7 @@ function _dismissMemberWelcome(cardEl) {
     cardEl.style.transition = 'opacity 0.3s ease';
     setTimeout(function() { cardEl.remove(); }, 300);
   }
-  google.script.run.dataMarkWelcomeDismissed(CURRENT_USER.email);
+  google.script.run.withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
 }
 
 // ═══════════════════════════════════════
@@ -1139,9 +1139,7 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardDirectory(document.getElementById('app')); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderMemberResources(document.getElementById('app')); } },
-    ].concat(typeof renderWorkloadTracker === 'function' ? [
       { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },
-    ] : []).concat([
       { icon: '\u2753', label: 'Weekly Questions', desc: 'Vote on this week\'s questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'member'); } },
       { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', action: function() { renderSurveyFormPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
@@ -1152,7 +1150,7 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'member'); } },
       { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app'), 'member'); } },
-    ]);
+    ];
 
     menuItems.forEach(function(m) {
       var item = el('div', { className: 'more-menu-item', onClick: m.action });
@@ -2246,7 +2244,6 @@ function _renderWTReminders(container) {
   }).getWorkloadReminderSSO(CURRENT_USER.email);
 }
 
-
 // ═══════════════════════════════════════
 // WEEKLY QUESTIONS (member side)
 // ═══════════════════════════════════════
@@ -3230,7 +3227,7 @@ function renderQAForum(appContainer, role) {
           onClick: function() {
             google.script.run.withSuccessHandler(function(r) {
               if (r && r.success) _renderQuestionDetail(cont, questionId);
-            }).qaUpvoteQuestion(CURRENT_USER.email, questionId);
+            }).withFailureHandler(function(e) { console.error(e.message); }).qaUpvoteQuestion(CURRENT_USER.email, questionId);
           }
         }, '\u25B2 ' + q.upvoteCount));
         if (isSteward && q.status !== 'flagged') {
@@ -3274,7 +3271,7 @@ function renderQAForum(appContainer, role) {
             google.script.run.withSuccessHandler(function(r) {
               if (r && r.success) _renderQuestionDetail(cont, questionId);
               else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
-            }).qaSubmitAnswer(CURRENT_USER.email, CURRENT_USER.name || '', questionId, text, isSteward);
+            }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitAnswer(CURRENT_USER.email, CURRENT_USER.name || '', questionId, text, isSteward);
           }
         }, 'Post Answer'));
       }).qaGetQuestionDetail(CURRENT_USER.email, questionId);
@@ -3307,7 +3304,7 @@ function renderQAForum(appContainer, role) {
           google.script.run.withSuccessHandler(function(r) {
             if (r && r.success) { activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
             else { statusMsg.textContent = r ? r.message : 'Error posting.'; statusMsg.style.color = 'var(--danger)'; }
-          }).qaSubmitQuestion(CURRENT_USER.email, CURRENT_USER.name || '', text, anonCheck.checked);
+          }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitQuestion(CURRENT_USER.email, CURRENT_USER.name || '', text, anonCheck.checked);
         }
       }, 'Post Question'));
     }
