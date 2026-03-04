@@ -1012,6 +1012,10 @@ var DataService = (function () {
 
   function _getSheet(name) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      Logger.log('DataService: getActiveSpreadsheet() returned null for sheet "' + name + '"');
+      return null;
+    }
     var sheet = ss.getSheetByName(name);
     if (!sheet) {
       Logger.log('DataService: Sheet "' + name + '" not found.');

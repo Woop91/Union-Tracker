@@ -5,6 +5,76 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.0] - 2026-03-03
+
+### Changed
+- **WorkloadTracker portal removed** — standalone `18_WorkloadTracker.gs` and `WorkloadTracker.html` deleted; workload tracker is now fully integrated into the SPA via `25_WorkloadService.gs` and `member_view.html`
+- `?page=workload` deep-link routes to the SPA workload tab after SSO auth (no longer a PIN-authenticated standalone portal)
+- Both DDS and UT repos are now identical (no file exclusions remain)
+
+### Merged from v4.19.2–v4.19.5 (error resilience hardening)
+- Fatal error guard in `doGet()` — thin wrapper calls `_serveFatalError()` as zero-dependency last resort
+- `doGetWebDashboard()` extracted as named inner handler; safe config fallback prevents error cascade
+- Null guards on `getActiveSpreadsheet()` in all web-app-chain files (19–28)
+- Try/catch on `onEditMultiSelect` and `onSelectionChangeMultiSelect` trigger handlers
+- Client-side `serverCall()` wrapper with default `withFailureHandler()`
+- Architecture tests A6–A15 enforce all error-handling rules
+- 535 new unit tests (total: 1,146 → 1,681)
+
+## [4.19.5] - 2026-03-03
+
+### Added
+- **535 new unit tests** across 14 test files, increasing total test count from 1,146 to 1,681 (+46.6%):
+  - `15_EventBus.test.js` (34 tests) — EventBus IIFE: subscribe, emit, wildcard, once, priority, logging, bridge functions
+  - `16_DashboardEnhancements.test.js` (50 tests) — date presets, Drive export, scheduled reports, notifications, shared views, presets, filtering, drill-down
+  - `17_CorrelationEngine.test.js` (52 tests) — statMean_, statStdDev_, pearsonCorrelation_, spearmanCorrelation_, toRanks_, chiSquareTest_, classifyCorrelation_, extractPairs_, generateInsight_
+  - `18_WorkloadTracker.test.js` (53 tests) — config constants, column constants, sanitizeString, rate limiting, withLock, authenticateWorkloadMember_
+  - `19_WebDashAuth.test.js` (50 tests) — Auth.resolveUser, Auth.sendMagicLink, Auth.createSessionToken, Auth.invalidateSession, Auth.cleanupExpiredTokens, magic token security
+  - `20_WebDashConfigReader.test.js` (32 tests) — ConfigReader.getConfig, getConfigJSON, refreshConfig, validateConfig, derived initials/abbreviations
+  - `21_WebDashDataService.test.js` (30 tests) — DataService.findUserByEmail, getUserRole, getMemberData, getMemberGrievances, getStewardDashboardData
+  - `22_WebDashApp.test.js` (20 tests) — doGet entry point, _serveFatalError, _serveError, _serveLogin, routing, error handling
+  - `23_PortalSheets.test.js` (24 tests) — portal column constants, portalGetOrCreateSheet_, all 8 getOrCreate functions, initPortalSheets
+  - `24_WeeklyQuestions.test.js` (27 tests) — WeeklyQuestionService IIFE: initSheets, addQuestion, submitResponse, activateQuestion, global wrappers
+  - `25_WorkloadService.test.js` (36 tests) — WorkloadService IIFE: submitWorkload, getHistory, getDashboardData, reminders, privacy, global wrappers
+  - `26_QAForum.test.js` (54 tests) — QAForum IIFE: initSheets, getQuestions, submitQuestion, submitAnswer, upvoteQuestion, moderateQuestion, getFlaggedContent
+  - `27_TimelineService.test.js` (40 tests) — TimelineService IIFE: CRUD operations, calendar import, Drive file attachment, filtering, pagination
+  - `28_FailsafeService.test.js` (33 tests) — FailsafeService IIFE: digest config, scheduled digests, bulk export, Drive backup, trigger management
+- **Enhanced gas-mock.js** with `createTemplateFromFile`, `createHtmlOutputFromFile`, `MimeType`, `ScriptApp.WeekDay`, `ScriptApp.getService`, `MailApp.getRemainingDailyQuota`, `Utilities.base64EncodeWebSafe`, `Utilities.newBlob`, `Utilities.base64Decode`, `DriveApp.getFileById`, corrected `XFrameOptionsMode` enum (DEFAULT instead of DENY)
+
+## [4.19.4] - 2026-03-03
+
+### Fixed
+- **`XFrameOptionsMode.DENY` bug:** `serveAccessDenied()` in `00_Security.gs` used `XFrameOptionsMode.DENY` which is not a valid GAS enum value (only DEFAULT and ALLOWALL exist). Changed to DEFAULT. This would cause a runtime error when serving an access-denied page.
+
+### Added
+- **Architecture tests A9–A15** — 7 new regression test suites covering every major historical failure category:
+  - **A9:** UI tab routes have matching render functions — prevents "tab does nothing" bugs
+  - **A10:** `escapeForFormula()` used on `setValue()`/`appendRow()` in web app files — prevents formula injection
+  - **A11:** Server-exposed functions have auth checks (`_resolveCallerEmail` / `_requireStewardAuth`) — prevents unauthenticated access
+  - **A12:** No unescaped dynamic HTML concatenation in `.gs` files — prevents XSS
+  - **A13:** `google.script.run` failure handler migration tracking — caps unprotected calls at 100 with ≥25% coverage threshold
+  - **A14:** GAS API enum validation — ensures only valid `XFrameOptionsMode` and `SandboxMode` values are used
+  - **A15:** Error handler no-cascade rule — catch blocks in web app files must not make unguarded calls to `SpreadsheetApp` or `ConfigReader`
+
+## [4.19.3] - 2026-03-03
+
+### Fixed
+- **Null guards on `getActiveSpreadsheet()`** in all web app chain files: `ConfigReader`, `DataService._getSheet()`, `PortalSheets`, `WeeklyQuestions._getSheet()`, `WorkloadService._getTimezone()/_getUserSharingStartDate()/_setUserSharingStartDate()`. Prevents "Cannot call method of null" crashes if the script binding breaks.
+- **Trigger entry point try/catch:** `onEditMultiSelect()` and `onSelectionChangeMultiSelect()` now wrap their bodies in try/catch to prevent silent trigger failures.
+
+### Added
+- **`serverCall()` client-side wrapper** (`index.html`): Drop-in replacement for `google.script.run` that attaches a default `.withFailureHandler()` — prevents silent spinner-forever failures for all 92+ unprotected server calls.
+- **`DataCache.cachedCall` always attaches failure handler** — no longer conditional.
+- **Architecture tests A6–A8:** Enforce null safety on `getActiveSpreadsheet()` in web app files, try/catch on trigger entry points, and `serverCall()` helper presence.
+- **CLAUDE.md error handling rules:** Four mandatory patterns documented to prevent future regressions.
+
+## [4.19.2] - 2026-03-03
+
+### Fixed
+- **Web app fatal error guard:** Added top-level try/catch in `doGet()` so the web app always returns a user-friendly error page instead of the generic Google "Sorry, unable to open the file at this time" page.
+- **Error handler cascade:** `doGetWebDashboard()` catch block now safely falls back to default config when `ConfigReader.getConfig()` itself is the source of the error, preventing a double-fault.
+- **Minimal fallback page:** New `_serveFatalError()` renders a self-contained error page with zero external dependencies (no sheet access, no ConfigReader).
+
 ## [4.19.1] - 2026-03-02
 
 ### Fixed

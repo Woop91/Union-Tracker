@@ -539,7 +539,7 @@ function getAccessDeniedPage(message) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Access Denied')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 // ============================================================================

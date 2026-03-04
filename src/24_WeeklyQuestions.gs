@@ -72,6 +72,7 @@ var WeeklyQuestions = (function() {
 
   function _getSheet(name) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
     var sheet = ss.getSheetByName(name);
     if (!sheet) {
       // Lazy-init: auto-create missing sheets

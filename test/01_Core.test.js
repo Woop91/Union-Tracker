@@ -176,54 +176,8 @@ describe('DEADLINE_RULES ↔ TIME_CONSTANTS.DEADLINE_DAYS consistency', () => {
   });
 });
 
-// ============================================================================
-// Header arrays match column constants
-// ============================================================================
-
-describe('getMemberHeaders', () => {
-  test('returns correct number of headers (matches DUES_STATUS column)', () => {
-    const headers = getMemberHeaders();
-    // Headers should cover columns up to DUES_STATUS (41) - includes address fields and Dues Status
-    expect(headers.length).toBe(MEMBER_COLS.DUES_STATUS);
-  });
-
-  test('first header is Member ID', () => {
-    expect(getMemberHeaders()[0]).toBe('Member ID');
-  });
-
-  test('last header is Dues Status', () => {
-    const headers = getMemberHeaders();
-    expect(headers[headers.length - 1]).toBe('Dues Status');
-  });
-
-  test('header position matches MEMBER_COLS for key fields', () => {
-    const headers = getMemberHeaders();
-    expect(headers[MEMBER_COLS.FIRST_NAME - 1]).toBe('First Name');
-    expect(headers[MEMBER_COLS.LAST_NAME - 1]).toBe('Last Name');
-    expect(headers[MEMBER_COLS.EMAIL - 1]).toBe('Email');
-    expect(headers[MEMBER_COLS.IS_STEWARD - 1]).toBe('Is Steward');
-  });
-});
-
-describe('getGrievanceHeaders', () => {
-  test('returns an array of strings', () => {
-    const headers = getGrievanceHeaders();
-    expect(Array.isArray(headers)).toBe(true);
-    expect(headers.length).toBeGreaterThan(0);
-    headers.forEach(h => expect(typeof h).toBe('string'));
-  });
-
-  test('first header is Grievance ID', () => {
-    expect(getGrievanceHeaders()[0]).toBe('Grievance ID');
-  });
-
-  test('header positions match GRIEVANCE_COLS for key fields', () => {
-    const headers = getGrievanceHeaders();
-    expect(headers[GRIEVANCE_COLS.STATUS - 1]).toBe('Status');
-    expect(headers[GRIEVANCE_COLS.CURRENT_STEP - 1]).toBe('Current Step');
-    expect(headers[GRIEVANCE_COLS.RESOLUTION - 1]).toBe('Resolution');
-  });
-});
+// NOTE: getMemberHeaders/getGrievanceHeaders header↔position tests
+// are covered in columns.test.js (Header map → COLS consistency).
 
 // ============================================================================
 // SHEETS constant

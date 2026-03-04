@@ -30,6 +30,14 @@ global.Utilities = {
     }
     return hash;
   }),
+  base64EncodeWebSafe: jest.fn((input) => {
+    if (Array.isArray(input)) {
+      return Buffer.from(input).toString('base64url');
+    }
+    return Buffer.from(String(input)).toString('base64url');
+  }),
+  newBlob: jest.fn((data, type, name) => ({ data, type, name })),
+  base64Decode: jest.fn((input) => [1, 2, 3]),
   base64Encode: jest.fn((input) => {
     // Simple mock base64 encoding for byte arrays
     if (Array.isArray(input)) {
@@ -207,11 +215,30 @@ global.HtmlService = {
     setXFrameOptionsMode: jest.fn(function() { return this; }),
     getContent: jest.fn(() => html)
   })),
-  XFrameOptionsMode: { DENY: 'DENY', ALLOWALL: 'ALLOWALL' }
+  createTemplateFromFile: jest.fn(name => ({
+    view: '',
+    pageData: '',
+    evaluate: jest.fn(function() {
+      return {
+        setTitle: jest.fn(function() { return this; }),
+        setXFrameOptionsMode: jest.fn(function() { return this; }),
+        addMetaTag: jest.fn(function() { return this; }),
+        getContent: jest.fn(() => '<html></html>')
+      };
+    })
+  })),
+  createHtmlOutputFromFile: jest.fn(name => ({
+    getContent: jest.fn(() => '<html>' + name + '</html>')
+  })),
+  XFrameOptionsMode: { DEFAULT: 'DEFAULT', ALLOWALL: 'ALLOWALL' },
+  SandboxMode: { IFRAME: 'IFRAME' }
 };
 
 // --- MailApp ---
-global.MailApp = { sendEmail: jest.fn() };
+global.MailApp = {
+  sendEmail: jest.fn(),
+  getRemainingDailyQuota: jest.fn(() => 100)
+};
 
 // --- DriveApp ---
 global.DriveApp = {
@@ -223,8 +250,12 @@ global.DriveApp = {
     createFolder: jest.fn()
   })),
   getFoldersByName: jest.fn(() => ({ hasNext: jest.fn(() => false) })),
-  getRootFolder: jest.fn(() => ({ getId: jest.fn(() => 'root') }))
+  getRootFolder: jest.fn(() => ({ getId: jest.fn(() => 'root') })),
+  getFileById: jest.fn(() => ({ getName: jest.fn(() => 'TestFile.pdf') }))
 };
+
+// --- MimeType ---
+global.MimeType = { CSV: 'text/csv', PDF: 'application/pdf' };
 
 // --- DocumentApp ---
 global.DocumentApp = {
@@ -261,8 +292,13 @@ global.ScriptApp = {
     timeBased: jest.fn(function() { return this; }),
     atHour: jest.fn(function() { return this; }),
     everyDays: jest.fn(function() { return this; }),
+    onWeekDay: jest.fn(function() { return this; }),
     create: jest.fn()
-  }))
+  })),
+  getService: jest.fn(() => ({
+    getUrl: jest.fn(() => 'https://script.google.com/macros/s/test/exec')
+  })),
+  WeekDay: { SUNDAY: 1, MONDAY: 2, TUESDAY: 3, WEDNESDAY: 4, THURSDAY: 5, FRIDAY: 6, SATURDAY: 7 }
 };
 
 // --- LockService ---
