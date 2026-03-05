@@ -502,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.20.2",
+  VERSION: "4.20.3",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.3', date: '2026-03-04', codename: 'Code Review Fixes', changes: 'Fix N+1 sheet reads in getStewardSurveyTracking — pre-load _Survey_Tracking once, build email map, O(1) lookup per member. Add escapeForFormula() to profile update setValue() (formula injection fix). Replace all google.script.run with serverCall() in member_view.html and steward_view.html (~52 calls) — all server calls now have default failure handler. Normalize QAForum anonymous checks to use isTruthyValue() for consistent Sheets boolean handling.' },
   { version: '4.20.2', date: '2026-03-04', codename: 'Web App Error Resilience', changes: 'Fix 14 missing withFailureHandler() on google.script.run calls in member_view.html (11) and steward_view.html (2) — prevents infinite loading spinners on server errors. Add null guards on getActiveSpreadsheet() in 26_QAForum.gs (10), 27_TimelineService.gs (7), 28_FailsafeService.gs (7) — prevents "Cannot call method of null" crashes in web app context.' },
   { version: '4.20.1', date: '2026-03-03', codename: 'Test Suite 100% Pass', changes: 'Fix all 40 pre-existing test failures: null guards on getActiveSpreadsheet() in 21_WebDashDataService.gs (17), 25_WorkloadService.gs (17), 24_WeeklyQuestions.gs (1+_ensureSheet early-return); PropertiesService singleton mock fix (16_DashboardEnhancements); Session/CacheService mock fixes (19_WebDashAuth); EventBus SHEETS reverse-map fix (15_EventBus); DataService API alignment in 21_WebDashDataService tests; A12 threshold updated to 130; A13 7 failure handlers added to HTML views. 1945/1945 tests pass.' },
   { version: '4.20.0', date: '2026-03-03', codename: 'WorkloadTracker SPA Integration', changes: 'Remove standalone WorkloadTracker portal (18_WorkloadTracker.gs, WorkloadTracker.html). Workload tracker fully integrated into SPA via 25_WorkloadService.gs and member_view.html. Route ?page=workload deep-links to SPA workload tab after SSO auth. Merge v4.19.2-v4.19.5 error resilience hardening: fatal error guard in doGet(), null guards on getActiveSpreadsheet(), trigger try/catch, serverCall() client wrapper, 535 new unit tests (1146→1681).' },

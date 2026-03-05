@@ -5,6 +5,25 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.3] - 2026-03-04
+
+### Fixed
+- **N+1 sheet reads** in `getStewardSurveyTracking` (`21_WebDashDataService.gs`) — pre-loads `_Survey_Tracking` sheet once and builds an email→status map; the per-member loop now does an O(1) map lookup instead of one full sheet read per member
+- **Formula injection** in profile update (`21_WebDashDataService.gs:395`) — `setValue(val)` now wraps user input with `escapeForFormula()`, consistent with all other `setValue()` calls in the file
+- **All `google.script.run` calls** in `member_view.html` and `steward_view.html` replaced with `serverCall()` (~52 total) — every server call now has a default failure handler, preventing silent spinner-forever failures on any server error
+- **QAForum boolean normalization** (`26_QAForum.gs`) — anonymous-flag checks replaced with `isTruthyValue()` to handle all Google Sheets boolean representations (`true`, `'TRUE'`, `'True'`, `'yes'`, `'1'`)
+
+## [4.20.2] - 2026-03-04
+
+### Fixed
+- **14 missing `withFailureHandler()`** on `google.script.run` calls in `member_view.html` (12) and `steward_view.html` (2) — prevents infinite loading spinners when server calls fail
+  - `dataGetStewardContact`, `dataGetAssignedSteward`, `dataGetAvailableStewards`, `wqSubmitResponse`, `wqGetHistory`, `dataGetGrievanceStats`, `dataGetGrievanceHotSpots`, `dataGetMembershipStats`, `dataGetEngagementStats`, `dataGetWorkloadSummaryStats`, `dataCompleteMemberTask` (member_view)
+  - `dataGetAgencyGrievanceStats`, `dataCompleteTask` (steward_view)
+- **24 null guards on `getActiveSpreadsheet()`** in web app modules to prevent "Cannot call method of null" crashes:
+  - `26_QAForum.gs` — 10 guards (initQAForumSheets, getQuestions, getQuestionDetail, submitQuestion, submitAnswer, upvoteQuestion, moderateQuestion, moderateAnswer, getFlaggedContent)
+  - `27_TimelineService.gs` — 7 guards (initTimelineSheet, getTimelineEvents, addTimelineEvent, updateTimelineEvent, deleteTimelineEvent, importCalendarEvents, attachDriveFiles)
+  - `28_FailsafeService.gs` — 7 guards (initFailsafeSheet, getDigestConfig, updateDigestConfig, processScheduledDigests, _composeMemberDigest, triggerBulkExport, backupCriticalSheets)
+
 ## [4.20.1] - 2026-03-03
 
 ### Fixed

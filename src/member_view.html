@@ -32,11 +32,11 @@ function initMemberView(container) {
   }
 
   // Fallback: load individually (batch unavailable)
-  google.script.run.withSuccessHandler(function(r) {
+  serverCall().withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
   }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(CURRENT_USER.email, 'member');
 
-  google.script.run
+  serverCall()
     .withSuccessHandler(function(grievances) {
       AppState.grievances = grievances || [];
       AppState.loading = false;
@@ -397,7 +397,7 @@ function renderGrievanceDetail(appContainer, g) {
       contactSection.appendChild(contactCard);
       container.appendChild(contactSection);
 
-      google.script.run.withSuccessHandler(function(contact) {
+      serverCall().withSuccessHandler(function(contact) {
         if (!contact) { cName.textContent = 'Not available'; return; }
         cName.textContent = contact.name || contact.email;
         contactBtns.appendChild(el('a', {
@@ -450,7 +450,7 @@ function renderMyCases(appContainer) {
       } }, '\uD83D\uDCDD Start a Grievance');
       var folderBtn = el('button', { className: 'btn', style: { flex: '1', fontSize: '13px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }, onClick: function() {
         folderBtn.textContent = 'Creating...'; folderBtn.disabled = true;
-        google.script.run.withSuccessHandler(function(result) {
+        serverCall().withSuccessHandler(function(result) {
           if (result && result.url) {
             folderBtn.textContent = '\u2705 Folder Created';
             window.open(result.url, '_blank');
@@ -518,7 +518,7 @@ function _showGrievanceIntakeForm(parentContent) {
     var description = fields.description.value.trim();
     if (!title) { statusMsg.textContent = 'Please enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
     submitBtn.textContent = 'Submitting...'; submitBtn.disabled = true;
-    google.script.run.withSuccessHandler(function(r) {
+    serverCall().withSuccessHandler(function(r) {
       if (r && r.success) {
         parentContent.innerHTML = '';
         var done = el('div', { className: 'card card-glass', style: { padding: '24px', textAlign: 'center' } });
@@ -575,7 +575,7 @@ function _renderPastCasesSection(parentContainer) {
   section.appendChild(listArea);
   parentContainer.appendChild(section);
 
-  google.script.run.withSuccessHandler(function(result) {
+  serverCall().withSuccessHandler(function(result) {
     listArea.innerHTML = '';
     if (!result || !result.success || !result.history || result.history.length === 0) {
       listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No past cases.'));
@@ -654,7 +654,7 @@ function _maybeShowMemberWelcome(slot) {
   // Skip if already dismissed in this session
   if (AppState._welcomeDismissed) return;
 
-  google.script.run.withSuccessHandler(function(data) {
+  serverCall().withSuccessHandler(function(data) {
     if (!data || !data.isFirstVisit) return;
 
     var card = el('div', {
@@ -736,7 +736,7 @@ function _dismissMemberWelcome(cardEl) {
     cardEl.style.transition = 'opacity 0.3s ease';
     setTimeout(function() { cardEl.remove(); }, 300);
   }
-  google.script.run.withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
+  serverCall().withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
 }
 
 // ═══════════════════════════════════════
@@ -750,7 +750,7 @@ function renderStewardContact(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(info) {
+    serverCall().withSuccessHandler(function(info) {
       content.innerHTML = '';
       if (info) {
         // Has assigned steward — show full contact card
@@ -804,7 +804,7 @@ function _renderStewardPicker(content) {
   pickerArea.innerHTML = '<div class="loading-spinner" style="min-height:100px"><div class="spinner"></div></div>';
   content.appendChild(pickerArea);
 
-  google.script.run.withSuccessHandler(function(stewards) {
+  serverCall().withSuccessHandler(function(stewards) {
     pickerArea.innerHTML = '';
     if (!stewards || stewards.length === 0) {
       pickerArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', padding: '16px 0' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's available.'));
@@ -826,7 +826,7 @@ function _renderStewardPicker(content) {
         style: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: '600' },
         onClick: function(e) {
           e.stopPropagation();
-          google.script.run.withSuccessHandler(function(result) {
+          serverCall().withSuccessHandler(function(result) {
             if (result && result.success) {
               renderStewardContact(document.getElementById('app'));
             }
@@ -892,7 +892,7 @@ function renderMemberResources(appContainer) {
     var activeCategory = 'All';
     showLoading(cardsWrap);
 
-    google.script.run.withSuccessHandler(function(resources) {
+    serverCall().withSuccessHandler(function(resources) {
       allResources = resources || [];
       // Build category pills
       var categories = ['All'];
@@ -988,7 +988,7 @@ function renderUpdateProfile(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(profile) {
+    serverCall().withSuccessHandler(function(profile) {
       content.innerHTML = '';
       if (!profile) {
         var errCard = el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } });
@@ -1027,7 +1027,7 @@ function renderUpdateProfile(appContainer) {
         for (var k in inputs) updates[k] = inputs[k].value;
         saveBtn.textContent = 'Saving...';
         saveBtn.disabled = true;
-        google.script.run.withSuccessHandler(function(result) {
+        serverCall().withSuccessHandler(function(result) {
           saveBtn.textContent = 'Save Changes';
           saveBtn.disabled = false;
           statusMsg.textContent = result && result.success ? 'Profile updated!' : (result && result.message) || 'Error saving.';
@@ -1060,7 +1060,7 @@ function renderMemberNotifications(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(notifications) {
+    serverCall().withSuccessHandler(function(notifications) {
       content.innerHTML = '';
       if (!notifications || notifications.length === 0) {
         var empty = el('div', { style: { textAlign: 'center', padding: '48px 16px' } });
@@ -1182,7 +1182,7 @@ function renderSurveyFormPage(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(data) {
+    serverCall().withSuccessHandler(function(data) {
       if (!data || !data.sections || !data.sections.length) {
         content.innerHTML = '';
         content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Survey is not available right now.'));
@@ -1382,7 +1382,7 @@ function _renderSurveyWizard(container, sections) {
     stepContainer.appendChild(submitCard);
 
     var email = (AppState.profile && AppState.profile.email) || '';
-    google.script.run.withSuccessHandler(function(result) {
+    serverCall().withSuccessHandler(function(result) {
       stepContainer.innerHTML = '';
       navRow.style.display = 'none';
       if (result && result.success) {
@@ -1421,7 +1421,7 @@ function _showSurveyError(stepContainer, navRow, message, email, responses) {
     submitCard.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Retrying...'));
     stepContainer.appendChild(submitCard);
     navRow.style.display = 'none';
-    google.script.run.withSuccessHandler(function(result) {
+    serverCall().withSuccessHandler(function(result) {
       stepContainer.innerHTML = '';
       if (result && result.success) {
         try { localStorage.removeItem('dds_survey_progress'); } catch (e) { /* ignore */ }
@@ -1455,7 +1455,7 @@ function renderSurveyResultsPage(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(data) {
+    serverCall().withSuccessHandler(function(data) {
       content.innerHTML = '';
       if (!data) {
         content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Survey data unavailable.'));
@@ -1797,7 +1797,7 @@ function _renderWTSubmit(container) {
       var formData = _wtCollectFormData(inputs, subData, selectedPrivacy);
       statusMsg.textContent = 'Submitting...';
       statusMsg.style.color = 'var(--muted)';
-      google.script.run.withSuccessHandler(function(result) {
+      serverCall().withSuccessHandler(function(result) {
         if (typeof result === 'string' && result.indexOf('Error') === 0) {
           statusMsg.textContent = result;
           statusMsg.style.color = 'var(--danger)';
@@ -1967,7 +1967,7 @@ function _openSubModal(cat, catIdx, mainInput, subData) {
 
 function _renderWTHistory(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(result) {
+  serverCall().withSuccessHandler(function(result) {
     container.innerHTML = '';
     if (!result || !result.success || !result.history || result.history.length === 0) {
       container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No submissions yet.'));
@@ -1978,7 +1978,7 @@ function _renderWTHistory(container) {
     var exportBtn = el('button', { className: 'btn btn-secondary', style: { marginBottom: '12px', fontSize: '12px' },
       onClick: function() {
         exportBtn.textContent = 'Exporting...';
-        google.script.run.withSuccessHandler(function(csv) {
+        serverCall().withSuccessHandler(function(csv) {
           if (!csv) { exportBtn.textContent = 'No data'; return; }
           var blob = new Blob([csv], { type: 'text/csv' });
           var url = URL.createObjectURL(blob);
@@ -2062,7 +2062,7 @@ function _renderWTHistory(container) {
 
 function _renderWTStats(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(result) {
+  serverCall().withSuccessHandler(function(result) {
     container.innerHTML = '';
 
     // Reciprocity blocked
@@ -2163,7 +2163,7 @@ function _wtStatCard(value, label) {
 
 function _renderWTReminders(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(prefs) {
+  serverCall().withSuccessHandler(function(prefs) {
     container.innerHTML = '';
     prefs = prefs || { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
 
@@ -2223,7 +2223,7 @@ function _renderWTReminders(container) {
       onClick: function() {
         statusMsg.textContent = 'Saving...';
         statusMsg.style.color = 'var(--muted)';
-        google.script.run.withSuccessHandler(function(res) {
+        serverCall().withSuccessHandler(function(res) {
           if (res && res.success) {
             statusMsg.textContent = 'Preferences saved!';
             statusMsg.style.color = 'var(--accent)';
@@ -2287,7 +2287,7 @@ function renderWeeklyQuestionsPage(appContainer, role) {
 
     function _renderCurrentQuestions(target) {
       showLoading(target);
-      google.script.run.withSuccessHandler(function(data) {
+      serverCall().withSuccessHandler(function(data) {
         target.innerHTML = '';
         if (!data || !data.questions || data.questions.length === 0) {
           target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No questions this week.'));
@@ -2307,7 +2307,7 @@ function renderWeeklyQuestionsPage(appContainer, role) {
             var options = ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree'];
             options.forEach(function(opt) {
               var optEl = el('div', { className: 'wq-option', onClick: function() {
-                google.script.run.withSuccessHandler(function(result) {
+                serverCall().withSuccessHandler(function(result) {
                   if (result && result.success) {
                     q.hasResponded = true;
                     q.stats = result.stats;
@@ -2337,7 +2337,7 @@ function renderWeeklyQuestionsPage(appContainer, role) {
       var page = 1;
       function loadPage(p) {
         showLoading(target);
-        google.script.run.withSuccessHandler(function(data) {
+        serverCall().withSuccessHandler(function(data) {
           target.innerHTML = '';
           if (!data || !data.questions || data.questions.length === 0) {
             target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, p > 1 ? 'No more past questions.' : 'No past questions available.'));
@@ -2418,7 +2418,7 @@ function renderEventsPage(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(events) {
+    serverCall().withSuccessHandler(function(events) {
       content.innerHTML = '';
       if (!events || events.length === 0) {
         var emptyCard = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
@@ -2501,7 +2501,7 @@ function renderUnionStatsPage(appContainer) {
 
 function _renderGrievanceStats(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(data) {
+  serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data || !data.available) {
       var msg = data && data.threshold ? 'Need ' + data.threshold + '+ grievances for anonymized stats (' + (data.count || 0) + ' current).' : 'Grievance stats unavailable.';
@@ -2559,7 +2559,7 @@ function _renderGrievanceStats(container) {
 
 function _renderHotSpots(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(spots) {
+  serverCall().withSuccessHandler(function(spots) {
     container.innerHTML = '';
     if (!spots || spots.length === 0) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'Not enough data for hot spot analysis.'));
@@ -2587,7 +2587,7 @@ function _renderHotSpots(container) {
 
 function _renderMembershipStats(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(data) {
+  serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data || !data.available) {
       var msg = data && data.threshold ? 'Need ' + data.threshold + '+ members for anonymized stats (' + (data.count || 0) + ' current).' : 'Membership stats unavailable.';
@@ -2614,7 +2614,7 @@ function _renderMembershipStats(container) {
 
 function _renderEngagementStats(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(data) {
+  serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'Engagement data unavailable.'));
@@ -2662,7 +2662,7 @@ function _renderEngagementStats(container) {
 
 function _renderWorkloadSummaryStats(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(data) {
+  serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'Workload summary unavailable.'));
@@ -2702,7 +2702,7 @@ function renderStewardDirectory(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(stewards) {
+    serverCall().withSuccessHandler(function(stewards) {
       content.innerHTML = '';
       if (!stewards || stewards.length === 0) {
         content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
@@ -2741,7 +2741,7 @@ function renderStewardDirectory(appContainer) {
             style: { fontSize: '11px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', fontWeight: '600', marginTop: '6px' },
             onClick: function(e) {
               e.stopPropagation();
-              google.script.run.withSuccessHandler(function(result) {
+              serverCall().withSuccessHandler(function(result) {
                 if (result && result.success) renderStewardContact(document.getElementById('app'));
               }).dataAssignSteward(CURRENT_USER.email, s.email);
             }
@@ -2781,7 +2781,7 @@ function _renderQuestionSubmission(container) {
       var text = textarea.value.trim();
       if (!text) { statusMsg.textContent = 'Please enter a question.'; statusMsg.style.color = 'var(--danger)'; return; }
       statusMsg.textContent = 'Submitting...';
-      google.script.run.withSuccessHandler(function(result) {
+      serverCall().withSuccessHandler(function(result) {
         statusMsg.textContent = result && result.success ? 'Question submitted! Thank you.' : 'Error submitting.';
         statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
         if (result && result.success) textarea.value = '';
@@ -2802,7 +2802,7 @@ function _renderMemberCaseChecklist(container, caseId) {
   section.appendChild(checklistContent);
   container.appendChild(section);
 
-  google.script.run.withSuccessHandler(function(items) {
+  serverCall().withSuccessHandler(function(items) {
     checklistContent.innerHTML = '';
     if (!items || items.length === 0) {
       checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', padding: '8px 0' } }, 'No checklist items for this case.'));
@@ -2854,7 +2854,7 @@ function renderMeetingsPage(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(meetings) {
+    serverCall().withSuccessHandler(function(meetings) {
       content.innerHTML = '';
       if (!meetings || meetings.length === 0) {
         content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting attendance recorded yet.'));
@@ -2920,7 +2920,7 @@ function renderPollsPage(appContainer) {
 
     function loadPolls() {
       showLoading(content);
-      google.script.run.withSuccessHandler(function(polls) {
+      serverCall().withSuccessHandler(function(polls) {
         content.innerHTML = '';
         if (!polls || polls.length === 0) {
           content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls right now.'));
@@ -2955,7 +2955,7 @@ function renderPollsPage(appContainer) {
               var btn = el('button', { className: 'btn', style: { display: 'block', width: '100%', marginBottom: '6px', textAlign: 'left', padding: '10px 14px', fontSize: '13px' },
                 onClick: function() {
                   btn.textContent = 'Voting...'; btn.disabled = true;
-                  google.script.run.withSuccessHandler(function(result) {
+                  serverCall().withSuccessHandler(function(result) {
                     if (result && result.success) loadPolls();
                     else { btn.textContent = opt; btn.disabled = false; }
                   }).withFailureHandler(function() {
@@ -2989,7 +2989,7 @@ function renderMinutesPage(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(minutes) {
+    serverCall().withSuccessHandler(function(minutes) {
       content.innerHTML = '';
       if (!minutes || minutes.length === 0) {
         content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting minutes posted yet.'));
@@ -3072,7 +3072,7 @@ function renderMemberTasks(appContainer) {
       subContent.innerHTML = '';
       showLoading(subContent);
       var statusFilter = activeSubTab === 'completed' ? 'completed' : null;
-      google.script.run.withSuccessHandler(function(tasks) {
+      serverCall().withSuccessHandler(function(tasks) {
         subContent.innerHTML = '';
         var filtered = statusFilter ? tasks.filter(function(t) { return t.status === 'completed'; }) : tasks.filter(function(t) { return t.status !== 'completed'; });
 
@@ -3114,7 +3114,7 @@ function renderMemberTasks(appContainer) {
             actions.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
               onClick: function() {
-                google.script.run.withSuccessHandler(function() { renderMemberTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
+                serverCall().withSuccessHandler(function() { renderMemberTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
               }
             }, '\u2705 Complete'));
             card.appendChild(actions);
@@ -3190,7 +3190,7 @@ function renderQAForum(appContainer, role) {
       cont.appendChild(listArea);
       showLoading(listArea);
 
-      google.script.run.withSuccessHandler(function(result) {
+      serverCall().withSuccessHandler(function(result) {
         listArea.innerHTML = '';
         if (!result || !result.questions || result.questions.length === 0) {
           listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No questions yet. Be the first to ask!'));
@@ -3234,7 +3234,7 @@ function renderQAForum(appContainer, role) {
       cont.appendChild(backBtn);
       showLoading(cont);
 
-      google.script.run.withSuccessHandler(function(q) {
+      serverCall().withSuccessHandler(function(q) {
         // Keep back button, remove loading
         while (cont.children.length > 1) cont.removeChild(cont.lastChild);
         if (!q) { cont.appendChild(el('div', { style: { color: 'var(--danger)', padding: '20px 0' } }, 'Question not found.')); return; }
@@ -3253,7 +3253,7 @@ function renderQAForum(appContainer, role) {
         actions.appendChild(el('button', {
           style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
           onClick: function() {
-            google.script.run.withSuccessHandler(function(r) {
+            serverCall().withSuccessHandler(function(r) {
               if (r && r.success) _renderQuestionDetail(cont, questionId);
             }).withFailureHandler(function(e) { console.error(e.message); }).qaUpvoteQuestion(CURRENT_USER.email, questionId);
           }
@@ -3261,7 +3261,7 @@ function renderQAForum(appContainer, role) {
         if (isSteward && q.status !== 'flagged') {
           actions.appendChild(el('button', {
             style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-            onClick: function() { google.script.run.withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).qaModerateQuestion(CURRENT_USER.email, questionId, 'flag'); }
+            onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).qaModerateQuestion(CURRENT_USER.email, questionId, 'flag'); }
           }, 'Flag'));
         }
         qCard.appendChild(actions);
@@ -3296,7 +3296,7 @@ function renderQAForum(appContainer, role) {
             var text = ansInput.value.trim();
             if (!text) { ansStatus.textContent = 'Write an answer first.'; ansStatus.style.color = 'var(--danger)'; return; }
             ansStatus.textContent = 'Posting...'; ansStatus.style.color = 'var(--muted)';
-            google.script.run.withSuccessHandler(function(r) {
+            serverCall().withSuccessHandler(function(r) {
               if (r && r.success) _renderQuestionDetail(cont, questionId);
               else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
             }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitAnswer(CURRENT_USER.email, CURRENT_USER.name || '', questionId, text, isSteward);
@@ -3329,7 +3329,7 @@ function renderQAForum(appContainer, role) {
           var text = textInput.value.trim();
           if (!text) { statusMsg.textContent = 'Write your question first.'; statusMsg.style.color = 'var(--danger)'; return; }
           statusMsg.textContent = 'Posting...'; statusMsg.style.color = 'var(--muted)';
-          google.script.run.withSuccessHandler(function(r) {
+          serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
             else { statusMsg.textContent = r ? r.message : 'Error posting.'; statusMsg.style.color = 'var(--danger)'; }
           }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitQuestion(CURRENT_USER.email, CURRENT_USER.name || '', text, anonCheck.checked);
@@ -3339,7 +3339,7 @@ function renderQAForum(appContainer, role) {
 
     function _renderModQueue(cont) {
       showLoading(cont);
-      google.script.run.withSuccessHandler(function(flagged) {
+      serverCall().withSuccessHandler(function(flagged) {
         cont.innerHTML = '';
         if (!flagged || (flagged.questions.length === 0 && flagged.answers.length === 0)) {
           cont.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No flagged content. All clear!'));
@@ -3355,11 +3355,11 @@ function renderQAForum(appContainer, role) {
             var acts = el('div', { style: { display: 'flex', gap: '6px' } });
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'approve'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'approve'); }
             }, 'Approve'));
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'delete'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'delete'); }
             }, 'Delete'));
             card.appendChild(acts);
             cont.appendChild(card);
@@ -3375,11 +3375,11 @@ function renderQAForum(appContainer, role) {
             var acts = el('div', { style: { display: 'flex', gap: '6px' } });
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'approve'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'approve'); }
             }, 'Approve'));
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'delete'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'delete'); }
             }, 'Delete'));
             card.appendChild(acts);
             cont.appendChild(card);
@@ -3464,7 +3464,7 @@ function renderTimelinePage(appContainer) {
       cont.appendChild(listArea);
       showLoading(listArea);
 
-      google.script.run.withSuccessHandler(function(result) {
+      serverCall().withSuccessHandler(function(result) {
         listArea.innerHTML = '';
         if (!result || !result.events || result.events.length === 0) {
           listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No events to display.'));
@@ -3504,7 +3504,7 @@ function renderTimelinePage(appContainer) {
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
               onClick: function() {
-                google.script.run.withSuccessHandler(function() { _renderTimeline(cont); }).tlDeleteTimelineEvent(CURRENT_USER.email, evt.id);
+                serverCall().withSuccessHandler(function() { _renderTimeline(cont); }).tlDeleteTimelineEvent(CURRENT_USER.email, evt.id);
               }
             }, 'Delete'));
             card.appendChild(acts);
@@ -3570,7 +3570,7 @@ function renderTimelinePage(appContainer) {
             title: title, eventDate: dateInput.value || '', description: descInput.value.trim(),
             category: catSelect.value, driveFileIds: driveInput.value.trim()
           };
-          google.script.run.withSuccessHandler(function(r) {
+          serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { activeSubTab = 'timeline'; refreshSubTabs(); renderTLSubContent(); }
             else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
           }).tlAddTimelineEvent(CURRENT_USER.email, eventData);
@@ -3602,7 +3602,7 @@ function renderTimelinePage(appContainer) {
         onClick: function() {
           if (!startInput.value || !endInput.value) { statusMsg.textContent = 'Select both dates.'; statusMsg.style.color = 'var(--danger)'; return; }
           statusMsg.textContent = 'Importing...'; statusMsg.style.color = 'var(--muted)';
-          google.script.run.withSuccessHandler(function(r) {
+          serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { statusMsg.textContent = r.imported + ' events imported!'; statusMsg.style.color = 'var(--success)'; }
             else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
           }).tlImportCalendarEvents(CURRENT_USER.email, startInput.value, endInput.value);
@@ -3631,7 +3631,7 @@ function _renderDigestSettings(container) {
   showLoading(formArea);
   section.appendChild(formArea);
 
-  google.script.run.withSuccessHandler(function(config) {
+  serverCall().withSuccessHandler(function(config) {
     formArea.innerHTML = '';
     if (!config) config = { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
 
@@ -3682,7 +3682,7 @@ function _renderDigestSettings(container) {
           includeWorkload: workCheck.checked,
           includeTasks: taskCheck.checked
         };
-        google.script.run.withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
           statusMsg.textContent = r && r.success ? 'Digest settings saved!' : (r && r.message) || 'Error.';
           statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
         }).fsUpdateDigestConfig(CURRENT_USER.email, digestConfig);

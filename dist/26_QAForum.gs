@@ -72,8 +72,8 @@ var QAForum = (function () {
       if (status === 'deleted') continue;
       questions.push({
         id: data[i][0],
-        authorName: data[i][3] === true || data[i][3] === 'TRUE' ? 'Anonymous' : String(data[i][2] || 'Member'),
-        isAnonymous: data[i][3] === true || data[i][3] === 'TRUE',
+        authorName: isTruthyValue(data[i][3]) ? 'Anonymous' : String(data[i][2] || 'Member'),
+        isAnonymous: isTruthyValue(data[i][3]),
         questionText: String(data[i][4] || ''),
         status: status,
         upvoteCount: parseInt(data[i][6], 10) || 0,
@@ -113,8 +113,8 @@ var QAForum = (function () {
         if (status === 'deleted') return null;
         question = {
           id: data[i][0],
-          authorName: data[i][3] === true || data[i][3] === 'TRUE' ? 'Anonymous' : String(data[i][2] || 'Member'),
-          isAnonymous: data[i][3] === true || data[i][3] === 'TRUE',
+          authorName: isTruthyValue(data[i][3]) ? 'Anonymous' : String(data[i][2] || 'Member'),
+          isAnonymous: isTruthyValue(data[i][3]),
           questionText: String(data[i][4] || ''),
           status: status,
           upvoteCount: parseInt(data[i][6], 10) || 0,

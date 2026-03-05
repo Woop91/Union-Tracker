@@ -392,7 +392,7 @@ var DataService = (function () {
         var col = _findColumn(colMap, editableFields[field]);
         if (col === -1) continue;
         var val = String(updates[field] || '').trim().substring(0, 255);
-        sheet.getRange(rowNum, col + 1).setValue(val);
+        sheet.getRange(rowNum, col + 1).setValue(escapeForFormula(val));
       }
 
       _invalidateSheetCache(MEMBER_SHEET);
@@ -847,11 +847,43 @@ var DataService = (function () {
     }
     if (members.length === 0) return { total: 0, completed: 0, members: [] };
 
+    // Pre-load _Survey_Tracking once and build an email → status map
+    // to avoid one sheet read per member (N+1 pattern).
+    var surveyMap = {};
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) throw new Error('Spreadsheet unavailable');
+      var trackSheet = ss.getSheetByName('_Survey_Tracking');
+      if (trackSheet && trackSheet.getLastRow() > 1) {
+        var tData = trackSheet.getDataRange().getValues();
+        var tColMap = _buildColumnMap(tData[0]);
+        var tEmailCol = _findColumn(tColMap, ['email', 'member email']);
+        var tStatusCol = _findColumn(tColMap, ['status', 'completion status', 'completed']);
+        var tDateCol = _findColumn(tColMap, ['completed date', 'date completed', 'completion date']);
+        if (tEmailCol !== -1) {
+          for (var r = 1; r < tData.length; r++) {
+            var rowEmail = String(tData[r][tEmailCol]).trim().toLowerCase();
+            if (!rowEmail) continue;
+            var rowStatus = tStatusCol !== -1 ? String(tData[r][tStatusCol]).trim().toLowerCase() : '';
+            var rowCompleted = rowStatus === 'completed' || rowStatus === 'yes' || rowStatus === 'true';
+            var rowDate = tDateCol !== -1 ? tData[r][tDateCol] : null;
+            surveyMap[rowEmail] = {
+              hasCompleted: rowCompleted,
+              lastCompleted: rowDate instanceof Date ? _formatDate(rowDate) : (rowDate ? String(rowDate) : null),
+            };
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log('getStewardSurveyTracking: survey pre-load error: ' + e.message);
+    }
+
     var tracking = [];
     var completedCount = 0;
 
     for (var i = 0; i < members.length; i++) {
-      var status = getMemberSurveyStatus(members[i].email);
+      var memberEmail = String(members[i].email || '').trim().toLowerCase();
+      var status = surveyMap[memberEmail] || { hasCompleted: false, lastCompleted: null };
       tracking.push({
         name: members[i].name,
         email: members[i].email,

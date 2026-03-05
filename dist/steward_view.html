@@ -28,14 +28,14 @@ function initStewardView(container) {
   }
 
   // Fallback: load individually (batch unavailable)
-  google.script.run.withSuccessHandler(function(r) {
+  serverCall().withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
   }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(CURRENT_USER.email, 'steward');
 
-  google.script.run
+  serverCall()
     .withSuccessHandler(function(cases) {
       AppState.cases = cases || [];
-      google.script.run
+      serverCall()
         .withSuccessHandler(function(kpis) {
           AppState.kpis = kpis;
           AppState.loading = false;
@@ -129,7 +129,7 @@ function renderStewardDashboard(appContainer) {
       container.appendChild(orgNote);
 
       // Fill in org-wide stats
-      google.script.run.withSuccessHandler(function(stats) {
+      serverCall().withSuccessHandler(function(stats) {
         if (!stats || !stats.available) return;
         var cards = kpiGrid.querySelectorAll('.kpi-value');
         if (cards[0]) cards[0].textContent = String(stats.total || 0);
@@ -204,7 +204,7 @@ function _maybeShowWelcome(slot, viewRole) {
   // Skip if already dismissed in this session
   if (AppState._welcomeDismissed) return;
 
-  google.script.run.withSuccessHandler(function(data) {
+  serverCall().withSuccessHandler(function(data) {
     if (!data || !data.isFirstVisit) return;
 
     var card = el('div', {
@@ -286,7 +286,7 @@ function _dismissWelcome(cardEl) {
     cardEl.style.transition = 'opacity 0.3s ease';
     setTimeout(function() { cardEl.remove(); }, 300);
   }
-  google.script.run.withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
+  serverCall().withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
 }
 
 function renderCaseList(container, filter) {
@@ -304,7 +304,7 @@ function renderCaseList(container, filter) {
       var agencyCharts = el('div');
       agencySlot.appendChild(agencyCharts);
       container.appendChild(agencySlot);
-      google.script.run.withSuccessHandler(function(data) {
+      serverCall().withSuccessHandler(function(data) {
         if (!data || !data.available) {
           agencyCharts.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '12px' } }, 'Grievance stats not yet available.'));
           return;
@@ -420,7 +420,7 @@ function renderStewardMembers(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(members) {
+    serverCall().withSuccessHandler(function(members) {
       content.innerHTML = '';
       if (!members || members.length === 0) {
         content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'No members found.'));
@@ -447,7 +447,7 @@ function renderStewardMembers(appContainer) {
 
       // Chart.js stats
       if (typeof ChartHelper !== 'undefined') {
-        google.script.run.withSuccessHandler(function(stats) {
+        serverCall().withSuccessHandler(function(stats) {
           if (!stats || !stats.byLocation) return;
           // Location bar
           var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
@@ -654,7 +654,7 @@ function _showMemberDetail(container, itemEl, member) {
     onClick: function() {
       profileBtn.disabled = true;
       profileBtn.textContent = 'Loading...';
-      google.script.run
+      serverCall()
         .withSuccessHandler(function(profile) {
           profileBtn.remove();
           profileArea.innerHTML = '';
@@ -755,7 +755,7 @@ function renderBroadcast(appContainer) {
     }
 
     // Fetch available filter options
-    google.script.run.withSuccessHandler(function(opts) {
+    serverCall().withSuccessHandler(function(opts) {
       // "Select All" for locations
       if (opts.locations.length > 0) {
         var allLocBtn = el('button', {
@@ -809,7 +809,7 @@ function renderBroadcast(appContainer) {
         if (days.length > 0) filter.officeDays = days.join(',');
         statusMsg.textContent = 'Sending...';
         statusMsg.style.color = 'var(--muted)';
-        google.script.run.withSuccessHandler(function(result) {
+        serverCall().withSuccessHandler(function(result) {
           statusMsg.textContent = result && result.success ? result.message : (result && result.message) || 'Error sending.';
           statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
           if (result && result.success) msgTextarea.value = '';
@@ -857,7 +857,7 @@ function renderStewardNotifications(appContainer) {
     // --- Inbox: same as member notification list ---
     function _renderNotifInbox(target) {
       showLoading(target);
-      google.script.run.withSuccessHandler(function(notifications) {
+      serverCall().withSuccessHandler(function(notifications) {
         target.innerHTML = '';
         if (!notifications || notifications.length === 0) {
           var empty = el('div', { style: { textAlign: 'center', padding: '48px 16px' } });
@@ -887,7 +887,7 @@ function renderStewardNotifications(appContainer) {
           card.appendChild(meta);
           var dismissBtn = el('button', { className: 'notif-dismiss', onClick: function() {
             dismissBtn.textContent = '...';
-            google.script.run.withSuccessHandler(function(r) {
+            serverCall().withSuccessHandler(function(r) {
               if (r && r.success) {
                 card.style.opacity = '0';
                 card.style.transition = 'opacity 0.3s';
@@ -947,7 +947,7 @@ function renderStewardNotifications(appContainer) {
         recipientArea.appendChild(searchInput);
         recipientArea.appendChild(listWrap);
 
-        google.script.run.withSuccessHandler(function(members) {
+        serverCall().withSuccessHandler(function(members) {
           var allMembers = members || [];
           function renderList(filter) {
             listWrap.innerHTML = '';
@@ -1014,7 +1014,7 @@ function renderStewardNotifications(appContainer) {
         sendBtn.textContent = 'Sending...';
         sendBtn.disabled = true;
         statusMsg.textContent = '';
-        google.script.run.withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
           sendBtn.textContent = 'Send Notification';
           sendBtn.disabled = false;
           if (r && r.success) {
@@ -1066,7 +1066,7 @@ function renderStewardNotifications(appContainer) {
     // --- Manage: view all notifications ---
     function _renderNotifManage(target) {
       showLoading(target);
-      google.script.run.withSuccessHandler(function(notifications) {
+      serverCall().withSuccessHandler(function(notifications) {
         target.innerHTML = '';
         if (!notifications || notifications.length === 0) {
           target.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'No notifications found.'));
@@ -1165,7 +1165,7 @@ function renderStewardResources(appContainer) {
       var activeCategory = 'All';
       showLoading(cardsWrap);
 
-      google.script.run.withSuccessHandler(function(resources) {
+      serverCall().withSuccessHandler(function(resources) {
         allResources = resources || [];
         var categories = ['All'];
         allResources.forEach(function(r) { if (r.category && categories.indexOf(r.category) === -1) categories.push(r.category); });
@@ -1244,7 +1244,7 @@ function renderStewardResources(appContainer) {
 
       function loadResourceList() {
         showLoading(tableWrap);
-        google.script.run.withSuccessHandler(function(resources) {
+        serverCall().withSuccessHandler(function(resources) {
           tableWrap.innerHTML = '';
           formWrap.innerHTML = '';
           if (!resources || resources.length === 0) {
@@ -1263,12 +1263,12 @@ function renderStewardResources(appContainer) {
             if (r.visible) {
               row.appendChild(el('button', { className: 'icon-btn', style: { fontSize: '14px', color: 'var(--danger)' }, onClick: function() {
                 if (confirm('Hide "' + r.title + '"? It can be restored later.')) {
-                  google.script.run.withSuccessHandler(function() { loadResourceList(); }).deleteWebAppResource(r.id);
+                  serverCall().withSuccessHandler(function() { loadResourceList(); }).deleteWebAppResource(r.id);
                 }
               }}, '\uD83D\uDDD1'));
             } else {
               row.appendChild(el('button', { className: 'icon-btn', style: { fontSize: '14px', color: 'var(--success)' }, onClick: function() {
-                google.script.run.withSuccessHandler(function() { loadResourceList(); }).restoreWebAppResource(r.id);
+                serverCall().withSuccessHandler(function() { loadResourceList(); }).restoreWebAppResource(r.id);
               }}, '\u21A9'));
             }
             tableWrap.appendChild(row);
@@ -1363,7 +1363,7 @@ function renderStewardResources(appContainer) {
             audience: audVal
           };
           if (isEdit) {
-            google.script.run.withSuccessHandler(function(r) {
+            serverCall().withSuccessHandler(function(r) {
               saveBtn.textContent = 'Save'; saveBtn.disabled = false;
               if (r && r.success) { listWrap.style.display = ''; formWrap.innerHTML = ''; loadResourceList(); }
               else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
@@ -1372,7 +1372,7 @@ function renderStewardResources(appContainer) {
               statusMsg.textContent = 'Error saving.'; statusMsg.style.color = 'var(--danger)';
             }).updateWebAppResource(existing.id, payload);
           } else {
-            google.script.run.withSuccessHandler(function(r) {
+            serverCall().withSuccessHandler(function(r) {
               saveBtn.textContent = 'Save'; saveBtn.disabled = false;
               if (r && r.success) { listWrap.style.display = ''; formWrap.innerHTML = ''; loadResourceList(); }
               else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
@@ -1440,7 +1440,7 @@ function renderSurveyTracking(appContainer) {
     function loadSurveyData(scope) {
       dataWrap.innerHTML = '';
       showLoading(dataWrap);
-      google.script.run.withSuccessHandler(function(data) {
+      serverCall().withSuccessHandler(function(data) {
         dataWrap.innerHTML = '';
         if (!data || data.total === 0) {
           var emptyLabel = scope === 'assigned' ? 'No assigned members to track.' : scope === 'location' ? 'No members at your location.' : 'No members found.';
@@ -1594,7 +1594,7 @@ function _renderContactForm(container) {
   var _acMembers = null;
   function _loadAcMembers(cb) {
     if (_acMembers) { cb(_acMembers); return; }
-    google.script.run
+    serverCall()
       .withSuccessHandler(function(m) { _acMembers = m || []; cb(_acMembers); })
       .withFailureHandler(function() { _acMembers = []; cb(_acMembers); })
       .dataGetAllMembers();
@@ -1664,7 +1664,7 @@ function _renderContactForm(container) {
       var email = memberInput.value.trim();
       if (!email) { statusMsg.textContent = 'Enter a member email.'; statusMsg.style.color = 'var(--danger)'; return; }
       statusMsg.textContent = 'Logging...'; statusMsg.style.color = 'var(--muted)';
-      google.script.run.withSuccessHandler(function(r) {
+      serverCall().withSuccessHandler(function(r) {
         statusMsg.textContent = r && r.success ? 'Contact logged!' : 'Error logging contact.';
         statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
         if (r && r.success) { memberInput.value = ''; notesInput.value = ''; }
@@ -1675,7 +1675,7 @@ function _renderContactForm(container) {
 
 function _renderRecentContacts(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(log) {
+  serverCall().withSuccessHandler(function(log) {
     container.innerHTML = '';
     if (!log || log.length === 0) {
       container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No contacts logged yet.'));
@@ -1707,7 +1707,7 @@ function _renderContactByMember(container) {
       var email = searchInput.value.trim();
       if (!email) return;
       showLoading(resultArea);
-      google.script.run.withSuccessHandler(function(history) {
+      serverCall().withSuccessHandler(function(history) {
         resultArea.innerHTML = '';
         if (!history || history.length === 0) {
           resultArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '10px 0' } }, 'No contacts found for this member.'));
@@ -1767,7 +1767,7 @@ function renderStewardTasks(appContainer) {
 
 function _renderTaskList(container, statusFilter) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(tasks) {
+  serverCall().withSuccessHandler(function(tasks) {
     container.innerHTML = '';
     var filtered = statusFilter ? tasks.filter(function(t) { return t.status === statusFilter; }) : tasks.filter(function(t) { return t.status !== 'completed'; });
 
@@ -1809,7 +1809,7 @@ function _renderTaskList(container, statusFilter) {
         actions.appendChild(el('button', {
           style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
           onClick: function() {
-            google.script.run.withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteTask(CURRENT_USER.email, task.id);
+            serverCall().withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteTask(CURRENT_USER.email, task.id);
           }
         }, '\u2705 Complete'));
         card.appendChild(actions);
@@ -1821,7 +1821,7 @@ function _renderTaskList(container, statusFilter) {
 
 function _renderStewardMemberTasks(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(tasks) {
+  serverCall().withSuccessHandler(function(tasks) {
     container.innerHTML = '';
     if (!tasks || tasks.length === 0) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No member tasks assigned yet.'));
@@ -1898,10 +1898,10 @@ function _renderNewTaskForm(container, onCreated) {
 
   // Check if current user is chief steward and populate steward list
   function _checkChief() {
-    google.script.run.withSuccessHandler(function(isChief) {
+    serverCall().withSuccessHandler(function(isChief) {
       if (isChief && assigneeType === 'steward') {
         assignGroup.style.display = '';
-        google.script.run.withSuccessHandler(function(stewards) {
+        serverCall().withSuccessHandler(function(stewards) {
           // Clear existing options except 'Myself'
           while (assignSelect.options.length > 1) assignSelect.remove(1);
           if (stewards && stewards.length > 0) {
@@ -1965,18 +1965,18 @@ function _renderNewTaskForm(container, onCreated) {
         // Create member task
         var memEmail = memberEmailInput.value.trim();
         if (!memEmail) { statusMsg.textContent = 'Enter member email.'; statusMsg.style.color = 'var(--danger)'; return; }
-        google.script.run.withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
           if (r && r.success) { onCreated(); } else { statusMsg.textContent = r ? r.message : 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
         }).dataCreateMemberTask(CURRENT_USER.email, memEmail, title, descInput.value.trim(), priSelect.value, dueInput.value || '');
       } else {
         // Create steward task
         var assignee = assignSelect ? assignSelect.value : '';
         if (assignee) {
-          google.script.run.withSuccessHandler(function(r) {
+          serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
           }).dataCreateTaskForSteward(CURRENT_USER.email, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         } else {
-          google.script.run.withSuccessHandler(function(r) {
+          serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
           }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         }
@@ -2011,7 +2011,7 @@ function renderWeeklyQuestionManager(appContainer) {
         var text = questionInput.value.trim();
         if (!text) { setStatus.textContent = 'Enter a question.'; setStatus.style.color = 'var(--danger)'; return; }
         setStatus.textContent = 'Saving...';
-        google.script.run.withSuccessHandler(function(result) {
+        serverCall().withSuccessHandler(function(result) {
           setStatus.textContent = result && result.success ? 'Question set!' : 'Error.';
           setStatus.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
           if (result && result.success) questionInput.value = '';
@@ -2025,7 +2025,7 @@ function renderWeeklyQuestionManager(appContainer) {
     showLoading(poolArea);
     content.appendChild(poolArea);
 
-    google.script.run.withSuccessHandler(function(pool) {
+    serverCall().withSuccessHandler(function(pool) {
       poolArea.innerHTML = '';
       if (!pool || pool.length === 0) {
         poolArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '16px 0' } }, 'No pending questions in the pool.'));
@@ -2068,7 +2068,7 @@ function renderInsightsPage(appContainer) {
       if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(content, satData);
     }
 
-    google.script.run.withSuccessHandler(function(stats) {
+    serverCall().withSuccessHandler(function(stats) {
       statsData = stats || { available: false };
       tryRender();
     }).withFailureHandler(function() {
@@ -2076,7 +2076,7 @@ function renderInsightsPage(appContainer) {
       tryRender();
     }).dataGetAgencyGrievanceStats();
 
-    google.script.run.withSuccessHandler(function(spots) {
+    serverCall().withSuccessHandler(function(spots) {
       hotSpotsData = spots || [];
       tryRender();
     }).withFailureHandler(function() {
@@ -2084,7 +2084,7 @@ function renderInsightsPage(appContainer) {
       tryRender();
     }).dataGetGrievanceHotSpots();
 
-    google.script.run.withSuccessHandler(function(perf) {
+    serverCall().withSuccessHandler(function(perf) {
       perfData = perf || [];
       tryRender();
     }).withFailureHandler(function() {
@@ -2092,7 +2092,7 @@ function renderInsightsPage(appContainer) {
       tryRender();
     }).dataGetAllStewardPerformance();
 
-    google.script.run.withSuccessHandler(function(sat) {
+    serverCall().withSuccessHandler(function(sat) {
       satData = sat || { categories: [] };
       tryRender();
     }).withFailureHandler(function() {
@@ -2301,7 +2301,7 @@ function renderStewardDirectoryPage(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(stewards) {
+    serverCall().withSuccessHandler(function(stewards) {
       content.innerHTML = '';
       if (!stewards || stewards.length === 0) {
         content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
@@ -2443,7 +2443,7 @@ function _renderCaseChecklist(container, caseId) {
   section.appendChild(checklistContent);
   container.appendChild(section);
 
-  google.script.run.withSuccessHandler(function(items) {
+  serverCall().withSuccessHandler(function(items) {
     checklistContent.innerHTML = '';
     if (!items || items.length === 0) {
       checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', padding: '8px 0' } }, 'No checklist items for this case.'));
@@ -2475,7 +2475,7 @@ function _renderCaseChecklist(container, caseId) {
           onClick: function() {
             var newState = !item.completed;
             cb.style.opacity = '0.4';
-            google.script.run.withSuccessHandler(function(result) {
+            serverCall().withSuccessHandler(function(result) {
               if (result && result.success) {
                 item.completed = newState;
                 cb.textContent = newState ? '\u2611' : '\u2610';
@@ -2546,7 +2546,7 @@ function renderManagePolls(appContainer) {
 
 function _renderActivePollsSteward(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(polls) {
+  serverCall().withSuccessHandler(function(polls) {
     container.innerHTML = '';
     if (!polls || polls.length === 0) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls. Create one to get started.'));
@@ -2601,7 +2601,7 @@ function _renderCreatePoll(container) {
       statusMsg.textContent = 'Creating poll...'; statusMsg.style.color = 'var(--muted)';
 
       // Use the polls sheet directly
-      google.script.run.withSuccessHandler(function() {
+      serverCall().withSuccessHandler(function() {
         statusMsg.textContent = 'Poll created!'; statusMsg.style.color = 'var(--success)';
         questionInput.value = ''; optionsInput.value = ''; unitInput.value = '';
       }).withFailureHandler(function() {
@@ -2652,7 +2652,7 @@ function renderStewardMinutes(appContainer) {
 
 function _renderMinutesList(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(minutes) {
+  serverCall().withSuccessHandler(function(minutes) {
     container.innerHTML = '';
     if (!minutes || minutes.length === 0) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting minutes yet.'));
@@ -2709,7 +2709,7 @@ function _renderAddMinutes(container) {
       var title = titleInput.value.trim();
       if (!title) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
       statusMsg.textContent = 'Saving...'; statusMsg.style.color = 'var(--muted)';
-      google.script.run.withSuccessHandler(function(result) {
+      serverCall().withSuccessHandler(function(result) {
         if (result && result.success) {
           statusMsg.textContent = 'Minutes saved!'; statusMsg.style.color = 'var(--success)';
           titleInput.value = ''; dateInput.value = ''; bulletsInput.value = ''; fullInput.value = '';
@@ -2804,7 +2804,7 @@ function _renderFeedbackForm(container) {
       var title = titleInput.value.trim();
       if (!title) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
       statusMsg.textContent = 'Submitting...'; statusMsg.style.color = 'var(--muted)';
-      google.script.run.withSuccessHandler(function(result) {
+      serverCall().withSuccessHandler(function(result) {
         if (result && result.success) {
           statusMsg.textContent = 'Feedback submitted! Thank you.'; statusMsg.style.color = 'var(--success)';
           titleInput.value = ''; descInput.value = '';
@@ -2825,7 +2825,7 @@ function _renderFeedbackForm(container) {
 
 function _renderMyFeedback(container) {
   showLoading(container);
-  google.script.run.withSuccessHandler(function(items) {
+  serverCall().withSuccessHandler(function(items) {
     container.innerHTML = '';
     if (!items || items.length === 0) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No feedback submitted yet.'));
@@ -2870,7 +2870,7 @@ function renderFailsafePage(appContainer) {
       className: 'btn btn-primary',
       onClick: function() {
         exportStatus.textContent = 'Sending emails... this may take a minute.'; exportStatus.style.color = 'var(--muted)';
-        google.script.run.withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
           if (r && r.success) { exportStatus.textContent = r.sent + ' member summaries emailed!'; exportStatus.style.color = 'var(--success)'; }
           else { exportStatus.textContent = r ? r.message : 'Error.'; exportStatus.style.color = 'var(--danger)'; }
         }).withFailureHandler(function() {
@@ -2890,7 +2890,7 @@ function renderFailsafePage(appContainer) {
       className: 'btn btn-primary',
       onClick: function() {
         backupStatus.textContent = 'Creating backup...'; backupStatus.style.color = 'var(--muted)';
-        google.script.run.withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
           if (r && r.success) { backupStatus.textContent = r.backedUp + ' sheets backed up to Drive folder: ' + r.folderName; backupStatus.style.color = 'var(--success)'; }
           else { backupStatus.textContent = 'Backup failed.'; backupStatus.style.color = 'var(--danger)'; }
         }).withFailureHandler(function() {
@@ -2911,7 +2911,7 @@ function renderFailsafePage(appContainer) {
       className: 'btn btn-primary',
       onClick: function() {
         triggerStatus.textContent = 'Installing...'; triggerStatus.style.color = 'var(--muted)';
-        google.script.run.withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
           triggerStatus.textContent = r && r.success ? r.message : 'Error.';
           triggerStatus.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
         }).fsSetupTriggers();
@@ -2921,7 +2921,7 @@ function renderFailsafePage(appContainer) {
       style: { fontSize: '12px', padding: '6px 14px', borderRadius: '8px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
       onClick: function() {
         triggerStatus.textContent = 'Removing...'; triggerStatus.style.color = 'var(--muted)';
-        google.script.run.withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
           triggerStatus.textContent = r && r.success ? r.removed + ' triggers removed.' : 'Error.';
           triggerStatus.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
         }).fsRemoveTriggers();
