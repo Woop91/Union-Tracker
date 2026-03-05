@@ -5,6 +5,19 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.9] - 2026-03-04
+
+### Fixed
+- **C-DATA-6** (`04e_PublicDashboard.gs:930–984`) — Satisfaction survey score assignment replaced positional array indices (`sections[6]`, `sections[7]`, `questions[0]`–`[4]`) with key-based lookup maps (`sectionByKey[key]`, `s._qByKey[key]`). Previously, adding or reordering a section would silently write scores to the wrong section. Now robust against structural changes to the `sections` array.
+
+### Removed (dead code)
+- **`emailDashboardLink_UIService_`** (`03_UIComponents.gs`) — `@deprecated`, zero callers. Superseded by `emailDashboardLink()` in `11_CommandHub.gs`.
+- **`getOrCreateMemberFolder_Legacy_`** (`11_CommandHub.gs`) — `@deprecated`, zero callers. Superseded by `getOrCreateMemberFolder()` in `05_Integrations.gs`.
+
+### Notes
+- Investigated `dataGetSurveyStatus` / `dataGetUpcomingEvents` apparent duplicate calls in `member_view.html` — both are `DataCache.cachedCall()` with the same cache key; second call is a cache hit, no real server redundancy.
+- Investigated remaining MEDIUM performance findings from FULL_CODE_REVIEW — `applyStatusColors`, `highlightUrgentGrievances`, `syncMemberGrievanceData`, `applyMessageAlertHighlighting_`, `setupActionTypeColumn` are all already batched; review findings were stale.
+
 ## [4.20.8] - 2026-03-04
 
 ### Fixed

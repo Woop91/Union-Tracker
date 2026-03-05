@@ -1498,38 +1498,6 @@ function createGrievancePDF(folder, data) {
 }
 
 /**
- * Gemini v4.0 Member Folder Creator (Legacy)
- * NOTE: Renamed to avoid duplicate - use getOrCreateMemberFolder() in 05_Integrations.gs instead
- *
- * @param {string} name - Member name
- * @param {string} id - Member ID
- * @returns {Folder} Google Drive folder for the member
- * @deprecated Use getOrCreateMemberFolder in 05_Integrations.gs (has better error handling)
- */
-function getOrCreateMemberFolder_Legacy_(name, id) {
-  // Get archive folder ID from Config
-  var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) ||
-                        getConfigValue_(CONFIG_COLS.DRIVE_FOLDER_ID) ||
-                        COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
-
-  if (!archiveFolderId) {
-    throw new Error('Archive Folder ID not configured. Set it in Config sheet.');
-  }
-
-  var parent = DriveApp.getFolderById(archiveFolderId);
-  var folderName = name + ' (' + id + ')';
-
-  // Check if folder already exists
-  var iter = parent.getFoldersByName(folderName);
-  if (iter.hasNext()) {
-    return iter.next();
-  }
-
-  // Create new folder
-  return parent.createFolder(folderName);
-}
-
-/**
  * Gemini v4.0 Enhanced Escalation Alert
  * Sends formatted escalation email to Chief Steward.
  *

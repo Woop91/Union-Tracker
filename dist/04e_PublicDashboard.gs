@@ -927,61 +927,79 @@ function getUnifiedDashboardData(includePII) {
     }
 
     function avg(arr) { return arr.length > 0 ? Math.round((arr.reduce(function(a,b){return a+b;},0) / arr.length) * 10) / 10 : 0; }
-    data.satisfactionData.sections[0].score = avg(sectionScores.overall);
-    data.satisfactionData.sections[1].score = avg(sectionScores.steward);
-    data.satisfactionData.sections[2].score = avg(sectionScores.chapter);
-    data.satisfactionData.sections[3].score = avg(sectionScores.leadership);
-    data.satisfactionData.sections[4].score = avg(sectionScores.contract);
-    data.satisfactionData.sections[5].score = avg(sectionScores.communication);
-    data.satisfactionData.sections[6].score = avg(sectionScores.voice);
-    data.satisfactionData.sections[7].score = avg(sectionScores.value);
+
+    // Build key-based lookup maps so score assignment is robust against
+    // section reordering (avoids fragile hardcoded positional indices).
+    var sectionByKey = {};
+    data.satisfactionData.sections.forEach(function(s) {
+      sectionByKey[s.key] = s;
+      var qMap = {};
+      s.questions.forEach(function(q) { qMap[q.key] = q; });
+      s._qByKey = qMap;
+    });
+    function setSectionScore(sKey, val) {
+      if (sectionByKey[sKey]) sectionByKey[sKey].score = val;
+    }
+    function setQuestionScore(sKey, qKey, val) {
+      var s = sectionByKey[sKey];
+      if (s && s._qByKey[qKey]) s._qByKey[qKey].score = val;
+    }
+
+    setSectionScore('overall',       avg(sectionScores.overall));
+    setSectionScore('steward',       avg(sectionScores.steward));
+    setSectionScore('chapter',       avg(sectionScores.chapter));
+    setSectionScore('leadership',    avg(sectionScores.leadership));
+    setSectionScore('contract',      avg(sectionScores.contract));
+    setSectionScore('communication', avg(sectionScores.communication));
+    setSectionScore('voice',         avg(sectionScores.voice));
+    setSectionScore('value',         avg(sectionScores.value));
 
     // Calculate individual question scores and populate section questions
     data.satisfactionData.allQuestionScores = {};
     for (var qKey in questionScores) {
       data.satisfactionData.allQuestionScores[qKey] = avg(questionScores[qKey]);
     }
-    // Populate scores in sections
-    data.satisfactionData.sections[0].questions[0].score = avg(questionScores.q6);
-    data.satisfactionData.sections[0].questions[1].score = avg(questionScores.q7);
-    data.satisfactionData.sections[0].questions[2].score = avg(questionScores.q8);
-    data.satisfactionData.sections[0].questions[3].score = avg(questionScores.q9);
-    data.satisfactionData.sections[1].questions[0].score = avg(questionScores.q10);
-    data.satisfactionData.sections[1].questions[1].score = avg(questionScores.q11);
-    data.satisfactionData.sections[1].questions[2].score = avg(questionScores.q12);
-    data.satisfactionData.sections[1].questions[3].score = avg(questionScores.q13);
-    data.satisfactionData.sections[1].questions[4].score = avg(questionScores.q14);
-    data.satisfactionData.sections[1].questions[5].score = avg(questionScores.q15);
-    data.satisfactionData.sections[1].questions[6].score = avg(questionScores.q16);
-    data.satisfactionData.sections[2].questions[0].score = avg(questionScores.q21);
-    data.satisfactionData.sections[2].questions[1].score = avg(questionScores.q22);
-    data.satisfactionData.sections[2].questions[2].score = avg(questionScores.q23);
-    data.satisfactionData.sections[2].questions[3].score = avg(questionScores.q24);
-    data.satisfactionData.sections[2].questions[4].score = avg(questionScores.q25);
-    data.satisfactionData.sections[3].questions[0].score = avg(questionScores.q26);
-    data.satisfactionData.sections[3].questions[1].score = avg(questionScores.q27);
-    data.satisfactionData.sections[3].questions[2].score = avg(questionScores.q28);
-    data.satisfactionData.sections[3].questions[3].score = avg(questionScores.q29);
-    data.satisfactionData.sections[3].questions[4].score = avg(questionScores.q30);
-    data.satisfactionData.sections[3].questions[5].score = avg(questionScores.q31);
-    data.satisfactionData.sections[4].questions[0].score = avg(questionScores.q32);
-    data.satisfactionData.sections[4].questions[1].score = avg(questionScores.q33);
-    data.satisfactionData.sections[4].questions[2].score = avg(questionScores.q34);
-    data.satisfactionData.sections[4].questions[3].score = avg(questionScores.q35);
-    data.satisfactionData.sections[5].questions[0].score = avg(questionScores.q41);
-    data.satisfactionData.sections[5].questions[1].score = avg(questionScores.q42);
-    data.satisfactionData.sections[5].questions[2].score = avg(questionScores.q43);
-    data.satisfactionData.sections[5].questions[3].score = avg(questionScores.q44);
-    data.satisfactionData.sections[5].questions[4].score = avg(questionScores.q45);
-    data.satisfactionData.sections[6].questions[0].score = avg(questionScores.q46);
-    data.satisfactionData.sections[6].questions[1].score = avg(questionScores.q47);
-    data.satisfactionData.sections[6].questions[2].score = avg(questionScores.q48);
-    data.satisfactionData.sections[6].questions[3].score = avg(questionScores.q49);
-    data.satisfactionData.sections[6].questions[4].score = avg(questionScores.q50);
-    data.satisfactionData.sections[7].questions[0].score = avg(questionScores.q51);
-    data.satisfactionData.sections[7].questions[1].score = avg(questionScores.q52);
-    data.satisfactionData.sections[7].questions[2].score = avg(questionScores.q53);
-    data.satisfactionData.sections[7].questions[3].score = avg(questionScores.q55);
+    // Populate scores in sections (key-based — safe against reordering)
+    setQuestionScore('overall',       'q6',  avg(questionScores.q6));
+    setQuestionScore('overall',       'q7',  avg(questionScores.q7));
+    setQuestionScore('overall',       'q8',  avg(questionScores.q8));
+    setQuestionScore('overall',       'q9',  avg(questionScores.q9));
+    setQuestionScore('steward',       'q10', avg(questionScores.q10));
+    setQuestionScore('steward',       'q11', avg(questionScores.q11));
+    setQuestionScore('steward',       'q12', avg(questionScores.q12));
+    setQuestionScore('steward',       'q13', avg(questionScores.q13));
+    setQuestionScore('steward',       'q14', avg(questionScores.q14));
+    setQuestionScore('steward',       'q15', avg(questionScores.q15));
+    setQuestionScore('steward',       'q16', avg(questionScores.q16));
+    setQuestionScore('chapter',       'q21', avg(questionScores.q21));
+    setQuestionScore('chapter',       'q22', avg(questionScores.q22));
+    setQuestionScore('chapter',       'q23', avg(questionScores.q23));
+    setQuestionScore('chapter',       'q24', avg(questionScores.q24));
+    setQuestionScore('chapter',       'q25', avg(questionScores.q25));
+    setQuestionScore('leadership',    'q26', avg(questionScores.q26));
+    setQuestionScore('leadership',    'q27', avg(questionScores.q27));
+    setQuestionScore('leadership',    'q28', avg(questionScores.q28));
+    setQuestionScore('leadership',    'q29', avg(questionScores.q29));
+    setQuestionScore('leadership',    'q30', avg(questionScores.q30));
+    setQuestionScore('leadership',    'q31', avg(questionScores.q31));
+    setQuestionScore('contract',      'q32', avg(questionScores.q32));
+    setQuestionScore('contract',      'q33', avg(questionScores.q33));
+    setQuestionScore('contract',      'q34', avg(questionScores.q34));
+    setQuestionScore('contract',      'q35', avg(questionScores.q35));
+    setQuestionScore('communication', 'q41', avg(questionScores.q41));
+    setQuestionScore('communication', 'q42', avg(questionScores.q42));
+    setQuestionScore('communication', 'q43', avg(questionScores.q43));
+    setQuestionScore('communication', 'q44', avg(questionScores.q44));
+    setQuestionScore('communication', 'q45', avg(questionScores.q45));
+    setQuestionScore('voice',         'q46', avg(questionScores.q46));
+    setQuestionScore('voice',         'q47', avg(questionScores.q47));
+    setQuestionScore('voice',         'q48', avg(questionScores.q48));
+    setQuestionScore('voice',         'q49', avg(questionScores.q49));
+    setQuestionScore('voice',         'q50', avg(questionScores.q50));
+    setQuestionScore('value',         'q51', avg(questionScores.q51));
+    setQuestionScore('value',         'q52', avg(questionScores.q52));
+    setQuestionScore('value',         'q53', avg(questionScores.q53));
+    setQuestionScore('value',         'q55', avg(questionScores.q55));
 
     if (trustScores.length > 0) {
       data.moraleScore = Math.round((trustScores.reduce(function(a,b){return a+b;},0) / trustScores.length) * 10) / 10;

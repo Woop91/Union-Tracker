@@ -653,16 +653,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.8';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.9';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 20,
-    PATCH: parseInt(parts[2], 10) || 8,
+    PATCH: parseInt(parts[2], 10) || 9,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-04',
-    CODENAME: 'Dead Code Removal & Performance'
+    CODENAME: 'Hardcoded Index Fix & Dead Code'
   };
 })();
 
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.9', date: '2026-03-04', codename: 'Hardcoded Index Fix & Dead Code', changes: 'C-DATA-6: Replace positional array indices (sections[6], sections[7], questions[0]–[4]) in satisfaction survey score assignment with key-based lookup maps (sectionByKey[key], s._qByKey[key]) — safe against section reordering. Dead code: emailDashboardLink_UIService_ (03_UIComponents.gs, deprecated, zero callers), getOrCreateMemberFolder_Legacy_ (11_CommandHub.gs, deprecated, zero callers). Note: DataCache.cachedCall deduplicates surveyStatus/events server calls by cache key — those are not real duplicates.' },
   { version: '4.20.8', date: '2026-03-04', codename: 'Dead Code Removal & Performance', changes: 'H-13: setupHiddenSheets skips sheet.clear() for SURVEY_TRACKING when data rows exist — prevents accidental wipe of survey history. Dead code removal: DataAccess namespace (~530 lines), validateInputLength_, getCurrentUserEmail, safeJsonForHtml, sanitizeDataForClient (00_Security.gs), getWebAppDashboardHtml (05_Integrations.gs), isMobileContext (03_UIComponents.gs), statStdDev_ (17_CorrelationEngine.gs). Performance: updateChecklistItem batches per-field setValue calls into single setValues row write. updateMemberProfile batches per-field setValue into single setValues row write. applyConfigSheetStyling replaces per-row setBackground loop with single setBackgrounds() call. 00_DataAccess.gs retains TIME_CONSTANTS and withScriptLock_ (both used in production).' },
   { version: '4.20.7', date: '2026-03-04', codename: 'Security & Data Integrity Fixes', changes: 'C-AUTH-4: dataGetMemberGrievanceHistoryPortal now resolves identity server-side (was IDOR). C-XSS-5: JSON.stringify+&quot; on category onclick param in 05_Integrations.gs. C-FORMULA-7: escapeForFormula on weekly question text in 24_WeeklyQuestions.gs (3 locations). C-DATA-1: vault dedup reads EMAIL column (col 2) not RESPONSE_ROW (col 1) — dedup was silently broken. C-DATA-5: weekly_cases manual fallback removed hardcoded \'15\' in member_view.html. H-5: LockService added to meeting check-in to prevent TOCTOU duplicate entries (14_MeetingCheckIn.gs). H-17: email regex validation before overdue report send (04d_ExecutiveDashboard.gs). H-18: LockService added to archiveClosedGrievances for atomic read-copy-delete (06_Maintenance.gs). H-3: applyState ADD_ROW bounds check (row > 1 and <= lastRow) before deleteRow. H-4: batchSetValues guards against header row (row <= 1) updates.' },
   { version: '4.20.6', date: '2026-03-04', codename: 'Critical Security Fixes', changes: 'Fix 9 confirmed vulnerabilities from FULL_CODE_REVIEW: C-AUTH-5 (getEffectiveUser→getActiveUser in 3 locations), C-AUTH-7 (PII guard || → && logic fix), C-XSS-7/8 (escapeHtml on custom field value+label in 12_Features.gs), C-XSS-9 (JSON.stringify+&quot; in onclick builder in 11_CommandHub.gs), C-XSS-14 (escapeHtml on renderGauge label in 09_Dashboards.gs), C-XSS-16 (escapeHtml in PublicDashboard HTML table; RFC 4180 double-quote CSV escaping), C-XSS-17 (email regex validation in 03_UIComponents.gs), C-OTHER-1 (delete dead buildSafeQuery function from 00_Security.gs). Add regression tests for C-AUTH-7 (+2) and C-XSS-17 (+9).' },
