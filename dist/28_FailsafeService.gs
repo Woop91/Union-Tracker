@@ -23,6 +23,7 @@ var FailsafeService = (function () {
 
   function initFailsafeSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('Spreadsheet binding broken — getActiveSpreadsheet() returned null.');
     var sheet = ss.getSheetByName(SHEETS.FAILSAFE_CONFIG);
     if (!sheet) {
       sheet = ss.insertSheet(SHEETS.FAILSAFE_CONFIG);
@@ -42,6 +43,7 @@ var FailsafeService = (function () {
   function getDigestConfig(email) {
     if (!email) return null;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
     var sheet = ss.getSheetByName(SHEETS.FAILSAFE_CONFIG);
     if (!sheet || sheet.getLastRow() <= 1) {
       return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
@@ -68,6 +70,7 @@ var FailsafeService = (function () {
     if (!email || !config) return { success: false, message: 'Missing data.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.FAILSAFE_CONFIG);
     if (!sheet) { initFailsafeSheet(); sheet = ss.getSheetByName(SHEETS.FAILSAFE_CONFIG); }
 
@@ -104,6 +107,7 @@ var FailsafeService = (function () {
 
   function processScheduledDigests() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { processed: 0 };
     var sheet = ss.getSheetByName(SHEETS.FAILSAFE_CONFIG);
     if (!sheet || sheet.getLastRow() <= 1) return { processed: 0 };
 
@@ -163,6 +167,7 @@ var FailsafeService = (function () {
 
   function _composeMemberDigest(email, config) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
     var sections = [];
 
     // Grievances
@@ -241,6 +246,7 @@ var FailsafeService = (function () {
     if (!stewardEmail) return { success: false, message: 'Not authorized.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!memberSheet || memberSheet.getLastRow() <= 1) return { success: false, message: 'No member data.' };
 
@@ -285,6 +291,7 @@ var FailsafeService = (function () {
 
   function backupCriticalSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var folder = _getOrCreateBackupFolder();
     var now = new Date();
     var dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmm');

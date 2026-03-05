@@ -323,7 +323,7 @@ function reorderSheetsToStandard(ss) {
     SHEETS.FEEDBACK,
     SHEETS.FUNCTION_CHECKLIST,
     SHEETS.CONFIG_GUIDE,
-    'Config'
+    SHEETS.CONFIG
   ];
 
   var position = 1;
@@ -606,8 +606,7 @@ function getConfigValues(configSheet, col) {
  * @returns {void}
  */
 function applyMultiSelectValue(value) {
-  // The inline dialog (getMultiSelectHtml) passes an array of selected IDs,
-  // while MultiSelectDialog.html passes a pre-joined comma string.
+  // The inline dialog (getMultiSelectHtml) may pass an array of selected IDs.
   // Normalise to a comma-separated string so all selections are saved.
   if (Array.isArray(value)) {
     value = value.join(', ');
@@ -661,29 +660,32 @@ function clearMultiSelectState() {
  */
 function onEditMultiSelect(e) {
   if (!e || !e.range) return;
+  try {
+    var sheet = e.range.getSheet();
+    var sheetName = sheet.getName();
 
-  var sheet = e.range.getSheet();
-  var sheetName = sheet.getName();
+    if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
-  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
+    var col = e.range.getColumn();
+    var row = e.range.getRow();
 
-  var col = e.range.getColumn();
-  var row = e.range.getRow();
+    if (row < 2) return;
 
-  if (row < 2) return;
+    var config = getMultiSelectConfig(col, sheetName);
+    if (!config) return;
 
-  var config = getMultiSelectConfig(col, sheetName);
-  if (!config) return;
+    var newValue = e.value || '';
 
-  var newValue = e.value || '';
+    if (newValue === '' || newValue.indexOf(',') !== -1) return;
 
-  if (newValue === '' || newValue.indexOf(',') !== -1) return;
-
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Tip: Use Tools menu > "Multi-Select Editor" for easier selection of multiple values.',
-    config.label,
-    5
-  );
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Tip: Use Tools menu > "Multi-Select Editor" for easier selection of multiple values.',
+      config.label,
+      5
+    );
+  } catch (err) {
+    Logger.log('onEditMultiSelect error: ' + err.message);
+  }
 }
 
 /**
@@ -693,29 +695,32 @@ function onEditMultiSelect(e) {
  */
 function onSelectionChangeMultiSelect(e) {
   if (!e || !e.range) return;
+  try {
+    var sheet = e.range.getSheet();
+    var sheetName = sheet.getName();
 
-  var sheet = e.range.getSheet();
-  var sheetName = sheet.getName();
+    if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
-  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
+    var col = e.range.getColumn();
+    var row = e.range.getRow();
 
-  var col = e.range.getColumn();
-  var row = e.range.getRow();
+    if (row < 2) return;
+    if (e.range.getNumRows() > 1 || e.range.getNumColumns() > 1) return;
 
-  if (row < 2) return;
-  if (e.range.getNumRows() > 1 || e.range.getNumColumns() > 1) return;
+    var config = getMultiSelectConfig(col, sheetName);
+    if (!config) return;
 
-  var config = getMultiSelectConfig(col, sheetName);
-  if (!config) return;
+    var props = PropertiesService.getUserProperties();
+    var lastCell = props.getProperty('lastMultiSelectCell');
+    var currentCell = row + ',' + col;
 
-  var props = PropertiesService.getUserProperties();
-  var lastCell = props.getProperty('lastMultiSelectCell');
-  var currentCell = row + ',' + col;
+    if (lastCell === currentCell) return;
 
-  if (lastCell === currentCell) return;
-
-  props.setProperty('lastMultiSelectCell', currentCell);
-  openCellMultiSelectEditor();
+    props.setProperty('lastMultiSelectCell', currentCell);
+    openCellMultiSelectEditor();
+  } catch (err) {
+    Logger.log('onSelectionChangeMultiSelect error: ' + err.message);
+  }
 }
 
 /**

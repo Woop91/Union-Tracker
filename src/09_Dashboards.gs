@@ -290,7 +290,7 @@ function getSatisfactionDashboardHtml() {
 
     // Load overview data
     'function loadOverview(){' +
-    '  google.script.run.withSuccessHandler(function(data){renderOverview(data)}).getSatisfactionOverviewData();' +
+    '  google.script.run.withFailureHandler(function(e){showError&&showError(e.message)}).withSuccessHandler(function(data){renderOverview(data)}).getSatisfactionOverviewData();' +
     '}' +
 
     // Render overview
@@ -331,7 +331,7 @@ function getSatisfactionDashboardHtml() {
 
     // Load responses
     'function loadResponses(){' +
-    '  google.script.run.withSuccessHandler(function(data){allResponses=data;renderResponses(data)}).getSatisfactionResponseData();' +
+    '  google.script.run.withFailureHandler(function(e){showError&&showError(e.message)}).withSuccessHandler(function(data){allResponses=data;renderResponses(data)}).getSatisfactionResponseData();' +
     '}' +
 
     // Render responses with clickable details
@@ -398,7 +398,7 @@ function getSatisfactionDashboardHtml() {
     // Load sections data
     'function loadSections(){' +
     '  sectionsLoaded=true;' +
-    '  google.script.run.withSuccessHandler(function(data){renderSections(data)}).getSatisfactionSectionData();' +
+    '  google.script.run.withFailureHandler(function(e){showError&&showError(e.message)}).withSuccessHandler(function(data){renderSections(data)}).getSatisfactionSectionData();' +
     '}' +
 
     // Render sections
@@ -444,7 +444,7 @@ function getSatisfactionDashboardHtml() {
     // Load analytics
     'function loadAnalytics(){' +
     '  analyticsLoaded=true;' +
-    '  google.script.run.withSuccessHandler(function(data){renderAnalytics(data)}).getSatisfactionAnalyticsData();' +
+    '  google.script.run.withFailureHandler(function(e){showError&&showError(e.message)}).withSuccessHandler(function(data){renderAnalytics(data)}).getSatisfactionAnalyticsData();' +
     '}' +
 
     // Render analytics/insights
@@ -1050,7 +1050,7 @@ function getSatisfactionTrendData(period) {
       result.issuesTrend.push({ name: issue, count: issueMap[issue] });
     }
     result.issuesTrend.sort(function(a, b) { return b.count - a.count; });
-  } catch(_e) { /* ignore if column doesn't exist */ }
+  } catch(_e) { Logger.log('Issue trend skipped: ' + _e.message); }
 
   return result;
 }
@@ -1736,8 +1736,7 @@ function syncGrievanceToMemberDirectory() {
   if (grievanceData.length < 2) return;
 
   // M-26: Closed statuses - grievances with these statuses don't count as "open"
-  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
-  var closedStatuses = ['Closed', 'Settled', 'Withdrawn', 'Denied', 'Won'];
+  var closedStatuses = GRIEVANCE_CLOSED_STATUSES;
 
   // Build lookup map: memberId -> {hasOpen, status, deadline}
   // Calculate directly from grievance data (handles "Overdue" text properly)
@@ -1856,8 +1855,7 @@ function syncGrievanceFormulasToLog() {
   today.setHours(0, 0, 0, 0); // Normalize to start of day
 
   // M-26: Closed statuses that should not have Next Action Due
-  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
-  var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+  var closedStatuses = GRIEVANCE_CLOSED_STATUSES;
 
   // Prepare updates
   var nameUpdates = [];           // Columns C-D
@@ -2346,7 +2344,7 @@ function installAutoSyncTrigger() {
     '<script>' +
     'function install(){' +
     'var opts={syncGrievances:document.getElementById("syncGrievances").checked,syncMembers:document.getElementById("syncMembers").checked,autoSort:document.getElementById("autoSort").checked,repairCheckboxes:document.getElementById("repairCheckboxes").checked,showToasts:document.getElementById("showToasts").checked};' +
-    'google.script.run.withSuccessHandler(function(){google.script.host.close()}).installAutoSyncTriggerWithOptions(opts)}' +
+    'google.script.run.withFailureHandler(function(e){alert(e.message)}).withSuccessHandler(function(){google.script.host.close()}).installAutoSyncTriggerWithOptions(opts)}' +
     '</script></body></html>'
   ).setWidth(450).setHeight(480);
   ui.showModalDialog(html, 'Auto-Sync Settings');
@@ -3402,7 +3400,7 @@ function getFlaggedSubmissionsHtml() {
     '</div>' +
     '<script>' +
     getClientSideEscapeHtml() +
-    'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
+    'function load(){google.script.run.withFailureHandler(function(e){document.getElementById("content").innerHTML="<div class=\\"empty-state\\">Error: "+e.message+"</div>"}).withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
     '  h+="<div class=\\"stat-card pending\\"><div class=\\"stat-value\\">"+d.pendingCount+"</div><div class=\\"stat-label\\">Pending Review</div></div>";' +
@@ -3430,12 +3428,12 @@ function getFlaggedSubmissionsHtml() {
     '}' +
     'function approve(row){' +
     '  if(confirm("Mark this submission as verified? This will include it in statistics.")){' +
-    '    google.script.run.withSuccessHandler(function(){load()}).approveFlaggedSubmission(row);' +
+    '    google.script.run.withFailureHandler(function(e){alert(e.message)}).withSuccessHandler(function(){load()}).approveFlaggedSubmission(row);' +
     '  }' +
     '}' +
     'function reject(row){' +
     '  if(confirm("Reject this submission? It will be excluded from all statistics.")){' +
-    '    google.script.run.withSuccessHandler(function(){load()}).rejectFlaggedSubmission(row);' +
+    '    google.script.run.withFailureHandler(function(e){alert(e.message)}).withSuccessHandler(function(){load()}).rejectFlaggedSubmission(row);' +
     '  }' +
     '}' +
     'load();' +
@@ -3467,7 +3465,7 @@ function getFlaggedSubmissionsData() {
     var timestamp = '';
     try {
       timestamp = satSheet.getRange(satRow, SATISFACTION_COLS.TIMESTAMP).getValue();
-    } catch (_e) { /* row may not exist */ }
+    } catch (_e) { Logger.log('Satisfaction row read skipped: ' + _e.message); }
 
     if (entry.verified === 'Yes') {
       result.verifiedCount++;

@@ -285,8 +285,6 @@ var Auth = (function () {
     // Dynamic accent color from config
     var hue = config.accentHue || 250;
     var accent = 'hsl(' + hue + ', 70%, 55%)';
-    var accentLight = 'hsl(' + hue + ', 70%, 95%)';
-
     var safeInitials = escapeHtml(String(config.logoInitials || ''));
     var safeOrgName = escapeHtml(String(config.orgName || ''));
     var safeExpiry = escapeHtml(String(config.magicLinkExpiryDays || 7));
@@ -357,24 +355,6 @@ function authLogout(sessionToken) {
 }
 
 /**
- * Script-editor verification: checks SSO, ScriptProperties, and Config tab.
- * Run from the Apps Script editor to confirm the auth module is ready.
- */
-function initWebDashboardAuth() {
-  var email = Session.getActiveUser().getEmail();
-  Logger.log('SSO email: ' + (email || '(not available — deploy as web app to test SSO)'));
-
-  var props = PropertiesService.getScriptProperties();
-  Logger.log('ScriptProperties accessible: ' + (props !== null));
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  Logger.log('Config tab found: ' + (configSheet !== null));
-
-  Logger.log('Auth module ready.');
-}
-
-/**
  * Global wrapper: Clean up expired auth tokens.
  * Called by daily time-based trigger.
  */
@@ -403,4 +383,23 @@ function installTokenCleanupTrigger() {
     .create();
 
   Logger.log('Token cleanup trigger installed — runs daily at ~2 AM.');
+}
+
+/**
+ * Script-editor verification: checks SSO, ScriptProperties, and Config tab.
+ * Run from the Apps Script editor to confirm the auth module is ready.
+ */
+function initWebDashboardAuth() {
+  var email = Session.getActiveUser().getEmail();
+  Logger.log('SSO email: ' + (email || '(not available — deploy as web app to test SSO)'));
+
+  var props = PropertiesService.getScriptProperties();
+  Logger.log('ScriptProperties accessible: ' + (props !== null));
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  Logger.log('Config tab found: ' + (configSheet !== null));
+
+  Logger.log('Auth module ready.');
 }

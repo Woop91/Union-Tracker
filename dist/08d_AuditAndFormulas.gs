@@ -280,7 +280,7 @@ function clearOldAuditEntries() {
 
   // Find rows older than 30 days (skip header)
   for (var i = data.length - 1; i >= 1; i--) {
-    var timestamp = data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1];
+    var timestamp = data[i][AUDIT_LOG_COLS.TIMESTAMP - 1];
     if (timestamp instanceof Date && timestamp < cutoffDate) {
       rowsToDelete.push(i + 1); // +1 for 1-indexed rows
     }
@@ -440,7 +440,6 @@ function setupGrievanceCalcSheet() {
   var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
   var gMemberIdCol = getColumnLetter(GRIEVANCE_COLS.MEMBER_ID);
   var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
-  var _gNextActionCol = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
   var gResolutionCol = getColumnLetter(GRIEVANCE_COLS.RESOLUTION);
   var gDateFiledCol = getColumnLetter(GRIEVANCE_COLS.DATE_FILED);
 
@@ -736,11 +735,6 @@ function setupMemberLookupSheet() {
 
   // Get column letters
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var _mFirstCol = getColumnLetter(MEMBER_COLS.FIRST_NAME);
-  var _mLastCol = getColumnLetter(MEMBER_COLS.LAST_NAME);
-  var _mEmailCol = getColumnLetter(MEMBER_COLS.EMAIL);
-  var _mUnitCol = getColumnLetter(MEMBER_COLS.UNIT);
-  var _mLocCol = getColumnLetter(MEMBER_COLS.WORK_LOCATION);
   var mStewardCol = getColumnLetter(MEMBER_COLS.ASSIGNED_STEWARD);
 
   // Formula to get unique member IDs from Grievance Log

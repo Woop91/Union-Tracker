@@ -1082,11 +1082,8 @@ function setupActionTypeColumn() {
 
     // Set default value for existing rows without an action type
     var existingValues = grievanceSheet.getRange(2, actionTypeCol, lastRow - 1, 1).getValues();
-    for (var i = 0; i < existingValues.length; i++) {
-      if (!existingValues[i][0]) {
-        grievanceSheet.getRange(i + 2, actionTypeCol).setValue('Grievance');
-      }
-    }
+    var output = existingValues.map(function(v) { return [v[0] || 'Grievance']; });
+    grievanceSheet.getRange(2, actionTypeCol, output.length, 1).setValues(output);
   }
 
   return { success: true };

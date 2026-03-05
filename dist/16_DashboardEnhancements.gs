@@ -95,6 +95,11 @@ function getTrendComparisonData(isPII, fromDate1, toDate1, fromDate2, toDate2) {
  * @returns {string} Drive file URL
  */
 function saveChartImageToDrive(chartName, base64Data) {
+  if (!chartName || typeof chartName !== 'string') throw new Error('Invalid chart name');
+  if (!base64Data || typeof base64Data !== 'string') throw new Error('Invalid image data');
+  chartName = chartName.replace(/[^a-zA-Z0-9_\- ]/g, '_').substring(0, 100);
+  if (base64Data.length > 10 * 1024 * 1024) throw new Error('Image data too large');
+
   var blob = Utilities.newBlob(
     Utilities.base64Decode(base64Data),
     'image/png',

@@ -482,18 +482,16 @@ function applyMessageAlertHighlighting_(sheet, lastRow) {
   var alertValues = sheet.getRange(2, alertCol, lastRow - 1, 1).getValues();
   var highlightColor = '#FFF2CC'; // Light yellow/orange
   var normalColor = null; // Remove background (white)
+  var lastCol = sheet.getLastColumn();
 
+  // Build backgrounds array and apply in a single batch
+  var backgrounds = [];
   for (var i = 0; i < alertValues.length; i++) {
-    var row = i + 2;
-    var rowRange = sheet.getRange(row, 1, 1, sheet.getLastColumn());
-
-    if (alertValues[i][0] === true) {
-      // Highlight the entire row
-      rowRange.setBackground(highlightColor);
-    } else {
-      // Remove highlighting (reset to white)
-      rowRange.setBackground(normalColor);
-    }
+    var color = alertValues[i][0] === true ? highlightColor : normalColor;
+    backgrounds.push(new Array(lastCol).fill(color));
+  }
+  if (backgrounds.length > 0) {
+    sheet.getRange(2, 1, backgrounds.length, lastCol).setBackgrounds(backgrounds);
   }
 }
 

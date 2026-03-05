@@ -1797,7 +1797,7 @@ function handleBulkStatusSelection(selectedIds) {
         <label class="form-label">New Status</label>
         <select class="form-select" id="newStatus">
           ${Object.values(GRIEVANCE_STATUS).map(s =>
-            `<option value="${s}">${s}</option>`
+            `<option value="${escapeHtml(String(s))}">${escapeHtml(String(s))}</option>`
           ).join('')}
         </select>
       </div>
@@ -1819,6 +1819,7 @@ function handleBulkStatusSelection(selectedIds) {
               alert(r.success ? r.message : 'Error: ' + r.error);
               google.script.host.close();
             })
+            .withFailureHandler(function(e) { alert('Error: ' + e.message); })
             .bulkUpdateGrievanceStatus(ids, status, notes);
         }
       </script>
@@ -1939,6 +1940,7 @@ function showNewMemberDialog() {
             other.textContent = 'Other';
             select.appendChild(other);
           })
+          .withFailureHandler(function(e) { console.error('Failed to load departments:', e.message); })
           .getDepartmentList();
 
         document.getElementById('memberForm').addEventListener('submit', function(e) {
@@ -2004,17 +2006,17 @@ function addNewMember(memberData) {
     // Prepare row data using MEMBER_COLS constants (1-indexed)
     var rowData = new Array(maxMemberCol).fill('');
     rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
-    rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
-    rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
-    rowData[MEMBER_COLS.JOB_TITLE - 1] = memberData.jobTitle || '';
-    rowData[MEMBER_COLS.WORK_LOCATION - 1] = memberData.workLocation || '';
-    rowData[MEMBER_COLS.UNIT - 1] = memberData.unit || '';
-    rowData[MEMBER_COLS.EMAIL - 1] = memberData.email || '';
-    rowData[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
     rowData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
     rowData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
-    rowData[MEMBER_COLS.EMPLOYEE_ID - 1] = memberData.employeeId || '';
-    rowData[MEMBER_COLS.DEPARTMENT - 1] = memberData.department || '';
+    rowData[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(memberData.employeeId || '');
+    rowData[MEMBER_COLS.DEPARTMENT - 1] = escapeForFormula(memberData.department || '');
     rowData[MEMBER_COLS.HIRE_DATE - 1] = memberData.hireDate ? new Date(memberData.hireDate) : '';
 
     sheet.appendRow(rowData);
@@ -2331,10 +2333,8 @@ function exportMemberDirectory(format) {
       }).join(',')).join('\n');
       const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
       const file = DriveApp.createFile(blob);
-      // M-60: CSV export creates a file in Drive that is never automatically cleaned up.
-      // TODO: Consider adding a time-driven trigger to delete export files older than
-      // 7 days, or move exports to a dedicated "Exports" folder and purge periodically.
-      // For now, users must manually delete old exports from their Drive.
+      // M-60: Export files can be auto-cleaned by running setupWeeklyExportCleanupTrigger()
+      // from the Tools menu. See cleanupOldExportFiles() in 06_Maintenance.gs.
       return {
         success: true,
         message: 'CSV file created! Opening... (Note: remember to delete from Drive when done)',

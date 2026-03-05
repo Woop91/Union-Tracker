@@ -284,6 +284,7 @@ function getVisualControlPanelHtml() {
           const isChecked = document.getElementById(setting).checked;
           google.script.run
             .withSuccessHandler(showStatus)
+            .withFailureHandler(function(e){showStatus("Error: "+e.message)})
             .saveVisualSetting(setting, isChecked);
         }
 
@@ -292,6 +293,7 @@ function getVisualControlPanelHtml() {
           event.target.classList.add('active');
           google.script.run
             .withSuccessHandler(showStatus)
+            .withFailureHandler(function(e){showStatus("Error: "+e.message)})
             .applyDashboardTheme(theme);
         }
 
@@ -299,11 +301,12 @@ function getVisualControlPanelHtml() {
           showStatus('Refreshing...');
           google.script.run
             .withSuccessHandler(function() { showStatus('Dashboard refreshed!'); })
+            .withFailureHandler(function(e){showStatus("Error: "+e.message)})
             .syncAllDashboardData();
         }
 
         function goToSheet(sheetName) {
-          google.script.run.navigateToSheet(sheetName);
+          google.script.run.withFailureHandler(function(){}).navigateToSheet(sheetName);
         }
 
         function showStatus(msg) {
@@ -872,11 +875,13 @@ function getDashboardSidebarHtml() {
         function loadStats() {
           google.script.run
             .withSuccessHandler(function(stats) {
+              if (typeof stats === 'string') { try { stats = JSON.parse(stats); } catch(e) { return; } }
               document.getElementById('openCount').textContent = stats.open;
               document.getElementById('pendingCount').textContent = stats.pending;
               document.getElementById('memberCount').textContent = stats.members;
               document.getElementById('resolvedCount').textContent = stats.resolved;
             })
+            .withFailureHandler(function(){document.getElementById("openCount").textContent="--";document.getElementById("pendingCount").textContent="--";document.getElementById("memberCount").textContent="--";document.getElementById("resolvedCount").textContent="--";})
             .getDashboardStats();
         }
 
@@ -896,6 +901,7 @@ function getDashboardSidebarHtml() {
                        '</div>';
               }).join('');
             })
+            .withFailureHandler(function(){document.getElementById("deadlineList").innerHTML='<div style="text-align:center;color:#666;padding:20px;">Could not load deadlines</div>';})
             .getUpcomingDeadlines(7);
         }
 

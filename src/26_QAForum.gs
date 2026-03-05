@@ -22,6 +22,7 @@ var QAForum = (function () {
 
   function initQAForumSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('Spreadsheet binding broken — getActiveSpreadsheet() returned null.');
 
     // _QA_Forum: ID | Author Email | Author Name | Is Anonymous | Question Text | Status | Upvote Count | Upvoters | Answer Count | Created | Updated
     var forumSheet = ss.getSheetByName(SHEETS.QA_FORUM);
@@ -56,6 +57,7 @@ var QAForum = (function () {
     sort = sort || 'recent';
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { questions: [], total: 0, page: page, pageSize: pageSize };
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
     if (!sheet) {
       initQAForumSheets();
@@ -99,6 +101,7 @@ var QAForum = (function () {
 
   function getQuestionDetail(email, questionId) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
     if (!sheet || sheet.getLastRow() <= 1) return null;
 
@@ -151,6 +154,7 @@ var QAForum = (function () {
     text = _sanitize(text.trim().substring(0, 2000));
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
     if (!sheet) { initQAForumSheets(); sheet = ss.getSheetByName(SHEETS.QA_FORUM); }
 
@@ -183,6 +187,7 @@ var QAForum = (function () {
     text = _sanitize(text.trim().substring(0, 2000));
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var ansSheet = ss.getSheetByName(SHEETS.QA_ANSWERS);
     if (!ansSheet) { initQAForumSheets(); ansSheet = ss.getSheetByName(SHEETS.QA_ANSWERS); }
 
@@ -223,6 +228,7 @@ var QAForum = (function () {
     if (!email || !questionId) return { success: false, message: 'Missing data.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Question not found.' };
 
@@ -265,6 +271,7 @@ var QAForum = (function () {
     if (!stewardEmail || !questionId || !action) return { success: false, message: 'Missing data.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Question not found.' };
 
@@ -285,6 +292,7 @@ var QAForum = (function () {
     if (!stewardEmail || !answerId || !action) return { success: false, message: 'Missing data.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.QA_ANSWERS);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Answer not found.' };
 
@@ -303,6 +311,7 @@ var QAForum = (function () {
   function getFlaggedContent(stewardEmail) {
     if (!stewardEmail) return { questions: [], answers: [] };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { questions: [], answers: [] };
     var flaggedQ = [];
     var flaggedA = [];
 

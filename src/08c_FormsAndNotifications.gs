@@ -1053,7 +1053,6 @@ function checkDeadlinesAndNotify_() {
   if (!email) return;
 
   var data = sheet.getDataRange().getValues();
-  var today = new Date();
   var urgent = [];
 
   for (var i = 1; i < data.length; i++) {
@@ -1062,7 +1061,7 @@ function checkDeadlinesAndNotify_() {
     var daysToDeadline = data[i][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
     var currentStep = data[i][GRIEVANCE_COLS.CURRENT_STEP - 1];
 
-    var closedStatuses = ['Closed', 'Settled', 'Won', 'Denied', 'Withdrawn'];
+    var closedStatuses = GRIEVANCE_CLOSED_STATUSES;
     if (closedStatuses.indexOf(status) !== -1) continue;
 
     if (daysToDeadline === 'Overdue' || (daysToDeadline !== '' && typeof daysToDeadline === 'number' && daysToDeadline <= 3)) {
@@ -1165,7 +1164,7 @@ function sendStewardDeadlineAlerts() {
 
   // Group grievances by steward
   var stewardGrievances = {};
-  var closedStatuses = ['Closed', 'Settled', 'Won', 'Denied', 'Withdrawn'];
+  var closedStatuses = GRIEVANCE_CLOSED_STATUSES;
 
   for (var i = 1; i < grievanceData.length; i++) {
     var row = grievanceData[i];

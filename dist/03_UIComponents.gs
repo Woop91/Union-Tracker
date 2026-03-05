@@ -101,7 +101,7 @@ function createDashboardMenu() {
   // ============================================================================
   // MENU 2: Tools - Supporting Features
   // ============================================================================
-  var toolsMenu_ = ui.createMenu('🔧 Tools')
+  ui.createMenu('🔧 Tools')
     .addSubMenu(ui.createMenu('📧 Communication')
       .addItem('📧 Send Contact Form', 'sendContactInfoForm')
       .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink')
@@ -154,24 +154,22 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('🔑 Generate Member PIN', 'showGeneratePINDialog')
       .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
-      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'));
+      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
 
-  // Workload Tracker submenu — typeof guard for backwards compatibility
-  if (typeof initWorkloadTrackerSheets === 'function') {
-    toolsMenu_.addSubMenu(ui.createMenu('📊 Workload Tracker')
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
       .addItem('📊 Refresh Ledger', 'refreshWorkloadLedger')
       .addItem('💾 Create Backup', 'createWorkloadBackup')
       .addItem('🗄️ Archive Old Data', 'archiveWorkloadData')
       .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
       .addSeparator()
       .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem')
-      .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'));
-  }
+      .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'))
 
-  toolsMenu_.addSubMenu(ui.createMenu('🔄 Maintenance')
-    .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
-    .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
-    .addItem('🔄 Refresh View', 'refreshMemberView'))
+    .addSubMenu(ui.createMenu('🔄 Maintenance')
+      .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
+      .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
+      .addItem('🔄 Refresh View', 'refreshMemberView'))
+
     .addToUi();
 
   // ============================================================================
@@ -320,7 +318,9 @@ function navigateToSheet(sheetName) {
  * @returns {void}
  */
 function showToast(message, title) {
-  SpreadsheetApp.getActiveSpreadsheet().toast(message, title || 'Info', 3);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  ss.toast(message, title || 'Info', 3);
 }
 
 /**
@@ -517,7 +517,7 @@ function clampFontSize_(size) {
   return Math.max(8, Math.min(24, n));
 }
 
-function applyThemeToSheet_(sheet) {
+function applyThemeToSheet_(sheet, themeKey) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
 

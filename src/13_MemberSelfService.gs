@@ -214,7 +214,7 @@ function assignMemberPIN(memberId, options) {
           'Your PIN is: ' + newPin + '\n\n' +
           'Please change your PIN after your first login for security.\n\n' +
           'If you did not expect this, please contact your union steward.\n\n' +
-          'Best regards,\nWFSE Local'
+          'Best regards,\n' + (typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Union') : 'Your Union')
       });
     } catch (emailError) {
       Logger.log('Could not send PIN email to member: ' + emailError.message);
@@ -300,18 +300,18 @@ function requestPINReset(memberId) {
     return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
   }
 
-  // Generate reset token and store it
+  // Generate reset token and store it (PropertiesService — survives cache eviction)
   var resetToken = generateResetToken_();
-  var cache = CacheService.getScriptCache();
-  var cacheKey = PIN_CONFIG.RESET_TOKEN_PREFIX + memberId;
+  var props = PropertiesService.getScriptProperties();
+  var propKey = PIN_CONFIG.RESET_TOKEN_PREFIX + memberId;
 
-  // Store token with member ID verification (expires in 30 minutes)
   var tokenData = JSON.stringify({
     token: resetToken,
     memberId: memberId,
-    created: Date.now()
+    created: Date.now(),
+    expiresAt: Date.now() + (PIN_CONFIG.RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000)
   });
-  cache.put(cacheKey, tokenData, PIN_CONFIG.RESET_TOKEN_EXPIRY_MINUTES * 60);
+  props.setProperty(propKey, tokenData);
 
   // Send reset email
   try {
@@ -322,7 +322,7 @@ function requestPINReset(memberId) {
       'This code will expire in ' + PIN_CONFIG.RESET_TOKEN_EXPIRY_MINUTES + ' minutes.\n\n' +
       'If you did not request this reset, please ignore this email or contact your union steward.\n\n' +
       'Best regards,\n' +
-      'WFSE Local';
+      (typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Union') : 'Your Union');
 
     MailApp.sendEmail({
       to: memberEmail,
@@ -366,10 +366,10 @@ function completePINReset(memberId, token, newPin) {
     return errorResponse('PIN must be exactly 6 digits');
   }
 
-  // Retrieve and verify token
-  var cache = CacheService.getScriptCache();
-  var cacheKey = PIN_CONFIG.RESET_TOKEN_PREFIX + memberId;
-  var storedData = cache.get(cacheKey);
+  // Retrieve and verify token (PropertiesService — survives cache eviction)
+  var props = PropertiesService.getScriptProperties();
+  var propKey = PIN_CONFIG.RESET_TOKEN_PREFIX + memberId;
+  var storedData = props.getProperty(propKey);
 
   if (!storedData) {
     return errorResponse('Reset code has expired or is invalid. Please request a new one.');
@@ -379,17 +379,26 @@ function completePINReset(memberId, token, newPin) {
   try {
     tokenData = JSON.parse(storedData);
   } catch (_e) {
+    props.deleteProperty(propKey);
     return errorResponse('Invalid reset data. Please request a new code.');
+  }
+
+  // Check expiry (PropertiesService has no auto-TTL, so we check manually)
+  if (tokenData.expiresAt && tokenData.expiresAt < Date.now()) {
+    props.deleteProperty(propKey);
+    return errorResponse('Reset code has expired or is invalid. Please request a new one.');
   }
 
   // Verify token matches
   if (tokenData.token !== token || tokenData.memberId !== memberId) {
-    // Log failed attempt
     if (typeof secureLog === 'function') {
       secureLog('PINResetFailed', 'Invalid reset token', { memberId: memberId });
     }
     return errorResponse('Invalid reset code. Please check and try again.');
   }
+
+  // Token consumed — delete immediately to prevent reuse
+  props.deleteProperty(propKey);
 
   // Token is valid - update the PIN
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -418,12 +427,12 @@ function completePINReset(memberId, token, newPin) {
   var newHash = hashPIN(newPin, memberId);
   sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(newHash);
 
-  // Invalidate the reset token
-  cache.remove(cacheKey);
+  // Reset token already consumed above (props.deleteProperty)
 
   // Clear any lockouts for this member
-  cache.remove('pin_lockout_' + memberId);
-  cache.remove('pin_attempts_' + memberId);
+  var lockoutCache = CacheService.getScriptCache();
+  lockoutCache.remove('pin_lockout_' + memberId);
+  lockoutCache.remove('pin_attempts_' + memberId);
 
   if (typeof secureLog === 'function') {
     secureLog('PINResetComplete', 'PIN successfully reset via email token', { memberId: memberId });
@@ -1190,7 +1199,6 @@ function updateMemberContact(sessionToken, updates) {
 
   // Apply updates
   var updated = [];
-  var fieldMaxLengths = { email: 254, phone: 30, preferredComm: 50, bestTime: 50, state: 50 };
   for (var field in updates) {
     if (allowedFields.indexOf(field) >= 0 && fieldMapping[field]) {
       var value = String(updates[field] || '').trim();
@@ -1328,17 +1336,12 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: true, history: [] };
     var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!memberSheet) return { success: true, history: [] };
     var memberData = memberSheet.getDataRange().getValues();
-    var emailCol = -1;
-    var idCol = -1;
-    for (var c = 0; c < memberData[0].length; c++) {
-      var h = String(memberData[0][c]).toLowerCase().trim();
-      if (h === 'email' || h === 'email address' || h === 'member email' || h === 'work email') emailCol = c;
-      if (h === 'member id' || h === 'id') idCol = c;
-    }
-    if (emailCol === -1) return { success: true, history: [] };
+    var emailCol = MEMBER_COLS.EMAIL - 1;
+    var idCol = MEMBER_COLS.MEMBER_ID - 1;
     for (var r = 1; r < memberData.length; r++) {
       if (String(memberData[r][emailCol]).trim().toLowerCase() === email) {
         memberId = String(memberData[r][idCol >= 0 ? idCol : emailCol] || '').trim().toUpperCase();
@@ -1356,6 +1359,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
   }
 
   ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: true, history: [] };
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) return { success: true, history: [] };
 

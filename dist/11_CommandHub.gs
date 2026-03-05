@@ -371,10 +371,11 @@ function generateMissingMemberIDsBatch() {
 
   // Batch write only the Member ID column cells that were actually changed
   if (countAdded > 0) {
+    var idData = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, data.length - 1, 1).getValues();
     for (var c = 0; c < changedRows.length; c++) {
-      sheet.getRange(changedRows[c].row, MEMBER_COLS.MEMBER_ID).setValue(changedRows[c].id);
+      idData[changedRows[c].row - 2][0] = changedRows[c].id;
     }
-    SpreadsheetApp.flush();
+    sheet.getRange(2, MEMBER_COLS.MEMBER_ID, idData.length, 1).setValues(idData);
   }
 
   ss.toast(countAdded + ' IDs generated.', COMMAND_CONFIG.SYSTEM_NAME, 3);
@@ -647,7 +648,7 @@ function NUKE_DATABASE() {
     // Clear Config dropdown values (rows 3+, columns A-E typical dropdowns)
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet && configSheet.getLastRow() > 2) {
-      configSheet.getRange(3, 1, Math.max(1, configSheet.getLastRow() - 2), 5)
+      configSheet.getRange(3, 1, Math.max(1, configSheet.getLastRow() - 2), configSheet.getLastColumn())
         .clearContent();
     }
 

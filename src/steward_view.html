@@ -326,6 +326,8 @@ function renderCaseList(container, filter) {
             agencyCharts.appendChild(stCard);
           }
         }
+      }).withFailureHandler(function() {
+        agencyCharts.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load agency stats.'));
       }).dataGetAgencyGrievanceStats();
     } else {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
@@ -1807,7 +1809,7 @@ function _renderTaskList(container, statusFilter) {
         actions.appendChild(el('button', {
           style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
           onClick: function() {
-            google.script.run.withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).dataCompleteTask(CURRENT_USER.email, task.id);
+            google.script.run.withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteTask(CURRENT_USER.email, task.id);
           }
         }, '\u2705 Complete'));
         card.appendChild(actions);

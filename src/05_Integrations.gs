@@ -1386,6 +1386,10 @@ function sendEmailToMember(memberId, subject, body) {
       return errorResponse('Invalid email address');
     }
 
+    // Strip HTML tags from subject — email subjects are plain text only
+    var safeSubject = String(subject || '').replace(/<[^>]*>/g, '').trim();
+    var safeBody = String(body || '');
+
     safeSendEmail_({
       to: email,
       subject: safeSubject,
@@ -1653,7 +1657,7 @@ function onGrievanceFormSubmit(e) {
 
     // Create member folder and PDF
     var memberFolder = getOrCreateMemberFolder(data.name, data.id);
-    var pdfFile = createSignatureReadyPDF(memberFolder, data);
+    var _pdfFile = createSignatureReadyPDF(memberFolder, data);
 
     // Link PDF back to the grievance log
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1737,6 +1741,9 @@ function showCalendarSyncDialog() {
           google.script.run
             .withSuccessHandler(function(r) {
               showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
+            })
+            .withFailureHandler(function(err) {
+              showStatus('Sync failed: ' + err.message, true);
             })
             .syncDeadlinesToCalendar();
         }
@@ -2778,9 +2785,20 @@ function getWebAppMemberList() {
  */
 function getWebAppResourceLinks() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
   var links = {
+    grievanceForm: '',
+    contactForm: '',
+    satisfactionForm: '',
+    spreadsheetUrl: '',
+    orgWebsite: '',
+    githubRepo: ''
+  };
+
+  if (!ss) return links;
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  links = {
     grievanceForm: '',
     contactForm: '',
     satisfactionForm: '',
@@ -2814,6 +2832,7 @@ function getWebAppDashboardStats() {
 
   // Calculate win rate
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return stats;
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (sheet && sheet.getLastRow() > 1) {
@@ -3904,6 +3923,9 @@ function deleteWebAppResource(resourceId) {
  */
 function restoreWebAppResource(resourceId) {
   try {
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.authorized) return { success: false, message: auth.message || 'Unauthorized' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.RESOURCES);
     if (!sheet) return { success: false, message: 'Resources sheet not found' };

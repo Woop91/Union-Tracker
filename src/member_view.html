@@ -410,7 +410,7 @@ function renderGrievanceDetail(appContainer, g) {
             style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
           }, '\uD83D\uDCDE ' + contact.phone));
         }
-      }).dataGetStewardContact(g.steward);
+      }).withFailureHandler(function() { cName.textContent = 'Not available'; }).dataGetStewardContact(g.steward);
     }
   });
 }
@@ -792,6 +792,9 @@ function renderStewardContact(appContainer) {
         content.appendChild(el('div', { style: { textAlign: 'center', fontSize: '13px', color: 'var(--muted)', marginBottom: '16px' } }, 'Pick one from your location below.'));
         _renderStewardPicker(content);
       }
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { className: 'empty-state' }, 'Failed to load ' + CONFIG.stewardLabel.toLowerCase() + ' info. Please try again.'));
     }).dataGetAssignedSteward(CURRENT_USER.email);
   });
 }
@@ -832,6 +835,9 @@ function _renderStewardPicker(content) {
       }, 'Select'));
       pickerArea.appendChild(item);
     });
+  }).withFailureHandler(function() {
+    pickerArea.innerHTML = '';
+    pickerArea.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '13px', padding: '16px 0' } }, 'Failed to load available ' + CONFIG.stewardLabel.toLowerCase() + 's.'));
   }).dataGetAvailableStewards(CURRENT_USER.email);
 }
 
@@ -1830,7 +1836,7 @@ function _wlRow(label, input) {
 function _wtCollectFormData(inputs, subData, privacy) {
   var fd = {};
   for (var i = 1; i <= 8; i++) fd['t' + i] = parseInt(inputs['t' + i].value) || 0;
-  fd.weekly_cases = inputs.weeklySelect.value === 'manual' ? '15' : inputs.weeklySelect.value;
+  fd.weekly_cases = inputs.weeklySelect.value === 'manual' ? (inputs.weeklyManual.value || '15') : inputs.weeklySelect.value;
   fd.weekly_cases_option = inputs.weeklySelect.value;
   fd.weekly_cases_manual = inputs.weeklyManual.value;
   fd.employment_type = inputs.empSelect.value;
@@ -2309,6 +2315,10 @@ function renderWeeklyQuestionsPage(appContainer, role) {
                     qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
                     _renderQuestionResults(qCard, q);
                   }
+                }).withFailureHandler(function() {
+                  qCard.innerHTML = '';
+                  qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+                  qCard.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px', marginTop: '6px' } }, 'Failed to submit response. Please try again.'));
                 }).wqSubmitResponse(CURRENT_USER.email, q.id, opt);
               }}, opt);
               qCard.appendChild(optEl);
@@ -2348,6 +2358,9 @@ function renderWeeklyQuestionsPage(appContainer, role) {
             if (data.hasMore) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p + 1; loadPage(page); } }, 'Next \u2192'));
             target.appendChild(nav);
           }
+        }).withFailureHandler(function() {
+          target.innerHTML = '';
+          target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load past questions.'));
         }).wqGetHistory(CURRENT_USER.email, p, 10);
       }
       loadPage(page);
@@ -2538,6 +2551,9 @@ function _renderGrievanceStats(container) {
         container.appendChild(monthCard);
       }
     }
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load grievance stats.'));
   }).dataGetGrievanceStats();
 }
 
@@ -2563,6 +2579,9 @@ function _renderHotSpots(container) {
       card.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '16px', fontWeight: '700', color: 'var(--accent)' } }, String(spot.count)));
       container.appendChild(card);
     });
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load data.'));
   }).dataGetGrievanceHotSpots();
 }
 
@@ -2587,6 +2606,9 @@ function _renderMembershipStats(container) {
       ChartHelper.createHorizontalBarChart(lCard, 'membership-loc-chart', lLabels, lData);
       container.appendChild(lCard);
     }
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load membership stats.'));
   }).dataGetMembershipStats();
 }
 
@@ -2632,6 +2654,9 @@ function _renderEngagementStats(container) {
       ]);
       container.appendChild(trendCard);
     }
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load engagement stats.'));
   }).dataGetEngagementStats();
 }
 
@@ -2660,6 +2685,9 @@ function _renderWorkloadSummaryStats(container) {
       grid.appendChild(card);
     });
     container.appendChild(grid);
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load workload stats.'));
   }).dataGetWorkloadSummaryStats();
 }
 
@@ -3086,7 +3114,7 @@ function renderMemberTasks(appContainer) {
             actions.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
               onClick: function() {
-                google.script.run.withSuccessHandler(function() { renderMemberTasks(document.getElementById('app')); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
+                google.script.run.withSuccessHandler(function() { renderMemberTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
               }
             }, '\u2705 Complete'));
             card.appendChild(actions);

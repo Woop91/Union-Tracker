@@ -87,6 +87,15 @@ function updateMember(memberId, updateData) {
     // Find the member row
     var data = sheet.getDataRange().getValues();
     var memberRow = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+        memberRow = i + 1; // 1-indexed for getRange
+        break;
+      }
+    }
+    if (memberRow === -1) {
+      throw new Error('Member not found: ' + memberId);
+    }
 
   // Read current row, modify requested fields, write back in single setValues call (F1: batch write)
   var totalCols = sheet.getLastColumn();
@@ -270,8 +279,7 @@ function getStewardWorkloadDetailed() {
   var grievances = grievanceSheet.getDataRange().getValues();
 
   stewards.forEach(function(steward) {
-    var fullName = steward[Object.keys(steward).find(function(k) { return k.toLowerCase().indexOf('first') !== -1; })] + ' ' +
-                   steward[Object.keys(steward).find(function(k) { return k.toLowerCase().indexOf('last') !== -1; })];
+    var fullName = (steward['First Name'] || '') + ' ' + (steward['Last Name'] || '');
 
     var activeCases = 0;
     var totalCases = 0;
@@ -768,7 +776,7 @@ function removeFromConfigDropdown_(configCol, value) {
   var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
 
   for (var i = 0; i < colData.length; i++) {
-    if (colData[i][0] === value) {
+    if (String(colData[i][0]).trim() === String(value).trim()) {
       configSheet.getRange(i + 3, configCol).clearContent();
       break;
     }
@@ -1272,7 +1280,6 @@ function getImportMembersHtml_() {
     '  }' +
     '}' +
     '' +
-    getClientSideEscapeHtml() +
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
     '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
@@ -1972,7 +1979,7 @@ function advanceGrievanceStep(grievanceId, options) {
     if (nextStep <= 3) {
       // F137: Use explicit column map instead of +1/+2 arithmetic.
       // The old code wrote responseDue to DATE_CLOSED and 'Pending' to DAYS_OPEN for Step 3.
-      // TODO(human): Verify this column map matches your sheet layout
+      // Verified: column map matches GRIEVANCE_HEADER_MAP_ in 01_Core.gs
       var ADVANCE_STEP_COLS_ = {
         2: { date: GRIEVANCE_COLS.STEP2_APPEAL_FILED, due: GRIEVANCE_COLS.STEP2_DUE },
         3: { date: GRIEVANCE_COLS.STEP3_APPEAL_FILED, due: GRIEVANCE_COLS.STEP3_APPEAL_DUE }
@@ -2083,8 +2090,10 @@ function recalcAllGrievancesBatched() {
   const data = sheet.getDataRange().getValues();
 
   let updatedCount = 0;
-  let batchCount = 0;
   const startTime = new Date().getTime();
+
+  // Collect updates in memory, then write in a single batch
+  var pendingUpdates = [];
 
   // Skip header row
   for (let i = 1; i < data.length; i++) {
@@ -2092,12 +2101,6 @@ function recalcAllGrievancesBatched() {
     if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - 30000) {
       console.log('Approaching time limit, stopping batch');
       break;
-    }
-
-    // Batch pause
-    if (batchCount >= BATCH_LIMITS.MAX_ROWS_PER_BATCH) {
-      Utilities.sleep(BATCH_LIMITS.PAUSE_BETWEEN_BATCHES_MS);
-      batchCount = 0;
     }
 
     const row = data[i];
@@ -2114,13 +2117,20 @@ function recalcAllGrievancesBatched() {
 
       if (stepDate instanceof Date && stepCols && stepCols.due) {
         const newDue = calculateResponseDeadline(currentStep, stepDate);
-
-        sheet.getRange(i + 1, stepCols.due).setValue(newDue);
+        pendingUpdates.push({ row: i + 1, col: stepCols.due, value: newDue });
         updatedCount++;
       }
     }
 
-    batchCount++;
+  }
+
+  // Batch write all updates
+  for (let u = 0; u < pendingUpdates.length; u++) {
+    var update = pendingUpdates[u];
+    data[update.row - 1][update.col - 1] = update.value;
+  }
+  if (pendingUpdates.length > 0) {
+    sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   }
 
   logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
@@ -2289,14 +2299,15 @@ function getUpcomingDeadlines(daysAhead) {
     let deadline;
 
     // Get the due date for current step using actual header names
-    switch (currentStep) {
-      case 1:
+    var stepStr = String(currentStep).trim();
+    switch (stepStr) {
+      case '1': case 'Step I': case 'Informal':
         deadline = g['Step I Due'];
         break;
-      case 2:
+      case '2': case 'Step II':
         deadline = g['Step II Due'];
         break;
-      case 3:
+      case '3': case 'Step III':
         deadline = g['Step III Appeal Due'];
         break;
     }
@@ -2383,7 +2394,6 @@ function getGrievanceStats() {
         break;
       case GRIEVANCE_STATUS.DENIED:
       case GRIEVANCE_STATUS.WITHDRAWN:
-      case GRIEVANCE_STATUS.RESOLVED:
       case GRIEVANCE_STATUS.SETTLED:
       case GRIEVANCE_STATUS.CLOSED:
         if (lastUpdated instanceof Date && lastUpdated.getFullYear() === currentYear) {
@@ -2434,6 +2444,10 @@ function getGrievanceStats() {
  * @return {Object} Result object
  */
 function resolveGrievance(grievanceId, outcome, resolution, notes) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return errorResponse('Could not acquire lock for resolveGrievance');
+  }
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
@@ -2500,6 +2514,8 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
   } catch (error) {
     console.error('Error resolving grievance:', error);
     return errorResponse(error.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -2834,6 +2850,7 @@ function getEditGrievanceFormHtml(grievanceId) {
           };
           google.script.run
             .withSuccessHandler(function() { google.script.host.close(); })
+            .withFailureHandler(function(err) { alert('Error saving: ' + err.message); })
             .updateGrievance(grievanceId, updates);
         });
 
@@ -2848,6 +2865,7 @@ function getEditGrievanceFormHtml(grievanceId) {
                   alert('Error: ' + result.error);
                 }
               })
+              .withFailureHandler(function(err) { alert('Error advancing step: ' + err.message); })
               .advanceGrievanceStep(grievanceId, {});
           }
         }
@@ -2955,19 +2973,22 @@ function highlightUrgentGrievances() {
 
   var daysValues = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1).getValues();
 
-  // Apply row backgrounds based on urgency
+  // Build background color array and apply in a single batch
+  var backgrounds = [];
   for (var i = 0; i < daysValues.length; i++) {
     var days = daysValues[i][0];
-    var rowRange = sheet.getRange(i + 2, 1, 1, lastCol);
+    var rowColors = new Array(lastCol).fill(null);
 
-    if (typeof days !== 'number' || isNaN(days)) {
-      continue;
-    } else if (days < 0) {
-      rowRange.setBackground(COLORS.ROW_ALT_RED);  // Light red tint
-    } else if (days <= 3) {
-      rowRange.setBackground('#fefce8');  // Light yellow tint
+    if (typeof days === 'number' && !isNaN(days)) {
+      if (days < 0) {
+        rowColors = new Array(lastCol).fill(COLORS.ROW_ALT_RED);
+      } else if (days <= 3) {
+        rowColors = new Array(lastCol).fill(COLORS.ROW_ALT_YELLOW);
+      }
     }
+    backgrounds.push(rowColors);
   }
+  sheet.getRange(2, 1, daysValues.length, lastCol).setBackgrounds(backgrounds);
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Urgent grievances highlighted', COMMAND_CONFIG.SYSTEM_NAME, 3);
 }

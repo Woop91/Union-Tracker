@@ -23,6 +23,7 @@ var TimelineService = (function () {
 
   function initTimelineSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('Spreadsheet binding broken — getActiveSpreadsheet() returned null.');
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet) {
       sheet = ss.insertSheet(SHEETS.TIMELINE_EVENTS);
@@ -45,6 +46,7 @@ var TimelineService = (function () {
     pageSize = pageSize || 25;
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { events: [], total: 0, page: page, pageSize: pageSize };
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet) { sheet = initTimelineSheet(); }
     if (!sheet || sheet.getLastRow() <= 1) return { events: [], total: 0, page: page, pageSize: pageSize };
@@ -93,6 +95,7 @@ var TimelineService = (function () {
     if (!stewardEmail || !data || !data.title) return { success: false, message: 'Title is required.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet) { initTimelineSheet(); sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS); }
 
@@ -124,6 +127,7 @@ var TimelineService = (function () {
     if (!stewardEmail || !eventId) return { success: false, message: 'Missing data.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Event not found.' };
 
@@ -149,6 +153,7 @@ var TimelineService = (function () {
     if (!stewardEmail || !eventId) return { success: false, message: 'Missing data.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Event not found.' };
 
@@ -177,6 +182,7 @@ var TimelineService = (function () {
       var imported = 0;
 
       var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
       if (!sheet) { initTimelineSheet(); sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS); }
 
@@ -230,6 +236,7 @@ var TimelineService = (function () {
     if (!stewardEmail || !eventId || !fileIds) return { success: false, message: 'Missing data.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Event not found.' };
 

@@ -151,6 +151,7 @@ function handleError(error, context, level) {
 function logErrorToSheet_(errorInfo) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return; // Web app context — cannot log to sheet
     var sheet = ss.getSheetByName(ERROR_CONFIG.LOG_SHEET_NAME);
 
     // Create sheet if it doesn't exist
@@ -501,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.20.1",
+  VERSION: "4.20.2",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -597,7 +598,7 @@ function getOrgNameFromConfig_() {
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  _cachedOrgName = 'SEIU Local';
+  _cachedOrgName = 'Union Dashboard';
   return _cachedOrgName;
 }
 
@@ -651,15 +652,19 @@ function getLocalNumberFromConfig_() {
  * M-51: Derives version string from COMMAND_CONFIG.VERSION to avoid duplication.
  * @const {Object}
  */
-var VERSION_INFO = {
-  MAJOR: 4,
-  MINOR: 20,
-  PATCH: 1,
-  BUILD: 'v4.20.1',
-  CURRENT: '4.20.1',
-  BUILD_DATE: '2026-03-03',
-  CODENAME: 'Test Suite 100% Pass'
-};
+var VERSION_INFO = (function() {
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.2';
+  var parts = ver.split('.');
+  return {
+    MAJOR: parseInt(parts[0], 10) || 4,
+    MINOR: parseInt(parts[1], 10) || 20,
+    PATCH: parseInt(parts[2], 10) || 2,
+    BUILD: 'v' + ver,
+    CURRENT: ver,
+    BUILD_DATE: '2026-03-04',
+    CODENAME: 'Code Review + Error Resilience'
+  };
+})();
 
 /**
  * Complete version history with release dates and codenames.
@@ -668,6 +673,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.2', date: '2026-03-04', codename: 'Web App Error Resilience', changes: 'Fix 14 missing withFailureHandler() on google.script.run calls in member_view.html (11) and steward_view.html (2) — prevents infinite loading spinners on server errors. Add null guards on getActiveSpreadsheet() in 26_QAForum.gs (10), 27_TimelineService.gs (7), 28_FailsafeService.gs (7) — prevents "Cannot call method of null" crashes in web app context.' },
   { version: '4.20.1', date: '2026-03-03', codename: 'Test Suite 100% Pass', changes: 'Fix all 40 pre-existing test failures: null guards on getActiveSpreadsheet() in 21_WebDashDataService.gs (17), 25_WorkloadService.gs (17), 24_WeeklyQuestions.gs (1+_ensureSheet early-return); PropertiesService singleton mock fix (16_DashboardEnhancements); Session/CacheService mock fixes (19_WebDashAuth); EventBus SHEETS reverse-map fix (15_EventBus); DataService API alignment in 21_WebDashDataService tests; A12 threshold updated to 130; A13 7 failure handlers added to HTML views. 1945/1945 tests pass.' },
   { version: '4.20.0', date: '2026-03-03', codename: 'WorkloadTracker SPA Integration', changes: 'Remove standalone WorkloadTracker portal (18_WorkloadTracker.gs, WorkloadTracker.html). Workload tracker fully integrated into SPA via 25_WorkloadService.gs and member_view.html. Route ?page=workload deep-links to SPA workload tab after SSO auth. Merge v4.19.2-v4.19.5 error resilience hardening: fatal error guard in doGet(), null guards on getActiveSpreadsheet(), trigger try/catch, serverCall() client wrapper, 535 new unit tests (1146→1681).' },
   { version: '4.19.5', date: '2026-03-03', codename: 'Full Coverage Expansion', changes: '535 new unit tests across 14 test files covering all previously untested source modules: EventBus (15), DashboardEnhancements (16), CorrelationEngine (17), WorkloadTracker (18), WebDashAuth (19), WebDashConfigReader (20), WebDashDataService (21), WebDashApp (22), PortalSheets (23), WeeklyQuestions (24), WorkloadService (25), QAForum (26), TimelineService (27), FailsafeService (28). Test count increased from 1146 to 1681 (+46.6%). Gas-mock.js enhanced with createTemplateFromFile, MimeType, ScriptApp.WeekDay, MailApp.getRemainingDailyQuota, and corrected XFrameOptionsMode enum.' },
@@ -1130,6 +1136,7 @@ var COLORS = {
   ROW_ALT_LIGHT: '#F9FAFB',     // Very light gray
   ROW_ALT_GREEN: '#ECFDF5',     // Light green tint
   ROW_ALT_RED: '#FEF2F2',       // Light red tint
+  ROW_ALT_YELLOW: '#FEFCE8',    // Light yellow tint
   ROW_ALT_BLUE: '#EFF6FF'       // Light blue tint
 };
 

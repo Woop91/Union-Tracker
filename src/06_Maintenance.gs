@@ -544,7 +544,7 @@ function getDiagnosticsDialogHtml_(results) {
     '<button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
     '<button class="btn btn-primary" onclick="runRepair()">Run Repair</button>' +
     '</div>' +
-    '<script>function runRepair(){google.script.run.REPAIR_DASHBOARD();google.script.host.close()}</script>' +
+    '<script>function runRepair(){google.script.run.withFailureHandler(function(e){alert("Repair failed: "+e.message)}).REPAIR_DASHBOARD();google.script.host.close()}</script>' +
     '</body></html>';
 }
 
@@ -923,8 +923,8 @@ function showCacheStatusDashboard() {
     '<button class="btn btn-danger" onclick="clearAll()">🗑️ Clear All Caches</button>' +
     '</div>' +
     '<script>' +
-    'function warmUp(){google.script.run.withSuccessHandler(function(){location.reload()}).warmUpCaches()}' +
-    'function clearAll(){google.script.run.withSuccessHandler(function(){location.reload()}).invalidateAllCaches()}' +
+    'function warmUp(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Warm-up failed: "+e.message)}).warmUpCaches()}' +
+    'function clearAll(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Clear failed: "+e.message)}).invalidateAllCaches()}' +
     '</script></body></html>'
   ).setWidth(600).setHeight(450);
 
@@ -1060,7 +1060,9 @@ function recordAction(type, description, beforeState, afterState) {
  * @returns {void}
  */
 function recordCellEdit(row, col, oldValue, newValue) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getActiveSheet();
   var colName = sheet.getRange(1, col).getValue();
 
   recordAction(
@@ -1078,7 +1080,9 @@ function recordCellEdit(row, col, oldValue, newValue) {
  * @returns {void}
  */
 function recordRowAddition(row, rowData) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getActiveSheet();
 
   recordAction(
     'ADD_ROW',
@@ -1095,7 +1099,9 @@ function recordRowAddition(row, rowData) {
  * @returns {void}
  */
 function recordRowDeletion(row, rowData) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getActiveSheet();
 
   recordAction(
     'DELETE_ROW',
@@ -1212,10 +1218,14 @@ function applyState(state, actionType) {
       break;
 
     case 'BATCH_UPDATE':
-      if (state.changes) {
+      if (state.changes && state.changes.length > 0) {
+        var data = sheet.getDataRange().getValues();
         state.changes.forEach(function(c) {
-          sheet.getRange(c.row, c.col).setValue(c.value);
+          if (c.row > 0 && c.row <= data.length && c.col > 0) {
+            data[c.row - 1][c.col - 1] = c.value;
+          }
         });
+        sheet.getDataRange().setValues(data);
       }
       break;
   }
@@ -1441,9 +1451,9 @@ function showUndoRedoPanel() {
     '<script>' +
     'function performUndo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).undoLastAction()}' +
     'function performRedo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).redoLastAction()}' +
-    'function undo(i){google.script.run.withSuccessHandler(function(){location.reload()}).undoToIndex(i)}' +
-    'function clearHistory(){if(confirm("Clear all history?")){google.script.run.withSuccessHandler(function(){location.reload()}).clearUndoHistory()}}' +
-    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");if(/^https:\\/\\/docs\\.google\\.com\\//.test(url))window.open(url,"_blank");else alert("Invalid URL")}).exportUndoHistoryToSheet()}' +
+    'function undo(i){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Undo failed: "+e.message)}).undoToIndex(i)}' +
+    'function clearHistory(){if(confirm("Clear all history?")){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Clear failed: "+e.message)}).clearUndoHistory()}}' +
+    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");if(/^https:\\/\\/docs\\.google\\.com\\//.test(url))window.open(url,"_blank");else alert("Invalid URL")}).withFailureHandler(function(e){alert("Export failed: "+e.message)}).exportUndoHistoryToSheet()}' +
     '</script></body></html>'
   ).setWidth(800).setHeight(600);
 
@@ -1965,6 +1975,72 @@ function setupWeeklyDriveCleanupTrigger() {
 }
 
 /**
+ * Cleans up old export files from Drive.
+ * Called by a weekly trigger (set up via setupWeeklyExportCleanupTrigger).
+ * Searches the user's Drive root for CSV/export files older than the retention period
+ * and moves them to trash.
+ */
+function cleanupOldExportFiles() {
+  var RETENTION_DAYS = 7;
+  var cutoff = new Date(Date.now() - RETENTION_DAYS * 86400000);
+  var trashed = 0;
+
+  // Export file name patterns used across the codebase
+  var patterns = [
+    'title contains "grievance_export_" and mimeType = "text/csv"',
+    'title contains "MemberDirectory_Export_" and mimeType = "text/csv"',
+    'title contains "AUDIT_LOG_BACKUP_" and mimeType = "text/csv"',
+    'title = "MemberDirectory.csv" and mimeType = "text/csv"'
+  ];
+
+  for (var p = 0; p < patterns.length; p++) {
+    var query = patterns[p] + ' and trashed = false';
+    try {
+      var files = DriveApp.searchFiles(query);
+      while (files.hasNext()) {
+        var file = files.next();
+        if (file.getDateCreated() < cutoff) {
+          file.setTrashed(true);
+          trashed++;
+        }
+      }
+    } catch (_e) {
+      Logger.log('Export cleanup search error (' + patterns[p] + '): ' + _e.message);
+    }
+  }
+
+  if (trashed > 0) {
+    logAuditEvent('EXPORT_FILES_CLEANED', 'Trashed ' + trashed + ' export file(s) older than ' + RETENTION_DAYS + ' days');
+  }
+  Logger.log('cleanupOldExportFiles: trashed ' + trashed + ' file(s)');
+}
+
+/**
+ * Sets up weekly export file cleanup trigger.
+ * Runs every Sunday at 4am to remove old CSV exports from Drive.
+ */
+function setupWeeklyExportCleanupTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'cleanupOldExportFiles') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  ScriptApp.newTrigger('cleanupOldExportFiles')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(4)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    'Export Cleanup Enabled',
+    'Old export files will be cleaned up every Sunday at 4:00 AM.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
  * Navigates to the Audit Log sheet
  */
 function navigateToAuditLog() {
@@ -2096,22 +2172,23 @@ function showSettingsDialog() {
               alert('Settings saved!');
               google.script.host.close();
             })
+            .withFailureHandler(function(e){alert("Save failed: "+e.message)})
             .saveSettings(settings);
         }
 
         function runDiagnostics() {
-          google.script.run.showDiagnosticsDialog();
+          google.script.run.withFailureHandler(function(e){alert(e.message)}).showDiagnosticsDialog();
           google.script.host.close();
         }
 
         function repairDashboard() {
-          google.script.run.showRepairDialog();
+          google.script.run.withFailureHandler(function(e){alert(e.message)}).showRepairDialog();
           google.script.host.close();
         }
 
         function nuclearReset() {
           if (confirm('This is an extreme action. Are you sure?')) {
-            google.script.run.NUCLEAR_RESET_HIDDEN_SHEETS();
+            google.script.run.withFailureHandler(function(e){alert(e.message)}).NUCLEAR_RESET_HIDDEN_SHEETS();
             google.script.host.close();
           }
         }
@@ -3174,11 +3251,11 @@ function archiveClosedGrievances(daysOld) {
   // Delete from main sheet (in reverse order to maintain row indices)
   // Transaction pattern: track individual failures and report at the end
   var failedDeletes = [];
-  var successfulDeletes = 0;
+  var _successfulDeletes = 0;
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
     try {
       grievanceSheet.deleteRow(rowIndex);
-      successfulDeletes++;
+      _successfulDeletes++;
     } catch (deleteErr) {
       failedDeletes.push({ row: rowIndex, error: deleteErr.message });
       Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);

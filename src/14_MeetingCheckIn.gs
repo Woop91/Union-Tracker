@@ -775,14 +775,14 @@ function getSetupMeetingHtml_() {
     'google.script.run.withSuccessHandler(function(list){' +
     '  stewardData=list||[];' +
     '  var container=document.getElementById("stewardListContainer");' +
-    '  if(stewardData.length===0){container.innerHTML="<em style=\\"color:#888\\">No stewards found</em>";return}' +
+    '  if(stewardData.length===0){container.textContent="";var em=document.createElement("em");em.style.color="#888";em.textContent="No stewards found";container.appendChild(em);return}' +
     '  var html="";' +
     '  stewardData.forEach(function(s,i){' +
     '    html+="<div class=\\"steward-item\\"><input type=\\"checkbox\\" id=\\"stew_"+i+"\\" value=\\""+escapeHtml(s.email)+"\\"><label for=\\"stew_"+i+"\\">"+escapeHtml(s.name)+" <span class=\\"email\\">"+escapeHtml(s.email)+"</span></label></div>"' +
     '  });' +
     '  container.innerHTML=html;' +
     '}).withFailureHandler(function(){' +
-    '  document.getElementById("stewardListContainer").innerHTML="<em style=\\"color:#888\\">Could not load stewards</em>"' +
+    '  var fc=document.getElementById("stewardListContainer");fc.textContent="";var em2=document.createElement("em");em2.style.color="#888";em2.textContent="Could not load stewards";fc.appendChild(em2)' +
     '}).getStewardEmailsForMeetingSetup();' +
     'function selectAllStewards(){document.querySelectorAll("#stewardListContainer input[type=checkbox]").forEach(function(cb){cb.checked=true})}' +
     'function clearAllStewards(){document.querySelectorAll("#stewardListContainer input[type=checkbox]").forEach(function(cb){cb.checked=false})}' +
@@ -1079,7 +1079,7 @@ function getCheckInPageHtml() {
     '<html lang="en"><head>' +
     '<meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
-    '<title>Meeting Check-In | SEIU 509</title>' +
+    '<title>Meeting Check-In | ' + escapeHtml(typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard') : 'Union Dashboard') + '</title>' +
     '<style>' +
 
     // Reset

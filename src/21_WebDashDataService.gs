@@ -694,7 +694,7 @@ var DataService = (function () {
 
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
-      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+      if (!ss) return '';
       var folderName = ss.getName();
 
       // Search for existing folder with same name owned by this user
@@ -872,6 +872,7 @@ var DataService = (function () {
    * @returns {Object} { success, sentCount, message }
    */
   function sendBroadcastMessage(stewardEmail, filter, message) {
+    var auth = checkWebAppAuthorization('steward'); if (!auth || !auth.authorized) return { success: false, sentCount: 0, message: 'Unauthorized' };
     if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
 
     // Use all members when no specific steward filter, otherwise use assigned members
