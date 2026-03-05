@@ -1,8 +1,8 @@
 /**
  * Tests for 00_DataAccess.gs
  *
- * Covers TIME_CONSTANTS, deadline calculation utilities,
- * and the DataAccess layer interface.
+ * Covers TIME_CONSTANTS and deadline calculation utilities.
+ * Note: DataAccess namespace was removed (zero callers — refactored away).
  */
 
 require('./gas-mock');
@@ -45,18 +45,4 @@ describe('TIME_CONSTANTS.REMINDER_DAYS', () => {
   });
 });
 
-// ============================================================================
-// DataAccess
-// ============================================================================
 
-describe('DataAccess', () => {
-  test('has required methods', () => {
-    expect(typeof DataAccess.getSpreadsheet).toBe('function');
-    expect(typeof DataAccess.getSheet).toBe('function');
-    expect(typeof DataAccess.getAllData).toBe('function');
-    expect(typeof DataAccess.findRow).toBe('function');
-    expect(typeof DataAccess.appendRow).toBe('function');
-    expect(typeof DataAccess.getMemberById).toBe('function');
-    expect(typeof DataAccess.getGrievanceById).toBe('function');
-  });
-});

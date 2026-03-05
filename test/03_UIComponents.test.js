@@ -269,23 +269,6 @@ describe('saveADHDSettings', () => {
 });
 
 // ============================================================================
-// isMobileContext
-// ============================================================================
-
-describe('isMobileContext', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('returns a boolean value', () => {
-    const result = isMobileContext();
-    expect(typeof result).toBe('boolean');
-  });
-
-  test('returns false in the test environment', () => {
-    const result = isMobileContext();
-    expect(result).toBe(false);
-  });
-});
-
 // ============================================================================
 // createDashboardMenu
 // ============================================================================

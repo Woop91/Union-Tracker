@@ -1165,23 +1165,6 @@ function refreshAllVisuals() {
  */
 
 // ============================================================================
-// MOBILE CONTEXT DETECTION
-// ============================================================================
-// Note: MOBILE_CONFIG is now defined in 01_Core.gs as a shared constant
-
-/**
- * Checks if the current context is a mobile device
- * Server-side detection is limited; this function exists for potential
- * future use with session properties or client-side communication
- * @returns {boolean} Always returns false on server-side
- */
-function isMobileContext() {
-  // Server-side we can't reliably detect mobile
-  // This function exists for potential future use with session properties
-  return false;
-}
-
-// ============================================================================
 // MOBILE DASHBOARD
 // ============================================================================
 

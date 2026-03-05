@@ -440,15 +440,14 @@ function applyConfigSheetStyling(sheet) {
       .setFontWeight('normal')
       .setVerticalAlignment('middle');
 
-    // Apply alternating row colors (zebra stripes) for readability
+    // Apply alternating row colors (zebra stripes) — single setBackgrounds() call
+    // instead of one setBackground() per row for a large performance improvement.
+    var bgColors = [];
     for (var row = 3; row <= maxRows; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      if (row % 2 === 0) {
-        rowRange.setBackground('#f1f5f9');  // Slightly darker for even rows
-      } else {
-        rowRange.setBackground('#ffffff');  // White for odd rows
-      }
+      var rowColor = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
+      bgColors.push(new Array(lastCol).fill(rowColor));
     }
+    sheet.getRange(3, 1, maxRows - 2, lastCol).setBackgrounds(bgColors);
   }
 
   // Apply section-specific column colors to headers

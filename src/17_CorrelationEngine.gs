@@ -34,22 +34,6 @@ function statMean_(arr) {
 }
 
 /**
- * Calculates the sample standard deviation of a numeric array (Bessel's correction).
- * @param {number[]} arr - Input values
- * @returns {number} Sample standard deviation, or 0 if n <= 1
- */
-function statStdDev_(arr) {
-  if (!arr || arr.length <= 1) return 0;
-  var mean = statMean_(arr);
-  var sumSq = 0;
-  for (var i = 0; i < arr.length; i++) {
-    var diff = arr[i] - mean;
-    sumSq += diff * diff;
-  }
-  return Math.sqrt(sumSq / (arr.length - 1));
-}
-
-/**
  * Calculates Pearson correlation coefficient between two numeric arrays.
  * Returns r in [-1, 1]. Requires paired arrays of equal length.
  *

@@ -253,35 +253,6 @@ function sanitizeForQuery(value) {
 }
 
 // ============================================================================
-// INPUT LENGTH VALIDATION
-// ============================================================================
-
-function validateInputLength_(value, maxLength, fieldName) {
-  if (typeof value === 'string' && value.length > maxLength) {
-    Logger.log('Input too long for ' + fieldName + ': ' + value.length + ' chars (max ' + maxLength + ')');
-    return value.substring(0, maxLength);
-  }
-  return value || '';
-}
-
-// ============================================================================
-// CENTRALIZED USER SESSION
-// ============================================================================
-
-/**
- * Gets the current user's email with caching and error handling.
- * Use this instead of calling Session.getActiveUser().getEmail() directly.
- * @returns {string} The user's email or 'Unknown' if unavailable
- */
-function getCurrentUserEmail() {
-  try {
-    return Session.getActiveUser().getEmail() || 'Unknown';
-  } catch (_e) {
-    return 'Unknown';
-  }
-}
-
-// ============================================================================
 // ACCESS CONTROL FOR WEB APP
 // ============================================================================
 
@@ -715,67 +686,6 @@ function getClientSecurityScript() {
     getClientSideEscapeHtml() +
     "function safeAttr(t){return escapeHtml(t);}" +
     '</script>';
-}
-
-/**
- * Sanitizes data for embedding in JSON within an HTML <script> tag.
- * Use this when passing server data to client-side JavaScript via template output.
- *
- * How it works: JSON.stringify() first, then replaces <, >, & and line separators
- * with Unicode escapes (\u003c, \u003e, \u0026, \u2028, \u2029). This prevents
- * the browser from interpreting these characters as HTML while keeping the JSON
- * parseable by the JS engine.
- *
- * Usage: var data = JSON.parse('<?= safeJsonForHtml(serverData) ?>');
- * No additional unescaping is needed — JSON.parse handles Unicode escapes natively.
- *
- * @param {Object} data - Data to sanitize
- * @returns {string} JSON string safe for HTML embedding
- */
-function safeJsonForHtml(data) {
-  if (!data) return '{}';
-
-  // Convert to JSON then use Unicode escapes for characters dangerous in <script> context.
-  // HTML entities don't work inside <script> — only Unicode escapes are interpreted by the JS engine.
-  var json = JSON.stringify(data);
-  return json
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
-}
-
-/**
- * Pre-sanitizes an array of objects for safe client-side rendering.
- * Call this on the server before passing data to client.
- *
- * @param {Array<Object>} dataArray - Array of data objects
- * @param {Array<string>} fieldsToSanitize - Field names to sanitize
- * @returns {Array<Object>} Array with sanitized string fields
- */
-function sanitizeDataForClient(dataArray, fieldsToSanitize) {
-  if (!Array.isArray(dataArray)) return [];
-  if (!Array.isArray(fieldsToSanitize) || fieldsToSanitize.length === 0) {
-    // Sanitize all string fields
-    return dataArray.map(function(item) {
-      return sanitizeObjectForHtml(item);
-    });
-  }
-
-  return dataArray.map(function(item) {
-    var sanitized = {};
-    for (var key in item) {
-      if (item.hasOwnProperty(key)) {
-        if (fieldsToSanitize.indexOf(key) !== -1 && typeof item[key] === 'string') {
-          sanitized[key] = escapeHtml(item[key]);
-        } else {
-          sanitized[key] = item[key];
-        }
-      }
-    }
-    return sanitized;
-  });
 }
 
 // ============================================================================

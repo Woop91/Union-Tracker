@@ -5,6 +5,24 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.8] - 2026-03-04
+
+### Fixed
+- **H-13** (`08a_SheetSetup.gs`) — `setupHiddenSheets()` now skips `sheet.clear()` for `SURVEY_TRACKING` when the sheet already has data rows. Previously every call to this function (e.g. from sheet setup menu) would silently erase all historical survey tracking records.
+
+### Removed (dead code)
+- **DataAccess namespace** (`00_DataAccess.gs`) — ~530-line singleton object with zero external callers. File retained for `TIME_CONSTANTS` and `withScriptLock_` (both actively used).
+- **`validateInputLength_`**, **`getCurrentUserEmail`**, **`safeJsonForHtml`**, **`sanitizeDataForClient`** (`00_Security.gs`) — all zero callers confirmed across entire codebase.
+- **`getWebAppDashboardHtml`** (`05_Integrations.gs`) — superseded by SPA router; zero callers (~150 lines removed).
+- **`isMobileContext`** (`03_UIComponents.gs`) — always returned `false`; zero callers.
+- **`statStdDev_`** (`17_CorrelationEngine.gs`) — zero callers.
+- Corresponding test blocks removed from `00_DataAccess.test.js`, `00_Security.test.js`, `03_UIComponents.test.js`, `17_CorrelationEngine.test.js`.
+
+### Performance
+- **`updateChecklistItem`** (`12_Features.gs`) — replaced N individual `setValue()` calls (one per updated field) with a single `setValues()` on the full row.
+- **`updateMemberProfile`** (`21_WebDashDataService.gs`) — same batch approach: apply all field edits in-memory, then one `setValues()` on the member row.
+- **`applyConfigSheetStyling`** (`10a_SheetCreation.gs`) — replaced per-row `setBackground()` loop with single `setBackgrounds()` call using a pre-built 2D color array.
+
 ## [4.20.7] - 2026-03-04
 
 ### Security

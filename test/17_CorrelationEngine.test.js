@@ -62,39 +62,6 @@ describe('statMean_', () => {
 });
 
 // ============================================================================
-// 2. statStdDev_
-// ============================================================================
-
-describe('statStdDev_', () => {
-  test('returns 0 for empty array', () => {
-    expect(statStdDev_([])).toBe(0);
-  });
-
-  test('returns 0 for single-element array', () => {
-    expect(statStdDev_([7])).toBe(0);
-  });
-
-  test('returns 0 for null/undefined', () => {
-    expect(statStdDev_(null)).toBe(0);
-  });
-
-  test('computes known standard deviation [2,4,4,4,5,5,7,9]', () => {
-    // Population stddev = 2.0, sample stddev = sqrt(32/7) ~ 2.13809
-    const result = statStdDev_([2, 4, 4, 4, 5, 5, 7, 9]);
-    expect(result).toBeCloseTo(2.13809, 3);
-  });
-
-  test('returns 0 for all identical values', () => {
-    expect(statStdDev_([5, 5, 5, 5, 5])).toBe(0);
-  });
-
-  test('computes standard deviation for two values', () => {
-    // [0, 10] => mean=5, sum_sq=50, sample var=50, stddev=sqrt(50)~7.071
-    const result = statStdDev_([0, 10]);
-    expect(result).toBeCloseTo(Math.sqrt(50), 5);
-  });
-});
-
 // ============================================================================
 // 3. pearsonCorrelation_
 // ============================================================================

@@ -387,13 +387,16 @@ var DataService = (function () {
       if (rowEmail !== email) continue;
 
       var rowNum = i + 1; // 1-indexed for sheet ops
+      var rowData = data[i].slice(); // copy row; apply all field edits in-memory
       for (var field in updates) {
         if (!editableFields[field]) continue;
         var col = _findColumn(colMap, editableFields[field]);
         if (col === -1) continue;
         var val = String(updates[field] || '').trim().substring(0, 255);
-        sheet.getRange(rowNum, col + 1).setValue(escapeForFormula(val));
+        rowData[col] = escapeForFormula(val);
       }
+      // Write entire row in one API call instead of one setValue per field
+      sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
 
       _invalidateSheetCache(MEMBER_SHEET);
       if (typeof logAuditEvent === 'function') {

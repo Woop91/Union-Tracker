@@ -537,23 +537,26 @@ function updateChecklistItem(checklistId, updates) {
   for (var i = 0; i < data.length; i++) {
     if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
       var row = i + 2;
+      var rowData = data[i].slice(); // copy row; apply all changes in-memory
 
       if (updates.itemText !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.ITEM_TEXT).setValue(escapeForFormula(updates.itemText));
+        rowData[CHECKLIST_COLS.ITEM_TEXT - 1] = escapeForFormula(updates.itemText);
       }
       if (updates.category !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.CATEGORY).setValue(escapeForFormula(updates.category));
+        rowData[CHECKLIST_COLS.CATEGORY - 1] = escapeForFormula(updates.category);
       }
       if (updates.required !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.REQUIRED).setValue(updates.required ? 'Yes' : 'No');
+        rowData[CHECKLIST_COLS.REQUIRED - 1] = updates.required ? 'Yes' : 'No';
       }
       if (updates.dueDate !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.DUE_DATE).setValue(updates.dueDate);
+        rowData[CHECKLIST_COLS.DUE_DATE - 1] = updates.dueDate;
       }
       if (updates.notes !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.NOTES).setValue(escapeForFormula(updates.notes));
+        rowData[CHECKLIST_COLS.NOTES - 1] = escapeForFormula(updates.notes);
       }
 
+      // Write entire row in one API call instead of one setValue per field
+      sheet.getRange(row, 1, 1, CHECKLIST_HEADER_MAP_.length).setValues([rowData]);
       return { success: true };
     }
   }

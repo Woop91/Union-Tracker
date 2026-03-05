@@ -291,35 +291,6 @@ describe('getClientSecurityScript', () => {
   });
 });
 
-describe('safeJsonForHtml', () => {
-  test('returns empty object for null', () => {
-    expect(safeJsonForHtml(null)).toBe('{}');
-  });
-
-  test('escapes HTML in string values', () => {
-    const result = safeJsonForHtml({ name: '<script>' });
-    expect(result).not.toContain('<script>');
-  });
-
-  test('escapes closing script tags', () => {
-    const result = safeJsonForHtml({ html: '</script>' });
-    expect(result).not.toContain('</script>');
-  });
-});
-
-describe('sanitizeDataForClient', () => {
-  test('sanitizes specified fields only', () => {
-    const data = [{ name: '<b>John</b>', age: 30 }];
-    const result = sanitizeDataForClient(data, ['name']);
-    expect(result[0].name).toBe(escapeHtml('<b>John</b>'));
-    expect(result[0].age).toBe(30);
-  });
-
-  test('returns empty array for non-array input', () => {
-    expect(sanitizeDataForClient(null)).toEqual([]);
-  });
-});
-
 // ============================================================================
 // ACCESS_CONTROL
 // ============================================================================

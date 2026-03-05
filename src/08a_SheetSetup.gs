@@ -378,7 +378,12 @@ function setupHiddenSheets(ss) {
     if (!sheet) {
       sheet = ss.insertSheet(config.name);
     }
-    sheet.clear();
+    // H-13: Don't clear SURVEY_TRACKING if it already has data rows — clearing
+    // would destroy all historical survey response records. The setup function
+    // safely overwrites only the header row, leaving data intact.
+    if (config.name !== HIDDEN_SHEETS.SURVEY_TRACKING || sheet.getLastRow() <= 1) {
+      sheet.clear();
+    }
     config.setup(sheet);
     setSheetVeryHidden_(sheet);
   });
