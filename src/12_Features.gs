@@ -1778,13 +1778,13 @@ function generateExpansionFieldsHtml(memberId) {
   const fields = expansionData.extraHeaders;
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i];
-    const value = (expansionData.memberData[field.name] || '').toString().replace(/"/g, '&quot;');
+    const value = escapeHtml(String(expansionData.memberData[field.name] || ''));
     const fieldId = 'custom_' + field.name.replace(/[^a-zA-Z0-9]/g, '_');
 
     parts.push(
       '<div class="form-group" style="margin-bottom:12px;">',
       '<label class="form-label" style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">',
-      field.name,
+      escapeHtml(field.name),
       '</label>',
       '<input type="text" class="form-input" id="', fieldId, '" name="', fieldId,
       '" data-column="', field.column, '" value="', value,

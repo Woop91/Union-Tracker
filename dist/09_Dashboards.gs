@@ -326,7 +326,7 @@ function getSatisfactionDashboardHtml() {
     'function renderGauge(value,label){' +
     '  var color=getScoreColor(value);' +
     '  var pct=value*10;' +
-    '  return"<div class=\\"gauge\\"><div class=\\"gauge-ring\\" style=\\"background:conic-gradient("+color+" "+pct+"%,#e5e7eb "+pct+"%)\\"><span style=\\"color:"+color+"\\">"+value.toFixed(1)+"</span></div><div class=\\"gauge-label\\">"+label.replace("\\n","<br>")+"</div></div>";' +
+    '  return"<div class=\\"gauge\\"><div class=\\"gauge-ring\\" style=\\"background:conic-gradient("+color+" "+pct+"%,#e5e7eb "+pct+"%)\\"><span style=\\"color:"+color+"\\">"+value.toFixed(1)+"</span></div><div class=\\"gauge-label\\">"+escapeHtml(label).replace(/\\n/g,"<br>")+"</div></div>";' +
     '}' +
 
     // Load responses

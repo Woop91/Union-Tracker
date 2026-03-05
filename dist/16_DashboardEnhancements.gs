@@ -155,7 +155,7 @@ function scheduleEmailReport(config) {
     var callerEmail = '';
     try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* */ }
     // Allow sending to self even if not steward/admin (non-PII only)
-    if (callerEmail.toLowerCase() !== config.email.toLowerCase() || config.includePII) {
+    if (config.includePII && callerEmail.toLowerCase() !== config.email.toLowerCase()) {
       return { success: false, error: 'Reports containing PII can only be sent to stewards or admins.' };
     }
   }

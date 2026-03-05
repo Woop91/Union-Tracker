@@ -2073,7 +2073,7 @@ function sendMemberDashboardLink() {
   if (response.getSelectedButton() === ui.Button.OK) {
     var email = response.getResponseText();
 
-    if (!email || !email.includes('@')) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       ui.alert('Please enter a valid email address.');
       return;
     }

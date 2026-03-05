@@ -2615,14 +2615,14 @@ function getUnifiedDashboardHtml(isPII) {
     'preview.style.display="block";' +
     'var html="<p style=\\"color:#94a3b8;margin-bottom:12px\\">"+selected.length+" metrics selected</p>";' +
     'html+="<table style=\\"width:100%;border-collapse:collapse;font-size:12px\\"><tr style=\\"background:#1e293b\\"><th style=\\"padding:8px;text-align:left;color:#94a3b8\\">Category</th><th style=\\"padding:8px;text-align:left;color:#94a3b8\\">Metric</th><th style=\\"padding:8px;text-align:right;color:#94a3b8\\">Value</th></tr>";' +
-    'selected.forEach(function(m,i){html+="<tr style=\\"background:"+(i%2===0?"#0f172a":"#1e293b")+"\\"><td style=\\"padding:8px;color:#60a5fa\\">"+m.category+"</td><td style=\\"padding:8px;color:#e2e8f0\\">"+m.label+"</td><td style=\\"padding:8px;text-align:right;font-weight:600;color:#22c55e\\">"+m.value+"</td></tr>"});' +
+    'selected.forEach(function(m,i){html+="<tr style=\\"background:"+(i%2===0?"#0f172a":"#1e293b")+"\\"><td style=\\"padding:8px;color:#60a5fa\\">"+escapeHtml(m.category)+"</td><td style=\\"padding:8px;color:#e2e8f0\\">"+escapeHtml(m.label)+"</td><td style=\\"padding:8px;text-align:right;font-weight:600;color:#22c55e\\">"+escapeHtml(m.value)+"</td></tr>"});' +
     'html+="</table>";content.innerHTML=html' +
     '}' +
     'function exportComparison(){' +
     'var selected=[];document.querySelectorAll(".metric-check:checked").forEach(function(cb){selected.push({label:cb.dataset.label,value:cb.dataset.value,category:cb.dataset.category})});' +
     'if(selected.length===0){alert("Please select at least one metric to export");return}' +
     'var csv="Category,Metric,Value\\n";' +
-    'selected.forEach(function(m){csv+="\\""+m.category+"\\",\\""+m.label+"\\",\\""+m.value+"\\"\\n"});' +
+    'selected.forEach(function(m){csv+="\\""+String(m.category).replace(/"/g,"\\"\\"")+"\\",\\""+String(m.label).replace(/"/g,"\\"\\"")+"\\",\\""+String(m.value).replace(/"/g,"\\"\\"")+"\\"\\n"});' +
     'var blob=new Blob([csv],{type:"text/csv"});' +
     'var url=URL.createObjectURL(blob);' +
     'var a=document.createElement("a");' +

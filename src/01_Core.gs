@@ -215,7 +215,7 @@ function showErrorNotification_(errorInfo) {
  */
 function sendCriticalErrorNotification_(errorInfo) {
   try {
-    var adminEmail = Session.getEffectiveUser().getEmail();
+    var adminEmail = Session.getActiveUser().getEmail();
     var subject;
     try {
       subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
@@ -653,16 +653,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.5';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.6';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 20,
-    PATCH: parseInt(parts[2], 10) || 2,
+    PATCH: parseInt(parts[2], 10) || 6,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-04',
-    CODENAME: 'Code Review + Error Resilience'
+    CODENAME: 'Critical Security Fixes'
   };
 })();
 
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.6', date: '2026-03-04', codename: 'Critical Security Fixes', changes: 'Fix 9 confirmed vulnerabilities from FULL_CODE_REVIEW: C-AUTH-5 (getEffectiveUser→getActiveUser in 3 locations), C-AUTH-7 (PII guard || → && logic fix), C-XSS-7/8 (escapeHtml on custom field value+label in 12_Features.gs), C-XSS-9 (JSON.stringify+&quot; in onclick builder in 11_CommandHub.gs), C-XSS-14 (escapeHtml on renderGauge label in 09_Dashboards.gs), C-XSS-16 (escapeHtml in PublicDashboard HTML table; RFC 4180 double-quote CSV escaping), C-XSS-17 (email regex validation in 03_UIComponents.gs), C-OTHER-1 (delete dead buildSafeQuery function from 00_Security.gs). Add regression tests for C-AUTH-7 (+2) and C-XSS-17 (+9).' },
   { version: '4.20.5', date: '2026-03-04', codename: 'XSS Fix OCR Dialog', changes: 'Wrap escapeHtml() around API key suffix in setupOCRApiKey() dialog (11_CommandHub.gs:2441) — raw key material was injected into HTML string without escaping.' },
   { version: '4.20.4', date: '2026-03-04', codename: 'Regression Test Hardening', changes: 'Add 138 regression tests targeting known failure modes: N+1 sheet reads (getStewardSurveyTracking spy test), boolean normalization via isTruthyValue() (anonymous flag QAForum ×20, getAllStewards IS_STEWARD ×15, vault VERIFIED/IS_LATEST ×11), formula injection protection (approveFlaggedSubmission, rejectFlaggedSubmission, addToConfigDropdown_ ×8 total), sendEmailToMember auth/safeSubject/safeBody (×6). Architecture tests A16 (lock→finally contract across 8 files), A17 (lock-acquiring mutations log audit events), A18 (dataXxx wrappers call DataService — 56 wrappers tested). Fix formula injection bugs in approveFlaggedSubmission, rejectFlaggedSubmission, and addToConfigDropdown_. Total: 2083/2083 tests pass (+138 from 1945).' },
   { version: '4.20.3', date: '2026-03-04', codename: 'Code Review Fixes', changes: 'Fix N+1 sheet reads in getStewardSurveyTracking — pre-load _Survey_Tracking once, build email map, O(1) lookup per member. Add escapeForFormula() to profile update setValue() (formula injection fix). Replace all google.script.run with serverCall() in member_view.html and steward_view.html (~52 calls) — all server calls now have default failure handler. Normalize QAForum anonymous checks to use isTruthyValue() for consistent Sheets boolean handling.' },

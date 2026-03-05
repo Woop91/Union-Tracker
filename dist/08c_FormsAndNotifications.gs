@@ -983,7 +983,7 @@ function showNotificationSettings() {
   var ui = SpreadsheetApp.getUi();
   var props = PropertiesService.getScriptProperties();
   var enabled = props.getProperty('notifications_enabled') === 'true';
-  var email = props.getProperty('notification_email') || Session.getEffectiveUser().getEmail();
+  var email = props.getProperty('notification_email') || Session.getActiveUser().getEmail();
 
   var response = ui.alert('Notification Settings',
     'Daily deadline notifications: ' + (enabled ? 'ENABLED' : 'DISABLED') + '\n' +

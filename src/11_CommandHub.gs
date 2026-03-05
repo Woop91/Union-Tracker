@@ -2743,7 +2743,7 @@ function showSearchPrecedents() {
     '      "</div>" +' +
     '      "<div class=\\"result-meta\\"><strong>" + escapeHtml(item.issueCategory) + "</strong> | " + escapeHtml(item.article) + "</div>" +' +
     '      "<div class=\\"result-meta\\">" + escapeHtml(item.memberName) + " • " + escapeHtml(item.location) + " • " + escapeHtml(item.dateResolved) + "</div>" +' +
-    '      (item.resolution ? "<div class=\\"result-outcome\\"><strong>Resolution:</strong> " + escapeHtml(item.resolution) + "<button class=\\"copy-btn\\" onclick=\\"copyText(\'" + escapeHtml(item.id).replace(/\'/g,"") + ": " + escapeHtml(item.resolution).replace(/\'/g, "") + "\')\\">Copy</button></div>" : "") +' +
+    '      (item.resolution ? "<div class=\\"result-outcome\\"><strong>Resolution:</strong> " + escapeHtml(item.resolution) + "<button class=\\"copy-btn\\" onclick=\\"copyText(" + JSON.stringify(item.id + ": " + item.resolution).replace(/"/g, \'&quot;\') + ")\\">Copy</button></div>" : "") +' +
     '    "</div>";' +
     '  });' +
     '  container.innerHTML = html;' +

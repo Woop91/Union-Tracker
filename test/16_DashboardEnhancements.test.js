@@ -222,6 +222,27 @@ describe('scheduleEmailReport', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('PII');
   });
+
+  // C-AUTH-7 regression: old `||` logic incorrectly blocked both of these
+  test('C-AUTH-7 regression: PII report sent to self is allowed for non-steward', () => {
+    getUserRole_.mockImplementation(() => 'member');
+    Session.getActiveUser.mockImplementation(() => ({
+      getEmail: jest.fn(() => 'member@example.com')
+    }));
+    // Sending PII to yourself should succeed even if you are not steward/admin
+    const result = scheduleEmailReport({ email: 'member@example.com', includePII: true });
+    expect(result.success).toBe(true);
+  });
+
+  test('C-AUTH-7 regression: non-PII report to any recipient is allowed for non-steward', () => {
+    getUserRole_.mockImplementation(() => 'member');
+    Session.getActiveUser.mockImplementation(() => ({
+      getEmail: jest.fn(() => 'sender@example.com')
+    }));
+    // Sending a non-PII report to another person should succeed
+    const result = scheduleEmailReport({ email: 'recipient@example.com', includePII: false });
+    expect(result.success).toBe(true);
+  });
 });
 
 // ============================================================================

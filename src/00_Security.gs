@@ -252,57 +252,6 @@ function sanitizeForQuery(value) {
   return str;
 }
 
-/**
- * Safely creates a QUERY formula with sanitized parameters
- * @param {string} sheetName - The sheet name
- * @param {string} query - The query string
- * @param {number} headers - Number of header rows
- * @returns {string} Safe QUERY formula
- */
-function buildSafeQuery(sheetName, query, headers, range) {
-  var safeSheet = safeSheetNameForFormula(sheetName);
-  var safeHeaders = parseInt(headers, 10) || 1;
-
-  // Determine the data range dynamically instead of hardcoding A:Z.
-  // If no range is provided, compute it from the actual sheet's last column.
-  var safeRange = 'A:Z'; // fallback
-  if (range) {
-    // Validate provided range format (e.g. "A:Z", "A1:Z100", "A:AZ")
-    if (/^[A-Z]+[0-9]*:[A-Z]+[0-9]*$/.test(String(range))) {
-      safeRange = String(range);
-    }
-  } else {
-    try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      var sheet = ss.getSheetByName(sheetName);
-      if (sheet) {
-        var lastCol = sheet.getLastColumn();
-        if (lastCol > 0) {
-          var lastColLetter = sheet.getRange(1, lastCol).getA1Notation().replace(/[0-9]/g, '');
-          safeRange = 'A:' + lastColLetter;
-        }
-      }
-    } catch (_e) {
-      // Fall back to A:Z if sheet lookup fails
-    }
-  }
-
-  // Sanitize the query - remove potentially dangerous characters
-  // CR-DATA-4: Google Visualization API QUERY strings use doubled-quote ("") escaping,
-  // not backslash-quote (\") which would produce a literal backslash in the formula.
-  var safeQuery = String(query)
-    .replace(/'/g, "''")
-    .replace(/"/g, '""');
-
-  // Reject queries that could break out of the QUERY string context
-  // Blocks: IMPORTRANGE, IMPORTDATA, IMPORTFEED, IMPORTHTML, IMAGE, QUERY, INDIRECT, OFFSET
-  if (/["\)]\s*[\+\&,]/.test(safeQuery) || /IMPORTRANGE|IMPORTDATA|IMPORTFEED|IMPORTHTML|IMAGE|QUERY|INDIRECT|OFFSET/i.test(safeQuery)) {
-    throw new Error('Query contains disallowed patterns');
-  }
-
-  return '=QUERY(' + safeSheet + '!' + safeRange + ', "' + safeQuery + '", ' + safeHeaders + ')';
-}
-
 // ============================================================================
 // INPUT LENGTH VALIDATION
 // ============================================================================

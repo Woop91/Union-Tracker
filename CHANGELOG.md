@@ -5,6 +5,22 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.6] - 2026-03-04
+
+### Security
+- **C-AUTH-5** — Replace `Session.getEffectiveUser()` with `Session.getActiveUser()` in 3 locations (`22_WebDashApp.gs:71`, `01_Core.gs:218`, `08c_FormsAndNotifications.gs:986`). In "Execute as me" web apps, `getEffectiveUser()` always returns the script owner, meaning every visitor passed the bootstrap admin check.
+- **C-AUTH-7** — Fix logic error in `scheduleEmailReport()` PII guard (`16_DashboardEnhancements.gs:158`): `||` → `&&`. Old logic blocked PII-to-self (should be allowed) and non-PII-to-others (should be allowed).
+- **C-XSS-7/8** — Wrap `escapeHtml()` around custom field `value` and `field.name` in expansion form builder (`12_Features.gs:1781,1787`).
+- **C-XSS-9** — Replace single-quote stripped onclick param with `JSON.stringify()` + `&quot;` HTML encoding in resolution copy button (`11_CommandHub.gs:2746`).
+- **C-XSS-14** — Wrap `escapeHtml()` around `label` before newline-to-`<br>` replacement in `renderGauge()` (`09_Dashboards.gs:329`).
+- **C-XSS-16** — Wrap `escapeHtml()` around `m.category`, `m.label`, `m.value` in PublicDashboard comparison table (`04e_PublicDashboard.gs:2618`); apply RFC 4180 double-quote escaping (`"` → `""`) in CSV export (`04e_PublicDashboard.gs:2625`).
+- **C-XSS-17** — Replace `email.includes('@')` with `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` regex in `03_UIComponents.gs:2076`.
+- **C-OTHER-1** — Delete dead `buildSafeQuery()` function (~42 lines) from `00_Security.gs:262-304`. Zero callers confirmed.
+
+### Tests
+- Add 2 C-AUTH-7 regression tests: PII-to-self allowed, non-PII-to-non-steward allowed (`16_DashboardEnhancements.test.js`)
+- Add 9 C-XSS-17 regression tests: valid/invalid email patterns against the new regex (`03_UIComponents.test.js`)
+
 ## [4.20.5] - 2026-03-04
 
 ### Fixed

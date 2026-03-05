@@ -67,7 +67,7 @@ function doGetWebDashboard(e) {
       // Check if the visitor is the script owner — grant bootstrap access
       // so the app is usable before the Member Directory is populated.
       try {
-        var ownerEmail = Session.getEffectiveUser().getEmail().toLowerCase();
+        var ownerEmail = Session.getActiveUser().getEmail().toLowerCase();
         if (user.email && user.email.toLowerCase() === ownerEmail) {
           userRecord = {
             email: user.email,

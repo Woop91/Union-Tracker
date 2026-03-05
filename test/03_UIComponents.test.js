@@ -346,3 +346,26 @@ describe('createDashboardMenu', () => {
     expect(menuNames.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ============================================================================
+// C-XSS-17 regression: email validation regex
+// ============================================================================
+
+describe('email validation regex (C-XSS-17 regression)', () => {
+  // The regex used in sendMemberReport_ after C-XSS-17 fix
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  test.each([
+    ['user@example.com', true],
+    ['first.last@subdomain.domain.org', true],
+    ['user+tag@example.co.uk', true],
+    ['not-an-email', false],
+    ['@example.com', false],
+    ['user@', false],
+    ['user @example.com', false],
+    ['user@example', false],
+    ['', false],
+  ])('email "%s" valid=%s', (email, expected) => {
+    expect(emailRegex.test(email)).toBe(expected);
+  });
+});
