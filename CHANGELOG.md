@@ -5,6 +5,11 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.12] - 2026-03-04
+
+### Removed (dead code)
+- **Testing framework duplicates** (`06_Maintenance.gs:3752-3835`, ~84 lines) — `TEST_RESULTS` var (zero callers), `TEST_MAX_EXECUTION_MS`/`TEST_LARGE_DATASET_THRESHOLD`/`Assert`/`VALIDATION_PATTERNS`/`VALIDATION_MESSAGES` (all active copies live in `07_DevTools.gs`), 4 empty section stub headers, 2 orphaned JSDoc comment blocks with no function implementations.
+
 ## [4.20.11] - 2026-03-04
 
 ### Fixed
