@@ -1657,7 +1657,7 @@ function onGrievanceFormSubmit(e) {
 
     // Create member folder and PDF
     var memberFolder = getOrCreateMemberFolder(data.name, data.id);
-    var _pdfFile = createSignatureReadyPDF(memberFolder, data);
+    createSignatureReadyPDF(memberFolder, data);
 
     // Link PDF back to the grievance log
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4636,7 +4636,6 @@ function getWebAppNotifications(userEmail, userRole) {
     var data = sheet.getDataRange().getValues();
     if (data.length < 2) return [];
 
-    var _headers = data[0];
     var C = NOTIFICATIONS_COLS;
     var now = new Date();
     var results = [];

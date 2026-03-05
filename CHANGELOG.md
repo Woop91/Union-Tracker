@@ -5,6 +5,21 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.15] - 2026-03-05
+
+### Fixed
+- **C-XSS-18** (`index.html:el()`) — Boolean attributes (`selected`, `disabled`, `checked`) were set via `setAttribute(key, false)` which adds `attr="false"` — presence of the attribute is truthy in DOM regardless of value. Fixed by using property assignment (`elem[key] = value`) for boolean values so `selected: false` correctly removes the selection.
+- **C-XSS-6** (`03_UIComponents.gs:showMemberQuickActions`) — Replace `'\'' + escapeHtml(memberId) + '\''` with `JSON.stringify(memberId)` in all `onclick` JS string contexts. `escapeHtml` produces HTML entities (`&#x27;`) which the HTML parser decodes back to the original character before JavaScript runs — the wrong escaping for a JS string context. `JSON.stringify` produces correct escape sequences for both HTML attribute and JS string boundaries.
+
+### Removed (dead code — LOW findings)
+- **Unused `_`-prefixed variables** — 9 declarations removed across 5 files:
+  - `_lastRow` (`04b_AccessibilityFeatures.gs`) — `sheet.getLastRow()` result stored but never read
+  - `_ss` × 2 (`04d_ExecutiveDashboard.gs`) — `getActiveSpreadsheet()` result stored but never used in `midnightAutoRefresh` and `createGrievancePDF_UIService_`
+  - `_headers` × 2 (`04e_PublicDashboard.gs`, `05_Integrations.gs`) — header row stored for skipping but index `m=1` already handles this
+  - `_stepDays`, `_mgmtResponseDays` (`04e_PublicDashboard.gs`) — initialized but never populated or read
+  - `_mode` (`04e_PublicDashboard.gs`) — `isPII ? 'steward' : 'member'` string assigned but `title`/`badge` variables used instead
+  - `_pdfFile` (`05_Integrations.gs`) — `createSignatureReadyPDF()` result stored but never used; call kept for side effect
+
 ## [4.20.14] - 2026-03-05
 
 ### Fixed

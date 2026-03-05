@@ -581,9 +581,6 @@ function processMemberImport(csvData) {
       return errorResponse('Required columns missing: First Name, Last Name');
     }
 
-    // Get existing data to find last row
-    var _lastRow = sheet.getLastRow();
-
     // Process data rows
     var importedCount = 0;
     for (var i = 1; i < lines.length; i++) {

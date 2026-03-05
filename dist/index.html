@@ -305,6 +305,11 @@
             elem.className = attrs[key];
           } else if (key.indexOf('on') === 0) {
             elem.addEventListener(key.substring(2).toLowerCase(), attrs[key]);
+          } else if (typeof attrs[key] === 'boolean') {
+            // CR-XSS-18: Boolean attributes (selected, disabled, checked) must use
+            // presence semantics — setAttribute('selected', false) still adds the
+            // attribute (string "false" is truthy in DOM). Use property assignment instead.
+            elem[key] = attrs[key];
           } else {
             elem.setAttribute(key, attrs[key]);
           }

@@ -271,8 +271,6 @@ function getUnifiedDashboardData(includePII) {
   // Process Members
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberData = memberSheet.getDataRange().getValues();
-    var _headers = memberData[0];
-
     for (var m = 1; m < memberData.length; m++) {
       var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
       if (!memberId || !memberId.toString().match(/^M/i)) continue;
@@ -479,8 +477,6 @@ function getUnifiedDashboardData(includePII) {
   var step1Total = 0, step1Denials = 0;
   var step2Total = 0, step2Denials = 0;
   var settlementDays = [];
-  var _stepDays = { step1: [], step2: [], step3: [], arb: [] };  // Days at each step
-  var _mgmtResponseDays = [];
   var monthlyFilingsMap = {};
   var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
 
@@ -1349,7 +1345,6 @@ function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
 function getUnifiedDashboardHtml(isPII) {
   // NOTE: This function builds a large HTML string via concatenation. This is an inherent
   // GAS limitation (no template engine / no file bundler). Keep total size under ~500KB.
-  var _mode = isPII ? 'steward' : 'member';
   var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
   var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
   var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union') : 'Union';

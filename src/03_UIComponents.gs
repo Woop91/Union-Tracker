@@ -1512,12 +1512,17 @@ function showMemberQuickActions(row) {
   // Build email section buttons (only if email exists)
   var emailButtons = '';
   if (email) {
+    // CR-XSS-6: Use JSON.stringify for memberId in onclick JS string context.
+    // escapeHtml() is wrong here — HTML entities get decoded by the parser before
+    // JS executes, so &apos; → ' which breaks single-quoted string delimiters.
+    // JSON.stringify() produces a double-quoted JS string with correct escape sequences.
+    var memberIdJs = JSON.stringify(memberId);
     emailButtons =
       '<div class="section-header">📨 Email Options</div>' +
-      '<button class="action-btn" onclick="google.script.run.composeEmailForMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ' + escapeHtml(email) + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>';
+      '<button class="action-btn" onclick="google.script.run.composeEmailForMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ' + escapeHtml(email) + '</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>';
   }
 
   var html = HtmlService.createHtmlOutput(
@@ -1550,9 +1555,9 @@ function showMemberQuickActions(row) {
     '<div class="actions">' +
     '<div class="section-header">📋 Member Actions</div>' +
     '<button class="action-btn" onclick="google.script.run.openGrievanceFormForMember(' + row + ');google.script.host.close()"><span class="icon">📋</span><span><div class="title">Start New Grievance</div><div class="desc">Create a grievance for this member</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
-    '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + escapeHtml(memberId) + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + escapeHtml(memberId) + '</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(\'' + escapeHtml(memberId) + '\')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
+    '<button class="action-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(memberId) + ');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + escapeHtml(memberId) + '</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(' + JSON.stringify(memberId) + ')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
     emailButtons +
     '</div>' +
     '<button class="close" onclick="google.script.host.close()">Close</button>' +
