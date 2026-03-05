@@ -85,7 +85,7 @@ function getInteractiveDashboardHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<base target="_top">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<style>' +
     // CSS Reset and base styles
     '*{box-sizing:border-box;margin:0;padding:0}' +

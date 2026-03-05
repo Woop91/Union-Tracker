@@ -645,7 +645,7 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) return { hasCompleted: false, lastCompleted: null };
-      var trackSheet = ss.getSheetByName('_Survey_Tracking');
+      var trackSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
       if (!trackSheet || trackSheet.getLastRow() <= 1) {
         return { hasCompleted: false, lastCompleted: null };
       }
@@ -856,7 +856,7 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) throw new Error('Spreadsheet unavailable');
-      var trackSheet = ss.getSheetByName('_Survey_Tracking');
+      var trackSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
       if (trackSheet && trackSheet.getLastRow() > 1) {
         var tData = trackSheet.getDataRange().getValues();
         var tColMap = _buildColumnMap(tData[0]);
@@ -1532,7 +1532,7 @@ var DataService = (function () {
       if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.CHIEF_STEWARD_EMAIL) {
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         if (!ss) return null;
-        var cfgSheet = ss.getSheetByName('Config');
+        var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);
         if (cfgSheet) email = String(cfgSheet.getRange(3, CONFIG_COLS.CHIEF_STEWARD_EMAIL).getValue() || '').toLowerCase().trim();
       }
       if (!email && typeof COMMAND_CONFIG !== 'undefined') email = String(COMMAND_CONFIG.CHIEF_STEWARD_EMAIL || '').toLowerCase().trim();

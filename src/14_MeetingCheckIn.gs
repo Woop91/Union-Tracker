@@ -1087,7 +1087,7 @@ function getCheckInPageHtml() {
   var html = '<!DOCTYPE html>' +
     '<html lang="en"><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Meeting Check-In | ' + escapeHtml(typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard') : 'Union Dashboard') + '</title>' +
     '<style>' +
 

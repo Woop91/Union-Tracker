@@ -1352,10 +1352,11 @@ function getUnifiedDashboardHtml(isPII) {
   var _mode = isPII ? 'steward' : 'member';
   var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
   var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
+  var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union') : 'Union';
 
   return '<!DOCTYPE html>' +
     '<html lang="en"><head><meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<meta name="apple-mobile-web-app-capable" content="yes">' +
     '<title>' + title + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">' +
@@ -2611,7 +2612,7 @@ function getUnifiedDashboardHtml(isPII) {
 
     // Save steward contact (v4.4.0)
     'function saveStewardContact(name,email,phone){' +
-    'var vcard="BEGIN:VCARD\\nVERSION:3.0\\nFN:"+name+"\\nORG:SEIU Local\\nTITLE:Union Steward\\n";' +
+    'var vcard="BEGIN:VCARD\\nVERSION:3.0\\nFN:"+name+"\\nORG:"+' + JSON.stringify(orgName) + '+"\\nTITLE:Union Steward\\n";' +
     'if(email)vcard+="EMAIL:"+email+"\\n";' +
     'if(phone)vcard+="TEL:"+phone+"\\n";' +
     'vcard+="END:VCARD";' +

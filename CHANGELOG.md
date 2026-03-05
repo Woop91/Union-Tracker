@@ -5,6 +5,15 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.13] - 2026-03-04
+
+### Fixed
+- **Accessibility** (`index.html`, `04c_InteractiveDashboard.gs`, `04e_PublicDashboard.gs`, `05_Integrations.gs` ×8, `14_MeetingCheckIn.gs`) — Replace `user-scalable=no` with `user-scalable=yes, maximum-scale=5.0` in all 12 viewport meta tags. Fixes WCAG 2.1 SC 1.4.4 (Resize Text) violation that blocked low-vision users from pinch-zooming on mobile.
+- **Hardcoded org names** (`05_Integrations.gs:4274`, `05_Integrations.gs:4970`, `08c_FormsAndNotifications.gs:1412`, `04e_PublicDashboard.gs:vCard`) — Replace literal org names (`SEIU 509`, `MassAbility DDS`, `SEIU Local`) in HTML titles, survey subject default, and vCard ORG field with `getConfigValue_(CONFIG_COLS.ORG_NAME)` — single source of truth from Config sheet.
+- **Hardcoded sheet name strings** (`21_WebDashDataService.gs:648`, `:859`, `:1535`) — Replace `'_Survey_Tracking'` with `HIDDEN_SHEETS.SURVEY_TRACKING` (×2) and `'Config'` with `SHEETS.CONFIG`. All sheet references now use named constants.
+- **Redundant sheet fallback** (`04d_ExecutiveDashboard.gs:279`) — Remove `|| ss.getSheetByName("_Dashboard_Calc")`. `SHEETS.DASHBOARD_CALC` already equals `'_Dashboard_Calc'`; the `||` branch was unreachable dead code.
+- **Deprecated `document.execCommand("copy")`** (`08c_FormsAndNotifications.gs` ×2) — Replace with `navigator.clipboard.writeText()` as primary path, `execCommand("copy")` as fallback for older environments. Eliminates browser deprecation warnings in contact form and survey link copy dialogs.
+
 ## [4.20.12] - 2026-03-04
 
 ### Removed (dead code)

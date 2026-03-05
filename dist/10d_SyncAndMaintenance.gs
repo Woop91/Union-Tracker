@@ -422,20 +422,24 @@ function sortGrievanceLogByStatus() {
   // Get all data (excluding header row) - use actual column count to avoid truncation
   var lastCol = sheet.getLastColumn();
   var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-  var data = dataRange.getValues();
+  var data  = dataRange.getValues();
+  var notes = dataRange.getNotes(); // capture per-cell notes so they move with their rows
+
+  // Zip rows with their notes, sort, then unzip
+  var rows = data.map(function(row, i) { return { d: row, n: notes[i] }; });
 
   // Sort with Message Alert first, then by status priority
-  data.sort(function(a, b) {
+  rows.sort(function(a, b) {
     // FIRST: Message Alert rows go to the very top
-    var alertA = a[GRIEVANCE_COLS.MESSAGE_ALERT - 1] === true;
-    var alertB = b[GRIEVANCE_COLS.MESSAGE_ALERT - 1] === true;
+    var alertA = a.d[GRIEVANCE_COLS.MESSAGE_ALERT - 1] === true;
+    var alertB = b.d[GRIEVANCE_COLS.MESSAGE_ALERT - 1] === true;
 
     if (alertA && !alertB) return -1; // A has alert, B doesn't - A goes first
     if (!alertA && alertB) return 1;  // B has alert, A doesn't - B goes first
 
     // SECOND: Sort by status priority
-    var statusA = a[GRIEVANCE_COLS.STATUS - 1] || '';
-    var statusB = b[GRIEVANCE_COLS.STATUS - 1] || '';
+    var statusA = a.d[GRIEVANCE_COLS.STATUS - 1] || '';
+    var statusB = b.d[GRIEVANCE_COLS.STATUS - 1] || '';
 
     var priorityA = GRIEVANCE_STATUS_PRIORITY[statusA] || 99;
     var priorityB = GRIEVANCE_STATUS_PRIORITY[statusB] || 99;
@@ -445,8 +449,8 @@ function sortGrievanceLogByStatus() {
     }
 
     // THIRD: Sort by Days to Deadline - most urgent first
-    var daysA = a[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var daysB = b[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+    var daysA = a.d[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+    var daysB = b.d[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
 
     // Handle non-numeric values: 'Overdue' → -1 (most urgent), blank/null → 9999 (least urgent)
     if (typeof daysA !== 'number' || isNaN(daysA)) daysA = (daysA === 'Overdue' ? -1 : 9999);
@@ -455,8 +459,9 @@ function sortGrievanceLogByStatus() {
     return daysA - daysB;
   });
 
-  // Write sorted data back
-  dataRange.setValues(data);
+  // Write sorted data and notes back
+  dataRange.setValues(rows.map(function(r) { return r.d; }));
+  dataRange.setNotes(rows.map(function(r) { return r.n; }));
 
   // Re-apply checkboxes - setValues overwrites them
   if (lastRow >= 2) {

@@ -1887,7 +1887,7 @@ function getWebAppSearchHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Search - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
@@ -2039,7 +2039,7 @@ function getWebAppGrievanceListHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Grievances - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
@@ -2224,7 +2224,7 @@ function getWebAppMemberListHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Members - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
@@ -2387,7 +2387,7 @@ function getWebAppLinksHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Links - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
@@ -3804,7 +3804,7 @@ function getWebAppResourcesHtml() {
   return '<!DOCTYPE html>' +
     '<html lang="en"><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Know Your Rights</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700;800&display=swap" rel="stylesheet">' +
     '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
@@ -3967,7 +3967,7 @@ function getWebAppCheckInHtml() {
   return '<!DOCTYPE html>' +
     '<html lang="en"><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Meeting Check-In</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap" rel="stylesheet">' +
     '<style>' +
@@ -4270,8 +4270,8 @@ function getDeadlineCalendarHtml() {
   var html = '<!DOCTYPE html>' +
     '<html lang="en"><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
-    '<title>Deadline Calendar | SEIU 509</title>' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
+    '<title>Deadline Calendar | ' + escapeHtml(typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union') : 'Union') + '</title>' +
     '<style>' +
 
     // Reset
@@ -4965,9 +4965,9 @@ function getWebAppNotificationsHtml() {
   var p = [];
   p.push('<!DOCTYPE html><html><head>');
   p.push('<meta charset="utf-8">');
-  p.push('<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">');
+  p.push('<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">');
   p.push('<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">');
-  p.push('<title>Notifications | MassAbility DDS</title>');
+  p.push('<title>Notifications | ' + escapeHtml(typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union') : 'Union') + '</title>');
 
   // ── CSS ──
   p.push('<style>');

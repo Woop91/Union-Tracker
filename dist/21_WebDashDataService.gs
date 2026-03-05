@@ -645,7 +645,7 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) return { hasCompleted: false, lastCompleted: null };
-      var trackSheet = ss.getSheetByName('_Survey_Tracking');
+      var trackSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
       if (!trackSheet || trackSheet.getLastRow() <= 1) {
         return { hasCompleted: false, lastCompleted: null };
       }
@@ -856,7 +856,7 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) throw new Error('Spreadsheet unavailable');
-      var trackSheet = ss.getSheetByName('_Survey_Tracking');
+      var trackSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
       if (trackSheet && trackSheet.getLastRow() > 1) {
         var tData = trackSheet.getDataRange().getValues();
         var tColMap = _buildColumnMap(tData[0]);
@@ -1300,10 +1300,16 @@ var DataService = (function () {
     var mEmail = memberEmail.toLowerCase().trim();
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][1]).toLowerCase().trim() === sEmail && String(data[i][2]).toLowerCase().trim() === mEmail) {
-        results.push({ id: data[i][0], type: data[i][3], date: data[i][4] instanceof Date ? _formatDate(data[i][4]) : String(data[i][4]), notes: data[i][5], duration: data[i][6] });
+        var rawDate = data[i][4];
+        results.push({ id: data[i][0], type: data[i][3],
+          date: rawDate instanceof Date ? _formatDate(rawDate) : String(rawDate),
+          _ts: rawDate instanceof Date ? rawDate.getTime() : 0,
+          notes: data[i][5], duration: data[i][6] });
       }
     }
-    results.sort(function(a, b) { return b.date > a.date ? 1 : -1; });
+    // H-16: sort by numeric timestamp — string comparison of formatted dates is not chronological
+    results.sort(function(a, b) { return (b._ts || 0) - (a._ts || 0); });
+    results.forEach(function(r) { delete r._ts; });
     return results;
   }
 
@@ -1315,10 +1321,16 @@ var DataService = (function () {
     var sEmail = stewardEmail.toLowerCase().trim();
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][1]).toLowerCase().trim() === sEmail) {
-        results.push({ id: data[i][0], memberEmail: data[i][2], type: data[i][3], date: data[i][4] instanceof Date ? _formatDate(data[i][4]) : String(data[i][4]), notes: data[i][5], duration: data[i][6] });
+        var rawDate2 = data[i][4];
+        results.push({ id: data[i][0], memberEmail: data[i][2], type: data[i][3],
+          date: rawDate2 instanceof Date ? _formatDate(rawDate2) : String(rawDate2),
+          _ts: rawDate2 instanceof Date ? rawDate2.getTime() : 0,
+          notes: data[i][5], duration: data[i][6] });
       }
     }
-    results.sort(function(a, b) { return b.date > a.date ? 1 : -1; });
+    // H-16: sort by numeric timestamp — string comparison of formatted dates is not chronological
+    results.sort(function(a, b) { return (b._ts || 0) - (a._ts || 0); });
+    results.forEach(function(r) { delete r._ts; });
     return results.slice(0, 100);
   }
 
@@ -1520,7 +1532,7 @@ var DataService = (function () {
       if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.CHIEF_STEWARD_EMAIL) {
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         if (!ss) return null;
-        var cfgSheet = ss.getSheetByName('Config');
+        var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);
         if (cfgSheet) email = String(cfgSheet.getRange(3, CONFIG_COLS.CHIEF_STEWARD_EMAIL).getValue() || '').toLowerCase().trim();
       }
       if (!email && typeof COMMAND_CONFIG !== 'undefined') email = String(COMMAND_CONFIG.CHIEF_STEWARD_EMAIL || '').toLowerCase().trim();

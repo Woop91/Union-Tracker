@@ -276,7 +276,7 @@ function getExecutiveDashboardHtml_() {
  */
 function getExecutiveMetrics_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var calcSheet = ss.getSheetByName(SHEETS.DASHBOARD_CALC) || ss.getSheetByName("_Dashboard_Calc");
+  var calcSheet = ss.getSheetByName(SHEETS.DASHBOARD_CALC);
 
   var metrics = {
     activeGrievances: 0,

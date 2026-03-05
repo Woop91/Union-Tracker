@@ -223,9 +223,9 @@ function sendContactInfoForm() {
       '<script>' +
       'function copyLink() {' +
       '  var ta = document.getElementById("link");' +
-      '  ta.select();' +
-      '  document.execCommand("copy");' +
-      '  document.getElementById("copied").style.display = "inline";' +
+      '  var showOk = function() { document.getElementById("copied").style.display = "inline"; };' +
+      '  if (navigator.clipboard) { navigator.clipboard.writeText(ta.value).then(showOk).catch(function() { ta.select(); document.execCommand("copy"); showOk(); }); }' +
+      '  else { ta.select(); document.execCommand("copy"); showOk(); }' +
       '}' +
       '</script>' +
       '</div></body></html>'
@@ -636,9 +636,9 @@ function getSatisfactionSurveyLink() {
       '<script>' +
       'function copyLink() {' +
       '  var ta = document.getElementById("link");' +
-      '  ta.select();' +
-      '  document.execCommand("copy");' +
-      '  document.getElementById("copied").style.display = "inline";' +
+      '  var showOk = function() { document.getElementById("copied").style.display = "inline"; };' +
+      '  if (navigator.clipboard) { navigator.clipboard.writeText(ta.value).then(showOk).catch(function() { ta.select(); document.execCommand("copy"); showOk(); }); }' +
+      '  else { ta.select(); document.execCommand("copy"); showOk(); }' +
       '}' +
       '</script>' +
       '</div></body></html>'
@@ -1387,6 +1387,7 @@ function configureAlertSettings() {
  */
 function sendRandomSurveyEmails() {
   var ui = SpreadsheetApp.getUi();
+  var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union') : 'Union';
 
   // Show configuration dialog
   var html = HtmlService.createHtmlOutput(
@@ -1409,7 +1410,7 @@ function sendRandomSurveyEmails() {
     '<select id="count"><option value="5">5 members</option><option value="10" selected>10 members</option>' +
     '<option value="20">20 members</option><option value="50">50 members</option><option value="100">100 members</option></select></div>' +
     '<div class="form-group"><label>Email Subject</label>' +
-    '<input type="text" id="subject" value="SEIU Local - Member Satisfaction Survey"></div>' +
+    '<input type="text" id="subject" value="' + escapeHtml(orgName) + ' - Member Satisfaction Survey"></div>' +
     '<div class="form-group"><label>Exclude members emailed in last (days)</label>' +
     '<select id="excludeDays"><option value="0">No exclusion</option><option value="30" selected>30 days</option>' +
     '<option value="60">60 days</option><option value="90">90 days</option></select></div>' +
