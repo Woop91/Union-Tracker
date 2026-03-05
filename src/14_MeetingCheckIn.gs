@@ -427,55 +427,64 @@ function processMeetingCheckIn(meetingId, email, pin) {
     clearPINAttempts(memberId);
   }
 
-  // Check if already checked in to this meeting
-  var checkInSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
-  if (!checkInSheet) {
-    return errorResponse('Meeting check-in sheet not found');
+  // H-5: Acquire lock to prevent TOCTOU race between duplicate check and appendRow
+  var checkInLock = LockService.getScriptLock();
+  if (!checkInLock.tryLock(10000)) {
+    return errorResponse('Check-in temporarily unavailable — please try again.');
   }
-
-  var checkInData = checkInSheet.getDataRange().getValues();
-  for (var j = 1; j < checkInData.length; j++) {
-    var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
-    var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
-    if (rowMeetingId === meetingId && rowMemberId === memberId) {
-      return errorResponse(memberName.trim() + ' is already checked in to this meeting.');
+  try {
+    // Check if already checked in to this meeting
+    var checkInSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!checkInSheet) {
+      return errorResponse('Meeting check-in sheet not found');
     }
-  }
 
-  // Find meeting details from the first row with this meeting ID
-  var meetingName = '';
-  var meetingDate = '';
-  var meetingType = '';
-  for (var k = 1; k < checkInData.length; k++) {
-    if (String(checkInData[k][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
-      meetingName = checkInData[k][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '';
-      meetingDate = checkInData[k][MEETING_CHECKIN_COLS.MEETING_DATE - 1] || '';
-      meetingType = checkInData[k][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '';
-      break;
-    }
-  }
-
-  // Record the check-in (columns A-H only; I-M are meeting-level metadata)
-  checkInSheet.appendRow([
-    meetingId,
-    meetingName,
-    meetingDate,
-    meetingType,
-    memberId,
-    escapeForFormula(memberName.trim()),
-    new Date(),
-    escapeForFormula(email)
-  ]);
-
-  // If this is a Scheduled meeting getting its first check-in, mark as Active
-  for (var m = 1; m < checkInData.length; m++) {
-    if (String(checkInData[m][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
-      var currentStatus = String(checkInData[m][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
-      if (currentStatus === MEETING_STATUS.SCHEDULED) {
-        checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
+    var checkInData = checkInSheet.getDataRange().getValues();
+    for (var j = 1; j < checkInData.length; j++) {
+      var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+      var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
+      if (rowMeetingId === meetingId && rowMemberId === memberId) {
+        return errorResponse(memberName.trim() + ' is already checked in to this meeting.');
       }
-      break;
     }
+
+    // Find meeting details from the first row with this meeting ID
+    var meetingName = '';
+    var meetingDate = '';
+    var meetingType = '';
+    for (var k = 1; k < checkInData.length; k++) {
+      if (String(checkInData[k][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+        meetingName = checkInData[k][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '';
+        meetingDate = checkInData[k][MEETING_CHECKIN_COLS.MEETING_DATE - 1] || '';
+        meetingType = checkInData[k][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '';
+        break;
+      }
+    }
+
+    // Record the check-in (columns A-H only; I-M are meeting-level metadata)
+    checkInSheet.appendRow([
+      meetingId,
+      meetingName,
+      meetingDate,
+      meetingType,
+      memberId,
+      escapeForFormula(memberName.trim()),
+      new Date(),
+      escapeForFormula(email)
+    ]);
+
+    // If this is a Scheduled meeting getting its first check-in, mark as Active
+    for (var m = 1; m < checkInData.length; m++) {
+      if (String(checkInData[m][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+        var currentStatus = String(checkInData[m][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+        if (currentStatus === MEETING_STATUS.SCHEDULED) {
+          checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
+        }
+        break;
+      }
+    }
+  } finally {
+    checkInLock.releaseLock();
   }
 
   // Audit log

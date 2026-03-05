@@ -600,7 +600,7 @@ function checkOverdueGrievances_() {
 
     if (overdueList.length > 0) {
       var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
-      if (chiefStewardEmail) {
+      if (chiefStewardEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chiefStewardEmail)) {
         var body = 'DAILY OVERDUE GRIEVANCE REPORT\n\n' +
                    'The following ' + overdueList.length + ' grievance(s) have passed their deadline:\n\n';
 

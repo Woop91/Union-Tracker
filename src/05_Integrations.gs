@@ -4097,7 +4097,7 @@ function getWebAppResourcesHtml() {
     '  var el=document.getElementById("catPills");' +
     '  var html="<button class=\\"cat-pill active\\" onclick=\\"setCat(\\x27all\\x27,this)\\">All ("+items.length+")</button>";' +
     '  Object.keys(cats).sort().forEach(function(c){' +
-    '    html+="<button class=\\"cat-pill\\" onclick=\\"setCat(\\x27"+c+"\\x27,this)\\">"+escapeHtml(c)+" ("+cats[c]+")</button>";' +
+    '    html+="<button class=\\"cat-pill\\" onclick=\\"setCat("+JSON.stringify(c).replace(/"/g,"&quot;")+",this)\\">"+escapeHtml(c)+" ("+cats[c]+")</button>";' +
     '  });' +
     '  el.innerHTML=html;' +
     '}' +

@@ -653,16 +653,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.6';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.7';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 20,
-    PATCH: parseInt(parts[2], 10) || 6,
+    PATCH: parseInt(parts[2], 10) || 7,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-04',
-    CODENAME: 'Critical Security Fixes'
+    CODENAME: 'Security & Data Integrity Fixes'
   };
 })();
 
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.7', date: '2026-03-04', codename: 'Security & Data Integrity Fixes', changes: 'C-AUTH-4: dataGetMemberGrievanceHistoryPortal now resolves identity server-side (was IDOR). C-XSS-5: JSON.stringify+&quot; on category onclick param in 05_Integrations.gs. C-FORMULA-7: escapeForFormula on weekly question text in 24_WeeklyQuestions.gs (3 locations). C-DATA-1: vault dedup reads EMAIL column (col 2) not RESPONSE_ROW (col 1) — dedup was silently broken. C-DATA-5: weekly_cases manual fallback removed hardcoded \'15\' in member_view.html. H-5: LockService added to meeting check-in to prevent TOCTOU duplicate entries (14_MeetingCheckIn.gs). H-17: email regex validation before overdue report send (04d_ExecutiveDashboard.gs). H-18: LockService added to archiveClosedGrievances for atomic read-copy-delete (06_Maintenance.gs). H-3: applyState ADD_ROW bounds check (row > 1 and <= lastRow) before deleteRow. H-4: batchSetValues guards against header row (row <= 1) updates.' },
   { version: '4.20.6', date: '2026-03-04', codename: 'Critical Security Fixes', changes: 'Fix 9 confirmed vulnerabilities from FULL_CODE_REVIEW: C-AUTH-5 (getEffectiveUser→getActiveUser in 3 locations), C-AUTH-7 (PII guard || → && logic fix), C-XSS-7/8 (escapeHtml on custom field value+label in 12_Features.gs), C-XSS-9 (JSON.stringify+&quot; in onclick builder in 11_CommandHub.gs), C-XSS-14 (escapeHtml on renderGauge label in 09_Dashboards.gs), C-XSS-16 (escapeHtml in PublicDashboard HTML table; RFC 4180 double-quote CSV escaping), C-XSS-17 (email regex validation in 03_UIComponents.gs), C-OTHER-1 (delete dead buildSafeQuery function from 00_Security.gs). Add regression tests for C-AUTH-7 (+2) and C-XSS-17 (+9).' },
   { version: '4.20.5', date: '2026-03-04', codename: 'XSS Fix OCR Dialog', changes: 'Wrap escapeHtml() around API key suffix in setupOCRApiKey() dialog (11_CommandHub.gs:2441) — raw key material was injected into HTML string without escaping.' },
   { version: '4.20.4', date: '2026-03-04', codename: 'Regression Test Hardening', changes: 'Add 138 regression tests targeting known failure modes: N+1 sheet reads (getStewardSurveyTracking spy test), boolean normalization via isTruthyValue() (anonymous flag QAForum ×20, getAllStewards IS_STEWARD ×15, vault VERIFIED/IS_LATEST ×11), formula injection protection (approveFlaggedSubmission, rejectFlaggedSubmission, addToConfigDropdown_ ×8 total), sendEmailToMember auth/safeSubject/safeBody (×6). Architecture tests A16 (lock→finally contract across 8 files), A17 (lock-acquiring mutations log audit events), A18 (dataXxx wrappers call DataService — 56 wrappers tested). Fix formula injection bugs in approveFlaggedSubmission, rejectFlaggedSubmission, and addToConfigDropdown_. Total: 2083/2083 tests pass (+138 from 1945).' },

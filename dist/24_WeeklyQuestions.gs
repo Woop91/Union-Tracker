@@ -203,7 +203,7 @@ var WeeklyQuestions = (function() {
 
     var id = _generateId();
     var emailHash = _hashEmail(email);
-    sheet.appendRow([id, questionText.trim().substring(0, 500), emailHash, 'pending', new Date()]);
+    sheet.appendRow([id, escapeForFormula(questionText.trim().substring(0, 500)), emailHash, 'pending', new Date()]);
 
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('WQ_POOL_SUBMIT', { emailHash: emailHash.substring(0, 8) });
@@ -279,7 +279,7 @@ var WeeklyQuestions = (function() {
     var weekStr = weekStart.toISOString().split('T')[0];
     var id = _generateId();
 
-    sheet.appendRow([id, text.trim().substring(0, 500), 'steward', stewardEmail, weekStr, 'TRUE', new Date()]);
+    sheet.appendRow([id, escapeForFormula(text.trim().substring(0, 500)), 'steward', stewardEmail, weekStr, 'TRUE', new Date()]);
 
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('WQ_STEWARD_SET', { steward: stewardEmail, weekStart: weekStr });
@@ -346,7 +346,7 @@ var WeeklyQuestions = (function() {
     var weekStr = weekStart.toISOString().split('T')[0];
     var newId = _generateId();
 
-    qSheet.appendRow([newId, selected.text, 'pool', '', weekStr, 'TRUE', new Date()]);
+    qSheet.appendRow([newId, escapeForFormula(selected.text), 'pool', '', weekStr, 'TRUE', new Date()]);
 
     return { success: true, questionId: newId, text: selected.text };
   }

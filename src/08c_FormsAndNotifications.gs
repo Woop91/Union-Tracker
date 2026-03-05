@@ -2131,7 +2131,7 @@ function submitSurveyResponse(hashedEmail, responses) {
     // Check vault for duplicate
     var vaultSheet = ss.getSheetByName(SHEETS.SURVEY_VAULT || '_Survey_Vault');
     if (vaultSheet && vaultSheet.getLastRow() > 1) {
-      var vaultData = vaultSheet.getRange(2, 1, vaultSheet.getLastRow() - 1, 1).getValues();
+      var vaultData = vaultSheet.getRange(2, SURVEY_VAULT_COLS.EMAIL, vaultSheet.getLastRow() - 1, 1).getValues();
       for (var v = 0; v < vaultData.length; v++) {
         if (String(vaultData[v][0]) === emailHash) {
           return { success: false, message: 'You have already submitted a survey this quarter.' };

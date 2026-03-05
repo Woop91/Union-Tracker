@@ -1394,11 +1394,15 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
 
 /**
  * Global wrapper for SPA to call member grievance history.
- * @param {string} email - Member email address
+ * C-AUTH-4: Resolves identity server-side — never accepts client-supplied email.
  * @returns {Object} { success: boolean, history: Array }
  */
-function dataGetMemberGrievanceHistoryPortal(email) {
-  return getMemberGrievanceHistory(email);
+function dataGetMemberGrievanceHistoryPortal() {
+  var e = (typeof _resolveCallerEmail === 'function') ? _resolveCallerEmail() : '';
+  if (!e) {
+    try { e = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_err) {}
+  }
+  return e ? getMemberGrievanceHistory(e) : { success: false, history: [], error: 'Not authenticated.' };
 }
 
 /**

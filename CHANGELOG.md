@@ -5,6 +5,22 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.7] - 2026-03-04
+
+### Security
+- **C-AUTH-4** (`13_MemberSelfService.gs:1400`) — `dataGetMemberGrievanceHistoryPortal()` no longer accepts client-supplied email. Now resolves identity server-side via `_resolveCallerEmail()` / `Session.getActiveUser()`. Callers passing email parameters are now ignored.
+- **C-XSS-5** (`05_Integrations.gs:4100`) — Category `c` in resource filter `onclick` now uses `JSON.stringify(c).replace(/"/g,"&quot;")` instead of raw single-quote concatenation.
+- **C-FORMULA-7** (`24_WeeklyQuestions.gs:206,282,349`) — `escapeForFormula()` applied to question text in all three write paths: pool submit, steward set, and pool select.
+
+### Fixed
+- **C-DATA-1** (`08c_FormsAndNotifications.gs:2134`) — Survey vault dedup was comparing email hash against column 1 (`RESPONSE_ROW`, row numbers) instead of column 2 (`EMAIL` hash). Dedup was silently broken; fixed to use `SURVEY_VAULT_COLS.EMAIL`.
+- **C-DATA-5** (`member_view.html:1839`) — `weekly_cases` manual input no longer falls back to hardcoded `'15'` when the field is empty. Now uses the actual input value.
+- **H-5** (`14_MeetingCheckIn.gs:430`) — Added `LockService.getScriptLock()` around the duplicate-check + `appendRow` block to prevent TOCTOU race condition producing duplicate check-in entries.
+- **H-17** (`04d_ExecutiveDashboard.gs:603`) — Added email regex validation (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`) before sending overdue report to chief steward email from Config.
+- **H-18** (`06_Maintenance.gs:3227`) — `archiveClosedGrievances()` now acquires a 30-second script lock before the read-archive-delete cycle, preventing duplicate archival on concurrent runs.
+- **H-3** (`06_Maintenance.gs:1208`) — `applyState` `ADD_ROW` case now validates `state.row > 1 && state.row <= sheet.getLastRow()` before calling `deleteRow()`.
+- **H-4** (`06_Maintenance.gs:2302`) — `batchSetValues()` now filters out any update targeting `row <= 1` (header protection).
+
 ## [4.20.6] - 2026-03-04
 
 ### Security

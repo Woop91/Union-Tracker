@@ -1205,7 +1205,7 @@ function applyState(state, actionType) {
       break;
 
     case 'ADD_ROW':
-      if (state.row) {
+      if (state.row && state.row > 1 && state.row <= sheet.getLastRow()) {
         sheet.deleteRow(state.row);
       }
       break;
@@ -2302,6 +2302,13 @@ function saveSettings(settings) {
 function batchSetValues(sheet, updates) {
   if (!updates || updates.length === 0) return;
 
+  // H-4: Guard against updates targeting the header row (row <= 1)
+  updates = updates.filter(function(u) {
+    if (u.row <= 1) { Logger.log('batchSetValues: skipped update targeting header row=' + u.row); return false; }
+    return true;
+  });
+  if (updates.length === 0) return;
+
   // CR-13: Wrap entire read-modify-write cycle in a script lock to prevent
   // concurrent writes from overwriting each other's changes
   withScriptLock_(function() {
@@ -3224,71 +3231,81 @@ function archiveClosedGrievances(daysOld) {
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) return { archived: 0 };
 
-  var data = grievanceSheet.getRange(2, 1, lastRow - 1, grievanceSheet.getLastColumn()).getValues();
-
-  var rowsToArchive = [];
-  var rowIndicesToDelete = [];
-
-  data.forEach(function(row, index) {
-    var status = row[GRIEVANCE_COLS.STATUS - 1];
-    var dateClosed = row[GRIEVANCE_COLS.DATE_CLOSED - 1];
-
-    if (closedStatuses.indexOf(status) !== -1 && dateClosed instanceof Date && dateClosed < cutoffDate) {
-      rowsToArchive.push(row);
-      rowIndicesToDelete.push(index + 2); // +2 for header and 0-index
-    }
-  });
-
-  if (rowsToArchive.length === 0) {
-    return { archived: 0 };
+  // H-18: Acquire lock so read-archive-delete is atomic; prevents duplicate archival on concurrent calls
+  var archiveLock = LockService.getScriptLock();
+  if (!archiveLock.tryLock(30000)) {
+    Logger.log('archiveClosedGrievances: could not acquire lock');
+    return { archived: 0, error: 'Lock unavailable' };
   }
+  try {
+    var data = grievanceSheet.getRange(2, 1, lastRow - 1, grievanceSheet.getLastColumn()).getValues();
 
-  // Append to archive sheet
-  var archiveLastRow = archiveSheet.getLastRow();
-  archiveSheet.getRange(archiveLastRow + 1, 1, rowsToArchive.length, rowsToArchive[0].length)
-    .setValues(rowsToArchive);
+    var rowsToArchive = [];
+    var rowIndicesToDelete = [];
 
-  // Delete from main sheet (in reverse order to maintain row indices)
-  // Transaction pattern: track individual failures and report at the end
-  var failedDeletes = [];
-  var _successfulDeletes = 0;
-  rowIndicesToDelete.reverse().forEach(function(rowIndex) {
-    try {
-      grievanceSheet.deleteRow(rowIndex);
-      _successfulDeletes++;
-    } catch (deleteErr) {
-      failedDeletes.push({ row: rowIndex, error: deleteErr.message });
-      Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
-    }
-  });
-  if (failedDeletes.length > 0) {
-    var failedRows = failedDeletes.map(function(f) { return f.row; });
-    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));
-  }
+    data.forEach(function(row, index) {
+      var status = row[GRIEVANCE_COLS.STATUS - 1];
+      var dateClosed = row[GRIEVANCE_COLS.DATE_CLOSED - 1];
 
-  // Log the archive operation
-  logIntegrityEvent('AUTO_ARCHIVE',
-    'Archived ' + rowsToArchive.length + ' closed grievances older than ' + daysOld + ' days',
-    { count: rowsToArchive.length, daysOld: daysOld, deleteFailed: failedDeletes.length }
-  );
-
-  // F141: Include failedGrievanceIds in return for error reporting
-  var failedGrievanceIds = [];
-  if (failedDeletes.length > 0) {
-    failedDeletes.forEach(function(rowIdx) {
-      var dataIdx = rowIdx - 2;
-      if (dataIdx >= 0 && dataIdx < data.length) {
-        var gId = data[dataIdx][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-        if (gId) failedGrievanceIds.push(String(gId));
+      if (closedStatuses.indexOf(status) !== -1 && dateClosed instanceof Date && dateClosed < cutoffDate) {
+        rowsToArchive.push(row);
+        rowIndicesToDelete.push(index + 2); // +2 for header and 0-index
       }
     });
-  }
 
-  return {
-    archived: rowsToArchive.length,
-    failedDeletes: failedDeletes.length,
-    failedGrievanceIds: failedGrievanceIds
-  };
+    if (rowsToArchive.length === 0) {
+      return { archived: 0 };
+    }
+
+    // Append to archive sheet
+    var archiveLastRow = archiveSheet.getLastRow();
+    archiveSheet.getRange(archiveLastRow + 1, 1, rowsToArchive.length, rowsToArchive[0].length)
+      .setValues(rowsToArchive);
+
+    // Delete from main sheet (in reverse order to maintain row indices)
+    // Transaction pattern: track individual failures and report at the end
+    var failedDeletes = [];
+    var _successfulDeletes = 0;
+    rowIndicesToDelete.reverse().forEach(function(rowIndex) {
+      try {
+        grievanceSheet.deleteRow(rowIndex);
+        _successfulDeletes++;
+      } catch (deleteErr) {
+        failedDeletes.push({ row: rowIndex, error: deleteErr.message });
+        Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
+      }
+    });
+    if (failedDeletes.length > 0) {
+      var failedRows = failedDeletes.map(function(f) { return f.row; });
+      Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));
+    }
+
+    // Log the archive operation
+    logIntegrityEvent('AUTO_ARCHIVE',
+      'Archived ' + rowsToArchive.length + ' closed grievances older than ' + daysOld + ' days',
+      { count: rowsToArchive.length, daysOld: daysOld, deleteFailed: failedDeletes.length }
+    );
+
+    // F141: Include failedGrievanceIds in return for error reporting
+    var failedGrievanceIds = [];
+    if (failedDeletes.length > 0) {
+      failedDeletes.forEach(function(rowIdx) {
+        var dataIdx = rowIdx - 2;
+        if (dataIdx >= 0 && dataIdx < data.length) {
+          var gId = data[dataIdx][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+          if (gId) failedGrievanceIds.push(String(gId));
+        }
+      });
+    }
+
+    return {
+      archived: rowsToArchive.length,
+      failedDeletes: failedDeletes.length,
+      failedGrievanceIds: failedGrievanceIds
+    };
+  } finally {
+    archiveLock.releaseLock();
+  }
 }
 
 /**
