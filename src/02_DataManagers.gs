@@ -284,6 +284,7 @@ function getStewardWorkloadDetailed() {
     var activeCases = 0;
     var totalCases = 0;
     var wonCases = 0;
+    var resolvedCases = 0; // H-20: track resolved cases separately for accurate win rate
 
     for (var i = 1; i < grievances.length; i++) {
       var assignedSteward = grievances[i][GRIEVANCE_COLS.STEWARD - 1];
@@ -296,13 +297,19 @@ function getStewardWorkloadDetailed() {
         if (status === GRIEVANCE_STATUS.WON) {
           wonCases++;
         }
+        // H-20: denominator matches getDashboardStats — Won+Denied+Settled+Withdrawn only
+        // (excludes 'Closed' which lacks a clear outcome, and excludes active cases)
+        if (status === GRIEVANCE_STATUS.WON || status === GRIEVANCE_STATUS.DENIED ||
+            status === GRIEVANCE_STATUS.SETTLED || status === GRIEVANCE_STATUS.WITHDRAWN) {
+          resolvedCases++;
+        }
       }
     }
 
     steward.activeCases = activeCases;
     steward.totalCases = totalCases;
     steward.wonCases = wonCases;
-    steward.winRate = totalCases > 0 ? Math.round((wonCases / totalCases) * 100) : 0;
+    steward.winRate = resolvedCases > 0 ? Math.round((wonCases / resolvedCases) * 100) : 0;
   });
 
   return stewards;

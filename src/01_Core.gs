@@ -653,16 +653,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.10';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.11';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 20,
-    PATCH: parseInt(parts[2], 10) || 10,
+    PATCH: parseInt(parts[2], 10) || 11,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-04',
-    CODENAME: 'Performance & Data Integrity Fixes'
+    CODENAME: 'Security & Logic Fixes'
   };
 })();
 
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.11', date: '2026-03-04', codename: 'Security & Logic Fixes', changes: 'H-12: Replace vault/reminders/userMeta/archive hideSheet() with setSheetVeryHidden_() in 25_WorkloadService.gs — API-level hide that persists on Google Sheets mobile (previously only UI-layer hide). H-16: Fix contact log sort in getMemberContactHistory and getStewardContactLog (21_WebDashDataService.gs) — was sorting by formatted date string (wrong alphabetical order); now stores _ts timestamp field, sorts numerically, deletes _ts before returning. H-20: Fix win rate denominator in getStewardWorkloadDetailed (02_DataManagers.gs) — was dividing wonCases by totalCases (includes active cases); now uses resolvedCases = Won+Denied+Settled+Withdrawn, matching the formula in getDashboardStats.' },
   { version: '4.20.10', date: '2026-03-04', codename: 'Performance & Data Integrity Fixes', changes: 'H-7: Batch 4 individual configSheet.getValue() calls in getDeadlineRules() into a single getValues() range read — 4 API calls → 1. H-2: sortGrievanceLogByStatus now captures cell notes via getNotes() before sort and restores them via setNotes() after setValues() — preserves user-added notes that would otherwise be silently discarded by the sort.' },
   { version: '4.20.9', date: '2026-03-04', codename: 'Hardcoded Index Fix & Dead Code', changes: 'C-DATA-6: Replace positional array indices (sections[6], sections[7], questions[0]–[4]) in satisfaction survey score assignment with key-based lookup maps (sectionByKey[key], s._qByKey[key]) — safe against section reordering. Dead code: emailDashboardLink_UIService_ (03_UIComponents.gs, deprecated, zero callers), getOrCreateMemberFolder_Legacy_ (11_CommandHub.gs, deprecated, zero callers). Note: DataCache.cachedCall deduplicates surveyStatus/events server calls by cache key — those are not real duplicates.' },
   { version: '4.20.8', date: '2026-03-04', codename: 'Dead Code Removal & Performance', changes: 'H-13: setupHiddenSheets skips sheet.clear() for SURVEY_TRACKING when data rows exist — prevents accidental wipe of survey history. Dead code removal: DataAccess namespace (~530 lines), validateInputLength_, getCurrentUserEmail, safeJsonForHtml, sanitizeDataForClient (00_Security.gs), getWebAppDashboardHtml (05_Integrations.gs), isMobileContext (03_UIComponents.gs), statStdDev_ (17_CorrelationEngine.gs). Performance: updateChecklistItem batches per-field setValue calls into single setValues row write. updateMemberProfile batches per-field setValue into single setValues row write. applyConfigSheetStyling replaces per-row setBackground loop with single setBackgrounds() call. 00_DataAccess.gs retains TIME_CONSTANTS and withScriptLock_ (both used in production).' },

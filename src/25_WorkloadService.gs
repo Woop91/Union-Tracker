@@ -371,7 +371,7 @@ var WorkloadService = (function() {
         }
       }
     }
-    vault.hideSheet();
+    setSheetVeryHidden_(vault); // H-12: API-level hide — survives mobile Sheets
 
     // Workload Reporting (anonymized, visible)
     var report = ss.getSheetByName(SHEETS.WORKLOAD_REPORTING);
@@ -398,7 +398,7 @@ var WorkloadService = (function() {
       reminders.getRange(1, 1, 1, 6)
         .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
       reminders.setFrozenRows(1);
-      reminders.hideSheet();
+      setSheetVeryHidden_(reminders); // H-12: API-level hide
     }
 
     // Workload UserMeta (hidden)
@@ -409,7 +409,7 @@ var WorkloadService = (function() {
       userMeta.getRange(1, 1, 1, 3)
         .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
       userMeta.setFrozenRows(1);
-      userMeta.hideSheet();
+      setSheetVeryHidden_(userMeta); // H-12: API-level hide
     }
 
     Logger.log('WorkloadService: sheets initialized (v' + CONFIG.version + ').');
@@ -986,7 +986,7 @@ var WorkloadService = (function() {
       archSheet = ss.insertSheet(SHEETS.WORKLOAD_ARCHIVE);
       archSheet.appendRow(header);
       archSheet.setFrozenRows(1);
-      archSheet.hideSheet();
+      setSheetVeryHidden_(archSheet); // H-12: API-level hide
     }
     // M-37: Write archive data first, then rewrite vault — prevents data loss if write fails
     archSheet.getRange(archSheet.getLastRow() + 1, 1, archive.length, header.length).setValues(archive);

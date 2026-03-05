@@ -5,6 +5,13 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.11] - 2026-03-04
+
+### Fixed
+- **H-12** (`25_WorkloadService.gs`) — Workload sheets (Vault, Reminders, UserMeta, Archive) now use `setSheetVeryHidden_()` instead of `hideSheet()`. The `hideSheet()` call is UI-layer only and is ignored by Google Sheets mobile; `setSheetVeryHidden_()` uses the Sheets Advanced Service API (with `hideSheet()` fallback) for enforcement that persists on mobile.
+- **H-16** (`21_WebDashDataService.gs:getMemberContactHistory`, `getStewardContactLog`) — Contact log sort was using string comparison on formatted date values (e.g. `"Jan 5, 2026"`) which is not chronological. Fixed by storing a `_ts` timestamp field when building results, sorting by `(b._ts - a._ts)`, and deleting `_ts` before returning.
+- **H-20** (`02_DataManagers.gs:getStewardWorkloadDetailed`) — Steward win rate was calculated as `wonCases / totalCases` where `totalCases` includes all active cases — systematically understating win rates. Now uses `resolvedCases` (Won + Denied + Settled + Withdrawn) as the denominator, consistent with `getDashboardStats()` in `04d_ExecutiveDashboard.gs`.
+
 ## [4.20.10] - 2026-03-04
 
 ### Fixed
