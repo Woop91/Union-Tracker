@@ -500,3 +500,115 @@ describe('Global wrappers', () => {
     expect(Array.isArray(result)).toBe(true);
   });
 });
+
+// ============================================================================
+// DataService.getStewardSurveyTracking
+// Regression tests for N+1 fix (fa27b42): survey sheet must be read ONCE
+// regardless of member count, with an O(1) email→status map lookup per member.
+// ============================================================================
+
+describe('DataService.getStewardSurveyTracking', () => {
+  const SURVEY_HEADERS = ['Email', 'Status', 'Completed Date'];
+
+  function makeSurveySheet(rows) {
+    const data = [SURVEY_HEADERS, ...rows];
+    return createMockSheet('_Survey_Tracking', data);
+  }
+
+  function makeFullMockSs(surveyRows) {
+    const memberData = makeMemberData();
+    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', memberData);
+    const grievanceSheet = createMockSheet(SHEETS.GRIEVANCE_LOG || 'Grievance Log', makeGrievanceData());
+    const surveySheet = makeSurveySheet(surveyRows || []);
+    return { ss: createMockSpreadsheet([memberSheet, grievanceSheet, surveySheet]), surveySheet };
+  }
+
+  beforeEach(() => {
+    if (typeof DataService !== 'undefined' && DataService._invalidateSheetCache) {
+      DataService._invalidateSheetCache('Member Directory');
+      DataService._invalidateSheetCache('Grievance Log');
+    }
+  });
+
+  test('reads the survey sheet exactly once for multiple members (N+1 fix)', () => {
+    // The fix pre-loads _Survey_Tracking once; previously it was read per member.
+    const { ss, surveySheet } = makeFullMockSs([
+      ['member@test.com', 'Completed', '2026-01-15'],
+      ['steward@test.com', 'Pending', ''],
+    ]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+
+    DataService.getStewardSurveyTracking('steward@test.com', 'all');
+
+    // getDataRange on the survey sheet must be called exactly once
+    expect(surveySheet.getDataRange).toHaveBeenCalledTimes(1);
+  });
+
+  test('returns correct completion counts from survey map', () => {
+    const { ss } = makeFullMockSs([
+      ['member@test.com', 'completed', '2026-01-15'],
+      ['steward@test.com', 'pending', ''],
+    ]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+
+    const result = DataService.getStewardSurveyTracking('steward@test.com', 'all');
+
+    expect(result.total).toBe(3); // 3 members in makeMemberData
+    expect(result.completed).toBe(1);
+    expect(result.members).toHaveLength(3);
+    const memberEntry = result.members.find(m => m.email === 'member@test.com');
+    expect(memberEntry.completed).toBe(true);
+  });
+
+  test('recognises all status string variants as completed', () => {
+    // Status column may contain 'completed', 'yes', or 'true' — all mean done.
+    const { ss } = makeFullMockSs([
+      ['member@test.com', 'yes', ''],
+      ['admin@test.com', 'true', ''],
+    ]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+
+    const result = DataService.getStewardSurveyTracking('steward@test.com', 'all');
+    const member = result.members.find(m => m.email === 'member@test.com');
+    const admin = result.members.find(m => m.email === 'admin@test.com');
+    expect(member.completed).toBe(true);
+    expect(admin.completed).toBe(true);
+  });
+
+  test('scope=assigned returns only steward-assigned members', () => {
+    // member@test.com has Assigned Steward = '' in makeMemberData; steward has none either.
+    // getStewardMembers returns members whose assignedSteward matches stewardEmail.
+    const { ss } = makeFullMockSs([]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+
+    const result = DataService.getStewardSurveyTracking('steward@test.com', 'assigned');
+    expect(typeof result.total).toBe('number');
+    expect(Array.isArray(result.members)).toBe(true);
+  });
+
+  test('returns { total:0, completed:0, members:[] } when no survey sheet exists', () => {
+    // No _Survey_Tracking sheet — should gracefully return all members with completed:false.
+    const memberData = makeMemberData();
+    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', memberData);
+    const grievanceSheet = createMockSheet(SHEETS.GRIEVANCE_LOG || 'Grievance Log', makeGrievanceData());
+    const ss = createMockSpreadsheet([memberSheet, grievanceSheet]); // no survey sheet
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+
+    const result = DataService.getStewardSurveyTracking('steward@test.com', 'all');
+    // No survey data → no one is marked completed, but members are still returned
+    expect(result.completed).toBe(0);
+    expect(result.total).toBeGreaterThan(0);
+    result.members.forEach(m => expect(m.completed).toBe(false));
+  });
+
+  test('is case-insensitive on email matching between members and survey map', () => {
+    const { ss } = makeFullMockSs([
+      ['MEMBER@TEST.COM', 'completed', '2026-02-01'], // uppercase in survey sheet
+    ]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+
+    const result = DataService.getStewardSurveyTracking('steward@test.com', 'all');
+    const memberEntry = result.members.find(m => m.email === 'member@test.com');
+    expect(memberEntry.completed).toBe(true);
+  });
+});

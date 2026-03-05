@@ -303,6 +303,57 @@ describe('QAForum.getQuestionDetail', () => {
 });
 
 // ============================================================================
+// Anonymous flag boolean normalization — regression for fa27b42
+// Google Sheets stores booleans as boolean true/false OR as strings 'TRUE'/'FALSE'.
+// isTruthyValue() must handle all representations consistently.
+// ============================================================================
+
+describe('QAForum anonymous flag — isTruthyValue normalization', () => {
+  var now = new Date('2026-03-01T12:00:00Z');
+
+  // Each pair: [Is Anonymous cell value, expected authorName, expected isAnonymous]
+  var cases = [
+    [true,    'Anonymous', true,  'boolean true'],
+    ['TRUE',  'Anonymous', true,  'string TRUE'],
+    ['True',  'Anonymous', true,  'string True'],
+    ['yes',   'Anonymous', true,  'string yes'],
+    ['1',     'Anonymous', true,  'string 1'],
+    [false,   'Real Name', false, 'boolean false'],
+    ['FALSE', 'Real Name', false, 'string FALSE'],
+    ['false', 'Real Name', false, 'string false'],
+    ['no',    'Real Name', false, 'string no'],
+    ['',      'Real Name', false, 'empty string'],
+  ];
+
+  cases.forEach(function(c) {
+    var anonValue = c[0], expectedName = c[1], expectedAnon = c[2], label = c[3];
+
+    test('getQuestions: Is Anonymous=' + label + ' → isAnonymous=' + expectedAnon, function() {
+      var forumData = makeForumData([
+        ['QA_X', 'author@test.com', 'Real Name', anonValue, 'A question', 'active', 0, '', 0, now, now],
+      ]);
+      setupSheets({ forumData: forumData });
+
+      var result = QAForum.getQuestions('user@test.com', 1, 10);
+      expect(result.questions).toHaveLength(1);
+      expect(result.questions[0].isAnonymous).toBe(expectedAnon);
+      expect(result.questions[0].authorName).toBe(expectedName);
+    });
+
+    test('getQuestionDetail: Is Anonymous=' + label + ' → isAnonymous=' + expectedAnon, function() {
+      var forumData = makeForumData([
+        ['QA_Y', 'author@test.com', 'Real Name', anonValue, 'A question', 'active', 0, '', 0, now, now],
+      ]);
+      setupSheets({ forumData: forumData, answerData: [ANSWER_HEADERS] });
+
+      var result = QAForum.getQuestionDetail('user@test.com', 'QA_Y');
+      expect(result.isAnonymous).toBe(expectedAnon);
+      expect(result.authorName).toBe(expectedName);
+    });
+  });
+});
+
+// ============================================================================
 // submitQuestion
 // ============================================================================
 

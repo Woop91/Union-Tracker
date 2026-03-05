@@ -653,7 +653,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.2';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.4';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.4', date: '2026-03-04', codename: 'Regression Test Hardening', changes: 'Add 138 regression tests targeting known failure modes: N+1 sheet reads (getStewardSurveyTracking spy test), boolean normalization via isTruthyValue() (anonymous flag QAForum ×20, getAllStewards IS_STEWARD ×15, vault VERIFIED/IS_LATEST ×11), formula injection protection (approveFlaggedSubmission, rejectFlaggedSubmission, addToConfigDropdown_ ×8 total), sendEmailToMember auth/safeSubject/safeBody (×6). Architecture tests A16 (lock→finally contract across 8 files), A17 (lock-acquiring mutations log audit events), A18 (dataXxx wrappers call DataService — 56 wrappers tested). Fix formula injection bugs in approveFlaggedSubmission, rejectFlaggedSubmission, and addToConfigDropdown_. Total: 2083/2083 tests pass (+138 from 1945).' },
   { version: '4.20.3', date: '2026-03-04', codename: 'Code Review Fixes', changes: 'Fix N+1 sheet reads in getStewardSurveyTracking — pre-load _Survey_Tracking once, build email map, O(1) lookup per member. Add escapeForFormula() to profile update setValue() (formula injection fix). Replace all google.script.run with serverCall() in member_view.html and steward_view.html (~52 calls) — all server calls now have default failure handler. Normalize QAForum anonymous checks to use isTruthyValue() for consistent Sheets boolean handling.' },
   { version: '4.20.2', date: '2026-03-04', codename: 'Web App Error Resilience', changes: 'Fix 14 missing withFailureHandler() on google.script.run calls in member_view.html (11) and steward_view.html (2) — prevents infinite loading spinners on server errors. Add null guards on getActiveSpreadsheet() in 26_QAForum.gs (10), 27_TimelineService.gs (7), 28_FailsafeService.gs (7) — prevents "Cannot call method of null" crashes in web app context.' },
   { version: '4.20.1', date: '2026-03-03', codename: 'Test Suite 100% Pass', changes: 'Fix all 40 pre-existing test failures: null guards on getActiveSpreadsheet() in 21_WebDashDataService.gs (17), 25_WorkloadService.gs (17), 24_WeeklyQuestions.gs (1+_ensureSheet early-return); PropertiesService singleton mock fix (16_DashboardEnhancements); Session/CacheService mock fixes (19_WebDashAuth); EventBus SHEETS reverse-map fix (15_EventBus); DataService API alignment in 21_WebDashDataService tests; A12 threshold updated to 130; A13 7 failure handlers added to HTML views. 1945/1945 tests pass.' },

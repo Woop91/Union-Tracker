@@ -932,6 +932,164 @@ describe('A14: GAS API enum validation', () => {
 // Rule: catch blocks in web app files must not call the same module that
 // could have thrown the original error without their own try/catch.
 
+// ============================================================================
+// A16: LOCK ACQUISITION → FINALLY RELEASE CONTRACT
+// ============================================================================
+// Failure mode: a function acquires LockService.getScriptLock() but throws
+// before releaseLock() → lock is held for the full 30-second timeout, blocking
+// all subsequent writes to the same spreadsheet for every user.
+// Rule: every direct getScriptLock() acquisition must pair with releaseLock()
+// inside a finally block. (withScriptLock_() helper is already safe by design.)
+
+describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
+  const lockFiles = [
+    '02_DataManagers.gs',
+    '25_WorkloadService.gs',
+    '26_QAForum.gs',
+    '27_TimelineService.gs',
+    '28_FailsafeService.gs',
+    '08c_FormsAndNotifications.gs',
+    '10d_SyncAndMaintenance.gs',
+    '12_Features.gs',
+  ];
+  const srcDir = path.resolve(__dirname, '..', 'src');
+
+  lockFiles.forEach(file => {
+    test(`${file}: every getScriptLock() is paired with waitLock() and releaseLock() in finally`, () => {
+      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+      const lines = content.split('\n');
+      const issues = [];
+
+      lines.forEach((line, idx) => {
+        if (!line.includes('LockService.getScriptLock()')) return;
+        if (line.trim().startsWith('//')) return; // skip comments
+
+        // Scan the next 120 lines for the required patterns
+        // (some functions like startNewGrievance have ~74 lines between lock acquire and finally)
+        const window = lines.slice(idx, idx + 120).join('\n');
+
+        // Both waitLock (blocking) and tryLock (non-blocking check) are acceptable
+        if (!window.includes('waitLock(') && !window.includes('tryLock(')) {
+          issues.push(`${file}:${idx + 1} — getScriptLock() has no waitLock() or tryLock()`);
+        }
+        if (!window.includes('finally')) {
+          issues.push(`${file}:${idx + 1} — getScriptLock() has no finally block`);
+        }
+        if (!window.includes('releaseLock()')) {
+          issues.push(`${file}:${idx + 1} — getScriptLock() has no releaseLock()`);
+        }
+
+        // Verify releaseLock() appears AFTER a finally keyword
+        const finallyIdx = window.indexOf('finally');
+        const releaseIdx = window.indexOf('releaseLock()');
+        if (finallyIdx !== -1 && releaseIdx !== -1 && releaseIdx < finallyIdx) {
+          issues.push(`${file}:${idx + 1} — releaseLock() appears before finally block`);
+        }
+      });
+
+      expect(issues).toEqual([]);
+    });
+  });
+});
+
+// ============================================================================
+// A17: LOCK-ACQUIRING MUTATIONS LOG AUDIT EVENTS
+// ============================================================================
+// Rule: any function that acquires a script lock (meaning it's performing a
+// protected write) in the web-app service files must also call logAuditEvent().
+// A write with no audit trail is undetectable if something goes wrong.
+// Exception: helper functions (trailing _) and batch/maintenance utilities.
+
+describe('A17: Lock-acquiring mutations in service files log audit events', () => {
+  const serviceFiles = [
+    '26_QAForum.gs',
+    '27_TimelineService.gs',
+    '28_FailsafeService.gs',
+    '25_WorkloadService.gs',
+  ];
+  const srcDir = path.resolve(__dirname, '..', 'src');
+
+  // Extract named function bodies from a source string.
+  // Returns [{name, body}] for each non-private (no trailing _) named function.
+  function extractFunctions(src) {
+    const results = [];
+    // Match: function name(...) { ... }  — captures up to 120 lines
+    const fnRegex = /^function (\w+)\s*\([^)]*\)\s*\{([\s\S]*?)(?=\n^function |\n\/\/ ===|$)/gm;
+    let match;
+    while ((match = fnRegex.exec(src)) !== null) {
+      if (!match[1].endsWith('_')) { // skip private helpers
+        results.push({ name: match[1], body: match[2] });
+      }
+    }
+    return results;
+  }
+
+  serviceFiles.forEach(file => {
+    test(`${file}: functions that acquire a lock also call logAuditEvent()`, () => {
+      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+      const fns = extractFunctions(content);
+      const issues = [];
+
+      fns.forEach(({ name, body }) => {
+        if (!body.includes('LockService.getScriptLock()')) return; // not a locking function
+        if (!body.includes('logAuditEvent(')) {
+          issues.push(`${file}: ${name}() acquires lock but has no logAuditEvent() call`);
+        }
+      });
+
+      expect(issues).toEqual([]);
+    });
+  });
+});
+
+// ============================================================================
+// A18: DATASERVICE WRAPPER → DATASERVICE METHOD LINKAGE
+// ============================================================================
+// Failure mode: a refactor renames DataService.getStewardCases() but the
+// dataGetStewardCases() wrapper still compiles (returns fallback []) — the
+// client gets empty data with no error. This test verifies every dataXxx
+// wrapper calls DataService.someMethod() rather than being silently orphaned.
+// Exception: wrappers that are intentionally thin pass-throughs or call
+// other global functions instead.
+
+describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8'
+  );
+  const lines = src.split('\n');
+
+  // Find each dataXxx function declaration line, then scan the next 12 lines
+  // for a DataService. call. This handles both one-liners and multi-line bodies
+  // without breaking on nested braces in inline object literals.
+  const wrappers = [];
+  lines.forEach((line, idx) => {
+    const m = line.match(/^function (data\w+)\s*\(/);
+    if (!m || m[1].endsWith('_')) return;
+    const name = m[1];
+    const window = lines.slice(idx, idx + 12).join('\n');
+    wrappers.push({ name, window });
+  });
+
+  test('found at least 50 dataXxx wrapper functions', () => {
+    expect(wrappers.length).toBeGreaterThanOrEqual(50);
+  });
+
+  // Wrappers intentionally delegating elsewhere (not DataService)
+  const nonDataServiceWrappers = [
+    'dataMarkWelcomeDismissed',        // writes directly to PropertiesService
+    'dataGetEngagementStats',          // reads seeded stats from PropertiesService
+    'dataGetWorkloadSummaryStats',     // reads seeded stats from PropertiesService
+  ];
+
+  wrappers
+    .filter(w => !nonDataServiceWrappers.includes(w.name))
+    .forEach(({ name, window }) => {
+      test(`${name}() calls DataService.someMethod() (not orphaned)`, () => {
+        expect(window).toContain('DataService.');
+      });
+    });
+});
+
 describe('A15: Catch blocks in web app files do not cascade', () => {
   const webAppFiles = [
     '19_WebDashAuth.gs',

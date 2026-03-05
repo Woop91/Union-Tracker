@@ -3512,7 +3512,7 @@ function approveFlaggedSubmission(rowNum) {
     if (vaultData[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1] === rowNum) {
       var vaultRow = i + 1;
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Yes');
-      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Approved by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue(escapeForFormula('Approved by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')));
       break;
     }
   }
@@ -3548,7 +3548,7 @@ function rejectFlaggedSubmission(rowNum) {
       var vaultRow = i + 1;
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
-      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue(escapeForFormula('Rejected by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')));
       break;
     }
   }

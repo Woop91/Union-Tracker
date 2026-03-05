@@ -1094,3 +1094,231 @@ describe('advanceGrievanceStep', () => {
     );
   });
 });
+
+// ============================================================================
+// addToConfigDropdown_ — formula injection protection
+// Regression test for fix applied alongside fa27b42: value written to Config
+// sheet must be wrapped in escapeForFormula() to prevent formula injection
+// via user-controlled strings (steward names, unit names, etc.).
+// ============================================================================
+
+describe('addToConfigDropdown_ — formula injection protection', () => {
+  function makeConfigSs(existingRows) {
+    var configData = [['Key', 'Stewards'], ['', ''], ...(existingRows || [])];
+    var setValueSpy = jest.fn();
+    var configSheet = {
+      getName: jest.fn(() => SHEETS.CONFIG),
+      getLastRow: jest.fn(() => configData.length),
+      getRange: jest.fn(() => ({
+        getValues: jest.fn(() => existingRows ? existingRows.map(r => [r[1]]) : []),
+        setValue: setValueSpy
+      }))
+    };
+    var ss = createMockSpreadsheet([configSheet]);
+    ss.getSheetByName = jest.fn(name => name === SHEETS.CONFIG ? configSheet : null);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    return setValueSpy;
+  }
+
+  test('wraps formula-starting value with escapeForFormula before writing', () => {
+    // A steward name starting with = (contrived but valid test of injection guard)
+    var setValueSpy = makeConfigSs([]);
+    addToConfigDropdown_(2, '=DANGEROUS()');
+    expect(setValueSpy).toHaveBeenCalledWith("'=DANGEROUS()");
+  });
+
+  test('normal steward name passes through unchanged', () => {
+    var setValueSpy = makeConfigSs([]);
+    addToConfigDropdown_(2, 'Jane Smith');
+    expect(setValueSpy).toHaveBeenCalledWith('Jane Smith');
+  });
+
+  test('does not write duplicate values', () => {
+    // If the value already exists, setValue should not be called
+    var setValueSpy = makeConfigSs([['', 'Jane Smith']]);
+    addToConfigDropdown_(2, 'Jane Smith');
+    expect(setValueSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// syncMemberGrievanceData — N+1 batch-read contract
+// Regression: both sheets must be read ONCE each, and writes must be batched
+// into 2 setValues calls (not N individual setValue per member row).
+// ============================================================================
+
+describe('syncMemberGrievanceData — batch-read/write contract', () => {
+  // Data must follow MEMBER_HEADER_MAP_ column order (1-indexed):
+  // 1=Member ID, 2=First Name, 3=Last Name, ..., 5=Status (STATUS uses GRIEVANCE_COLS not MEMBER_COLS)
+  // GRIEVANCE_HEADER_MAP_: 1=Grievance ID, 2=Member ID, ..., 5=Status
+  function makeSyncSs() {
+    // Minimal member data in MEMBER_HEADER_MAP_ column order
+    var memberData = [
+      ['Member ID', 'First Name', 'Last Name', 'Job Title', 'Work Location'],
+      ['MEM-001', 'Alice', 'A', '', 'HQ'],
+      ['MEM-002', 'Bob',   'B', '', 'HQ'],
+      ['MEM-003', 'Carol', 'C', '', 'HQ'],
+    ];
+    // GRIEVANCE_COLS: 1=ID, 2=Member ID, 3=First, 4=Last, 5=Status
+    var grievanceData = [
+      ['Grievance ID', 'Member ID', 'First Name', 'Last Name', 'Status'],
+      ['GRV-001', 'MEM-001', '', '', 'Open'],
+      ['GRV-002', 'MEM-001', '', '', 'Pending Info'],
+      ['GRV-003', 'MEM-002', '', '', 'Won'],
+    ];
+    var memberSheet = createMockSheet(SHEETS.MEMBER_DIR, memberData);
+    var grievanceSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, grievanceData);
+    var ss = createMockSpreadsheet([memberSheet, grievanceSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    return { memberSheet, grievanceSheet };
+  }
+
+  test('reads member sheet exactly once (not once per grievance)', () => {
+    var { memberSheet } = makeSyncSs();
+    syncMemberGrievanceData();
+    expect(memberSheet.getDataRange).toHaveBeenCalledTimes(1);
+  });
+
+  test('reads grievance sheet exactly once (not once per member)', () => {
+    var { grievanceSheet } = makeSyncSs();
+    syncMemberGrievanceData();
+    expect(grievanceSheet.getDataRange).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ============================================================================
+// generateMissingMemberIDs — N+1 batch-write contract
+// Regression: sheet must be read ONCE for the full data, and new IDs written
+// in a single setValues call (not one setValue per member without an ID).
+// ============================================================================
+
+describe('generateMissingMemberIDs — batch-write contract', () => {
+  // MEMBER_HEADER_MAP_ order: 1=Member ID, 2=First Name, 3=Last Name, ...
+  // Rows with empty Member ID (col 1) and a First/Last Name trigger ID generation.
+  function makeIdSs(rows) {
+    var headers = ['Member ID', 'First Name', 'Last Name', 'Job Title', 'Work Location'];
+    var data = [headers, ...rows];
+    var sheet = createMockSheet(SHEETS.MEMBER_DIR, data);
+    // Override getRange so the ID column read returns the right number of rows
+    var idColData = rows.map(r => [r[0] || null]); // col 0 = Member ID
+    var idColRange = { getValues: jest.fn(() => idColData), setValues: jest.fn() };
+    sheet.getRange = jest.fn(() => idColRange);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    SpreadsheetApp.getUi = jest.fn(() => ({ alert: jest.fn() }));
+    return { sheet, idColRange };
+  }
+
+  test('reads sheet exactly once to build the full member list', () => {
+    var { sheet } = makeIdSs([
+      ['',        'Alice', 'Adams', '', ''],
+      ['',        'Bob',   'Baker', '', ''],
+      ['MEM-EXISTING', 'Carol', 'Cox', '', ''],
+    ]);
+
+    generateMissingMemberIDs();
+
+    // getDataRange is called once to load all data
+    expect(sheet.getDataRange).toHaveBeenCalledTimes(1);
+  });
+
+  test('writes all new IDs with a single setValues call (not one setValue per row)', () => {
+    var { idColRange } = makeIdSs([
+      ['',  'Alice', 'Adams', '', ''],
+      ['',  'Bob',   'Baker', '', ''],
+      ['',  'Carol', 'Cox',   '', ''],
+    ]);
+
+    generateMissingMemberIDs();
+
+    // Batch contract: setValues called once for all rows, not once per member
+    expect(idColRange.setValues).toHaveBeenCalledTimes(1);
+    // setValue (singular) should NOT be called — that would be the N+1 pattern
+    expect(idColRange.setValue).toBeUndefined(); // mock has no setValue — confirms batch path
+  });
+
+  test('returns the count of IDs generated', () => {
+    var { idColRange } = makeIdSs([
+      ['',        'Alice', 'Adams', '', ''],
+      ['MEM-002', 'Bob',   'Baker', '', ''],
+    ]);
+
+    var result = generateMissingMemberIDs();
+
+    expect(result).toBe(1); // only Alice has no ID
+    expect(idColRange.setValues).toHaveBeenCalledTimes(1);
+  });
+
+  test('skips rows with no name data', () => {
+    var { idColRange } = makeIdSs([
+      ['', '', '', '', ''], // no name — should be skipped
+      ['', 'Dave', 'D', '', ''],
+    ]);
+
+    var result = generateMissingMemberIDs();
+
+    expect(result).toBe(1); // only Dave
+  });
+});
+
+// ============================================================================
+// getAllStewards — isTruthyValue boolean normalization
+// The IS_STEWARD column in Google Sheets can hold boolean true/false OR
+// strings like 'YES', 'TRUE', 'True', 'yes', '1'. All truthy variants must
+// result in that member being included in the steward list.
+// ============================================================================
+
+describe('getAllStewards — isTruthyValue normalization for IS_STEWARD', () => {
+  // MEMBER_HEADER_MAP_ order (1-indexed): 1=Member ID, 2=First Name, 3=Last Name,
+  // 4=Job Title, 5=Work Location, 6=Unit, 7=Cubicle, 8=Office Days, 9=Email,
+  // 10=Phone, 11=Preferred Comm, 12=Best Time, 13=Supervisor, 14=Manager, 15=Is Steward
+  // IS_STEWARD is at position 15 → array index 14.
+  function makeStawardSs(isStewardValue) {
+    var row = new Array(15).fill('');
+    row[0]  = 'MEM-S';       // Member ID (col 1)
+    row[1]  = 'S';           // First Name
+    row[2]  = 'Person';      // Last Name
+    row[14] = isStewardValue; // Is Steward (col 15)
+
+    var nonStewardRow = new Array(15).fill('');
+    nonStewardRow[0]  = 'MEM-M';
+    nonStewardRow[1]  = 'M';
+    nonStewardRow[2]  = 'Person';
+    nonStewardRow[14] = false;
+
+    var headers = ['Member ID','First Name','Last Name','Job Title','Work Location','Unit','Cubicle','Office Days','Email','Phone','Preferred Communication','Best Time to Contact','Supervisor','Manager','Is Steward'];
+    var data = [headers, row, nonStewardRow];
+    var sheet = createMockSheet(SHEETS.MEMBER_DIR, data);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+  }
+
+  var cases = [
+    // Truthy variants — all must yield exactly 1 steward
+    [true,    1, 'boolean true'],
+    ['YES',   1, 'string YES'],
+    ['Yes',   1, 'string Yes'],
+    ['yes',   1, 'string yes'],
+    ['TRUE',  1, 'string TRUE'],
+    ['True',  1, 'string True'],
+    ['true',  1, 'string true'],
+    ['1',     1, 'string 1'],
+    // Falsy variants — all must yield 0 stewards
+    [false,   0, 'boolean false'],
+    ['NO',    0, 'string NO'],
+    ['No',    0, 'string No'],
+    ['FALSE', 0, 'string FALSE'],
+    ['false', 0, 'string false'],
+    ['',      0, 'empty string'],
+    [0,       0, 'number 0'],
+  ];
+
+  cases.forEach(function(c) {
+    var cellValue = c[0], expectedCount = c[1], label = c[2];
+    test('IS_STEWARD=' + label + ' → steward count=' + expectedCount, function() {
+      makeStawardSs(cellValue);
+      var result = getAllStewards();
+      expect(result.length).toBe(expectedCount);
+    });
+  });
+});

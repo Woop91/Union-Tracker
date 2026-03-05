@@ -5,6 +5,21 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.4] - 2026-03-04
+
+### Added
+- **Regression tests — N+1 sheet reads**: spy test verifies `getStewardSurveyTracking` calls `getDataRange()` exactly once (not once per member)
+- **Regression tests — boolean normalization**: 46 parameterized tests covering all Google Sheets boolean representations (`true`, `'TRUE'`, `'True'`, `'yes'`, `'1'`, `false`, `'FALSE'`, `'false'`, `'no'`, `''`, `0`) for QAForum anonymous flag (×20), `getAllStewards` IS_STEWARD (×15), and vault VERIFIED/IS_LATEST (×11)
+- **Regression tests — formula injection protection**: 8 tests for `approveFlaggedSubmission`, `rejectFlaggedSubmission`, and `addToConfigDropdown_` verifying that user-controlled strings are wrapped with `escapeForFormula()` before `setValue()`
+- **Regression tests — `sendEmailToMember`**: 6 tests covering success path, HTML stripping from subject, member-not-found, invalid email, and unauthorized role
+- **Architecture test A16**: static scan of 8 files verifying every `LockService.getScriptLock()` acquisition is paired with `releaseLock()` inside a `finally` block
+- **Architecture test A17**: static scan of 4 web-app service files verifying every lock-acquiring function also calls `logAuditEvent()`
+- **Architecture test A18**: line-window scan of `21_WebDashDataService.gs` verifying all 56+ `dataXxx()` wrapper functions call `DataService.someMethod()` (no orphaned wrappers)
+
+### Fixed
+- **Formula injection** in `approveFlaggedSubmission` (`09_Dashboards.gs:3515`) and `rejectFlaggedSubmission` (`09_Dashboards.gs:3551`) — reviewer notes `setValue()` now wraps `callerEmail` + timestamp string with `escapeForFormula()`
+- **Formula injection** in `addToConfigDropdown_` (`02_DataManagers.gs:756,758`) — config dropdown `setValue()` calls now wrap user-supplied `value` with `escapeForFormula()`
+
 ## [4.20.3] - 2026-03-04
 
 ### Fixed

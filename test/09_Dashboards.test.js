@@ -13,6 +13,8 @@ const { loadSources } = require('./load-source');
 
 // Mock globals that these modules expect
 global.logAuditEvent = jest.fn();
+// getVaultDataMap_ lives in 08d_AuditAndFormulas.gs (not loaded here) — default to empty map
+global.getVaultDataMap_ = jest.fn(() => ({}));
 global.AUDIT_EVENTS = {
   SYSTEM_REPAIR: 'SYSTEM_REPAIR',
   FOLDER_CREATED: 'FOLDER_CREATED'
@@ -435,6 +437,156 @@ describe('computeSatisfactionRowAverages', () => {
 // ============================================================================
 // Module-level function existence
 // ============================================================================
+
+// ============================================================================
+// approveFlaggedSubmission / rejectFlaggedSubmission
+// Regression tests for formula injection fix: callerEmail must be wrapped
+// with escapeForFormula() before writing to REVIEWER_NOTES column.
+// ============================================================================
+
+describe('approveFlaggedSubmission / rejectFlaggedSubmission — formula injection protection', () => {
+  // Vault column order (1-indexed, matches SURVEY_VAULT_HEADER_MAP_):
+  // 1=Response Row, 2=Email Hash, 3=Verified, 4=Member ID Hash,
+  // 5=Quarter, 6=Is Latest, 7=Superseded By, 8=Reviewer Notes
+  const VAULT_HEADERS = ['Response Row', 'Email Hash', 'Verified', 'Member ID Hash', 'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'];
+
+  var _origGetUserRole;
+  var _origSyncSatisfaction;
+
+  beforeEach(() => {
+    _origGetUserRole = global.getUserRole_;
+    global.getUserRole_ = jest.fn(() => 'admin');
+    _origSyncSatisfaction = global.syncSatisfactionValues;
+    global.syncSatisfactionValues = jest.fn(); // prevent cascade
+  });
+
+  afterEach(() => {
+    global.getUserRole_ = _origGetUserRole;
+    global.syncSatisfactionValues = _origSyncSatisfaction;
+  });
+
+  function makeVaultSs(extraRows) {
+    var data = [VAULT_HEADERS, ...(extraRows || [])];
+    var setValueSpy = jest.fn();
+    var vaultSheet = createMockSheet('_Survey_Vault', data);
+    // Override getRange to capture setValue calls
+    vaultSheet.getRange = jest.fn(() => ({ setValue: setValueSpy, getValues: jest.fn(() => data) }));
+    var ss = createMockSpreadsheet([vaultSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    return setValueSpy;
+  }
+
+  test('approve: escapeForFormula called on reviewer notes (newline injection blocked)', () => {
+    // A crafted email with \n= would inject a formula on the next cell line
+    // without escapeForFormula. escapeForFormula replaces \n with a space.
+    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => 'steward@org.com\n=MALICIOUS()') }));
+    var setValueSpy = makeVaultSs([[1, 'hash', false, 'memhash', 'Q1', true, '', '']]);
+
+    approveFlaggedSubmission(1);
+
+    var reviewerNotesCall = setValueSpy.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('Approved by'));
+    expect(reviewerNotesCall).toBeDefined();
+    // escapeForFormula strips newlines — no raw \n in output
+    expect(reviewerNotesCall[0]).not.toContain('\n');
+    expect(reviewerNotesCall[0]).not.toMatch(/^=/);
+  });
+
+  test('approve: writes "Yes" to VERIFIED column', () => {
+    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => 'admin@org.com') }));
+    var setValueSpy = makeVaultSs([[1, 'hash', false, 'memhash', 'Q1', true, '', '']]);
+
+    approveFlaggedSubmission(1);
+
+    expect(setValueSpy).toHaveBeenCalledWith('Yes');
+  });
+
+  test('reject: escapeForFormula called on reviewer notes', () => {
+    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => 'steward@org.com\n=MALICIOUS()') }));
+    var setValueSpy = makeVaultSs([[2, 'hash', false, 'memhash', 'Q1', true, '', '']]);
+
+    rejectFlaggedSubmission(2);
+
+    var reviewerNotesCall = setValueSpy.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('Rejected by'));
+    expect(reviewerNotesCall).toBeDefined();
+    expect(reviewerNotesCall[0]).not.toContain('\n');
+  });
+
+  test('reject: writes "Rejected" to VERIFIED and "No" to IS_LATEST', () => {
+    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => 'admin@org.com') }));
+    var setValueSpy = makeVaultSs([[3, 'hash', false, 'memhash', 'Q1', true, '', '']]);
+
+    rejectFlaggedSubmission(3);
+
+    expect(setValueSpy).toHaveBeenCalledWith('Rejected');
+    expect(setValueSpy).toHaveBeenCalledWith('No');
+  });
+
+  test('approve: throws when caller has no role (auth check)', () => {
+    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => 'nobody@org.com') }));
+    global.getUserRole_ = jest.fn(() => 'member');
+    makeVaultSs([[1, 'hash', false, 'memhash', 'Q1', true, '', '']]);
+
+    expect(() => approveFlaggedSubmission(1)).toThrow('Access denied');
+  });
+});
+
+// ============================================================================
+// getAggregateSatisfactionStats — vault VERIFIED / IS_LATEST isTruthyValue
+// The vault flags written by approveFlaggedSubmission ('Yes') and rejected
+// ('Rejected'/'No') flow through isTruthyValue(). Tests confirm all string
+// representations from Sheets are handled correctly.
+// ============================================================================
+
+describe('getAggregateSatisfactionStats — vault VERIFIED/IS_LATEST normalization', () => {
+  // Minimal satisfaction row: must be indexable by SATISFACTION_COLS constants.
+  // We only need a non-empty row; actual metric columns aren't tested here.
+  const SAT_HEADERS = ['Response'];
+  const SAT_ROW     = ['response-data'];
+
+  function makeSatisfactionSs() {
+    var satData = [SAT_HEADERS, SAT_ROW]; // row 2 = satRow index 2
+    var satSheet = createMockSheet(SHEETS.SATISFACTION || '_Satisfaction', satData);
+    // getRange for data read — return the row
+    satSheet.getRange = jest.fn(() => ({ getValues: jest.fn(() => [SAT_ROW]) }));
+    var ss = createMockSpreadsheet([satSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+  }
+
+  // Vault flag value pairs: [verified, isLatest, shouldInclude, label]
+  var vaultCases = [
+    // Values written by approveFlaggedSubmission
+    ['Yes',   'Yes',  true,  "approve writes 'Yes'/'Yes'"],
+    // Boolean true (manual entry or import)
+    [true,    true,   true,  'boolean true/true'],
+    // Common Sheets string variants
+    ['TRUE',  'TRUE', true,  "string 'TRUE'/'TRUE'"],
+    ['True',  'True', true,  "string 'True'/'True'"],
+    ['1',     '1',    true,  "string '1'/'1'"],
+    // Values written by rejectFlaggedSubmission
+    ['Rejected', 'No', false, "reject writes 'Rejected'/'No'"],
+    // Explicitly falsy
+    [false,   true,   false, 'boolean false verified'],
+    ['No',    'Yes',  false, "string 'No' verified"],
+    ['',      'Yes',  false, 'empty verified'],
+    ['Yes',   false,  false, 'boolean false isLatest'],
+    ['Yes',   '',     false, 'empty isLatest'],
+  ];
+
+  vaultCases.forEach(function(c) {
+    var verified = c[0], isLatest = c[1], shouldInclude = c[2], label = c[3];
+
+    test(label + ' → responseCount=' + (shouldInclude ? 1 : 0), function() {
+      makeSatisfactionSs();
+      // Inject vault map with the test values at row 2 (satRow for the single data row)
+      getVaultDataMap_.mockReturnValueOnce({
+        2: { verified: verified, isLatest: isLatest, quarter: 'Q1', vaultRow: 2 }
+      });
+
+      var result = getAggregateSatisfactionStats();
+      expect(result.responseCount).toBe(shouldInclude ? 1 : 0);
+    });
+  });
+});
 
 describe('Dashboard module functions exist', () => {
   test('showSatisfactionDashboard is defined', () => {

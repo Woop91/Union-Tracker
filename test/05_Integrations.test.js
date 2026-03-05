@@ -588,6 +588,70 @@ describe('fetchCCContacts_', () => {
 // Constant Contact Disconnect
 // ============================================================================
 
+// ============================================================================
+// sendEmailToMember
+// Regression tests for 3f88994: safeSubject/safeBody were undefined (ReferenceError
+// on every call). Also covers HTML stripping, auth check, and member-not-found.
+// ============================================================================
+
+describe('sendEmailToMember', () => {
+  var _origGetUserRole;
+  beforeEach(() => {
+    global.getMemberById = jest.fn(() => ({ Email: 'member@test.com', 'Member ID': 'MEM-001' }));
+    // Mock getUserRole_ directly so auth passes without spreadsheet reads.
+    _origGetUserRole = global.getUserRole_;
+    global.getUserRole_ = jest.fn(() => 'admin');
+    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => 'admin@test.com') }));
+    MailApp.sendEmail = jest.fn();
+    MailApp.getRemainingDailyQuota = jest.fn(() => 100);
+  });
+  afterEach(() => {
+    global.getUserRole_ = _origGetUserRole;
+  });
+
+  test('returns success and calls safeSendEmail_ (safeSubject/safeBody no longer undefined)', () => {
+    // Before 3f88994, safeSubject and safeBody were undefined → ReferenceError.
+    // This test fails if that regression is reintroduced.
+    const result = sendEmailToMember('MEM-001', 'Hello', '<p>Body text</p>');
+    expect(result.success).toBe(true);
+    expect(MailApp.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('strips HTML tags from subject before sending', () => {
+    sendEmailToMember('MEM-001', '<b>Important</b> Notice', 'Body');
+    const callArgs = MailApp.sendEmail.mock.calls[0][0];
+    expect(callArgs.subject).toBe('Important Notice');
+    expect(callArgs.subject).not.toContain('<b>');
+  });
+
+  test('preserves subject text when no HTML tags present', () => {
+    sendEmailToMember('MEM-001', 'Plain subject', 'Body');
+    const callArgs = MailApp.sendEmail.mock.calls[0][0];
+    expect(callArgs.subject).toBe('Plain subject');
+  });
+
+  test('returns error when member is not found', () => {
+    global.getMemberById = jest.fn(() => null);
+    const result = sendEmailToMember('NONEXISTENT', 'Subject', 'Body');
+    expect(result.success).toBe(false);
+    expect(MailApp.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('returns error when member email is invalid', () => {
+    global.getMemberById = jest.fn(() => ({ Email: 'not-a-valid-email', 'Member ID': 'MEM-X' }));
+    const result = sendEmailToMember('MEM-X', 'Subject', 'Body');
+    expect(result.success).toBe(false);
+    expect(MailApp.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('returns error when caller role is not admin or steward', () => {
+    global.getUserRole_ = jest.fn(() => 'member');
+    const result = sendEmailToMember('MEM-001', 'Subject', 'Body');
+    expect(result.success).toBe(false);
+    expect(MailApp.sendEmail).not.toHaveBeenCalled();
+  });
+});
+
 describe('disconnectConstantContact', () => {
   test('removes all CC properties when user confirms', () => {
     const deletedKeys = [];

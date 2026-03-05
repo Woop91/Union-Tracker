@@ -753,9 +753,9 @@ function addToConfigDropdown_(configCol, value) {
     }
 
     if (emptyRow === -1) emptyRow = lastRow + 1;
-    configSheet.getRange(emptyRow, configCol).setValue(value);
+    configSheet.getRange(emptyRow, configCol).setValue(escapeForFormula(value));
   } else {
-    configSheet.getRange(3, configCol).setValue(value);
+    configSheet.getRange(3, configCol).setValue(escapeForFormula(value));
   }
 }
 
