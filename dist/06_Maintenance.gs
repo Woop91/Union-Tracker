@@ -3689,39 +3689,45 @@ function createMobileStewardPortal() {
  * @param {Event} e - Edit event
  */
 function onEditWithAuditLogging(e) {
-  var sheet = e.source.getActiveSheet();
-  var range = e.range;
-  var oldValue = e.oldValue;
-  var newValue = e.value;
+  if (!e || !e.range) return;
 
-  // Only process single cell edits
-  if (range.getNumRows() !== 1 || range.getNumColumns() !== 1) return;
+  try {
+    var sheet = e.source.getActiveSheet();
+    var range = e.range;
+    var oldValue = e.oldValue;
+    var newValue = e.value;
 
-  var sheetName = sheet.getName();
-  var col = range.getColumn();
-  var row = range.getRow();
+    // Only process single cell edits
+    if (range.getNumRows() !== 1 || range.getNumColumns() !== 1) return;
 
-  // Skip header row
-  if (row === 1) return;
+    var sheetName = sheet.getName();
+    var col = range.getColumn();
+    var row = range.getRow();
 
-  // Grievance Log changes
-  if (sheetName === SHEETS.GRIEVANCE_LOG) {
-    var grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+    // Skip header row
+    if (row === 1) return;
 
-    // Status change
-    if (col === GRIEVANCE_COLS.STATUS && oldValue !== newValue) {
-      logGrievanceStatusChange(grievanceId, oldValue, newValue);
+    // Grievance Log changes
+    if (sheetName === SHEETS.GRIEVANCE_LOG) {
+      var grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+
+      // Status change
+      if (col === GRIEVANCE_COLS.STATUS && oldValue !== newValue) {
+        logGrievanceStatusChange(grievanceId, oldValue, newValue);
+      }
+
+      // Steward assignment change
+      if (col === GRIEVANCE_COLS.STEWARD && oldValue !== newValue) {
+        logStewardAssignmentChange(grievanceId, oldValue, newValue);
+      }
     }
 
-    // Steward assignment change
-    if (col === GRIEVANCE_COLS.STEWARD && oldValue !== newValue) {
-      logStewardAssignmentChange(grievanceId, oldValue, newValue);
+    // Member Directory - duplicate ID check
+    if (sheetName === SHEETS.MEMBER_DIR && col === MEMBER_COLS.MEMBER_ID) {
+      validateMemberIdOnEdit(e);
     }
-  }
-
-  // Member Directory - duplicate ID check
-  if (sheetName === SHEETS.MEMBER_DIR && col === MEMBER_COLS.MEMBER_ID) {
-    validateMemberIdOnEdit(e);
+  } catch (err) {
+    console.error('onEditWithAuditLogging error:', err.message);
   }
 }
 

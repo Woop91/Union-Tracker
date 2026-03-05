@@ -95,6 +95,10 @@ function onOpenDeferred_() {
   } catch (_e) { /* skip cleanup if unavailable */ }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    Logger.log('onOpenDeferred_: getActiveSpreadsheet() returned null');
+    return;
+  }
 
   try {
     syncColumnMaps();

@@ -653,16 +653,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.13';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.14';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 20,
-    PATCH: parseInt(parts[2], 10) || 13,
+    PATCH: parseInt(parts[2], 10) || 14,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-04',
-    CODENAME: 'Accessibility & Config Hardening'
+    BUILD_DATE: '2026-03-05',
+    CODENAME: 'Trigger Null Guards'
   };
 })();
 
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.14', date: '2026-03-05', codename: 'Trigger Null Guards', changes: 'onOpenDeferred_ (10_Main.gs): add null guard after getActiveSpreadsheet() — returns null in web app context, would crash ss.toast(). onEditWithAuditLogging (06_Maintenance.gs): add !e || !e.range early return guard and wrap body in try/catch — trigger functions must not throw or GAS silently drops all subsequent edits.' },
   { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names (SEIU 509, MassAbility DDS, SEIU Local in titles/survey subject/vCard ORG) with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
   { version: '4.20.12', date: '2026-03-04', codename: 'Dead Code Removal — Testing Stubs', changes: 'Remove duplicate testing framework section from 06_Maintenance.gs (~84 lines): TEST_RESULTS var (zero callers), TEST_MAX_EXECUTION_MS/TEST_LARGE_DATASET_THRESHOLD (duplicates of 07_DevTools.gs), Assert object (duplicate of 07_DevTools.gs), 4 empty section headers, VALIDATION_PATTERNS/VALIDATION_MESSAGES (duplicates of 07_DevTools.gs), 2 orphaned JSDoc stubs with no function bodies. Active versions of all these remain in 07_DevTools.gs. 16 corresponding test assertions removed from 06_Maintenance.test.js.' },
   { version: '4.20.11', date: '2026-03-04', codename: 'Security & Logic Fixes', changes: 'H-12: Replace vault/reminders/userMeta/archive hideSheet() with setSheetVeryHidden_() in 25_WorkloadService.gs — API-level hide that persists on Google Sheets mobile (previously only UI-layer hide). H-16: Fix contact log sort in getMemberContactHistory and getStewardContactLog (21_WebDashDataService.gs) — was sorting by formatted date string (wrong alphabetical order); now stores _ts timestamp field, sorts numerically, deletes _ts before returning. H-20: Fix win rate denominator in getStewardWorkloadDetailed (02_DataManagers.gs) — was dividing wonCases by totalCases (includes active cases); now uses resolvedCases = Won+Denied+Settled+Withdrawn, matching the formula in getDashboardStats.' },

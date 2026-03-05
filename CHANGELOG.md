@@ -5,6 +5,12 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.14] - 2026-03-05
+
+### Fixed
+- **Trigger null guard** (`10_Main.gs:97`) — `onOpenDeferred_` called `SpreadsheetApp.getActiveSpreadsheet()` without checking for null. In web app context this returns null, causing `ss.toast()` to crash and silently abort the deferred init. Added early return with `Logger.log`.
+- **Trigger error resilience** (`06_Maintenance.gs:3691`) — `onEditWithAuditLogging` lacked a null guard for the event object and had no try/catch wrapper. GAS trigger functions that throw cause the runtime to silently drop all subsequent edit events. Added `!e || !e.range` guard and wrapped body in try/catch per CLAUDE.md mandatory error handling pattern.
+
 ## [4.20.13] - 2026-03-04
 
 ### Fixed
