@@ -2438,7 +2438,7 @@ function setupOCRApiKey() {
 
   // Check current status
   var statusMessage = currentKey
-    ? '✅ API Key Configured (ends with: ...' + currentKey.slice(-6) + ')'
+    ? '✅ API Key Configured (ends with: ...' + escapeHtml(currentKey.slice(-6)) + ')'
     : '❌ API Key Not Configured';
 
   var html = HtmlService.createHtmlOutput(
