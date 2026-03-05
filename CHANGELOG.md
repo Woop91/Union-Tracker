@@ -5,6 +5,12 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.10] - 2026-03-04
+
+### Fixed
+- **H-7** (`01_Core.gs:2459`) — `getDeadlineRules()` batches 4 individual `configSheet.getValue()` calls into a single `getValues()` range read. Previously 4 separate Sheets API round-trips; now 1.
+- **H-2** (`10d_SyncAndMaintenance.gs:410`) — `sortGrievanceLogByStatus()` now captures cell notes via `getNotes()` before sorting and restores them via `setNotes()` after `setValues()`. Previously, any user-added notes on Grievance Log rows were silently discarded on every sort.
+
 ## [4.20.9] - 2026-03-04
 
 ### Fixed

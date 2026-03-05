@@ -1,6 +1,6 @@
 {
   "name": "union-steward-dashboard",
-  "version": "4.20.9",
+  "version": "4.20.10",
   "description": "Modular Union Steward Dashboard for Google Sheets",
   "main": "build.js",
   "scripts": {

@@ -653,16 +653,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.9';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.10';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 20,
-    PATCH: parseInt(parts[2], 10) || 9,
+    PATCH: parseInt(parts[2], 10) || 10,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-04',
-    CODENAME: 'Hardcoded Index Fix & Dead Code'
+    CODENAME: 'Performance & Data Integrity Fixes'
   };
 })();
 
@@ -673,6 +673,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.20.10', date: '2026-03-04', codename: 'Performance & Data Integrity Fixes', changes: 'H-7: Batch 4 individual configSheet.getValue() calls in getDeadlineRules() into a single getValues() range read — 4 API calls → 1. H-2: sortGrievanceLogByStatus now captures cell notes via getNotes() before sort and restores them via setNotes() after setValues() — preserves user-added notes that would otherwise be silently discarded by the sort.' },
   { version: '4.20.9', date: '2026-03-04', codename: 'Hardcoded Index Fix & Dead Code', changes: 'C-DATA-6: Replace positional array indices (sections[6], sections[7], questions[0]–[4]) in satisfaction survey score assignment with key-based lookup maps (sectionByKey[key], s._qByKey[key]) — safe against section reordering. Dead code: emailDashboardLink_UIService_ (03_UIComponents.gs, deprecated, zero callers), getOrCreateMemberFolder_Legacy_ (11_CommandHub.gs, deprecated, zero callers). Note: DataCache.cachedCall deduplicates surveyStatus/events server calls by cache key — those are not real duplicates.' },
   { version: '4.20.8', date: '2026-03-04', codename: 'Dead Code Removal & Performance', changes: 'H-13: setupHiddenSheets skips sheet.clear() for SURVEY_TRACKING when data rows exist — prevents accidental wipe of survey history. Dead code removal: DataAccess namespace (~530 lines), validateInputLength_, getCurrentUserEmail, safeJsonForHtml, sanitizeDataForClient (00_Security.gs), getWebAppDashboardHtml (05_Integrations.gs), isMobileContext (03_UIComponents.gs), statStdDev_ (17_CorrelationEngine.gs). Performance: updateChecklistItem batches per-field setValue calls into single setValues row write. updateMemberProfile batches per-field setValue into single setValues row write. applyConfigSheetStyling replaces per-row setBackground loop with single setBackgrounds() call. 00_DataAccess.gs retains TIME_CONSTANTS and withScriptLock_ (both used in production).' },
   { version: '4.20.7', date: '2026-03-04', codename: 'Security & Data Integrity Fixes', changes: 'C-AUTH-4: dataGetMemberGrievanceHistoryPortal now resolves identity server-side (was IDOR). C-XSS-5: JSON.stringify+&quot; on category onclick param in 05_Integrations.gs. C-FORMULA-7: escapeForFormula on weekly question text in 24_WeeklyQuestions.gs (3 locations). C-DATA-1: vault dedup reads EMAIL column (col 2) not RESPONSE_ROW (col 1) — dedup was silently broken. C-DATA-5: weekly_cases manual fallback removed hardcoded \'15\' in member_view.html. H-5: LockService added to meeting check-in to prevent TOCTOU duplicate entries (14_MeetingCheckIn.gs). H-17: email regex validation before overdue report send (04d_ExecutiveDashboard.gs). H-18: LockService added to archiveClosedGrievances for atomic read-copy-delete (06_Maintenance.gs). H-3: applyState ADD_ROW bounds check (row > 1 and <= lastRow) before deleteRow. H-4: batchSetValues guards against header row (row <= 1) updates.' },
@@ -2456,10 +2457,13 @@ function getDeadlineRules() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      var filing = Number(configSheet.getRange(3, CONFIG_COLS.FILING_DEADLINE_DAYS).getValue());
-      var s1Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP1_RESPONSE_DAYS).getValue());
-      var s2Appeal = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS).getValue());
-      var s2Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS).getValue());
+      var colStart = CONFIG_COLS.FILING_DEADLINE_DAYS;
+      var colEnd   = CONFIG_COLS.STEP2_RESPONSE_DAYS;
+      var dVals    = configSheet.getRange(3, colStart, 1, colEnd - colStart + 1).getValues()[0];
+      var filing   = Number(dVals[0]);
+      var s1Resp   = Number(dVals[CONFIG_COLS.STEP1_RESPONSE_DAYS - colStart]);
+      var s2Appeal = Number(dVals[CONFIG_COLS.STEP2_APPEAL_DAYS   - colStart]);
+      var s2Resp   = Number(dVals[colEnd - colStart]);
       return {
         FILING_DAYS: isNaN(filing) ? DEADLINE_DEFAULTS.FILING_DAYS : filing,
         STEP_1: { DAYS_FOR_RESPONSE: isNaN(s1Resp) ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : s1Resp },
