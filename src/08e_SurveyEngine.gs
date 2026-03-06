@@ -83,6 +83,21 @@ function initSurveyEngine() {
     }
   } catch(e) { log.push('❌ Open period: ' + e.message); }
 
+  try {
+    // 8. Populate _Survey_Tracking from Member Directory (non-destructive if responses exist)
+    var ss2 = SpreadsheetApp.getActiveSpreadsheet();
+    var trackSheet = ss2.getSheetByName(SHEETS.SURVEY_TRACKING);
+    var memberSheet = ss2.getSheetByName(SHEETS.MEMBER_DIR);
+    var memberCount = memberSheet ? Math.max(0, memberSheet.getLastRow() - 1) : 0;
+    if (memberCount === 0) {
+      log.push('⚠️  Member Directory empty — tracking not populated. Add members first, then re-run.');
+    } else {
+      populateSurveyTrackingFromMembers();
+      var newCount = trackSheet ? Math.max(0, trackSheet.getLastRow() - 1) : 0;
+      log.push('✅ _Survey_Tracking populated: ' + newCount + ' members');
+    }
+  } catch(e) { log.push('❌ Tracking populate: ' + e.message); }
+
   var summary = log.join('\n');
   Logger.log('initSurveyEngine:\n' + summary);
   ui.alert('Survey Engine Initialized', summary, ui.ButtonSet.OK);
@@ -305,6 +320,21 @@ function archiveSurveyPeriod_(periodId) {
         ? periodFolderIter.next()
         : parentFolder.createFolder(periodName);
       pastFolderUrl = periodFolder.getUrl();
+
+      // Pin the parent folder ID back to Config so future archives use it directly
+      // (only writes if PAST_SURVEYS_FOLDER_ID is currently empty)
+      try {
+        var existingPinId = getConfigValue_(CONFIG_COLS.PAST_SURVEYS_FOLDER_ID);
+        if (!existingPinId) {
+          var configSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.CONFIG);
+          if (configSh && CONFIG_COLS.PAST_SURVEYS_FOLDER_ID) {
+            configSh.getRange(3, CONFIG_COLS.PAST_SURVEYS_FOLDER_ID).setValue(parentFolder.getId());
+            Logger.log('archiveSurveyPeriod_: Pinned Past Surveys Folder ID to Config: ' + parentFolder.getId());
+          }
+        }
+      } catch(pe) {
+        Logger.log('archiveSurveyPeriod_: Could not pin folder ID to Config: ' + pe.message);
+      }
 
       // ── Export question snapshot (JSON) ──────────────────────────────
       try {
