@@ -502,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.20.15",
+  VERSION: "4.20.20",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -562,15 +562,47 @@ var COMMAND_CONFIG = {
  * @const {Object}
  */
 var DRIVE_CONFIG = {
-  // M-19: Ideally this would come from the Config tab, but acceptable as a constant
-  // since Drive folder names rarely change and renaming would break existing folder links.
-  ROOT_FOLDER_NAME: 'Dashboard - Grievance Files',
-  // Simplified template: Member Name and Date Filed
+  // Root folder name — derived dynamically from ORG_NAME in Config sheet at runtime.
+  // Use getDriveRootFolderName_() everywhere you need the folder name.
+  // Fallback used only if Config sheet is not yet set up (first-time CREATE_DASHBOARD run).
+  ROOT_FOLDER_FALLBACK: 'Dashboard Files',
+  // Subfolder names within the root — these are fixed (renaming would break stored IDs)
+  GRIEVANCES_SUBFOLDER:   'Grievances',
+  RESOURCES_SUBFOLDER:    'Resources',
+  MINUTES_SUBFOLDER:      'Minutes',
+  EVENT_CHECKIN_SUBFOLDER: 'Event Check-In',
+  // Grievance case folder naming templates (inside Grievances/)
   // Template uses placeholders: {date}, {lastName}, {firstName}
   SUBFOLDER_TEMPLATE: '{lastName}, {firstName} - {date}',
   // Fallback if member name not available
   SUBFOLDER_TEMPLATE_SIMPLE: '{grievanceId} - {date}'
 };
+
+/**
+ * Returns the root Drive folder name for this deployment.
+ * Derived from the ORG_NAME value in the Config sheet (row 3).
+ * Example: "SEIU Local 509" → "SEIU Local 509 Dashboard"
+ * Falls back to DRIVE_CONFIG.ROOT_FOLDER_FALLBACK if Config is not yet set up.
+ * Memoized per script execution (same pattern as getSystemName_).
+ * @returns {string} Root folder name
+ */
+var _cachedDriveRootName_ = null;
+function getDriveRootFolderName_() {
+  if (_cachedDriveRootName_ !== null) return _cachedDriveRootName_;
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet && CONFIG_COLS.ORG_NAME) {
+      var orgName = String(configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue() || '').trim();
+      if (orgName) {
+        _cachedDriveRootName_ = orgName + ' Dashboard';
+        return _cachedDriveRootName_;
+      }
+    }
+  } catch (_e) {}
+  _cachedDriveRootName_ = DRIVE_CONFIG.ROOT_FOLDER_FALLBACK;
+  return _cachedDriveRootName_;
+}
 
 /**
  * Get organization name from Config sheet, falling back to default.
@@ -662,7 +694,7 @@ var VERSION_INFO = (function() {
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-05',
-    CODENAME: 'Trigger Null Guards'
+    CODENAME: 'Backfill Progress Flush, MegaSurvey Col Test'
   };
 })();
 
@@ -673,6 +705,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.21.0', date: '2026-03-05', codename: 'Native Survey Engine', changes: 'Deprecate Google Form integration entirely. Full webapp-native satisfaction survey: getSurveyQuestions() returns all 67 questions with types (slider-10, dropdown, radio, checkbox, paragraph), branching rules (Q5→3A/3B, Q36→6A), and slider labels. submitSurveyResponse() maps all 67 SATISFACTION_COLS, period-aware vault dedup per SURVEY_PERIODS sheet. New: getSurveyPeriod(), autoTriggerQuarterlyPeriod(), archiveSurveyPeriod_() (Drive export to Past Survey Questions/), getPendingSurveyMembers(), getSatisfactionSummary() (section averages as plain values). New hidden sheet _Survey_Periods (SURVEY_PERIODS_COLS, 8 cols). New Config cols: Survey Priority Options (Q64 dynamic), Past Surveys Folder ID. Quarterly time trigger installed via setupQuarterlyTrigger(). Survey-open notifications pushed to all active members on period start. Slider label: 1=Strongly Disagree / 10=Strongly Agree (universal across all 52 scale questions). Anonymity architecture preserved: three-layer separation (Satisfaction sheet=anonymous scores, _Survey_Vault=hashed PII only, _Survey_Tracking=completion status only).' },
   { version: '4.20.15', date: '2026-03-05', codename: 'FULL_CODE_REVIEW Final Fixes', changes: 'C-XSS-18: Fix el() boolean attribute handling — el() now uses property assignment (elem[key]=value) for boolean attrs (selected, disabled, checked) instead of setAttribute which would set attr="false" (truthy in DOM). C-XSS-6: Replace escapeHtml() with JSON.stringify() for memberId in onclick JS string context in 03_UIComponents.gs — HTML entities decoded by parser before JS executes, JSON.stringify produces correct escape sequences. LOW: Remove 6 unused _-prefixed variables (_lastRow, _pdfFile, _headers×2, _stepDays, _mgmtResponseDays, _mode, _ss×2) from 04b/04d/04e/05_Integrations.' },
   { version: '4.20.14', date: '2026-03-05', codename: 'Trigger Null Guards', changes: 'onOpenDeferred_ (10_Main.gs): add null guard after getActiveSpreadsheet() — returns null in web app context, would crash ss.toast(). onEditWithAuditLogging (06_Maintenance.gs): add !e || !e.range early return guard and wrap body in try/catch — trigger functions must not throw or GAS silently drops all subsequent edits.' },
   { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names (SEIU 509, MassAbility DDS, SEIU Local in titles/survey subject/vCard ORG) with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
@@ -849,7 +882,8 @@ var HIDDEN_SHEETS = {
   AUDIT_LOG: '_Audit_Log',
   CHECKLIST_CALC: '_Checklist_Calc',
   SURVEY_TRACKING: '_Survey_Tracking',
-  SURVEY_VAULT: '_Survey_Vault'
+  SURVEY_VAULT: '_Survey_Vault',
+  SURVEY_PERIODS: '_Survey_Periods'
 };
 
 // ============================================================================
@@ -1462,10 +1496,40 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
   { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' },
   { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)' },
-  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' }
+  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' },
+  // Drive folder structure (v4.20.17) — set by CREATE_DASHBOARD, read-only at runtime
+  { key: 'DASHBOARD_ROOT_FOLDER_ID',   header: 'Dashboard Root Folder ID' },
+  { key: 'GRIEVANCES_FOLDER_ID',       header: 'Grievances Folder ID' },
+  { key: 'RESOURCES_FOLDER_ID',        header: 'Resources Folder ID' },
+  { key: 'MINUTES_FOLDER_ID',          header: 'Minutes Folder ID' },
+  { key: 'EVENT_CHECKIN_FOLDER_ID',    header: 'Event Check-In Folder ID' },
+  // Survey engine (v4.21.0) — Q64 priority options, editable in sheet
+  { key: 'SURVEY_PRIORITY_OPTIONS',  header: 'Survey Priority Options' },
+  // Drive folder for archived past survey periods
+  { key: 'PAST_SURVEYS_FOLDER_ID',   header: 'Past Surveys Folder ID' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
+
+// ============================================================================
+// SURVEY PERIODS COLUMNS — Hidden sheet: _Survey_Periods (v4.21.0)
+// ============================================================================
+/**
+ * Tracks quarterly survey periods.
+ * One row per period. Status: 'Active' | 'Closed'.
+ * archiveSurveyPeriod_() writes Drive archive URL here when closing.
+ */
+var SURVEY_PERIODS_HEADER_MAP_ = [
+  { key: 'PERIOD_ID',      header: 'Period ID' },
+  { key: 'PERIOD_NAME',    header: 'Period Name' },
+  { key: 'START_DATE',     header: 'Start Date' },
+  { key: 'END_DATE',       header: 'End Date' },
+  { key: 'STATUS',         header: 'Status' },
+  { key: 'ARCHIVE_URL',    header: 'Archive Folder URL' },
+  { key: 'CREATED_BY',     header: 'Created By' },
+  { key: 'RESPONSE_COUNT', header: 'Response Count' }
+];
+var SURVEY_PERIODS_COLS = buildColsFromMap_(SURVEY_PERIODS_HEADER_MAP_);
 
 // ============================================================================
 // STEWARD PERFORMANCE CALC COLUMNS — Auto-derived from header map

@@ -1226,8 +1226,9 @@ var DataService = (function () {
 
     var status = String(_getVal(row, colMap, HEADERS.grievanceStatus, 'new')).trim().toLowerCase();
 
-    // Auto-detect overdue if deadline is past and status is active
-    if (deadlineDays !== null && deadlineDays < 0 && status !== 'resolved') {
+    // Auto-detect overdue: only flag active/open cases whose deadline has passed
+    var TERMINAL_STATUSES = ['resolved', 'won', 'denied', 'settled', 'withdrawn', 'closed'];
+    if (deadlineDays !== null && deadlineDays < 0 && TERMINAL_STATUSES.indexOf(status) === -1) {
       status = 'overdue';
     }
 
@@ -1615,7 +1616,8 @@ var DataService = (function () {
         unit: rec.unit,
       });
     }
-    stewards.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    // Return unsorted — client-side renderList applies smart sort:
+    // (1) same work location as current user, (2) in-office today, (3) alphabetical
     return stewards;
   }
 
@@ -1630,7 +1632,6 @@ var DataService = (function () {
     if (data.length <= 1) return { available: false };
     var colMap = cached.colMap;
     var total = data.length - 1;
-    if (total < 3) return { available: false, count: total, threshold: 3 };
 
     var byStatus = {};
     var byStep = {};
@@ -1749,7 +1750,7 @@ var DataService = (function () {
     limit = limit || 10;
     try {
       var config = ConfigReader.getConfig();
-      if (!config.calendarId) return [];
+      if (!config.calendarId) return { _notConfigured: true, events: [] };
       var cache = CacheService.getScriptCache();
       var cacheKey = 'events_' + config.calendarId;
       var cached = cache.get(cacheKey);
@@ -2105,6 +2106,7 @@ var DataService = (function () {
         createdBy: String(data[i][PORTAL_MINUTES_COLS.CREATED_BY] || ''),
         createdDate: data[i][PORTAL_MINUTES_COLS.CREATED_DATE] instanceof Date
           ? _formatDate(data[i][PORTAL_MINUTES_COLS.CREATED_DATE]) : '',
+        driveDocUrl: String(data[i][PORTAL_MINUTES_COLS.DRIVE_DOC_URL] || '')  // col 8 — Google Doc in Minutes/ folder
       });
     }
     minutes.sort(function(a, b) { return (b.meetingDateTs || 0) - (a.meetingDateTs || 0); });
@@ -2133,6 +2135,58 @@ var DataService = (function () {
     var meetingDate = minutesData.meetingDate ? new Date(minutesData.meetingDate) : new Date();
     if (isNaN(meetingDate.getTime())) meetingDate = new Date();
 
+    // ── Save Google Doc to Minutes/ Drive folder ─────────────────────────────
+    // Stores a formatted Google Doc alongside the spreadsheet record so stewards
+    // can share a clean link. Falls back gracefully if Drive setup hasn't run.
+    var driveDocUrl = '';
+    try {
+      var minutesFolderId = (typeof getConfigValue_ === 'function')
+        ? getConfigValue_(CONFIG_COLS.MINUTES_FOLDER_ID)
+        : '';
+      if (!minutesFolderId && typeof PropertiesService !== 'undefined') {
+        minutesFolderId = PropertiesService.getScriptProperties().getProperty('MINUTES_FOLDER_ID') || '';
+      }
+
+      var docTitle = minutesData.title + ' — ' +
+        Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+      var doc = DocumentApp.create(docTitle);
+      var body = doc.getBody();
+      body.appendParagraph(docTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+      body.appendParagraph('Recorded by: ' + stewardEmail);
+      body.appendParagraph('Date: ' + Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'MMMM d, yyyy'));
+      body.appendParagraph('');
+
+      if (minutesData.bullets) {
+        body.appendParagraph('Key Points').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        String(minutesData.bullets).split('\n').forEach(function(line) {
+          if (line.trim()) body.appendListItem(line.replace(/^[-•*]\s*/, '').trim());
+        });
+        body.appendParagraph('');
+      }
+      if (minutesData.fullMinutes) {
+        body.appendParagraph('Full Minutes').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        body.appendParagraph(String(minutesData.fullMinutes));
+      }
+      doc.saveAndClose();
+
+      // Move the doc into the Minutes/ subfolder if it exists
+      var docFile = DriveApp.getFileById(doc.getId());
+      if (minutesFolderId) {
+        try {
+          var minutesFolder = DriveApp.getFolderById(minutesFolderId);
+          minutesFolder.addFile(docFile);
+          DriveApp.getRootFolder().removeFile(docFile);
+        } catch (moveErr) {
+          Logger.log('addMeetingMinutes: could not move doc to Minutes folder: ' + moveErr.message);
+        }
+      }
+      driveDocUrl = docFile.getUrl();
+    } catch (driveErr) {
+      Logger.log('addMeetingMinutes: Drive doc creation failed (non-fatal): ' + driveErr.message);
+    }
+
+    // ── Write to sheet (8 columns: add DriveDocUrl at end) ──────────────────
     sheet.appendRow([
       id,
       meetingDate,
@@ -2141,12 +2195,19 @@ var DataService = (function () {
       String(minutesData.fullMinutes || '').substring(0, 5000),
       String(stewardEmail).trim().toLowerCase(),
       new Date(),
+      driveDocUrl
     ]);
 
+    // Ensure DriveDocUrl header exists in col 8
+    try {
+      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      if (!headers[7]) sheet.getRange(1, 8).setValue('DriveDocUrl');
+    } catch (_he) {}
+
     if (typeof logAuditEvent === 'function') {
-      logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title });
+      logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title, driveDocUrl: driveDocUrl });
     }
-    return { success: true, message: 'Minutes added.', id: id };
+    return { success: true, message: 'Minutes added.' + (driveDocUrl ? ' Google Doc saved.' : ''), id: id, driveDocUrl: driveDocUrl };
   }
 
   /**
@@ -2673,8 +2734,11 @@ function dataGetAllMembers() { var s = _requireStewardAuth(); if (!s) return [];
 function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
 function dataSendBroadcast(ignoredEmail, filter, msg) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg); }
 function dataGetSurveyResults() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getSurveyResults(); }
-
-// v4.12.0 — data service wrappers (CR-AUTH-3: steward role verification)
+// v4.21.0 — Native survey engine wrappers
+function dataGetSurveyQuestions()                    { return getSurveyQuestions(); }
+function dataGetSurveyPeriod()                       { return getSurveyPeriod(); }
+function dataSubmitSurveyResponse(ignoredEmail, responses) { var e = _resolveCallerEmail(); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
+// dataGetPendingSurveyMembers, dataGetSatisfactionSummary, dataOpenNewSurveyPeriod are in 08e_SurveyEngine.gs
 function dataLogMemberContact(ignoredStewardEmail, memberEmail, type, notes, duration) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.logMemberContact(s, memberEmail, type, notes, duration); }
 function dataGetMemberContactHistory(ignoredStewardEmail, memberEmail) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getMemberContactHistory(s, memberEmail); }
 function dataGetStewardContactLog() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardContactLog(s); }
@@ -2716,6 +2780,138 @@ function dataGetActivePolls() { var e = _resolveCallerEmail(); return e ? DataSe
 function dataSubmitPollVote(ignoredEmail, pollId, response) { var e = _resolveCallerEmail(); return e ? DataService.submitPollVote(e, pollId, response) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMeetingMinutes(limit) { return DataService.getMeetingMinutes(limit); }
 function dataAddMeetingMinutes(ignoredStewardEmail, data) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data); }
+
+/**
+ * BACKFILL: Generates Drive docs for any existing MeetingMinutes rows
+ * that pre-date v4.20.18 and therefore have an empty DriveDocUrl column.
+ *
+ * Run once from Apps Script editor or from the menu after upgrading to v4.20.18.
+ * Safe to re-run — skips rows that already have a URL.
+ * Processes up to 50 rows per call to avoid the 6-min GAS timeout.
+ *
+ * @returns {Object} { processed, skipped, errors, message }
+ */
+function BACKFILL_MINUTES_DRIVE_DOCS() {
+  var ui;
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
+  if (!sheet) {
+    var msg = 'MeetingMinutes sheet not found \u2014 nothing to backfill.';
+    if (ui) ui.alert('\uD83D\uDCC4 Minutes Backfill', msg, ui.ButtonSet.OK);
+    return { processed: 0, skipped: 0, errors: 0, message: msg };
+  }
+
+  // Resolve Minutes/ Drive folder ID
+  var minutesFolderId = '';
+  try {
+    if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.MINUTES_FOLDER_ID) {
+      minutesFolderId = getConfigValue_(CONFIG_COLS.MINUTES_FOLDER_ID) || '';
+    }
+    if (!minutesFolderId) {
+      minutesFolderId = PropertiesService.getScriptProperties().getProperty('MINUTES_FOLDER_ID') || '';
+    }
+  } catch (_re) {}
+
+  var data      = sheet.getDataRange().getValues();
+  var tz        = Session.getScriptTimeZone();
+  var totalRows = data.length - 1; // rows excluding header
+
+  // Pre-scan: count rows that still need a doc so progress toasts show X of Y
+  var needsDoc = 0;
+  for (var c = 1; c < data.length; c++) {
+    if (!String(data[c][PORTAL_MINUTES_COLS.DRIVE_DOC_URL] || '').trim()) needsDoc++;
+  }
+
+  if (needsDoc === 0) {
+    var allDoneMsg = '\u2705 All ' + totalRows + ' rows already have Drive doc URLs \u2014 nothing to do.';
+    if (ui) ui.alert('\uD83D\uDCC4 Minutes Backfill', allDoneMsg, ui.ButtonSet.OK);
+    else ss.toast(allDoneMsg, '\uD83D\uDCC4 Minutes Backfill', 6);
+    return { processed: 0, skipped: totalRows, errors: 0, message: allDoneMsg };
+  }
+
+  ss.toast('Starting backfill of ' + needsDoc + ' rows\u2026', '\uD83D\uDCC4 Minutes Backfill', 5);
+
+  var processed = 0, skipped = 0, errors = 0;
+  // Flush every FLUSH_EVERY docs: commits URL writes to the sheet so that any
+  // GAS 6-minute timeout preserves work done so far. Re-running the function
+  // safely skips already-written rows and continues from where it left off.
+  var FLUSH_EVERY = 10;
+
+  for (var i = 1; i < data.length; i++) {
+    var existingUrl = String(data[i][PORTAL_MINUTES_COLS.DRIVE_DOC_URL] || '').trim();
+    if (existingUrl) { skipped++; continue; }
+
+    var meetingDate = data[i][PORTAL_MINUTES_COLS.MEETING_DATE];
+    var title       = String(data[i][PORTAL_MINUTES_COLS.TITLE]        || '(Untitled)');
+    var bullets     = String(data[i][PORTAL_MINUTES_COLS.BULLETS]      || '');
+    var fullMins    = String(data[i][PORTAL_MINUTES_COLS.FULL_MINUTES]  || '');
+    var createdBy   = String(data[i][PORTAL_MINUTES_COLS.CREATED_BY]   || 'unknown');
+
+    if (isNaN(new Date(meetingDate).getTime())) meetingDate = new Date();
+    var dateStr  = Utilities.formatDate(new Date(meetingDate), tz, 'yyyy-MM-dd');
+    var docTitle = title + ' \u2014 ' + dateStr;
+
+    try {
+      var doc  = DocumentApp.create(docTitle);
+      var body = doc.getBody();
+      body.appendParagraph(docTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+      body.appendParagraph('Recorded by: ' + createdBy);
+      body.appendParagraph('Date: ' + Utilities.formatDate(new Date(meetingDate), tz, 'MMMM d, yyyy'));
+      body.appendParagraph('');
+      if (bullets) {
+        body.appendParagraph('Key Points').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        bullets.split('\n').forEach(function(line) {
+          if (line.trim()) body.appendListItem(line.replace(/^[-\u2022*]\s*/, '').trim());
+        });
+        body.appendParagraph('');
+      }
+      if (fullMins) {
+        body.appendParagraph('Full Minutes').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        body.appendParagraph(fullMins);
+      }
+      doc.saveAndClose();
+
+      var docFile = DriveApp.getFileById(doc.getId());
+      if (minutesFolderId) {
+        try {
+          DriveApp.getFolderById(minutesFolderId).addFile(docFile);
+          DriveApp.getRootFolder().removeFile(docFile);
+        } catch (_mv) {}
+      }
+
+      // Write URL back to sheet immediately (0-indexed col + 1 = 1-indexed for getRange)
+      sheet.getRange(i + 1, PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1).setValue(docFile.getUrl());
+      processed++;
+
+      // Progress checkpoint: flush writes + show X-of-Y toast every FLUSH_EVERY docs.
+      // SpreadsheetApp.flush() ensures partial progress survives a GAS 6-min timeout.
+      if (processed % FLUSH_EVERY === 0) {
+        SpreadsheetApp.flush();
+        ss.toast('Created ' + processed + ' of ' + needsDoc + ' docs\u2026', '\uD83D\uDCC4 Minutes Backfill', 3);
+      }
+
+    } catch (docErr) {
+      Logger.log('BACKFILL_MINUTES_DRIVE_DOCS row ' + i + ': ' + docErr.message);
+      errors++;
+    }
+  }
+
+  // Final flush \u2014 commit the last partial batch before showing the result dialog
+  SpreadsheetApp.flush();
+
+  var summary = '\u2705 Backfill complete!\n\n' +
+    'Docs created:              ' + processed + '\n' +
+    'Already had URL (skipped): ' + skipped   + '\n' +
+    'Errors:                    ' + errors +
+    (errors > 0 ? '\n\nCheck Apps Script logs (Extensions > Apps Script > Executions) for details.' : '');
+
+  if (ui) ui.alert('\uD83D\uDCC4 Minutes Backfill', summary, ui.ButtonSet.OK);
+  else ss.toast('\u2705 Backfill done: ' + processed + ' created, ' + errors + ' errors.', '\uD83D\uDCC4 Minutes Backfill', 8);
+  Logger.log('BACKFILL_MINUTES_DRIVE_DOCS: processed=' + processed + ' skipped=' + skipped + ' errors=' + errors);
+  return { processed: processed, skipped: skipped, errors: errors, message: summary };
+}
 function dataAddPoll(ignoredStewardEmail, question, options, unit) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addPoll(s, question, options, unit); }
 
 // Batch data fetch — single round-trip for SPA init (CR-AUTH-3: server-side identity)
