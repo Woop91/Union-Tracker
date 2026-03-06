@@ -1506,7 +1506,9 @@ var CONFIG_HEADER_MAP_ = [
   // Survey engine (v4.21.0) — Q64 priority options, editable in sheet
   { key: 'SURVEY_PRIORITY_OPTIONS',  header: 'Survey Priority Options' },
   // Drive folder for archived past survey periods
-  { key: 'PAST_SURVEYS_FOLDER_ID',   header: 'Past Surveys Folder ID' }
+  { key: 'PAST_SURVEYS_FOLDER_ID',   header: 'Past Surveys Folder ID' },
+  // Insights page cache — how long (in minutes) to serve cached data before re-fetching
+  { key: 'INSIGHTS_CACHE_TTL_MIN',   header: 'Insights Cache TTL (Minutes)' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);

@@ -822,3 +822,76 @@ Two stray `}` braces were left in member_view.html (lines ~2864, ~2873) from the
 - Section: "Standing Rule — Badge Refresh on Case/Task Mutations"
 - Documents which mutation types require `_refreshNavBadges()`, the `typeof` guard pattern, and the debounce guarantee.
 - Explicitly calls out the future case-status-change UI as a required wire point.
+
+---
+
+## 2026-03-06 — Insights caching + auth fixes + duplicate removal (patch 8)
+
+**FEAT: Insights page caching (AppState.insightsCache, 5-min TTL)**
+- On first visit: shows spinner, fires all four calls, stores result in AppState.insightsCache with timestamp.
+- On revisit within 5 min: renders instantly from cache, zero server calls.
+- On revisit after 5 min (stale): renders stale data immediately (no spinner), fires all four calls in background, replaces content when they resolve.
+- On server failure: falls back to stale cache value rather than showing blank/empty.
+- `_renderInsightsContent()` extracted as standalone function to support cache-render and fresh-render paths.
+
+**BUG-INSIGHTS-01: dataGetGrievanceStats / dataGetGrievanceHotSpots / dataGetSatisfactionTrends had no auth**
+- Any authenticated user (member) could call these and receive grievance statistics, hot spot locations, satisfaction trends, and steward performance data.
+- Fixed: `dataGetGrievanceStats` and `dataGetGrievanceHotSpots` now call `_requireStewardAuth()`.
+- Fixed: `dataGetSatisfactionTrends` now calls `_requireStewardAuth()`. Returns `{ categories: [] }` for unauthorized callers.
+
+**BUG-INSIGHTS-02: Duplicate wrapper — dataGetAgencyGrievanceStats**
+- `dataGetAgencyGrievanceStats` and `dataGetGrievanceStats` both called `DataService.getGrievanceStats()`.
+- Alias removed. Frontend updated to call `dataGetGrievanceStats` directly.
+
+---
+
+## 2026-03-06 — Dynamic TTL + dataGetMembershipStats auth (patch 9)
+
+**FEAT: Insights cache TTL now driven by CONFIG**
+- `CONFIG.insightsCacheTTLMin` added to ConfigReader (default: 5 minutes).
+- New header: `'Insights Cache TTL (Minutes)'` in Config tab → `CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN`.
+- Frontend reads `(CONFIG.insightsCacheTTLMin || 5) * 60 * 1000` — hardcoded `5 * 60 * 1000` removed.
+- Admins can change the TTL in the Config sheet without a code deploy.
+- Falls back to 5 min if the Config tab cell is blank or missing.
+
+**BUG-AUTH-01: dataGetMembershipStats had no auth**
+- Any unauthenticated caller could retrieve org membership statistics.
+- Members legitimately need this data (used on member union-stats page), so steward-only auth would break them.
+- Fixed: `_resolveCallerEmail()` required — returns `null` for unauthenticated callers. Member view already handles null response gracefully via failure handler.
+
+---
+
+## 2026-03-06 — dataGetUpcomingEvents auth + sheet setup auto-seeding (patch 10)
+
+**BUG-AUTH-02: dataGetUpcomingEvents had no auth**
+- Unauthenticated callers could read org calendar events.
+- Members and stewards both use this, so minimum auth (_resolveCallerEmail) applied — same pattern as dataGetMembershipStats.
+- Returns [] for unauthenticated callers. Member view DataCache handles empty gracefully.
+
+**FIX: Insights Cache TTL now auto-seeded by createConfigSheet**
+- CONFIG_HEADER_MAP_ already had INSIGHTS_CACHE_TTL_MIN added in patch 9 — headers were always auto-derived from the map, so the column header writes automatically.
+- Added seedConfigDefault_(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, [5], isExistingSheet) to 10a_SheetCreation.gs.
+- Re-running CREATE_DASHBOARD on existing sheets will add the column header and seed the value 5 without overwriting user changes.
+- No manual Config tab editing required.
+
+---
+
+## 2026-03-06 — Full data* wrapper auth audit (patch 11)
+
+**AUDIT: All function data* wrappers scanned — 7 unguarded found and fixed**
+
+All fixed with `_resolveCallerEmail()` minimum auth (both steward and member roles use these):
+
+| Wrapper | Return on unauth |
+|---|---|
+| dataGetStewardDirectory | [] |
+| dataGetCaseChecklist | [] |
+| dataGetSurveyQuestions | [] |
+| dataGetSurveyPeriod | null |
+| dataGetMeetingMinutes | [] |
+| dataGetEngagementStats | null |
+| dataGetWorkloadSummaryStats | null |
+
+**CONFIRMED CLEAN:** dataGetFullProfile, dataUpdateProfile, dataCreateTaskForSteward, dataGetBatchData, dataGetBroadcastFilterOptions, dataGetWelcomeData, dataMarkWelcomeDismissed — all verified guarded internally.
+
+**STANDING RULE (addendum to CLAUDE.md):** Every new `function data*` wrapper MUST include either `_resolveCallerEmail()` or `_requireStewardAuth()` as its first statement. No exceptions.

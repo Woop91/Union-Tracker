@@ -2833,8 +2833,7 @@ function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireSte
 function dataSendBroadcast(ignoredEmail, filter, msg) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg); }
 function dataGetSurveyResults() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getSurveyResults(); }
 // v4.21.0 — Native survey engine wrappers
-function dataGetSurveyQuestions()                    { return getSurveyQuestions(); }
-function dataGetSurveyPeriod()                       { return getSurveyPeriod(); }
+function dataGetSurveyQuestions() { var e = _resolveCallerEmail(); return e ? getSurveyQuestions() : []; }
 function dataSubmitSurveyResponse(ignoredEmail, responses) { var e = _resolveCallerEmail(); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
 // dataGetPendingSurveyMembers, dataGetSatisfactionSummary, dataOpenNewSurveyPeriod are in 08e_SurveyEngine.gs
 function dataLogMemberContact(ignoredStewardEmail, memberEmail, type, notes, duration) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.logMemberContact(s, memberEmail, type, notes, duration); }
@@ -2850,14 +2849,14 @@ function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, de
 function dataGetTasks(ignoredStewardEmail, statusFilter) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getTasks(s, statusFilter); }
 function dataCompleteTask(ignoredStewardEmail, taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
 function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
-function dataGetStewardDirectory() { try { return DataService.getStewardDirectory(); } catch (e) { Logger.log('dataGetStewardDirectory error: ' + e.message + '\n' + (e.stack || '')); return []; } }
-function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
-function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
-function dataGetMembershipStats() { return DataService.getMembershipStats(); }
-function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(limit); }
+function dataGetStewardDirectory() { var e = _resolveCallerEmail(); if (!e) return []; try { return DataService.getStewardDirectory(); } catch (err) { Logger.log('dataGetStewardDirectory error: ' + err.message + '\n' + (err.stack || '')); return []; } }
+function dataGetGrievanceStats() { var s = _requireStewardAuth(); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
+function dataGetGrievanceHotSpots() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getGrievanceHotSpots(); }
+function dataGetMembershipStats() { var e = _resolveCallerEmail(); return e ? DataService.getMembershipStats() : null; }
+function dataGetUpcomingEvents(limit) { var e = _resolveCallerEmail(); return e ? DataService.getUpcomingEvents(limit) : []; }
 // dataGetSurveyQuestions and dataSubmitSurveyResponse are defined in the v4.21.0 block above (single canonical definition)
 function dataIsChiefSteward() { var e = _resolveCallerEmail(); return e ? DataService.isChiefSteward(e) : false; }
-function dataGetAgencyGrievanceStats() { return DataService.getGrievanceStats(); }
+// dataGetAgencyGrievanceStats — alias removed; frontend uses dataGetGrievanceStats directly
 
 // v4.17.0 — member task assignment wrappers (CR-AUTH-3: server-side identity)
 function dataCreateMemberTask(ignoredStewardEmail, memberEmail, title, desc, priority, dueDate) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createMemberTask(s, memberEmail, title, desc, priority, dueDate); }
@@ -2867,10 +2866,10 @@ function dataGetStewardAssignedMemberTasks() { var s = _requireStewardAuth(); if
 
 // v4.16.0 — unwired sheet wrappers (CR-AUTH-3: server-side identity + role checks)
 function dataGetAllStewardPerformance() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllStewardPerformance(); }
-function dataGetCaseChecklist(caseId) { return DataService.getCaseChecklist(caseId); }
+function dataGetCaseChecklist(caseId) { var e = _resolveCallerEmail(); return e ? DataService.getCaseChecklist(caseId) : []; }
 function dataToggleChecklistItem(checklistId, completed) { var e = _resolveCallerEmail(); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMemberMeetings() { var e = _resolveCallerEmail(); return e ? DataService.getMemberMeetings(e) : []; }
-function dataGetSatisfactionTrends() { return DataService.getSatisfactionTrends(); }
+function dataGetSatisfactionTrends() { var s = _requireStewardAuth(); if (!s) return { categories: [] }; return DataService.getSatisfactionTrends(); }
 function dataSubmitFeedback(ignoredEmail, data) { var e = _resolveCallerEmail(); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMyFeedback() { var e = _resolveCallerEmail(); return e ? DataService.getMyFeedback(e) : []; }
 // v4.23.0: Portal Polls system deprecated — replaced by unified wq* poll system (24_WeeklyQuestions.gs)
@@ -2878,7 +2877,7 @@ function dataGetMyFeedback() { var e = _resolveCallerEmail(); return e ? DataSer
 function dataGetActivePolls() { return []; }
 function dataSubmitPollVote() { return { success: false, message: 'Polls system updated — please refresh.' }; }
 function dataAddPoll() { return { success: false, message: 'Polls system updated — please refresh.' }; }
-function dataGetMeetingMinutes(limit) { return DataService.getMeetingMinutes(limit); }
+function dataGetMeetingMinutes(limit) { var e = _resolveCallerEmail(); return e ? DataService.getMeetingMinutes(limit) : []; }
 function dataAddMeetingMinutes(ignoredStewardEmail, data) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data); }
 
 /**
@@ -3073,6 +3072,8 @@ function dataGetBroadcastFilterOptions() {
  *   membershipTrends     — monthly total/new member counts from Member Directory HIRE_DATE (last 6 mo)
  */
 function dataGetEngagementStats() {
+  var _caller = _resolveCallerEmail();
+  if (!_caller) return null;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -3236,6 +3237,8 @@ function dataGetEngagementStats() {
  *   trendDirection    — 'increasing' | 'decreasing' | 'stable' based on avg last 4 wks vs prior 4 wks
  */
 function dataGetWorkloadSummaryStats() {
+  var _caller = _resolveCallerEmail();
+  if (!_caller) return null;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);

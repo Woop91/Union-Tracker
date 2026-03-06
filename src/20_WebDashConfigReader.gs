@@ -59,11 +59,19 @@ var ConfigReader = (function () {
       cookieDurationDays:  30,
       stewardLabel:        'Steward',
       memberLabel:         'Member',
+      // Insights cache TTL in minutes (default 5). Admins can override via Config tab.
+      insightsCacheTTLMin: Number(_readCell(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN) || 5) || 5,
       // Org links — from Config tab columns
       calendarId:          _readCell(sheet, CONFIG_COLS.CALENDAR_ID) || '',
       driveFolderId:       _readCell(sheet, CONFIG_COLS.DRIVE_FOLDER_ID) || '',
       satisfactionFormUrl: _readCell(sheet, CONFIG_COLS.SATISFACTION_FORM_URL) || '',
       orgWebsite:          _readCell(sheet, CONFIG_COLS.ORG_WEBSITE) || '',
+      // Dashboard folder structure (v4.20.17)
+      dashboardRootFolderId:  _readCell(sheet, CONFIG_COLS.DASHBOARD_ROOT_FOLDER_ID) || '',
+      grievancesFolderId:     _readCell(sheet, CONFIG_COLS.GRIEVANCES_FOLDER_ID) || '',
+      resourcesFolderId:      _readCell(sheet, CONFIG_COLS.RESOURCES_FOLDER_ID) || '',
+      minutesFolderId:        _readCell(sheet, CONFIG_COLS.MINUTES_FOLDER_ID) || '',
+      eventCheckinFolderId:   _readCell(sheet, CONFIG_COLS.EVENT_CHECKIN_FOLDER_ID) || '',
       // Derived (computed below)
       magicLinkExpiryMs:   0,
       cookieDurationMs:    0,

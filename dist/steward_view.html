@@ -352,7 +352,7 @@ function renderCaseList(container, filter) {
         }
       }).withFailureHandler(function() {
         agencyCharts.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load agency stats.'));
-      }).dataGetAgencyGrievanceStats();
+      }).dataGetGrievanceStats();
     } else {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
         'No ' + filter + ' cases.'));
@@ -2172,36 +2172,44 @@ function renderInsightsPage(appContainer) {
   renderPageLayout(appContainer, 'steward', 'insights', function(container) {
     _stewardHeader(container, 'Insights', 'Agency-wide analytics');
     var content = el('div', { className: 'content' });
-    showLoading(content);
     container.appendChild(content);
+
+    // Cache: serve immediately on revisit, background-refresh after 5 min
+    var CACHE_TTL = ((CONFIG && CONFIG.insightsCacheTTLMin) || 5) * 60 * 1000;
+    var cache = AppState.insightsCache;
+    var cacheAge = cache ? (Date.now() - (cache.ts || 0)) : Infinity;
+
+    if (cache && cacheAge < CACHE_TTL) {
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat);
+      return;
+    }
+    if (cache) {
+      // Stale: render stale immediately, refresh in background
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat);
+    } else {
+      showLoading(content);
+    }
 
     var statsData = null, hotSpotsData = null, perfData = null, satData = null;
     function tryRender() {
       if (statsData === null || hotSpotsData === null || perfData === null || satData === null) return;
-      content.innerHTML = '';
-      if (!statsData || !statsData.available) {
-        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));
-      } else {
-        _renderQuickInsights(content, statsData, hotSpotsData);
-        _renderFiledVsResolved(content, statsData);
-      }
-      if (perfData && perfData.length > 0) _renderPerformanceSection(content, perfData);
-      if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(content, satData);
+      AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData };
+      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData);
     }
 
     serverCall().withSuccessHandler(function(stats) {
       statsData = stats || { available: false };
       tryRender();
     }).withFailureHandler(function() {
-      statsData = { available: false };
+      statsData = (cache && cache.stats) || { available: false };
       tryRender();
-    }).dataGetAgencyGrievanceStats();
+    }).dataGetGrievanceStats();
 
     serverCall().withSuccessHandler(function(spots) {
       hotSpotsData = spots || [];
       tryRender();
     }).withFailureHandler(function() {
-      hotSpotsData = [];
+      hotSpotsData = (cache && cache.hotSpots) || [];
       tryRender();
     }).dataGetGrievanceHotSpots();
 
@@ -2209,7 +2217,7 @@ function renderInsightsPage(appContainer) {
       perfData = perf || [];
       tryRender();
     }).withFailureHandler(function() {
-      perfData = [];
+      perfData = (cache && cache.perf) || [];
       tryRender();
     }).dataGetAllStewardPerformance();
 
@@ -2217,10 +2225,22 @@ function renderInsightsPage(appContainer) {
       satData = sat || { categories: [] };
       tryRender();
     }).withFailureHandler(function() {
-      satData = { categories: [] };
+      satData = (cache && cache.sat) || { categories: [] };
       tryRender();
     }).dataGetSatisfactionTrends();
   });
+}
+
+function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData) {
+  content.innerHTML = '';
+  if (!statsData || !statsData.available) {
+    content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));
+  } else {
+    _renderQuickInsights(content, statsData, hotSpotsData);
+    _renderFiledVsResolved(content, statsData);
+  }
+  if (perfData && perfData.length > 0) _renderPerformanceSection(content, perfData);
+  if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(content, satData);
 }
 
 function _fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }

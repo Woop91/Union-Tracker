@@ -199,6 +199,10 @@ function createConfigSheet(ss) {
     'Other'
   ], isExistingSheet);
 
+  // Insights page cache TTL — how many minutes before the Insights tab re-fetches data.
+  // Default 5 min. Admins can raise this for large datasets or lower it for real-time needs.
+  seedConfigDefault_(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, [5], isExistingSheet);
+
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
 

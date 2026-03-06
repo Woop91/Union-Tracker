@@ -281,3 +281,19 @@ Any frontend action that writes to the Grievance Log or Steward Tasks sheet **mu
 - Member task completed (member_view.html) → call `_refreshNavBadges()` (guarded by `typeof` check since function lives in steward_view.html)
 
 Always use the guard: `if (typeof _refreshNavBadges === 'function') _refreshNavBadges();`
+
+## Standing Rule — Auth on Every data* Wrapper
+
+Every `function data*` in `21_WebDashDataService.gs` MUST begin with an auth check. No exceptions.
+
+```js
+// Minimum (any authenticated user):
+var e = _resolveCallerEmail();
+if (!e) return <safe_empty>;   // [], {}, null, false
+
+// Steward-only:
+var s = _requireStewardAuth();
+if (!s) return <safe_empty>;
+```
+
+A wrapper with no auth check is an open endpoint — any user can call it anonymously via the GAS web app URL.
