@@ -2019,8 +2019,10 @@ function _renderTaskList(container, statusFilter) {
                 var updates = { title: titleIn.value.trim(), priority: priSel.value, dueDate: dueIn.value };
                 if (!updates.title) { alert('Title required.'); return; }
                 serverCall().withSuccessHandler(function(r) {
-                  if (r && r.success) { renderStewardTasks(document.getElementById('app')); }
-                  else { alert('Update failed.'); }
+                  if (r && r.success) {
+                    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+                    renderStewardTasks(document.getElementById('app'));
+                  } else { alert('Update failed.'); }
                 }).withFailureHandler(function() { alert('Update failed.'); }).dataUpdateTask(CURRENT_USER.email, t.id, updates);
               }
             }, 'Save');
@@ -2089,7 +2091,7 @@ function _renderStewardMemberTasks(container) {
               serverCall().withSuccessHandler(function(r) {
                 if (r && r.success) {
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
-                  _renderStewardMemberTasks(container.parentNode || container);
+                  renderStewardTasks(document.getElementById('app'));
                 } else { alert('Failed to complete task.'); }
               }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataStaffCompleteMemberTask(t.id);
             }
