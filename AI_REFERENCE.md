@@ -954,3 +954,36 @@ Added shared `actionArea` div below the button row. All 4 buttons render inline 
 - Everything dynamic — column lookups always by header name, never by index
 - `Contact Steward` = display name, NOT email
 - `dataSendDirectMessage` and `dataGetMemberCaseFolderUrl` both call `_requireStewardAuth()` as first statement
+
+---
+
+## 2026-03-06 — Per-member Drive contact log sheets (v4.20.22)
+
+### What was added
+Every contact logged via `logMemberContact()` now also appends to a per-member Google Sheet stored in Drive, in addition to `_Contact_Log` and the Member Directory snapshot.
+
+### Drive folder structure
+```
+[Org Root]/
+  Member Contacts/            ← MEMBER_CONTACTS_SUBFOLDER constant; ID cached in 'MEMBER_CONTACTS_FOLDER_ID' Script Property
+    LastName, FirstName/      ← one folder per member; created on first contact
+      Contact Log — LastName, FirstName.gsheet   ← full rolling history
+```
+
+### Sheet schema ("Contact Log" tab)
+| Date | Steward | Contact Type | Notes | Duration |
+
+### logMemberContact() execution order (4 steps)
+1. Append row to `_Contact_Log` (fast, always first — this is the write that must not fail)
+2. Resolve steward display name via `findUserByEmail()` (done once, reused in steps 3+4)
+3. Writeback to Member Directory snapshot columns — non-fatal try/catch
+4. Append to per-member Drive sheet — non-fatal try/catch, independent of step 3
+
+### Rules
+- Member folder name = `LastName, FirstName` (sanitized, Drive-safe chars only)
+- If no last name: just FirstName
+- If member not found in directory: falls back to email prefix (splits on @ and replaces `.` and `_` with spaces)
+- Sheet title = `Contact Log — [folder name]`
+- `MEMBER_CONTACTS_SUBFOLDER = 'Member Contacts'` — do NOT rename this folder in Drive; the stored prop ID will go stale
+- Member Directory keeps only the LAST contact snapshot — Drive sheet is the full history
+- `_Contact_Log` hidden sheet is still maintained for fast dashboard queries (Recent/By Member views)

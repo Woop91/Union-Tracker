@@ -37,46 +37,241 @@ var CALENDAR_CONFIG = {
 // GOOGLE DRIVE INTEGRATION
 // ============================================================================
 
+// ─── DRIVE FOLDER SETUP (v4.20.17) ─────────────────────────────────────────
 /**
- * Gets or creates the root folder for grievance files
- * @return {Folder} The root grievance folder
+ * Creates the full DashboardTest Drive folder hierarchy during CREATE_DASHBOARD.
+ *
+ * Folder structure:
+ *   DashboardTest/               ← PRIVATE — only explicitly shared users can access
+ *     ├── Grievances/            ← individual case folders go here
+ *     ├── Resources/
+ *     ├── Minutes/
+ *     └── Event Check-In/
+ *
+ * All folder IDs are written back to Config sheet row 3 so the system
+ * can reference them dynamically at runtime.
+ *
+ * Safe to re-run — existing folders are found by stored ID first, then by
+ * name search, then created fresh.
+ *
+ * @returns {Object} { success, rootFolderId, rootFolderUrl, grievancesFolderId,
+ *                     resourcesFolderId, minutesFolderId, eventCheckinFolderId }
  */
-function getOrCreateRootFolder() {
-  // Check for stored folder ID first to avoid global name-search ambiguity
+function setupDashboardDriveFolders() {
   var props = PropertiesService.getScriptProperties();
-  var storedFolderId = props.getProperty('GRIEVANCE_ROOT_FOLDER_ID');
-  if (storedFolderId) {
-    try {
-      return DriveApp.getFolderById(storedFolderId);
-    } catch (_e) {
-      // Stored ID invalid, fall through to name search
-    }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  // ── 1. Get or create DashboardTest root ─────────────────────────────────
+  var rootFolder = _getOrCreateNamedFolder_(
+    getDriveRootFolderName_(),
+    'DASHBOARD_ROOT_FOLDER_ID',
+    props,
+    configSheet,
+    null // no parent = root of My Drive
+  );
+  if (!rootFolder) throw new Error('Could not create or access the root Dashboard folder');
+
+  // Lock it down: PRIVATE — nobody can discover it outside explicit sharing
+  try {
+    rootFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  } catch (shareErr) {
+    Logger.log('setupDashboardDriveFolders: could not set root folder to PRIVATE: ' + shareErr.message);
   }
 
-  const folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
-  const folders = DriveApp.getFoldersByName(folderName);
+  // ── 2. Create required subfolders inside DashboardTest ───────────────────
+  var subDefs = [
+    { name: DRIVE_CONFIG.GRIEVANCES_SUBFOLDER,    propKey: 'GRIEVANCE_ROOT_FOLDER_ID',    cfgKey: 'GRIEVANCES_FOLDER_ID' },
+    { name: DRIVE_CONFIG.RESOURCES_SUBFOLDER,     propKey: 'RESOURCES_FOLDER_ID',         cfgKey: 'RESOURCES_FOLDER_ID' },
+    { name: DRIVE_CONFIG.MINUTES_SUBFOLDER,       propKey: 'MINUTES_FOLDER_ID',           cfgKey: 'MINUTES_FOLDER_ID' },
+    { name: DRIVE_CONFIG.EVENT_CHECKIN_SUBFOLDER, propKey: 'EVENT_CHECKIN_FOLDER_ID',     cfgKey: 'EVENT_CHECKIN_FOLDER_ID' },
+    { name: DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER, propKey: 'MEMBER_CONTACTS_FOLDER_ID', cfgKey: 'MEMBER_CONTACTS_FOLDER_ID' },
+  ];
 
-  if (folders.hasNext()) {
-    var existing = folders.next();
-    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', existing.getId());
+  var result = {
+    success: true,
+    rootFolderId:        rootFolder.getId(),
+    rootFolderUrl:       rootFolder.getUrl(),
+    rootFolderName:      getDriveRootFolderName_(),
+  };
+
+  subDefs.forEach(function(def) {
+    var sub = _getOrCreateNamedFolder_(def.name, def.propKey, props, configSheet, rootFolder);
+    if (!sub) { Logger.log('Could not create subfolder: ' + def.name); return; }
+    result[def.propKey] = sub.getId();
+    // Also write to Config sheet using the config-specific key
+    _writeConfigFolderId_(configSheet, CONFIG_COLS[def.cfgKey], sub.getId(), sub.getUrl());
+    Logger.log('Drive folder ready: ' + def.name + ' (' + sub.getId() + ')');
+  });
+
+  // Write root folder IDs to Config
+  _writeConfigFolderId_(configSheet, CONFIG_COLS.DASHBOARD_ROOT_FOLDER_ID, rootFolder.getId(), rootFolder.getUrl());
+  _writeConfigFolderId_(configSheet, CONFIG_COLS.DRIVE_FOLDER_ID, rootFolder.getId(), rootFolder.getUrl());
+
+  return result;
+}
+
+/**
+ * Gets a folder by stored Script Property ID, falling back to a name search
+ * within the given parent, then creating it fresh.
+ * @private
+ */
+function _getOrCreateNamedFolder_(name, propKey, props, configSheet, parentFolder) {
+  // Try stored ID first
+  var storedId = props.getProperty(propKey);
+  if (storedId) {
+    try {
+      var found = DriveApp.getFolderById(storedId);
+      if (found) return found;
+    } catch (_e) { /* stale ID */ }
+  }
+
+  // Try name search inside parent (or all of Drive)
+  var iter = parentFolder ? parentFolder.getFoldersByName(name) : DriveApp.getFoldersByName(name);
+  if (iter.hasNext()) {
+    var existing = iter.next();
+    props.setProperty(propKey, existing.getId());
     return existing;
   }
 
-  // Create the root folder
-  const newFolder = DriveApp.createFolder(folderName);
-  props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
+  // Create fresh
+  var newFolder = parentFolder ? parentFolder.createFolder(name) : DriveApp.createFolder(name);
+  props.setProperty(propKey, newFolder.getId());
 
-  // Set folder color/description
-  newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
+  newFolder.setDescription('Union Dashboard — auto-managed. Do not move or rename.');
+  return newFolder;
+}
+
+/**
+ * Writes a folder ID (and optionally URL) to a Config sheet column in row 3.
+ * Safe — skips if the column is 0/undefined (config key not mapped).
+ * @private
+ */
+function _writeConfigFolderId_(configSheet, colIndex, folderId, folderUrl) {
+  if (!configSheet || !colIndex || colIndex === 0) return;
+  try {
+    configSheet.getRange(3, colIndex).setValue(folderId || '');
+  } catch (e) {
+    Logger.log('_writeConfigFolderId_: could not write col ' + colIndex + ': ' + e.message);
+  }
+}
+
+// ─── CALENDAR SETUP (v4.20.17) ──────────────────────────────────────────────
+/**
+ * Creates the union events calendar and writes its ID to Config.
+ * Safe to re-run — finds existing calendar by stored ID first, then by name.
+ *
+ * @returns {Object} { success, calendarId, calendarName }
+ */
+function setupDashboardCalendar() {
+  var props = PropertiesService.getScriptProperties();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  // Derive calendar name from org name
+  var orgName = getSystemName_();
+  var calendarName = (orgName && orgName !== 'Union Dashboard') ? orgName + ' Events' : 'Union Events';
+
+  // Try stored ID
+  var storedId = props.getProperty('UNION_CALENDAR_ID');
+  if (storedId) {
+    try {
+      var existingCal = CalendarApp.getCalendarById(storedId);
+      if (existingCal) {
+        _writeCalendarIdToConfig_(configSheet, storedId);
+        return { success: true, calendarId: storedId, calendarName: existingCal.getName() };
+      }
+    } catch (_e) { /* stale ID */ }
+  }
+
+  // Search by name
+  var byName = CalendarApp.getCalendarsByName(calendarName);
+  if (byName.length > 0) {
+    var cal = byName[0];
+    var calId = cal.getId();
+    props.setProperty('UNION_CALENDAR_ID', calId);
+    _writeCalendarIdToConfig_(configSheet, calId);
+    return { success: true, calendarId: calId, calendarName: calendarName };
+  }
+
+  // Create fresh
+  var newCal = CalendarApp.createCalendar(calendarName, {
+    summary: 'Union events — Auto-managed by Dashboard',
+    color: CalendarApp.Color.BLUE,
+    timeZone: Session.getScriptTimeZone()
+  });
+
+  var newId = newCal.getId();
+  props.setProperty('UNION_CALENDAR_ID', newId);
+  _writeCalendarIdToConfig_(configSheet, newId);
+
+  Logger.log('Created union events calendar: ' + calendarName + ' (' + newId + ')');
+  return { success: true, calendarId: newId, calendarName: calendarName };
+}
+
+/**
+ * Writes calendar ID to Config sheet row 3, CONFIG_COLS.CALENDAR_ID.
+ * @private
+ */
+function _writeCalendarIdToConfig_(configSheet, calendarId) {
+  if (!configSheet || !CONFIG_COLS.CALENDAR_ID) return;
+  try {
+    configSheet.getRange(3, CONFIG_COLS.CALENDAR_ID).setValue(calendarId || '');
+  } catch (e) {
+    Logger.log('_writeCalendarIdToConfig_: ' + e.message);
+  }
+}
+
+// ─── ROOT FOLDER ACCESS ──────────────────────────────────────────────────────
+/**
+ * Gets or creates the Grievances subfolder inside DashboardTest.
+ * This is used by setupDriveFolderForGrievance() to place case folders
+ * inside DashboardTest/Grievances/ rather than in a standalone root.
+ * @return {Folder} The Grievances folder
+ */
+function getOrCreateRootFolder() {
+  // Grievance case folders live in DashboardTest/Grievances/.
+  // Try stored Grievances subfolder ID first (fastest path, set by setupDashboardDriveFolders).
+  var props = PropertiesService.getScriptProperties();
+  var storedId = props.getProperty('GRIEVANCE_ROOT_FOLDER_ID');
+  if (storedId) {
+    try {
+      return DriveApp.getFolderById(storedId);
+    } catch (_e) { /* stale — fall through */ }
+  }
+
+  // Find or create the DashboardTest root, then the Grievances subfolder inside it.
+  var rootFolder = _getOrCreateNamedFolder_(
+    getDriveRootFolderName_(),
+    'DASHBOARD_ROOT_FOLDER_ID',
+    props,
+    null, // configSheet — not needed here
+    null  // no parent = My Drive root
+  );
+
+  var grievancesFolder = _getOrCreateNamedFolder_(
+    DRIVE_CONFIG.GRIEVANCES_SUBFOLDER,
+    'GRIEVANCE_ROOT_FOLDER_ID',
+    props,
+    null,
+    rootFolder
+  );
+
+  // Lock root if it's new (best-effort)
+  try {
+    rootFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  } catch (_e) {}
+
+  grievancesFolder.setDescription('Individual case folders — Auto-managed by Union Dashboard');
 
   logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
-    folderId: newFolder.getId(),
-    folderName: folderName,
-    type: 'ROOT',
+    folderId:  grievancesFolder.getId(),
+    folderName: DRIVE_CONFIG.GRIEVANCES_SUBFOLDER,
+    type: 'GRIEVANCES_ROOT',
     createdBy: Session.getActiveUser().getEmail()
   });
 
-  return newFolder;
+  return grievancesFolder;
 }
 
 /**
@@ -2630,7 +2825,8 @@ function getWebAppResourceLinks() {
     satisfactionForm: '',
     spreadsheetUrl: '',
     orgWebsite: '',
-    githubRepo: ''
+    githubRepo: '',
+    resourcesFolderUrl: ''  // v4.20.18: Drive Resources/ folder URL for steward uploads
   };
 
   if (!ss) return links;
@@ -2642,7 +2838,8 @@ function getWebAppResourceLinks() {
     satisfactionForm: '',
     spreadsheetUrl: ss.getUrl(),
     orgWebsite: '',
-    githubRepo: ''  // Set via Config sheet ORG_WEBSITE or manually
+    githubRepo: '',
+    resourcesFolderUrl: ''
   };
 
   // Get form URLs from Config sheet using CONFIG_COLS constants (data in row 3)
@@ -2650,13 +2847,26 @@ function getWebAppResourceLinks() {
     try {
       var configRow = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
       links.grievanceForm = configRow[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
-      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
+      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';;
       links.satisfactionForm = configRow[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
       links.orgWebsite = configRow[CONFIG_COLS.ORG_WEBSITE - 1] || '';
     } catch (_e) {
       // Ignore errors reading config
     }
   }
+
+  // Resolve Resources/ folder URL from stored ID (v4.20.18)
+  try {
+    var resFolderId = (typeof getConfigValue_ === 'function' && CONFIG_COLS.RESOURCES_FOLDER_ID)
+      ? getConfigValue_(CONFIG_COLS.RESOURCES_FOLDER_ID)
+      : '';
+    if (!resFolderId) {
+      resFolderId = PropertiesService.getScriptProperties().getProperty('RESOURCES_FOLDER_ID') || '';
+    }
+    if (resFolderId) {
+      links.resourcesFolderUrl = DriveApp.getFolderById(resFolderId).getUrl();
+    }
+  } catch (_re) {}
 
   return links;
 }
@@ -5271,4 +5481,40 @@ function getWebAppNotificationsHtml() {
   p.push('</script></body></html>');
 
   return p.join('\n');
+}
+
+// ─── MANUAL RE-RUN WRAPPERS (v4.20.17) ─────────────────────────────────────
+/**
+ * Standalone wrapper — run from Apps Script editor or menu to
+ * re-create/repair the DashboardTest Drive folder structure.
+ */
+function SETUP_DRIVE_FOLDERS() {
+  var result = setupDashboardDriveFolders();
+  var ui;
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+  var msg = result.success
+    ? '✅ Drive folders ready!\n\n' + result.rootFolderName + ': ' + result.rootFolderUrl +
+      '\n\nAll folder IDs have been saved to the Config sheet.'
+    : '❌ Drive folder setup failed — check Apps Script logs.';
+  if (ui) ui.alert('📁 Drive Folder Setup', msg, ui.ButtonSet.OK);
+  else Logger.log('SETUP_DRIVE_FOLDERS: ' + JSON.stringify(result));
+  return result;
+}
+
+/**
+ * Standalone wrapper — run from Apps Script editor or menu to
+ * re-create/repair the union events calendar.
+ */
+function SETUP_CALENDAR() {
+  var result = setupDashboardCalendar();
+  var ui;
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+  var msg = result.success
+    ? '✅ Calendar ready!\n\nCalendar: ' + result.calendarName +
+      '\nID: ' + result.calendarId +
+      '\n\nCalendar ID has been saved to the Config sheet.'
+    : '❌ Calendar setup failed — check Apps Script logs.';
+  if (ui) ui.alert('📅 Calendar Setup', msg, ui.ButtonSet.OK);
+  else Logger.log('SETUP_CALENDAR: ' + JSON.stringify(result));
+  return result;
 }

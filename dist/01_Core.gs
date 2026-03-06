@@ -567,10 +567,11 @@ var DRIVE_CONFIG = {
   // Fallback used only if Config sheet is not yet set up (first-time CREATE_DASHBOARD run).
   ROOT_FOLDER_FALLBACK: 'Dashboard Files',
   // Subfolder names within the root — these are fixed (renaming would break stored IDs)
-  GRIEVANCES_SUBFOLDER:   'Grievances',
-  RESOURCES_SUBFOLDER:    'Resources',
-  MINUTES_SUBFOLDER:      'Minutes',
-  EVENT_CHECKIN_SUBFOLDER: 'Event Check-In',
+  GRIEVANCES_SUBFOLDER:      'Grievances',
+  RESOURCES_SUBFOLDER:       'Resources',
+  MINUTES_SUBFOLDER:         'Minutes',
+  EVENT_CHECKIN_SUBFOLDER:   'Event Check-In',
+  MEMBER_CONTACTS_SUBFOLDER: 'Member Contacts',  // per-member contact log sheets
   // Grievance case folder naming templates (inside Grievances/)
   // Template uses placeholders: {date}, {lastName}, {firstName}
   SUBFOLDER_TEMPLATE: '{lastName}, {firstName} - {date}',

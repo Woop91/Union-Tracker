@@ -5,6 +5,19 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.22] - 2026-03-06
+
+### Added
+- **Per-member Drive contact log sheets** — every time a contact is logged via `logMemberContact()`, a Google Sheet is auto-created (or opened if it already exists) at `[Root]/Member Contacts/[LastName, FirstName]/Contact Log — [Name]`. Columns: Date, Steward, Contact Type, Notes, Duration. The sheet is formatted with frozen headers and appropriate column widths on first creation.
+- **`DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER`** (`01_Core.gs`) — new constant `'Member Contacts'` for the parent subfolder name. Fixed name; do not rename (breaks stored folder ID).
+- **`MEMBER_CONTACTS_FOLDER_ID`** Script Property — cached root folder ID for the Member Contacts parent folder, consistent with the pattern used by Grievances, Minutes, etc.
+- **`setupDashboardDriveFolders()`** (`05_Integrations.gs`) — now includes `Member Contacts` in the subfolder registration list, so it is created alongside Grievances/Resources/Minutes on dashboard setup.
+- **`getOrCreateMemberContactFolder_(memberEmail)`** (`21_WebDashDataService.gs`) — private helper. Resolves member's first/last name from Member Directory by email header lookup (never by index). Creates `[Root]/Member Contacts/LastName, FirstName/` folder. Falls back to `[FirstName]` if last name blank, or to email prefix if name not found. Folder ID not cached per-member (Drive search is fast enough for per-contact writes).
+- **`getOrCreateMemberContactSheet_(memberFolder, folderName)`** (`21_WebDashDataService.gs`) — private helper. Finds existing sheet by title inside member folder, or creates a new one with proper headers. Moves new sheet out of My Drive root into member folder.
+
+### Changed
+- **`logMemberContact()`** (`21_WebDashDataService.gs`) — now performs 4 sequential steps: (1) append to `_Contact_Log` hidden sheet, (2) resolve steward display name once, (3) write back to Member Directory snapshot columns, (4) append row to per-member Drive sheet. Steps 3 and 4 are each wrapped in independent try/catch — failure of either does not block the other or prevent the `_Contact_Log` write from succeeding.
+
 ## [4.20.21] - 2026-03-06
 
 ### Fixed

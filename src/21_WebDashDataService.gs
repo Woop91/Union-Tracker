@@ -1323,6 +1323,132 @@ var DataService = (function () {
   }
 
   // ═══════════════════════════════════════
+  // PRIVATE: Member Contact Drive helpers (v4.20.22)
+  // ═══════════════════════════════════════
+
+  /**
+   * Gets or creates the per-member folder inside [Root]/Member Contacts/[LastName, FirstName]/
+   * Folder name: "LastName, FirstName" — same sanitization rules as grievance folders.
+   * Member Contacts root folder ID cached in Script Properties under MEMBER_CONTACTS_FOLDER_ID.
+   * @param {string} memberEmail
+   * @returns {Folder|null}
+   */
+  function getOrCreateMemberContactFolder_(memberEmail) {
+    try {
+      var props = PropertiesService.getScriptProperties();
+
+      // ── Resolve member name ───────────────────────────────────────────────
+      var firstName = '', lastName = '';
+      var memberDir = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET);
+      if (memberDir) {
+        var mData = memberDir.getDataRange().getValues();
+        var mHeaders = mData[0];
+        var eIdx = -1, fIdx = -1, lIdx = -1;
+        for (var h = 0; h < mHeaders.length; h++) {
+          var hl = String(mHeaders[h]).toLowerCase().trim();
+          if (hl === 'email') eIdx = h;
+          else if (hl === 'first name') fIdx = h;
+          else if (hl === 'last name') lIdx = h;
+        }
+        var mNorm = memberEmail.toLowerCase().trim();
+        for (var r = 1; r < mData.length; r++) {
+          if (eIdx !== -1 && String(mData[r][eIdx]).toLowerCase().trim() === mNorm) {
+            firstName = fIdx !== -1 ? String(mData[r][fIdx] || '').trim() : '';
+            lastName  = lIdx !== -1 ? String(mData[r][lIdx] || '').trim() : '';
+            break;
+          }
+        }
+      }
+
+      // Fallback: derive name from email prefix if lookup fails
+      if (!firstName && !lastName) {
+        var prefix = memberEmail.split('@')[0].replace(/[._]/g, ' ');
+        firstName = prefix;
+      }
+
+      // Sanitize: strip chars Drive doesn't allow in folder names
+      function _sanitize(s) { return String(s || '').replace(/[\/\\:*?"<>|]/g, '').trim(); }
+      var memberFolderName = lastName
+        ? _sanitize(lastName) + ', ' + _sanitize(firstName)
+        : _sanitize(firstName);
+
+      // ── Get or create [Root]/Member Contacts/ ────────────────────────────
+      var storedRootId = props.getProperty('MEMBER_CONTACTS_FOLDER_ID');
+      var contactsRoot = null;
+      if (storedRootId) {
+        try { contactsRoot = DriveApp.getFolderById(storedRootId); } catch (_e) {}
+      }
+      if (!contactsRoot) {
+        // Try to find it under the dashboard root
+        var dashRootId = props.getProperty('DASHBOARD_ROOT_FOLDER_ID');
+        if (dashRootId) {
+          try {
+            var dashRoot = DriveApp.getFolderById(dashRootId);
+            var subIter = dashRoot.getFoldersByName(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
+            contactsRoot = subIter.hasNext() ? subIter.next() : dashRoot.createFolder(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
+          } catch (_e) {}
+        }
+        // Final fallback: create at My Drive root
+        if (!contactsRoot) {
+          var iter = DriveApp.getFoldersByName(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
+          contactsRoot = iter.hasNext() ? iter.next() : DriveApp.createFolder(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
+        }
+        props.setProperty('MEMBER_CONTACTS_FOLDER_ID', contactsRoot.getId());
+      }
+
+      // ── Get or create [Root]/Member Contacts/[LastName, FirstName]/ ───────
+      var memberIter = contactsRoot.getFoldersByName(memberFolderName);
+      var memberFolder = memberIter.hasNext() ? memberIter.next() : contactsRoot.createFolder(memberFolderName);
+      return memberFolder;
+
+    } catch (e) {
+      Logger.log('getOrCreateMemberContactFolder_ error: ' + e.message);
+      return null;
+    }
+  }
+
+  /**
+   * Gets or creates the Contact Log Google Sheet inside the member's Drive folder.
+   * Sheet name: "Contact Log — [folder name]"
+   * Columns: Date | Steward | Contact Type | Notes | Duration
+   * @param {Folder} memberFolder
+   * @param {string} memberFolderName  — used for sheet title
+   * @returns {Spreadsheet|null}
+   */
+  function getOrCreateMemberContactSheet_(memberFolder, memberFolderName) {
+    try {
+      var sheetTitle = 'Contact Log \u2014 ' + memberFolderName;
+      var fileIter = memberFolder.getFilesByName(sheetTitle);
+      if (fileIter.hasNext()) {
+        return SpreadsheetApp.open(fileIter.next());
+      }
+      // Create new sheet in member's folder
+      var ss = SpreadsheetApp.create(sheetTitle);
+      var ssFile = DriveApp.getFileById(ss.getId());
+      memberFolder.addFile(ssFile);
+      DriveApp.getRootFolder().removeFile(ssFile); // move out of My Drive root
+
+      var sheet = ss.getActiveSheet();
+      sheet.setName('Contact Log');
+      var headers = ['Date', 'Steward', 'Contact Type', 'Notes', 'Duration'];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+           .setFontWeight('bold')
+           .setBackground('#1a365d')
+           .setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+      sheet.setColumnWidth(1, 130); // Date
+      sheet.setColumnWidth(2, 180); // Steward
+      sheet.setColumnWidth(3, 120); // Contact Type
+      sheet.setColumnWidth(4, 320); // Notes
+      sheet.setColumnWidth(5, 100); // Duration
+      return ss;
+    } catch (e) {
+      Logger.log('getOrCreateMemberContactSheet_ error: ' + e.message);
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════
   // PUBLIC: Contact Log (v4.12.0)
   // ═══════════════════════════════════════
 
@@ -1340,37 +1466,40 @@ var DataService = (function () {
 
   function logMemberContact(stewardEmail, memberEmail, contactType, notes, duration) {
     if (!stewardEmail || !memberEmail || !contactType) return { success: false, message: 'Missing fields.' };
+
+    // ── 1. Append to _Contact_Log hidden sheet (fast dashboard queries) ────
     var sheet = _ensureContactLog();
     var id = 'CL_' + Date.now().toString(36);
     sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), contactType, new Date(), (notes || '').substring(0, 500), duration || '', new Date()]);
     if (typeof logAuditEvent === 'function') logAuditEvent('CONTACT_LOG', { steward: stewardEmail, member: memberEmail, type: contactType });
 
-    // Writeback: update Member Directory snapshot columns so WorkloadTracker/KPIs stay current
+    // ── 2. Resolve steward display name once (used in both writeback and Drive sheet) ──
+    var sRecord = (typeof findUserByEmail === 'function') ? findUserByEmail(stewardEmail) : null;
+    var sName   = (sRecord && sRecord.name) ? sRecord.name : stewardEmail;
+
+    // ── 3. Writeback: update Member Directory snapshot columns ────────────
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (ss) {
         var memberDir = ss.getSheetByName(MEMBER_SHEET);
         if (memberDir) {
-          var mData = memberDir.getDataRange().getValues();
+          var mData    = memberDir.getDataRange().getValues();
           var mHeaders = mData[0];
           var emailIdx = -1, recentContactIdx = -1, contactStewardIdx = -1, contactNotesIdx = -1;
           for (var h = 0; h < mHeaders.length; h++) {
             var hLow = String(mHeaders[h]).toLowerCase().trim();
-            if (hLow === 'email') emailIdx = h;
-            else if (hLow === 'recent contact date') recentContactIdx = h;
-            else if (hLow === 'contact steward') contactStewardIdx = h;
-            else if (hLow === 'contact notes') contactNotesIdx = h;
+            if (hLow === 'email')                emailIdx          = h;
+            else if (hLow === 'recent contact date') recentContactIdx  = h;
+            else if (hLow === 'contact steward')     contactStewardIdx = h;
+            else if (hLow === 'contact notes')       contactNotesIdx   = h;
           }
           if (emailIdx !== -1) {
             var mEmailNorm = memberEmail.toLowerCase().trim();
             for (var r = 1; r < mData.length; r++) {
               if (String(mData[r][emailIdx]).toLowerCase().trim() === mEmailNorm) {
-                // Resolve steward display name — Contact Steward stores name, not email
-                var sRecord = (typeof findUserByEmail === 'function') ? findUserByEmail(stewardEmail) : null;
-                var sName = (sRecord && sRecord.name) ? sRecord.name : stewardEmail;
-                if (recentContactIdx !== -1)   memberDir.getRange(r + 1, recentContactIdx + 1).setValue(new Date());
-                if (contactStewardIdx !== -1)  memberDir.getRange(r + 1, contactStewardIdx + 1).setValue(sName);
-                if (contactNotesIdx !== -1 && notes) memberDir.getRange(r + 1, contactNotesIdx + 1).setValue(String(notes).substring(0, 500));
+                if (recentContactIdx  !== -1) memberDir.getRange(r + 1, recentContactIdx  + 1).setValue(new Date());
+                if (contactStewardIdx !== -1) memberDir.getRange(r + 1, contactStewardIdx + 1).setValue(sName);
+                if (contactNotesIdx   !== -1 && notes) memberDir.getRange(r + 1, contactNotesIdx + 1).setValue(String(notes).substring(0, 500));
                 break;
               }
             }
@@ -1379,7 +1508,23 @@ var DataService = (function () {
       }
     } catch (wbErr) {
       Logger.log('logMemberContact writeback error: ' + wbErr.message);
-      // Non-fatal — contact log row was already written; snapshot update failed silently
+    }
+
+    // ── 4. Append to per-member Drive contact log sheet ───────────────────
+    try {
+      var memberFolder = getOrCreateMemberContactFolder_(memberEmail.toLowerCase().trim());
+      if (memberFolder) {
+        // Derive folder name for sheet title (same as folder name)
+        var folderName = memberFolder.getName();
+        var contactSS = getOrCreateMemberContactSheet_(memberFolder, folderName);
+        if (contactSS) {
+          var logSheet = contactSS.getSheetByName('Contact Log') || contactSS.getActiveSheet();
+          logSheet.appendRow([new Date(), sName, contactType, (notes || '').substring(0, 500), duration || '']);
+        }
+      }
+    } catch (driveErr) {
+      Logger.log('logMemberContact Drive sheet error: ' + driveErr.message);
+      // Non-fatal — _Contact_Log and Member Directory snapshot already updated
     }
 
     return { success: true, message: 'Contact logged.' };
