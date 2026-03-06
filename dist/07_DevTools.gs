@@ -436,6 +436,21 @@ function seedConfigData() {
     'Political Action Committee', 'Membership Committee', 'Executive Board'
   ])) seededAny = true;
 
+  // Survey Priority Options — Q64 checkbox list (v4.21.0)
+  if (seedIfEmpty(CONFIG_COLS.SURVEY_PRIORITY_OPTIONS, [
+    'Contract Enforcement',
+    'Workload & Staffing',
+    'Scheduling & Office Days',
+    'Pay & Benefits',
+    'Health & Safety',
+    'Training & Development',
+    'Equity & Inclusion',
+    'Communication',
+    'Steward Support & Access',
+    'Member Organizing',
+    'Other'
+  ])) seededAny = true;
+
   if (seededAny) {
     SpreadsheetApp.getActiveSpreadsheet().toast('Config data seeded!', '✅ Success', 3);
   }
@@ -1002,191 +1017,6 @@ function restoreConfigFromSheetData_() {
 }
 
 /**
- * Seed sample members with optional grievances
- * @param {number} count - Number of members to seed (max 2000)
- * @param {number} grievancePercent - Percentage of members to give grievances (0-100, default 30)
- */
-function SEED_MEMBERS(count, grievancePercent) {
-  if (!isDemoSafeToRun_()) return;
-  count = Math.min(count || 50, 2000);
-  grievancePercent = (grievancePercent !== undefined) ? grievancePercent : 30; // Default 30% get grievances
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-
-  if (!sheet || !configSheet) {
-    SpreadsheetApp.getUi().alert('Error: Required sheets not found.');
-    return;
-  }
-
-  // Ensure Member Directory has enough columns (AF = column 32)
-  ensureMinimumColumns(sheet, MEMBER_COLS.QUICK_ACTIONS);
-
-  // Always ensure Config has data for all required columns
-  ss.toast('Ensuring Config data exists...', '🌱 Seeding', 2);
-  seedConfigData();  // seedConfigData now only populates EMPTY columns
-
-  // Now get all config values (will have data from seedConfigData or user's existing data)
-  var jobTitles = getConfigValues(configSheet, CONFIG_COLS.JOB_TITLES);
-  var locations = getConfigValues(configSheet, CONFIG_COLS.OFFICE_LOCATIONS);
-  var units = getConfigValues(configSheet, CONFIG_COLS.UNITS);
-  var supervisors = getConfigValues(configSheet, CONFIG_COLS.SUPERVISORS);
-  var managers = getConfigValues(configSheet, CONFIG_COLS.MANAGERS);
-  var stewards = getConfigValues(configSheet, CONFIG_COLS.STEWARDS);
-  var committees = getConfigValues(configSheet, CONFIG_COLS.STEWARD_COMMITTEES);
-
-  // Expanded name pools for better variety (100+ names each = 10,000+ unique combinations)
-  var firstNames = [
-    'James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda', 'William', 'Elizabeth',
-    'David', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica', 'Thomas', 'Sarah', 'Charles', 'Karen',
-    'Christopher', 'Nancy', 'Daniel', 'Lisa', 'Matthew', 'Betty', 'Anthony', 'Margaret', 'Mark', 'Sandra',
-    'Donald', 'Ashley', 'Steven', 'Kimberly', 'Paul', 'Emily', 'Andrew', 'Donna', 'Joshua', 'Michelle',
-    'Kenneth', 'Dorothy', 'Kevin', 'Carol', 'Brian', 'Amanda', 'George', 'Melissa', 'Timothy', 'Deborah',
-    'Ronald', 'Stephanie', 'Edward', 'Rebecca', 'Jason', 'Sharon', 'Jeffrey', 'Laura', 'Ryan', 'Cynthia',
-    'Jacob', 'Kathleen', 'Gary', 'Amy', 'Nicholas', 'Angela', 'Eric', 'Shirley', 'Jonathan', 'Anna',
-    'Stephen', 'Brenda', 'Larry', 'Pamela', 'Justin', 'Emma', 'Scott', 'Nicole', 'Brandon', 'Helen',
-    'Benjamin', 'Samantha', 'Samuel', 'Katherine', 'Raymond', 'Christine', 'Gregory', 'Debra', 'Frank', 'Rachel',
-    'Alexander', 'Carolyn', 'Patrick', 'Janet', 'Jack', 'Catherine', 'Dennis', 'Maria', 'Jerry', 'Heather',
-    'Tyler', 'Diane', 'Aaron', 'Ruth', 'Jose', 'Julie', 'Adam', 'Olivia', 'Nathan', 'Joyce',
-    'Henry', 'Virginia', 'Douglas', 'Victoria', 'Zachary', 'Kelly', 'Peter', 'Lauren', 'Kyle', 'Christina'
-  ];
-  var lastNames = [
-    'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez',
-    'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin',
-    'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson',
-    'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores',
-    'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter', 'Roberts',
-    'Gomez', 'Phillips', 'Evans', 'Turner', 'Diaz', 'Parker', 'Cruz', 'Edwards', 'Collins', 'Reyes',
-    'Stewart', 'Morris', 'Morales', 'Murphy', 'Cook', 'Rogers', 'Gutierrez', 'Ortiz', 'Morgan', 'Cooper',
-    'Peterson', 'Bailey', 'Reed', 'Kelly', 'Howard', 'Ramos', 'Kim', 'Cox', 'Ward', 'Richardson',
-    'Watson', 'Brooks', 'Chavez', 'Wood', 'James', 'Bennett', 'Gray', 'Mendoza', 'Ruiz', 'Hughes',
-    'Price', 'Alvarez', 'Castillo', 'Sanders', 'Patel', 'Myers', 'Long', 'Ross', 'Foster', 'Jimenez',
-    'Powell', 'Jenkins', 'Perry', 'Russell', 'Sullivan', 'Bell', 'Coleman', 'Butler', 'Henderson', 'Barnes',
-    'Gonzales', 'Fisher', 'Vasquez', 'Simmons', 'Stokes', 'Burns', 'Fox', 'Alexander', 'Rice', 'Stone'
-  ];
-  var officeDays = DEFAULT_CONFIG.OFFICE_DAYS;
-  var commMethods = DEFAULT_CONFIG.COMM_METHODS;
-
-  var startRow = Math.max(sheet.getLastRow() + 1, 2);
-
-  // Build set of existing member IDs to prevent duplicates
-  var existingMemberIds = {};
-  if (startRow > 2) {
-    var existingData = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, startRow - 2, 1).getValues();
-    for (var e = 0; e < existingData.length; e++) {
-      if (existingData[e][0]) {
-        existingMemberIds[existingData[e][0]] = true;
-      }
-    }
-  }
-
-  var allRows = [];
-  var seededIds = []; // Track IDs for this seeding session
-  var batchSize = 50;
-  var today = new Date();
-
-  // Sample contact notes for members who have been contacted
-  var sampleContactNotes = [
-    'Discussed workload concerns',
-    'Follow up on scheduling issue',
-    'Interested in becoming steward',
-    'Addressed safety complaint',
-    'Positive feedback received',
-    'Needs info on benefits',
-    'Question about contract language',
-    'Planning to attend next meeting',
-    'Grievance update provided',
-    'Initial outreach - new member',
-    'Discussed upcoming negotiations',
-    'Shared resources on workplace rights',
-    'Scheduling meeting for next week'
-  ];
-
-  // First pass: generate all member rows
-  for (var i = 0; i < count; i++) {
-    var firstName = randomChoice(firstNames);
-    var lastName = randomChoice(lastNames);
-    var memberId = generateNameBasedId('M', firstName, lastName, existingMemberIds);
-    existingMemberIds[memberId] = true; // Track new ID to prevent duplicates in same batch
-    seededIds.push(memberId); // Track for persistence
-    var email = firstName.toLowerCase() + '.' + lastName.toLowerCase() + '.' + memberId.toLowerCase() + '@example.org';
-    var phone = '617-555-' + String(Math.floor(Math.random() * 9000) + 1000);
-    var isSteward = Math.random() < 0.1 ? 'Yes' : 'No';
-
-    // Generate recent contact data (50% chance of having recent contact)
-    var hasRecentContact = Math.random() < 0.5;
-    var recentContactDate = hasRecentContact ? randomDate(new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000), today) : '';
-    var contactSteward = hasRecentContact ? randomChoice(stewards) : '';
-    var contactNotes = hasRecentContact ? randomChoice(sampleContactNotes) : '';
-
-    var row = generateSingleMemberRow(
-      memberId, firstName, lastName,
-      randomChoice(jobTitles),
-      randomChoice(locations),
-      randomChoice(units),
-      randomChoice(officeDays),
-      email, phone,
-      randomChoice(commMethods),
-      'Morning',
-      randomChoice(supervisors),
-      randomChoice(managers),
-      isSteward,
-      isSteward === 'Yes' ? randomChoice(committees) : '',
-      '', // assignedSteward — set in second pass
-      recentContactDate,
-      contactSteward,
-      contactNotes
-    );
-
-    allRows.push(row);
-  }
-
-  // Second pass: collect steward emails and assign to non-steward members
-  var stewardEmails = [];
-  for (var s = 0; s < allRows.length; s++) {
-    if (allRows[s][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
-      stewardEmails.push(allRows[s][MEMBER_COLS.EMAIL - 1]);
-    }
-  }
-  // Fallback: if no stewards generated (unlikely), use first member's email
-  if (stewardEmails.length === 0) stewardEmails.push(allRows[0][MEMBER_COLS.EMAIL - 1]);
-
-  for (var a = 0; a < allRows.length; a++) {
-    allRows[a][MEMBER_COLS.ASSIGNED_STEWARD - 1] = randomChoice(stewardEmails);
-  }
-
-  // Write all rows in batches
-  for (var b = 0; b < allRows.length; b += batchSize) {
-    var batch = allRows.slice(b, Math.min(b + batchSize, allRows.length));
-    sheet.getRange(startRow, 1, batch.length, batch[0].length).setValues(batch);
-    startRow += batch.length;
-    Utilities.sleep(100);
-  }
-
-  // Re-apply checkboxes to Start Grievance column (AE) - setValues overwrites them
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    sheet.getRange(2, MEMBER_COLS.START_GRIEVANCE, lastRow - 1, 1).insertCheckboxes();
-  }
-
-  // Sync grievance data to Member Directory (populates AB-AD: Has Open Grievance, Status, Next Deadline)
-  syncGrievanceToMemberDirectory();
-
-  // Track seeded IDs for later cleanup (nuke only removes seeded data)
-  trackSeededMemberIdsBatch(seededIds);
-
-  // Seed grievances if percentage > 0
-  var grievanceCount = Math.floor(count * grievancePercent / 100);
-  if (grievanceCount > 0) {
-    SpreadsheetApp.getActiveSpreadsheet().toast(count + ' members seeded! Now seeding ' + grievanceCount + ' grievances...', '✅ Members Done', 2);
-    SEED_GRIEVANCES(grievanceCount);
-  } else {
-    SpreadsheetApp.getActiveSpreadsheet().toast(count + ' members seeded!', '✅ Success', 3);
-  }
-}
-
-/**
  * Seed members only (no automatic grievance seeding)
  * Used by SEED_SAMPLE_DATA to separate member and grievance seeding
  * @param {number} count - Number of members to seed (max 2000)
@@ -1711,104 +1541,6 @@ function generateSingleGrievanceRow(grievanceId, memberId, firstName, lastName, 
 // ============================================================================
 // DIALOG FUNCTIONS
 // ============================================================================
-
-/**
- * Show dialog to seed custom number of members (30% get grievances by default)
- */
-function SEED_MEMBERS_DIALOG() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt(
-    '👥 Seed Members & Grievances',
-    'How many members to seed? (30% will get grievances)\nMax 2000:',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (response.getSelectedButton() === ui.Button.OK) {
-    var count = parseInt(response.getResponseText(), 10);
-    if (isNaN(count) || count < 1) {
-      ui.alert('Please enter a valid number.');
-      return;
-    }
-    SEED_MEMBERS(count, 30);
-  }
-}
-
-/**
- * Show dialog to seed custom number of members with custom grievance percentage
- */
-function SEED_MEMBERS_ADVANCED_DIALOG() {
-  var ui = SpreadsheetApp.getUi();
-
-  var countResponse = ui.prompt(
-    '👥 Seed Members (Step 1/2)',
-    'How many members to seed? (max 2000)',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (countResponse.getSelectedButton() !== ui.Button.OK) return;
-
-  var count = parseInt(countResponse.getResponseText(), 10);
-  if (isNaN(count) || count < 1) {
-    ui.alert('Please enter a valid number.');
-    return;
-  }
-
-  var percentResponse = ui.prompt(
-    '📋 Grievance Percentage (Step 2/2)',
-    'What percentage of members should have grievances? (0-100)\nDefault: 30',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (percentResponse.getSelectedButton() !== ui.Button.OK) return;
-
-  var percent = parseInt(percentResponse.getResponseText(), 10);
-  if (isNaN(percent)) percent = 30;
-  percent = Math.max(0, Math.min(100, percent));
-
-  SEED_MEMBERS(count, percent);
-}
-
-/**
- * Show dialog to seed custom number of grievances
- */
-function SEED_GRIEVANCES_DIALOG() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt(
-    '📋 Seed Grievances',
-    'How many grievances to seed? (max 300)',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (response.getSelectedButton() === ui.Button.OK) {
-    var count = parseInt(response.getResponseText(), 10);
-    if (isNaN(count) || count < 1) {
-      ui.alert('Please enter a valid number.');
-      return;
-    }
-    SEED_GRIEVANCES(count);
-  }
-}
-
-/**
- * Seed 50 members with 30% grievances (shortcut)
- */
-function seed50Members() {
-  SEED_MEMBERS(50, 30);
-}
-
-/**
- * Seed 100 members with 50% grievances (shortcut)
- */
-function seed100MembersWithGrievances() {
-  SEED_MEMBERS(100, 50);
-}
-
-/**
- * Seed 25 grievances for existing members (shortcut)
- */
-function seed25Grievances() {
-  SEED_GRIEVANCES(25);
-}
 
 // ============================================================================
 // SEED: SCRIPT OWNER AS TEST MEMBER
@@ -3818,7 +3550,19 @@ var TestSuite = {
       // Module integration tests
       test_SearchEngine_Functions,
       test_ThemeService_Functions,
-      test_MenuBuilder_Functions
+      test_MenuBuilder_Functions,
+
+      // Portal column map tests (v4.20.19)
+      test_PortalMinutesCols_Complete,
+      test_PortalColsNoHardcodedIndices,
+
+      // Multi-select tests (v4.20.19)
+      test_MultiSelectCols_Populated,
+      test_MultiSelectAutoOpen_DefaultOn,
+
+      // Drive / config column tests (v4.20.19)
+      test_DriveRootFolderName_Dynamic,
+      test_ConfigCols_FolderIds_Exist
     ];
   }
 };
@@ -4192,6 +3936,210 @@ function test_MenuBuilder_Functions() {
   Assert.isDefined(typeof createDashboardMenu, 'createDashboardMenu should be defined');
   Assert.isDefined(typeof navigateToSheet, 'navigateToSheet should be defined');
   Assert.isDefined(typeof showToast, 'showToast should be defined');
+}
+
+// ============================================================================
+// PORTAL COLUMN MAP TESTS (v4.20.19)
+// Catch hardcoded indices and missing column definitions before they reach prod.
+// ============================================================================
+
+/**
+ * Verifies PORTAL_MINUTES_COLS has all required keys including DRIVE_DOC_URL.
+ * Failing here means getMeetingMinutes() would silently return empty driveDocUrl.
+ */
+function test_PortalMinutesCols_Complete() {
+  Assert.isDefined(typeof PORTAL_MINUTES_COLS, 'PORTAL_MINUTES_COLS should be defined');
+
+  var required = ['ID', 'MEETING_DATE', 'TITLE', 'BULLETS', 'FULL_MINUTES',
+                  'CREATED_BY', 'CREATED_DATE', 'DRIVE_DOC_URL'];
+  required.forEach(function(key) {
+    Assert.isTrue(key in PORTAL_MINUTES_COLS, 'PORTAL_MINUTES_COLS.' + key + ' must exist');
+    Assert.isTrue(typeof PORTAL_MINUTES_COLS[key] === 'number',
+      'PORTAL_MINUTES_COLS.' + key + ' must be a number (0-indexed)');
+    Assert.isTrue(PORTAL_MINUTES_COLS[key] >= 0,
+      'PORTAL_MINUTES_COLS.' + key + ' must be non-negative');
+  });
+
+  // Ensure DRIVE_DOC_URL is one beyond CREATED_DATE (cols are contiguous)
+  Assert.assertEquals(PORTAL_MINUTES_COLS.CREATED_DATE + 1, PORTAL_MINUTES_COLS.DRIVE_DOC_URL,
+    'DRIVE_DOC_URL must be exactly one column after CREATED_DATE');
+
+  // Spot-check other portal col objects for existence (full coverage in test_PortalColsNoHardcodedIndices)
+  Assert.isDefined(typeof PORTAL_EVENT_COLS,          'PORTAL_EVENT_COLS must exist');
+  Assert.isDefined(typeof PORTAL_POLL_COLS,            'PORTAL_POLL_COLS must exist');
+  Assert.isDefined(typeof PORTAL_POLL_RESPONSE_COLS,   'PORTAL_POLL_RESPONSE_COLS must exist');
+  Assert.isDefined(typeof PORTAL_STEWARD_LOG_COLS,     'PORTAL_STEWARD_LOG_COLS must exist');
+  Assert.isDefined(typeof PORTAL_MEGA_SURVEY_COLS,     'PORTAL_MEGA_SURVEY_COLS must exist');
+}
+
+/**
+ * Guards against raw numeric literals being used in array access instead of
+ * PORTAL_*_COLS constants.  Checks that every constant is a non-negative integer
+ * and that no two keys in the same object share the same index
+ * (which would indicate a copy-paste error creating a shadow column).
+ */
+function test_PortalColsNoHardcodedIndices() {
+  var colObjects = [
+    { name: 'PORTAL_MINUTES_COLS',       obj: PORTAL_MINUTES_COLS },
+    { name: 'PORTAL_EVENT_COLS',         obj: PORTAL_EVENT_COLS },
+    { name: 'PORTAL_POLL_COLS',          obj: PORTAL_POLL_COLS },
+    { name: 'PORTAL_POLL_RESPONSE_COLS', obj: PORTAL_POLL_RESPONSE_COLS },
+    { name: 'PORTAL_GRIEVANCE_COLS',     obj: PORTAL_GRIEVANCE_COLS },
+    { name: 'PORTAL_STEWARD_LOG_COLS',   obj: PORTAL_STEWARD_LOG_COLS },
+    { name: 'PORTAL_MEGA_SURVEY_COLS',   obj: PORTAL_MEGA_SURVEY_COLS },
+  ];
+
+  colObjects.forEach(function(item) {
+    var seen = {};
+    Object.keys(item.obj).forEach(function(key) {
+      var val = item.obj[key];
+      Assert.isTrue(typeof val === 'number' && val >= 0,
+        item.name + '.' + key + ' must be a non-negative number, got: ' + val);
+      Assert.isTrue(!seen[val],
+        item.name + ': duplicate column index ' + val + ' on key ' + key +
+        ' (already used by ' + seen[val] + ')');
+      seen[val] = key;
+    });
+  });
+}
+
+// ============================================================================
+// MULTI-SELECT TESTS (v4.20.19)
+// Verify multi-select config is populated and default is ON.
+// ============================================================================
+
+/**
+ * Verifies MULTI_SELECT_COLS is populated with valid column references.
+ * Failing here means onSelectionChange would never find a match and
+ * auto-open would silently stop working after a column-map rebuild.
+ */
+function test_MultiSelectCols_Populated() {
+  Assert.isDefined(typeof MULTI_SELECT_COLS, 'MULTI_SELECT_COLS must be defined');
+  Assert.isTrue(Array.isArray(MULTI_SELECT_COLS.MEMBER_DIR),
+    'MULTI_SELECT_COLS.MEMBER_DIR must be an array');
+  Assert.isTrue(Array.isArray(MULTI_SELECT_COLS.GRIEVANCE_LOG),
+    'MULTI_SELECT_COLS.GRIEVANCE_LOG must be an array');
+
+  Assert.isTrue(MULTI_SELECT_COLS.MEMBER_DIR.length >= 1,
+    'MULTI_SELECT_COLS.MEMBER_DIR must have at least 1 entry');
+  Assert.isTrue(MULTI_SELECT_COLS.GRIEVANCE_LOG.length >= 1,
+    'MULTI_SELECT_COLS.GRIEVANCE_LOG must have at least 1 entry');
+
+  // Every entry must have col (positive number), configCol (positive number), label (string)
+  var allEntries = MULTI_SELECT_COLS.MEMBER_DIR.concat(MULTI_SELECT_COLS.GRIEVANCE_LOG);
+  allEntries.forEach(function(entry) {
+    Assert.isTrue(typeof entry.col === 'number' && entry.col > 0,
+      'Multi-select entry.col must be a positive integer (1-indexed), got: ' + entry.col);
+    Assert.isTrue(typeof entry.configCol === 'number' && entry.configCol > 0,
+      'Multi-select entry.configCol must be a positive integer, got: ' + entry.configCol);
+    Assert.isTrue(typeof entry.label === 'string' && entry.label.length > 0,
+      'Multi-select entry.label must be a non-empty string');
+  });
+
+  // buildMultiSelectCols_ must be callable and return identical structure
+  if (typeof buildMultiSelectCols_ === 'function') {
+    var fresh = buildMultiSelectCols_();
+    Assert.isTrue(fresh.MEMBER_DIR.length === MULTI_SELECT_COLS.MEMBER_DIR.length,
+      'buildMultiSelectCols_() MEMBER_DIR length should match MULTI_SELECT_COLS');
+    Assert.isTrue(fresh.GRIEVANCE_LOG.length === MULTI_SELECT_COLS.GRIEVANCE_LOG.length,
+      'buildMultiSelectCols_() GRIEVANCE_LOG length should match MULTI_SELECT_COLS');
+  }
+}
+
+/**
+ * Verifies that auto multi-select is ON by default.
+ * The `multiSelectAutoOpen` UserProperty must be absent OR not 'false' for
+ * onSelectionChange to activate the dialog.  A fresh install (property absent)
+ * must behave as enabled.
+ *
+ * This test simulates the flag check logic from onSelectionChange()
+ * without actually calling PropertiesService (which requires a live session).
+ */
+function test_MultiSelectAutoOpen_DefaultOn() {
+  // Simulate the logic in onSelectionChange:
+  //   if (autoOpen === 'false') return;  ← only skip when explicitly disabled
+  function isAutoOpenActive(propValue) {
+    return propValue !== 'false';
+  }
+
+  Assert.isTrue(isAutoOpenActive(null),
+    'Auto multi-select must be ON when property is null (fresh install)');
+  Assert.isTrue(isAutoOpenActive(undefined),
+    'Auto multi-select must be ON when property is undefined');
+  Assert.isTrue(isAutoOpenActive(''),
+    'Auto multi-select must be ON when property is empty string');
+  Assert.isTrue(isAutoOpenActive('true'),
+    'Auto multi-select must be ON when property is "true"');
+  Assert.isFalse(isAutoOpenActive('false'),
+    'Auto multi-select must be OFF only when property is explicitly "false"');
+
+  // Verify removeMultiSelectTrigger is the disable path (sets 'false')
+  Assert.isDefined(typeof removeMultiSelectTrigger,
+    'removeMultiSelectTrigger function must exist (opt-out path)');
+  Assert.isDefined(typeof installMultiSelectTrigger,
+    'installMultiSelectTrigger function must exist (re-enable path)');
+}
+
+// ============================================================================
+// DRIVE / CONFIG COLUMN TESTS (v4.20.19)
+// ============================================================================
+
+/**
+ * Verifies getDriveRootFolderName_() is defined and returns a non-empty string.
+ * Failing here means CREATE_DASHBOARD and getOrCreateRootFolder() would
+ * use the fallback name for ALL deployments, ignoring Config ORG_NAME.
+ */
+function test_DriveRootFolderName_Dynamic() {
+  Assert.isDefined(typeof getDriveRootFolderName_,
+    'getDriveRootFolderName_ must be defined');
+  Assert.isTrue(typeof getDriveRootFolderName_ === 'function',
+    'getDriveRootFolderName_ must be a function');
+
+  // DRIVE_CONFIG fallback must exist and be a non-empty string
+  Assert.isDefined(typeof DRIVE_CONFIG, 'DRIVE_CONFIG must be defined');
+  Assert.isTrue(typeof DRIVE_CONFIG.ROOT_FOLDER_FALLBACK === 'string' &&
+    DRIVE_CONFIG.ROOT_FOLDER_FALLBACK.length > 0,
+    'DRIVE_CONFIG.ROOT_FOLDER_FALLBACK must be a non-empty string');
+
+  // ROOT_FOLDER_NAME must NOT exist — it was replaced by getDriveRootFolderName_()
+  Assert.isFalse('ROOT_FOLDER_NAME' in DRIVE_CONFIG,
+    'DRIVE_CONFIG.ROOT_FOLDER_NAME must not exist — use getDriveRootFolderName_() instead');
+
+  // Subfolder names must be non-empty strings
+  ['GRIEVANCES_SUBFOLDER', 'RESOURCES_SUBFOLDER', 'MINUTES_SUBFOLDER', 'EVENT_CHECKIN_SUBFOLDER']
+    .forEach(function(key) {
+      Assert.isTrue(typeof DRIVE_CONFIG[key] === 'string' && DRIVE_CONFIG[key].length > 0,
+        'DRIVE_CONFIG.' + key + ' must be a non-empty string');
+    });
+}
+
+/**
+ * Verifies CONFIG_COLS has all 5 Drive folder ID columns added in v4.20.17.
+ * Failing here means setupDashboardDriveFolders() cannot write folder IDs
+ * back to Config, making every subsequent folder lookup fall through to
+ * name-search (expensive) or fail entirely.
+ */
+function test_ConfigCols_FolderIds_Exist() {
+  var required = [
+    'DASHBOARD_ROOT_FOLDER_ID',
+    'GRIEVANCES_FOLDER_ID',
+    'RESOURCES_FOLDER_ID',
+    'MINUTES_FOLDER_ID',
+    'EVENT_CHECKIN_FOLDER_ID'
+  ];
+
+  Assert.isDefined(typeof CONFIG_COLS, 'CONFIG_COLS must be defined');
+
+  required.forEach(function(key) {
+    Assert.isTrue(key in CONFIG_COLS,
+      'CONFIG_COLS.' + key + ' must exist (added in v4.20.17)');
+    Assert.isTrue(typeof CONFIG_COLS[key] === 'number' && CONFIG_COLS[key] > 0,
+      'CONFIG_COLS.' + key + ' must be a positive integer (1-indexed)');
+  });
+
+  // Also verify the calendar ID column exists
+  Assert.isTrue('CALENDAR_ID' in CONFIG_COLS && CONFIG_COLS.CALENDAR_ID > 0,
+    'CONFIG_COLS.CALENDAR_ID must be a positive integer');
 }
 
 // ============================================================================

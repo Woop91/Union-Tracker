@@ -2,6 +2,91 @@
 // 08e_SurveyEngine.gs — Survey Period Management & Aggregation
 // v4.21.0 — Replaces Google Form integration with fully native webapp survey
 // ============================================================================
+
+// ── One-shot init (run once after deployment) ─────────────────────────────────
+
+/**
+ * RUN THIS ONCE after deployment.
+ * Does everything needed to activate the survey engine:
+ *   1. Creates _Survey_Periods hidden sheet
+ *   2. Seeds Survey Priority Options into Config tab (if empty)
+ *   3. Installs quarterly auto-trigger (Jan/Apr/Jul/Oct day 1 at 6 AM)
+ *   4. Installs weekly reminder trigger (Tuesdays at 9 AM)
+ *   5. Opens the current quarter's survey period immediately
+ *   6. Resets _Survey_Tracking statuses to 'Not Completed' for new period
+ *   7. Pushes 'Survey Now Open' notification to all members
+ *
+ * Safe to re-run — each step is idempotent.
+ */
+function initSurveyEngine() {
+  var ui = SpreadsheetApp.getUi();
+  var log = [];
+
+  try {
+    // 1. Hidden sheet
+    setupSurveyPeriodsSheet();
+    log.push('✅ _Survey_Periods sheet ready');
+  } catch(e) { log.push('❌ _Survey_Periods: ' + e.message); }
+
+  try {
+    // 2. Seed Config Survey Priority Options (non-destructive)
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet && CONFIG_COLS.SURVEY_PRIORITY_OPTIONS) {
+      var existing = configSheet.getLastRow() > 2
+        ? configSheet.getRange(3, CONFIG_COLS.SURVEY_PRIORITY_OPTIONS, configSheet.getLastRow() - 2, 1).getValues().flat().filter(String)
+        : [];
+      if (existing.length === 0) {
+        var defaults = [
+          'Contract Enforcement','Workload & Staffing','Scheduling & Office Days',
+          'Pay & Benefits','Health & Safety','Training & Development',
+          'Equity & Inclusion','Communication','Steward Support & Access',
+          'Member Organizing','Other'
+        ];
+        configSheet.getRange(3, CONFIG_COLS.SURVEY_PRIORITY_OPTIONS, defaults.length, 1)
+          .setValues(defaults.map(function(v) { return [v]; }));
+        log.push('✅ Survey Priority Options seeded (' + defaults.length + ' options)');
+      } else {
+        log.push('✅ Survey Priority Options already set (' + existing.length + ' options) — not overwritten');
+      }
+    } else {
+      log.push('⚠️  Config sheet or SURVEY_PRIORITY_OPTIONS column not found');
+    }
+  } catch(e) { log.push('❌ Config seed: ' + e.message); }
+
+  try {
+    // 3. Quarterly trigger
+    setupQuarterlyTrigger();
+    log.push('✅ Quarterly auto-trigger installed');
+  } catch(e) { log.push('❌ Quarterly trigger: ' + e.message); }
+
+  try {
+    // 4. Weekly reminder trigger
+    setupWeeklyReminderTrigger();
+    log.push('✅ Weekly reminder trigger installed');
+  } catch(e) { log.push('❌ Weekly trigger: ' + e.message); }
+
+  try {
+    // 5–7. Open the current period (also resets tracking + sends notification)
+    var activePeriod = getSurveyPeriod();
+    if (activePeriod) {
+      log.push('✅ Survey period already active: ' + activePeriod.periodId + ' — not reopened');
+    } else {
+      var result = openNewSurveyPeriod('initSurveyEngine()');
+      if (result.success) {
+        log.push('✅ Survey period opened: ' + result.periodId);
+        log.push('✅ _Survey_Tracking reset to Not Completed');
+        log.push('✅ Survey-open notification sent to members');
+      } else {
+        log.push('❌ Open period: ' + result.message);
+      }
+    }
+  } catch(e) { log.push('❌ Open period: ' + e.message); }
+
+  var summary = log.join('\n');
+  Logger.log('initSurveyEngine:\n' + summary);
+  ui.alert('Survey Engine Initialized', summary, ui.ButtonSet.OK);
+}
 //
 // RESPONSIBILITIES:
 //   - Quarterly period lifecycle (open, track, close, archive)
@@ -609,4 +694,46 @@ function dataOpenNewSurveyPeriod() {
   var s = _requireStewardAuth();
   if (!s) return { success: false, message: 'Not authorized.' };
   return openNewSurveyPeriod(s);
+}
+
+// ── Menu-callable wrappers ───────────────────────────────────────────────────
+
+/**
+ * Menu: Tools → Survey Engine → Open New Survey Period
+ * Confirms with user before opening (will archive any active period first).
+ */
+function menuOpenNewSurveyPeriod() {
+  var ui = SpreadsheetApp.getUi();
+  var active = getSurveyPeriod();
+  var msg = active
+    ? 'An active period (' + active.periodId + ') will be archived first. Open the new quarter period now?'
+    : 'Open a new survey period for the current quarter now?';
+  var resp = ui.alert('Open New Survey Period', msg, ui.ButtonSet.YES_NO);
+  if (resp !== ui.Button.YES) return;
+
+  var caller = Session.getActiveUser().getEmail();
+  var result = openNewSurveyPeriod(caller);
+  ui.alert(result.success ? '✅ Opened' : '❌ Error', result.message, ui.ButtonSet.OK);
+}
+
+/**
+ * Menu: Tools → Survey Engine → View Current Period Status
+ */
+function menuShowSurveyPeriodStatus() {
+  var ui = SpreadsheetApp.getUi();
+  var period = getSurveyPeriod();
+  if (!period) {
+    ui.alert('Survey Status', 'No active survey period. Use "Open New Survey Period" to start one.', ui.ButtonSet.OK);
+    return;
+  }
+  var pending = getPendingSurveyMembers();
+  var msg = [
+    'Period: ' + period.name,
+    'Status: ' + period.status,
+    'Responses: ' + period.responseCount,
+    '',
+    'Completion: ' + pending.completed + '/' + pending.total + ' members (' + pending.rate + '%)',
+    'Pending: ' + pending.pending + ' members'
+  ].join('\n');
+  ui.alert('📋 Current Survey Period', msg, ui.ButtonSet.OK);
 }

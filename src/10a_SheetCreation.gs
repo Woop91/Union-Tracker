@@ -183,6 +183,22 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_NAME, ['Help'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_URL, ['https://www.example.org/help'], isExistingSheet);
 
+  // Survey engine — Q64 checkbox options (v4.21.0)
+  // Editable directly in Config tab. getSurveyQuestions() reads this column dynamically.
+  seedConfigDefault_(sheet, CONFIG_COLS.SURVEY_PRIORITY_OPTIONS, [
+    'Contract Enforcement',
+    'Workload & Staffing',
+    'Scheduling & Office Days',
+    'Pay & Benefits',
+    'Health & Safety',
+    'Training & Development',
+    'Equity & Inclusion',
+    'Communication',
+    'Steward Support & Access',
+    'Member Organizing',
+    'Other'
+  ], isExistingSheet);
+
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
 

@@ -39,6 +39,13 @@ function CREATE_DASHBOARD() {
     var response = ui.alert(
       '🏗️ Create Dashboard',
       'This will create the Dashboard with:\n\n' +
+      '📁 Google Drive: DashboardTest/ folder (private)\n' +
+      '   ├── Grievances/ (case folders go here)\n' +
+      '   ├── Resources/\n' +
+      '   ├── Minutes/\n' +
+      '   └── Event Check-In/\n' +
+      '📅 Google Calendar: Union Events calendar (ID written to Config)\n\n' +
+      '📄 Spreadsheet Sheets:\n' +
       '• Config (dropdown sources)\n' +
       '• Member Directory\n' +
       '• Grievance Log (with Action Type dropdown)\n' +
@@ -71,6 +78,39 @@ function CREATE_DASHBOARD() {
   ss.toast('Starting dashboard creation...', '🏗️ Setup', 5);
 
   try {
+    // ── DRIVE FOLDER STRUCTURE ───────────────────────────────────────────────────────────────
+    // Creates DashboardTest/ with Grievances/, Resources/, Minutes/, Event Check-In/
+    // Folder IDs are written to Config sheet + Script Properties automatically.
+    if (typeof setupDashboardDriveFolders === 'function') {
+      try {
+        var driveResult = setupDashboardDriveFolders();
+        if (driveResult && driveResult.success) {
+          ss.toast('Drive folder structure ready (📁 DashboardTest/)', '🏗️ Progress', 3);
+        } else {
+          ss.toast('Drive folders skipped — check logs', '⚠️ Warning', 3);
+        }
+      } catch (driveErr) {
+        Logger.log('Drive folder setup error: ' + driveErr.message);
+        ss.toast('Drive folders skipped: ' + driveErr.message, '⚠️ Warning', 4);
+      }
+    }
+
+    // ── EVENTS CALENDAR ─────────────────────────────────────────────────────────────────
+    // Creates the org events calendar, writes Calendar ID to Config row 3.
+    if (typeof setupDashboardCalendar === 'function') {
+      try {
+        var calResult = setupDashboardCalendar();
+        if (calResult && calResult.success) {
+          ss.toast('📅 Events calendar ready (' + calResult.calendarName + ')', '🏗️ Progress', 3);
+        } else {
+          ss.toast('Calendar setup skipped — check logs', '⚠️ Warning', 3);
+        }
+      } catch (calErr) {
+        Logger.log('Calendar setup error: ' + calErr.message);
+        ss.toast('Calendar skipped: ' + calErr.message, '⚠️ Warning', 4);
+      }
+    }
+
     createConfigSheet(ss);
     ss.toast('Created Config sheet', '🏗️ Progress', 2);
 
@@ -204,6 +244,10 @@ function CREATE_DASHBOARD() {
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
+        '📁 Drive folder: DashboardTest/ (private)\n' +
+        '   Subfolders: Grievances / Resources / Minutes / Event Check-In\n' +
+        '   Folder IDs saved to Config sheet.\n' +
+        '📅 Events calendar created — ID saved to Config sheet.\n\n' +
         '15+ sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
@@ -398,6 +442,9 @@ function setupHiddenSheets(ss) {
 
   // Survey Vault uses its own setup (includes sheet protection)
   setupSurveyVaultSheet();
+
+  // Survey Periods — period lifecycle tracking (v4.21.0)
+  setupSurveyPeriodsSheet();
 }
 
 
@@ -737,12 +784,14 @@ function onSelectionChangeMultiSelect(e) {
  */
 function installMultiSelectTrigger() {
   var props = PropertiesService.getUserProperties();
-  if (props.getProperty('multiSelectAutoOpen') === 'true') {
-    SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
+  var current = props.getProperty('multiSelectAutoOpen');
+  // Default is ON (absent = enabled). Only disabled if explicitly set to 'false'.
+  if (current !== 'false') {
+    SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled (it is ON by default).');
     return;
   }
 
-  props.setProperty('multiSelectAutoOpen', 'true');
+  props.deleteProperty('multiSelectAutoOpen');  // Remove explicit 'false' — reverts to default ON
 
   // Clean up any legacy .onChange() triggers that were incorrectly installed
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -753,7 +802,7 @@ function installMultiSelectTrigger() {
     }
   });
 
-  SpreadsheetApp.getUi().alert('Multi-Select auto-open has been enabled!\n\n' +
+  SpreadsheetApp.getUi().alert('Multi-Select auto-open has been re-enabled!\n\n' +
     'The multi-select dialog will now open automatically when you click a multi-select cell.');
 }
 
@@ -764,8 +813,11 @@ function installMultiSelectTrigger() {
  */
 function removeMultiSelectTrigger() {
   var props = PropertiesService.getUserProperties();
-  var wasEnabled = props.getProperty('multiSelectAutoOpen') === 'true';
-  props.deleteProperty('multiSelectAutoOpen');
+  var current = props.getProperty('multiSelectAutoOpen');
+  // Default is ON. To disable we must explicitly set 'false' (not just delete).
+  var wasEnabled = current !== 'false';
+
+  props.setProperty('multiSelectAutoOpen', 'false');
   props.deleteProperty('lastMultiSelectCell');
 
   // Also clean up any legacy .onChange() triggers
@@ -781,7 +833,7 @@ function removeMultiSelectTrigger() {
   if (wasEnabled) {
     SpreadsheetApp.getUi().alert('Multi-Select auto-open has been disabled.');
   } else {
-    SpreadsheetApp.getUi().alert('Multi-Select auto-open was not enabled.');
+    SpreadsheetApp.getUi().alert('Multi-Select auto-open was already disabled.');
   }
 }
 
