@@ -465,6 +465,27 @@ function renderMyCases(appContainer) {
       btnRow.appendChild(folderBtn);
       content.appendChild(btnRow);
     } else {
+      // Active cases exist — show compact "Start New" action bar at top
+      var newCaseBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px' } });
+      newCaseBar.appendChild(el('button', {
+        className: 'btn btn-primary', style: { flex: '1', fontSize: '12px', padding: '9px' },
+        onClick: function() { content.innerHTML = ''; _showGrievanceIntakeForm(content); }
+      }, '\uD83D\uDCDD Start New Grievance'));
+      newCaseBar.appendChild(el('button', {
+        className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '9px 14px' },
+        onClick: function() {
+          this.textContent = 'Creating\u2026'; this.disabled = true;
+          var btn = this;
+          serverCall().withSuccessHandler(function(result) {
+            if (result && result.url) { window.open(result.url, '_blank'); btn.textContent = '\u2705 Folder'; }
+            else { btn.textContent = '\uD83D\uDCC1 Folder'; btn.disabled = false; }
+          }).withFailureHandler(function() {
+            btn.textContent = '\uD83D\uDCC1 Folder'; btn.disabled = false;
+          }).dataCreateGrievanceDrive(CURRENT_USER.email);
+        }
+      }, '\uD83D\uDCC1 Case Folder'));
+      content.appendChild(newCaseBar);
+
       AppState.grievances.forEach(function(g) {
         renderGrievanceCard(content, g);
       });
@@ -743,102 +764,341 @@ function _dismissMemberWelcome(cardEl) {
 // CONTACT / STEWARD PICKER
 // ═══════════════════════════════════════
 
+// ═══════════════════════════════════════
+// CONTACT TAB (v4.23.2)
+// Assigned steward card at top + full directory below
+// ═══════════════════════════════════════
+
 function renderStewardContact(appContainer) {
   renderPageLayout(appContainer, 'member', 'contact', function(container) {
-    _memberHeader(container, 'Contact ' + CONFIG.stewardLabel);
+    _memberHeader(container, 'Contact');
     var content = el('div', { className: 'content' });
-    showLoading(content);
     container.appendChild(content);
 
-    serverCall().withSuccessHandler(function(info) {
-      content.innerHTML = '';
-      if (info) {
-        // Has assigned steward — show full contact card
-        var card = el('div', { className: 'card card-glass', style: { padding: '18px' } });
-        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '17px', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, info.name || 'Your ' + CONFIG.stewardLabel));
-        var details = [
-          { label: 'Email', value: info.email, icon: '\u2709\uFE0F', href: 'mailto:' + info.email },
-          { label: 'Phone', value: info.phone, icon: '\uD83D\uDCDE', href: 'tel:' + info.phone },
-          { label: 'Location', value: info.workLocation, icon: '\uD83D\uDCCD' },
-          { label: 'Office Days', value: info.officeDays, icon: '\uD83D\uDCC5' },
-        ];
-        details.forEach(function(d) {
-          if (!d.value) return;
-          var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
-          row.appendChild(el('span', { style: { fontSize: '14px' } }, d.icon));
-          var info_ = el('div', { style: { flex: '1' } });
-          info_.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase' } }, d.label));
-          if (d.href) {
-            info_.appendChild(el('a', { href: d.href, style: { fontSize: '13px', color: 'var(--accent)', fontWeight: '600' } }, d.value));
-          } else {
-            info_.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)' } }, d.value));
-          }
-          row.appendChild(info_);
-          card.appendChild(row);
-        });
-        content.appendChild(card);
+    // ── Section 1: Your assigned steward ─────────────────────────────────
+    var assignedSection = el('div', { style: { marginBottom: '20px' } });
+    content.appendChild(assignedSection);
+    showLoading(assignedSection);
 
-        // Option to change steward
-        content.appendChild(el('button', {
-          className: 'btn btn-secondary', style: { marginTop: '14px' },
-          onClick: function() { _renderStewardPicker(content); }
+    serverCall().withSuccessHandler(function(info) {
+      assignedSection.innerHTML = '';
+
+      var sectionLabel = el('div', { style: {
+        fontSize: '10px', fontWeight: '700', color: 'var(--muted)',
+        textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px'
+      }}, 'Your ' + CONFIG.stewardLabel);
+      assignedSection.appendChild(sectionLabel);
+
+      if (info) {
+        var card = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '8px' } });
+
+        // Name + avatar row
+        var nameRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' } });
+        var avatar = el('div', { className: 'member-list-avatar', style: { width: '44px', height: '44px', fontSize: '18px', flexShrink: '0' } },
+          (info.name || 'S').charAt(0).toUpperCase());
+        nameRow.appendChild(avatar);
+        var nameCol = el('div', { style: { flex: '1' } });
+        nameCol.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)' } }, info.name || 'Your ' + CONFIG.stewardLabel));
+        var metaParts = [];
+        if (info.workLocation) metaParts.push(info.workLocation);
+        if (info.unit) metaParts.push(info.unit);
+        if (metaParts.length) nameCol.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '2px' } }, metaParts.join(' · ')));
+        nameRow.appendChild(nameCol);
+        card.appendChild(nameRow);
+
+        // Contact rows
+        var contactRows = [
+          { icon: '✉️', label: 'Email', value: info.email, href: 'mailto:' + info.email },
+          { icon: '📞', label: 'Phone', value: info.phone, href: 'tel:' + info.phone },
+          { icon: '📅', label: 'In-office', value: info.officeDays, href: null },
+        ];
+        contactRows.forEach(function(row) {
+          if (!row.value) return;
+          var rowEl = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderTop: '1px solid var(--border)' } });
+          rowEl.appendChild(el('span', { style: { fontSize: '15px', flexShrink: '0' } }, row.icon));
+          var col = el('div', { style: { flex: '1' } });
+          col.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1px' } }, row.label));
+          if (row.href) {
+            col.appendChild(el('a', { href: row.href, style: { fontSize: '13px', color: 'var(--accent)', fontWeight: '600', textDecoration: 'none' } }, row.value));
+          } else {
+            col.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)' } }, row.value));
+          }
+          rowEl.appendChild(col);
+          card.appendChild(rowEl);
+        });
+
+        // vCard + Change buttons
+        var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
+        btnRow.appendChild(el('button', {
+          className: 'btn btn-secondary', style: { width: 'auto', flex: '1', fontSize: '12px', padding: '8px' },
+          onClick: function() {
+            var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (info.name || '') + '\n';
+            if (info.email) vcf += 'EMAIL:' + info.email + '\n';
+            if (info.phone) vcf += 'TEL:' + info.phone + '\n';
+            if (info.workLocation) vcf += 'ORG:' + (CONFIG.orgName || '') + ';' + info.workLocation + '\n';
+            if (info.unit) vcf += 'TITLE:' + CONFIG.stewardLabel + ' - ' + info.unit + '\n';
+            vcf += 'END:VCARD';
+            var blob = new Blob([vcf], { type: 'text/vcard' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a'); a.href = url;
+            a.download = (info.name || 'steward').replace(/\s+/g, '_') + '.vcf';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+          }
+        }, '💾 Save Contact'));
+        btnRow.appendChild(el('button', {
+          className: 'btn btn-secondary', style: { width: 'auto', flex: '1', fontSize: '12px', padding: '8px' },
+          onClick: function() { _showStewardPicker(assignedSection); }
         }, 'Change ' + CONFIG.stewardLabel));
+        card.appendChild(btnRow);
+        assignedSection.appendChild(card);
+
       } else {
-        // No steward assigned — show picker
-        content.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0' } },
-          el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDC65')
-        ));
-        content.appendChild(el('div', { style: { textAlign: 'center', fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No ' + CONFIG.stewardLabel + ' Assigned'));
-        content.appendChild(el('div', { style: { textAlign: 'center', fontSize: '13px', color: 'var(--muted)', marginBottom: '16px' } }, 'Pick one from your location below.'));
-        _renderStewardPicker(content);
+        // No steward assigned — prompt
+        var emptyCard = el('div', { className: 'card card-glass', style: { padding: '18px', textAlign: 'center' } });
+        emptyCard.appendChild(el('div', { style: { fontSize: '28px', marginBottom: '8px' } }, '👤'));
+        emptyCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, 'No ' + CONFIG.stewardLabel + ' assigned'));
+        emptyCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Select one from the directory below.'));
+        assignedSection.appendChild(emptyCard);
       }
     }).withFailureHandler(function() {
-      content.innerHTML = '';
-      content.appendChild(el('div', { className: 'empty-state' }, 'Failed to load ' + CONFIG.stewardLabel.toLowerCase() + ' info. Please try again.'));
+      assignedSection.innerHTML = '';
+      assignedSection.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', padding: '10px 0' } }, 'Could not load your assigned ' + CONFIG.stewardLabel.toLowerCase() + '.'));
     }).dataGetAssignedSteward(CURRENT_USER.email);
+
+    // ── Section 2: Full directory ─────────────────────────────────────────
+    var dirSection = el('div');
+    content.appendChild(dirSection);
+    _renderMemberDirectory(dirSection);
   });
 }
 
-function _renderStewardPicker(content) {
-  var pickerArea = el('div');
-  pickerArea.innerHTML = '<div class="loading-spinner" style="min-height:100px"><div class="spinner"></div></div>';
-  content.appendChild(pickerArea);
+// ── Steward picker (inline replace for assigned section) ─────────────────
+function _showStewardPicker(targetSection) {
+  targetSection.innerHTML = '';
+  targetSection.appendChild(el('div', { style: {
+    fontSize: '10px', fontWeight: '700', color: 'var(--muted)',
+    textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px'
+  }}, 'Choose your ' + CONFIG.stewardLabel));
+  showLoading(targetSection);
 
   serverCall().withSuccessHandler(function(stewards) {
-    pickerArea.innerHTML = '';
+    targetSection.innerHTML = '';
+    targetSection.appendChild(el('div', { style: {
+      fontSize: '10px', fontWeight: '700', color: 'var(--muted)',
+      textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px'
+    }}, 'Choose your ' + CONFIG.stewardLabel));
+
     if (!stewards || stewards.length === 0) {
-      pickerArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', padding: '16px 0' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's available.'));
+      targetSection.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', padding: '10px 0' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's available.'));
       return;
     }
-    pickerArea.appendChild(el('h3', { className: 'section-title' }, 'Available ' + CONFIG.stewardLabel + 's'));
     stewards.forEach(function(s) {
-      var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 16px', marginBottom: '6px' } });
-      var avatar = el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase());
-      item.appendChild(avatar);
+      var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', marginBottom: '6px' } });
+      item.appendChild(el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase()));
       var info = el('div', { style: { flex: '1' } });
       info.appendChild(el('div', { className: 'member-list-name' }, s.name || s.email));
-      var meta = s.workLocation || '';
-      if (s.officeDays) meta += (meta ? ' \u00B7 ' : '') + s.officeDays;
-      if (s.sameLocation) meta += ' \u2605';
-      info.appendChild(el('div', { className: 'member-list-meta' }, meta));
+      var meta = []; if (s.workLocation) meta.push(s.workLocation); if (s.officeDays) meta.push(s.officeDays); if (s.sameLocation) meta.push('⭐ Your location');
+      info.appendChild(el('div', { className: 'member-list-meta' }, meta.join(' · ')));
       item.appendChild(info);
-      item.appendChild(el('button', {
-        style: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: '600' },
+      var selectBtn = el('button', {
+        className: 'btn', style: { width: 'auto', padding: '6px 12px', fontSize: '11px', fontWeight: '600', flexShrink: '0' },
         onClick: function(e) {
           e.stopPropagation();
+          selectBtn.textContent = '…'; selectBtn.disabled = true;
           serverCall().withSuccessHandler(function(result) {
-            if (result && result.success) {
-              renderStewardContact(document.getElementById('app'));
-            }
+            if (result && result.success) renderStewardContact(document.getElementById('app'));
+          }).withFailureHandler(function() {
+            selectBtn.textContent = 'Select'; selectBtn.disabled = false;
           }).dataAssignSteward(CURRENT_USER.email, s.email);
         }
-      }, 'Select'));
-      pickerArea.appendChild(item);
+      }, 'Select');
+      item.appendChild(selectBtn);
+      targetSection.appendChild(item);
     });
   }).withFailureHandler(function() {
-    pickerArea.innerHTML = '';
-    pickerArea.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '13px', padding: '16px 0' } }, 'Failed to load available ' + CONFIG.stewardLabel.toLowerCase() + 's.'));
+    targetSection.innerHTML = '';
+    targetSection.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px', padding: '10px 0' } }, 'Failed to load stewards.'));
   }).dataGetAvailableStewards(CURRENT_USER.email);
+}
+
+// ── Full member directory ─────────────────────────────────────────────────
+function _renderMemberDirectory(target) {
+  var labelRow = el('div', { style: {
+    fontSize: '10px', fontWeight: '700', color: 'var(--muted)',
+    textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px'
+  }}, 'All ' + CONFIG.stewardLabel + 's');
+  target.appendChild(labelRow);
+  showLoading(target);
+
+  serverCall().withSuccessHandler(function(stewards) {
+    // Remove spinner but keep label
+    while (target.children.length > 1) target.removeChild(target.lastChild);
+
+    if (!stewards || stewards.length === 0) {
+      target.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', padding: '10px 0' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
+      return;
+    }
+
+    // Search input
+    var searchInput = el('input', {
+      className: 'search-input',
+      placeholder: 'Search by name or location…',
+      style: { marginBottom: '8px' },
+    });
+    target.appendChild(searchInput);
+
+    // Location filter pills — top 5 locations
+    var locs = {};
+    stewards.forEach(function(s) { if (s.workLocation) locs[s.workLocation] = (locs[s.workLocation] || 0) + 1; });
+    var topLocs = Object.keys(locs).sort(function(a, b) { return locs[b] - locs[a]; }).slice(0, 5);
+    var activeLocFilter = '';
+
+    var pillBar = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' } });
+    target.appendChild(pillBar);
+
+    var listArea = el('div');
+    target.appendChild(listArea);
+
+    function renderPills() {
+      pillBar.innerHTML = '';
+      ['All'].concat(topLocs).forEach(function(loc) {
+        var isActive = loc === 'All' ? !activeLocFilter : activeLocFilter === loc;
+        var pill = el('button', {
+          style: {
+            fontSize: '11px', padding: '4px 12px', borderRadius: '16px',
+            fontWeight: '600', fontFamily: 'var(--fontBody)',
+            background: isActive ? 'var(--accent)' : 'var(--surface)',
+            color: isActive ? '#fff' : 'var(--muted)',
+            border: '1px solid ' + (isActive ? 'var(--accent)' : 'var(--border)'),
+            cursor: 'pointer',
+          },
+          onClick: function() {
+            activeLocFilter = loc === 'All' ? '' : loc;
+            renderPills();
+            renderList(searchInput.value.toLowerCase());
+          },
+        }, loc);
+        pillBar.appendChild(pill);
+      });
+    }
+
+    if (topLocs.length > 1) renderPills();
+    else pillBar.style.display = 'none';
+
+    searchInput.addEventListener('input', function() { renderList(searchInput.value.toLowerCase()); });
+
+    function renderList(query) {
+      listArea.innerHTML = '';
+
+      // Filter
+      var filtered = stewards.filter(function(s) {
+        if (activeLocFilter && (s.workLocation || '') !== activeLocFilter) return false;
+        if (!query) return true;
+        return (s.name || '').toLowerCase().indexOf(query) !== -1
+          || (s.workLocation || '').toLowerCase().indexOf(query) !== -1;
+      });
+
+      if (filtered.length === 0) {
+        listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No matches.'));
+        return;
+      }
+
+      // Smart sort: (1) same location as member, (2) in-office today, (3) alpha
+      var myLoc = (CURRENT_USER && CURRENT_USER.workLocation) ? CURRENT_USER.workLocation.trim().toLowerCase() : '';
+      var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+      var todayName = days[new Date().getDay()];
+      function inOfficeToday(s) { return s.officeDays && s.officeDays.toLowerCase().indexOf(todayName) !== -1; }
+      filtered.sort(function(a, b) {
+        var aLoc = myLoc && (a.workLocation || '').trim().toLowerCase() === myLoc ? 0 : 1;
+        var bLoc = myLoc && (b.workLocation || '').trim().toLowerCase() === myLoc ? 0 : 1;
+        if (aLoc !== bLoc) return aLoc - bLoc;
+        var aOff = inOfficeToday(a) ? 0 : 1;
+        var bOff = inOfficeToday(b) ? 0 : 1;
+        if (aOff !== bOff) return aOff - bOff;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+      filtered.forEach(function(s, i) {
+        var card = el('div', {
+          className: 'card card-glass card-fade-in',
+          style: { padding: '13px 15px', marginBottom: '6px', cursor: 'pointer', animationDelay: (i * 0.04) + 's' },
+        });
+
+        // Top row: avatar + name/meta
+        var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '11px' } });
+        topRow.appendChild(el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase()));
+        var info = el('div', { style: { flex: '1' } });
+        info.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, s.name || s.email));
+        var metaParts = [];
+        if (s.workLocation) metaParts.push(s.workLocation);
+        if (s.unit) metaParts.push(s.unit);
+        // Same-location badge
+        if (myLoc && (s.workLocation || '').trim().toLowerCase() === myLoc) metaParts.push('⭐ Your location');
+        info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '1px' } }, metaParts.join(' · ')));
+        topRow.appendChild(info);
+        card.appendChild(topRow);
+
+        // Expandable details
+        var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
+
+        if (s.officeDays) {
+          var odRow = el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' } });
+          var inOffice = inOfficeToday(s);
+          odRow.innerHTML = '📅 In-office: ' + s.officeDays + (inOffice ? ' <span style="color:var(--success);font-weight:600">● In today</span>' : '');
+          details.appendChild(odRow);
+        }
+        if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px', textDecoration: 'none' } }, '✉️ ' + s.email));
+        if (s.phone) details.appendChild(el('a', { href: 'tel:' + s.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '6px', textDecoration: 'none' } }, '📞 ' + s.phone));
+
+        // Buttons row
+        var btnRow = el('div', { style: { display: 'flex', gap: '6px', marginTop: '4px' } });
+
+        // vCard
+        btnRow.appendChild(el('button', {
+          className: 'btn btn-secondary', style: { width: 'auto', flex: '1', fontSize: '11px', padding: '7px 10px' },
+          onClick: function(e) {
+            e.stopPropagation();
+            var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (s.name || '') + '\n';
+            if (s.email) vcf += 'EMAIL:' + s.email + '\n';
+            if (s.phone) vcf += 'TEL:' + s.phone + '\n';
+            if (s.workLocation) vcf += 'ORG:' + (CONFIG.orgName || '') + ';' + s.workLocation + '\n';
+            if (s.unit) vcf += 'TITLE:' + CONFIG.stewardLabel + ' - ' + s.unit + '\n';
+            vcf += 'END:VCARD';
+            var blob = new Blob([vcf], { type: 'text/vcard' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a'); a.href = url;
+            a.download = (s.name || 'steward').replace(/\s+/g, '_') + '.vcf';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+          }
+        }, '💾 Save Contact'));
+
+        // Select as my steward
+        btnRow.appendChild(el('button', {
+          className: 'btn', style: { width: 'auto', flex: '1', fontSize: '11px', padding: '7px 10px' },
+          onClick: function(e) {
+            e.stopPropagation();
+            serverCall().withSuccessHandler(function(result) {
+              if (result && result.success) renderStewardContact(document.getElementById('app'));
+            }).dataAssignSteward(CURRENT_USER.email, s.email);
+          }
+        }, 'Select as my ' + CONFIG.stewardLabel));
+
+        details.appendChild(btnRow);
+        card.appendChild(details);
+        card.addEventListener('click', function() {
+          details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        });
+        listArea.appendChild(card);
+      });
+    }
+
+    renderList('');
+  }).withFailureHandler(function() {
+    while (target.children.length > 1) target.removeChild(target.lastChild);
+    target.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '13px', padding: '10px 0' } }, 'Failed to load directory.'));
+  }).dataGetStewardDirectory();
 }
 
 // ═══════════════════════════════════════
@@ -1142,16 +1402,17 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Messages and alerts', action: function() { renderMemberNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', action: function() { renderUnionStatsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardDirectory(document.getElementById('app')); } },
+      { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardContact(document.getElementById('app')); } },
+      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('member', 'orgchart'); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderMemberResources(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },
-      { icon: '\u2753', label: 'Weekly Questions', desc: 'Vote on this week\'s questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'member'); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', action: function() { renderPollsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', action: function() { renderSurveyFormPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', action: function() { renderMemberTasks(document.getElementById('app')); } },
-      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on active polls', action: function() { renderPollsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderMinutesPage(document.getElementById('app')); } },
+
+      { icon: '\uD83D\uDCCB', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderMinutesPage(document.getElementById('app')); } },
       { icon: '\uD83E\uDD1D', label: 'My Meetings', desc: 'Your meeting attendance', action: function() { renderMeetingsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'member'); } },
@@ -2499,162 +2760,6 @@ function _renderWTReminders(container) {
 // WEEKLY QUESTIONS (member side)
 // ═══════════════════════════════════════
 
-function renderWeeklyQuestionsPage(appContainer, role) {
-  var isMember = role === 'member';
-  renderPageLayout(appContainer, role, 'weeklyq', function(container) {
-    if (isMember) _memberHeader(container, 'Weekly Questions');
-    else container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Weekly Questions')));
-
-    var content = el('div', { className: 'content' });
-
-    // Sub-tabs: This Week | Past Questions | Suggest
-    var activeSubTab = 'current';
-    var subTabBar = el('div', { className: 'sub-tabs' });
-    var subContent = el('div');
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      var tabs = [{ id: 'current', label: 'This Week' }, { id: 'past', label: 'Past Questions' }, { id: 'suggest', label: 'Suggest' }];
-      tabs.forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
-          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderWQSubContent(); }
-        }, tab.label));
-      });
-    }
-
-    function renderWQSubContent() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'suggest') { _renderQuestionSubmission(subContent); return; }
-      if (activeSubTab === 'past') { _renderPastQuestions(subContent); return; }
-      _renderCurrentQuestions(subContent);
-    }
-
-    function _renderCurrentQuestions(target) {
-      showLoading(target);
-      serverCall().withSuccessHandler(function(data) {
-        target.innerHTML = '';
-        if (!data || !data.questions || data.questions.length === 0) {
-          var wqEmpty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
-          wqEmpty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\u2753'));
-          wqEmpty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No questions this week'));
-          wqEmpty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward can add questions via the Weekly Question Manager in the steward view.'));
-          target.appendChild(wqEmpty);
-          return;
-        }
-
-        // Survey anonymity badge
-        target.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '\uD83D\uDD12 Your responses are fully anonymous via one-way encryption'));
-
-        data.questions.forEach(function(q) {
-          var qCard = el('div', { className: 'wq-card' });
-          qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
-
-          if (q.hasResponded) {
-            _renderQuestionResults(qCard, q);
-          } else {
-            var options = ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree'];
-            options.forEach(function(opt) {
-              var optEl = el('div', { className: 'wq-option', onClick: function() {
-                serverCall().withSuccessHandler(function(result) {
-                  if (result && result.success) {
-                    q.hasResponded = true;
-                    q.stats = result.stats;
-                    qCard.innerHTML = '';
-                    qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
-                    _renderQuestionResults(qCard, q);
-                  }
-                }).withFailureHandler(function() {
-                  qCard.innerHTML = '';
-                  qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
-                  qCard.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px', marginTop: '6px' } }, 'Failed to submit response. Please try again.'));
-                }).wqSubmitResponse(CURRENT_USER.email, q.id, opt);
-              }}, opt);
-              qCard.appendChild(optEl);
-            });
-          }
-          target.appendChild(qCard);
-        });
-      }).withFailureHandler(function() {
-        target.innerHTML = '';
-        target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load questions.'));
-      }).wqGetActiveQuestions(CURRENT_USER.email);
-    }
-
-    function _renderPastQuestions(target) {
-      showLoading(target);
-      var page = 1;
-      function loadPage(p) {
-        showLoading(target);
-        serverCall().withSuccessHandler(function(data) {
-          target.innerHTML = '';
-          if (!data || !data.questions || data.questions.length === 0) {
-            target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, p > 1 ? 'No more past questions.' : 'No past questions available.'));
-            return;
-          }
-          data.questions.forEach(function(q) {
-            var card = el('div', { className: 'wq-card' });
-            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Week of ' + q.weekStr));
-            card.appendChild(el('div', { className: 'wq-question' }, q.text));
-            if (q.stats && q.stats.total > 0) _renderQuestionResults(card, q);
-            else card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No responses'));
-            target.appendChild(card);
-          });
-          // Pagination
-          if (data.hasMore || p > 1) {
-            var nav = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' } });
-            if (p > 1) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p - 1; loadPage(page); } }, '\u2190 Previous'));
-            if (data.hasMore) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p + 1; loadPage(page); } }, 'Next \u2192'));
-            target.appendChild(nav);
-          }
-        }).withFailureHandler(function() {
-          target.innerHTML = '';
-          target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load past questions.'));
-        }).wqGetHistory(CURRENT_USER.email, p, 10);
-      }
-      loadPage(page);
-    }
-
-    refreshSubTabs();
-    renderWQSubContent();
-    content.appendChild(subTabBar);
-    content.appendChild(subContent);
-    container.appendChild(content);
-  });
-}
-
-function _renderQuestionResults(container, q) {
-  var stats = q.stats || {};
-  var total = stats.total || 0;
-  var options = ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree'];
-
-  if (typeof ChartHelper !== 'undefined' && total > 0) {
-    var labels = [];
-    var data = [];
-    var colors = ['#4ade80', '#60a5fa', '#a78bfa', '#facc15', '#ef4444'];
-    options.forEach(function(opt, i) {
-      labels.push(opt);
-      data.push((stats.counts && stats.counts[opt]) || 0);
-    });
-    var chartId = 'wq-results-' + (q.id || Math.random().toString(36).substr(2, 6));
-    ChartHelper.createHorizontalBarChart(container, chartId, labels, data, colors);
-  } else {
-    options.forEach(function(opt) {
-      var count = (stats.counts && stats.counts[opt]) || 0;
-      var pct = total > 0 ? Math.round((count / total) * 100) : 0;
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } });
-      row.appendChild(el('div', { style: { width: '110px', fontSize: '11px', color: 'var(--muted)', textAlign: 'right', flexShrink: '0' } }, opt));
-      var bar = el('div', { className: 'wq-results-bar' });
-      bar.appendChild(el('div', { className: 'wq-results-fill', style: { width: pct + '%' } }));
-      row.appendChild(bar);
-      row.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text)', fontWeight: '600', width: '40px' } }, pct + '%'));
-      container.appendChild(row);
-    });
-  }
-  container.appendChild(el('div', { className: 'wq-stats' }, total + ' responses'));
-}
-
-// ═══════════════════════════════════════
 // EVENTS PAGE (shared member+steward) (v4.12.0)
 // ═══════════════════════════════════════
 
@@ -3019,34 +3124,7 @@ function renderStewardDirectory(appContainer) {
 }
 
 // ═══════════════════════════════════════
-// WEEKLY QUESTION HISTORY (v4.12.0)
-// ═══════════════════════════════════════
-// (Integrated as sub-tab in the Weekly Questions page below)
-
-function _renderQuestionSubmission(container) {
-  container.innerHTML = '';
-  container.appendChild(el('h3', { className: 'section-title' }, 'Suggest a Question'));
-  container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' } }, 'Your question will be reviewed and may appear in future weeks.'));
-  var textarea = el('textarea', { className: 'msg-textarea', placeholder: 'Type your question here...', style: { minHeight: '80px' } });
-  container.appendChild(textarea);
-
-  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginTop: '6px' } });
-  container.appendChild(statusMsg);
-
-  container.appendChild(el('button', {
-    className: 'btn btn-primary', style: { marginTop: '10px' },
-    onClick: function() {
-      var text = textarea.value.trim();
-      if (!text) { statusMsg.textContent = 'Please enter a question.'; statusMsg.style.color = 'var(--danger)'; return; }
-      statusMsg.textContent = 'Submitting...';
-      serverCall().withSuccessHandler(function(result) {
-        statusMsg.textContent = result && result.success ? 'Question submitted! Thank you.' : 'Error submitting.';
-        statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
-        if (result && result.success) textarea.value = '';
-      }).wqSubmitPoolQuestion(CURRENT_USER.email, text);
-    }
-  }, 'Submit Question'));
-}
+// _renderQuestionSubmission removed v4.23.0 — integrated into renderPollsPage > Submit a Poll tab
 
 // ═══════════════════════════════════════
 // MEMBER CASE CHECKLIST (read-only, v4.16.0)
@@ -3166,74 +3244,293 @@ function renderMeetingsPage(appContainer) {
 }
 
 // ═══════════════════════════════════════
-// POLLS PAGE (member, v4.16.0)
+// POLLS (v4.23.0 — merged Weekly Questions + Polls)
 // ═══════════════════════════════════════
+// Single unified page. Two tracks per week:
+//   • Steward Poll  — steward-authored, any topic, custom options
+//   • Community Poll — randomly drawn from member-submitted pool
+// All votes are anonymous (email hashed). Results show after voting.
 
+// ── Shared poll guide text ───────────────────────────────────────────────
+var POLL_GUIDE = [
+  { head: '✅ Good polls are:', items: [
+    'Neutral — avoid "Don\'t you think…" or loaded framing.',
+    'Single-focus — one concept per question.',
+    'Balanced — options cover the full range without weighting one end.',
+    'Specific — clear enough that everyone interprets it the same way.',
+  ]},
+  { head: '💡 Example questions:', items: [
+    '"How satisfied are you with the office day scheduling process?" → Very satisfied / Satisfied / Neutral / Dissatisfied / Very dissatisfied',
+    '"Has management communicated the new policy clearly?" → Yes, fully / Somewhat / No',
+  ]},
+  { head: '❌ Avoid:', items: [
+    '"Don\'t you think management is being unfair about office days?" (leading — implies the correct answer)',
+    '"How do you feel about office days and workload and communication?" (multiple concepts — split into separate polls)',
+  ]},
+];
+
+function _renderPollGuide(container) {
+  var guideDiv = el('div', { style: { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', marginBottom: '14px', fontSize: '12px' } });
+  guideDiv.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '700', color: 'var(--accent)', marginBottom: '10px' } }, '📋 Writing a good poll'));
+  POLL_GUIDE.forEach(function(section) {
+    guideDiv.appendChild(el('div', { style: { fontWeight: '600', color: 'var(--text)', margin: '8px 0 4px' } }, section.head));
+    section.items.forEach(function(item) {
+      var row = el('div', { style: { display: 'flex', gap: '6px', color: 'var(--muted)', marginBottom: '3px', lineHeight: '1.5' } });
+      row.appendChild(el('span', {}, '•'));
+      row.appendChild(el('span', {}, item));
+      guideDiv.appendChild(row);
+    });
+  });
+  container.appendChild(guideDiv);
+}
+
+// ── Option builder ───────────────────────────────────────────────────────
+function _buildOptionInputs(container, onChange) {
+  var options = ['', ''];
+  var rows = el('div', { style: { marginBottom: '8px' } });
+
+  function refresh() {
+    rows.innerHTML = '';
+    options.forEach(function(opt, i) {
+      var row = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' } });
+      var input = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Option ' + (i + 1),
+        style: { flex: '1', minHeight: '34px', marginBottom: '0' } });
+      input.value = opt;
+      input.addEventListener('input', function() { options[i] = input.value; if (onChange) onChange(options); });
+      row.appendChild(input);
+      if (options.length > 2) {
+        var removeBtn = el('button', { className: 'btn btn-secondary', style: { width: 'auto', padding: '4px 10px', fontSize: '18px', lineHeight: '1', minHeight: '34px' },
+          onClick: function() { options.splice(i, 1); refresh(); if (onChange) onChange(options); }
+        }, '×');
+        row.appendChild(removeBtn);
+      }
+      rows.appendChild(row);
+    });
+    if (options.length < 5) {
+      var addBtn = el('button', { className: 'btn btn-secondary', style: { width: 'auto', padding: '6px 14px', fontSize: '12px', marginTop: '2px' },
+        onClick: function() { options.push(''); refresh(); if (onChange) onChange(options); }
+      }, '+ Add option');
+      rows.appendChild(addBtn);
+    }
+  }
+
+  refresh();
+  container.appendChild(rows);
+  return { getOptions: function() { return options.map(function(o) { return o.trim(); }).filter(Boolean); } };
+}
+
+// ── Results bar chart ────────────────────────────────────────────────────
+function _renderPollResults(container, q) {
+  var stats = q.stats || {};
+  var total = stats.total || 0;
+  var counts = stats.counts || {};
+  var options = q.options || [];
+
+  container.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '10px' } }, '🔒 Anonymous — votes are one-way encrypted'));
+
+  if (total === 0) {
+    container.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', textAlign: 'center', padding: '10px 0' } }, 'No votes yet — be the first!'));
+    return;
+  }
+
+  var colors = ['var(--accent)', 'var(--success)', '#facc15', '#f97316', '#a78bfa'];
+  options.forEach(function(opt, i) {
+    var count = counts[opt] || 0;
+    var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+    var row = el('div', { style: { marginBottom: '8px' } });
+    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' } });
+    header.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '500' } }, opt));
+    header.appendChild(el('span', { style: { color: 'var(--muted)' } }, pct + '%  (' + count + ')'));
+    row.appendChild(header);
+    var bar = el('div', { style: { height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
+    bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: colors[i % colors.length], borderRadius: '4px', transition: 'width 0.5s ease' } }));
+    row.appendChild(bar);
+    container.appendChild(row);
+  });
+  container.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '6px' } }, total + ' anonymous vote' + (total !== 1 ? 's' : '')));
+}
+
+// ── Vote UI ──────────────────────────────────────────────────────────────
+function _renderPollVoteUI(qCard, q) {
+  var label = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } },
+    q.source === 'community' ? '🌐 Community poll — drawn randomly from member submissions' : '🗳️ ' + (CONFIG.stewardLabel || 'Steward') + ' poll');
+  qCard.appendChild(label);
+
+  if (q.hasResponded) {
+    _renderPollResults(qCard, q);
+  } else {
+    q.options.forEach(function(opt) {
+      var btn = el('button', {
+        className: 'btn',
+        style: { display: 'block', width: '100%', marginBottom: '6px', textAlign: 'left', padding: '10px 14px', fontSize: '13px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text)' },
+        onClick: function() {
+          btn.disabled = true; btn.textContent = 'Voting…';
+          serverCall().withSuccessHandler(function(result) {
+            if (result && result.success) {
+              q.hasResponded = true;
+              q.stats = result.stats;
+              qCard.innerHTML = '';
+              qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+              _renderPollVoteUI(qCard, q);
+            } else {
+              btn.disabled = false; btn.textContent = opt;
+              qCard.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, (result && result.message) || 'Error submitting.'));
+            }
+          }).withFailureHandler(function() {
+            btn.disabled = false; btn.textContent = opt;
+          }).wqSubmitResponse(null, q.id, opt);
+        }
+      }, opt);
+      qCard.appendChild(btn);
+    });
+  }
+}
+
+// ── Main member polls page ────────────────────────────────────────────────
 function renderPollsPage(appContainer) {
   renderPageLayout(appContainer, 'member', 'polls', function(container) {
-    _memberHeader(container, 'Polls', 'Vote on active polls');
+    _memberHeader(container, 'Polls', 'Anonymous community polls');
     var content = el('div', { className: 'content' });
-    showLoading(content);
-    container.appendChild(content);
 
-    function loadPolls() {
-      showLoading(content);
-      serverCall().withSuccessHandler(function(polls) {
-        content.innerHTML = '';
-        if (!polls || polls.length === 0) {
-          content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls right now.'));
-          return;
-        }
+    var activeSubTab = 'vote';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
 
-        polls.forEach(function(poll) {
-          var card = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
-          card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, poll.question));
-
-          if (poll.hasVoted) {
-            // Show results
-            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--success)', marginBottom: '8px', fontWeight: '600' } }, 'You voted: ' + poll.myVote));
-            poll.options.forEach(function(opt) {
-              var count = poll.results[opt] || 0;
-              var pct = poll.totalVotes > 0 ? Math.round((count / poll.totalVotes) * 100) : 0;
-              var isMyVote = opt === poll.myVote;
-              var row = el('div', { style: { marginBottom: '6px' } });
-              var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' } });
-              header.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: isMyVote ? '600' : '400' } }, opt));
-              header.appendChild(el('span', { style: { color: 'var(--muted)' } }, count + ' (' + pct + '%)'));
-              row.appendChild(header);
-              var bar = el('div', { style: { height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
-              bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: isMyVote ? 'var(--accent)' : 'var(--info)', borderRadius: '4px', transition: 'width 0.6s ease' } }));
-              row.appendChild(bar);
-              card.appendChild(row);
-            });
-            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '6px' } }, poll.totalVotes + ' total vote' + (poll.totalVotes !== 1 ? 's' : '')));
-          } else {
-            // Show vote buttons
-            poll.options.forEach(function(opt) {
-              var btn = el('button', { className: 'btn', style: { display: 'block', width: '100%', marginBottom: '6px', textAlign: 'left', padding: '10px 14px', fontSize: '13px' },
-                onClick: function() {
-                  btn.textContent = 'Voting...'; btn.disabled = true;
-                  serverCall().withSuccessHandler(function(result) {
-                    if (result && result.success) loadPolls();
-                    else { btn.textContent = opt; btn.disabled = false; }
-                  }).withFailureHandler(function() {
-                    btn.textContent = opt; btn.disabled = false;
-                  }).dataSubmitPollVote(CURRENT_USER.email, poll.id, opt);
-                }
-              }, opt);
-              card.appendChild(btn);
-            });
-          }
-          content.appendChild(card);
-        });
-      }).withFailureHandler(function() {
-        content.innerHTML = '';
-        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
-      }).dataGetActivePolls(CURRENT_USER.email);
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      [{ id: 'vote', label: 'This Week' }, { id: 'past', label: 'Past Polls' }, { id: 'submit', label: 'Submit a Poll' }].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderSub(); }
+        }, tab.label));
+      });
     }
 
-    loadPolls();
+    function renderSub() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'vote')   _renderThisWeekPolls(subContent);
+      if (activeSubTab === 'past')   _renderPastPolls(subContent);
+      if (activeSubTab === 'submit') _renderSubmitPoll(subContent);
+    }
+
+    refreshSubTabs();
+    renderSub();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
   });
+}
+
+function _renderThisWeekPolls(target) {
+  showLoading(target);
+  // Load frequency first so empty-state copy is accurate, then load polls
+  serverCall().withSuccessHandler(function(freq) {
+    var freqLabels = { weekly: 'each Monday', biweekly: 'every other Monday', monthly: 'on the 1st of each month' };
+    var nextLabel = freqLabels[freq] || 'each Monday';
+    serverCall().withSuccessHandler(function(data) {
+      target.innerHTML = '';
+      if (!data || !data.questions || data.questions.length === 0) {
+        var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+        empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '🗳️'));
+        var periodWord = freq === 'monthly' ? 'this month' : freq === 'biweekly' ? 'this fortnight' : 'this week';
+        empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No polls ' + periodWord));
+        empty.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'New polls are posted ' + nextLabel + '.'));
+        target.appendChild(empty);
+        return;
+      }
+      target.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '🔒 All votes are fully anonymous — your identity is never stored'));
+      data.questions.forEach(function(q) {
+        var qCard = el('div', { className: 'wq-card', style: { marginBottom: '14px' } });
+        qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+        _renderPollVoteUI(qCard, q);
+        target.appendChild(qCard);
+      });
+    }).withFailureHandler(function() {
+      target.innerHTML = '';
+      target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
+    }).wqGetActiveQuestions();
+  }).withFailureHandler(function() {
+    // Frequency load failed — fall back to loading polls anyway
+    serverCall().withSuccessHandler(function(data) {
+      target.innerHTML = '';
+      if (!data || !data.questions || data.questions.length === 0) {
+        target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No polls this period.'));
+        return;
+      }
+      target.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '🔒 All votes are fully anonymous'));
+      data.questions.forEach(function(q) {
+        var qCard = el('div', { className: 'wq-card', style: { marginBottom: '14px' } });
+        qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+        _renderPollVoteUI(qCard, q);
+        target.appendChild(qCard);
+      });
+    }).wqGetActiveQuestions();
+  }).wqGetPollFrequency();
+}
+
+function _renderPastPolls(target) {
+  showLoading(target);
+  var page = 1;
+  function loadPage(p) {
+    showLoading(target);
+    serverCall().withSuccessHandler(function(data) {
+      target.innerHTML = '';
+      if (!data || !data.questions || data.questions.length === 0) {
+        target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, p > 1 ? 'No more past polls.' : 'No past polls yet.'));
+        return;
+      }
+      data.questions.forEach(function(q) {
+        var card = el('div', { className: 'wq-card', style: { marginBottom: '12px' } });
+        card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Week of ' + q.weekStr + ' · ' + (q.source === 'community' ? '🌐 Community' : '🗳️ ' + (CONFIG.stewardLabel || 'Steward'))));
+        card.appendChild(el('div', { className: 'wq-question', style: { marginBottom: '10px' } }, q.text));
+        if (q.stats && q.stats.total > 0) _renderPollResults(card, q);
+        else card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No votes'));
+        target.appendChild(card);
+      });
+      if (data.hasMore || p > 1) {
+        var nav = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' } });
+        if (p > 1) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p - 1; loadPage(page); } }, '← Previous'));
+        if (data.hasMore) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p + 1; loadPage(page); } }, 'Next →'));
+        target.appendChild(nav);
+      }
+    }).withFailureHandler(function() {
+      target.innerHTML = '';
+      target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load past polls.'));
+    }).wqGetHistory(null, p, 10);
+  }
+  loadPage(page);
+}
+
+function _renderSubmitPoll(target) {
+  _renderPollGuide(target);
+
+  var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+  formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, 'Submit a Poll to the Community Pool'));
+  formCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Your poll may be randomly drawn for a future week. Your submission is anonymous.'));
+
+  var questionInput = el('textarea', { className: 'msg-textarea', placeholder: 'Your poll question...', style: { minHeight: '70px', marginBottom: '10px' } });
+  formCard.appendChild(questionInput);
+  formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, 'Answer options (2–5):'));
+  var optBuilder = _buildOptionInputs(formCard, null);
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '18px', marginBottom: '8px' } });
+  formCard.appendChild(statusMsg);
+  formCard.appendChild(el('button', { className: 'btn btn-primary', style: { marginTop: '6px' },
+    onClick: function() {
+      var text = questionInput.value.trim();
+      var opts = optBuilder.getOptions();
+      if (!text) { statusMsg.textContent = 'Please enter a question.'; statusMsg.style.color = 'var(--danger)'; return; }
+      if (opts.length < 2) { statusMsg.textContent = 'Add at least 2 answer options.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Submitting…'; statusMsg.style.color = 'var(--muted)';
+      serverCall().withSuccessHandler(function(result) {
+        statusMsg.textContent = result && result.success ? '✅ ' + result.message : (result && result.message) || 'Error.';
+        statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+        if (result && result.success) { questionInput.value = ''; }
+      }).withFailureHandler(function() {
+        statusMsg.textContent = 'Failed to submit.'; statusMsg.style.color = 'var(--danger)';
+      }).wqSubmitPoolQuestion(null, text, opts);
+    }
+  }, 'Submit to Pool'));
+  target.appendChild(formCard);
 }
 
 // ═══════════════════════════════════════
@@ -3372,7 +3669,12 @@ function renderMemberTasks(appContainer) {
             actions.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
               onClick: function() {
-                serverCall().withSuccessHandler(function() { renderMemberTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
+                serverCall().withSuccessHandler(function() {
+                  // Notify steward-side badge counts — member completing a task
+                  // changes the steward's open/overdue task totals.
+                  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+                  renderMemberTasks(document.getElementById('app'));
+                }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
               }
             }, '\u2705 Complete'));
             card.appendChild(actions);

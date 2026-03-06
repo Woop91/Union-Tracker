@@ -15,7 +15,7 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 - Source: DDS `Main` → Target: UT `staging`
 - User manages: UT `staging` → UT `dev` → UT `main`
 - **Excluded from UT:**
-  - DDS Apps Script ID (`18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`)
+  - DDS Apps Script ID (`[REDACTED — DDS private]`)
   - Workload Tracker-exclusive files (see registry below)
   - Any credentials, tokens, or secrets (UT is public)
 

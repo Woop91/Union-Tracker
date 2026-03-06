@@ -21,6 +21,9 @@ function initStewardView(container) {
     AppState.cases = batch.cases || [];
     AppState.kpis = batch.kpis || { totalCases: AppState.cases.length, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
     AppState.notificationCount = batch.notificationCount || 0;
+    AppState.memberCount = batch.memberCount || 0;
+    AppState.taskCount = batch.taskCount || 0;
+    AppState.overdueTaskCount = batch.overdueTaskCount || 0;
     AppState.loading = false;
     renderStewardDashboard(container);
     _checkDeepLink('steward');
@@ -31,6 +34,21 @@ function initStewardView(container) {
   serverCall().withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
   }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(CURRENT_USER.email, 'steward');
+
+  // Fire member and task count fetches in parallel — non-blocking.
+  // AppState is updated when they arrive; badges render on next nav redraw.
+  serverCall().withSuccessHandler(function(members) {
+    AppState.memberCount = (members || []).length;
+  }).withFailureHandler(function() { AppState.memberCount = 0; }).dataGetAllMembers();
+
+  serverCall().withSuccessHandler(function(tasks) {
+    var open = (tasks || []).filter(function(t) { return t.status !== 'completed'; });
+    AppState.taskCount = open.length;
+    AppState.overdueTaskCount = open.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
+  }).withFailureHandler(function() {
+    AppState.taskCount = 0;
+    AppState.overdueTaskCount = 0;
+  }).dataGetTasks(CURRENT_USER.email, null);
 
   serverCall()
     .withSuccessHandler(function(cases) {
@@ -290,9 +308,16 @@ function _dismissWelcome(cardEl) {
 
 function renderCaseList(container, filter) {
   container.innerHTML = '';
+  var TERMINAL = ['resolved', 'won', 'denied', 'settled', 'withdrawn', 'closed'];
   var cases = AppState.cases;
-  if (filter === 'overdue') cases = cases.filter(function(c) { return c.status === 'overdue'; });
-  if (filter === 'active') cases = cases.filter(function(c) { return c.status === 'active' || c.status === 'new'; });
+  if (filter === 'overdue') {
+    cases = cases.filter(function(c) { return c.status === 'overdue'; });
+  } else if (filter === 'active') {
+    // Active = not terminal AND not overdue (catches open/new/pending/step-i/in-progress etc.)
+    cases = cases.filter(function(c) {
+      return c.status !== 'overdue' && TERMINAL.indexOf(c.status) === -1;
+    });
+  }
 
   if (cases.length === 0) {
     if (filter === 'all' && AppState.cases.length === 0) {
@@ -352,7 +377,7 @@ function renderCaseList(container, filter) {
     card.appendChild(topRow);
 
     var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
-    var memberDisplay = c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown';
+    var memberDisplay = c.memberName || (c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown');
     bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' } }, memberDisplay + ' \u00B7 ' + (c.step || '')));
     bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' } }, c.unit || ''));
     card.appendChild(bottomRow);
@@ -379,6 +404,43 @@ function renderCaseList(container, filter) {
 // BOTTOM NAV (shared by both views)
 // ═══════════════════════════════════════
 
+// ═══════════════════════════════════════
+// BADGE REFRESH
+// Call after any mutation that changes task or case counts.
+// Debounced 600ms — rapid mutations collapse into one server round-trip.
+// Re-fetches counts and swaps the bottom nav DOM node in place.
+// ═══════════════════════════════════════
+
+var _refreshNavBadgesTimer = null;
+function _refreshNavBadges() {
+  if (_refreshNavBadgesTimer) clearTimeout(_refreshNavBadgesTimer);
+  _refreshNavBadgesTimer = setTimeout(function() {
+    _refreshNavBadgesTimer = null;
+
+    // Re-fetch KPIs (case overdue count may have changed)
+    serverCall().withSuccessHandler(function(kpis) {
+      if (kpis) AppState.kpis = kpis;
+    }).withFailureHandler(function() {}).dataGetStewardKPIs(CURRENT_USER.email);
+
+    // Re-fetch open tasks, then swap nav
+    serverCall().withSuccessHandler(function(tasks) {
+      var open = (tasks || []).filter(function(t) { return t.status !== 'completed'; });
+      AppState.taskCount = open.length;
+      AppState.overdueTaskCount = open.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
+      var appRoot = document.getElementById('app') || document;
+      var existingNav = appRoot.querySelector('.bottom-nav');
+      if (existingNav && existingNav.parentNode) {
+        var parent = existingNav.parentNode;
+        var replacement = document.createElement('div');
+        parent.replaceChild(replacement, existingNav);
+        renderBottomNav(replacement, 'steward', AppState.activeTab || 'cases');
+        var newNav = replacement.querySelector('.bottom-nav');
+        if (newNav) parent.replaceChild(newNav, replacement);
+      }
+    }).withFailureHandler(function() {}).dataGetTasks(CURRENT_USER.email, null);
+  }, 600);
+}
+
 function renderBottomNav(container, role, activeTab) {
   var nav = el('div', { className: 'bottom-nav' });
   var tabs = role === 'steward' ? [
@@ -398,7 +460,42 @@ function renderBottomNav(container, role, activeTab) {
       className: 'nav-item' + (tab.id === activeTab ? ' active' : ''),
       onClick: function() { _handleTabNav(role, tab.id === 'more_steward' ? '_steward_more' : tab.id === 'more' ? '_member_more' : tab.id); }
     });
-    item.appendChild(el('span', { className: 'nav-icon' }, tab.icon));
+
+    // Icon wrapper — allows badge positioning
+    var iconWrap = el('div', { style: { position: 'relative', display: 'inline-block' } });
+    iconWrap.appendChild(el('span', { className: 'nav-icon' }, tab.icon));
+
+    // Badge: overdue cases count on Cases tab
+    if (tab.id === 'cases' && role === 'steward') {
+      var overdueNav = (AppState.kpis && AppState.kpis.overdue) || 0;
+      if (overdueNav > 0) {
+        iconWrap.appendChild(el('span', {
+          style: {
+            position: 'absolute', top: '-4px', right: '-6px',
+            background: 'var(--danger)', color: '#fff',
+            fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+            padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+          }
+        }, overdueNav > 9 ? '9+' : String(overdueNav)));
+      }
+    }
+
+    // Badge: member count on Members tab (just a count, no urgency color)
+    if (tab.id === 'members' && role === 'steward') {
+      var mc = AppState.memberCount || 0;
+      if (mc > 0) {
+        iconWrap.appendChild(el('span', {
+          style: {
+            position: 'absolute', top: '-4px', right: '-6px',
+            background: 'var(--accent)', color: '#000',
+            fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+            padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+          }
+        }, mc > 99 ? '99+' : String(mc)));
+      }
+    }
+
+    item.appendChild(iconWrap);
     var label = el('span', { className: 'nav-label' }, tab.label);
     if (tab.id === activeTab) label.style.color = 'var(--accent)';
     item.appendChild(label);
@@ -1558,12 +1655,12 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View and send notifications', action: function() { renderStewardNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'steward'); } },
       { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
-      { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { renderManagePolls(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { renderStewardDirectoryPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create and manage flash polls', action: function() { renderManagePolls(document.getElementById('app')); } },
+
       { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderStewardMinutes(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app')); } },
@@ -1573,10 +1670,32 @@ function renderStewardMore(appContainer) {
     menuItems.forEach(function(m) {
       var item = el('div', { className: 'more-menu-item', onClick: m.action });
       item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
-      var text = el('div');
+      var text = el('div', { style: { flex: '1' } });
       text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
       text.appendChild(el('div', { className: 'more-menu-desc' }, m.desc));
       item.appendChild(text);
+      // Overdue task badge on Tasks entry
+      if (m.label === 'Tasks') {
+        var ot = AppState.overdueTaskCount || 0;
+        var tc = AppState.taskCount || 0;
+        if (ot > 0) {
+          item.appendChild(el('span', {
+            style: {
+              background: 'var(--danger)', color: '#fff',
+              fontSize: '10px', fontWeight: '700', borderRadius: '10px',
+              padding: '2px 7px', whiteSpace: 'nowrap', alignSelf: 'center',
+            }
+          }, ot + ' overdue'));
+        } else if (tc > 0) {
+          item.appendChild(el('span', {
+            style: {
+              background: 'var(--accent)', color: '#000',
+              fontSize: '10px', fontWeight: '700', borderRadius: '10px',
+              padding: '2px 7px', whiteSpace: 'nowrap', alignSelf: 'center',
+            }
+          }, tc + ' open'));
+        }
+      }
       content.appendChild(item);
     });
     container.appendChild(content);
@@ -1863,7 +1982,10 @@ function _renderTaskList(container, statusFilter) {
         actions.appendChild(el('button', {
           style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
           onClick: function() {
-            serverCall().withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteTask(CURRENT_USER.email, task.id);
+            serverCall().withSuccessHandler(function() {
+              if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+              renderStewardTasks(document.getElementById('app'));
+            }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteTask(CURRENT_USER.email, task.id);
           }
         }, '\u2705 Complete'));
         card.appendChild(actions);
@@ -2020,18 +2142,18 @@ function _renderNewTaskForm(container, onCreated) {
         var memEmail = memberEmailInput.value.trim();
         if (!memEmail) { statusMsg.textContent = 'Enter member email.'; statusMsg.style.color = 'var(--danger)'; return; }
         serverCall().withSuccessHandler(function(r) {
-          if (r && r.success) { onCreated(); } else { statusMsg.textContent = r ? r.message : 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+          if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = r ? r.message : 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
         }).dataCreateMemberTask(CURRENT_USER.email, memEmail, title, descInput.value.trim(), priSelect.value, dueInput.value || '');
       } else {
         // Create steward task
         var assignee = assignSelect ? assignSelect.value : '';
         if (assignee) {
           serverCall().withSuccessHandler(function(r) {
-            if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+            if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
           }).dataCreateTaskForSteward(CURRENT_USER.email, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         } else {
           serverCall().withSuccessHandler(function(r) {
-            if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+            if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
           }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         }
       }
@@ -2044,61 +2166,6 @@ function _renderNewTaskForm(container, onCreated) {
 // ═══════════════════════════════════════
 // Overrides the original renderStewardMembers with enhanced version
 
-// renderWeeklyQuestionsPage already handles steward role via the role param.
-// Additional steward-specific manager (set question, review pool):
-function renderWeeklyQuestionManager(appContainer) {
-  renderPageLayout(appContainer, 'steward', 'weeklyq', function(container) {
-    _stewardHeader(container, 'Weekly Question Manager');
-    var content = el('div', { className: 'content' });
-
-    // Set steward question
-    content.appendChild(el('h3', { className: 'section-title' }, 'Set This Week\'s Question'));
-    var questionInput = el('textarea', { className: 'msg-textarea', placeholder: 'Type your question for this week...' });
-    content.appendChild(questionInput);
-
-    var setStatus = el('div', { style: { fontSize: '13px', minHeight: '20px', marginTop: '6px' } });
-    content.appendChild(setStatus);
-
-    content.appendChild(el('button', {
-      className: 'btn btn-primary', style: { marginTop: '10px', marginBottom: '24px' },
-      onClick: function() {
-        var text = questionInput.value.trim();
-        if (!text) { setStatus.textContent = 'Enter a question.'; setStatus.style.color = 'var(--danger)'; return; }
-        setStatus.textContent = 'Saving...';
-        serverCall().withSuccessHandler(function(result) {
-          setStatus.textContent = result && result.success ? 'Question set!' : 'Error.';
-          setStatus.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
-          if (result && result.success) questionInput.value = '';
-        }).wqSetStewardQuestion(CURRENT_USER.email, text);
-      }
-    }, 'Set Question'));
-
-    // Pool review
-    content.appendChild(el('h3', { className: 'section-title' }, 'Submitted Questions Pool'));
-    var poolArea = el('div');
-    showLoading(poolArea);
-    content.appendChild(poolArea);
-
-    serverCall().withSuccessHandler(function(pool) {
-      poolArea.innerHTML = '';
-      if (!pool || pool.length === 0) {
-        poolArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '16px 0' } }, 'No pending questions in the pool.'));
-        return;
-      }
-      pool.forEach(function(q) {
-        var card = el('div', { className: 'wq-card' });
-        card.appendChild(el('div', { className: 'wq-question' }, q.text));
-        card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Status: ' + (q.status || 'pending')));
-        poolArea.appendChild(card);
-      });
-    }).wqGetPoolQuestions();
-
-    container.appendChild(content);
-  });
-}
-
-// ═══════════════════════════════════════
-// INSIGHTS PAGE (v4.15.0)
 // ═══════════════════════════════════════
 
 function renderInsightsPage(appContainer) {
@@ -2585,106 +2652,249 @@ function _renderCaseChecklist(container, caseId) {
 // POLLS MANAGEMENT (steward, v4.16.0)
 // ═══════════════════════════════════════
 
+// POLLS MANAGEMENT (steward, v4.23.0 — merged Weekly Questions + Polls)
+// ═══════════════════════════════════════
+// Steward can:
+//   • See this week's live poll results
+//   • Create/replace the steward poll for this week (with guide)
+//   • Close any active poll manually
+//   • View past poll history
+// Community pool is drawn automatically every Monday — stewards cannot
+// pick from it or approve submissions.
+
 function renderManagePolls(appContainer) {
   renderPageLayout(appContainer, 'steward', 'polls', function(container) {
-    _stewardHeader(container, 'Polls', 'Create and manage flash polls');
+    _stewardHeader(container, 'Polls', 'Create polls · view community results');
     var content = el('div', { className: 'content' });
 
-    var activeSubTab = 'active';
+    var activeSubTab = 'live';
     var subTabBar = el('div', { className: 'sub-tabs' });
     var subContent = el('div');
 
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
-      ['active', 'create'].forEach(function(tab) {
+      [
+        { id: 'live',   label: 'This Week' },
+        { id: 'create', label: 'Create Poll' },
+        { id: 'past',   label: 'History' },
+      ].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
-          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderSub(); }
+        }, tab.label));
       });
     }
 
-    function renderSubContent() {
+    function renderSub() {
       subContent.innerHTML = '';
-      if (activeSubTab === 'active') _renderActivePollsSteward(subContent);
-      else _renderCreatePoll(subContent);
+      if (activeSubTab === 'live')   _renderLivePollsSteward(subContent);
+      if (activeSubTab === 'create') _renderCreateStewardPoll(subContent);
+      if (activeSubTab === 'past')   _renderPollHistorySteward(subContent);
     }
 
     refreshSubTabs();
-    renderSubContent();
+    renderSub();
     content.appendChild(subTabBar);
     content.appendChild(subContent);
     container.appendChild(content);
   });
 }
 
-function _renderActivePollsSteward(container) {
+function _renderLivePollsSteward(container) {
   showLoading(container);
-  serverCall().withSuccessHandler(function(polls) {
+  serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
-    if (!polls || polls.length === 0) {
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls. Create one to get started.'));
+    if (!data || !data.questions || data.questions.length === 0) {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls this week. Create one in the "Create Poll" tab.'));
       return;
     }
-    polls.forEach(function(poll) {
-      var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '8px' } });
-      card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, poll.question));
-      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } }, poll.totalVotes + ' vote' + (poll.totalVotes !== 1 ? 's' : '') + (poll.unit ? ' \u00B7 ' + poll.unit : '')));
-      poll.options.forEach(function(opt) {
-        var count = poll.results[opt] || 0;
-        var pct = poll.totalVotes > 0 ? Math.round((count / poll.totalVotes) * 100) : 0;
-        var row = el('div', { style: { marginBottom: '4px' } });
-        var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '2px' } });
+    container.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '🔒 Votes are anonymous — individual responses are never stored'));
+    data.questions.forEach(function(q) {
+      var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '10px' } });
+      var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' } });
+      var titleCol = el('div');
+      titleCol.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, q.text));
+      titleCol.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', marginTop: '2px' } },
+        q.source === 'community' ? '🌐 Community poll (random draw)' : '🗳️ ' + (CONFIG.stewardLabel || 'Steward') + ' poll'));
+      topRow.appendChild(titleCol);
+      var closeBtn = el('button', { className: 'btn btn-secondary', style: { width: 'auto', padding: '4px 10px', fontSize: '11px', flexShrink: '0', marginLeft: '8px' },
+        onClick: function() {
+          closeBtn.textContent = 'Closing…'; closeBtn.disabled = true;
+          serverCall().withSuccessHandler(function(result) {
+            if (result && result.success) { _renderLivePollsSteward(container); }
+            else { closeBtn.textContent = 'Close'; closeBtn.disabled = false; }
+          }).wqClosePoll(null, q.id);
+        }
+      }, 'Close');
+      topRow.appendChild(closeBtn);
+      card.appendChild(topRow);
+
+      // Results
+      var stats = q.stats || {};
+      var total = stats.total || 0;
+      var counts = stats.counts || {};
+      var colors = ['var(--accent)', 'var(--success)', '#facc15', '#f97316', '#a78bfa'];
+      (q.options || []).forEach(function(opt, i) {
+        var count = counts[opt] || 0;
+        var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+        var row = el('div', { style: { marginBottom: '6px' } });
+        var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' } });
         header.appendChild(el('span', { style: { color: 'var(--text)' } }, opt));
-        header.appendChild(el('span', { style: { color: 'var(--muted)' } }, count + ' (' + pct + '%)'));
+        header.appendChild(el('span', { style: { color: 'var(--muted)' } }, pct + '%  (' + count + ')'));
         row.appendChild(header);
-        var bar = el('div', { style: { height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' } });
-        bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: 'var(--accent)', borderRadius: '3px' } }));
+        var bar = el('div', { style: { height: '7px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
+        bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: colors[i % colors.length], borderRadius: '4px' } }));
         row.appendChild(bar);
         card.appendChild(row);
       });
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, total + ' anonymous vote' + (total !== 1 ? 's' : '')));
       container.appendChild(card);
     });
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
-  }).dataGetActivePolls(CURRENT_USER.email);
+  }).wqGetActiveQuestions();
 }
 
-function _renderCreatePoll(container) {
+function _renderCreateStewardPoll(container) {
+  // Guide
+  if (typeof _renderPollGuide === 'function') _renderPollGuide(container);
+  else {
+    container.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px', padding: '10px', border: '1px solid var(--border)', borderRadius: '8px' } },
+      '📋 Good polls: neutral framing, one concept, balanced options, 2–5 choices. Avoid leading questions.'));
+  }
+
   var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
-  formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '12px' } }, 'Create New Poll'));
+  formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, 'Create This Week's ' + (CONFIG.stewardLabel || 'Steward') + ' Poll'));
+  formCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Replaces any existing steward poll for this week. The community poll is drawn automatically from the member pool each Monday.'));
 
-  var questionInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Poll question...', style: { marginBottom: '8px', minHeight: '36px' } });
+  var questionInput = el('textarea', { className: 'msg-textarea', placeholder: 'Poll question…', style: { minHeight: '70px', marginBottom: '10px' } });
   formCard.appendChild(questionInput);
+  formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, 'Answer options (2–5):'));
+  var optBuilder = typeof _buildOptionInputs === 'function' ? _buildOptionInputs(formCard, null) : null;
 
-  var optionsInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Options (comma-separated, e.g. Yes, No, Maybe)', style: { marginBottom: '8px', minHeight: '36px' } });
-  formCard.appendChild(optionsInput);
-
-  var unitInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Target unit (leave blank for All)', style: { marginBottom: '10px', minHeight: '36px' } });
-  formCard.appendChild(unitInput);
-
-  var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '8px' } });
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '18px', marginBottom: '8px' } });
   formCard.appendChild(statusMsg);
-
-  formCard.appendChild(el('button', { className: 'btn btn-primary',
+  formCard.appendChild(el('button', { className: 'btn btn-primary', style: { marginTop: '6px' },
     onClick: function() {
-      var question = questionInput.value.trim();
-      var options = optionsInput.value.trim();
-      if (!question || !options) { statusMsg.textContent = 'Question and options are required.'; statusMsg.style.color = 'var(--danger)'; return; }
-      statusMsg.textContent = 'Creating poll...'; statusMsg.style.color = 'var(--muted)';
-
-      // Use the polls sheet directly
-      serverCall().withSuccessHandler(function() {
-        statusMsg.textContent = 'Poll created!'; statusMsg.style.color = 'var(--success)';
-        questionInput.value = ''; optionsInput.value = ''; unitInput.value = '';
+      var text = questionInput.value.trim();
+      var opts = optBuilder ? optBuilder.getOptions() : [];
+      if (!text) { statusMsg.textContent = 'Please enter a question.'; statusMsg.style.color = 'var(--danger)'; return; }
+      if (opts.length < 2) { statusMsg.textContent = 'Add at least 2 answer options.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Creating…'; statusMsg.style.color = 'var(--muted)';
+      serverCall().withSuccessHandler(function(result) {
+        statusMsg.textContent = result && result.success ? '✅ ' + result.message : (result && result.message) || 'Error creating poll.';
+        statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+        if (result && result.success) questionInput.value = '';
       }).withFailureHandler(function() {
         statusMsg.textContent = 'Failed to create poll.'; statusMsg.style.color = 'var(--danger)';
-      }).dataAddPoll(CURRENT_USER.email, question, options, unitInput.value.trim());
+      }).wqSetStewardQuestion(null, text, opts);
     }
-  }, 'Create Poll'));
-
+  }, 'Post Poll'));
   container.appendChild(formCard);
+
+  // Frequency setting
+  var freqCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginTop: '14px' } });
+  freqCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, '⏱️ Poll Frequency'));
+  freqCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '10px' } }, 'How often should new polls be posted? Affects both the steward poll and community pool draw.'));
+
+  var freqStatus = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '6px' } });
+  var freqBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+
+  serverCall().withSuccessHandler(function(currentFreq) {
+    ['weekly', 'biweekly', 'monthly'].forEach(function(freq) {
+      var labels = { weekly: '📅 Weekly', biweekly: '📆 Bi-weekly', monthly: '🗓️ Monthly' };
+      var btn = el('button', {
+        className: 'btn' + (currentFreq === freq ? ' btn-primary' : ' btn-secondary'),
+        style: { width: 'auto', padding: '8px 16px', fontSize: '12px' },
+        onClick: function() {
+          freqStatus.textContent = 'Saving…'; freqStatus.style.color = 'var(--muted)';
+          freqBtns.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+          serverCall().withSuccessHandler(function(result) {
+            freqStatus.textContent = result && result.success ? '✅ ' + result.message : (result && result.message) || 'Error.';
+            freqStatus.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+            freqBtns.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+            if (result && result.success) {
+              // Update active state
+              freqBtns.querySelectorAll('button').forEach(function(b) {
+                b.className = b.getAttribute('data-freq') === freq ? 'btn btn-primary' : 'btn btn-secondary';
+                b.style.width = 'auto'; b.style.padding = '8px 16px'; b.style.fontSize = '12px';
+              });
+            }
+          }).withFailureHandler(function() {
+            freqStatus.textContent = 'Failed to save.'; freqStatus.style.color = 'var(--danger)';
+            freqBtns.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+          }).wqSetPollFrequency(null, freq);
+        }
+      }, labels[freq]);
+      btn.setAttribute('data-freq', freq);
+      freqBtns.appendChild(btn);
+    });
+  }).withFailureHandler(function() {
+    freqBtns.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Could not load frequency setting.'));
+  }).wqGetPollFrequency();
+
+  freqCard.appendChild(freqBtns);
+  freqCard.appendChild(freqStatus);
+  container.appendChild(freqCard);
+
+  // Pool count info
+  serverCall().withSuccessHandler(function(count) {
+    var infoDiv = el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '14px', padding: '10px', border: '1px solid var(--border)', borderRadius: '8px' } },
+      '🌐 Community pool: ' + (count || 0) + ' poll' + (count !== 1 ? 's' : '') + ' submitted by members. One is drawn randomly each period — you cannot select which one.');
+    container.appendChild(infoDiv);
+  }).wqGetPoolCount();
+}
+
+function _renderPollHistorySteward(container) {
+  showLoading(container);
+  var page = 1;
+  function loadPage(p) {
+    showLoading(container);
+    serverCall().withSuccessHandler(function(data) {
+      container.innerHTML = '';
+      if (!data || !data.questions || data.questions.length === 0) {
+        container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, p > 1 ? 'No more history.' : 'No past polls.'));
+        return;
+      }
+      data.questions.forEach(function(q) {
+        var card = el('div', { className: 'card card-glass', style: { padding: '13px', marginBottom: '8px' } });
+        card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', marginBottom: '3px' } },
+          'Week of ' + q.weekStr + ' · ' + (q.source === 'community' ? '🌐 Community' : '🗳️ ' + (CONFIG.stewardLabel || 'Steward'))));
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, q.text));
+        var stats = q.stats || {};
+        var total = stats.total || 0;
+        var counts = stats.counts || {};
+        if (total > 0) {
+          (q.options || []).forEach(function(opt) {
+            var count = counts[opt] || 0;
+            var pct = Math.round((count / total) * 100);
+            var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+            row.appendChild(el('div', { style: { width: '120px', fontSize: '11px', color: 'var(--muted)', flexShrink: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, opt));
+            var bar = el('div', { style: { flex: '1', height: '7px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' } });
+            bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: 'var(--accent)', borderRadius: '3px' } }));
+            row.appendChild(bar);
+            row.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text)', width: '36px', textAlign: 'right' } }, pct + '%'));
+            card.appendChild(row);
+          });
+          card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', marginTop: '4px' } }, total + ' votes'));
+        } else {
+          card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'No votes'));
+        }
+        container.appendChild(card);
+      });
+      if (data.hasMore || p > 1) {
+        var nav = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' } });
+        if (p > 1) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p - 1; loadPage(page); } }, '← Previous'));
+        if (data.hasMore) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p + 1; loadPage(page); } }, 'Next →'));
+        container.appendChild(nav);
+      }
+    }).withFailureHandler(function() {
+      container.innerHTML = '';
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load history.'));
+    }).wqGetHistory(null, p, 15);
+  }
+  loadPage(page);
 }
 
 // ═══════════════════════════════════════

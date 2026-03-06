@@ -507,9 +507,8 @@
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
-        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
-        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
         { divider: true },
@@ -533,7 +532,6 @@
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
-        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
         { divider: true },
@@ -569,6 +567,7 @@
 
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
+      AppState.activeTab = tabId; // track for badge refresh
       // Handle "More" menus for both roles (mobile bottom-nav)
       if (tabId === '_member_more') { renderMemberMore(app); return; }
       if (tabId === '_steward_more') { renderStewardMore(app); return; }
@@ -579,18 +578,18 @@
         switch(tabId) {
           case 'home': renderMemberHome(app); break;
           case 'cases': renderMyCases(app); break;
-          case 'contact': renderStewardDirectory(app); break;
+          case 'contact': renderStewardContact(app); break;
           case 'profile': renderUpdateProfile(app); break;
           case 'resources': renderMemberResources(app); break;
           case 'workload': renderWorkloadTracker(app); break;
-          case 'weeklyq': renderWeeklyQuestionsPage(app, 'member'); break;
+          case 'weeklyq': // legacy deep-link — redirect to polls
+          case 'polls': renderPollsPage(app); break;
           case 'survey': renderSurveyResultsPage(app); break;
           case 'unionstats': renderUnionStatsPage(app); break;
           case 'events': renderEventsPage(app); break;
-          case 'stewarddirectory': renderStewardDirectory(app); break;
+          case 'stewarddirectory': renderStewardContact(app); break;
           case 'notifications': renderMemberNotifications(app); break;
           case 'meetings': renderMeetingsPage(app); break;
-          case 'polls': renderPollsPage(app); break;
           case 'minutes': renderMinutesPage(app); break;
           case 'feedback': renderFeedbackPage(app, 'member'); break;
           case 'mytasks': renderMemberTasks(app); break;
@@ -607,12 +606,12 @@
           case 'broadcast': renderBroadcast(app); break;
           case 'notifications': renderStewardNotifications(app); break;
           case 'resources': renderStewardResources(app); break;
-          case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
+          case 'weeklyq': // legacy deep-link — redirect to polls
+          case 'polls': renderManagePolls(app); break;
           case 'surveytrack': renderSurveyTracking(app); break;
           case 'contactlog': renderContactLog(app); break;
           case 'tasks': renderStewardTasks(app); break;
           case 'events': renderEventsPage(app); break;
-          case 'polls': renderManagePolls(app); break;
           case 'minutes': renderStewardMinutes(app); break;
           case 'feedback': renderFeedbackPage(app, 'steward'); break;
           case 'qaforum': renderQAForum(app, 'steward'); break;

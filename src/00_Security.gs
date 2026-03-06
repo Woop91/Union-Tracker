@@ -304,7 +304,7 @@ function checkWebAppAuthorization(requiredRole) {
         result.message = 'Administrator access required';
         return result;
       }
-      if (requiredRole === 'steward' && role !== 'steward' && role !== 'admin') {
+      if (requiredRole === 'steward' && role !== 'steward' && role !== 'admin' && role !== 'both') {
         result.message = 'Steward access required';
         return result;
       }
@@ -347,6 +347,10 @@ function getUserRole_(email) {
           var memberEmail = data[i][MEMBER_COLS.EMAIL - 1] || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
             var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+            var roleCol = MEMBER_COLS.ROLE ? data[i][MEMBER_COLS.ROLE - 1] : '';
+            var roleRaw = String(roleCol || '').trim().toLowerCase();
+            var isBoth = roleRaw === 'both' || roleRaw === 'steward/member';
+            if (isBoth) return 'both';
             if (isTruthyValue(isSteward)) {
               return 'steward';
             }
