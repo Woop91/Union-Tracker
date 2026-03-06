@@ -1172,7 +1172,7 @@ function renderMemberMore(appContainer) {
 }
 
 // ═══════════════════════════════════════
-// IN-APP SURVEY FORM (multi-step wizard)
+// IN-APP SURVEY FORM (multi-step wizard) — v4.21.0 native engine
 // ═══════════════════════════════════════
 
 function renderSurveyFormPage(appContainer) {
@@ -1182,13 +1182,48 @@ function renderSurveyFormPage(appContainer) {
     showLoading(content);
     container.appendChild(content);
 
-    serverCall().withSuccessHandler(function(data) {
-      if (!data || !data.sections || !data.sections.length) {
-        content.innerHTML = '';
-        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Survey is not available right now.'));
+    serverCall().withSuccessHandler(function(surveyData) {
+      content.innerHTML = '';
+
+      if (!surveyData || !surveyData.period || surveyData.period.status !== 'Active') {
+        var closedCard = el('div', { className: 'card card-glass', style: { padding: '28px', textAlign: 'center' } });
+        closedCard.appendChild(el('div', { style: { fontSize: '40px', marginBottom: '12px' } }, '\uD83D\uDCCB'));
+        closedCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'No Survey Open'));
+        closedCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6' } }, 'The quarterly satisfaction survey is not currently open. Surveys open at the start of each quarter — Jan, Apr, Jul, Oct.'));
+        content.appendChild(closedCard);
         return;
       }
-      _renderSurveyWizard(content, data.sections);
+
+      var period = surveyData.period;
+      var questions = surveyData.questions || [];
+      var sectionMeta = surveyData.sections || [];
+      var sliderLabels = surveyData.sliderLabels || { min: 'Strongly Disagree', max: 'Strongly Agree' };
+
+      if (!questions.length) {
+        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Survey questions not available. Please try again later.'));
+        return;
+      }
+
+      serverCall().withSuccessHandler(function(status) {
+        content.innerHTML = '';
+        if (status && status.hasCompleted) {
+          var doneCard = el('div', { className: 'card card-glass', style: { padding: '28px', textAlign: 'center' } });
+          doneCard.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\u2705'));
+          doneCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Survey Completed'));
+          doneCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '6px' } }, period.name));
+          if (status.lastCompleted) {
+            doneCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '16px' } }, 'Submitted ' + status.lastCompleted));
+          }
+          doneCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto 8px' }, onClick: function() { renderSurveyResultsPage(appContainer); } }, '\uD83D\uDCCA View Results'));
+          doneCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '10px' } }, 'Results are shown in aggregate only. No individual responses are ever visible.'));
+          content.appendChild(doneCard);
+          return;
+        }
+        _renderSurveyWizard(content, questions, sectionMeta, sliderLabels, period, appContainer);
+      }).withFailureHandler(function() {
+        _renderSurveyWizard(content, questions, sectionMeta, sliderLabels, period, appContainer);
+      }).dataGetSurveyStatus();
+
     }).withFailureHandler(function(err) {
       content.innerHTML = '';
       var errCard = el('div', { className: 'card card-glass', style: { padding: '22px', textAlign: 'center' } });
@@ -1200,53 +1235,93 @@ function renderSurveyFormPage(appContainer) {
   });
 }
 
-function _renderSurveyWizard(container, sections) {
+/**
+ * Renders the multi-step survey wizard.
+ * @param {HTMLElement} container
+ * @param {Array}  questions    - flat array from getSurveyQuestions()
+ * @param {Array}  sectionMeta  - sections[] from getSurveyQuestions()
+ * @param {Object} sliderLabels - { min, max }
+ * @param {Object} period       - current period object
+ * @param {HTMLElement} appContainer - for post-submit navigation
+ */
+function _renderSurveyWizard(container, questions, sectionMeta, sliderLabels, period, appContainer) {
   container.innerHTML = '';
-  var totalSteps = sections.length;
-  var currentStep = 0;
-  var responses = {};
 
-  // Restore saved progress from localStorage
-  var STORAGE_KEY = 'dds_survey_progress';
+  var responses = {};
+  var STORAGE_KEY = 'dds_survey_progress_v2';
+
+  // Restore saved progress (keyed to period so stale drafts don't persist)
   try {
     var saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       var parsed = JSON.parse(saved);
-      responses = parsed.responses || {};
-      if (parsed.step >= 0 && parsed.step < totalSteps) currentStep = parsed.step;
+      if (parsed.periodId === period.periodId) {
+        responses = parsed.responses || {};
+      }
     }
-  } catch (e) { /* ignore */ }
+  } catch(e) {}
 
-  function saveProgress() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ step: currentStep, responses: responses })); } catch (e) { /* ignore */ }
+  function saveProgress(stepKey) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ periodId: period.periodId, stepKey: stepKey, responses: responses })); } catch(e) {}
   }
-
   function clearProgress() {
-    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
   }
 
-  // Privacy banner (sticky)
-  var banner = el('div', {
-    className: 'privacy-badge',
-    style: { marginBottom: '14px', textAlign: 'center', position: 'sticky', top: '0', zIndex: '10', padding: '8px 12px', background: 'var(--surface)', borderRadius: '8px' }
-  }, '\uD83D\uDD12 Your responses are fully anonymous via one-way encryption');
-  container.appendChild(banner);
+  // ── Build ordered section list ───────────────────────────────────────────
+  // sectionMeta already in correct display order (1, 2, 3A, 3B, 4 … 11)
+  // We compute active sections dynamically based on branch answers each render.
+  var ALWAYS_SECTIONS = { WORK_CONTEXT:1, OVERALL_SAT:1, CHAPTER:1, LEADERSHIP:1,
+    CONTRACT:1, COMMUNICATION:1, MEMBER_VOICE:1, VALUE_ACTION:1, SCHEDULING:1, PRIORITIES:1 };
 
-  // Progress bar container
-  var progressWrap = el('div', { style: { marginBottom: '18px' } });
-  var progressLabel = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' } });
-  var progressTrack = el('div', { className: 'bar-chart-track', style: { height: '6px', borderRadius: '3px' } });
-  var progressFill = el('div', { className: 'bar-chart-fill', style: { borderRadius: '3px', background: 'var(--accent)', transition: 'width 0.3s ease' } });
+  function getActiveSectionKeys() {
+    var active = [];
+    sectionMeta.forEach(function(s) {
+      var k = s.key;
+      if (ALWAYS_SECTIONS[k]) { active.push(k); return; }
+      if (k === 'STEWARD_3A' && String(responses.q5 || '') === 'Yes') { active.push(k); return; }
+      if (k === 'STEWARD_3B' && String(responses.q5 || '') === 'No')  { active.push(k); return; }
+      if (k === 'REPRESENTATION' && String(responses.q36 || '') === 'Yes') { active.push(k); return; }
+    });
+    return active;
+  }
+
+  // Index into active sections
+  var currentSectionIdx = 0;
+
+  // Restore step from storage
+  try {
+    var savedStep = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}').stepKey;
+    if (savedStep) {
+      var activeSecs = getActiveSectionKeys();
+      var savedIdx = activeSecs.indexOf(savedStep);
+      if (savedIdx >= 0) currentSectionIdx = savedIdx;
+    }
+  } catch(e) {}
+
+  // ── Fixed UI elements ────────────────────────────────────────────────────
+  var privacyBanner = el('div', {
+    style: { position: 'sticky', top: '0', zIndex: '10', background: 'var(--surface)',
+      borderRadius: '8px', padding: '8px 12px', marginBottom: '14px', textAlign: 'center',
+      fontSize: '12px', color: 'var(--muted)', borderBottom: '1px solid var(--border)' }
+  }, '\uD83D\uDD12 Your responses are fully anonymous — no names or identifying information are ever stored');
+  container.appendChild(privacyBanner);
+
+  // Period name sub-header
+  container.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', textAlign: 'center', marginBottom: '10px' } }, period.name));
+
+  var progressWrap = el('div', { style: { marginBottom: '16px' } });
+  var progressLabelRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--muted)', marginBottom: '5px' } });
+  var progressTrack = el('div', { className: 'bar-chart-track', style: { height: '5px', borderRadius: '3px' } });
+  var progressFill = el('div', { className: 'bar-chart-fill', style: { borderRadius: '3px', background: 'var(--accent)', transition: 'width 0.35s ease' } });
   progressTrack.appendChild(progressFill);
-  progressWrap.appendChild(progressLabel);
+  progressWrap.appendChild(progressLabelRow);
   progressWrap.appendChild(progressTrack);
   container.appendChild(progressWrap);
 
-  // Step content area
-  var stepContainer = el('div');
+  var stepContainer = el('div', { style: { minHeight: '240px' } });
   container.appendChild(stepContainer);
 
-  // Navigation buttons
   var navRow = el('div', { style: { display: 'flex', gap: '10px', marginTop: '18px', justifyContent: 'space-between' } });
   var prevBtn = el('button', { className: 'btn btn-secondary', style: { flex: '1' }, onClick: function() { goStep(-1); } }, '\u2190 Back');
   var nextBtn = el('button', { className: 'btn btn-primary', style: { flex: '1' }, onClick: function() { goStep(1); } }, 'Next \u2192');
@@ -1254,121 +1329,297 @@ function _renderSurveyWizard(container, sections) {
   navRow.appendChild(nextBtn);
   container.appendChild(navRow);
 
-  function updateProgress() {
-    progressLabel.innerHTML = '';
-    progressLabel.appendChild(el('span', {}, 'Section ' + (currentStep + 1) + ' of ' + totalSteps));
-    progressLabel.appendChild(el('span', {}, sections[currentStep].title));
-    var pct = ((currentStep + 1) / totalSteps) * 100;
-    progressFill.style.width = pct + '%';
+  // ── Render helpers ───────────────────────────────────────────────────────
+
+  function updateProgress(activeSecs) {
+    var total = activeSecs.length;
+    var cur   = currentSectionIdx + 1;
+    var secName = '';
+    sectionMeta.forEach(function(s) { if (s.key === activeSecs[currentSectionIdx]) secName = s.title; });
+    progressLabelRow.innerHTML = '';
+    progressLabelRow.appendChild(el('span', {}, 'Section ' + cur + ' of ' + total));
+    progressLabelRow.appendChild(el('span', {}, secName));
+    progressFill.style.width = Math.round((cur / total) * 100) + '%';
   }
 
   function renderStep() {
     stepContainer.innerHTML = '';
-    var sec = sections[currentStep];
+    var activeSecs = getActiveSectionKeys();
+    var totalSecs  = activeSecs.length;
+    var secKey     = activeSecs[currentSectionIdx];
+
+    // Get questions for this section (already filtered by sectionKey)
+    var secQuestions = questions.filter(function(q) { return q.sectionKey === secKey; });
+    var secName = '';
+    sectionMeta.forEach(function(s) { if (s.key === secKey) secName = s.title; });
 
     var sectionCard = el('div', { className: 'card card-glass fade-in', style: { padding: '20px' } });
-    sectionCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '16px' } }, sec.title));
+    sectionCard.appendChild(el('div', {
+      style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '18px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }
+    }, secName));
 
-    sec.questions.forEach(function(q) {
-      var qWrap = el('div', { style: { marginBottom: '20px' } });
-      qWrap.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', marginBottom: '8px', lineHeight: '1.5' } }, q.text));
+    // Validation state for this section
+    var validationMsg = el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '10px', display: 'none', textAlign: 'center' } }, 'Please answer all required questions before continuing.');
+    var inputRefs = {}; // qId → {getVal, validate}
 
-      if (q.type === 'scale') {
-        // 1-10 tappable number buttons
-        var scaleRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' } });
-        for (var n = 1; n <= 10; n++) {
-          (function(num) {
-            var isSelected = responses[q.id] === num;
-            var numBtn = el('button', {
-              style: {
-                width: '44px', height: '44px', borderRadius: '10px', fontSize: '16px', fontWeight: '600',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                background: isSelected ? 'var(--accent)' : 'var(--surface)',
-                color: isSelected ? '#fff' : 'var(--text)',
-                border: isSelected ? '2px solid var(--accent)' : '2px solid var(--border)'
-              },
-              onClick: function() {
-                responses[q.id] = num;
-                saveProgress();
-                renderStep();
-              }
-            }, String(num));
-            scaleRow.appendChild(numBtn);
-          })(n);
-        }
-        // Scale labels
-        var scaleLabels = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--muted)', marginTop: '4px', padding: '0 4px' } });
-        scaleLabels.appendChild(el('span', {}, 'Strongly disagree'));
-        scaleLabels.appendChild(el('span', {}, 'Strongly agree'));
-        qWrap.appendChild(scaleRow);
-        qWrap.appendChild(scaleLabels);
+    secQuestions.forEach(function(q) {
+      var qWrap = el('div', { style: { marginBottom: '22px' } });
 
-      } else if (q.type === 'freetext') {
-        // Multi-line text area with character counter
-        var maxChars = 1000;
-        var ta = el('textarea', {
-          style: {
-            width: '100%', minHeight: '120px', padding: '12px', fontSize: '16px',
-            fontFamily: 'var(--fontBody)', background: 'var(--surface)', color: 'var(--text)',
-            border: '1px solid var(--border)', borderRadius: '10px', resize: 'vertical', boxSizing: 'border-box'
-          },
-          placeholder: 'Share your thoughts (optional)...',
-          maxLength: String(maxChars)
+      // Question label
+      var labelRow = el('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '6px', marginBottom: '10px' } });
+      if (q.required) {
+        labelRow.appendChild(el('span', { style: { color: 'var(--danger)', fontSize: '12px', marginTop: '2px', flexShrink: '0' } }, '*'));
+      }
+      labelRow.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', lineHeight: '1.55' } }, q.text));
+      qWrap.appendChild(labelRow);
+
+      // ── Input widgets ──────────────────────────────────────────────────
+
+      if (q.type === 'slider-10') {
+        // Horizontal range slider with live value bubble
+        var currentVal = parseInt(responses[q.id], 10) || 0;
+        var sliderWrap = el('div', { style: { padding: '0 4px' } });
+
+        // Value display
+        var valDisplay = el('div', {
+          style: { textAlign: 'center', fontFamily: 'var(--fontDisplay)', fontSize: '28px', fontWeight: '700',
+            color: currentVal ? 'var(--accent)' : 'var(--muted)', marginBottom: '8px', transition: 'color 0.2s' }
+        }, currentVal ? String(currentVal) : '--');
+
+        // Slider input
+        var slider = document.createElement('input');
+        slider.type  = 'range';
+        slider.min   = '1';
+        slider.max   = '10';
+        slider.step  = '1';
+        slider.value = currentVal || '5';
+        slider.style.cssText = 'width:100%;height:6px;cursor:pointer;accent-color:var(--accent);';
+        if (!currentVal) slider.style.opacity = '0.4';
+
+        slider.addEventListener('input', function() {
+          var v = parseInt(slider.value, 10);
+          responses[q.id] = v;
+          valDisplay.textContent = String(v);
+          valDisplay.style.color = 'var(--accent)';
+          slider.style.opacity = '1';
+          saveProgress(secKey);
+          // Update tick color
+          updateSliderTicks(tickRow, v);
         });
+
+        // Tick marks 1-10
+        var tickRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', margin: '4px 0', padding: '0 1px' } });
+        function updateSliderTicks(row, selected) {
+          row.innerHTML = '';
+          for (var t = 1; t <= 10; t++) {
+            var tick = el('div', { style: {
+              width: '20px', textAlign: 'center', fontSize: '10px',
+              color: selected && t <= selected ? 'var(--accent)' : 'var(--muted)',
+              fontWeight: selected === t ? '700' : '400'
+            } }, String(t));
+            row.appendChild(tick);
+          }
+        }
+        updateSliderTicks(tickRow, currentVal || 0);
+
+        // End labels
+        var endLabels = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--muted)', marginTop: '4px' } });
+        endLabels.appendChild(el('span', {}, sliderLabels.min || 'Strongly Disagree'));
+        endLabels.appendChild(el('span', {}, sliderLabels.max || 'Strongly Agree'));
+
+        sliderWrap.appendChild(valDisplay);
+        sliderWrap.appendChild(slider);
+        sliderWrap.appendChild(tickRow);
+        sliderWrap.appendChild(endLabels);
+        qWrap.appendChild(sliderWrap);
+
+        inputRefs[q.id] = {
+          getVal: function() { return parseInt(slider.value, 10); },
+          validate: function() { return !!responses[q.id]; }
+        };
+
+      } else if (q.type === 'dropdown') {
+        var sel = document.createElement('select');
+        sel.style.cssText = 'width:100%;padding:12px;font-size:15px;font-family:var(--fontBody);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;box-sizing:border-box;cursor:pointer;';
+        var defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '— Select —';
+        sel.appendChild(defaultOpt);
+        (q.options || []).forEach(function(opt) {
+          var o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          if (responses[q.id] === opt) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function() {
+          responses[q.id] = sel.value;
+          saveProgress(secKey);
+          // Q5 and Q36 branches — re-render step just to update nav visibility
+          if (q.id === 'q5' || q.id === 'q36') { /* branching questions not dropdown type */ }
+        });
+        qWrap.appendChild(sel);
+        inputRefs[q.id] = {
+          getVal: function() { return sel.value; },
+          validate: function() { return !!sel.value; }
+        };
+
+      } else if (q.type === 'radio' || q.type === 'radio-branch') {
+        var radioGroup = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } });
+        (q.options || []).forEach(function(opt) {
+          var isSelected = responses[q.id] === opt;
+          var optBtn = el('button', {
+            style: {
+              padding: '10px 14px', borderRadius: '10px', textAlign: 'left', fontSize: '14px',
+              background: isSelected ? 'var(--accent)' : 'var(--surface)',
+              color: isSelected ? '#fff' : 'var(--text)',
+              border: isSelected ? '2px solid var(--accent)' : '2px solid var(--border)',
+              cursor: 'pointer', transition: 'all 0.15s ease', fontFamily: 'var(--fontBody)'
+            },
+            onClick: function() {
+              responses[q.id] = opt;
+              saveProgress(secKey);
+              renderStep(); // re-render to update selection state + branch nav
+            }
+          }, opt);
+          radioGroup.appendChild(optBtn);
+        });
+        qWrap.appendChild(radioGroup);
+        inputRefs[q.id] = {
+          getVal: function() { return responses[q.id] || ''; },
+          validate: function() { return !!responses[q.id]; }
+        };
+
+      } else if (q.type === 'checkbox') {
+        var maxSel = q.maxSelections || 3;
+        var cbWrap = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } });
+        var currentSel = [];
+        try {
+          var stored = responses[q.id];
+          if (stored) currentSel = String(stored).split(', ').filter(Boolean);
+        } catch(e) {}
+
+        var limitNote = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, 'Select up to ' + maxSel);
+        cbWrap.appendChild(limitNote);
+
+        var cbBtns = {};
+        (q.options || []).forEach(function(opt) {
+          var isOn = currentSel.indexOf(opt) >= 0;
+          var cbBtn = el('button', {
+            style: {
+              padding: '9px 14px', borderRadius: '10px', textAlign: 'left', fontSize: '13px',
+              background: isOn ? 'rgba(var(--accentRgb,59,130,246),0.15)' : 'var(--surface)',
+              color: isOn ? 'var(--accent)' : 'var(--text)',
+              border: isOn ? '2px solid var(--accent)' : '2px solid var(--border)',
+              cursor: 'pointer', transition: 'all 0.15s ease', fontFamily: 'var(--fontBody)',
+              display: 'flex', alignItems: 'center', gap: '8px'
+            },
+            onClick: function() {
+              var idx = currentSel.indexOf(opt);
+              if (idx >= 0) {
+                currentSel.splice(idx, 1);
+              } else if (currentSel.length < maxSel) {
+                currentSel.push(opt);
+              } else {
+                // At limit — flash warning
+                limitNote.style.color = 'var(--danger)';
+                limitNote.textContent = 'Maximum ' + maxSel + ' selections reached';
+                setTimeout(function() {
+                  limitNote.style.color = 'var(--muted)';
+                  limitNote.textContent = 'Select up to ' + maxSel;
+                }, 2000);
+                return;
+              }
+              responses[q.id] = currentSel.join(', ');
+              saveProgress(secKey);
+              // Update all checkbox button styles
+              Object.keys(cbBtns).forEach(function(o) {
+                var on = currentSel.indexOf(o) >= 0;
+                cbBtns[o].style.background = on ? 'rgba(59,130,246,0.15)' : 'var(--surface)';
+                cbBtns[o].style.color = on ? 'var(--accent)' : 'var(--text)';
+                cbBtns[o].style.border = on ? '2px solid var(--accent)' : '2px solid var(--border)';
+                cbBtns[o].querySelector('.cb-check').textContent = on ? '\u2611' : '\u2610';
+              });
+              limitNote.textContent = currentSel.length + ' / ' + maxSel + ' selected';
+            }
+          });
+          cbBtn.appendChild(el('span', { className: 'cb-check', style: { fontSize: '16px' } }, isOn ? '\u2611' : '\u2610'));
+          cbBtn.appendChild(el('span', {}, opt));
+          cbBtns[opt] = cbBtn;
+          cbWrap.appendChild(cbBtn);
+        });
+        qWrap.appendChild(cbWrap);
+        inputRefs[q.id] = {
+          getVal: function() { return responses[q.id] || ''; },
+          validate: function() { return currentSel.length > 0; }
+        };
+
+      } else if (q.type === 'paragraph') {
+        var maxChars = 2000;
+        var ta = document.createElement('textarea');
+        ta.style.cssText = 'width:100%;min-height:100px;padding:12px;font-size:15px;font-family:var(--fontBody);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;resize:vertical;box-sizing:border-box;';
+        ta.placeholder = q.required ? 'Your answer...' : 'Optional — share your thoughts...';
+        ta.maxLength = maxChars;
         ta.value = responses[q.id] || '';
-        var counter = el('div', { style: { fontSize: '11px', color: 'var(--muted)', textAlign: 'right', marginTop: '4px' } },
+        var counter = el('div', { style: { fontSize: '11px', color: 'var(--muted)', textAlign: 'right', marginTop: '3px' } },
           (responses[q.id] || '').length + ' / ' + maxChars);
         ta.addEventListener('input', function() {
           responses[q.id] = ta.value;
           counter.textContent = ta.value.length + ' / ' + maxChars;
-          saveProgress();
+          saveProgress(secKey);
         });
         qWrap.appendChild(ta);
         qWrap.appendChild(counter);
-
-      } else {
-        // Short text input
-        var inp = el('input', {
-          className: 'auth-input',
-          type: 'text',
-          style: { fontSize: '16px', width: '100%', boxSizing: 'border-box' },
-          placeholder: 'Your answer...'
-        });
-        inp.value = responses[q.id] || '';
-        inp.addEventListener('input', function() {
-          responses[q.id] = inp.value;
-          saveProgress();
-        });
-        qWrap.appendChild(inp);
+        inputRefs[q.id] = {
+          getVal: function() { return ta.value; },
+          validate: function() { return !q.required || ta.value.trim().length > 0; }
+        };
       }
+
       sectionCard.appendChild(qWrap);
     });
 
+    sectionCard.appendChild(validationMsg);
     stepContainer.appendChild(sectionCard);
 
-    // Update nav button states
-    prevBtn.style.display = currentStep === 0 ? 'none' : '';
-    if (currentStep === totalSteps - 1) {
-      nextBtn.textContent = 'Submit Survey';
-      nextBtn.className = 'btn btn-primary';
-      nextBtn.style.background = 'var(--success)';
-    } else {
-      nextBtn.textContent = 'Next \u2192';
-      nextBtn.style.background = '';
-    }
+    // Nav button states
+    prevBtn.style.display = currentSectionIdx === 0 ? 'none' : '';
+    var isLast = currentSectionIdx === activeSecs.length - 1;
+    nextBtn.textContent = isLast ? '\uD83D\uDCE4 Submit Survey' : 'Next \u2192';
+    nextBtn.style.background = isLast ? 'var(--success)' : '';
+    nextBtn.style.borderColor = isLast ? 'var(--success)' : '';
 
-    updateProgress();
+    updateProgress(activeSecs);
+
+    // Validate + advance
+    nextBtn._validate = function() {
+      var allValid = true;
+      secQuestions.forEach(function(q) {
+        if (q.required && inputRefs[q.id] && !inputRefs[q.id].validate()) {
+          allValid = false;
+        }
+      });
+      if (!allValid) {
+        validationMsg.style.display = 'block';
+        validationMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return false;
+      }
+      validationMsg.style.display = 'none';
+      return true;
+    };
   }
 
   function goStep(dir) {
-    if (dir > 0 && currentStep === totalSteps - 1) {
-      // Submit
-      submitSurvey();
-      return;
+    var activeSecs = getActiveSectionKeys();
+    if (dir > 0) {
+      if (typeof nextBtn._validate === 'function' && !nextBtn._validate()) return;
+      if (currentSectionIdx === activeSecs.length - 1) {
+        submitSurvey();
+        return;
+      }
     }
-    currentStep = Math.max(0, Math.min(totalSteps - 1, currentStep + dir));
-    saveProgress();
+    currentSectionIdx = Math.max(0, Math.min(activeSecs.length - 1, currentSectionIdx + dir));
+    saveProgress(activeSecs[currentSectionIdx]);
     renderStep();
     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -1378,69 +1629,67 @@ function _renderSurveyWizard(container, sections) {
     navRow.style.display = 'none';
     var submitCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
     submitCard.appendChild(el('div', { className: 'spinner', style: { marginBottom: '14px' } }));
-    submitCard.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Submitting your responses...'));
+    submitCard.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Submitting your responses\u2026'));
     stepContainer.appendChild(submitCard);
 
-    var email = (AppState.profile && AppState.profile.email) || '';
     serverCall().withSuccessHandler(function(result) {
       stepContainer.innerHTML = '';
-      navRow.style.display = 'none';
       if (result && result.success) {
         clearProgress();
         var doneCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
-        doneCard.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\u2705'));
-        doneCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Thank you!'));
-        doneCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '20px', lineHeight: '1.5' } }, 'Your anonymous response has been recorded.'));
-        doneCard.appendChild(el('button', { className: 'btn btn-primary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() {
-          renderMemberHome(document.getElementById('app'));
-        } }, 'Return Home'));
+        doneCard.appendChild(el('div', { style: { fontSize: '56px', marginBottom: '12px' } }, '\u2705'));
+        doneCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' } }, 'Thank you!'));
+        doneCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '6px', lineHeight: '1.6' } }, 'Your anonymous response has been recorded.'));
+        doneCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '20px', lineHeight: '1.5' } }, 'Your feedback helps shape your union. Results are shown in aggregate — no individual responses are ever visible.'));
+        doneCard.appendChild(el('button', { className: 'btn btn-primary', style: { maxWidth: '220px', margin: '0 auto 8px' }, onClick: function() { renderMemberHome(document.getElementById('app')); } }, 'Return Home'));
+        doneCard.appendChild(el('div', { style: { marginTop: '4px' } }));
+        doneCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '220px', margin: '0 auto' }, onClick: function() { renderSurveyResultsPage(appContainer); } }, '\uD83D\uDCCA View Results'));
         stepContainer.appendChild(doneCard);
       } else {
-        _showSurveyError(stepContainer, navRow, (result && result.message) || 'Submission failed.', email, responses);
+        navRow.style.display = '';
+        _showSurveyError(stepContainer, navRow, (result && result.message) || 'Submission failed. Please try again.', responses, appContainer);
       }
     }).withFailureHandler(function(err) {
       stepContainer.innerHTML = '';
-      _showSurveyError(stepContainer, navRow, err.message || 'Network error. Your progress is saved.', email, responses);
-    }).dataSubmitSurveyResponse(email, responses);
+      navRow.style.display = '';
+      _showSurveyError(stepContainer, navRow, err.message || 'Network error. Your progress is saved.', responses, appContainer);
+    }).dataSubmitSurveyResponse(null, responses);
   }
 
   renderStep();
 }
 
-function _showSurveyError(stepContainer, navRow, message, email, responses) {
+function _showSurveyError(stepContainer, navRow, message, responses, appContainer) {
   navRow.style.display = 'none';
-  var errCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
-  errCard.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\u26A0\uFE0F'));
+  var errCard = el('div', { className: 'card card-glass fade-in', style: { padding: '28px', textAlign: 'center' } });
+  errCard.appendChild(el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '\u26A0\uFE0F'));
   errCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--danger)', marginBottom: '8px' } }, 'Submission Error'));
-  errCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '20px', lineHeight: '1.5' } }, message));
-  errCard.appendChild(el('button', { className: 'btn btn-primary', style: { maxWidth: '200px', margin: '0 auto 10px' }, onClick: function() {
+  errCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '18px', lineHeight: '1.5' } }, message));
+  errCard.appendChild(el('button', { className: 'btn btn-primary', style: { maxWidth: '200px', margin: '0 auto 8px' }, onClick: function() {
     stepContainer.innerHTML = '';
-    navRow.style.display = '';
-    var submitCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
-    submitCard.appendChild(el('div', { className: 'spinner', style: { marginBottom: '14px' } }));
-    submitCard.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Retrying...'));
-    stepContainer.appendChild(submitCard);
     navRow.style.display = 'none';
+    var retryCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
+    retryCard.appendChild(el('div', { className: 'spinner', style: { marginBottom: '14px' } }));
+    retryCard.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Retrying\u2026'));
+    stepContainer.appendChild(retryCard);
     serverCall().withSuccessHandler(function(result) {
       stepContainer.innerHTML = '';
       if (result && result.success) {
-        try { localStorage.removeItem('dds_survey_progress'); } catch (e) { /* ignore */ }
+        try { localStorage.removeItem('dds_survey_progress_v2'); } catch(e) {}
         var doneCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
-        doneCard.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\u2705'));
+        doneCard.appendChild(el('div', { style: { fontSize: '56px', marginBottom: '12px' } }, '\u2705'));
         doneCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Thank you!'));
         doneCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '20px' } }, 'Your anonymous response has been recorded.'));
         doneCard.appendChild(el('button', { className: 'btn btn-primary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { renderMemberHome(document.getElementById('app')); } }, 'Return Home'));
         stepContainer.appendChild(doneCard);
       } else {
-        _showSurveyError(stepContainer, navRow, (result && result.message) || 'Submission failed.', email, responses);
+        _showSurveyError(stepContainer, navRow, (result && result.message) || 'Still failing. Your responses are saved locally.', responses, appContainer);
       }
     }).withFailureHandler(function(err2) {
-      _showSurveyError(stepContainer, navRow, err2.message || 'Still failing. Your progress is saved locally.', email, responses);
-    }).dataSubmitSurveyResponse(email, responses);
+      _showSurveyError(stepContainer, navRow, err2.message || 'Still failing. Your responses are saved locally.', responses, appContainer);
+    }).dataSubmitSurveyResponse(null, responses);
   } }, 'Retry'));
-  errCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() {
-    renderSurveyFormPage(document.getElementById('app'));
-  } }, 'Back to Survey'));
+  errCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { renderSurveyFormPage(document.getElementById('app')); } }, 'Back to Survey'));
   stepContainer.appendChild(errCard);
 }
 
@@ -1462,75 +1711,71 @@ function renderSurveyResultsPage(appContainer) {
         return;
       }
 
-      if (!data.available) {
-        // Below threshold
-        var pct = data.threshold > 0 ? Math.round((data.count / data.threshold) * 100) : 0;
+      var THRESHOLD = 10; // min responses before showing results
+      if (!data.responseCount || data.responseCount < THRESHOLD) {
+        var pct = THRESHOLD > 0 ? Math.round((data.responseCount / THRESHOLD) * 100) : 0;
         var card = el('div', { className: 'card card-glass', style: { padding: '22px', textAlign: 'center' } });
         card.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCCA'));
         card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Not enough responses yet'));
-        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.count + ' of ' + data.threshold + ' needed'));
+        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, (data.responseCount || 0) + ' of ' + THRESHOLD + ' needed to show results'));
         var track = el('div', { className: 'bar-chart-track', style: { height: '10px', margin: '0 auto', maxWidth: '240px' } });
-        var fill = el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: 'var(--accent)' } });
-        track.appendChild(fill);
+        track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: 'var(--accent)' } }));
         card.appendChild(track);
         content.appendChild(card);
         return;
       }
 
-      // Render section charts
-      content.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '10px' } }, '\uD83D\uDD12 Your responses are fully anonymous via one-way encryption'));
-      content.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.count + ' responses'));
+      content.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '10px' } }, '\uD83D\uDD12 Results shown in aggregate only — no individual responses are ever visible'));
+      content.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, (data.periodName || '') + ' \u2014 ' + data.responseCount + ' responses'));
 
       // Chart.js horizontal bar — all sections
       var secLabels = [];
       var secData = [];
       var secColors = [];
-      (data.sections || []).forEach(function(sec) {
-        secLabels.push(sec.name);
-        secData.push(sec.avg || 0);
-        var avg = sec.avg || 0;
-        secColors.push(avg < 4 ? '#ef4444' : avg < 6 ? '#facc15' : avg < 8 ? '#4ade80' : '#22c55e');
+      var sections = data.sections || {};
+      var sectionOrder = ['OVERALL_SAT','STEWARD_3A','STEWARD_3B','CHAPTER','LEADERSHIP','CONTRACT','REPRESENTATION','COMMUNICATION','MEMBER_VOICE','VALUE_ACTION','SCHEDULING'];
+      sectionOrder.forEach(function(key) {
+        var s = sections[key];
+        if (s && s.avg !== null && s.avg !== undefined) {
+          secLabels.push(s.name);
+          secData.push(s.avg);
+          secColors.push(s.avg < 4 ? '#ef4444' : s.avg < 6 ? '#facc15' : s.avg < 8 ? '#4ade80' : '#22c55e');
+        }
       });
 
       if (secLabels.length > 0 && typeof ChartHelper !== 'undefined') {
         var chartCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
-        chartCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Section Averages'));
+        chartCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Section Averages (1–10)'));
         ChartHelper.createHorizontalBarChart(chartCard, 'survey-sections-chart', secLabels, secData, secColors);
         content.appendChild(chartCard);
       }
 
-      // Individual section cards with question breakout
-      (data.sections || []).forEach(function(sec) {
-        var secCard = el('div', { className: 'card card-glass card-accent-border', style: { padding: '16px', marginBottom: '10px' } });
-        var avg = sec.avg || 0;
+      // Individual section cards
+      sectionOrder.forEach(function(key) {
+        var s = sections[key];
+        if (!s || s.avg === null || s.avg === undefined) return;
+        var avg = s.avg;
         var color = avg < 4 ? 'var(--danger)' : avg < 6 ? 'var(--warning)' : avg < 8 ? 'var(--success)' : '#22c55e';
-
-        // Section header row with overall average
-        var headerRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (sec.questions && sec.questions.length) ? '10px' : '0' } });
-        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
-        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
+        var secCard = el('div', { className: 'card card-glass card-accent-border', style: { padding: '16px', marginBottom: '10px' } });
+        var headerRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, s.name));
+        headerRow.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '700', color: color } }, avg.toFixed(1)));
         secCard.appendChild(headerRow);
-
-        // Individual question breakout
-        if (sec.questions && sec.questions.length > 0) {
-          sec.questions.forEach(function(q) {
-            if (!q.text) return;
-            var qAvg = q.avg || 0;
-            var qColor = qAvg < 4 ? 'var(--danger)' : qAvg < 6 ? 'var(--warning)' : qAvg < 8 ? 'var(--success)' : '#22c55e';
-            var qRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.05)' } });
-            qRow.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', flex: '1' } }, q.text));
-            qRow.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: qColor, marginLeft: '12px', minWidth: '32px', textAlign: 'right' } }, qAvg.toFixed(1)));
-            secCard.appendChild(qRow);
-          });
-        }
-
+        // Progress bar for section avg
+        var secTrack = el('div', { className: 'bar-chart-track', style: { height: '5px', marginTop: '8px' } });
+        secTrack.appendChild(el('div', { className: 'bar-chart-fill', style: { width: (avg * 10) + '%', background: color, borderRadius: '3px', transition: 'width 0.5s ease' } }));
+        secCard.appendChild(secTrack);
         content.appendChild(secCard);
       });
-    }).dataGetSurveyResults();
+
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Failed to load survey results.'));
+    }).dataGetSatisfactionSummary();
   });
 }
 
-// ═══════════════════════════════════════
+
 // WORKLOAD TRACKER (embedded, SSO)
 // ═══════════════════════════════════════
 
@@ -2290,7 +2535,11 @@ function renderWeeklyQuestionsPage(appContainer, role) {
       serverCall().withSuccessHandler(function(data) {
         target.innerHTML = '';
         if (!data || !data.questions || data.questions.length === 0) {
-          target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No questions this week.'));
+          var wqEmpty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+          wqEmpty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\u2753'));
+          wqEmpty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No questions this week'));
+          wqEmpty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward can add questions via the Weekly Question Manager in the steward view.'));
+          target.appendChild(wqEmpty);
           return;
         }
 
@@ -2420,6 +2669,15 @@ function renderEventsPage(appContainer) {
 
     serverCall().withSuccessHandler(function(events) {
       content.innerHTML = '';
+      // Handle not-configured calendar sentinel
+      if (events && events._notConfigured) {
+        var cfgCard = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+        cfgCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCC5'));
+        cfgCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Calendar not connected'));
+        cfgCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward admin needs to set the Calendar ID in the Config tab.'));
+        content.appendChild(cfgCard);
+        return;
+      }
       if (!events || events.length === 0) {
         var emptyCard = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
         emptyCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCC5'));
@@ -3467,7 +3725,11 @@ function renderTimelinePage(appContainer) {
       serverCall().withSuccessHandler(function(result) {
         listArea.innerHTML = '';
         if (!result || !result.events || result.events.length === 0) {
-          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No events to display.'));
+          var tlEmpty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+          tlEmpty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
+          tlEmpty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
+          tlEmpty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward with admin access can add events here, or import from the union calendar.'));
+          listArea.appendChild(tlEmpty);
           return;
         }
 

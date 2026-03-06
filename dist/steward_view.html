@@ -71,12 +71,11 @@ function _stewardHeader(container, title, subtitle) {
 
   var headerRight = el('div', { className: 'page-header-right' });
   if (!isSidebarLayout()) {
-    if (IS_DUAL_ROLE) {
-      headerRight.appendChild(el('button', {
-        style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
-        onClick: function() { AppState.activeRole = 'member'; initMemberView(document.getElementById('app')); }
-      }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
-    }
+    // All stewards can switch to member view (every steward is also a member)
+    headerRight.appendChild(el('button', {
+      style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+      onClick: function() { AppState.activeRole = 'member'; initMemberView(document.getElementById('app')); }
+    }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
       AppState.isDark = !AppState.isDark;
       ThemeEngine.applyTheme(ThemeEngine.getTheme('steward', AppState.isDark));
@@ -1233,6 +1232,25 @@ function renderStewardResources(appContainer) {
       target.appendChild(listWrap);
       target.appendChild(formWrap);
 
+      // Drive upload banner — show Resources/ folder link if configured
+      var driveBanner = el('div', { className: 'card', style: { background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', padding: '10px 14px', marginBottom: '12px', display: 'none' } });
+      var bannerIcon = el('span', { style: { fontSize: '18px', marginRight: '8px' } }, '\uD83D\uDCC2');
+      var bannerText = el('span', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4' } }, 'Loading Drive folder...');
+      var bannerLink = el('a', { style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginTop: '4px' }, target: '_blank' }, '\u2197 Open Resources/ Drive Folder');
+      driveBanner.appendChild(bannerIcon);
+      driveBanner.appendChild(bannerText);
+      driveBanner.appendChild(bannerLink);
+      listWrap.appendChild(driveBanner);
+
+      // Load resource links to get resourcesFolderUrl
+      serverCall().withSuccessHandler(function(links) {
+        if (links && links.resourcesFolderUrl) {
+          bannerText.textContent = 'Upload files to Drive, then add their URLs below as resources.';
+          bannerLink.href = links.resourcesFolderUrl;
+          driveBanner.style.display = 'block';
+        }
+      }).withFailureHandler(function() {}).getWebAppResourceLinks();
+
       var addBtn = el('button', { className: 'btn btn-primary', style: { marginBottom: '12px' }, onClick: function() {
         showResourceForm(null);
       }}, '+ Add Resource');
@@ -1408,85 +1426,120 @@ function renderSurveyTracking(appContainer) {
   renderPageLayout(appContainer, 'steward', 'surveytrack', function(container) {
     _stewardHeader(container, 'Survey Tracking');
     var content = el('div', { className: 'content' });
-    var activeScope = 'assigned';
-
-    // Scope toggle buttons
-    var toggleRow = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '14px' } });
-    var scopes = [
-      { key: 'assigned', label: 'My Members' },
-      { key: 'location', label: 'My Location' },
-      { key: 'all', label: 'Agency-wide' }
-    ];
-    var toggleBtns = {};
-    scopes.forEach(function(s) {
-      var btn = el('button', { className: 'btn btn-sm', style: { flex: '1', fontSize: '12px', padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border)', background: s.key === activeScope ? 'var(--accent)' : 'var(--surface)', color: s.key === activeScope ? '#fff' : 'var(--text)', cursor: 'pointer' }, onClick: function() {
-        if (activeScope === s.key) return;
-        activeScope = s.key;
-        scopes.forEach(function(sc) {
-          toggleBtns[sc.key].style.background = sc.key === activeScope ? 'var(--accent)' : 'var(--surface)';
-          toggleBtns[sc.key].style.color = sc.key === activeScope ? '#fff' : 'var(--text)';
-        });
-        loadSurveyData(activeScope);
-      } }, s.label);
-      toggleBtns[s.key] = btn;
-      toggleRow.appendChild(btn);
-    });
-    content.appendChild(toggleRow);
-
-    var dataWrap = el('div');
-    content.appendChild(dataWrap);
     container.appendChild(content);
 
-    function loadSurveyData(scope) {
-      dataWrap.innerHTML = '';
-      showLoading(dataWrap);
-      serverCall().withSuccessHandler(function(data) {
-        dataWrap.innerHTML = '';
-        if (!data || data.total === 0) {
-          var emptyLabel = scope === 'assigned' ? 'No assigned members to track.' : scope === 'location' ? 'No members at your location.' : 'No members found.';
-          dataWrap.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, emptyLabel));
-          return;
-        }
+    // Period status bar
+    var periodBar = el('div', { style: { marginBottom: '14px' } });
+    content.appendChild(periodBar);
 
-        // Progress chart (doughnut)
-        var pct = Math.round((data.completed / data.total) * 100);
-        var progCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '14px' } });
-        progCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Completion: ' + data.completed + '/' + data.total));
+    // KPI summary area
+    var kpiWrap = el('div', { style: { marginBottom: '14px' } });
+    content.appendChild(kpiWrap);
+
+    // Tracking list area
+    var dataWrap = el('div');
+    content.appendChild(dataWrap);
+
+    // Load period + pending members + satisfaction summary in parallel
+    showLoading(dataWrap);
+
+    serverCall().withSuccessHandler(function(pendingData) {
+      dataWrap.innerHTML = '';
+
+      // ── Period status bar ──────────────────────────────────────────────
+      periodBar.innerHTML = '';
+      var period = pendingData.periodId
+        ? { id: pendingData.periodId, name: pendingData.periodName, status: 'Active' }
+        : null;
+
+      if (period) {
+        var pBar = el('div', { className: 'card', style: { padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)' } });
+        pBar.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)' } }, '\uD83D\uDCCB ' + (period.name || period.id)));
+        pBar.appendChild(el('span', { style: { fontSize: '11px', background: 'var(--success)', color: '#fff', padding: '2px 8px', borderRadius: '20px' } }, 'Active'));
+        periodBar.appendChild(pBar);
+      } else {
+        var closedBar = el('div', { className: 'card', style: { padding: '10px 14px', textAlign: 'center', fontSize: '12px', color: 'var(--muted)', background: 'var(--surface)', marginBottom: '0' } });
+        closedBar.appendChild(el('span', {}, 'No survey period is currently open. '));
+        closedBar.appendChild(el('button', { className: 'btn btn-sm', style: { fontSize: '11px', padding: '3px 10px', marginLeft: '8px' }, onClick: function() {
+          serverCall().withSuccessHandler(function(r) {
+            if (r && r.success) renderSurveyTracking(appContainer);
+            else alert('Error: ' + (r && r.message));
+          }).dataOpenNewSurveyPeriod();
+        } }, 'Open New Period'));
+        periodBar.appendChild(closedBar);
+      }
+
+      // ── Completion chart ───────────────────────────────────────────────
+      var total     = pendingData.total     || 0;
+      var completed = pendingData.completed || 0;
+      var pending   = pendingData.pending   || 0;
+      var rate      = pendingData.rate      || 0;
+
+      if (total > 0) {
+        var progCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '10px' } });
+        var progHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
+        progHeader.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, 'Response Rate'));
+        progHeader.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '700', color: rate >= 80 ? 'var(--success)' : rate >= 50 ? 'var(--warning)' : 'var(--danger)' } }, rate + '%'));
+        progCard.appendChild(progHeader);
 
         if (typeof ChartHelper !== 'undefined') {
-          var remaining = data.total - data.completed;
-          var cColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#ef4444';
+          var cColor = rate >= 80 ? '#4ade80' : rate >= 50 ? '#facc15' : '#ef4444';
           ChartHelper.createDoughnutChart(progCard, 'survey-track-chart',
-            ['Completed', 'Pending'],
-            [data.completed, remaining],
-            [cColor, 'rgba(255,255,255,0.08)']
-          );
-        } else {
-          var track = el('div', { className: 'bar-chart-track', style: { height: '10px' } });
-          track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)' } }));
-          progCard.appendChild(track);
+            ['Completed', 'Pending'], [completed, pending], [cColor, 'rgba(255,255,255,0.08)']);
         }
-        progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, pct + '% complete'));
+        progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px', textAlign: 'center' } }, completed + ' completed of ' + total + ' members'));
         dataWrap.appendChild(progCard);
+      }
 
-        // Member list with checkmarks
-        (data.members || []).forEach(function(m) {
+      // ── Satisfaction section averages ──────────────────────────────────
+      serverCall().withSuccessHandler(function(summary) {
+        kpiWrap.innerHTML = '';
+        if (!summary || !summary.sections) return;
+        var sections = summary.sections;
+        var topSections = ['OVERALL_SAT','STEWARD_3A','CHAPTER','LEADERSHIP','CONTRACT'];
+        var hasAny = topSections.some(function(k) { return sections[k] && sections[k].avg !== null; });
+        if (!hasAny || summary.responseCount < 5) return;
+
+        kpiWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Section Averages (1–10)'));
+        var kpiRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+        topSections.forEach(function(key) {
+          var s = sections[key];
+          if (!s || s.avg === null) return;
+          var color = s.avg < 4 ? 'var(--danger)' : s.avg < 6 ? 'var(--warning)' : 'var(--success)';
+          var kpi = el('div', { className: 'card', style: { flex: '1', minWidth: '80px', padding: '10px 8px', textAlign: 'center', background: 'var(--surface)' } });
+          kpi.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: color } }, s.avg.toFixed(1)));
+          kpi.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', marginTop: '2px', lineHeight: '1.3' } }, s.name));
+          kpiRow.appendChild(kpi);
+        });
+        kpiWrap.appendChild(kpiRow);
+      }).withFailureHandler(function() {}).dataGetSatisfactionSummary();
+
+      // ── Pending member list ────────────────────────────────────────────
+      if (!total) {
+        dataWrap.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No survey tracking data. Open a period and populate tracking.'));
+        return;
+      }
+
+      // Pending list
+      if (pending > 0) {
+        var pendHeader = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', margin: '12px 0 6px' } }, 'Pending (' + pending + ')');
+        dataWrap.appendChild(pendHeader);
+        (pendingData.members || []).forEach(function(m) {
           var item = el('div', { className: 'member-list-item' });
           item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
           var info = el('div', { className: 'member-list-info' });
-          info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
-          if (m.lastCompleted) info.appendChild(el('div', { className: 'member-list-meta' }, 'Completed ' + m.lastCompleted));
+          info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.memberId));
+          if (m.workLocation) info.appendChild(el('div', { className: 'member-list-meta' }, m.workLocation + (m.assignedSteward ? ' \u2014 ' + m.assignedSteward : '')));
           item.appendChild(info);
-          item.appendChild(el('span', { style: { fontSize: '16px', color: m.completed ? 'var(--success)' : 'var(--muted)' } }, m.completed ? '\u2705' : '\u2B1C'));
+          item.appendChild(el('span', { style: { fontSize: '14px', color: 'var(--muted)' } }, '\u23F3'));
           dataWrap.appendChild(item);
         });
-      }).withFailureHandler(function() {
-        dataWrap.innerHTML = '';
-        dataWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load survey data.'));
-      }).dataGetStewardSurveyTracking(CURRENT_USER.email, scope);
-    }
+      }
 
-    loadSurveyData(activeScope);
+    }).withFailureHandler(function() {
+      dataWrap.innerHTML = '';
+      dataWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load survey data.'));
+    }).dataGetPendingSurveyMembers();
   });
 }
 
@@ -1505,13 +1558,14 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View and send notifications', action: function() { renderStewardNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app')); } },
+      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
       { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { renderStewardDirectoryPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create and manage flash polls', action: function() { renderManagePolls(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderStewardMinutes(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app')); } },
       { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { renderFailsafePage(document.getElementById('app')); } },
     ];
@@ -1544,14 +1598,14 @@ function renderContactLog(appContainer) {
     _stewardHeader(container, 'Contact Log');
     var content = el('div', { className: 'content' });
 
-    // Sub-tabs
-    var activeSubTab = 'log';
+    // Sub-tabs — default to 'recent', order: Recent → By Member → Log
+    var activeSubTab = 'recent';
     var subTabBar = el('div', { className: 'sub-tabs' });
     var subContent = el('div');
 
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
-      ['log', 'recent', 'by member'].forEach(function(tab) {
+      ['recent', 'by member', 'log'].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
           onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
@@ -2371,6 +2425,26 @@ function renderStewardDirectoryPage(appContainer) {
           return;
         }
 
+        // Smart sort: (1) same work location as current user, (2) in office today, (3) alphabetical
+        var myLocation = (CURRENT_USER && CURRENT_USER.workLocation) ? CURRENT_USER.workLocation.trim().toLowerCase() : '';
+        var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        var todayName = days[new Date().getDay()];
+        function isInOfficeToday(s) {
+          if (!s.officeDays) return false;
+          return s.officeDays.toLowerCase().indexOf(todayName) !== -1;
+        }
+        filtered.sort(function(a, b) {
+          var aLoc = (a.workLocation || '').trim().toLowerCase();
+          var bLoc = (b.workLocation || '').trim().toLowerCase();
+          var aMatch = myLocation && aLoc === myLocation ? 0 : 1;
+          var bMatch = myLocation && bLoc === myLocation ? 0 : 1;
+          if (aMatch !== bMatch) return aMatch - bMatch;
+          var aOffice = isInOfficeToday(a) ? 0 : 1;
+          var bOffice = isInOfficeToday(b) ? 0 : 1;
+          if (aOffice !== bOffice) return aOffice - bOffice;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+
         filtered.forEach(function(s, i) {
           var card = el('div', {
             className: 'card card-glass card-fade-in',
@@ -2669,6 +2743,11 @@ function _renderMinutesList(container) {
       var expanded = false;
       var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes || '');
       card.appendChild(fullDiv);
+      // Show Drive doc link if available (v4.20.18)
+      if (m.driveDocUrl && /^https?:\/\//i.test(m.driveDocUrl)) {
+        var driveLink = el('a', { href: m.driveDocUrl, target: '_blank', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', marginTop: '6px', textDecoration: 'none' } }, '\uD83D\uDCC4 Open Google Doc');
+        card.appendChild(driveLink);
+      }
       if (m.fullMinutes) {
         card.addEventListener('click', function() {
           expanded = !expanded;
