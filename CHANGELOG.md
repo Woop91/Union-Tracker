@@ -5,6 +5,15 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.23] - 2026-03-06
+
+### Changed
+- **`getOrCreateMemberContactFolder_()`** (`21_WebDashDataService.gs`) — when a member folder is **first created**, it is now shared with the member as a **viewer** via `memberFolder.addViewer(memberEmail)`. Existing folders are not re-shared on subsequent contacts (avoids unnecessary Drive API calls). Sharing failure is non-fatal (logged, folder still returned).
+- **`dataSendDirectMessage()`** (`21_WebDashDataService.gs`) — after sending the email, now appends a row to the member's Drive contact log sheet with type `Email` and notes containing the subject + first 300 chars of the body. Uses `DataService.getOrCreateMemberContactFolderPublic` and `getOrCreateMemberContactSheetPublic` (newly exposed on the public API). Drive logging is non-fatal — email sending failure still returns the send error; Drive failure is logged and swallowed.
+
+### Added
+- **`DataService.getOrCreateMemberContactFolderPublic`** and **`getOrCreateMemberContactSheetPublic`** — the two private Drive helpers are now exposed on the `DataService` public return object so top-level wrapper functions outside the IIFE can call them.
+
 ## [4.20.22] - 2026-03-06
 
 ### Added

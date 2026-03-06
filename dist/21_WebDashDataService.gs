@@ -1398,7 +1398,19 @@ var DataService = (function () {
 
       // ── Get or create [Root]/Member Contacts/[LastName, FirstName]/ ───────
       var memberIter = contactsRoot.getFoldersByName(memberFolderName);
-      var memberFolder = memberIter.hasNext() ? memberIter.next() : contactsRoot.createFolder(memberFolderName);
+      var isNewFolder = !memberIter.hasNext();
+      var memberFolder = isNewFolder ? contactsRoot.createFolder(memberFolderName) : memberIter.next();
+
+      // Share folder with member (viewer) on creation — so they can always access their log
+      if (isNewFolder) {
+        try {
+          memberFolder.addViewer(memberEmail);
+        } catch (shareErr) {
+          Logger.log('getOrCreateMemberContactFolder_ share error for ' + memberEmail + ': ' + shareErr.message);
+          // Non-fatal — folder created, sharing failed (e.g. external domain restriction)
+        }
+      }
+
       return memberFolder;
 
     } catch (e) {
@@ -2918,6 +2930,9 @@ var DataService = (function () {
     getStewardMembers: getStewardMembers,
     getAllMembers: getAllMembers,
     getStewardSurveyTracking: getStewardSurveyTracking,
+    // Drive contact log helpers — exposed for use by top-level wrappers (e.g. dataSendDirectMessage)
+    getOrCreateMemberContactFolderPublic: getOrCreateMemberContactFolder_,
+    getOrCreateMemberContactSheetPublic: getOrCreateMemberContactSheet_,
     sendBroadcastMessage: sendBroadcastMessage,
     startGrievanceDraft: startGrievanceDraft,
     createGrievanceDriveFolder: createGrievanceDriveFolder,
@@ -3059,9 +3074,29 @@ function dataSendDirectMessage(ignoredEmail, memberEmail, subject, body) {
   if (!memberEmail || !subject || !body) return { success: false, message: 'Missing required fields.' };
   try {
     var config = (typeof ConfigReader !== 'undefined') ? ConfigReader.getConfig() : {};
-    var fullSubject = (config.orgAbbrev || 'Union') + ' — ' + subject;
+    var fullSubject = (config.orgAbbrev || 'Union') + ' \u2014 ' + subject;
     MailApp.sendEmail(memberEmail.trim(), fullSubject, body);
     if (typeof logAuditEvent === 'function') logAuditEvent('DIRECT_MESSAGE_SENT', { steward: s, member: memberEmail, subject: subject });
+
+    // Log to per-member Drive contact sheet — type 'Email', notes = subject + body preview
+    try {
+      var sRecord = (typeof findUserByEmail === 'function') ? findUserByEmail(s) : null;
+      var sName   = (sRecord && sRecord.name) ? sRecord.name : s;
+      var memberFolder = DataService.getOrCreateMemberContactFolderPublic(memberEmail.trim().toLowerCase());
+      if (memberFolder) {
+        var folderName = memberFolder.getName();
+        var contactSS  = DataService.getOrCreateMemberContactSheetPublic(memberFolder, folderName);
+        if (contactSS) {
+          var logSheet = contactSS.getSheetByName('Contact Log') || contactSS.getActiveSheet();
+          var noteText = 'Subject: ' + subject + (body ? ' | ' + String(body).substring(0, 300) : '');
+          logSheet.appendRow([new Date(), sName, 'Email', noteText, '']);
+        }
+      }
+    } catch (driveErr) {
+      Logger.log('dataSendDirectMessage Drive log error: ' + driveErr.message);
+      // Non-fatal — email already sent
+    }
+
     return { success: true, message: 'Message sent.' };
   } catch (e) {
     Logger.log('dataSendDirectMessage error: ' + e.message);

@@ -987,3 +987,22 @@ Every contact logged via `logMemberContact()` now also appends to a per-member G
 - `MEMBER_CONTACTS_SUBFOLDER = 'Member Contacts'` — do NOT rename this folder in Drive; the stored prop ID will go stale
 - Member Directory keeps only the LAST contact snapshot — Drive sheet is the full history
 - `_Contact_Log` hidden sheet is still maintained for fast dashboard queries (Recent/By Member views)
+
+---
+
+## 2026-03-06 — Member folder sharing + dataSendDirectMessage Drive log (v4.20.23)
+
+### Member folder sharing
+- `getOrCreateMemberContactFolder_()` now calls `memberFolder.addViewer(memberEmail)` when the folder is **first created** (`isNewFolder` flag)
+- Members get viewer access — they can read their contact log but cannot edit it
+- Sharing is non-fatal; if it fails (e.g. external domain restriction), folder is still returned and used
+- Existing folders are NOT re-shared on every contact (no extra Drive API calls)
+
+### dataSendDirectMessage Drive logging
+- After `MailApp.sendEmail()` succeeds, appends to Drive contact sheet: `[Date, stewardName, 'Email', 'Subject: X | bodyPreview', '']`
+- Body preview capped at 300 chars to keep notes readable
+- Uses `DataService.getOrCreateMemberContactFolderPublic` + `getOrCreateMemberContactSheetPublic` — these are the private helpers exposed on DataService's return object specifically for cross-IIFE access
+- Non-fatal — email send failure returns error as before; Drive append failure is logged and swallowed
+
+### RULE: public exposure of private helpers
+Private helpers that need to be called from outside the DataService IIFE must be exposed via the return object with a `Public` suffix to make the cross-boundary access explicit. Do NOT expose them as top-level functions — they must remain under the DataService namespace.
