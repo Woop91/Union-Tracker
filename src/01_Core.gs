@@ -848,6 +848,7 @@ var SHEETS = {
   WORKLOAD_ARCHIVE:   'Workload Archive',     // hidden — data older than 24 months
   // Resources & Education (v4.11.0 — content management for educational hub)
   RESOURCES:          '📚 Resources',         // steward-managed educational content
+  RESOURCE_CONFIG:    '📚 Resource Config',   // categories & settings for Resources tab (v4.22.x)
   // Weekly Questions (24_WeeklyQuestions.gs) — anonymous pulse surveys
   WEEKLY_QUESTIONS:   '_Weekly_Questions',    // hidden — active/scheduled questions
   WEEKLY_RESPONSES:   '_Weekly_Responses',    // hidden — SHA-256 hashed anonymous responses
@@ -1917,7 +1918,16 @@ var RESOURCES_HEADER_MAP_ = [
 
 var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
 
-// Notifications sheet — in-app notification system (v4.13.0)
+// Resource Config sheet — categories & settings for the Resources tab (v4.22.x)
+var RESOURCE_CONFIG_HEADER_MAP_ = [
+  { key: 'SETTING',      header: 'Setting' },    // e.g. 'Category'
+  { key: 'VALUE',        header: 'Value' },       // the category name
+  { key: 'SORT_ORDER',   header: 'Sort Order' },  // display order (numeric)
+  { key: 'ACTIVE',       header: 'Active' },      // Yes / No
+  { key: 'NOTES',        header: 'Notes' }        // optional steward notes
+];
+
+var RESOURCE_CONFIG_COLS = buildColsFromMap_(RESOURCE_CONFIG_HEADER_MAP_);
 // v4.22.0: Added DISMISS_MODE column — 'Dismissible' (user can permanently dismiss)
 //          or 'Timed' (auto-expires on Expires_Date; dismiss button hidden from members).
 var NOTIFICATIONS_HEADER_MAP_ = [
@@ -2046,7 +2056,8 @@ function syncColumnMaps() {
     { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
     { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
     { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS },
-    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS }
+    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS },
+    { name: 'RESOURCE_CONFIG_COLS', sheet: SHEETS.RESOURCE_CONFIG, map: RESOURCE_CONFIG_HEADER_MAP_, target: RESOURCE_CONFIG_COLS }
   ];
 
   for (var m = 0; m < maps.length; m++) {
