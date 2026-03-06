@@ -5,9 +5,89 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.20.15] - 2026-03-05
+## [4.20.21] - 2026-03-06
 
 ### Fixed
+- **Contact log writeback gap** — `logMemberContact()` (`21_WebDashDataService.gs`) now writes back to the three Member Directory snapshot columns (`Recent Contact Date`, `Contact Steward`, `Contact Notes`) after appending to `_Contact_Log`. `Contact Steward` stores the steward's display name (resolved via `findUserByEmail`), not their email. Writeback is non-fatal — a failure logs to Apps Script Logger but does not prevent the contact row from being saved.
+
+### Added
+- **`dataSendDirectMessage()`** — new steward-only wrapper in `21_WebDashDataService.gs`. Sends a targeted email to a single member. Subject is prefixed with `orgAbbrev` from Config. Fires `DIRECT_MESSAGE_SENT` audit event.
+- **`dataGetMemberCaseFolderUrl()`** — new steward-only wrapper. Looks up a member's active (non-resolved) grievance and returns its Drive folder URL from the Grievance Log `Drive Folder URL` column. Falls back to most recent grievance if no active one found.
+- **Member card actions** (`steward_view.html`) — three inline action buttons added to every member's expanded detail panel in the Members tab:
+  - **📞 Log Contact** — inline quick-log form (contact type pills + notes) pre-scoped to that member. Replaces the old nav-only button that redirected to the Contact Log tab.
+  - **🔔 Send Notification** — inline subject + body form that sends a direct email to that member via `dataSendDirectMessage`.
+  - **📂 Case Folder** — fetches and opens the member's active grievance Drive folder in a new tab via `dataGetMemberCaseFolderUrl`. Shows a message if no folder is linked.
+
+## [4.20.20] - 2026-03-05
+
+### Changed
+- **`BACKFILL_MINUTES_DRIVE_DOCS()` — full progress loop with flush checkpoints**
+  - Removed the hard `LIMIT = 50` cap. The function now processes all rows in a single call.
+  - Pre-scan counts rows needing docs so toasts display "Created X of Y docs…" throughout.
+  - `SpreadsheetApp.flush()` called every 10 docs (`FLUSH_EVERY = 10`) — commits writes to the sheet so that any GAS 6-minute timeout preserves everything done so far.
+  - Final `SpreadsheetApp.flush()` after the loop commits the last partial batch before the result dialog.
+  - Re-running the function after a timeout is safe and automatic — rows with an existing URL are skipped.
+  - Toast shown in non-UI context (e.g. direct script run) as well as UI.
+
+- **`test_PortalColsNoHardcodedIndices`** now covers all 7 `PORTAL_*_COLS` objects including `PORTAL_MEGA_SURVEY_COLS` (previously omitted). The test checks: every value is a non-negative number, no duplicate indices within the same object.
+
+- **`test_PortalMinutesCols_Complete`** spot-check updated to explicitly assert `PORTAL_MEGA_SURVEY_COLS` exists.
+
+## [4.20.19] - 2026-03-05
+
+### Added
+- **`BACKFILL_MINUTES_DRIVE_DOCS()`**: Retroactively generates Google Docs for all existing MeetingMinutes rows without a `DriveDocUrl`. Processes up to 50 rows per run (GAS 6-min guard), skips rows that already have a URL. Accessible via menu `📅 Calendar & Meetings > 📄 Backfill Minutes → Drive Docs` or directly from the Apps Script editor.
+- **6 new tests in `TestSuite`**:
+  - `test_PortalMinutesCols_Complete` — all 8 PORTAL_MINUTES_COLS keys present including DRIVE_DOC_URL; DRIVE_DOC_URL = CREATED_DATE + 1
+  - `test_PortalColsNoHardcodedIndices` — no duplicate indices within any PORTAL_*_COLS object
+  - `test_MultiSelectCols_Populated` — MULTI_SELECT_COLS has ≥1 entry per sheet, all entries have valid col/configCol/label
+  - `test_MultiSelectAutoOpen_DefaultOn` — auto-open is active when flag is null/undefined/empty/"true"; inactive only when explicitly "false"
+  - `test_DriveRootFolderName_Dynamic` — getDriveRootFolderName_ is a function; ROOT_FOLDER_NAME is gone; all subfolder names are non-empty strings
+  - `test_ConfigCols_FolderIds_Exist` — all 5 v4.20.17 folder ID columns exist and are positive integers
+
+### Changed
+- **`PORTAL_MINUTES_COLS`**: Added `DRIVE_DOC_URL: 7` constant. The hardcoded `data[i][7]` in `getMeetingMinutes()` is replaced with `data[i][PORTAL_MINUTES_COLS.DRIVE_DOC_URL]`.
+- **Auto multi-select is now ON by default**: `onSelectionChange()` now skips only when `multiSelectAutoOpen === 'false'` (previously required it to be exactly `'true'`). Fresh installs and upgrades get auto-open without any manual step.
+- **`removeMultiSelectTrigger()`** now sets `'false'` explicitly (opt-out). **`installMultiSelectTrigger()`** removes the `'false'` flag (reverts to default-on).
+
+## [4.20.18] - 2026-03-05
+
+### Added
+- **Dynamic Drive root folder name**: `getDriveRootFolderName_()` reads `ORG_NAME` from Config sheet and appends `" Dashboard"` (e.g. `"MassAbility DDS Dashboard"`). No hardcoded folder name anywhere. Falls back to `DRIVE_CONFIG.ROOT_FOLDER_FALLBACK = 'Dashboard Files'`.
+- **Minutes saved to Drive**: `addMeetingMinutes()` now creates a formatted Google Doc in `Minutes/` Drive folder. Doc URL stored in MeetingMinutes sheet col 8 (`DriveDocUrl`) and returned to caller. Minutes cards in steward view show "📄 Open Google Doc" link when available.
+- **Attendance exported to Drive on meeting close**: `updateMeetingStatuses()` calls `saveAttendanceToDriveFolder_()` (new function in `14_MeetingCheckIn.gs`) when a meeting is marked COMPLETED. Saves attendee list as a Google Doc in `Event Check-In/` Drive folder.
+- **Resources/ Drive folder exposed in UI**: `getWebAppResourceLinks()` now returns `resourcesFolderUrl`. The Resources > Manage tab shows a banner linking to the `Resources/` Drive folder so stewards know where to upload files before adding URLs.
+
+### Changed
+- `DRIVE_CONFIG.ROOT_FOLDER_NAME` replaced by `getDriveRootFolderName_()` in all callsites (`05_Integrations.gs`, `10d_SyncAndMaintenance.gs`).
+- `DRIVE_CONFIG` loses the `ROOT_FOLDER_NAME` static key; gains `ROOT_FOLDER_FALLBACK`.
+- `getMeetingMinutes()` now returns `driveDocUrl` field (col index 7, empty string for pre-existing rows).
+
+## [4.20.17] - 2026-03-05
+
+### Added
+- **CREATE_DASHBOARD now auto-builds Drive folder hierarchy**: Creates `DashboardTest/` (PRIVATE) with subfolders `Grievances/`, `Resources/`, `Minutes/`, `Event Check-In/`. All folder IDs are written to Config sheet + Script Properties. Idempotent — safe to re-run.
+- **CREATE_DASHBOARD now auto-creates Events Calendar**: Creates `<OrgName> Events` Google Calendar and writes the Calendar ID to Config sheet. Fixes the Events tab showing "Calendar not connected" after fresh setup.
+- **New Config columns**: `DASHBOARD_ROOT_FOLDER_ID`, `GRIEVANCES_FOLDER_ID`, `RESOURCES_FOLDER_ID`, `MINUTES_FOLDER_ID`, `EVENT_CHECKIN_FOLDER_ID`.
+- **Menu items**: `📁 Google Drive > 🏗️ Setup Dashboard Folder Structure` and `📅 Calendar > 🏗️ Setup Union Events Calendar` for manual re-run.
+- **Standalone wrappers**: `SETUP_DRIVE_FOLDERS()` and `SETUP_CALENDAR()` can be run from the Apps Script editor.
+
+### Changed
+- `getOrCreateRootFolder()` now routes to `DashboardTest/Grievances/` — individual case folders are created inside that subfolder instead of in a standalone root folder.
+- `DRIVE_CONFIG.ROOT_FOLDER_NAME` changed from `'Dashboard - Grievance Files'` to `'DashboardTest'`.
+
+## [4.20.16] - 2026-03-05
+
+### Fixed
+- **Contact Log**: Default tab changed from 'Log a Contact' to 'Recent'. Tab order is now Recent → By Member → Log.
+- **Member View switch**: Available to ALL stewards (was gated by IS_DUAL_ROLE / role='both' in sheet).
+- **Org Overdue / Org Due <7d showing zero**: Fixed two bugs in `_buildGrievanceRecord()` — now excludes all terminal statuses (won/denied/settled/withdrawn/closed) from auto-overdue detection, not just 'resolved'. Removed `total < 3` early-return threshold in `getGrievanceStats()`.
+- **Events tab**: Now shows actionable "Calendar not connected" message when `calendarId` is missing from Config tab, instead of silently showing empty.
+- **Steward Directory sorting**: Smart sort applied client-side — same work location as viewer first, then stewards in office today, then alphabetical. Server-side sort removed.
+- **More menu order**: Q&A Forum moved to immediately after Resources. Org Chart added as new item after Q&A Forum.
+- **Org Chart**: Auto-fits to viewport width on load/resize. Added zoom control bar (−/+/Fit/Reset) for manual zoom.
+- **Timeline / Weekly Questions empty states**: Improved messages explain WHY there's no content and how to fix it.
+
 - **C-XSS-18** (`index.html:el()`) — Boolean attributes (`selected`, `disabled`, `checked`) were set via `setAttribute(key, false)` which adds `attr="false"` — presence of the attribute is truthy in DOM regardless of value. Fixed by using property assignment (`elem[key] = value`) for boolean values so `selected: false` correctly removes the selection.
 - **C-XSS-6** (`03_UIComponents.gs:showMemberQuickActions`) — Replace `'\'' + escapeHtml(memberId) + '\''` with `JSON.stringify(memberId)` in all `onclick` JS string contexts. `escapeHtml` produces HTML entities (`&#x27;`) which the HTML parser decodes back to the original character before JavaScript runs — the wrong escaping for a JS string context. `JSON.stringify` produces correct escape sequences for both HTML attribute and JS string boundaries.
 

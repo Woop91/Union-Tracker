@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 39 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 39 `.gs` + 8 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED — DDS private]`
+**DDS Apps Script ID:** `[REDACTED — private repo only]`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -920,3 +920,37 @@ All fixed with `_resolveCallerEmail()` minimum auth (both steward and member rol
 
 **BUG-TASKS-05: dataCreateTask exposes assignToEmail**
 - Wrapper extended with optional assignToEmail param passed through to backend.
+
+---
+
+## 2026-03-06 — Contact log writeback + member card actions (v4.20.21)
+
+### Problem fixed: two contact tracking systems were not synced
+`_Contact_Log` sheet (rolling history, written by web dashboard) and Member Directory snapshot columns (`Recent Contact Date`, `Contact Steward`, `Contact Notes`) were completely independent. Dashboard KPIs and WorkloadTracker read from Member Directory snapshot only, so they showed stale data for any member whose contact was logged via the web UI.
+
+### Fix: `logMemberContact()` writeback (`21_WebDashDataService.gs`)
+After writing to `_Contact_Log`, the function now:
+1. Opens `MEMBER_SHEET` (dynamic — resolved from `SHEETS.MEMBER_DIR` or `'Member Directory'`)
+2. Finds all column indices by header name (never by index)
+3. Locates the member's row by email match (case-insensitive)
+4. Writes:
+   - `Recent Contact Date` → `new Date()`
+   - `Contact Steward` → steward's display name via `findUserByEmail()` (falls back to email if not found)
+   - `Contact Notes` → notes text (only if notes provided; existing notes not cleared on a contact with no notes)
+5. Writeback is wrapped in try/catch — non-fatal; failure logged to Apps Script Logger only
+
+### New backend wrappers
+- `dataSendDirectMessage(ignoredEmail, memberEmail, subject, body)` — steward-only. Sends email via MailApp. Prefixes subject with `orgAbbrev`. Fires `DIRECT_MESSAGE_SENT` audit event.
+- `dataGetMemberCaseFolderUrl(ignoredEmail, memberEmail)` — steward-only. Returns `{ success, url, grievanceId }`. Prefers active (non-resolved/closed/withdrawn/denied) grievance. Falls back to most recent grievance. Returns `{ success: false, url: null, message }` if no Drive folder URL stored in Grievance Log.
+
+### Member card changes (`steward_view.html` — `_showMemberDetail`)
+Added shared `actionArea` div below the button row. All 4 buttons render inline forms into `actionArea` (clears previous form on each click):
+- **Full Profile** — unchanged behavior (loads extra profile fields inline)
+- **📞 Log Contact** — inline form: contact type pills (Phone/Email/In Person/Text) + notes textarea. Calls `dataLogMemberContact`. Shows ✓ confirmation on success.
+- **🔔 Send Notification** — inline form: subject input + body textarea. Calls `dataSendDirectMessage`. Shows ✓ confirmation on success.
+- **📂 Case Folder** — no form. Calls `dataGetMemberCaseFolderUrl`, opens Drive URL in new tab on success, or shows message in `actionArea` if no folder found.
+
+### RULES REMINDER
+- Everything dynamic — column lookups always by header name, never by index
+- `Contact Steward` = display name, NOT email
+- `dataSendDirectMessage` and `dataGetMemberCaseFolderUrl` both call `_requireStewardAuth()` as first statement

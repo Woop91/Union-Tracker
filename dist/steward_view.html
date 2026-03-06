@@ -742,9 +742,10 @@ function _showMemberDetail(container, itemEl, member) {
   panel.appendChild(infoRow);
 
   // Action buttons
-  var btnRow = el('div', { style: { display: 'flex', gap: '8px' } });
-  var profileArea = el('div');
+  var btnRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  var actionArea = el('div', { style: { marginTop: '8px' } });
 
+  // ── Full Profile ──────────────────────────────────────────────────────────
   var profileBtn = el('button', {
     style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600', cursor: 'pointer' },
     onClick: function() {
@@ -753,9 +754,9 @@ function _showMemberDetail(container, itemEl, member) {
       serverCall()
         .withSuccessHandler(function(profile) {
           profileBtn.remove();
-          profileArea.innerHTML = '';
+          actionArea.innerHTML = '';
           if (!profile) {
-            profileArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '8px' } }, 'Profile not found.'));
+            actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '8px' } }, 'Profile not found.'));
             return;
           }
           var extraRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px 20px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
@@ -771,27 +772,173 @@ function _showMemberDetail(container, itemEl, member) {
             pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
             extraRow.appendChild(pair);
           });
-          profileArea.appendChild(extraRow);
+          actionArea.appendChild(extraRow);
         })
         .withFailureHandler(function() {
           profileBtn.disabled = false;
           profileBtn.textContent = 'Full Profile';
-          profileArea.innerHTML = '';
-          profileArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to load profile.'));
+          actionArea.innerHTML = '';
+          actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to load profile.'));
         })
         .dataGetFullProfile(member.email);
     }
   }, 'Full Profile');
 
-  var contactBtn = el('button', {
+  // ── Log Contact ───────────────────────────────────────────────────────────
+  var logContactBtn = el('button', {
     style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: '600', cursor: 'pointer' },
-    onClick: function() { _handleTabNav('steward', 'contactlog'); }
-  }, 'Log Contact');
+    onClick: function() {
+      actionArea.innerHTML = '';
+      var typeIcons = { 'Phone': '\uD83D\uDCDE', 'Email': '\u2709\uFE0F', 'In Person': '\uD83D\uDC64', 'Text': '\uD83D\uDCAC' };
+      var selectedType = 'Phone';
+
+      var form = el('div', { style: { borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' } });
+      form.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '\uD83D\uDCDE Log Contact — ' + (member.name || member.email)));
+
+      // Contact type pills
+      var typeRow = el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' } });
+      var typeBtns = {};
+      Object.keys(typeIcons).forEach(function(t) {
+        var btn = el('button', {
+          className: 'filter-tab' + (t === selectedType ? ' active' : ''),
+          onClick: function() {
+            selectedType = t;
+            Object.keys(typeBtns).forEach(function(k) { typeBtns[k].className = 'filter-tab' + (k === t ? ' active' : ''); });
+          }
+        }, typeIcons[t] + ' ' + t);
+        typeBtns[t] = btn;
+        typeRow.appendChild(btn);
+      });
+      form.appendChild(typeRow);
+
+      // Notes
+      var notesInput = el('textarea', { className: 'msg-textarea', placeholder: 'Notes (optional)...', style: { minHeight: '50px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' } });
+      form.appendChild(notesInput);
+
+      var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
+      form.appendChild(statusMsg);
+
+      var btnRowInner = el('div', { style: { display: 'flex', gap: '6px' } });
+      var submitBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px' },
+        onClick: function() {
+          submitBtn.disabled = true;
+          statusMsg.textContent = 'Logging...';
+          statusMsg.style.color = 'var(--muted)';
+          serverCall()
+            .withSuccessHandler(function(r) {
+              if (r && r.success) {
+                actionArea.innerHTML = '';
+                actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--success)', marginTop: '6px' } }, '\u2713 Contact logged.'));
+              } else {
+                statusMsg.textContent = (r && r.message) || 'Error.';
+                statusMsg.style.color = 'var(--danger)';
+                submitBtn.disabled = false;
+              }
+            })
+            .withFailureHandler(function() {
+              statusMsg.textContent = 'Failed. Try again.';
+              statusMsg.style.color = 'var(--danger)';
+              submitBtn.disabled = false;
+            })
+            .dataLogMemberContact(CURRENT_USER.email, member.email, selectedType, notesInput.value.trim(), '');
+        }
+      }, 'Log');
+      var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
+      btnRowInner.appendChild(submitBtn);
+      btnRowInner.appendChild(cancelBtn);
+      form.appendChild(btnRowInner);
+      actionArea.appendChild(form);
+    }
+  }, '\uD83D\uDCDE Log Contact');
+
+  // ── Send Notification ─────────────────────────────────────────────────────
+  var notifBtn = el('button', {
+    style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: '600', cursor: 'pointer' },
+    onClick: function() {
+      actionArea.innerHTML = '';
+      var form = el('div', { style: { borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' } });
+      form.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '\uD83D\uDD14 Send Notification — ' + (member.name || member.email)));
+
+      var subjectInput = el('input', { className: 'form-input', placeholder: 'Subject...', style: { marginBottom: '6px' } });
+      var bodyInput = el('textarea', { className: 'msg-textarea', placeholder: 'Message body...', style: { minHeight: '70px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' } });
+      form.appendChild(subjectInput);
+      form.appendChild(bodyInput);
+
+      var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
+      form.appendChild(statusMsg);
+
+      var btnRowInner = el('div', { style: { display: 'flex', gap: '6px' } });
+      var sendBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px' },
+        onClick: function() {
+          if (!subjectInput.value.trim() || !bodyInput.value.trim()) {
+            statusMsg.textContent = 'Subject and body required.';
+            statusMsg.style.color = 'var(--danger)';
+            return;
+          }
+          sendBtn.disabled = true;
+          statusMsg.textContent = 'Sending...';
+          statusMsg.style.color = 'var(--muted)';
+          serverCall()
+            .withSuccessHandler(function(r) {
+              if (r && r.success) {
+                actionArea.innerHTML = '';
+                actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--success)', marginTop: '6px' } }, '\u2713 Message sent to ' + member.email));
+              } else {
+                statusMsg.textContent = (r && r.message) || 'Error.';
+                statusMsg.style.color = 'var(--danger)';
+                sendBtn.disabled = false;
+              }
+            })
+            .withFailureHandler(function() {
+              statusMsg.textContent = 'Failed. Try again.';
+              statusMsg.style.color = 'var(--danger)';
+              sendBtn.disabled = false;
+            })
+            .dataSendDirectMessage(CURRENT_USER.email, member.email, subjectInput.value.trim(), bodyInput.value.trim());
+        }
+      }, 'Send');
+      var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
+      btnRowInner.appendChild(sendBtn);
+      btnRowInner.appendChild(cancelBtn);
+      form.appendChild(btnRowInner);
+      actionArea.appendChild(form);
+    }
+  }, '\uD83D\uDD14 Send Notification');
+
+  // ── Case Folder ───────────────────────────────────────────────────────────
+  var caseFolderBtn = el('button', {
+    style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: '600', cursor: 'pointer' },
+    onClick: function() {
+      actionArea.innerHTML = '';
+      caseFolderBtn.disabled = true;
+      caseFolderBtn.textContent = 'Loading...';
+      serverCall()
+        .withSuccessHandler(function(r) {
+          caseFolderBtn.disabled = false;
+          caseFolderBtn.textContent = '\uD83D\uDCC2 Case Folder';
+          if (r && r.success && r.url) {
+            window.open(r.url, '_blank');
+          } else {
+            actionArea.innerHTML = '';
+            actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px' } },
+              (r && r.message) || 'No Drive folder found for this member\u2019s case.'));
+          }
+        })
+        .withFailureHandler(function() {
+          caseFolderBtn.disabled = false;
+          caseFolderBtn.textContent = '\uD83D\uDCC2 Case Folder';
+          actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '6px' } }, 'Failed to fetch case folder.'));
+        })
+        .dataGetMemberCaseFolderUrl(CURRENT_USER.email, member.email);
+    }
+  }, '\uD83D\uDCC2 Case Folder');
 
   btnRow.appendChild(profileBtn);
-  btnRow.appendChild(contactBtn);
+  btnRow.appendChild(logContactBtn);
+  btnRow.appendChild(notifBtn);
+  btnRow.appendChild(caseFolderBtn);
   panel.appendChild(btnRow);
-  panel.appendChild(profileArea);
+  panel.appendChild(actionArea);
 
   itemEl.parentNode.insertBefore(panel, itemEl.nextSibling);
 }

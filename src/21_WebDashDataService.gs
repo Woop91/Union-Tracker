@@ -1344,6 +1344,44 @@ var DataService = (function () {
     var id = 'CL_' + Date.now().toString(36);
     sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), contactType, new Date(), (notes || '').substring(0, 500), duration || '', new Date()]);
     if (typeof logAuditEvent === 'function') logAuditEvent('CONTACT_LOG', { steward: stewardEmail, member: memberEmail, type: contactType });
+
+    // Writeback: update Member Directory snapshot columns so WorkloadTracker/KPIs stay current
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (ss) {
+        var memberDir = ss.getSheetByName(MEMBER_SHEET);
+        if (memberDir) {
+          var mData = memberDir.getDataRange().getValues();
+          var mHeaders = mData[0];
+          var emailIdx = -1, recentContactIdx = -1, contactStewardIdx = -1, contactNotesIdx = -1;
+          for (var h = 0; h < mHeaders.length; h++) {
+            var hLow = String(mHeaders[h]).toLowerCase().trim();
+            if (hLow === 'email') emailIdx = h;
+            else if (hLow === 'recent contact date') recentContactIdx = h;
+            else if (hLow === 'contact steward') contactStewardIdx = h;
+            else if (hLow === 'contact notes') contactNotesIdx = h;
+          }
+          if (emailIdx !== -1) {
+            var mEmailNorm = memberEmail.toLowerCase().trim();
+            for (var r = 1; r < mData.length; r++) {
+              if (String(mData[r][emailIdx]).toLowerCase().trim() === mEmailNorm) {
+                // Resolve steward display name — Contact Steward stores name, not email
+                var sRecord = (typeof findUserByEmail === 'function') ? findUserByEmail(stewardEmail) : null;
+                var sName = (sRecord && sRecord.name) ? sRecord.name : stewardEmail;
+                if (recentContactIdx !== -1)   memberDir.getRange(r + 1, recentContactIdx + 1).setValue(new Date());
+                if (contactStewardIdx !== -1)  memberDir.getRange(r + 1, contactStewardIdx + 1).setValue(sName);
+                if (contactNotesIdx !== -1 && notes) memberDir.getRange(r + 1, contactNotesIdx + 1).setValue(String(notes).substring(0, 500));
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (wbErr) {
+      Logger.log('logMemberContact writeback error: ' + wbErr.message);
+      // Non-fatal — contact log row was already written; snapshot update failed silently
+    }
+
     return { success: true, message: 'Contact logged.' };
   }
 
@@ -2868,6 +2906,44 @@ function dataSubmitSurveyResponse(ignoredEmail, responses) { var e = _resolveCal
 function dataLogMemberContact(ignoredStewardEmail, memberEmail, type, notes, duration) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.logMemberContact(s, memberEmail, type, notes, duration); }
 function dataGetMemberContactHistory(ignoredStewardEmail, memberEmail) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getMemberContactHistory(s, memberEmail); }
 function dataGetStewardContactLog() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardContactLog(s); }
+
+// Send a direct email notification to a single member (steward-only)
+function dataSendDirectMessage(ignoredEmail, memberEmail, subject, body) {
+  var s = _requireStewardAuth();
+  if (!s) return { success: false, message: 'Steward access required.' };
+  if (!memberEmail || !subject || !body) return { success: false, message: 'Missing required fields.' };
+  try {
+    var config = (typeof ConfigReader !== 'undefined') ? ConfigReader.getConfig() : {};
+    var fullSubject = (config.orgAbbrev || 'Union') + ' — ' + subject;
+    MailApp.sendEmail(memberEmail.trim(), fullSubject, body);
+    if (typeof logAuditEvent === 'function') logAuditEvent('DIRECT_MESSAGE_SENT', { steward: s, member: memberEmail, subject: subject });
+    return { success: true, message: 'Message sent.' };
+  } catch (e) {
+    Logger.log('dataSendDirectMessage error: ' + e.message);
+    return { success: false, message: 'Failed to send: ' + e.message };
+  }
+}
+
+// Returns the Drive folder URL for a member's active (non-resolved) grievance (steward-only)
+function dataGetMemberCaseFolderUrl(ignoredEmail, memberEmail) {
+  var s = _requireStewardAuth();
+  if (!s) return { success: false, url: null, message: 'Steward access required.' };
+  if (!memberEmail) return { success: false, url: null, message: 'Member email required.' };
+  try {
+    var grievances = DataService.getMemberGrievances(memberEmail.trim().toLowerCase());
+    if (!grievances || grievances.length === 0) return { success: false, url: null, message: 'No grievances found.' };
+    var active = grievances.find(function(g) {
+      var st = (g.status || '').toLowerCase();
+      return st !== 'resolved' && st !== 'closed' && st !== 'withdrawn' && st !== 'denied';
+    });
+    var target = active || grievances[0];
+    if (target.driveFolderUrl) return { success: true, url: target.driveFolderUrl, grievanceId: target.grievanceId };
+    return { success: false, url: null, message: 'No Drive folder linked to this case.' };
+  } catch (e) {
+    Logger.log('dataGetMemberCaseFolderUrl error: ' + e.message);
+    return { success: false, url: null, message: 'Error fetching case folder.' };
+  }
+}
 function dataCreateTask(ignoredStewardEmail, title, desc, memberEmail, priority, dueDate, assignToEmail) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assignToEmail || ''); }
 function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, desc, memberEmail, priority, dueDate) {
   var s = _requireStewardAuth();
