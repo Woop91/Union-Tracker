@@ -772,12 +772,13 @@ function _showMemberDetail(container, itemEl, member) {
             pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
             extraRow.appendChild(pair);
           });
-          // Contact Log Folder link — shown only if URL exists (set on first contact)
-          if (profile.contactLogFolderUrl) {
+          // Member admin folder link — shown only if URL exists (set on first contact or grievance)
+          // Links to Members/LastName, FirstName/ — steward-only workspace, never shared with member
+          if (profile.memberAdminFolderUrl) {
             var folderPair = el('div', { style: { minWidth: '100px' } });
-            folderPair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Contact Log'));
+            folderPair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Member Folder'));
             var folderLink = el('a', {
-              href: profile.contactLogFolderUrl,
+              href: profile.memberAdminFolderUrl,
               target: '_blank',
               style: { fontSize: '13px', color: 'var(--accent)', fontWeight: '500', textDecoration: 'none' }
             }, '\uD83D\uDCC2 Open in Drive');
@@ -967,15 +968,15 @@ function renderBroadcast(appContainer) {
     // State
     var selectedLocations = {};
     var selectedDays = {};
-    var selectedScope = 'mine'; // 'mine' | 'all'
+    var selectedScope = 'mine'; // 'mine' | 'all'  — 'all' only shown if broadcastScopeAll=yes in Config
     var selectedDuesPaying = null; // null | 'paying' | 'nonpaying'
 
     // Recipient preview
     var recipientPreview = el('div', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '12px' } }, 'Loading filters...');
     content.appendChild(recipientPreview);
 
-    // ── Scope toggle ──────────────────────────────────────
-    var scopeGroup = el('div', { className: 'form-group' });
+    // ── Scope toggle (rendered only if Config: Broadcast: Allow All Members Scope = yes) ──
+    var scopeGroup = el('div', { className: 'form-group', style: { display: 'none' } });
     scopeGroup.appendChild(el('label', { className: 'form-label' }, 'Recipients'));
     var scopeBar = el('div', { style: { display: 'flex', gap: '6px', marginTop: '4px' } });
 
@@ -1011,7 +1012,7 @@ function renderBroadcast(appContainer) {
     daysGroup.appendChild(daysCheckboxes);
     content.appendChild(daysGroup);
 
-    // ── Dues paying filter (shown only if column exists in sheet) ──
+    // ── Dues paying filter (shown only if Dues Paying column exists in sheet) ──
     var duesGroup = el('div', { className: 'form-group', style: { display: 'none' } });
     duesGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Dues Status'));
     var duesBar = el('div', { style: { display: 'flex', gap: '6px', marginTop: '4px' } });
@@ -1062,11 +1063,14 @@ function renderBroadcast(appContainer) {
       if (days.length > 0) parts.push(days.length + ' day' + (days.length > 1 ? 's' : ''));
       if (selectedDuesPaying === 'paying') parts.push('dues paying only');
       if (selectedDuesPaying === 'nonpaying') parts.push('non-dues paying only');
-      recipientPreview.textContent = 'Sending to: ' + parts.join(' · ');
+      recipientPreview.textContent = 'Sending to: ' + parts.join(' \u00b7 ');
     }
 
     // ── Fetch filter options ──────────────────────────────
     serverCall().withSuccessHandler(function(opts) {
+      // Scope toggle — only shown when Config enables all-members broadcast
+      if (opts.broadcastScopeAll) scopeGroup.style.display = '';
+
       if (opts.locations.length > 0) {
         var allLocBtn = el('button', {
           className: 'filter-tab', style: { fontSize: '11px', padding: '4px 10px', fontWeight: '600' },
@@ -1091,7 +1095,7 @@ function renderBroadcast(appContainer) {
         daysCheckboxes.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No office day data available'));
       }
 
-      // Show dues paying filter only if the column exists in the sheet
+      // Dues paying filter — shown only if column exists in the sheet
       if (opts.hasDuesPayingColumn) duesGroup.style.display = '';
 
       updatePreview();
@@ -1099,6 +1103,20 @@ function renderBroadcast(appContainer) {
       recipientPreview.textContent = 'Failed to load filters. You can still send to all members.';
       recipientPreview.style.color = 'var(--danger)';
     }).dataGetBroadcastFilterOptions(CURRENT_USER.email);
+
+    // ── Subject line ──────────────────────────────────────
+    var subjectGroup = el('div', { className: 'form-group' });
+    subjectGroup.appendChild(el('label', { className: 'form-label' }, 'Subject'));
+    var subjectHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Leave blank to use the default auto-generated subject.');
+    subjectGroup.appendChild(subjectHint);
+    var subjectInput = el('input', {
+      type: 'text',
+      className: 'form-input',
+      placeholder: CONFIG.orgAbbrev + ' - Message from your ' + CONFIG.stewardLabel,
+      style: { width: '100%', boxSizing: 'border-box' }
+    });
+    subjectGroup.appendChild(subjectInput);
+    content.appendChild(subjectGroup);
 
     // ── Message ───────────────────────────────────────────
     var msgGroup = el('div', { className: 'form-group' });
@@ -1121,16 +1139,17 @@ function renderBroadcast(appContainer) {
         if (locs.length > 0) filter.location = locs.join(',');
         if (days.length > 0) filter.officeDays = days.join(',');
         if (selectedDuesPaying) filter.duesPaying = selectedDuesPaying;
+        var customSubject = subjectInput.value.trim() || null;
         statusMsg.textContent = 'Sending...';
         statusMsg.style.color = 'var(--muted)';
         serverCall().withSuccessHandler(function(result) {
           statusMsg.textContent = result && result.success ? result.message : (result && result.message) || 'Error sending.';
           statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
-          if (result && result.success) msgTextarea.value = '';
+          if (result && result.success) { msgTextarea.value = ''; subjectInput.value = ''; }
         }).withFailureHandler(function() {
           statusMsg.textContent = 'Error sending. Try again.';
           statusMsg.style.color = 'var(--danger)';
-        }).dataSendBroadcast(CURRENT_USER.email, filter, msg);
+        }).dataSendBroadcast(CURRENT_USER.email, filter, msg, customSubject);
       }
     }, 'Send Broadcast'));
 
@@ -1208,7 +1227,7 @@ function renderStewardNotifications(appContainer) {
                 setTimeout(function() { card.remove(); }, 300);
                 AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
               }
-            }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+            }).dismissWebAppNotification(n.id);
           }}, '\u2715');
           card.appendChild(dismissBtn);
           target.appendChild(card);
@@ -1318,6 +1337,31 @@ function renderStewardNotifications(appContainer) {
       var expiresInput = el('input', { className: 'form-input', type: 'date' });
       expiresGroup.appendChild(expiresInput);
 
+      // Dismiss Mode (v4.22.0)
+      var selectedDismissMode = 'Dismissible';
+      var dismissModeGroup = el('div', { className: 'form-group' });
+      dismissModeGroup.appendChild(el('label', { className: 'form-label' }, 'Dismiss Mode'));
+      var dismissHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } },
+        'Dismissible: member can close it permanently. Timed: auto-expires on set date, no dismiss button shown.');
+      dismissModeGroup.appendChild(dismissHint);
+      var dmBar = el('div', { style: { display: 'flex', gap: '8px' } });
+      var dismissibleBtn = el('button', { className: 'filter-tab active', onClick: function() {
+        selectedDismissMode = 'Dismissible';
+        dismissibleBtn.className = 'filter-tab active';
+        timedBtn.className = 'filter-tab';
+        expiresGroup.style.opacity = '1';
+      }}, '\u2715 Dismissible');
+      var timedBtn = el('button', { className: 'filter-tab', onClick: function() {
+        selectedDismissMode = 'Timed';
+        timedBtn.className = 'filter-tab active';
+        dismissibleBtn.className = 'filter-tab';
+        expiresGroup.style.opacity = '1'; // still needs a date
+        expiresInput.focus();
+      }}, '\u23F0 Timed');
+      dmBar.appendChild(dismissibleBtn);
+      dmBar.appendChild(timedBtn);
+      dismissModeGroup.appendChild(dmBar);
+
       var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
 
       var sendBtn = el('button', { className: 'btn btn-primary', onClick: function() {
@@ -1328,6 +1372,16 @@ function renderStewardNotifications(appContainer) {
         sendBtn.textContent = 'Sending...';
         sendBtn.disabled = true;
         statusMsg.textContent = '';
+
+        // Timed mode requires an expires date
+        if (selectedDismissMode === 'Timed' && !expiresInput.value.trim()) {
+          statusMsg.textContent = 'Timed mode requires an expiry date.';
+          statusMsg.style.color = 'var(--danger)';
+          sendBtn.textContent = 'Send Notification';
+          sendBtn.disabled = false;
+          return;
+        }
+
         serverCall().withSuccessHandler(function(r) {
           sendBtn.textContent = 'Send Notification';
           sendBtn.disabled = false;
@@ -1352,7 +1406,8 @@ function renderStewardNotifications(appContainer) {
           message: msgTextarea.value.trim(),
           priority: selectedPriority,
           expiresDate: expiresInput.value || '',
-          senderName: CURRENT_USER.name || ''
+          senderName: CURRENT_USER.name || '',
+          dismissMode: selectedDismissMode
         });
       }}, 'Send Notification');
 
@@ -1373,11 +1428,12 @@ function renderStewardNotifications(appContainer) {
         msgTextarea
       ]));
       target.appendChild(expiresGroup);
+      target.appendChild(dismissModeGroup);
       target.appendChild(statusMsg);
       target.appendChild(sendBtn);
     }
 
-    // --- Manage: view all notifications ---
+    // --- Manage: view ALL notifications (full ledger for stewards) ---
     function _renderNotifManage(target) {
       showLoading(target);
       serverCall().withSuccessHandler(function(notifications) {
@@ -1388,18 +1444,58 @@ function renderStewardNotifications(appContainer) {
         }
         var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
         notifications.forEach(function(n) {
-          var row = el('div', { className: 'res-manage-row', style: { flexWrap: 'wrap' } });
+          var row = el('div', { className: 'res-manage-row', style: { flexWrap: 'wrap', gap: '6px', alignItems: 'center' } });
           var typeClass = typeColors[n.type] || 'system';
           row.appendChild(el('span', { className: 'notif-type-badge notif-type-' + typeClass, style: { fontSize: '10px' } }, n.type));
+          // Status pill
+          var statusColor = n.status === 'Active' ? 'var(--success)' : 'var(--muted)';
+          row.appendChild(el('span', { className: 'notif-type-badge', style: { background: 'transparent', border: '1px solid ' + statusColor, color: statusColor, fontSize: '10px' } }, n.status));
+          // Dismiss mode pill
+          row.appendChild(el('span', { className: 'notif-type-badge', style: { background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: '10px' } }, n.dismissMode || 'Dismissible'));
           row.appendChild(el('span', { className: 'res-manage-title' }, n.title));
           row.appendChild(el('span', { className: 'res-manage-meta' }, 'To: ' + n.recipient));
           row.appendChild(el('span', { className: 'res-manage-meta' }, n.createdDate));
+          if (n.dismissedCount > 0) {
+            row.appendChild(el('span', { className: 'res-manage-meta', style: { color: 'var(--accent)' } }, n.dismissedCount + ' dismissed'));
+          }
+          if (n.expiresDate) row.appendChild(el('span', { className: 'res-manage-meta' }, 'Exp: ' + n.expiresDate));
+
+          // Archive button — only shown for Active notifications
+          if (n.status === 'Active') {
+            var archiveBtn = el('button', {
+              className: 'filter-tab',
+              style: { marginLeft: 'auto', fontSize: '11px', padding: '3px 10px', color: 'var(--muted)' },
+              onClick: function() {
+                archiveBtn.textContent = '...';
+                archiveBtn.disabled = true;
+                serverCall().withSuccessHandler(function(r) {
+                  if (r && r.success) {
+                    // Update status pill and hide archive button in place
+                    row.querySelector('.notif-type-badge[style*="--success"]') &&
+                      (row.querySelector('.notif-type-badge[style*="--success"]').textContent = 'Archived');
+                    row.querySelector('.notif-type-badge[style*="--success"]') &&
+                      (row.querySelector('.notif-type-badge[style*="--success"]').style.borderColor = 'var(--muted)') &&
+                      (row.querySelector('.notif-type-badge[style*="--success"]').style.color = 'var(--muted)');
+                    archiveBtn.remove();
+                  } else {
+                    archiveBtn.textContent = 'Archive';
+                    archiveBtn.disabled = false;
+                  }
+                }).withFailureHandler(function() {
+                  archiveBtn.textContent = 'Archive';
+                  archiveBtn.disabled = false;
+                }).archiveWebAppNotification(n.id);
+              }
+            }, 'Archive');
+            row.appendChild(archiveBtn);
+          }
+
           target.appendChild(row);
         });
       }).withFailureHandler(function() {
         target.innerHTML = '';
         target.appendChild(el('div', { style: { padding: '24px', color: 'var(--danger)' } }, 'Failed to load.'));
-      }).getWebAppNotifications(CURRENT_USER.email, 'steward');
+      }).getAllWebAppNotifications();
     }
 
     refreshSubTabs();

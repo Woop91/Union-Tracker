@@ -85,7 +85,7 @@ function setupDashboardDriveFolders() {
     { name: DRIVE_CONFIG.RESOURCES_SUBFOLDER,     propKey: 'RESOURCES_FOLDER_ID',         cfgKey: 'RESOURCES_FOLDER_ID' },
     { name: DRIVE_CONFIG.MINUTES_SUBFOLDER,       propKey: 'MINUTES_FOLDER_ID',           cfgKey: 'MINUTES_FOLDER_ID' },
     { name: DRIVE_CONFIG.EVENT_CHECKIN_SUBFOLDER, propKey: 'EVENT_CHECKIN_FOLDER_ID',     cfgKey: 'EVENT_CHECKIN_FOLDER_ID' },
-    { name: DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER, propKey: 'MEMBER_CONTACTS_FOLDER_ID', cfgKey: 'MEMBER_CONTACTS_FOLDER_ID' },
+    { name: DRIVE_CONFIG.MEMBERS_SUBFOLDER,       propKey: 'MEMBERS_FOLDER_ID',           cfgKey: 'MEMBERS_FOLDER_ID' },
   ];
 
   var result = {
@@ -280,96 +280,251 @@ function getOrCreateRootFolder() {
  * @param {string} grievanceId - The grievance ID
  * @return {Object} Result with folder URL or error
  */
+// ============================================================================
+// PER-MEMBER ADMIN FOLDER
+// ============================================================================
+
+/**
+ * Gets or creates the per-member master admin folder under [Root]/Members/.
+ * Structure: [Dashboard Root]/Members/LastName, FirstName/
+ *              ├── Contact Log — LastName, FirstName  (Sheet — added by DataService)
+ *              └── Grievances/                         (subfolder for case folders)
+ *
+ * Sharing model:
+ *   - Members/ parent      → steward-only (PRIVATE, never shared)
+ *   - Per-member folder    → steward-only (PRIVATE, never shared with member directly)
+ *   - Individual grievance case folders get member editor access (see setupDriveFolderForGrievance)
+ *
+ * Writes the master folder URL to Member Directory "Member Admin Folder URL" column (non-fatal).
+ * Caches MEMBERS_FOLDER_ID in Script Properties.
+ *
+ * @param {string} memberEmail - The member's email address
+ * @returns {{ masterFolder: Folder, grievancesFolder: Folder }|null}
+ */
+function getOrCreateMemberAdminFolder(memberEmail) {
+  if (!memberEmail) return null;
+  memberEmail = String(memberEmail).trim().toLowerCase();
+
+  try {
+    var props = PropertiesService.getScriptProperties();
+
+    // ── 1. Get or locate the Members/ parent folder ─────────────────────────
+    var membersRoot = null;
+    var storedMembersId = props.getProperty('MEMBERS_FOLDER_ID') || '';
+    if (storedMembersId) {
+      try { membersRoot = DriveApp.getFolderById(storedMembersId); } catch (e) { membersRoot = null; }
+    }
+    if (!membersRoot) {
+      // Resolve via dashboard root
+      var dashRootId = props.getProperty('DASHBOARD_ROOT_FOLDER_ID') || '';
+      if (dashRootId) {
+        try {
+          var dashRoot = DriveApp.getFolderById(dashRootId);
+          var mIter = dashRoot.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+          membersRoot = mIter.hasNext() ? mIter.next() : dashRoot.createFolder(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+        } catch (e) { membersRoot = null; }
+      }
+      if (!membersRoot) {
+        var fallbackIter = DriveApp.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+        membersRoot = fallbackIter.hasNext() ? fallbackIter.next() : DriveApp.createFolder(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+      }
+      props.setProperty('MEMBERS_FOLDER_ID', membersRoot.getId());
+    }
+
+    // ── 2. Resolve member display name from Member Directory ─────────────────
+    var memberFolderName = '';
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var mSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (mSheet) {
+      var mData = mSheet.getDataRange().getValues();
+      var mHeaders = mData[0];
+      var mEmailIdx = -1, mFirstIdx = -1, mLastIdx = -1;
+      for (var mh = 0; mh < mHeaders.length; mh++) {
+        var mhl = String(mHeaders[mh]).toLowerCase().trim();
+        if (mhl === 'email')      mEmailIdx = mh;
+        else if (mhl === 'first name') mFirstIdx = mh;
+        else if (mhl === 'last name')  mLastIdx  = mh;
+      }
+      if (mEmailIdx !== -1) {
+        for (var mr = 1; mr < mData.length; mr++) {
+          if (String(mData[mr][mEmailIdx]).toLowerCase().trim() === memberEmail) {
+            var fn = mFirstIdx !== -1 ? String(mData[mr][mFirstIdx] || '').trim() : '';
+            var ln = mLastIdx  !== -1 ? String(mData[mr][mLastIdx]  || '').trim() : '';
+            if (ln && fn) memberFolderName = sanitizeFolderName(ln) + ', ' + sanitizeFolderName(fn);
+            else if (fn)  memberFolderName = sanitizeFolderName(fn);
+            break;
+          }
+        }
+      }
+    }
+    // Fallback to email prefix
+    if (!memberFolderName) {
+      memberFolderName = sanitizeFolderName(memberEmail.split('@')[0].replace(/[._]/g, ' ').trim() || memberEmail);
+    }
+
+    // ── 3. Find or create per-member master folder ───────────────────────────
+    var masterFolder = null;
+    var isNewMaster   = false;
+    var existingIter  = membersRoot.getFoldersByName(memberFolderName);
+    if (existingIter.hasNext()) {
+      masterFolder = existingIter.next();
+    } else {
+      masterFolder = membersRoot.createFolder(memberFolderName);
+      isNewMaster  = true;
+    }
+
+    // ── 4. Find or create Grievances/ subfolder ──────────────────────────────
+    var grievancesFolder = null;
+    var gIter = masterFolder.getFoldersByName('Grievances');
+    if (gIter.hasNext()) {
+      grievancesFolder = gIter.next();
+    } else {
+      grievancesFolder = masterFolder.createFolder('Grievances');
+    }
+
+    // ── 5. Write master folder URL to Member Directory (non-fatal) ───────────
+    if (isNewMaster) {
+      try {
+        var folderUrl = masterFolder.getUrl();
+        if (mSheet) {
+          // Reload fresh (mData may be stale after loop above)
+          var mData2    = mSheet.getDataRange().getValues();
+          var mHeaders2 = mData2[0];
+          var mEmailIdx2 = -1, mAdminIdx2 = -1;
+          for (var h2 = 0; h2 < mHeaders2.length; h2++) {
+            var hl2 = String(mHeaders2[h2]).toLowerCase().trim();
+            if (hl2 === 'email')                  mEmailIdx2 = h2;
+            else if (hl2 === 'member admin folder url') mAdminIdx2 = h2;
+          }
+          if (mEmailIdx2 !== -1 && mAdminIdx2 !== -1) {
+            for (var r2 = 1; r2 < mData2.length; r2++) {
+              if (String(mData2[r2][mEmailIdx2]).toLowerCase().trim() === memberEmail) {
+                mSheet.getRange(r2 + 1, mAdminIdx2 + 1).setValue(folderUrl);
+                break;
+              }
+            }
+          }
+        }
+      } catch (writeErr) {
+        Logger.log('getOrCreateMemberAdminFolder URL writeback error: ' + writeErr.message);
+      }
+    }
+
+    return { masterFolder: masterFolder, grievancesFolder: grievancesFolder };
+
+  } catch (err) {
+    Logger.log('getOrCreateMemberAdminFolder error for ' + memberEmail + ': ' + err.message);
+    return null;
+  }
+}
+
+/**
+ * Creates or retrieves a Google Drive folder for a grievance case.
+ * Folder is nested under [Root]/Members/LastName, FirstName/Grievances/{id} - {date}/
+ * Member receives EDITOR access on the case folder so they can upload evidence.
+ * Steward receives EDITOR access (in addition to inherited steward team access).
+ *
+ * @param {string} grievanceId - The grievance ID
+ * @return {Object} { success, folderId, folderUrl, message } or errorResponse
+ */
 function setupDriveFolderForGrievance(grievanceId) {
   try {
-    // Get grievance data
     const grievance = getGrievanceById(grievanceId);
     if (!grievance) {
       return errorResponse('Grievance not found', 'setupDriveFolderForGrievance');
     }
 
-    // Extract fields for folder naming
-    const firstName = grievance['First Name'] || grievance.firstName || '';
-    const lastName = grievance['Last Name'] || grievance.lastName || '';
-    const dateFiled = grievance['Date Filed'] || grievance.dateFiled || new Date();
+    const firstName   = grievance['First Name'] || grievance.firstName  || '';
+    const lastName    = grievance['Last Name']  || grievance.lastName   || '';
+    const memberEmail = String(grievance['Member Email'] || grievance.memberEmail || '').trim().toLowerCase();
+    const dateFiled   = grievance['Date Filed'] || grievance.dateFiled  || new Date();
 
-    // Format date as YYYY-MM-DD (full date the claim was initiated)
     const dateStr = Utilities.formatDate(
       new Date(dateFiled),
       Session.getScriptTimeZone(),
       'yyyy-MM-dd'
     );
 
-    // Create folder name from template
-    // Simplified Format: LastName, FirstName - YYYY-MM-DD
-    let folderName;
-    if (firstName && lastName) {
-      folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE
-        .replace('{date}', dateStr)
-        .replace('{lastName}', sanitizeFolderName(lastName))
-        .replace('{firstName}', sanitizeFolderName(firstName));
-    } else {
-      // Fallback if name not available: GrievanceID - Date
-      folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE_SIMPLE
-        .replace('{date}', dateStr)
-        .replace('{grievanceId}', grievanceId);
+    // Case folder name: {grievanceId} - {date}   (parent already scoped to the member)
+    const caseFolderName = grievanceId + ' - ' + dateStr;
+
+    // ── Resolve member admin folder ──────────────────────────────────────────
+    // Try by email first; fall back to name-only lookup if no email
+    var folderParent = null;  // the Grievances/ subfolder to create under
+    if (memberEmail) {
+      var adminResult = getOrCreateMemberAdminFolder(memberEmail);
+      if (adminResult) folderParent = adminResult.grievancesFolder;
+    }
+    if (!folderParent) {
+      // Fallback: find/create member folder by name under Members/
+      var props        = PropertiesService.getScriptProperties();
+      var membersRootId = props.getProperty('MEMBERS_FOLDER_ID') || '';
+      var membersRoot   = null;
+      if (membersRootId) {
+        try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (e) {}
+      }
+      if (!membersRoot) membersRoot = getOrCreateRootFolder(); // ultimate fallback to dashboard root
+      var memberFolderName = (lastName && firstName)
+        ? (sanitizeFolderName(lastName) + ', ' + sanitizeFolderName(firstName))
+        : (sanitizeFolderName(firstName || lastName || 'Unknown'));
+      var mfIter  = membersRoot.getFoldersByName(memberFolderName);
+      var mFolder = mfIter.hasNext() ? mfIter.next() : membersRoot.createFolder(memberFolderName);
+      var gfIter  = mFolder.getFoldersByName('Grievances');
+      folderParent = gfIter.hasNext() ? gfIter.next() : mFolder.createFolder('Grievances');
     }
 
-    // Get root folder
-    const rootFolder = getOrCreateRootFolder();
-
-    // Check if folder already exists
-    const existingFolders = rootFolder.getFoldersByName(folderName);
-    if (existingFolders.hasNext()) {
-      const existing = existingFolders.next();
-      return {
-        success: true,
-        folderId: existing.getId(),
-        folderUrl: existing.getUrl(),
-        message: 'Folder already exists'
-      };
+    // ── Check for existing case folder ───────────────────────────────────────
+    var existingIter = folderParent.getFoldersByName(caseFolderName);
+    if (existingIter.hasNext()) {
+      var existing = existingIter.next();
+      return { success: true, folderId: existing.getId(), folderUrl: existing.getUrl(), message: 'Folder already exists' };
     }
 
-    // Create new folder
-    const newFolder = rootFolder.createFolder(folderName);
+    // ── Create case folder + standard subfolders ─────────────────────────────
+    var caseFolder = folderParent.createFolder(caseFolderName);
+    caseFolder.createFolder('Step 1 - Informal');
+    caseFolder.createFolder('Step 2 - Written');
+    caseFolder.createFolder('Step 3 - Review');
+    caseFolder.createFolder('Supporting Documents');
 
-    // Create standard subfolders
-    newFolder.createFolder('Step 1 - Informal');
-    newFolder.createFolder('Step 2 - Written');
-    newFolder.createFolder('Step 3 - Review');
-    newFolder.createFolder('Supporting Documents');
-
-    // Share folder with assigned steward if available
-    if (grievance && grievance.steward) {
+    // ── Share: member gets EDITOR (can upload evidence) ──────────────────────
+    if (memberEmail) {
       try {
-        var stewardEmail = typeof grievance.stewardEmail === 'string' ? grievance.stewardEmail : '';
-        if (stewardEmail) {
-          newFolder.addEditor(stewardEmail);
-        }
-      } catch (shareError) {
-        Logger.log('Could not share folder with steward: ' + shareError.message);
+        caseFolder.addEditor(memberEmail);
+      } catch (shareErr) {
+        Logger.log('setupDriveFolderForGrievance: could not share with member ' + memberEmail + ': ' + shareErr.message);
       }
     }
 
-    // Update grievance record with folder link
-    updateGrievanceFolderLink(grievanceId, newFolder.getUrl());
+    // ── Share: assigned steward gets EDITOR ──────────────────────────────────
+    var stewardEmail = typeof grievance.stewardEmail === 'string'
+      ? grievance.stewardEmail
+      : (grievance['Assigned Steward'] ? String(grievance['Assigned Steward']).trim() : '');
+    if (stewardEmail && stewardEmail.indexOf('@') !== -1) {
+      try {
+        caseFolder.addEditor(stewardEmail);
+      } catch (shareErr) {
+        Logger.log('setupDriveFolderForGrievance: could not share with steward ' + stewardEmail + ': ' + shareErr.message);
+      }
+    }
 
-    logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
-      grievanceId: grievanceId,
-      folderId: newFolder.getId(),
-      folderName: folderName,
-      createdBy: Session.getActiveUser().getEmail()
-    });
+    // ── Write URL back to Grievance Log ─────────────────────────────────────
+    updateGrievanceFolderLink(grievanceId, caseFolder.getUrl());
 
-    return {
-      success: true,
-      folderId: newFolder.getId(),
-      folderUrl: newFolder.getUrl(),
-      message: 'Folder created successfully'
-    };
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
+        grievanceId:  grievanceId,
+        folderId:     caseFolder.getId(),
+        folderName:   caseFolderName,
+        memberEmail:  memberEmail,
+        createdBy:    Session.getActiveUser().getEmail()
+      });
+    }
+
+    return { success: true, folderId: caseFolder.getId(), folderUrl: caseFolder.getUrl(), message: 'Folder created successfully' };
 
   } catch (error) {
-    console.error('Error creating Drive folder:', error);
+    Logger.log('setupDriveFolderForGrievance error: ' + error.message);
     return errorResponse(error.message, 'setupDriveFolderForGrievance');
   }
 }
@@ -1214,86 +1369,38 @@ function processMeetingDocNotifications() {
  * @param {string} memberId - The member ID
  * @returns {Object} { success, folderUrl, folderId, message, error }
  */
+/**
+ * @deprecated Use getOrCreateMemberAdminFolder(memberEmail) instead.
+ * Kept for backwards-compatibility with steward_view "Create Member Folder" button.
+ * Resolves the member's email from their memberId, then delegates.
+ */
 function setupDriveFolderForMember(memberId) {
   try {
-    if (!memberId) {
-      return errorResponse('Member ID is required');
-    }
+    if (!memberId) return errorResponse('Member ID is required');
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!memberSheet) return errorResponse('Member Directory not found');
 
-    // Find member row
     var memberData = memberSheet.getDataRange().getValues();
-    var memberRow = -1;
-    var firstName = '';
-    var lastName = '';
+    var emailCol   = -1;
+    for (var h = 0; h < memberData[0].length; h++) {
+      if (String(memberData[0][h]).toLowerCase().trim() === 'email') { emailCol = h; break; }
+    }
+    var memberEmail = '';
     for (var i = 1; i < memberData.length; i++) {
       if (String(memberData[i][MEMBER_COLS.MEMBER_ID - 1]) === String(memberId)) {
-        memberRow = i + 1;
-        firstName = memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '';
-        lastName = memberData[i][MEMBER_COLS.LAST_NAME - 1] || '';
+        memberEmail = emailCol !== -1 ? String(memberData[i][emailCol]).trim() : '';
         break;
       }
     }
-    if (memberRow === -1) {
-      return errorResponse('Member not found: ' + memberId);
-    }
+    if (!memberEmail) return errorResponse('Member not found or has no email: ' + memberId);
 
-    // Check if member has an existing grievance with a Drive folder
-    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-    if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-      var gData = grievanceSheet.getDataRange().getValues();
-      for (var g = 1; g < gData.length; g++) {
-        if (String(gData[g][GRIEVANCE_COLS.MEMBER_ID - 1]) === String(memberId)) {
-          var existingUrl = gData[g][GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1];
-          if (existingUrl) {
-            return {
-              success: true,
-              folderUrl: existingUrl,
-              message: 'Using existing grievance folder for this member'
-            };
-          }
-        }
-      }
-    }
-
-    // No existing folder found - create a new one
-    var rootFolder = getOrCreateRootFolder();
-    var folderName = sanitizeFolderName(lastName) + ', ' + sanitizeFolderName(firstName) + ' - ' + memberId;
-
-    // Check if folder already exists
-    var existingFolders = rootFolder.getFoldersByName(folderName);
-    if (existingFolders.hasNext()) {
-      var existing = existingFolders.next();
-      return {
-        success: true,
-        folderId: existing.getId(),
-        folderUrl: existing.getUrl(),
-        message: 'Folder already exists'
-      };
-    }
-
-    var newFolder = rootFolder.createFolder(folderName);
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('MEMBER_FOLDER_CREATED', {
-        memberId: memberId,
-        folderId: newFolder.getId(),
-        folderName: folderName
-      });
-    }
-
-    return {
-      success: true,
-      folderId: newFolder.getId(),
-      folderUrl: newFolder.getUrl(),
-      message: 'Folder created successfully'
-    };
-  } catch (error) {
-    Logger.log('Error creating member Drive folder: ' + error.message);
-    return errorResponse(error.message);
+    var result = getOrCreateMemberAdminFolder(memberEmail);
+    if (!result) return errorResponse('Could not create member admin folder');
+    return { success: true, folderId: result.masterFolder.getId(), folderUrl: result.masterFolder.getUrl(), message: 'Member admin folder ready' };
+  } catch (err) {
+    return errorResponse(err.message);
   }
 }
 
@@ -4895,17 +5002,20 @@ function getWebAppNotifications(userEmail, userRole) {
         expiresDate: row[C.EXPIRES_DATE - 1] ? Utilities.formatDate(
           row[C.EXPIRES_DATE - 1] instanceof Date ? row[C.EXPIRES_DATE - 1] : new Date(row[C.EXPIRES_DATE - 1]),
           Session.getScriptTimeZone(), 'MMM d, yyyy') : '',
+        // v4.22.0: 'Dismissible' (default) | 'Timed'. Empty cells on existing sheets default to Dismissible.
+        dismissMode: String(row[C.DISMISS_MODE - 1] || 'Dismissible'),
         rowIndex: i + 1
       });
     }
 
-    // Sort: Urgent first, then newest first
+    // FIX (v4.22.0): reverse first so newest is at index 0, THEN stable-sort Urgent to top.
+    // Previous code reversed AFTER sorting, which sent Urgent to the bottom.
+    results.reverse();
     results.sort(function(a, b) {
       if (a.priority === 'Urgent' && b.priority !== 'Urgent') return -1;
       if (b.priority === 'Urgent' && a.priority !== 'Urgent') return 1;
-      return 0; // preserve sheet order (newest at bottom, but we'll reverse)
+      return 0;
     });
-    results.reverse();
 
     return results;
   } catch (e) {
@@ -5037,7 +5147,8 @@ function sendWebAppNotification(data) {
       today,
       escapeForFormula(data.expiresDate || ''),
       '',
-      'Active'
+      'Active',
+      escapeForFormula(data.dismissMode || 'Dismissible')  // v4.22.0
     ];
 
     sheet.appendRow(newRow);
@@ -5045,6 +5156,105 @@ function sendWebAppNotification(data) {
     return { success: true, notificationId: nextId, message: 'Notification sent' };
   } catch (e) {
     logError_('sendWebAppNotification', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Returns ALL notifications from the sheet regardless of recipient/expiry.
+ * Steward-only — used by the Manage sub-tab to give stewards a full ledger view.
+ * Includes dismissedCount so stewards can see reach/engagement.
+ * @returns {Object[]} array of notification objects with status + dismissedCount
+ */
+function getAllWebAppNotifications() {
+  try {
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return [];
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+
+    var C = NOTIFICATIONS_COLS;
+    var results = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var id = String(row[C.NOTIFICATION_ID - 1] || '').trim();
+      if (!id) continue;
+
+      // Count dismissals for engagement metric
+      var dismissedRaw = String(row[C.DISMISSED_BY - 1] || '').trim();
+      var dismissedCount = dismissedRaw
+        ? dismissedRaw.split(',').filter(function(e) { return e.trim(); }).length
+        : 0;
+
+      results.push({
+        id: id,
+        recipient: String(row[C.RECIPIENT - 1] || ''),
+        type: String(row[C.TYPE - 1] || 'System'),
+        title: String(row[C.TITLE - 1] || ''),
+        message: String(row[C.MESSAGE - 1] || ''),
+        priority: String(row[C.PRIORITY - 1] || 'Normal'),
+        sentBy: String(row[C.SENT_BY_NAME - 1] || ''),
+        createdDate: row[C.CREATED_DATE - 1] ? Utilities.formatDate(
+          row[C.CREATED_DATE - 1] instanceof Date ? row[C.CREATED_DATE - 1] : new Date(row[C.CREATED_DATE - 1]),
+          Session.getScriptTimeZone(), 'MMM d, yyyy') : '',
+        expiresDate: row[C.EXPIRES_DATE - 1] ? Utilities.formatDate(
+          row[C.EXPIRES_DATE - 1] instanceof Date ? row[C.EXPIRES_DATE - 1] : new Date(row[C.EXPIRES_DATE - 1]),
+          Session.getScriptTimeZone(), 'MMM d, yyyy') : '',
+        status: String(row[C.STATUS - 1] || 'Active'),
+        dismissMode: String(row[C.DISMISS_MODE - 1] || 'Dismissible'),
+        dismissedCount: dismissedCount,
+        rowIndex: i + 1
+      });
+    }
+
+    // Newest first
+    results.reverse();
+    return results;
+  } catch (e) {
+    logError_('getAllWebAppNotifications', e);
+    return [];
+  }
+}
+
+
+/**
+ * Archives a notification (sets Status = 'Archived').
+ * Steward-only. Archived notifications are excluded from all member views
+ * because getWebAppNotifications() filters Status = 'Active' only.
+ * Non-destructive — row stays in sheet, data is preserved.
+ * @param {string} notificationId — e.g. 'NOTIF-003'
+ * @returns {Object} { success, message }
+ */
+function archiveWebAppNotification(notificationId) {
+  try {
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) return { success: false, message: 'Notifications sheet not found.' };
+
+    var data = sheet.getDataRange().getValues();
+    var C = NOTIFICATIONS_COLS;
+
+    for (var i = 1; i < data.length; i++) {
+      var rowId = String(data[i][C.NOTIFICATION_ID - 1] || '').trim();
+      if (rowId === notificationId) {
+        sheet.getRange(i + 1, C.STATUS).setValue('Archived');
+        return { success: true, message: 'Notification archived.' };
+      }
+    }
+
+    return { success: false, message: 'Notification not found.' };
+  } catch (e) {
+    logError_('archiveWebAppNotification', e);
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
@@ -5139,348 +5349,75 @@ function getNotificationRecipientListFull() {
 }
 
 
-// ============================================================================
-// NOTIFICATIONS WEB PAGE (v4.12.0)
-// ============================================================================
-// ?page=notifications - dual-role page
-// Members: view + dismiss notifications
-// Stewards: inline compose form + recipient picker + view/manage
-// Recipient picker: groups + individuals, filterable by location/dept/title
-// ============================================================================
+// NOTE (v4.22.0): getWebAppNotificationsHtml() removed — standalone ?page=notifications
+// route was never wired in doGet(). Notifications fully handled by SPA (index.html).
+
+
+// ─── ONE-TIME MIGRATIONS ────────────────────────────────────────────────────
 
 /**
- * Generate notifications page HTML.
- * Detects role via checkWebAppAuthorization - stewards get compose form.
- * @returns {string} full HTML page
+ * ONE-TIME MIGRATION (v4.22.0) — Add Dismiss_Mode column to existing Notifications sheet.
+ * Safe to re-run: checks for column before modifying anything.
+ * After running successfully, this function can be deleted from the codebase.
+ *
+ * HOW TO RUN: Open Apps Script editor → select this function → click Run.
+ * Expected output in Logs: "Migration complete" or "Already has Dismiss_Mode column".
  */
-function getWebAppNotificationsHtml() {
-  var isSteward = false;
-  var userEmail = '';
-  var userName = '';
-  try {
-    var authResult = checkWebAppAuthorization('steward');
-    isSteward = authResult.isAuthorized;
-    userEmail = authResult.email || Session.getActiveUser().getEmail() || '';
-    userName = userEmail.split('@')[0] || '';
-  } catch (_authErr) {
-    try { userEmail = Session.getActiveUser().getEmail() || ''; } catch (_e2) { userEmail = ''; }
+function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+  var ui;
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+
+  if (!sheet) {
+    var msg = 'Notifications sheet not found. Nothing to migrate.';
+    Logger.log(msg);
+    if (ui) ui.alert(msg);
+    return;
   }
 
-  var userRole = isSteward ? 'steward' : 'member';
-  var notifications = getWebAppNotifications(userEmail, userRole);
-  var notifJson = JSON.stringify(notifications || []);
-  var recipientJson = isSteward ? JSON.stringify(getNotificationRecipientListFull() || []) : '[]';
+  var headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-  var p = [];
-  p.push('<!DOCTYPE html><html><head>');
-  p.push('<meta charset="utf-8">');
-  p.push('<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">');
-  p.push('<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">');
-  p.push('<title>Notifications | ' + escapeHtml(typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union') : 'Union') + '</title>');
-
-  // ── CSS ──
-  p.push('<style>');
-  p.push('*{box-sizing:border-box;margin:0;padding:0}');
-  p.push('body{font-family:"DM Sans",sans-serif;background:#fafaf9;min-height:100vh;padding-bottom:20px;color:#1c1917}');
-  p.push('.hero{background:linear-gradient(145deg,#92400e,#b45309);color:#fff;padding:26px 20px 34px;position:relative;overflow:hidden}');
-  p.push('.hero h1{font-family:"Fraunces",serif;font-size:clamp(22px,5vw,28px);font-weight:700;letter-spacing:-0.02em;margin-bottom:5px}');
-  p.push('.hero .sub{font-size:14px;opacity:0.85}');
-  p.push('.hero .curve{position:absolute;bottom:-20px;left:-20px;right:-20px;height:40px;background:#fafaf9;border-radius:50% 50% 0 0}');
-  p.push('.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:600;margin-top:8px}');
-  p.push('.container{max-width:600px;margin:0 auto;padding:0 16px}');
-  // Compose
-  p.push('.compose{background:#fff;border-radius:16px;padding:20px;margin-top:-12px;position:relative;z-index:2;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid #f5f5f4;margin-bottom:20px}');
-  p.push('.compose h2{font-family:"Fraunces",serif;font-size:18px;color:#92400e;margin-bottom:16px}');
-  p.push('.fg{margin-bottom:14px}');
-  p.push('.fg label{display:block;font-weight:600;font-size:13px;margin-bottom:6px;color:#44403c}');
-  p.push('.fg input,.fg select,.fg textarea{width:100%;padding:12px;border:2px solid #e7e5e4;border-radius:10px;font-size:14px;font-family:"DM Sans",sans-serif;outline:none}');
-  p.push('.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#b45309}');
-  p.push('.fg textarea{min-height:80px;resize:vertical}');
-  // Tabs
-  p.push('.rtabs{display:flex;gap:6px;margin-bottom:10px}');
-  p.push('.rtabs button{padding:6px 14px;border-radius:20px;border:2px solid #e7e5e4;background:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif}');
-  p.push('.rtabs button.act{background:#92400e;color:#fff;border-color:#92400e}');
-  // Groups
-  p.push('.gbtn{padding:8px 14px;border-radius:10px;border:2px solid #e7e5e4;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;margin:0 6px 6px 0}');
-  p.push('.gbtn.sel{background:#fffbeb;border-color:#b45309;color:#92400e}');
-  // Filter bar
-  p.push('.fbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}');
-  p.push('.fbar select{padding:8px 10px;border:2px solid #e7e5e4;border-radius:8px;font-size:12px;font-family:"DM Sans",sans-serif;background:#fff;outline:none;min-width:100px}');
-  p.push('.fbar input{flex:1;min-width:120px;padding:8px 12px;border:2px solid #e7e5e4;border-radius:8px;font-size:12px;font-family:"DM Sans",sans-serif;outline:none}');
-  // Member list
-  p.push('.mlist{max-height:240px;overflow-y:auto;border:2px solid #e7e5e4;border-radius:10px;background:#fff}');
-  p.push('.mrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f5f5f4;cursor:pointer}');
-  p.push('.mrow:hover{background:#fffbeb}.mrow.sel{background:#fef3c7}');
-  p.push('.mchk{width:18px;height:18px;border-radius:4px;border:2px solid #d6d3d1;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px}');
-  p.push('.mchk.on{background:#92400e;border-color:#92400e;color:#fff}');
-  p.push('.mname{font-weight:600;font-size:13px}.mdtl{font-size:11px;color:#78716c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
-  p.push('.scnt{font-size:12px;color:#78716c;margin-top:6px}');
-  // Send button
-  p.push('.btn-send{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:"DM Sans",sans-serif;background:#92400e;color:#fff;margin-top:16px}');
-  p.push('.btn-send:disabled{opacity:0.5;cursor:not-allowed}');
-  // Notification cards
-  p.push('.slabel{font-size:12px;font-weight:700;color:#a8a29e;text-transform:uppercase;letter-spacing:0.06em;margin:20px 0 10px}');
-  p.push('.nc{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f5f5f4;position:relative;animation:fi 0.3s ease both}');
-  p.push('.nc.urg{border-left:4px solid #dc2626}');
-  p.push('.nc h3{font-family:"Fraunces",serif;font-size:15px;font-weight:700;color:#1c1917;margin-bottom:4px;line-height:1.3}');
-  p.push('.nc .msg{font-size:13px;color:#57534e;line-height:1.5}');
-  p.push('.nc .meta{display:flex;gap:12px;margin-top:10px;font-size:11px;color:#a8a29e;flex-wrap:wrap}');
-  p.push('.nc .dbtn{position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;color:#d6d3d1;cursor:pointer;padding:4px;line-height:1}');
-  p.push('.nc .dbtn:hover{color:#78716c}');
-  p.push('.tbdg{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;margin-right:4px}');
-  p.push('.empty{text-align:center;padding:40px 20px;color:#a8a29e}');
-  p.push('.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.15);display:none}');
-  p.push('.toast.ok{background:#065f46;color:#fff}.toast.err{background:#dc2626;color:#fff}');
-  p.push('@keyframes fi{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}');
-  p.push('</style></head><body>');
-
-  // ── Hero ──
-  p.push('<div class="hero"><div class="curve"></div>');
-  p.push('<h1>&#128276; Notifications</h1>');
-  var heroSub = isSteward ? 'Compose and manage member notifications' : 'Messages from your union steward';
-  p.push('<div class="sub">' + heroSub + '</div>');
-  if (isSteward) {
-    p.push('<div class="badge">&#128737;&#65039; Steward &#183; Compose Access</div>');
-  }
-  p.push('</div>');
-  p.push('<div class="container">');
-
-  // ── Steward Compose Form ──
-  if (isSteward) {
-    p.push('<div class="compose" id="composeForm">');
-    p.push('<h2>&#9997;&#65039; Send Notification</h2>');
-
-    // Recipient section
-    p.push('<div class="fg">');
-    p.push('<label>To</label>');
-    p.push('<div class="rtabs" id="rtabs">');
-    p.push('<button class="act" onclick="switchTab(0)">Groups</button>');
-    p.push('<button onclick="switchTab(1)">Individuals</button>');
-    p.push('</div>');
-
-    // Groups tab
-    p.push('<div id="grpTab">');
-    p.push('<button class="gbtn sel" onclick="selGrp(this,\'All Members\')">&#128226; All Members</button>');
-    p.push('<button class="gbtn" onclick="selGrp(this,\'All Stewards\')">&#128737;&#65039; All Stewards</button>');
-    p.push('<button class="gbtn" onclick="selGrp(this,\'Everyone\')">&#127760; Everyone</button>');
-    p.push('</div>');
-
-    // Individuals tab
-    p.push('<div id="indTab" style="display:none">');
-    p.push('<div class="fbar">');
-    p.push('<input type="text" id="mSearch" placeholder="Search name..." oninput="filterM()">');
-    p.push('<select id="fLoc" onchange="filterM()"><option value="">All Locations</option></select>');
-    p.push('<select id="fDept" onchange="filterM()"><option value="">All Depts</option></select>');
-    p.push('<select id="fTitle" onchange="filterM()"><option value="">All Titles</option></select>');
-    p.push('</div>');
-    p.push('<div class="mlist" id="mList"></div>');
-    p.push('<div class="scnt" id="sCnt">0 selected</div>');
-    p.push('</div>');
-    p.push('</div>');
-
-    // Type + Priority row
-    p.push('<div style="display:flex;gap:10px">');
-    p.push('<div class="fg" style="flex:1"><label>Type</label>');
-    p.push('<select id="nType"><option>Steward Message</option><option>Announcement</option><option>Deadline</option><option>System</option></select></div>');
-    p.push('<div class="fg" style="flex:1"><label>Priority</label>');
-    p.push('<select id="nPri"><option>Normal</option><option>Urgent</option></select></div>');
-    p.push('</div>');
-
-    // Title, Message, Expires
-    p.push('<div class="fg"><label>Title</label><input type="text" id="nTitle" placeholder="Short headline..."></div>');
-    p.push('<div class="fg"><label>Message</label><textarea id="nMsg" placeholder="Notification body..."></textarea></div>');
-    p.push('<div class="fg"><label>Expires (blank = manual archive only)</label><input type="date" id="nExp"></div>');
-    p.push('<button class="btn-send" id="sendBtn" onclick="doSend()">Send Notification</button>');
-    p.push('</div>'); // end compose
+  // Check if column already exists (case-insensitive)
+  for (var i = 0; i < headerRow.length; i++) {
+    if (String(headerRow[i]).toLowerCase() === 'dismiss_mode') {
+      var alreadyMsg = 'Already has Dismiss_Mode column at col ' + (i + 1) + '. No changes made.';
+      Logger.log(alreadyMsg);
+      if (ui) ui.alert(alreadyMsg);
+      return;
+    }
   }
 
-  // ── Notification List ──
-  p.push('<div class="slabel">Your Notifications</div>');
-  p.push('<div id="nList"></div>');
-  p.push('</div>'); // end container
-  p.push('<div id="toast" class="toast"></div>');
+  // Append as next column after current last column
+  var newColIndex = sheet.getLastColumn() + 1;
 
-  // ── JavaScript ──
-  p.push('<script>');
-  p.push('var UE="' + userEmail.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '";');
-  p.push('var UR="' + userRole + '";');
-  p.push('var UN="' + userName.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '";');
-  p.push('var IS=' + String(isSteward) + ';');
-  p.push('var notifs=' + notifJson + ';');
-  p.push('var allM=' + recipientJson + ';');
-  p.push('var rMode="groups";');
-  p.push('var selGroup="All Members";');
-  p.push('var selMems={};');
+  // Header cell
+  var headerCell = sheet.getRange(1, newColIndex);
+  headerCell.setValue('Dismiss_Mode')
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
 
-  // CR-XSS-6: Client-side HTML escaping for dynamic content
-  p.push('function _esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#x27;");}');
+  sheet.setColumnWidth(newColIndex, 120);
 
-  // Render notifications
-  p.push('function renderN(){');
-  p.push('var el=document.getElementById("nList");');
-  p.push('if(!notifs||!notifs.length){');
-  p.push('el.innerHTML=\'<div class="empty"><div style="font-size:48px;margin-bottom:12px;opacity:0.4">\\ud83d\\udd14</div><div style="font-family:Fraunces,serif;font-size:18px;font-weight:700;color:#78716c;margin-bottom:4px">All caught up!</div><div>No new notifications</div></div>\';');
-  p.push('return;}');
-  p.push('var tc={"Steward Message":{bg:"#eff6ff",c:"#1e40af"},"Announcement":{bg:"#f0fdf4",c:"#065f46"},"Deadline":{bg:"#fef2f2",c:"#dc2626"},"System":{bg:"#faf5ff",c:"#7c3aed"}};');
-  p.push('var h="";');
-  p.push('for(var i=0;i<notifs.length;i++){');
-  p.push('var n=notifs[i];var t=tc[n.type]||tc.System;var u=n.priority==="Urgent"?" urg":"";');
-  p.push('h+=\'<div class="nc\'+u+\'" style="animation-delay:\'+i*0.06+\'s" id="n-\'+n.id+\'">\';');
-  p.push('h+=\'<button class="dbtn" onclick="dismissN(\\x27\'+n.id+\'\\x27)">\\u2715</button>\';');
-  p.push('h+=\'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">\';');
-  p.push('h+=\'<div><span class="tbdg" style="background:\'+t.bg+\';color:\'+t.c+\'">\'+_esc(n.type)+\'</span>\';');
-  p.push('if(n.priority==="Urgent")h+=\'<span class="tbdg" style="background:#fef2f2;color:#dc2626">URGENT</span>\';');
-  p.push('h+=\'</div><span style="font-size:11px;color:#a8a29e">\'+_esc(n.createdDate)+\'</span></div>\';');
-  p.push('h+=\'<h3>\'+_esc(n.title)+\'</h3>\';');
-  p.push('h+=\'<div class="msg">\'+_esc(n.message)+\'</div>\';');
-  p.push('h+=\'<div class="meta">\';');
-  p.push('if(n.sentBy)h+=\'<span>From: \'+_esc(n.sentBy)+\'</span>\';');
-  p.push('if(n.expiresDate)h+=\'<span>Expires: \'+_esc(n.expiresDate)+\'</span>\';');
-  p.push('h+=\'</div></div>\';');
-  p.push('}');
-  p.push('el.innerHTML=h;}');
-
-  // Dismiss
-  p.push('function dismissN(id){');
-  p.push('var c=document.getElementById("n-"+id);');
-  p.push('if(c){c.style.opacity="0.3";c.style.pointerEvents="none";}');
-  p.push('google.script.run.withSuccessHandler(function(r){');
-  p.push('if(r&&r.success){if(c)c.remove();');
-  p.push('notifs=notifs.filter(function(n){return n.id!==id;});');
-  p.push('if(!notifs.length)renderN();showT("Dismissed","ok");}');
-  p.push('else{if(c){c.style.opacity="1";c.style.pointerEvents="auto";}');
-  p.push('showT((r&&r.message)||"Failed","err");}');
-  p.push('}).withFailureHandler(function(err){');
-  p.push('if(c){c.style.opacity="1";c.style.pointerEvents="auto";}');
-  p.push('showT("Error: "+err,"err");');
-  p.push('}).dismissWebAppNotification(id,UE);}');
-
-  // Steward-only functions
-  if (isSteward) {
-    // Switch tabs
-    p.push('function switchTab(idx){');
-    p.push('rMode=idx===0?"groups":"individual";');
-    p.push('document.getElementById("grpTab").style.display=idx===0?"block":"none";');
-    p.push('document.getElementById("indTab").style.display=idx===1?"block":"none";');
-    p.push('var btns=document.querySelectorAll("#rtabs button");');
-    p.push('btns[0].className=idx===0?"act":"";btns[1].className=idx===1?"act":"";');
-    p.push('if(idx===1&&!document.getElementById("mList").innerHTML)renderML();}');
-
-    // Select group
-    p.push('function selGrp(btn,grp){');
-    p.push('var all=document.querySelectorAll(".gbtn");');
-    p.push('for(var i=0;i<all.length;i++)all[i].className="gbtn";');
-    p.push('btn.className="gbtn sel";selGroup=grp;}');
-
-    // Build filter dropdowns
-    p.push('function buildFilters(){');
-    p.push('var locs={},depts={},titles={};');
-    p.push('for(var i=0;i<allM.length;i++){');
-    p.push('if(allM[i].location)locs[allM[i].location]=1;');
-    p.push('if(allM[i].department)depts[allM[i].department]=1;');
-    p.push('if(allM[i].jobTitle)titles[allM[i].jobTitle]=1;}');
-    p.push('var addOpts=function(selId,obj){var s=document.getElementById(selId);var ks=Object.keys(obj).sort();');
-    p.push('for(var j=0;j<ks.length;j++){var o=document.createElement("option");o.value=ks[j];o.textContent=ks[j];s.appendChild(o);}};');
-    p.push('addOpts("fLoc",locs);addOpts("fDept",depts);addOpts("fTitle",titles);}');
-
-    // Render member list
-    p.push('function renderML(){');
-    p.push('var q=(document.getElementById("mSearch").value||"").toLowerCase();');
-    p.push('var loc=document.getElementById("fLoc").value;');
-    p.push('var dept=document.getElementById("fDept").value;');
-    p.push('var title=document.getElementById("fTitle").value;');
-    p.push('var fl=[];');
-    p.push('for(var i=0;i<allM.length;i++){');
-    p.push('var m=allM[i];');
-    p.push('if(q&&m.name.toLowerCase().indexOf(q)===-1&&m.email.toLowerCase().indexOf(q)===-1)continue;');
-    p.push('if(loc&&m.location!==loc)continue;');
-    p.push('if(dept&&m.department!==dept)continue;');
-    p.push('if(title&&m.jobTitle!==title)continue;');
-    p.push('fl.push(m);}');
-    p.push('var el=document.getElementById("mList");');
-    p.push('if(!fl.length){el.innerHTML=\'<div style="padding:20px;text-align:center;color:#a8a29e">No members match</div>\';return;}');
-    p.push('var h="";');
-    p.push('for(var j=0;j<fl.length;j++){');
-    p.push('var m=fl[j];var s=!!selMems[m.email];');
-    p.push('h+=\'<div class="mrow\'+(s?" sel":"")+\'" onclick="togM(\\x27\'+_esc(m.email)+\'\\x27,\\x27\'+_esc(m.name).replace(/\\x27/g,"\\\\\\x27")+\'\\x27)">\';');
-    p.push('h+=\'<div class="mchk\'+(s?" on":"")+"\">"+(s?"\\u2713":"")+"</div>";');
-    p.push('h+=\'<div style="flex:1;min-width:0"><div class="mname">\'+_esc(m.name)+\'</div>\';');
-    p.push('h+=\'<div class="mdtl">\'+_esc(m.email);');
-    p.push('if(m.location)h+=" \\u00b7 "+_esc(m.location);');
-    p.push('if(m.department)h+=" \\u00b7 "+_esc(m.department);');
-    p.push('h+=\'</div></div></div>\';}');
-    p.push('el.innerHTML=h;updCnt();}');
-
-    p.push('function filterM(){renderML();}');
-
-    // Toggle member
-    p.push('function togM(email,name){');
-    p.push('if(selMems[email])delete selMems[email];');
-    p.push('else selMems[email]=name;');
-    p.push('renderML();}');
-
-    p.push('function updCnt(){');
-    p.push('var c=Object.keys(selMems).length;');
-    p.push('document.getElementById("sCnt").textContent=c+" selected";}');
-
-    // Send notification
-    p.push('function doSend(){');
-    p.push('var title=document.getElementById("nTitle").value.trim();');
-    p.push('var msg=document.getElementById("nMsg").value.trim();');
-    p.push('if(!title||!msg){showT("Title and message required","err");return;}');
-    p.push('var btn=document.getElementById("sendBtn");');
-    p.push('btn.disabled=true;btn.textContent="Sending...";');
-    p.push('var recips=[];');
-    p.push('if(rMode==="groups"){recips=[selGroup];}');
-    p.push('else{recips=Object.keys(selMems);');
-    p.push('if(!recips.length){showT("Select at least one recipient","err");btn.disabled=false;btn.textContent="Send Notification";return;}}');
-    p.push('var sent=0;var total=recips.length;var errs=[];');
-    p.push('for(var i=0;i<recips.length;i++){');
-    p.push('(function(recip){');
-    p.push('google.script.run.withSuccessHandler(function(r){');
-    p.push('sent++;if(!r||!r.success)errs.push(recip);');
-    p.push('if(sent===total){btn.disabled=false;btn.textContent="Send Notification";');
-    p.push('if(errs.length){showT(errs.length+" failed","err");}');
-    p.push('else{showT("Sent to "+total+" recipient"+(total>1?"s":""),"ok");');
-    p.push('document.getElementById("nTitle").value="";');
-    p.push('document.getElementById("nMsg").value="";');
-    p.push('document.getElementById("nExp").value="";');
-    p.push('selMems={};updCnt();renderML();refreshN();}}');
-    p.push('}).withFailureHandler(function(err){');
-    p.push('sent++;errs.push(recip);');
-    p.push('if(sent===total){btn.disabled=false;btn.textContent="Send Notification";showT("Error: "+err,"err");}');
-    p.push('}).sendWebAppNotification({');
-    p.push('recipient:recip,');
-    p.push('type:document.getElementById("nType").value,');
-    p.push('title:title,message:msg,');
-    p.push('priority:document.getElementById("nPri").value,');
-    p.push('expiresDate:document.getElementById("nExp").value,');
-    p.push('senderName:UN});');
-    p.push('})(recips[i]);}');
-    p.push('}');
-
-    // Refresh after send
-    p.push('function refreshN(){');
-    p.push('google.script.run.withSuccessHandler(function(data){');
-    p.push('notifs=data||[];renderN();');
-    p.push('}).getWebAppNotifications(UE,UR);}');
+  // Data validation on data rows
+  var dismissModeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Dismissible', 'Timed'])
+    .setAllowInvalid(false)
+    .build();
+  var lastDataRow = sheet.getLastRow();
+  if (lastDataRow >= 2) {
+    sheet.getRange(2, newColIndex, lastDataRow - 1).setDataValidation(dismissModeRule);
+    // Backfill all existing rows with 'Dismissible' (safe default — preserves legacy behaviour)
+    sheet.getRange(2, newColIndex, lastDataRow - 1).setValue('Dismissible');
   }
 
-  // Toast
-  p.push('function showT(msg,type){');
-  p.push('var t=document.getElementById("toast");');
-  p.push('t.className="toast "+(type||"ok");');
-  p.push('t.textContent=msg;t.style.display="block";');
-  p.push('setTimeout(function(){t.style.display="none";},3000);}');
-
-  // Init
-  p.push('renderN();');
-  if (isSteward) {
-    p.push('buildFilters();');
-  }
-  p.push('</script></body></html>');
-
-  return p.join('\n');
+  var successMsg = 'Migration complete. Dismiss_Mode column added at col ' + newColIndex +
+    '. All ' + (lastDataRow - 1) + ' existing rows backfilled with "Dismissible".';
+  Logger.log(successMsg);
+  if (ui) ui.alert(successMsg);
 }
 
 // ─── MANUAL RE-RUN WRAPPERS (v4.20.17) ─────────────────────────────────────

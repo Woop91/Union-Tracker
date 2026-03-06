@@ -2119,6 +2119,7 @@ function createNotificationsSheet(ss) {
   sheet.setColumnWidth(NOTIFICATIONS_COLS.EXPIRES_DATE, 120);
   sheet.setColumnWidth(NOTIFICATIONS_COLS.DISMISSED_BY, 300);
   sheet.setColumnWidth(NOTIFICATIONS_COLS.STATUS, 90);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.DISMISS_MODE, 120);  // v4.22.0
 
   // Data validation — Type
   var typeRule = SpreadsheetApp.newDataValidation()
@@ -2140,6 +2141,14 @@ function createNotificationsSheet(ss) {
     .setAllowInvalid(false)
     .build();
   sheet.getRange(2, NOTIFICATIONS_COLS.STATUS, 500).setDataValidation(statusRule);
+
+  // Data validation — Dismiss Mode (v4.22.0)
+  // 'Dismissible': member can permanently dismiss; 'Timed': expires on Expires_Date only.
+  var dismissModeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Dismissible', 'Timed'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.DISMISS_MODE, 500).setDataValidation(dismissModeRule);
 
   // Data validation — Expires Date (must be date)
   var dateRule = SpreadsheetApp.newDataValidation()
@@ -2171,7 +2180,8 @@ function createNotificationsSheet(ss) {
       today,
       nextMonthStr,
       '',
-      'Active'
+      'Active',
+      'Dismissible'
     ],
     [
       'NOTIF-002',
@@ -2185,7 +2195,8 @@ function createNotificationsSheet(ss) {
       today,
       nextWeekStr,
       '',
-      'Active'
+      'Active',
+      'Dismissible'
     ]
   ];
 

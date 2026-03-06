@@ -47,7 +47,7 @@ var DataService = (function () {
     memberHasOpenGrievance: ['has open grievance?', 'has open grievance', 'open grievance'],
     memberSupervisor: ['supervisor'],
     memberJobTitle:  ['job title', 'title', 'position'],
-    memberContactLogFolderUrl: ['contact log folder url', 'contact log folder'],
+    memberAdminFolderUrl: ['member admin folder url', 'member admin folder', 'contact log folder url'],  // 'contact log folder url' retained as fallback alias for backward compat
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -364,7 +364,7 @@ var DataService = (function () {
       supervisor: user.supervisor,
       jobTitle: user.jobTitle,
       joined: user.joined,
-      contactLogFolderUrl: user.contactLogFolderUrl || '',
+      memberAdminFolderUrl: user.memberAdminFolderUrl || '',
     };
   }
 
@@ -963,7 +963,7 @@ var DataService = (function () {
    * @param {string} message - The message body
    * @returns {Object} { success, sentCount, message }
    */
-  function sendBroadcastMessage(stewardEmail, filter, message) {
+  function sendBroadcastMessage(stewardEmail, filter, message, customSubject) {
     var auth = checkWebAppAuthorization('steward'); if (!auth || !auth.isAuthorized) return { success: false, sentCount: 0, message: 'Unauthorized' };
     if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
 
@@ -987,9 +987,10 @@ var DataService = (function () {
         if (!filterDays.some(function(d) { return memberDays.indexOf(d) !== -1; })) return false;
       }
       // Dues paying: 'paying' = only dues paying, 'nonpaying' = only non-dues paying
+      // null means column is absent — treat as paying (benefit of the doubt)
       if (filter && filter.duesPaying) {
         var dp = m.duesPaying; // true, false, or null (column absent)
-        if (filter.duesPaying === 'paying' && dp !== true) return false;
+        if (filter.duesPaying === 'paying' && dp === false) return false;
         if (filter.duesPaying === 'nonpaying' && dp !== false) return false;
       }
       return true;
@@ -999,7 +1000,8 @@ var DataService = (function () {
 
     var sentCount = 0;
     var config = ConfigReader.getConfig();
-    var subject = config.orgAbbrev + ' - Message from your ' + config.stewardLabel;
+    var autoSubject = config.orgAbbrev + ' - Message from your ' + config.stewardLabel;
+    var subject = (customSubject && String(customSubject).trim()) ? String(customSubject).trim() : autoSubject;
 
     for (var i = 0; i < filtered.length; i++) {
       try {
@@ -1227,7 +1229,7 @@ var DataService = (function () {
       zip: String(_getVal(row, colMap, HEADERS.memberZip, '')).trim(),
       supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
-      contactLogFolderUrl: String(_getVal(row, colMap, HEADERS.memberContactLogFolderUrl, '')).trim(),
+      memberAdminFolderUrl: String(_getVal(row, colMap, HEADERS.memberAdminFolderUrl, '')).trim(),
     };
   }
 
@@ -1350,124 +1352,24 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   /**
-   * Gets or creates the per-member folder inside [Root]/Member Contacts/[LastName, FirstName]/
-   * Folder name: "LastName, FirstName" — same sanitization rules as grievance folders.
-   * Member Contacts root folder ID cached in Script Properties under MEMBER_CONTACTS_FOLDER_ID.
+   * Bridge to getOrCreateMemberAdminFolder() in 05_Integrations.gs.
+   * Returns the per-member master admin folder (Members/LastName, FirstName/).
+   * Contact Log sheet lives directly inside this folder.
+   * Steward-only — never shared with member.
    * @param {string} memberEmail
    * @returns {Folder|null}
    */
-  function getOrCreateMemberContactFolder_(memberEmail) {
-    try {
-      var props = PropertiesService.getScriptProperties();
-
-      // ── Resolve member name ───────────────────────────────────────────────
-      var firstName = '', lastName = '';
-      var memberDir = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET);
-      if (memberDir) {
-        var mData = memberDir.getDataRange().getValues();
-        var mHeaders = mData[0];
-        var eIdx = -1, fIdx = -1, lIdx = -1;
-        for (var h = 0; h < mHeaders.length; h++) {
-          var hl = String(mHeaders[h]).toLowerCase().trim();
-          if (hl === 'email') eIdx = h;
-          else if (hl === 'first name') fIdx = h;
-          else if (hl === 'last name') lIdx = h;
-        }
-        var mNorm = memberEmail.toLowerCase().trim();
-        for (var r = 1; r < mData.length; r++) {
-          if (eIdx !== -1 && String(mData[r][eIdx]).toLowerCase().trim() === mNorm) {
-            firstName = fIdx !== -1 ? String(mData[r][fIdx] || '').trim() : '';
-            lastName  = lIdx !== -1 ? String(mData[r][lIdx] || '').trim() : '';
-            break;
-          }
-        }
-      }
-
-      // Fallback: derive name from email prefix if lookup fails
-      if (!firstName && !lastName) {
-        var prefix = memberEmail.split('@')[0].replace(/[._]/g, ' ');
-        firstName = prefix;
-      }
-
-      // Sanitize: strip chars Drive doesn't allow in folder names
-      function _sanitize(s) { return String(s || '').replace(/[\/\\:*?"<>|]/g, '').trim(); }
-      var memberFolderName = lastName
-        ? _sanitize(lastName) + ', ' + _sanitize(firstName)
-        : _sanitize(firstName);
-
-      // ── Get or create [Root]/Member Contacts/ ────────────────────────────
-      var storedRootId = props.getProperty('MEMBER_CONTACTS_FOLDER_ID');
-      var contactsRoot = null;
-      if (storedRootId) {
-        try { contactsRoot = DriveApp.getFolderById(storedRootId); } catch (_e) {}
-      }
-      if (!contactsRoot) {
-        // Try to find it under the dashboard root
-        var dashRootId = props.getProperty('DASHBOARD_ROOT_FOLDER_ID');
-        if (dashRootId) {
-          try {
-            var dashRoot = DriveApp.getFolderById(dashRootId);
-            var subIter = dashRoot.getFoldersByName(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
-            contactsRoot = subIter.hasNext() ? subIter.next() : dashRoot.createFolder(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
-          } catch (_e) {}
-        }
-        // Final fallback: create at My Drive root
-        if (!contactsRoot) {
-          var iter = DriveApp.getFoldersByName(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
-          contactsRoot = iter.hasNext() ? iter.next() : DriveApp.createFolder(DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER);
-        }
-        props.setProperty('MEMBER_CONTACTS_FOLDER_ID', contactsRoot.getId());
-      }
-
-      // ── Get or create [Root]/Member Contacts/[LastName, FirstName]/ ───────
-      var memberIter = contactsRoot.getFoldersByName(memberFolderName);
-      var isNewFolder = !memberIter.hasNext();
-      var memberFolder = isNewFolder ? contactsRoot.createFolder(memberFolderName) : memberIter.next();
-
-      // Share folder with member (viewer) on creation — so they can always access their log
-      if (isNewFolder) {
-        try {
-          memberFolder.addViewer(memberEmail);
-        } catch (shareErr) {
-          Logger.log('getOrCreateMemberContactFolder_ share error for ' + memberEmail + ': ' + shareErr.message);
-          // Non-fatal — folder created, sharing failed (e.g. external domain restriction)
-        }
-
-        // Write folder URL to Member Directory — Contact Log Folder URL column
-        try {
-          var folderUrl = 'https://drive.google.com/drive/folders/' + memberFolder.getId();
-          var mDirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET);
-          if (mDirSheet) {
-            var mDirData    = mDirSheet.getDataRange().getValues();
-            var mDirHeaders = mDirData[0];
-            var mDirEmailIdx = -1, mDirFolderIdx = -1;
-            for (var mh = 0; mh < mDirHeaders.length; mh++) {
-              var mhl = String(mDirHeaders[mh]).toLowerCase().trim();
-              if (mhl === 'email') mDirEmailIdx = mh;
-              else if (mhl === 'contact log folder url') mDirFolderIdx = mh;
-            }
-            if (mDirEmailIdx !== -1 && mDirFolderIdx !== -1) {
-              var mNorm2 = memberEmail.toLowerCase().trim();
-              for (var mr = 1; mr < mDirData.length; mr++) {
-                if (String(mDirData[mr][mDirEmailIdx]).toLowerCase().trim() === mNorm2) {
-                  mDirSheet.getRange(mr + 1, mDirFolderIdx + 1).setValue(folderUrl);
-                  break;
-                }
-              }
-            }
-          }
-        } catch (urlWriteErr) {
-          Logger.log('getOrCreateMemberContactFolder_ URL writeback error: ' + urlWriteErr.message);
-          // Non-fatal
-        }
-      }
-
-      return memberFolder;
-
-    } catch (e) {
-      Logger.log('getOrCreateMemberContactFolder_ error: ' + e.message);
+  function _getMemberAdminFolder_(memberEmail) {
+    if (typeof getOrCreateMemberAdminFolder !== 'function') {
+      Logger.log('_getMemberAdminFolder_: getOrCreateMemberAdminFolder not available');
       return null;
     }
+    return getOrCreateMemberAdminFolder(memberEmail);
+  }
+
+  // Legacy stub — delegates to new implementation
+  function getOrCreateMemberContactFolder_(memberEmail) {
+    return _getMemberAdminFolder_(memberEmail);
   }
 
   /**
@@ -1574,12 +1476,14 @@ var DataService = (function () {
     }
 
     // ── 4. Append to per-member Drive contact log sheet ───────────────────
+    // getOrCreateMemberContactFolder_ → _getMemberAdminFolder_ → getOrCreateMemberAdminFolder
+    // which returns { masterFolder, grievancesFolder } — extract masterFolder explicitly.
     try {
-      var memberFolder = getOrCreateMemberContactFolder_(memberEmail.toLowerCase().trim());
-      if (memberFolder) {
-        // Derive folder name for sheet title (same as folder name)
-        var folderName = memberFolder.getName();
-        var contactSS = getOrCreateMemberContactSheet_(memberFolder, folderName);
+      var adminResult = getOrCreateMemberContactFolder_(memberEmail.toLowerCase().trim());
+      var masterFolder = (adminResult && adminResult.masterFolder) ? adminResult.masterFolder : null;
+      if (masterFolder) {
+        var folderName = masterFolder.getName();
+        var contactSS = getOrCreateMemberContactSheet_(masterFolder, folderName);
         if (contactSS) {
           var logSheet = contactSS.getSheetByName('Contact Log') || contactSS.getActiveSheet();
           logSheet.appendRow([new Date(), sName, contactType, (notes || '').substring(0, 500), duration || '']);
@@ -2087,7 +1991,7 @@ var DataService = (function () {
       if (cached) return JSON.parse(cached);
 
       var cal = CalendarApp.getCalendarById(config.calendarId);
-      if (!cal) return [];
+      if (!cal) return { _calNotFound: true };
       var now = new Date();
       var future = new Date(now.getTime() + 90 * 86400000);
       var events = cal.getEvents(now, future);
@@ -3108,7 +3012,7 @@ function dataCreateGrievanceDrive() { var e = _resolveCallerEmail(); return e ? 
 function dataGetSurveyStatus() { var e = _resolveCallerEmail(); return e ? DataService.getMemberSurveyStatus(e) : null; }
 function dataGetAllMembers() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllMembers(); }
 function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
-function dataSendBroadcast(ignoredEmail, filter, msg) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg); }
+function dataSendBroadcast(ignoredEmail, filter, msg, subject) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg, subject); }
 function dataGetSurveyResults() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getSurveyResults(); }
 // v4.21.0 — Native survey engine wrappers
 function dataGetSurveyQuestions() { var e = _resolveCallerEmail(); return e ? getSurveyQuestions() : []; }
@@ -3367,7 +3271,7 @@ function dataGetBatchData(ignoredEmail, ignoredRole) {
 // Broadcast filter options (CR-AUTH-3: steward auth required)
 function dataGetBroadcastFilterOptions() {
   var s = _requireStewardAuth();
-  if (!s) return { locations: [], officeDays: [], hasDuesPayingColumn: false, totalMembers: 0 };
+  if (!s) return { locations: [], officeDays: [], hasDuesPayingColumn: false, broadcastScopeAll: false, totalMembers: 0 };
   try {
     var members = DataService.getAllMembers();
     var locations = {};
@@ -3385,15 +3289,22 @@ function dataGetBroadcastFilterOptions() {
       // Detect if dues paying column exists (null = absent, true/false = present)
       if (m.duesPaying !== null && m.duesPaying !== undefined) hasDuesPayingColumn = true;
     });
+    // Read broadcastScopeAll from config — determines if All Members scope toggle is shown
+    var broadcastScopeAll = false;
+    try {
+      var config = ConfigReader.getConfig();
+      broadcastScopeAll = (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes');
+    } catch (_e) { /* non-fatal — defaults to false */ }
     return {
       locations: Object.keys(locations).sort(),
       officeDays: Object.keys(officeDays).sort(),
       hasDuesPayingColumn: hasDuesPayingColumn,
+      broadcastScopeAll: broadcastScopeAll,
       totalMembers: members.length
     };
   } catch (e) {
     Logger.log('dataGetBroadcastFilterOptions error: ' + e.message + '\n' + (e.stack || ''));
-    return { locations: [], officeDays: [], hasDuesPayingColumn: false, totalMembers: 0 };
+    return { locations: [], officeDays: [], hasDuesPayingColumn: false, broadcastScopeAll: false, totalMembers: 0 };
   }
 }
 

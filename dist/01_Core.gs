@@ -571,7 +571,7 @@ var DRIVE_CONFIG = {
   RESOURCES_SUBFOLDER:       'Resources',
   MINUTES_SUBFOLDER:         'Minutes',
   EVENT_CHECKIN_SUBFOLDER:   'Event Check-In',
-  MEMBER_CONTACTS_SUBFOLDER: 'Member Contacts',  // per-member contact log sheets
+  MEMBERS_SUBFOLDER: 'Members',  // per-member master admin folders (steward-only hub)
   // Grievance case folder naming templates (inside Grievances/)
   // Template uses placeholders: {date}, {lastName}, {firstName}
   SUBFOLDER_TEMPLATE: '{lastName}, {firstName} - {date}',
@@ -706,6 +706,12 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.22.5', date: '2026-03-06', codename: 'Events Sentinel Propagation Fix', changes: 'Bug fix: home widget events section crashed when getUpcomingEvents returned a sentinel object ({_notConfigured} or {_calNotFound}) — events.length on a plain object returns undefined, rendering "undefined" in KPI counter and crashing forEach. Added Array.isArray guard before rendering and before DataCache.set. DataCache.set now only caches actual arrays; sentinel objects are dropped, preventing the bad value from poisoning the client-side cache on subsequent home re-renders.' },
+  { version: '4.22.4', date: '2026-03-06', codename: 'Events Access & Calendar Targeting', changes: 'Events tab dues gate removed — any authenticated member can view events regardless of dues status. More menu Events item lock icon removed. Create Event button URL now includes &src=calendarId param so new events land on the union calendar, not the steward personal calendar. No structural changes to backend auth — dataGetUpcomingEvents still requires valid session.' },
+  { version: '4.22.3', date: '2026-03-06', codename: 'Events Tab Hardening', changes: 'Bug fix: ISO date formatter in Add-to-Calendar URLs changed from .replace(\".000Z\",\"Z\") to .replace(/\\.\\d+Z$/,\"Z\") — handles any millisecond value (was silently broken for non-.000 ms values). Bug fix: CalendarApp.getCalendarById() returning null now returns {_calNotFound:true} sentinel instead of [] — distinguishes typo/permission error from genuinely empty calendar. Frontend handles _calNotFound with diagnostic message. Bug fix: Add-to-Calendar URL now includes &details= param (ev.description) in both home widget and Events page — was silently omitted. Feature: Steward Events page now shows \"Manage in Google Calendar\" and \"Create Event\" action buttons when a calendarId is configured. _sanitizeConfig in 22_WebDashApp.gs now exposes calendarId (non-sensitive) so frontend can conditionally show management links.' },
+  { version: '4.22.2', date: '2026-03-06', codename: 'Notification Cleanup Pass', changes: 'Bug fix: steward inbox dismiss was passing stale second arg (CURRENT_USER.email) to dismissWebAppNotification() — function only accepts notificationId, gets identity from Session server-side. Arg removed. Dead empty2 block removed from member_view.html renderMemberNotifications — visible=notifications made the unreachable second empty-state check redundant. 04e_PublicDashboard.gs: inline JS notification calls updated from deleted getUserNotifications/markNotificationRead to getWebAppNotifications. Dead DataService.getMemberNotifications guard replaced with [] constant and comment. All four issues are in 04e which is confirmed orphaned (not routed in doGet).' },
+  { version: '4.22.1', date: '2026-03-06', codename: 'Notification Manage Hardening', changes: 'Migration function MIGRATE_ADD_DISMISS_MODE_COLUMN() added to 05_Integrations.gs — safe one-time runner that appends Dismiss_Mode header to existing Notifications sheet and backfills all rows with "Dismissible". New archiveWebAppNotification(notificationId) in 05_Integrations.gs — steward-auth-gated, sets Status=Archived, non-destructive. Archive button added to each Active row in steward Manage tab (steward_view.html) — updates status pill in-place, hides button after success. Expired/Archived rows remain visible in Manage tab for auditing.' },
+  { version: '4.22.0', date: '2026-03-06', codename: 'Notification System Overhaul', changes: 'Bug fix: sort in getWebAppNotifications() now reverses first then sorts by priority — previously Urgent notifications landed at the bottom. New DISMISS_MODE column (Dismissible | Timed) added to NOTIFICATIONS_HEADER_MAP_ (col 13). Dismissible: member can permanently dismiss (writes to Dismissed_By column). Timed: auto-expires on Expires_Date, dismiss button hidden, "Auto-expires" badge shown to member. Compose form gets dismiss mode toggle with Timed validation requiring an expiry date. Member dismiss changed from 1-hour localStorage TTL to permanent backend write via dismissWebAppNotification(). Bell badge DOM re-renders correctly on dismiss. Manage tab fixed: now calls getAllWebAppNotifications() (new function, steward-auth-gated) returning all rows with dismissedCount + status — was incorrectly calling getWebAppNotifications() which filtered to the steward\'s own inbox. Dead code removed: getUserNotifications(), markNotificationRead(), broadcastStewardNotification() (all ScriptProperties-based, orphaned since v4.13.0 Notifications sheet). getWebAppNotificationsHtml() removed — 345 lines of standalone ?page=notifications HTML never routed in doGet(). pushNotification() rerouted from ScriptProperties to Notifications sheet (still called by saveSharedView()).' },
   { version: '4.21.0', date: '2026-03-05', codename: 'Native Survey Engine', changes: 'Deprecate Google Form integration entirely. Full webapp-native satisfaction survey: getSurveyQuestions() returns all 67 questions with types (slider-10, dropdown, radio, checkbox, paragraph), branching rules (Q5→3A/3B, Q36→6A), and slider labels. submitSurveyResponse() maps all 67 SATISFACTION_COLS, period-aware vault dedup per SURVEY_PERIODS sheet. New: getSurveyPeriod(), autoTriggerQuarterlyPeriod(), archiveSurveyPeriod_() (Drive export to Past Survey Questions/), getPendingSurveyMembers(), getSatisfactionSummary() (section averages as plain values). New hidden sheet _Survey_Periods (SURVEY_PERIODS_COLS, 8 cols). New Config cols: Survey Priority Options (Q64 dynamic), Past Surveys Folder ID. Quarterly time trigger installed via setupQuarterlyTrigger(). Survey-open notifications pushed to all active members on period start. Slider label: 1=Strongly Disagree / 10=Strongly Agree (universal across all 52 scale questions). Anonymity architecture preserved: three-layer separation (Satisfaction sheet=anonymous scores, _Survey_Vault=hashed PII only, _Survey_Tracking=completion status only).' },
   { version: '4.20.15', date: '2026-03-05', codename: 'FULL_CODE_REVIEW Final Fixes', changes: 'C-XSS-18: Fix el() boolean attribute handling — el() now uses property assignment (elem[key]=value) for boolean attrs (selected, disabled, checked) instead of setAttribute which would set attr="false" (truthy in DOM). C-XSS-6: Replace escapeHtml() with JSON.stringify() for memberId in onclick JS string context in 03_UIComponents.gs — HTML entities decoded by parser before JS executes, JSON.stringify produces correct escape sequences. LOW: Remove 6 unused _-prefixed variables (_lastRow, _pdfFile, _headers×2, _stepDays, _mgmtResponseDays, _mode, _ss×2) from 04b/04d/04e/05_Integrations.' },
   { version: '4.20.14', date: '2026-03-05', codename: 'Trigger Null Guards', changes: 'onOpenDeferred_ (10_Main.gs): add null guard after getActiveSpreadsheet() — returns null in web app context, would crash ss.toast(). onEditWithAuditLogging (06_Maintenance.gs): add !e || !e.range early return guard and wrap body in try/catch — trigger functions must not throw or GAS silently drops all subsequent edits.' },
@@ -1333,7 +1339,7 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'STATE',              header: 'State' },
   { key: 'ZIP_CODE',           header: 'Zip Code' },
   { key: 'DUES_STATUS',             header: 'Dues Status' },
-  { key: 'CONTACT_LOG_FOLDER_URL',  header: 'Contact Log Folder URL' }   // Drive folder URL for per-member contact log — auto-set on first contact
+  { key: 'MEMBER_ADMIN_FOLDER_URL',  header: 'Member Admin Folder URL' }   // Drive master folder URL — auto-set on first contact or grievance; steward-visible only
 ];
 
 // CONVENTION: Column constants are 1-indexed (Range API). Use COL - 1 for 0-indexed array access.
@@ -1510,7 +1516,10 @@ var CONFIG_HEADER_MAP_ = [
   // Drive folder for archived past survey periods
   { key: 'PAST_SURVEYS_FOLDER_ID',   header: 'Past Surveys Folder ID' },
   // Insights page cache — how long (in minutes) to serve cached data before re-fetching
-  { key: 'INSIGHTS_CACHE_TTL_MIN',   header: 'Insights Cache TTL (Minutes)' }
+  { key: 'INSIGHTS_CACHE_TTL_MIN',   header: 'Insights Cache TTL (Minutes)' },
+  // Broadcast: allow any steward to send to ALL members (not just their assigned ones)
+  // Set to 'yes' to enable the All Members scope option in the Broadcast tab
+  { key: 'BROADCAST_SCOPE_ALL',      header: 'Broadcast: Allow All Members Scope' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -1909,6 +1918,8 @@ var RESOURCES_HEADER_MAP_ = [
 var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
 
 // Notifications sheet — in-app notification system (v4.13.0)
+// v4.22.0: Added DISMISS_MODE column — 'Dismissible' (user can permanently dismiss)
+//          or 'Timed' (auto-expires on Expires_Date; dismiss button hidden from members).
 var NOTIFICATIONS_HEADER_MAP_ = [
   { key: 'NOTIFICATION_ID', header: 'Notification ID' },
   { key: 'RECIPIENT',       header: 'Recipient' },
@@ -1921,7 +1932,8 @@ var NOTIFICATIONS_HEADER_MAP_ = [
   { key: 'CREATED_DATE',     header: 'Created_Date' },
   { key: 'EXPIRES_DATE',     header: 'Expires_Date' },
   { key: 'DISMISSED_BY',     header: 'Dismissed_By' },
-  { key: 'STATUS',           header: 'Status' }
+  { key: 'STATUS',           header: 'Status' },
+  { key: 'DISMISS_MODE',     header: 'Dismiss_Mode' }  // v4.22.0: 'Dismissible' | 'Timed'
 ];
 
 var NOTIFICATIONS_COLS = buildColsFromMap_(NOTIFICATIONS_HEADER_MAP_);

@@ -5,6 +5,28 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.25] - 2026-03-06
+
+### Changed (Breaking — Drive folder restructure)
+- **New per-member master admin folder architecture** — all member-specific Drive content now lives under `[Root]/Members/LastName, FirstName/` (steward-only, never shared with member directly).
+  - `Contact Log — Name` sheet lives directly inside the master folder.
+  - All grievance case folders live under `Members/LastName, FirstName/Grievances/GR-XXXX - YYYY-MM-DD/`.
+  - Member gets **Editor** access on their individual grievance case folder only (so they can upload evidence). They do not see the master folder, the contact log, or the Grievances/ subfolder.
+- **`DRIVE_CONFIG.MEMBER_CONTACTS_SUBFOLDER`** removed from `01_Core.gs` — replaced by `DRIVE_CONFIG.MEMBERS_SUBFOLDER: 'Members'`.
+- **`MEMBER_CONTACTS_FOLDER_ID`** Script Property and `setupDashboardDriveFolders()` subDef removed — replaced by `MEMBERS_FOLDER_ID`.
+- **Column rename** — `'Contact Log Folder URL'` → `'Member Admin Folder URL'` in `MEMBER_HEADER_MAP_` (`01_Core.gs`). Stores URL of `Members/LastName, FirstName/` master folder (steward-visible only).
+- **`HEADERS.memberContactLogFolderUrl`** → `memberAdminFolderUrl` (`21_WebDashDataService.gs`). Backward alias `'contact log folder url'` retained for existing Member Directory data compatibility.
+- **Member card Full Profile link** (`steward_view.html`) — label changed from `'Contact Log'` to `'Member Folder'`, field from `profile.contactLogFolderUrl` to `profile.memberAdminFolderUrl`. Links to the master admin folder.
+- **`setupDriveFolderForGrievance()`** (`05_Integrations.gs`) — now nests case folders under `Members/Name/Grievances/` via `getOrCreateMemberAdminFolder()`. Member added as Editor on case folder. Steward added as Editor explicitly. Falls back gracefully if member email missing (creates folder, skips sharing, logs warning).
+- **`setupDriveFolderForMember()`** (`05_Integrations.gs`) — converted to a backward-compatible shim that resolves the member's email by ID and delegates to `getOrCreateMemberAdminFolder()`. The "Create Member Folder" button in `03_UIComponents.gs` continues to work unchanged.
+
+### Added
+- **`getOrCreateMemberAdminFolder(memberEmail)`** (`05_Integrations.gs`) — single source of truth for all per-member Drive operations. Creates `Members/LastName, FirstName/` and `Grievances/` subfolder inside it. Writes master folder URL to `Member Admin Folder URL` column in Member Directory on first creation (header lookup, never by index). Caches `MEMBERS_FOLDER_ID` in Script Properties. Returns `{ masterFolder, grievancesFolder }`.
+- **`_getMemberAdminFolder_(memberEmail)`** bridge function (`21_WebDashDataService.gs`) — thin wrapper used internally so DataService IIFE can call `getOrCreateMemberAdminFolder()` from `05_Integrations.gs` without tight coupling.
+
+### Migration note
+Existing `Member Contacts/` root-level subfolder and its per-member subfolders are **not deleted**. Old contact log sheets remain in Drive but will no longer be written to by new contacts. New contacts write to the new `Members/Name/` location. Stewards can manually move old folders if desired.
+
 ## [4.20.24] - 2026-03-06
 
 ### Added

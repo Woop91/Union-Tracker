@@ -1,38 +1,52 @@
 /**
- * 24_WeeklyQuestions.gs — Weekly Questions Engagement System
+ * 24_WeeklyQuestions.gs — Unified Polls System (v4.23.0)
  *
- * Two questions per week: one set by a steward, one drawn from the member pool.
- * Responses are anonymous (email hashed). Results show live after responding.
+ * Replaces the separate "Weekly Questions" + "Polls" systems.
  *
- * Sheets (hidden):
- *   _Weekly_Questions  — active and past questions
- *   _Weekly_Responses  — hashed-email responses
- *   _Question_Pool     — member-submitted question candidates
+ * Architecture:
+ *   Two polls are active each week:
+ *     1. STEWARD POLL  — created manually by any steward, resets each week
+ *     2. COMMUNITY POLL — drawn randomly every Monday from the member pool
+ *                         (no steward curation or approval step)
  *
- * @version 4.11.0
- * @requires 01_Core.gs (SHEETS)
+ *   All responses are fully anonymous:
+ *     - Only SHA-256 hashed email stored; never plaintext
+ *     - Results visible to all AFTER voting (member) or always (steward view)
+ *     - No "myVote" field ever returned; only aggregate counts + percentages
+ *
+ *   Creating a poll requires passing the question guide validation:
+ *     - Non-leading question text
+ *     - 2–5 distinct, non-empty options
+ *     - Single-concept check (enforced by guide, not by regex)
+ *
+ * Sheets (all hidden):
+ *   _Weekly_Questions  — active and past polls
+ *     Cols: ID | Text | Options (JSON) | Source | SubmittedBy | WeekStart | Active | Created
+ *   _Weekly_Responses  — hashed-email responses (unchanged from v4.11.0)
+ *     Cols: ID | QuestionID | EmailHash | Response | Timestamp
+ *   _Question_Pool     — member-submitted poll candidates
+ *     Cols: ID | Text | Options (JSON) | SubmittedByHash | Status | Created
+ *
+ * @version 4.23.0
+ * @requires 01_Core.gs (SHEETS, escapeForFormula)
  * @requires 06_Maintenance.gs (logAuditEvent)
  */
 
-var WeeklyQuestions = (function() {
+var WeeklyQuestions = (function () {
 
-  // ═══════════════════════════════════════
-  // SHEET SETUP
-  // ═══════════════════════════════════════
+  // ── Column indices (0-based) ─────────────────────────────────────────────
+  var Q_COLS = { ID: 0, TEXT: 1, OPTIONS: 2, SOURCE: 3, SUBMITTED_BY: 4, WEEK_START: 5, ACTIVE: 6, CREATED: 7 };
+  var R_COLS = { ID: 0, QUESTION_ID: 1, EMAIL_HASH: 2, RESPONSE: 3, TIMESTAMP: 4 };
+  var P_COLS = { ID: 0, TEXT: 1, OPTIONS: 2, SUBMITTED_BY_HASH: 3, STATUS: 4, CREATED: 5 };
+
+  // ── Sheet bootstrap ──────────────────────────────────────────────────────
 
   function initWeeklyQuestionSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) throw new Error('Spreadsheet unavailable — cannot initialize weekly question sheets.');
-
-    _ensureSheet(ss, SHEETS.WEEKLY_QUESTIONS, [
-      'ID', 'Text', 'Source', 'Submitted By', 'Week Start', 'Active', 'Created'
-    ]);
-    _ensureSheet(ss, SHEETS.WEEKLY_RESPONSES, [
-      'ID', 'Question ID', 'Email Hash', 'Response', 'Timestamp'
-    ]);
-    _ensureSheet(ss, SHEETS.QUESTION_POOL, [
-      'ID', 'Text', 'Submitted By Hash', 'Status', 'Created'
-    ]);
+    if (!ss) throw new Error('Spreadsheet unavailable.');
+    _ensureSheet(ss, SHEETS.WEEKLY_QUESTIONS,  ['ID','Text','Options','Source','Submitted By','Week Start','Active','Created']);
+    _ensureSheet(ss, SHEETS.WEEKLY_RESPONSES,  ['ID','Question ID','Email Hash','Response','Timestamp']);
+    _ensureSheet(ss, SHEETS.QUESTION_POOL,     ['ID','Text','Options','Submitted By Hash','Status','Created']);
   }
 
   function _ensureSheet(ss, name, headers) {
@@ -44,320 +58,351 @@ var WeeklyQuestions = (function() {
     return sheet;
   }
 
-  // ═══════════════════════════════════════
-  // HELPERS
-  // ═══════════════════════════════════════
+  // ── Helpers ──────────────────────────────────────────────────────────────
 
   function _hashEmail(email) {
     var raw = String(email).trim().toLowerCase();
     var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw);
-    return digest.map(function(b) {
-      return ('0' + (b & 0xFF).toString(16)).slice(-2);
-    }).join('');
+    return digest.map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
   }
 
-  function _getWeekStart(date) {
-    date = date || new Date();
-    var d = new Date(date);
+  /**
+   * Returns the poll frequency setting stored in ScriptProperties.
+   * Defaults to 'weekly' if not set.
+   * @returns {'weekly'|'biweekly'|'monthly'}
+   */
+  function _getFrequency() {
+    try {
+      var val = PropertiesService.getScriptProperties().getProperty('POLL_FREQUENCY');
+      if (val === 'biweekly' || val === 'monthly') return val;
+    } catch (_e) {}
+    return 'weekly';
+  }
+
+  /**
+   * Returns the canonical start date of the current poll period.
+   * weekly   -> Monday of the current week
+   * biweekly -> Monday of the even-numbered ISO week (weeks 2,4,6... start new period)
+   * monthly  -> 1st of the current month
+   */
+  function _getPeriodStart(date) {
+    var d = new Date(date || new Date());
     d.setHours(0, 0, 0, 0);
+    var freq = _getFrequency();
+
+    if (freq === 'monthly') {
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+
+    // Get Monday of this week
     var day = d.getDay();
-    var diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-    d.setDate(diff);
-    return d;
+    var monday = new Date(d);
+    monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+
+    if (freq === 'biweekly') {
+      // ISO week number
+      var jan4 = new Date(monday.getFullYear(), 0, 4);
+      var weekNum = Math.ceil(((monday - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+      // If odd week, step back one week to land on even-week anchor
+      if (weekNum % 2 !== 0) {
+        monday.setDate(monday.getDate() - 7);
+      }
+    }
+
+    return monday;
   }
 
-  function _generateId() {
-    return 'WQ_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+  function _periodKey(date) {
+    return _getPeriodStart(date).toISOString().split('T')[0];
+  }
+
+  function _id() {
+    return 'PL_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+  }
+
+  function _parseOptions(raw) {
+    if (!raw) return [];
+    try { return JSON.parse(raw); } catch (_e) {
+      // Legacy comma-separated fallback
+      return String(raw).split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    }
+  }
+
+  function _validateOptions(options) {
+    if (!Array.isArray(options) || options.length < 2 || options.length > 5) {
+      return 'Polls require 2–5 answer options.';
+    }
+    var seen = {};
+    for (var i = 0; i < options.length; i++) {
+      var o = String(options[i]).trim();
+      if (!o) return 'Options cannot be blank.';
+      if (o.length > 100) return 'Each option must be 100 characters or fewer.';
+      if (seen[o.toLowerCase()]) return 'Options must be unique.';
+      seen[o.toLowerCase()] = true;
+    }
+    return null; // valid
   }
 
   function _getSheet(name) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
     var sheet = ss.getSheetByName(name);
-    if (!sheet) {
-      // Lazy-init: auto-create missing sheets
-      initWeeklyQuestionSheets();
-      sheet = ss.getSheetByName(name);
-    }
+    if (!sheet) { initWeeklyQuestionSheets(); sheet = ss.getSheetByName(name); }
     return sheet;
   }
 
-  // ═══════════════════════════════════════
-  // PUBLIC: Get Active Questions
-  // ═══════════════════════════════════════
+  // ── Public: Get Active Polls ─────────────────────────────────────────────
 
   /**
-   * Returns this week's active questions with user response status + live stats.
-   * @param {string} email
-   * @returns {Object} { questions: [{id, text, source, hasResponded, stats}] }
+   * Returns this week's active polls with anonymous aggregate stats.
+   * hasResponded = true if the caller already voted (prevents double-vote).
+   * options = [] always returned (needed before voting).
+   * counts/total = aggregate only; no individual mapping.
    */
   function getActiveQuestions(email) {
-    var weekStart = _getWeekStart();
-    var weekStr = weekStart.toISOString().split('T')[0];
+    var thisPeriod = _periodKey();
     var emailHash = _hashEmail(email);
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
     if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [] };
 
     var qData = qSheet.getDataRange().getValues();
-    var activeQs = [];
-
+    var active = [];
     for (var i = 1; i < qData.length; i++) {
-      var qWeek = qData[i][4]; // Week Start column
-      if (qWeek instanceof Date) qWeek = qWeek.toISOString().split('T')[0];
-      var active = String(qData[i][5]).toLowerCase();
-      if (String(qWeek) === weekStr && (active === 'true' || active === 'yes' || active === '1')) {
-        activeQs.push({
-          id: qData[i][0],
-          text: qData[i][1],
-          source: qData[i][2],
+      var wk = qData[i][Q_COLS.WEEK_START];
+      if (wk instanceof Date) wk = wk.toISOString().split('T')[0];
+      var isActive = String(qData[i][Q_COLS.ACTIVE]).toLowerCase();
+      if (String(wk) === thisPeriod && (isActive === 'true' || isActive === 'yes' || isActive === '1')) {
+        active.push({
+          id:      String(qData[i][Q_COLS.ID]),
+          text:    String(qData[i][Q_COLS.TEXT]),
+          options: _parseOptions(qData[i][Q_COLS.OPTIONS]),
+          source:  String(qData[i][Q_COLS.SOURCE] || 'steward'),
         });
       }
     }
 
-    // Check responses and get stats
+    // Build response stats in one pass
     var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
     var responses = rSheet && rSheet.getLastRow() > 1 ? rSheet.getDataRange().getValues() : [];
 
-    activeQs.forEach(function(q) {
-      q.hasResponded = false;
+    active.forEach(function(q) {
       var counts = {};
       var total = 0;
+      q.options.forEach(function(o) { counts[o] = 0; });
+      q.hasResponded = false;
       for (var r = 1; r < responses.length; r++) {
-        if (responses[r][1] !== q.id) continue;
+        if (String(responses[r][R_COLS.QUESTION_ID]) !== q.id) continue;
         total++;
-        var resp = responses[r][3];
+        var resp = String(responses[r][R_COLS.RESPONSE]);
         counts[resp] = (counts[resp] || 0) + 1;
-        if (responses[r][2] === emailHash) q.hasResponded = true;
+        if (responses[r][R_COLS.EMAIL_HASH] === emailHash) q.hasResponded = true;
       }
       q.stats = { total: total, counts: counts };
     });
 
-    return { questions: activeQs };
+    return { questions: active };
   }
 
-  // ═══════════════════════════════════════
-  // PUBLIC: Submit Response
-  // ═══════════════════════════════════════
+  // ── Public: Submit Response ──────────────────────────────────────────────
 
   /**
-   * Submits a response to a weekly question. Returns updated stats.
-   * @param {string} email
-   * @param {string} questionId
-   * @param {string} response
-   * @returns {Object} { success, stats }
+   * Records an anonymous vote. Returns updated aggregate stats only.
+   * Never returns which option the caller chose.
    */
   function submitResponse(email, questionId, response) {
-    if (!email || !questionId || !response) {
-      return { success: false, message: 'Missing required fields.' };
-    }
+    if (!email || !questionId || !response) return { success: false, message: 'Missing fields.' };
 
     var emailHash = _hashEmail(email);
-
-    // Check for duplicate
     var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
     if (!rSheet) return { success: false, message: 'System not initialized.' };
 
+    // Dedup check
     if (rSheet.getLastRow() > 1) {
       var existing = rSheet.getDataRange().getValues();
       for (var i = 1; i < existing.length; i++) {
-        if (existing[i][1] === questionId && existing[i][2] === emailHash) {
-          return { success: false, message: 'Already responded.' };
+        if (String(existing[i][R_COLS.QUESTION_ID]) === questionId &&
+            existing[i][R_COLS.EMAIL_HASH] === emailHash) {
+          return { success: false, message: 'Already voted.' };
         }
       }
     }
 
-    // Write response
-    var id = _generateId();
-    rSheet.appendRow([id, questionId, emailHash, response, new Date()]);
+    rSheet.appendRow([_id(), questionId, emailHash, String(response), new Date()]);
 
-    // Calculate updated stats
-    var allResp = rSheet.getDataRange().getValues();
+    // Return updated aggregate stats
+    var all = rSheet.getDataRange().getValues();
     var counts = {};
     var total = 0;
-    for (var r = 1; r < allResp.length; r++) {
-      if (allResp[r][1] !== questionId) continue;
+    for (var r = 1; r < all.length; r++) {
+      if (String(all[r][R_COLS.QUESTION_ID]) !== questionId) continue;
       total++;
-      var resp = allResp[r][3];
+      var resp = String(all[r][R_COLS.RESPONSE]);
       counts[resp] = (counts[resp] || 0) + 1;
     }
-
     return { success: true, stats: { total: total, counts: counts } };
   }
 
-  // ═══════════════════════════════════════
-  // PUBLIC: Submit Pool Question
-  // ═══════════════════════════════════════
+  // ── Public: Steward — Create Poll ────────────────────────────────────────
 
   /**
-   * Submits a candidate question to the pool.
-   * @param {string} email
-   * @param {string} questionText
-   * @returns {Object} { success, message }
+   * Steward creates this week's poll. Replaces any existing steward poll for
+   * the current week (one steward poll per week maximum).
+   * @param {string} stewardEmail - verified server-side by wrapper
+   * @param {string} text         - question text
+   * @param {string[]} options    - 2–5 answer strings
    */
-  function submitPoolQuestion(email, questionText) {
-    if (!email || !questionText) return { success: false, message: 'Missing fields.' };
-
-    var sheet = _getSheet(SHEETS.QUESTION_POOL);
-    if (!sheet) return { success: false, message: 'System not initialized.' };
-
-    var id = _generateId();
-    var emailHash = _hashEmail(email);
-    sheet.appendRow([id, escapeForFormula(questionText.trim().substring(0, 500)), emailHash, 'pending', new Date()]);
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('WQ_POOL_SUBMIT', { emailHash: emailHash.substring(0, 8) });
-    }
-
-    return { success: true, message: 'Question submitted.' };
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Question Stats
-  // ═══════════════════════════════════════
-
-  function getQuestionStats(questionId) {
-    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
-    if (!rSheet || rSheet.getLastRow() <= 1) return { total: 0, counts: {} };
-
-    var data = rSheet.getDataRange().getValues();
-    var counts = {};
-    var total = 0;
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][1] !== questionId) continue;
-      total++;
-      var resp = data[i][3];
-      counts[resp] = (counts[resp] || 0) + 1;
-    }
-    return { total: total, counts: counts };
-  }
-
-  function hasUserResponded(email, questionId) {
-    var emailHash = _hashEmail(email);
-    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
-    if (!rSheet || rSheet.getLastRow() <= 1) return false;
-
-    var data = rSheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][1] === questionId && data[i][2] === emailHash) return true;
-    }
-    return false;
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Steward — Set Question & Pool Management
-  // ═══════════════════════════════════════
-
-  /**
-   * Steward sets their weekly question.
-   * H-24: Authorization check — only stewards and admins may set the weekly question.
-   * @param {string} stewardEmail
-   * @param {string} text
-   * @returns {Object} { success, message }
-   */
-  function setStewardQuestion(stewardEmail, text) {
+  function setStewardQuestion(stewardEmail, text, options) {
     if (!stewardEmail || !text) return { success: false, message: 'Missing fields.' };
 
-    // H-24: Verify the caller is a steward or admin
+    text = text.trim().substring(0, 500);
+    if (!text) return { success: false, message: 'Question text required.' };
+
+    var optErr = _validateOptions(options);
+    if (optErr) return { success: false, message: optErr };
+
+    // Role check — belt-and-suspenders (wrapper already calls _requireStewardAuth)
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* SSO unavailable */ }
-    if (!callerEmail) return { success: false, message: 'Unable to verify identity. Please sign in again.' };
-    callerEmail = callerEmail.toLowerCase().trim();
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_e) {}
+    if (!callerEmail) return { success: false, message: 'Unable to verify identity.' };
 
-    var role = null;
-    if (typeof DataService !== 'undefined' && typeof DataService.getUserRole === 'function') {
-      role = DataService.getUserRole(callerEmail);
-    }
-    if (role !== 'steward' && role !== 'admin' && role !== 'both') {
-      return { success: false, message: 'Only stewards and admins can set the weekly question.' };
-    }
+    var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
+    if (!qSheet) return { success: false, message: 'System not initialized.' };
 
-    var sheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
-    if (!sheet) return { success: false, message: 'System not initialized.' };
+    var thisPeriod = _periodKey();
 
-    var weekStart = _getWeekStart();
-    var weekStr = weekStart.toISOString().split('T')[0];
-    var id = _generateId();
-
-    sheet.appendRow([id, escapeForFormula(text.trim().substring(0, 500)), 'steward', stewardEmail, weekStr, 'TRUE', new Date()]);
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('WQ_STEWARD_SET', { steward: stewardEmail, weekStart: weekStr });
-    }
-
-    return { success: true, message: 'Question set for this week.' };
-  }
-
-  /**
-   * Returns pending pool questions for steward review.
-   * H-25: Intentionally accessible without role check — pool questions are
-   * informational and used in the member portal to show community engagement.
-   * No PII is exposed (submitter emails are hashed and not returned).
-   * @returns {Object[]} Array of { id, text, status, created }
-   */
-  function getPoolQuestions() {
-    var sheet = _getSheet(SHEETS.QUESTION_POOL);
-    if (!sheet || sheet.getLastRow() <= 1) return [];
-
-    var data = sheet.getDataRange().getValues();
-    var questions = [];
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][3]).toLowerCase() === 'pending') {
-        questions.push({
-          id: data[i][0],
-          text: data[i][1],
-          status: data[i][3],
-          created: data[i][4],
-        });
+    // Deactivate any existing steward poll this week
+    if (qSheet.getLastRow() > 1) {
+      var data = qSheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        var wk = data[i][Q_COLS.WEEK_START];
+        if (wk instanceof Date) wk = wk.toISOString().split('T')[0];
+        if (String(wk) === thisPeriod && String(data[i][Q_COLS.SOURCE]) === 'steward') {
+          qSheet.getRange(i + 1, Q_COLS.ACTIVE + 1).setValue('FALSE');
+        }
       }
     }
-    return questions;
+
+    var id = _id();
+    qSheet.appendRow([id, escapeForFormula(text), JSON.stringify(options), 'steward',
+                      callerEmail, thisPeriod, 'TRUE', new Date()]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('POLL_STEWARD_CREATE', { steward: callerEmail, weekStart: thisPeriod });
+    }
+    return { success: true, message: 'Poll created for this week.', id: id };
   }
 
+  // ── Public: Member — Submit to Pool ─────────────────────────────────────
+
   /**
-   * Selects a random question from the pending pool and makes it active.
-   * Intended for a weekly time-driven trigger.
-   * @returns {Object} { success, questionId }
+   * Member submits a poll question candidate to the pool.
+   * Submitter email is hashed — no PII stored.
+   * @param {string} email
+   * @param {string} text    - question text
+   * @param {string[]} options - 2–5 answer strings
+   */
+  function submitPoolQuestion(email, text, options) {
+    if (!email || !text) return { success: false, message: 'Missing fields.' };
+
+    text = text.trim().substring(0, 500);
+    if (!text) return { success: false, message: 'Question text required.' };
+
+    var optErr = _validateOptions(options);
+    if (optErr) return { success: false, message: optErr };
+
+    var sheet = _getSheet(SHEETS.QUESTION_POOL);
+    if (!sheet) return { success: false, message: 'System not initialized.' };
+
+    var id = _id();
+    var emailHash = _hashEmail(email);
+    sheet.appendRow([id, escapeForFormula(text), JSON.stringify(options), emailHash, 'pending', new Date()]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('POLL_POOL_SUBMIT', { emailHash: emailHash.substring(0, 8) });
+    }
+    return { success: true, message: 'Your poll has been added to the community pool. It may be drawn in a future week.' };
+  }
+
+  // ── Public: Random Pool Draw (time trigger) ──────────────────────────────
+
+  /**
+   * Selects ONE random pending question from the pool and activates it for
+   * the current week as the community poll track.
+   * Called by a weekly Monday time trigger — NOT by stewards.
+   * Replaces any existing community poll for the current week.
+   * @returns {Object} { success, questionId, text }
    */
   function selectRandomPoolQuestion() {
     var poolSheet = _getSheet(SHEETS.QUESTION_POOL);
-    if (!poolSheet || poolSheet.getLastRow() <= 1) return { success: false, message: 'No pool questions.' };
-
-    var data = poolSheet.getDataRange().getValues();
-    var pending = [];
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][3]).toLowerCase() === 'pending') {
-        pending.push({ row: i + 1, id: data[i][0], text: data[i][1] });
-      }
+    if (!poolSheet || poolSheet.getLastRow() <= 1) {
+      Logger.log('selectRandomPoolQuestion: pool is empty.');
+      return { success: false, message: 'No pool questions.' };
     }
 
+    var poolData = poolSheet.getDataRange().getValues();
+    var pending = [];
+    for (var i = 1; i < poolData.length; i++) {
+      if (String(poolData[i][P_COLS.STATUS]).toLowerCase() === 'pending') {
+        pending.push({ row: i + 1, id: poolData[i][P_COLS.ID], text: poolData[i][P_COLS.TEXT], options: poolData[i][P_COLS.OPTIONS] });
+      }
+    }
     if (pending.length === 0) return { success: false, message: 'No pending questions.' };
 
     var selected = pending[Math.floor(Math.random() * pending.length)];
+    poolSheet.getRange(selected.row, P_COLS.STATUS + 1).setValue('used');
 
-    // Mark as used in pool
-    poolSheet.getRange(selected.row, 4).setValue('used');
-
-    // Add to active questions
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
     if (!qSheet) return { success: false, message: 'Questions sheet missing.' };
 
-    var weekStart = _getWeekStart();
-    var weekStr = weekStart.toISOString().split('T')[0];
-    var newId = _generateId();
+    var thisPeriod = _periodKey();
 
-    qSheet.appendRow([newId, escapeForFormula(selected.text), 'pool', '', weekStr, 'TRUE', new Date()]);
+    // Deactivate existing community poll for this week
+    if (qSheet.getLastRow() > 1) {
+      var existing = qSheet.getDataRange().getValues();
+      for (var j = 1; j < existing.length; j++) {
+        var wk = existing[j][Q_COLS.WEEK_START];
+        if (wk instanceof Date) wk = wk.toISOString().split('T')[0];
+        if (String(wk) === thisPeriod && String(existing[j][Q_COLS.SOURCE]) === 'community') {
+          qSheet.getRange(j + 1, Q_COLS.ACTIVE + 1).setValue('FALSE');
+        }
+      }
+    }
 
+    var newId = _id();
+    qSheet.appendRow([newId, escapeForFormula(String(selected.text)), selected.options, 'community',
+                      '', thisPeriod, 'TRUE', new Date()]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('POLL_COMMUNITY_DRAW', { weekStart: thisPeriod, poolId: selected.id });
+    }
     return { success: true, questionId: newId, text: selected.text };
   }
 
-  // ═══════════════════════════════════════
-  // PUBLIC: History (v4.12.0)
-  // ═══════════════════════════════════════
+  // ── Public: Steward — Close a Poll ──────────────────────────────────────
+
+  /**
+   * Deactivates a poll by ID. Steward-only.
+   */
+  function closePoll(stewardEmail, pollId) {
+    if (!stewardEmail || !pollId) return { success: false, message: 'Missing fields.' };
+    var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
+    if (!qSheet || qSheet.getLastRow() <= 1) return { success: false, message: 'No polls found.' };
+    var data = qSheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][Q_COLS.ID]) === pollId) {
+        qSheet.getRange(i + 1, Q_COLS.ACTIVE + 1).setValue('FALSE');
+        return { success: true, message: 'Poll closed.' };
+      }
+    }
+    return { success: false, message: 'Poll not found.' };
+  }
+
+  // ── Public: History (paginated) ──────────────────────────────────────────
 
   function getHistory(email, page, pageSize) {
-    page = page || 1;
-    pageSize = pageSize || 10;
+    page = Math.max(1, page || 1);
+    pageSize = Math.min(20, pageSize || 10);
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
     if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [], hasMore: false };
@@ -368,8 +413,15 @@ var WeeklyQuestions = (function() {
     var qData = qSheet.getDataRange().getValues();
     var allQs = [];
     for (var i = 1; i < qData.length; i++) {
-      allQs.push({ id: qData[i][0], text: qData[i][1], source: qData[i][2], weekStart: qData[i][4] });
+      allQs.push({
+        id:        String(qData[i][Q_COLS.ID]),
+        text:      String(qData[i][Q_COLS.TEXT]),
+        options:   _parseOptions(qData[i][Q_COLS.OPTIONS]),
+        source:    String(qData[i][Q_COLS.SOURCE] || 'steward'),
+        weekStart: qData[i][Q_COLS.WEEK_START],
+      });
     }
+
     allQs.sort(function(a, b) {
       var da = a.weekStart instanceof Date ? a.weekStart.getTime() : 0;
       var db = b.weekStart instanceof Date ? b.weekStart.getTime() : 0;
@@ -382,59 +434,182 @@ var WeeklyQuestions = (function() {
     paged.forEach(function(q) {
       var counts = {};
       var total = 0;
+      q.options.forEach(function(o) { counts[o] = 0; });
       for (var r = 1; r < responses.length; r++) {
-        if (responses[r][1] !== q.id) continue;
+        if (String(responses[r][R_COLS.QUESTION_ID]) !== q.id) continue;
         total++;
-        var resp = responses[r][3];
+        var resp = String(responses[r][R_COLS.RESPONSE]);
         counts[resp] = (counts[resp] || 0) + 1;
       }
       q.stats = { total: total, counts: counts };
-      q.weekStr = q.weekStart instanceof Date ? q.weekStart.toLocaleDateString() : String(q.weekStart || '');
+      q.weekStr = q.weekStart instanceof Date
+        ? q.weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : String(q.weekStart || '');
     });
 
     return { questions: paged, hasMore: start + pageSize < allQs.length };
   }
 
+  // ── Public: Pool questions (count only, for display) ────────────────────
+
+  function getPoolCount() {
+    var sheet = _getSheet(SHEETS.QUESTION_POOL);
+    if (!sheet || sheet.getLastRow() <= 1) return 0;
+    var data = sheet.getDataRange().getValues();
+    var n = 0;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][P_COLS.STATUS]).toLowerCase() === 'pending') n++;
+    }
+    return n;
+  }
+
+  // ── Public: Frequency settings ──────────────────────────────────────────
+
+  /**
+   * Returns current poll frequency: 'weekly' | 'biweekly' | 'monthly'.
+   * Safe to call from any context (member or steward).
+   */
+  function getPollFrequency() {
+    return _getFrequency();
+  }
+
+  /**
+   * Sets the poll frequency. Steward-only (enforced by wrapper).
+   * Updates the Monday time trigger interval accordingly.
+   * @param {string} freq - 'weekly' | 'biweekly' | 'monthly'
+   */
+  function setPollFrequency(stewardEmail, freq) {
+    if (freq !== 'weekly' && freq !== 'biweekly' && freq !== 'monthly') {
+      return { success: false, message: 'Invalid frequency. Use weekly, biweekly, or monthly.' };
+    }
+    try {
+      PropertiesService.getScriptProperties().setProperty('POLL_FREQUENCY', freq);
+    } catch (e) {
+      return { success: false, message: 'Failed to save setting: ' + e.message };
+    }
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('POLL_FREQ_CHANGE', { steward: stewardEmail, frequency: freq });
+    }
+    return { success: true, frequency: freq, message: 'Poll frequency set to ' + freq + '.' };
+  }
+
   // Public API
   return {
     initWeeklyQuestionSheets: initWeeklyQuestionSheets,
-    getActiveQuestions: getActiveQuestions,
-    submitResponse: submitResponse,
-    submitPoolQuestion: submitPoolQuestion,
-    getQuestionStats: getQuestionStats,
-    hasUserResponded: hasUserResponded,
-    setStewardQuestion: setStewardQuestion,
-    getPoolQuestions: getPoolQuestions,
+    getActiveQuestions:       getActiveQuestions,
+    submitResponse:           submitResponse,
+    setStewardQuestion:       setStewardQuestion,
+    submitPoolQuestion:       submitPoolQuestion,
     selectRandomPoolQuestion: selectRandomPoolQuestion,
-    getHistory: getHistory,
+    closePoll:                closePoll,
+    getHistory:               getHistory,
+    getPoolCount:             getPoolCount,
+    getPollFrequency:         getPollFrequency,
+    setPollFrequency:         setPollFrequency,
   };
 
 })();
 
 
 // ═══════════════════════════════════════
-// GLOBAL WRAPPERS (callable from client)
+// GLOBAL WRAPPERS
 // ═══════════════════════════════════════
 
 function wqGetActiveQuestions() {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
   return e ? WeeklyQuestions.getActiveQuestions(e) : { questions: [] };
 }
+
 function wqSubmitResponse(ignoredEmail, questionId, response) {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
   return e ? WeeklyQuestions.submitResponse(e, questionId, response) : { success: false, message: 'Not authenticated.' };
 }
-function wqSubmitPoolQuestion(ignoredEmail, text) {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
-  return e ? WeeklyQuestions.submitPoolQuestion(e, text) : { success: false, message: 'Not authenticated.' };
+
+// v4.23.0: options param added (array of 2–5 strings)
+function wqSetStewardQuestion(ignoredEmail, text, options) {
+  var e = _requireStewardAuth();
+  if (!e) return { success: false, message: 'Steward access required.' };
+  return WeeklyQuestions.setStewardQuestion(e, text, options);
 }
-function wqSetStewardQuestion(ignoredStewardEmail, text) {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
-  return e ? WeeklyQuestions.setStewardQuestion(e, text) : { success: false, message: 'Not authenticated.' };
+
+function wqSubmitPoolQuestion(ignoredEmail, text, options) {
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
+  return e ? WeeklyQuestions.submitPoolQuestion(e, text, options) : { success: false, message: 'Not authenticated.' };
 }
-function wqGetPoolQuestions() { return WeeklyQuestions.getPoolQuestions(); }
-function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
+
+function wqClosePoll(ignoredEmail, pollId) {
+  var e = _requireStewardAuth();
+  if (!e) return { success: false, message: 'Steward access required.' };
+  return WeeklyQuestions.closePoll(e, pollId);
+}
+
 function wqGetHistory(ignoredEmail, page, pageSize) {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
   return e ? WeeklyQuestions.getHistory(e, page, pageSize) : { questions: [], hasMore: false };
+}
+
+function wqGetPoolCount() { return WeeklyQuestions.getPoolCount(); }
+function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
+function wqGetPollFrequency() { return WeeklyQuestions.getPollFrequency(); }
+function wqSetPollFrequency(ignoredEmail, freq) {
+  var e = _requireStewardAuth();
+  if (!e) return { success: false, message: 'Steward access required.' };
+  return WeeklyQuestions.setPollFrequency(e, freq);
+}
+
+// Time trigger — runs every Monday but internally respects frequency.
+// For biweekly/monthly, it checks whether the period has actually changed
+// before drawing a new community poll (avoids drawing on off-weeks).
+function autoSelectCommunityPoll() {
+  try {
+    var freq = WeeklyQuestions.getPollFrequency();
+    var today = new Date();
+    var dayOfWeek = today.getDay(); // 0=Sun, 1=Mon
+
+    // Biweekly: only draw on even-week Mondays
+    if (freq === 'biweekly') {
+      var jan4 = new Date(today.getFullYear(), 0, 4);
+      var weekNum = Math.ceil(((today - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+      if (weekNum % 2 !== 0) {
+        Logger.log('autoSelectCommunityPoll: biweekly — odd week ' + weekNum + ', skipping draw.');
+        return;
+      }
+    }
+
+    // Monthly: only draw on the 1st of the month (trigger fires daily at start of month range)
+    if (freq === 'monthly') {
+      if (today.getDate() !== 1) {
+        Logger.log('autoSelectCommunityPoll: monthly — not the 1st, skipping draw.');
+        return;
+      }
+    }
+
+    var result = WeeklyQuestions.selectRandomPoolQuestion();
+    Logger.log('autoSelectCommunityPoll: ' + JSON.stringify(result));
+  } catch (e) {
+    Logger.log('autoSelectCommunityPoll error: ' + e.message);
+  }
+}
+
+/**
+ * Installs the Monday community poll draw trigger.
+ * Run once after deployment via menu or Apps Script editor.
+ */
+function setupCommunityPollTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'autoSelectCommunityPoll') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('autoSelectCommunityPoll')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.MONDAY)
+    .atHour(7)
+    .create();
+  Logger.log('setupCommunityPollTrigger: Community poll draw trigger installed (Mondays at 7 AM).');
+  try {
+    SpreadsheetApp.getActiveSpreadsheet()
+      .toast('Community poll draw trigger installed — fires every Monday at 7 AM.', 'Polls', 5);
+  } catch (_e) {}
 }

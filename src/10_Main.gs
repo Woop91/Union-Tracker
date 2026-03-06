@@ -281,7 +281,9 @@ function onSelectionChange(e) {
   try {
     var autoOpen = PropertiesService.getUserProperties()
       .getProperty('multiSelectAutoOpen');
-    if (autoOpen !== 'true') return;
+    // Default is ON — only skip if user has explicitly disabled it ('false').
+    // Absence of the property (fresh install) means enabled.
+    if (autoOpen === 'false') return;
 
     if (typeof onSelectionChangeMultiSelect === 'function') {
       onSelectionChangeMultiSelect(e);

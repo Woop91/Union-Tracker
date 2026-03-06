@@ -24,7 +24,7 @@ function initMemberView(container) {
     if (batch.history) DataCache.set('memberHistory_' + CURRENT_USER.email, batch.history);
     if (batch.stewardInfo) DataCache.set('stewardInfo_' + CURRENT_USER.email, batch.stewardInfo);
     if (batch.surveyStatus) DataCache.set('surveyStatus_' + CURRENT_USER.email, batch.surveyStatus);
-    if (batch.events) DataCache.set('events', batch.events);
+    if (batch.events && Array.isArray(batch.events)) DataCache.set('events', batch.events);
     AppState.loading = false;
     renderMemberHome(container);
     _checkDeepLink('member');
@@ -84,6 +84,41 @@ function _memberHeader(container, title, subtitle) {
 }
 
 // ═══════════════════════════════════════
+// DUES GATE
+// ═══════════════════════════════════════
+// Rules:
+//   duesPaying === true  → paying → access granted
+//   duesPaying === false → not paying → access blocked
+//   duesPaying === null  → column absent → treat as paying (benefit of the doubt)
+
+function _isDuesPaying() {
+  return CURRENT_USER.duesPaying !== false;
+}
+
+/**
+ * Renders a full-page "dues required" wall inside the given container.
+ * @param {Element} appContainer - top-level app container
+ * @param {string} featureName - human-readable name of the blocked feature
+ * @param {Function} [backFn] - optional callback for a Back button
+ */
+function _renderDuesGate(appContainer, featureName, backFn) {
+  renderPageLayout(appContainer, 'member', 'dues-gate', function(container) {
+    _memberHeader(container, featureName);
+    var content = el('div', { className: 'content' });
+    var card = el('div', { className: 'card', style: { textAlign: 'center', padding: '32px 24px' } });
+    card.appendChild(el('div', { style: { fontSize: '40px', marginBottom: '12px' } }, '\uD83D\uDD12'));
+    card.appendChild(el('h3', { style: { margin: '0 0 10px', fontSize: '17px' } }, 'Membership Dues Required'));
+    card.appendChild(el('p', { style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6', margin: '0 0 20px' } },
+      'Access to ' + featureName + ' is available to dues-paying members. Please contact your steward if you believe this is an error.'));
+    if (typeof backFn === 'function') {
+      card.appendChild(el('button', { className: 'btn btn-secondary', onClick: backFn }, 'Back'));
+    }
+    content.appendChild(card);
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
 // HOME TAB
 // ═══════════════════════════════════════
 
@@ -104,9 +139,37 @@ function renderMemberHome(appContainer) {
     container.appendChild(welcomeSlot);
     _maybeShowMemberWelcome(welcomeSlot);
 
-    // Survey banner — links to in-app survey form (uses DataCache)
+    // Dues-restricted banner — shown persistently to non-dues-paying members
+    // Synchronous: CURRENT_USER.duesPaying is available at render time (no server call needed)
+    if (!_isDuesPaying()) {
+      var duesBanner = el('div', {
+        className: 'fade-in',
+        style: {
+          margin: '0 16px 12px',
+          padding: '12px 16px',
+          borderRadius: 'var(--radius)',
+          background: 'rgba(245,127,23,0.10)',
+          border: '1px solid rgba(245,127,23,0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }
+      });
+      duesBanner.appendChild(el('span', { style: { fontSize: '20px', flexShrink: '0' } }, '\uD83D\uDD12'));
+      var duesBannerText = el('div');
+      duesBannerText.appendChild(el('div', {
+        style: { fontSize: '13px', fontWeight: '600', color: 'var(--warning)', marginBottom: '2px' }
+      }, 'Some features require membership dues'));
+      duesBannerText.appendChild(el('div', {
+        style: { fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }
+      }, 'Events, Resources, Polls, Survey, Org Chart, and Union Stats are only available to dues-paying members. Contact your steward if you believe this is an error.'));
+      duesBanner.appendChild(duesBannerText);
+      container.appendChild(duesBanner);
+    }
+
+    // Survey banner — only shown to dues-paying members (non-paying members are gated from the survey)
     DataCache.cachedCall('surveyStatus_' + CURRENT_USER.email, 'dataGetSurveyStatus', [CURRENT_USER.email], function(status) {
-      if (status && !status.hasCompleted) {
+      if (status && !status.hasCompleted && _isDuesPaying()) {
         var banner = el('div', { className: 'survey-banner fade-in' });
         var bannerLeft = el('div');
         bannerLeft.appendChild(el('span', { className: 'survey-banner-text' }, 'Quarterly survey is open!'));
@@ -231,10 +294,16 @@ function renderMemberHome(appContainer) {
 
     DataCache.cachedCall('events', 'dataGetUpcomingEvents', [10], function(events) {
       // Update KPI counter
-      eventsVal.textContent = events ? String(events.length) : '0';
+      // Guard against _notConfigured / _calNotFound sentinels (v4.22.5)
+      if (!events || !Array.isArray(events)) {
+        eventsVal.textContent = '0';
+        eventsArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'Calendar not configured.'));
+        return;
+      }
+      eventsVal.textContent = String(events.length);
 
       // Render event cards
-      if (!events || events.length === 0) {
+      if (events.length === 0) {
         eventsArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'No upcoming events.'));
         return;
       }
@@ -249,8 +318,9 @@ function renderMemberHome(appContainer) {
         // Add to Calendar button
         var calUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
           '&text=' + encodeURIComponent(ev.title) +
-          '&dates=' + ev.startTime.replace(/[-:]/g, '').replace('.000Z', 'Z') + '/' + ev.endTime.replace(/[-:]/g, '').replace('.000Z', 'Z') +
-          (ev.location ? '&location=' + encodeURIComponent(ev.location) : '');
+          '&dates=' + ev.startTime.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z') + '/' + ev.endTime.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z') +
+          (ev.location ? '&location=' + encodeURIComponent(ev.location) : '') +
+          (ev.description ? '&details=' + encodeURIComponent(ev.description) : '');
         card.appendChild(el('a', {
           href: calUrl, target: '_blank',
           style: { display: 'inline-block', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginTop: '6px' }
@@ -1106,6 +1176,7 @@ function _renderMemberDirectory(target) {
 // ═══════════════════════════════════════
 
 function renderMemberResources(appContainer) {
+  if (!_isDuesPaying()) { _renderDuesGate(appContainer, 'Member Resources', function() { renderMemberHome(appContainer); }); return; }
   renderPageLayout(appContainer, 'member', 'resources', function(container) {
     _memberHeader(container, 'Resources');
     var content = el('div', { className: 'content' });
@@ -1331,21 +1402,9 @@ function renderMemberNotifications(appContainer) {
         return;
       }
 
-      // Filter out temporarily dismissed notifications (1-hour localStorage TTL)
-      var DISMISS_TTL = 3600000; // 1 hour
-      var visible = notifications.filter(function(n) {
-        var dismissedAt = localStorage.getItem('dismissed_notif_' + n.id);
-        return !dismissedAt || (Date.now() - parseInt(dismissedAt, 10)) >= DISMISS_TTL;
-      });
-
-      if (visible.length === 0) {
-        var empty2 = el('div', { style: { textAlign: 'center', padding: '48px 16px' } });
-        empty2.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
-        empty2.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)' } }, 'All caught up!'));
-        empty2.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '6px' } }, 'Dismissed notifications will reappear in up to 1 hour'));
-        content.appendChild(empty2);
-        return;
-      }
+      // Dismissals are handled server-side in getWebAppNotifications (Dismissed_By column filter).
+      // No client-side filtering needed.
+      var visible = notifications;
 
       var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
       visible.forEach(function(n, idx) {
@@ -1360,6 +1419,10 @@ function renderMemberNotifications(appContainer) {
         if (n.priority === 'Urgent') {
           top.appendChild(el('span', { className: 'notif-type-badge notif-type-deadline' }, 'Urgent'));
         }
+        // Timed badge — helps member understand why there's no dismiss button
+        if (n.dismissMode === 'Timed') {
+          top.appendChild(el('span', { className: 'notif-type-badge', style: { background: 'var(--border)', color: 'var(--muted)', fontSize: '10px' } }, 'Auto-expires'));
+        }
         card.appendChild(top);
 
         card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)', paddingRight: '28px' } }, n.title));
@@ -1368,18 +1431,40 @@ function renderMemberNotifications(appContainer) {
         var meta = el('div', { className: 'notif-meta' });
         if (n.sentBy) meta.appendChild(el('span', null, 'From: ' + n.sentBy + '  '));
         if (n.createdDate) meta.appendChild(el('span', null, n.createdDate));
-        if (n.expiresDate) meta.appendChild(el('span', null, '  · Expires: ' + n.expiresDate));
+        if (n.expiresDate) meta.appendChild(el('span', null, '  \u00B7 Expires: ' + n.expiresDate));
         card.appendChild(meta);
 
-        var dismissBtn = el('button', { className: 'notif-dismiss', onClick: function() {
-          // Use localStorage with 1-hour TTL instead of permanent backend dismiss
-          localStorage.setItem('dismissed_notif_' + n.id, String(Date.now()));
-          card.style.opacity = '0';
-          card.style.transition = 'opacity 0.3s';
-          setTimeout(function() { card.remove(); }, 300);
-          AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
-        }}, '\u2715');
-        card.appendChild(dismissBtn);
+        // Dismiss button only shown for Dismissible mode
+        if (n.dismissMode !== 'Timed') {
+          var dismissBtn = el('button', { className: 'notif-dismiss', onClick: function() {
+            dismissBtn.textContent = '...';
+            dismissBtn.disabled = true;
+            serverCall().withSuccessHandler(function(r) {
+              if (r && r.success) {
+                card.style.opacity = '0';
+                card.style.transition = 'opacity 0.3s';
+                setTimeout(function() {
+                  card.remove();
+                  // Re-render bell badge with updated count
+                  AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
+                  var badge = document.querySelector('.notif-bell-badge');
+                  if (AppState.notificationCount > 0) {
+                    if (badge) badge.textContent = String(AppState.notificationCount);
+                  } else {
+                    if (badge) badge.remove();
+                  }
+                }, 300);
+              } else {
+                dismissBtn.textContent = '\u2715';
+                dismissBtn.disabled = false;
+              }
+            }).withFailureHandler(function() {
+              dismissBtn.textContent = '\u2715';
+              dismissBtn.disabled = false;
+            }).dismissWebAppNotification(n.id);
+          }}, '\u2715');
+          card.appendChild(dismissBtn);
+        }
 
         content.appendChild(card);
       });
@@ -1398,20 +1483,20 @@ function renderMemberMore(appContainer) {
   renderPageLayout(appContainer, 'member', 'more', function(container) {
     _memberHeader(container, 'More');
     var content = el('div', { className: 'content' });
+    var isDuesPaying = _isDuesPaying();
     var menuItems = [
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Messages and alerts', action: function() { renderMemberNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', action: function() { renderUnionStatsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { renderUnionStatsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardContact(document.getElementById('app')); } },
-      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('member', 'orgchart'); } },
+      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderMemberResources(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { renderMemberResources(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },
-      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', action: function() { renderPollsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', action: function() { renderSurveyFormPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { renderPollsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { renderSurveyFormPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', action: function() { renderMemberTasks(document.getElementById('app')); } },
-
       { icon: '\uD83D\uDCCB', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderMinutesPage(document.getElementById('app')); } },
       { icon: '\uD83E\uDD1D', label: 'My Meetings', desc: 'Your meeting attendance', action: function() { renderMeetingsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
@@ -1420,10 +1505,39 @@ function renderMemberMore(appContainer) {
     ];
 
     menuItems.forEach(function(m) {
-      var item = el('div', { className: 'more-menu-item', onClick: m.action });
-      item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
-      var text = el('div');
-      text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
+      var isLocked = m.locked && !isDuesPaying;
+      var item = el('div', {
+        className: 'more-menu-item',
+        style: isLocked ? { opacity: '0.6' } : {},
+        onClick: m.action
+      });
+
+      // Icon wrapper — allows lock badge positioning
+      var iconWrap = el('div', { style: { position: 'relative', display: 'inline-block', marginRight: '2px' } });
+      iconWrap.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
+      if (isLocked) {
+        iconWrap.appendChild(el('span', {
+          style: {
+            position: 'absolute', bottom: '-2px', right: '-4px',
+            fontSize: '10px', lineHeight: '1'
+          }
+        }, '\uD83D\uDD12'));
+      }
+      item.appendChild(iconWrap);
+
+      var text = el('div', { style: { flex: '1' } });
+      var labelRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } });
+      labelRow.appendChild(el('span', { className: 'more-menu-label' }, m.label));
+      if (isLocked) {
+        labelRow.appendChild(el('span', {
+          style: {
+            fontSize: '10px', color: 'var(--warning)', fontWeight: '600',
+            background: 'rgba(255,180,0,0.12)', borderRadius: '4px',
+            padding: '1px 5px', letterSpacing: '0.02em'
+          }
+        }, 'DUES REQUIRED'));
+      }
+      text.appendChild(labelRow);
       text.appendChild(el('div', { className: 'more-menu-desc' }, m.desc));
       item.appendChild(text);
       content.appendChild(item);
@@ -1437,6 +1551,7 @@ function renderMemberMore(appContainer) {
 // ═══════════════════════════════════════
 
 function renderSurveyFormPage(appContainer) {
+  if (!_isDuesPaying()) { _renderDuesGate(appContainer, 'Quarterly Survey', function() { renderMemberHome(appContainer); }); return; }
   renderPageLayout(appContainer, 'member', 'survey-form', function(container) {
     _memberHeader(container, 'Quarterly Survey');
     var content = el('div', { className: 'content' });
@@ -2765,9 +2880,27 @@ function _renderWTReminders(container) {
 
 function renderEventsPage(appContainer) {
   var role = AppState.activeRole || 'member';
+  // Events are visible to all authenticated members regardless of dues status (v4.22.4)
   renderPageLayout(appContainer, role, 'events', function(container) {
     if (role === 'member') _memberHeader(container, 'Upcoming Events');
     else _stewardHeader(container, 'Upcoming Events');
+
+    // Steward: manage-calendar action bar (v4.18.2)
+    if (role === 'steward' && CONFIG.calendarId) {
+      var calMgmtBar = el('div', { style: { padding: '0 16px 8px', display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+      calMgmtBar.appendChild(el('a', {
+        href: 'https://calendar.google.com/calendar/r',
+        target: '_blank',
+        style: { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', padding: '6px 14px', borderRadius: '8px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', textDecoration: 'none' }
+      }, '\uD83D\uDCC5 Manage in Google Calendar'));
+      calMgmtBar.appendChild(el('a', {
+        href: 'https://calendar.google.com/calendar/render?action=TEMPLATE&src=' + encodeURIComponent(CONFIG.calendarId),
+        target: '_blank',
+        style: { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', padding: '6px 14px', borderRadius: '8px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', textDecoration: 'none' }
+      }, '+ Create Event'));
+      container.appendChild(calMgmtBar);
+    }
+
     var content = el('div', { className: 'content' });
     showLoading(content);
     container.appendChild(content);
@@ -2781,6 +2914,15 @@ function renderEventsPage(appContainer) {
         cfgCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Calendar not connected'));
         cfgCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward admin needs to set the Calendar ID in the Config tab.'));
         content.appendChild(cfgCard);
+        return;
+      }
+      // Handle calendar ID set but calendar inaccessible / not found (Bug fix v4.18.2)
+      if (events && events._calNotFound) {
+        var notFoundCard = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+        notFoundCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\u26A0\uFE0F'));
+        notFoundCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Calendar not accessible'));
+        notFoundCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'The Calendar ID in Config is set but Google Calendar could not find it. Verify the ID is correct and the calendar is shared with this script.'));
+        content.appendChild(notFoundCard);
         return;
       }
       if (!events || events.length === 0) {
@@ -2802,11 +2944,13 @@ function renderEventsPage(appContainer) {
         card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, timeStr));
         if (ev.location) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, '\uD83D\uDCCD ' + ev.location));
         if (ev.description) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px', lineHeight: '1.5' } }, ev.description));
-        // Add to Calendar
+        // Add to Calendar — fixed ISO date formatter (Bug fix v4.18.2: handles any ms value, not just .000Z)
+        var _toGCalDate = function(iso) { return iso.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z'); };
         var calUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
           '&text=' + encodeURIComponent(ev.title) +
-          '&dates=' + ev.startTime.replace(/[-:]/g, '').replace('.000Z', 'Z') + '/' + ev.endTime.replace(/[-:]/g, '').replace('.000Z', 'Z') +
-          (ev.location ? '&location=' + encodeURIComponent(ev.location) : '');
+          '&dates=' + _toGCalDate(ev.startTime) + '/' + _toGCalDate(ev.endTime) +
+          (ev.location ? '&location=' + encodeURIComponent(ev.location) : '') +
+          (ev.description ? '&details=' + encodeURIComponent(ev.description) : '');
         card.appendChild(el('a', {
           href: calUrl, target: '_blank',
           style: { display: 'inline-block', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginTop: '8px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)' }
@@ -2825,6 +2969,7 @@ function renderEventsPage(appContainer) {
 // ═══════════════════════════════════════
 
 function renderUnionStatsPage(appContainer) {
+  if (!_isDuesPaying()) { _renderDuesGate(appContainer, 'Union Stats', function() { renderMemberHome(appContainer); }); return; }
   renderPageLayout(appContainer, 'member', 'unionstats', function(container) {
     _memberHeader(container, 'Union Stats');
     var content = el('div', { className: 'content' });
@@ -3388,6 +3533,7 @@ function _renderPollVoteUI(qCard, q) {
 
 // ── Main member polls page ────────────────────────────────────────────────
 function renderPollsPage(appContainer) {
+  if (!_isDuesPaying()) { _renderDuesGate(appContainer, 'Polls', function() { renderMemberHome(appContainer); }); return; }
   renderPageLayout(appContainer, 'member', 'polls', function(container) {
     _memberHeader(container, 'Polls', 'Anonymous community polls');
     var content = el('div', { className: 'content' });

@@ -327,120 +327,75 @@ function removeScheduledReport(scheduleId) {
 
 
 // ============================================================================
-// 4. MOBILE APP PUSH NOTIFICATIONS (In-app notification center)
+// 4. NOTIFICATIONS (v4.22.0 — rerouted to sheet-based system in 05_Integrations.gs)
 // ============================================================================
+// getUserNotifications() and markNotificationRead() removed — used ScriptProperties
+// storage which is orphaned by the Notifications sheet system (v4.13.0+).
+// broadcastStewardNotification() removed — no active callers; steward compose
+// form handles broadcast directly via sendWebAppNotification().
+//
+// pushNotification() is kept because saveSharedView() (below) calls it.
+// It now writes to the Notifications sheet instead of ScriptProperties.
 
 /**
- * Gets pending notifications for the current user
- * @returns {string} JSON array of notifications
- */
-function getUserNotifications() {
-  // Use ScriptProperties with user-scoped key (matches pushNotification's write store)
-  var userEmail = Session.getActiveUser().getEmail();
-  var scriptProps = PropertiesService.getScriptProperties();
-  var key = 'notifications_' + userEmail.replace(/[^a-zA-Z0-9]/g, '_');
-  var notifications = JSON.parse(scriptProps.getProperty(key) || '[]');
-
-  // Prune notifications older than 30 days
-  var cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
-  notifications = notifications.filter(function(n) {
-    return new Date(n.timestamp) > cutoff;
-  });
-
-  scriptProps.setProperty(key, JSON.stringify(notifications));
-  return JSON.stringify(notifications);
-}
-
-/**
- * Adds a notification for a specific user (server-side push)
+ * Server-side push for a single-user notification.
+ * Called internally by saveSharedView() and EventBus trigger handlers.
+ * Writes to the 📢 Notifications sheet (same system as sendWebAppNotification).
  * @param {string} userEmail - Target user email
- * @param {Object} notification - Notification data
- * @param {string} notification.title - Notification title
- * @param {string} notification.body - Notification message body
- * @param {string} notification.type - Type: 'alert','info','success','warning'
- * @param {string} [notification.link] - Optional link/action URL
- * @returns {Object} Push result
+ * @param {Object} notification - { title, body, type }
+ * @returns {Object} { success, id }
  */
 function pushNotification(userEmail, notification) {
-  // Authorization check — only stewards/admins can push notifications to other users
-  var callerEmail = '';
-  try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { /* trigger/web app context */ }
-  if (callerEmail && callerEmail !== userEmail.toLowerCase()) {
-    var callerRole = typeof getUserRole_ === 'function' ? getUserRole_(callerEmail) : 'member';
-    if (callerRole !== 'admin' && callerRole !== 'steward') {
-      return { success: false, error: 'Not authorized to push notifications to other users.' };
+  try {
+    if (!userEmail || !notification || !notification.title) {
+      return { success: false, error: 'userEmail and notification.title are required.' };
     }
-  }
 
-  // For cross-user notifications, use ScriptProperties with user key
-  var scriptProps = PropertiesService.getScriptProperties();
-  var key = 'notifications_' + userEmail.replace(/[^a-zA-Z0-9]/g, '_');
-  var notifications = JSON.parse(scriptProps.getProperty(key) || '[]');
-
-  var note = {
-    id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-    title: notification.title,
-    body: notification.body,
-    type: notification.type || 'info',
-    link: notification.link || '',
-    timestamp: new Date().toISOString(),
-    read: false
-  };
-
-  notifications.unshift(note);
-
-  // Keep max 50 notifications
-  if (notifications.length > 50) {
-    notifications = notifications.slice(0, 50);
-  }
-
-  scriptProps.setProperty(key, JSON.stringify(notifications));
-  EventBus.emit('notification:pushed', { userId: userEmail, notificationId: note.id });
-  return { success: true, id: note.id };
-}
-
-/**
- * Marks a notification as read
- * @param {string} notificationId - Notification ID
- * @returns {Object} Update result
- */
-function markNotificationRead(notificationId) {
-  var userEmail = Session.getActiveUser().getEmail();
-  var scriptProps = PropertiesService.getScriptProperties();
-  var key = 'notifications_' + userEmail.replace(/[^a-zA-Z0-9]/g, '_');
-  var notifications = JSON.parse(scriptProps.getProperty(key) || '[]');
-
-  for (var i = 0; i < notifications.length; i++) {
-    if (notifications[i].id === notificationId) {
-      notifications[i].read = true;
-      break;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) {
+      if (typeof createNotificationsSheet === 'function') {
+        sheet = createNotificationsSheet(ss);
+      } else {
+        return { success: false, error: 'Notifications sheet not found.' };
+      }
     }
-  }
 
-  scriptProps.setProperty(key, JSON.stringify(notifications));
-  return { success: true };
-}
-
-/**
- * Sends notification to all stewards (bulk push)
- * @param {Object} notification - Notification data (title, body, type)
- * @returns {Object} Broadcast result with count
- */
-function broadcastStewardNotification(notification) {
-  var data = JSON.parse(getUnifiedDashboardData(true));
-  var stewards = data.stewardPerformance || [];
-  var sent = 0;
-
-  for (var i = 0; i < stewards.length; i++) {
-    if (stewards[i].email) {
-      pushNotification(stewards[i].email, notification);
-      sent++;
+    var allData = sheet.getDataRange().getValues();
+    var maxNum = 0;
+    var C = NOTIFICATIONS_COLS;
+    for (var i = 1; i < allData.length; i++) {
+      var existId = String(allData[i][C.NOTIFICATION_ID - 1] || '');
+      var match = existId.match(/NOTIF-(\d+)/);
+      if (match) { var num = parseInt(match[1], 10); if (num > maxNum) maxNum = num; }
     }
-  }
+    var nextId = 'NOTIF-' + String(maxNum + 1).padStart(3, '0');
 
-  EventBus.emit('notification:broadcast', { count: sent, type: notification.type });
-  return { success: true, sentCount: sent };
+    var tz = Session.getScriptTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    sheet.appendRow([
+      nextId,
+      userEmail,                                      // RECIPIENT
+      'System',                                       // TYPE
+      String(notification.title || ''),               // TITLE
+      String(notification.body || ''),                // MESSAGE
+      'Normal',                                       // PRIORITY
+      Session.getActiveUser().getEmail() || 'system', // SENT_BY
+      'System',                                       // SENT_BY_NAME
+      today,                                          // CREATED_DATE
+      '',                                             // EXPIRES_DATE
+      '',                                             // DISMISSED_BY
+      'Active',                                       // STATUS
+      'Dismissible'                                   // DISMISS_MODE
+    ]);
+
+    EventBus.emit('notification:pushed', { userId: userEmail, notificationId: nextId });
+    return { success: true, id: nextId };
+  } catch (e) {
+    Logger.log('pushNotification error: ' + e.message);
+    return { success: false, error: e.message };
+  }
 }
 
 

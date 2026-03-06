@@ -72,7 +72,8 @@ function createConfigSheet(ss) {
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
     '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
     '── CUSTOM LINKS ──', '', '', '',                     // BE-BH (4 cols)
-    '── SURVEY LOG ──', ''                                // BI-BJ (2 cols)
+    '── SURVEY LOG ──', '',                               // BI-BJ (2 cols)
+    '── BROADCAST ──'                                     // BK (1 col)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -202,6 +203,19 @@ function createConfigSheet(ss) {
   // Insights page cache TTL — how many minutes before the Insights tab re-fetches data.
   // Default 5 min. Admins can raise this for large datasets or lower it for real-time needs.
   seedConfigDefault_(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, [5], isExistingSheet);
+
+  // Broadcast: Allow All Members Scope — controls whether stewards can send to all members
+  // (not just their own assigned members). Default: 'no'. Set to 'yes' to enable.
+  seedConfigDefault_(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL, ['no'], isExistingSheet);
+  // Apply yes/no dropdown validation so admins get a picker instead of a free-text cell
+  if (CONFIG_COLS.BROADCAST_SCOPE_ALL) {
+    var broadcastScopeRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['yes', 'no'], true)
+      .setAllowInvalid(false)
+      .setHelpText('yes = stewards can broadcast to all members. no = stewards can only broadcast to their assigned members.')
+      .build();
+    sheet.getRange(3, CONFIG_COLS.BROADCAST_SCOPE_ALL).setDataValidation(broadcastScopeRule);
+  }
 
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
@@ -751,7 +765,76 @@ function createConfigGuideSheet(ss) {
 }
 
 /**
- * Create or recreate the Member Directory sheet
+ * Adds any columns defined in MEMBER_HEADER_MAP_ that are missing from the
+ * Member Directory sheet, without touching existing data.
+ *
+ * Pattern matches createConfigSheet: headers are always authoritative;
+ * data columns are never deleted or moved.
+ *
+ * For each newly-added column this function also applies column-specific
+ * formatting (checkboxes, conditional rules) so the sheet is fully set up
+ * without requiring a manual step.
+ *
+ * @param {Sheet} sheet - The Member Directory sheet object
+ * @returns {string[]} Array of header names that were added (empty if none)
+ */
+function _addMissingMemberHeaders_(sheet) {
+  var allHeaders = getMemberHeaders(); // ordered list from MEMBER_HEADER_MAP_
+  var lastCol = sheet.getLastColumn();
+
+  // Read current headers — only as many columns as the sheet has
+  var existingHeaders = lastCol > 0
+    ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim().toLowerCase(); })
+    : [];
+
+  var added = [];
+
+  for (var i = 0; i < allHeaders.length; i++) {
+    var header = allHeaders[i];
+    var normalised = header.toLowerCase();
+
+    // Skip if header already present anywhere in row 1
+    if (existingHeaders.indexOf(normalised) !== -1) continue;
+
+    // Append to the next empty column
+    var targetCol = lastCol + added.length + 1;
+    var cell = sheet.getRange(1, targetCol);
+    cell.setValue(header)
+      .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+      .setFontColor(COLORS.WHITE)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center');
+
+    added.push(header);
+    Logger.log('_addMissingMemberHeaders_: added column "' + header + '" at col ' + targetCol);
+
+    // ── Per-column post-setup ───────────────────────────────────────────────
+    // Dues Paying: checkbox + conditional formatting
+    if (normalised === 'dues paying') {
+      sheet.getRange(2, targetCol, 4999, 1).insertCheckboxes();
+      sheet.setColumnWidth(targetCol, 100);
+      var colLetter = getColumnLetter(targetCol);
+      var duesRange = sheet.getRange(2, targetCol, 4999, 1);
+      var existingRules = sheet.getConditionalFormatRules();
+      var duesTrueRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied('=' + colLetter + '2=TRUE')
+        .setBackground('#e8f5e9').setFontColor('#2e7d32')
+        .setRanges([duesRange]).build();
+      var duesFalseRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied('=' + colLetter + '2=FALSE')
+        .setBackground('#fff8e1').setFontColor('#f57f17')
+        .setRanges([duesRange]).build();
+      sheet.setConditionalFormatRules(existingRules.concat([duesTrueRule, duesFalseRule]));
+    }
+  }
+
+  return added;
+}
+
+/**
+ * Create or recreate the Member Directory sheet.
+ * On new sheets: writes all headers from MEMBER_HEADER_MAP_ and applies full formatting.
+ * On existing sheets: appends any headers not yet present without touching existing data.
  */
 function createMemberDirectory(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEMBER_DIR);
@@ -768,6 +851,39 @@ function createMemberDirectory(ss) {
       .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
       .setFontColor(COLORS.WHITE)
       .setFontWeight('bold');
+    // New sheet: apply per-column setup that requires knowing the column position.
+    // syncColumnMaps has not run yet, so re-resolve DUES_PAYING position from the
+    // header we just wrote rather than relying on the global MEMBER_COLS constant.
+    var duesPayingColIdx = headers.indexOf('Dues Paying');
+    if (duesPayingColIdx !== -1) {
+      var dpCol = duesPayingColIdx + 1;
+      sheet.getRange(2, dpCol, 4999, 1).insertCheckboxes();
+      sheet.setColumnWidth(dpCol, 100);
+      var dpLetter = getColumnLetter(dpCol);
+      var dpRange = sheet.getRange(2, dpCol, 4999, 1);
+      var dpTrueRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied('=' + dpLetter + '2=TRUE')
+        .setBackground('#e8f5e9').setFontColor('#2e7d32')
+        .setRanges([dpRange]).build();
+      var dpFalseRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied('=' + dpLetter + '2=FALSE')
+        .setBackground('#fff8e1').setFontColor('#f57f17')
+        .setRanges([dpRange]).build();
+      // Rules array will be extended below with the rest of the conditional formatting
+      // Store these for later application (setConditionalFormatRules is called once at end)
+      sheet._duesCfRules = [dpTrueRule, dpFalseRule];
+    }
+  } else {
+    // Existing sheet: append any columns from MEMBER_HEADER_MAP_ not yet present.
+    // Data in existing columns is never touched.
+    var added = _addMissingMemberHeaders_(sheet);
+    if (added.length > 0) {
+      Logger.log('createMemberDirectory: added ' + added.length + ' missing column(s): ' + added.join(', '));
+      SpreadsheetApp.getActive().toast(
+        'Added ' + added.length + ' new column(s): ' + added.join(', '),
+        '\uD83D\uDCCB Member Directory', 5
+      );
+    }
   }
 
   // Freeze header row
@@ -788,6 +904,10 @@ function createMemberDirectory(ss) {
 
   // Add checkbox for Quick Actions column (opens quick actions dialog when checked)
   sheet.getRange(2, MEMBER_COLS.QUICK_ACTIONS, 4999, 1).insertCheckboxes();
+
+  // Dues Paying checkbox and conditional formatting are applied by _addMissingMemberHeaders_
+  // when the column is first added to an existing sheet, or during new-sheet creation below.
+  // MEMBER_COLS.DUES_PAYING is resolved by syncColumnMaps after headers are written.
 
   // Format date columns (MM/dd/yyyy)
   var dateColumns = [
@@ -941,6 +1061,27 @@ function createMemberDirectory(ss) {
     .build();
 
   var rules = [redRule, emptyEmailRule, emptyPhoneRule, deadlineOverdueRule, deadline1to3Rule, deadline4to7Rule, deadlineOnTrackRule];
+
+  // Dues Paying conditional formatting — green = paying, amber = not paying
+  // New sheets: rules built inline above (stored in sheet._duesCfRules) because
+  //   MEMBER_COLS.DUES_PAYING isn't resolved until syncColumnMaps runs.
+  // Existing sheets: MEMBER_COLS.DUES_PAYING is already resolved from the live sheet.
+  if (sheet._duesCfRules) {
+    rules = rules.concat(sheet._duesCfRules);
+    delete sheet._duesCfRules;
+  } else if (MEMBER_COLS.DUES_PAYING) {
+    var duesPayingRange = sheet.getRange(2, MEMBER_COLS.DUES_PAYING, 4999, 1);
+    var duesPayingTrueRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=' + getColumnLetter(MEMBER_COLS.DUES_PAYING) + '2=TRUE')
+      .setBackground('#e8f5e9').setFontColor('#2e7d32')
+      .setRanges([duesPayingRange]).build();
+    var duesPayingFalseRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=' + getColumnLetter(MEMBER_COLS.DUES_PAYING) + '2=FALSE')
+      .setBackground('#fff8e1').setFontColor('#f57f17')
+      .setRanges([duesPayingRange]).build();
+    rules = rules.concat([duesPayingTrueRule, duesPayingFalseRule]);
+  }
+
   sheet.setConditionalFormatRules(rules);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -966,6 +1107,54 @@ function createMemberDirectory(ss) {
 }
 
 /**
+ * Adds any columns defined in GRIEVANCE_HEADER_MAP_ that are missing from the
+ * Grievance Log sheet, without touching existing data.
+ *
+ * Parallel to _addMissingMemberHeaders_ — same pattern, same rules:
+ *  - Header name matching only (case-insensitive), never by column index
+ *  - Data in existing columns is never deleted, moved, or overwritten
+ *  - Per-column post-setup block handles column-specific formatting on first-add
+ *
+ * @param {Sheet} sheet - The Grievance Log sheet object
+ * @returns {string[]} Array of header names that were added (empty if none)
+ */
+function _addMissingGrievanceHeaders_(sheet) {
+  var allHeaders = getGrievanceHeaders(); // ordered list from GRIEVANCE_HEADER_MAP_
+  var lastCol = sheet.getLastColumn();
+
+  var existingHeaders = lastCol > 0
+    ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim().toLowerCase(); })
+    : [];
+
+  var added = [];
+
+  for (var i = 0; i < allHeaders.length; i++) {
+    var header = allHeaders[i];
+    var normalised = header.toLowerCase();
+
+    if (existingHeaders.indexOf(normalised) !== -1) continue;
+
+    var targetCol = lastCol + added.length + 1;
+    var cell = sheet.getRange(1, targetCol);
+    cell.setValue(header)
+      .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+      .setFontColor(COLORS.WHITE)
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center');
+
+    added.push(header);
+    Logger.log('_addMissingGrievanceHeaders_: added column "' + header + '" at col ' + targetCol);
+
+    // ── Per-column post-setup ───────────────────────────────────────────────
+    // Add cases here for any Grievance column that needs special formatting on first-add.
+    // Example: if ('message alert' === normalised) { sheet.getRange(2,targetCol,4999,1).insertCheckboxes(); }
+    // (MESSAGE_ALERT and QUICK_ACTIONS already exist in all live sheets so no case needed today)
+  }
+
+  return added;
+}
+
+/**
  * Create or recreate the Grievance Log sheet
  * NOTE: Calculated columns (First Name, Last Name, Email, Deadlines, Days Open, etc.)
  * are managed by the hidden _Grievance_Formulas sheet for self-healing capability.
@@ -986,6 +1175,17 @@ function createGrievanceLog(ss) {
       .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
       .setFontColor(COLORS.WHITE)
       .setFontWeight('bold');
+  } else {
+    // Existing sheet: append any columns from GRIEVANCE_HEADER_MAP_ not yet present.
+    // Data in existing columns is never touched.
+    var added = _addMissingGrievanceHeaders_(sheet);
+    if (added.length > 0) {
+      Logger.log('createGrievanceLog: added ' + added.length + ' missing column(s): ' + added.join(', '));
+      SpreadsheetApp.getActive().toast(
+        'Added ' + added.length + ' new column(s): ' + added.join(', '),
+        '\uD83D\uDCCB Grievance Log', 5
+      );
+    }
   }
 
   // Freeze header row

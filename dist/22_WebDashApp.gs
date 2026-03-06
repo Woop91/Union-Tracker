@@ -157,6 +157,8 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     unit: userRecord.unit,
     joined: userRecord.joined,
     duesStatus: userRecord.duesStatus,
+    // duesPaying: true=paying, false=not paying, null=column absent (treated as paying)
+    duesPaying: (userRecord.duesPaying !== undefined) ? userRecord.duesPaying : null,
     phone: userRecord.phone,
     workLocation: userRecord.workLocation || '',
     officeDays: userRecord.officeDays || '',
@@ -227,9 +229,11 @@ function _sanitizeConfig(config) {
     magicLinkExpiryDays: config.magicLinkExpiryDays,
     cookieDurationDays: config.cookieDurationDays,
     calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
+    calendarId: config.calendarId || '',
     driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
     surveyFormUrl: config.satisfactionFormUrl || '',
     orgWebsite: config.orgWebsite || '',
+    broadcastScopeAll: (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes'),
   };
 }
 

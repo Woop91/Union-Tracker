@@ -616,6 +616,15 @@ function updateMeetingStatuses() {
             Logger.log('Error emailing attendance for ' + meetingId + ': ' + emailError.message);
           }
         }
+
+        // Save attendance sheet to Event Check-In/ Drive folder
+        if (typeof saveAttendanceToDriveFolder_ === 'function') {
+          try {
+            saveAttendanceToDriveFolder_(meetingId, data[i]);
+          } catch (driveErr) {
+            Logger.log('Error saving attendance to Drive for ' + meetingId + ': ' + driveErr.message);
+          }
+        }
       }
     }
 
@@ -1350,4 +1359,101 @@ function getCheckInPageHtml() {
     '</script></body></html>';
 
   return html;
+}
+
+// ============================================================================
+// DRIVE FOLDER INTEGRATION (v4.20.18)
+// ============================================================================
+
+/**
+ * Saves a completed meeting attendance list as a Google Sheet in the
+ * Event Check-In/ Drive subfolder.
+ *
+ * Called by updateMeetingStatuses() when a meeting is deactivated.
+ * Reads the Event Check-In folder ID from Config sheet (MINUTES_FOLDER_ID)
+ * and Script Properties (both set by setupDashboardDriveFolders).
+ * Fails silently — Drive errors never block check-in functionality.
+ *
+ * @param {string} meetingId   - Meeting ID
+ * @param {Array}  meetingRow  - One data row from MEETING_CHECKIN_LOG for metadata
+ */
+function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
+  if (!meetingId) return;
+
+  // Get folder ID from Config or Script Properties
+  var folderId = '';
+  try {
+    if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.EVENT_CHECKIN_FOLDER_ID) {
+      folderId = getConfigValue_(CONFIG_COLS.EVENT_CHECKIN_FOLDER_ID) || '';
+    }
+    if (!folderId) {
+      folderId = PropertiesService.getScriptProperties().getProperty('EVENT_CHECKIN_FOLDER_ID') || '';
+    }
+  } catch (_e) {}
+
+  if (!folderId) {
+    Logger.log('saveAttendanceToDriveFolder_: Event Check-In folder ID not configured — skipping Drive save for ' + meetingId);
+    return;
+  }
+
+  // Pull attendance rows for this meeting
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var checkInSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+  if (!checkInSheet || checkInSheet.getLastRow() < 2) return;
+
+  var allData = checkInSheet.getDataRange().getValues();
+  var attendees = [];
+  for (var i = 1; i < allData.length; i++) {
+    if (String(allData[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+      attendees.push(allData[i]);
+    }
+  }
+  if (attendees.length === 0) {
+    Logger.log('saveAttendanceToDriveFolder_: no attendees for ' + meetingId + ', skipping Drive save');
+    return;
+  }
+
+  // Build meeting metadata from the passed row (or first matching row)
+  var metaRow = meetingRow || attendees[0];
+  var meetingName = String(metaRow[MEETING_CHECKIN_COLS.MEETING_NAME - 1] || 'Meeting');
+  var meetingDate = metaRow[MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+  var dateStr = meetingDate instanceof Date
+    ? Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+    : String(meetingDate || new Date().toDateString());
+
+  var docTitle = meetingName + ' Attendance — ' + dateStr;
+
+  // Create a Google Doc with the attendance list
+  var doc = DocumentApp.create(docTitle);
+  var body = doc.getBody();
+
+  body.appendParagraph(docTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph('Meeting ID: ' + meetingId);
+  body.appendParagraph('Total Attendees: ' + attendees.length);
+  body.appendParagraph('Generated: ' + new Date().toString());
+  body.appendParagraph('');
+  body.appendParagraph('Attendees').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+
+  attendees.forEach(function(row, idx) {
+    var memberId   = String(row[MEETING_CHECKIN_COLS.MEMBER_ID   - 1] || '');
+    var memberName = String(row[MEETING_CHECKIN_COLS.MEMBER_NAME - 1] || '');
+    var checkInTime = row[MEETING_CHECKIN_COLS.CHECK_IN_TIME - 1];
+    var timeStr = checkInTime instanceof Date
+      ? Utilities.formatDate(checkInTime, Session.getScriptTimeZone(), 'h:mm a')
+      : String(checkInTime || '');
+    body.appendListItem((idx + 1) + '. ' + memberName + ' (' + memberId + ') — ' + timeStr);
+  });
+
+  doc.saveAndClose();
+
+  // Move the doc into the Event Check-In/ folder
+  try {
+    var docFile = DriveApp.getFileById(doc.getId());
+    var folder  = DriveApp.getFolderById(folderId);
+    folder.addFile(docFile);
+    DriveApp.getRootFolder().removeFile(docFile);
+    Logger.log('saveAttendanceToDriveFolder_: saved "' + docTitle + '" to Event Check-In/ folder');
+  } catch (moveErr) {
+    Logger.log('saveAttendanceToDriveFolder_: could not move doc to Event Check-In/ folder: ' + moveErr.message);
+  }
 }

@@ -572,7 +572,17 @@
       if (tabId === '_member_more') { renderMemberMore(app); return; }
       if (tabId === '_steward_more') { renderStewardMore(app); return; }
       // Shared tabs (available in both roles)
-      if (tabId === 'orgchart') { renderOrgChart(app, role); return; }
+      if (tabId === 'orgchart') {
+        // Block non-dues-paying members from org chart; stewards always have access
+        if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
+          if (typeof _renderDuesGate === 'function') {
+            _renderDuesGate(app, 'Org Chart', function() { _handleTabNav(role, 'home'); });
+          }
+          return;
+        }
+        renderOrgChart(app, role);
+        return;
+      }
 
       if (role === 'member') {
         switch(tabId) {

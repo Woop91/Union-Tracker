@@ -187,6 +187,11 @@ Features: Material Design UI, Weingarten Rights, live steward search, PII scrubb
 
 | Date | Error | Cause | Fix | Status |
 |------|-------|-------|-----|--------|
+| 2026-03-06 | Add-to-Calendar URL malformed for events with ms ≠ .000 | `.replace('.000Z','Z')` is a string replace, not regex — silently fails for `.100Z`, `.500Z` etc | Changed to `.replace(/\.\d+Z$/,'Z')` regex in home widget + Events page (2 locations in member_view.html) | ✅ |
+| 2026-03-06 | Typo in Calendar ID shows "No upcoming events" (wrong error) | `CalendarApp.getCalendarById()` returns null → was returning `[]` same as empty calendar | Returns `{_calNotFound:true}` sentinel; frontend shows diagnostic message with fix instructions | ✅ |
+| 2026-03-06 | Add-to-Calendar creates event with no description | `&details=` param omitted from Google Calendar URL builder | Added `(ev.description ? '&details='+encodeURIComponent(ev.description) : '')` in both locations | ✅ |
+| 2026-03-06 | Home widget KPI shows "undefined" + forEach crash when calendar sentinel returned | `events.length` on a plain object → `undefined`; `if (!events \|\| events.length === 0)` passes for object; sentinel cached via DataCache.set | Added `Array.isArray(events)` guard before render and before `DataCache.set` | ✅ |
+| 2026-03-06 | Events dues-gated when it should be auth-only | `_isDuesPaying()` check on `renderEventsPage` blocked non-dues members | Gate removed; any authenticated session can view Events. `locked:true` removed from More menu item | ✅ |
 | 2026-02-22 | `clasp push` → "must include manifest" | `appsscript.json` not in `dist/` | Copied manifest to `dist/` | ✅ |
 | 2026-02-22 | `clasp push` → "User has not enabled Apps Script API" | API disabled | Enabled at script.google.com/home/usersettings | ✅ |
 | 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
@@ -957,72 +962,327 @@ Added shared `actionArea` div below the button row. All 4 buttons render inline 
 
 ---
 
-## 2026-03-06 — Per-member Drive contact log sheets (v4.20.22)
+## 2026-03-06 — Per-member Drive folder architecture (v4.20.22 → v4.20.25)
 
-### What was added
-Every contact logged via `logMemberContact()` now also appends to a per-member Google Sheet stored in Drive, in addition to `_Contact_Log` and the Member Directory snapshot.
-
-### Drive folder structure
+### Current Drive structure (v4.20.25 — authoritative)
 ```
-[Org Root]/
-  Member Contacts/            ← MEMBER_CONTACTS_SUBFOLDER constant; ID cached in 'MEMBER_CONTACTS_FOLDER_ID' Script Property
-    LastName, FirstName/      ← one folder per member; created on first contact
-      Contact Log — LastName, FirstName.gsheet   ← full rolling history
+[Dashboard Root]/                        ← PRIVATE — steward/admin only
+  Members/                               ← MEMBERS_SUBFOLDER; ID cached as MEMBERS_FOLDER_ID Script Property
+    LastName, FirstName/                 ← per-member master admin folder — steward-only, NEVER shared with member
+      Contact Log — LastName, FirstName  ← Google Sheet — steward-only, full rolling history
+      Grievances/                        ← steward-only subfolder — members do NOT see this level
+        GR-XXXX - YYYY-MM-DD/            ← case folder — member added as EDITOR (can upload evidence)
+          Step 1 - Informal/
+          Step 2 - Written/
+          Step 3 - Review/
+          Supporting Documents/
+  Resources/
+  Minutes/
+  Event Check-In/
+  Meeting Notes/
+  Meeting Agenda/
 ```
 
-### Sheet schema ("Contact Log" tab)
-| Date | Steward | Contact Type | Notes | Duration |
+### Sharing model — exact rules
+| Folder | Member access | Steward access |
+|---|---|---|
+| `Members/` | None | Inherited from Dashboard Root |
+| `Members/LastName, FirstName/` | None | Inherited |
+| `Contact Log` sheet | None | Inherited |
+| `Grievances/` subfolder | None | Inherited |
+| `GR-XXXX` case folder | **Editor** (explicitly granted) | **Editor** (explicitly granted) |
 
-### logMemberContact() execution order (4 steps)
-1. Append row to `_Contact_Log` (fast, always first — this is the write that must not fail)
-2. Resolve steward display name via `findUserByEmail()` (done once, reused in steps 3+4)
+### Key function: `getOrCreateMemberAdminFolder(memberEmail)` — `05_Integrations.gs`
+- Single source of truth for all per-member Drive work
+- Resolves `Members/` root via cached Script Property `MEMBERS_FOLDER_ID`, fallback to `DASHBOARD_ROOT_FOLDER_ID`, fallback to DriveApp search
+- Resolves member display name from Member Directory by header-name lookup (email column → first/last name). Falls back to email prefix.
+- Creates `Members/LastName, FirstName/` and `Grievances/` subfolder inside it on first call
+- On first creation: writes master folder URL to `Member Admin Folder URL` column in Member Directory (by header name, never by column index)
+- Returns `{ masterFolder: Folder, grievancesFolder: Folder }` or `null` on failure
+
+### `setupDriveFolderForGrievance(grievanceId)` — `05_Integrations.gs`
+- Reads `MEMBER_EMAIL` from Grievance Log (`GRIEVANCE_COLS.MEMBER_EMAIL`)
+- Calls `getOrCreateMemberAdminFolder(memberEmail)` → gets `grievancesFolder`
+- Creates `GR-XXXX - YYYY-MM-DD/` case folder under `grievancesFolder`
+- Adds member as Editor on case folder (non-fatal if missing email — folder created, sharing skipped, warning logged)
+- Adds assigned steward as Editor (non-fatal)
+- Falls back to name-based member folder lookup if no email available
+
+### `setupDriveFolderForMember(memberId)` — `05_Integrations.gs`
+- **Shim only** — resolves email from memberId, delegates to `getOrCreateMemberAdminFolder()`
+- Kept for backward compatibility with "Create Member Folder" button in `03_UIComponents.gs`
+
+### `logMemberContact()` execution order (4 steps) — `21_WebDashDataService.gs`
+1. Append row to `_Contact_Log` hidden sheet (fast — must not fail)
+2. Resolve steward display name via `findUserByEmail()` (reused in steps 3+4)
 3. Writeback to Member Directory snapshot columns — non-fatal try/catch
-4. Append to per-member Drive sheet — non-fatal try/catch, independent of step 3
+4. Append to per-member Drive contact sheet via `getOrCreateMemberAdminFolder()` + `getOrCreateMemberContactSheet_()` — non-fatal
 
-### Rules
-- Member folder name = `LastName, FirstName` (sanitized, Drive-safe chars only)
-- If no last name: just FirstName
-- If member not found in directory: falls back to email prefix (splits on @ and replaces `.` and `_` with spaces)
-- Sheet title = `Contact Log — [folder name]`
-- `MEMBER_CONTACTS_SUBFOLDER = 'Member Contacts'` — do NOT rename this folder in Drive; the stored prop ID will go stale
-- Member Directory keeps only the LAST contact snapshot — Drive sheet is the full history
-- `_Contact_Log` hidden sheet is still maintained for fast dashboard queries (Recent/By Member views)
+### Member Directory column
+- Header: `'Member Admin Folder URL'`
+- HEADERS alias: `memberAdminFolderUrl: ['member admin folder url', 'member admin folder', 'contact log folder url']`
+  - `'contact log folder url'` alias retained for backward compat with existing Member Directory data
+- Surfaced in `_buildUserRecord()` → `user.memberAdminFolderUrl`
+- Surfaced in `getFullMemberProfile()` → `profile.memberAdminFolderUrl`
+- Steward-visible only (Full Profile section → `📂 Member Folder` link). Never expose to member-facing view.
 
----
+### RULES — do not violate
+- Never share `Members/`, `Members/Name/`, `Contact Log`, or `Grievances/` with the member — these are internal steward workspace
+- Only the individual grievance case folder (`GR-XXXX`) is shared with the member, as Editor
+- `MEMBERS_SUBFOLDER = 'Members'` — do NOT rename this folder in Drive; the stored Script Property ID will go stale
+- `Member Admin Folder URL` column is populated by code (non-fatal). Never hardcode the URL.
+- All folder/column lookups must be by header name, never by column index
 
-## 2026-03-06 — Member folder sharing + dataSendDirectMessage Drive log (v4.20.23)
-
-### Member folder sharing
-- `getOrCreateMemberContactFolder_()` now calls `memberFolder.addViewer(memberEmail)` when the folder is **first created** (`isNewFolder` flag)
-- Members get viewer access — they can read their contact log but cannot edit it
-- Sharing is non-fatal; if it fails (e.g. external domain restriction), folder is still returned and used
-- Existing folders are NOT re-shared on every contact (no extra Drive API calls)
-
-### dataSendDirectMessage Drive logging
-- After `MailApp.sendEmail()` succeeds, appends to Drive contact sheet: `[Date, stewardName, 'Email', 'Subject: X | bodyPreview', '']`
-- Body preview capped at 300 chars to keep notes readable
-- Uses `DataService.getOrCreateMemberContactFolderPublic` + `getOrCreateMemberContactSheetPublic` — these are the private helpers exposed on DataService's return object specifically for cross-IIFE access
-- Non-fatal — email send failure returns error as before; Drive append failure is logged and swallowed
+### dataSendDirectMessage Drive logging — `21_WebDashDataService.gs`
+- After email sent: appends `[Date, stewardName, 'Email', 'Subject: X | bodyPreview', '']` to Drive contact sheet
+- Body preview capped at 300 chars
+- Uses `DataService.getOrCreateMemberContactFolderPublic` + `getOrCreateMemberContactSheetPublic` (private helpers exposed on DataService return object for cross-IIFE access)
+- Non-fatal — email send failure returns error; Drive failure is logged and swallowed
 
 ### RULE: public exposure of private helpers
-Private helpers that need to be called from outside the DataService IIFE must be exposed via the return object with a `Public` suffix to make the cross-boundary access explicit. Do NOT expose them as top-level functions — they must remain under the DataService namespace.
+Private helpers needed outside the DataService IIFE must be exposed on the return object with a `Public` suffix. Do NOT make them top-level functions.
+
+### Migration note (existing deployments)
+Old `Member Contacts/` subfolder and its per-member folders are **not deleted**. Old contact log sheets remain readable in Drive but will no longer receive new writes. New contacts/grievances write to the new `Members/` hierarchy.
+
+## 2026-03-06 — Notification System Overhaul (v4.22.0)
+
+### Bugs Fixed
+1. **Sort bug** (`05_Integrations.gs` `getWebAppNotifications()`): `results.reverse()` was called AFTER `sort()`, undoing the Urgent-first ordering. Now: `reverse()` first (newest at index 0), then `sort()` for Urgent promotion.
+2. **Manage tab wrong data** (`steward_view.html` `_renderNotifManage()`): was calling `getWebAppNotifications(steward_email, 'steward')` which returns only what the steward received. Now calls new `getAllWebAppNotifications()` which returns every row in the sheet.
+3. **Bell badge DOM stale after dismiss** (`member_view.html`): `AppState.notificationCount` was decremented but DOM badge element not updated. Fixed: after card removal, find `.notif-bell-badge` and update or remove it.
+
+### Features Added
+- **`DISMISS_MODE` column** (col 13, `Dismissible` | `Timed`) in `NOTIFICATIONS_HEADER_MAP_` (`01_Core.gs`)
+  - `Dismissible`: member can permanently dismiss (writes to `Dismissed_By` column via `dismissWebAppNotification()`)
+  - `Timed`: notification shows until `Expires_Date`, no dismiss button, "Auto-expires" badge shown
+- **Compose form dismiss mode toggle** (`steward_view.html`): two buttons (✕ Dismissible / ⏰ Timed). Timed enforces expiry date.
+- **Permanent member dismiss** (`member_view.html`): replaced 1-hour localStorage TTL with `dismissWebAppNotification()` backend call.
+- **`getAllWebAppNotifications()`** (`05_Integrations.gs`): steward-auth-gated, returns all rows with `dismissedCount`, `status`, `dismissMode`. Used by Manage tab.
+
+### Dead Code Removed
+- `getUserNotifications()` — ScriptProperties-based, orphaned since v4.13.0 Notifications sheet
+- `markNotificationRead()` — same
+- `broadcastStewardNotification()` — no active callers
+- `getWebAppNotificationsHtml()` — 345 lines of standalone HTML, never routed in `doGet()`
+- `pushNotification()` rerouted to Notifications sheet (still called by `saveSharedView()`)
+
+### Files Changed
+- `src/01_Core.gs` — NOTIFICATIONS_HEADER_MAP_, v4.22.0 changelog entry
+- `src/05_Integrations.gs` — sort fix, dismissMode in results, sendWebAppNotification, getAllWebAppNotifications, dead HTML removed
+- `src/10b_SurveyDocSheets.gs` — createNotificationsSheet: DISMISS_MODE col width, validation, starter rows
+- `src/16_DashboardEnhancements.gs` — dead functions removed, pushNotification rerouted
+- `src/steward_view.html` — Manage tab fix, compose dismiss mode toggle
+- `src/member_view.html` — permanent dismiss, Timed mode badge, bell badge DOM fix
+
+## 2026-03-06 — Notification Manage Hardening (v4.22.1)
+
+### Features Added
+1. **`MIGRATE_ADD_DISMISS_MODE_COLUMN()`** (`05_Integrations.gs`)
+   - One-time migration for existing Notifications sheets
+   - Checks for column before touching anything (safe to re-run)
+   - Appends `Dismiss_Mode` as next column after current last col
+   - Backfills all existing rows with `'Dismissible'` (safe legacy default)
+   - Shows UI alert on success/skip; logs to Apps Script Logger
+   - **Run from Apps Script editor → can be deleted after confirmed success**
+
+2. **`archiveWebAppNotification(notificationId)`** (`05_Integrations.gs`)
+   - Steward-auth-gated
+   - Sets `Status = 'Archived'` on matching row — non-destructive, row preserved
+   - Archived rows excluded from all member views automatically (getWebAppNotifications filters `Status = 'Active'`)
+
+3. **Archive button in Manage tab** (`steward_view.html`)
+   - Shown only on `Active` rows
+   - Calls `archiveWebAppNotification()` on click
+   - On success: updates status pill in-place, removes itself — no full re-render needed
+   - Expired/Archived rows remain visible for audit purposes
+
+### Files Changed
+- `src/05_Integrations.gs` — MIGRATE_ADD_DISMISS_MODE_COLUMN, archiveWebAppNotification
+- `src/steward_view.html` — Archive button in _renderNotifManage
+- `src/01_Core.gs` — v4.22.1 changelog entry
 
 ---
 
-## 2026-03-06 — Contact Log Folder URL in Member Directory + member card link (v4.20.24)
+## 2026-03-06 — Subject line, scope config, dues gate on 6 tabs
 
-### New column: Contact Log Folder URL
-- Added to `MEMBER_HEADER_MAP_` in `01_Core.gs` as the last column
-- Header: `'Contact Log Folder URL'`
-- Auto-populated on first contact log: `getOrCreateMemberContactFolder_()` writes `https://drive.google.com/drive/folders/[ID]` to this column via header-name lookup (never by index)
-- Surfaced in `_buildUserRecord()` → `user.contactLogFolderUrl`
-- Surfaced in `getFullMemberProfile()` → `profile.contactLogFolderUrl`
-- HEADERS alias: `memberContactLogFolderUrl: ['contact log folder url', 'contact log folder']`
+### Broadcast: Custom subject line
+- `dataSendBroadcast(ignoredEmail, filter, msg, subject)` — 4th param added
+- `sendBroadcastMessage(stewardEmail, filter, message, customSubject)` — if customSubject non-empty, uses it; else falls back to auto-generated `orgAbbrev + ' - Message from your ' + stewardLabel`
+- UI: subject input field above message textarea; placeholder shows auto-generated default
 
-### Member card
-- Full Profile expanded section shows `📂 Open in Drive` link when `profile.contactLogFolderUrl` is truthy
-- Matches pattern used for grievance Drive folder links
-- Hidden until first contact is logged (column value empty by default)
+### Broadcast: Scope toggle via Config (not hardcoded)
+- New Config tab column: `Broadcast: Allow All Members Scope` (key: `BROADCAST_SCOPE_ALL`)
+- Set value to `yes` in Config tab to show the My Members / All Members toggle in Broadcast UI
+- Leave blank or set to anything else to hide the toggle (steward can only send to their assigned members)
+- `dataGetBroadcastFilterOptions()` now returns `broadcastScopeAll: boolean`
+- `_sanitizeConfig()` now includes `broadcastScopeAll: boolean` (22_WebDashApp.gs)
+- RULE: scope toggle visibility must always come from config — never hardcode as always-visible
 
-### RULE
-Contact Log Folder URL is steward-visible only (in Full Profile). Members see their folder via the Drive share — they are NOT shown the URL in their own member view dashboard. Do not expose `contactLogFolderUrl` to the member-facing view.
+### Dues paying: null = paying fix
+- `filter.duesPaying === 'paying'` now only blocks members where `duesPaying === false` (not null)
+- `filter.duesPaying === 'nonpaying'` only includes members where `duesPaying === false`
+- null means column is absent — always treated as dues paying (benefit of the doubt)
+
+### safeUser: duesPaying added
+- `_serveDashboard()` now includes `duesPaying` in `safeUser` sent to client
+- Value: true=paying, false=not paying, null=column absent (22_WebDashApp.gs)
+- CURRENT_USER.duesPaying is available client-side in all view scripts
+
+### Dues gate: 6 member tabs blocked for non-dues-paying members
+**`member_view.html`**
+- `_isDuesPaying()` → returns `CURRENT_USER.duesPaying !== false` (null = paying)
+- `_renderDuesGate(appContainer, featureName, backFn)` → standard locked-feature wall with 🔒 icon
+- Gated functions (each checks `_isDuesPaying()` at entry, returns gate if false):
+  - `renderMemberResources` — Member Resources tab
+  - `renderSurveyFormPage` — Quarterly Survey
+  - `renderEventsPage` — Events (member role only; stewards bypass the check)
+  - `renderUnionStatsPage` — Union Stats / Insights
+  - `renderPollsPage` — Polls (includes weekly questions)
+
+**`index.html`**
+- `_handleTabNav` org chart case: checks role === 'member' && !_isDuesPaying() before rendering
+- Uses typeof guards for _isDuesPaying/_renderDuesGate to prevent errors if member_view not loaded
+
+### RULES
+- Stewards are NEVER gated by dues status — checks are role-gated (role === 'member' only)
+- Dues gate functions must remain in member_view.html (not index.html) so they have access to member-specific layout/header helpers
+- The org chart gate in index.html uses typeof guards since it lives outside member_view scope
+- EVERYTHING IS DYNAMIC: dues gate checks CURRENT_USER.duesPaying which comes from live sheet data
+
+---
+
+## 2026-03-06 — Survey banner gate, More menu lock icons, broadcast scope Config seeding
+
+### Survey banner (member_view.html — renderMemberHome)
+- Banner condition changed from `status && !status.hasCompleted` to `status && !status.hasCompleted && _isDuesPaying()`
+- Non-dues-paying members no longer see the survey banner on the home page
+- Consistent with the gate on renderSurveyFormPage itself
+
+### More menu lock indicators (member_view.html — renderMemberMore)
+- `isDuesPaying` computed once at the top of renderMemberMore (not per item)
+- Menu item schema extended: optional `locked: true` flag on gated items
+- Gated items: Events, Union Stats, Org Chart, Resources, Polls, Take Survey
+- When `isLocked = m.locked && !isDuesPaying`:
+  - Item renders at 60% opacity
+  - 🔒 badge (10px, absolute-positioned) overlaid on bottom-right of icon
+  - "DUES REQUIRED" amber pill appended next to label text
+  - Click still routes through the normal action → hits the gate wall inside the render function
+- Non-locked items render identically to before (no style changes)
+- RULE: locked flag list must stay in sync with the 6 functions that have `_isDuesPaying()` entry guards
+
+### Broadcast scope Config seeding (10a_SheetCreation.gs)
+- `seedConfigDefault_(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL, ['no'], isExistingSheet)` — default 'no'
+- `SpreadsheetApp.newDataValidation().requireValueInList(['yes', 'no'])` applied to row 3 of that column
+  — admins get a dropdown picker, not a free-text cell
+- Help text: "yes = stewards can broadcast to all members. no = stewards can only broadcast to their assigned members."
+- `'── BROADCAST ──'` section header added to sectionHeaders array
+- CONFIG_COLS.BROADCAST_SCOPE_ALL is only defined after buildColsFromMap_ runs — validation block wrapped in `if (CONFIG_COLS.BROADCAST_SCOPE_ALL)` guard
+
+### ConfigReader (20_WebDashConfigReader.gs)
+- Added `broadcastScopeAll: _readCell(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL) || 'no'`
+- config.broadcastScopeAll now resolves from live Config sheet data
+- _sanitizeConfig (22_WebDashApp.gs) converts it to boolean: `String(...).toLowerCase() === 'yes'`
+- dataGetBroadcastFilterOptions (21_WebDashDataService.gs) reads it and returns as `broadcastScopeAll: boolean`
+- UI reads opts.broadcastScopeAll to conditionally show scope toggle
+
+### REMINDER — everything must be dynamic
+- Broadcast scope is controlled by Config tab — never hardcode as always-visible
+- Lock icon visibility is driven by CURRENT_USER.duesPaying (from live sheet at login)
+- Dues gate checks CURRENT_USER.duesPaying which comes from _serveDashboard safeUser
+
+---
+
+## 2026-03-06 — Dues gate: home page banner + Member Directory checkbox column
+
+### Persistent home page banner (member_view.html — renderMemberHome)
+- Inserted synchronously after the welcome slot — no server call, uses CURRENT_USER.duesPaying
+- Condition: `!_isDuesPaying()` (false = not paying, null = column absent → not shown)
+- Amber color scheme (rgba orange background + border) to match lock icons in More menu
+- Lists all 6 gated features explicitly: Events, Resources, Polls, Survey, Org Chart, Union Stats
+- Includes "Contact your steward if you believe this is an error" so member has a clear path
+- RULE: banner must stay in sync with the locked:true items in renderMemberMore and the
+  _isDuesPaying() guards in individual render functions
+
+### Member Directory: Dues Paying column (10a_SheetCreation.gs — createMemberDirectory)
+- `sheet.getRange(2, MEMBER_COLS.DUES_PAYING, 4999, 1).insertCheckboxes()` — checked = paying
+- Column width set to 100px
+- Guarded with `if (MEMBER_COLS.DUES_PAYING)` — safe to run on existing sheets without the column
+- Conditional formatting added to existing rules array:
+  - TRUE (checked) → green background (#e8f5e9) + dark green text (#2e7d32)
+  - FALSE (unchecked) → amber background (#fff8e1) + dark amber text (#f57f17)
+  - Unchecked-but-empty cells get no color (checkbox default = FALSE in Sheets,
+    so all pre-existing rows will appear amber until explicitly checked)
+- IMPORTANT: After running CREATE_DASHBOARD on an existing sheet, all members will appear
+  as "not dues paying" until manually checked. Recommend bulk-checking all current paying
+  members after column is added.
+
+### REMINDER — everything must be dynamic
+- Dues Paying column detected at login via _buildUserRecord (reads HEADERS.memberDuesPaying)
+- CURRENT_USER.duesPaying flows: sheet → _buildUserRecord → _serveDashboard safeUser → client
+- Home banner, More menu locks, and gate walls all read CURRENT_USER.duesPaying — one source
+
+---
+
+## 2026-03-06 — Member Directory column auto-migration
+
+### _addMissingMemberHeaders_(sheet) — new function (10a_SheetCreation.gs)
+- Reads current row-1 headers from the live sheet (case-insensitive match)
+- Compares against `getMemberHeaders()` (derived from MEMBER_HEADER_MAP_)
+- Appends any missing headers into the next available columns, styled with purple bg/white bold
+- Per-column post-setup block inside the loop handles column-specific formatting:
+  - `'dues paying'` → `insertCheckboxes()` + width 100px + green/amber conditional format rules
+  - Extend this block for any future column that needs special formatting on first-add
+- Returns array of added header names (empty if nothing added)
+- Never deletes, moves, or overwrites existing columns or data
+
+### createMemberDirectory() migration path
+- `getLastRow() <= 1` → new sheet: writes all headers, Dues Paying setup done inline
+  (MEMBER_COLS.DUES_PAYING not yet resolved → resolve from `headers.indexOf('Dues Paying')`)
+  Rules stored in `sheet._duesCfRules`, merged into final `setConditionalFormatRules()` call
+- `getLastRow() > 1` → existing sheet: calls `_addMissingMemberHeaders_()`, shows toast
+- Toast message lists added column names so admins know what changed
+
+### Pattern rule for future columns
+To add a new column to the Member Directory that auto-migrates to existing sheets:
+1. Add `{ key: 'YOUR_KEY', header: 'Your Header' }` to `MEMBER_HEADER_MAP_` in `01_Core.gs`
+2. If column needs special formatting (checkbox, dropdown, date format, etc.), add a case
+   to the `if (normalised === '...')` block inside `_addMissingMemberHeaders_()` in `10a_SheetCreation.gs`
+3. For new sheets, add the same setup after the header write block in `createMemberDirectory()`
+   using index-based column resolution (not MEMBER_COLS.YOUR_KEY — not yet resolved)
+4. syncColumnMaps() will pick up the new column automatically at next onOpen/execution
+
+### REMINDER — everything must be dynamic
+- Column detection always uses header name matching, never hardcoded column index
+- MEMBER_COLS constants are resolved at runtime by syncColumnMaps/resolveColumnsFromSheet_
+- _addMissingMemberHeaders_ follows the same header-name matching pattern
+
+---
+
+## 2026-03-06 — Grievance Log column auto-migration
+
+### _addMissingGrievanceHeaders_(sheet) — new function (10a_SheetCreation.gs)
+- Exact parallel to _addMissingMemberHeaders_ — same logic, same safety rules
+- Compares row-1 headers against getGrievanceHeaders() (from GRIEVANCE_HEADER_MAP_)
+- Appends missing headers far-right into next empty columns with purple/white bold styling
+- Per-column post-setup block included but empty today — MESSAGE_ALERT and QUICK_ACTIONS
+  already exist in all live sheets. Add cases here when new Grievance columns need
+  special formatting (checkboxes, date format, conditional rules, etc.)
+- Returns array of added header names (empty if nothing added)
+
+### createGrievanceLog() migration path
+- getLastRow() <= 1 → new sheet: writes all headers (unchanged)
+- getLastRow() > 1 → existing sheet: calls _addMissingGrievanceHeaders_(), shows toast
+- Toast message lists added column names with 📋 Grievance Log label
+
+### Pattern rule for future Grievance columns
+1. Add { key: 'YOUR_KEY', header: 'Your Header' } to GRIEVANCE_HEADER_MAP_ in 01_Core.gs
+2. Add per-column formatting case to the post-setup block in _addMissingGrievanceHeaders_()
+3. For new-sheet path: add same setup in createGrievanceLog() after header write,
+   using index-based resolution (GRIEVANCE_COLS.YOUR_KEY not yet resolved on new sheets)
+
+### Both sheets now covered
+- Member Directory → _addMissingMemberHeaders_()
+- Grievance Log    → _addMissingGrievanceHeaders_()
+- Both functions follow identical contract: header-name match only, no data mutation,
+  per-column hook, toast on change, Logger output

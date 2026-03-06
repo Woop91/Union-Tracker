@@ -1226,7 +1226,7 @@ function getWebDashBatchData(email, role) {
     result.profile       = DataService.findUserByEmail(email);
     result.events        = DataService.getUpcomingEvents(5);
     result.surveyStatus  = DataService.getMemberSurveyStatus(email);
-    result.notifications = DataService.getMemberNotifications ? DataService.getMemberNotifications(email) : [];
+    result.notifications = []; // NOTE (v4.22.2): getMemberNotifications removed. SPA fetches notifications directly via getWebAppNotifications().
     result.orgLinks      = DataService.getOrgLinks();
     result.welcome       = dataGetWelcomeData(email);
 
@@ -3168,22 +3168,21 @@ function getUnifiedDashboardHtml(isPII) {
     'el.innerHTML=html' +
     '}' +
 
-    // === NOTIFICATIONS ===
+    // === NOTIFICATIONS (v4.22.2) ===
+    // NOTE: 04e_PublicDashboard is currently orphaned (not routed via doGet).
+    // getUserNotifications/markNotificationRead were removed in v4.22.0.
+    // Updated to use getWebAppNotifications/dismissWebAppNotification if re-activated.
     'function toggleNotifPref(){document.getElementById("notifToggle").classList.toggle("on")}' +
     'function loadNotifications(){' +
-    'google.script.run.withSuccessHandler(function(json){' +
-    'var notifs=JSON.parse(json);var el=document.getElementById("notifList");if(!el)return;' +
-    'if(notifs.length===0){el.innerHTML="<p>No notifications</p>";return}' +
+    'google.script.run.withSuccessHandler(function(notifs){' +
+    'var el=document.getElementById("notifList");if(!el)return;' +
+    'if(!notifs||notifs.length===0){el.innerHTML="<p>No notifications</p>";return}' +
     'var html="";notifs.slice(0,5).forEach(function(n){' +
-    'var style=n.read?"color:#64748b":"color:#e2e8f0;font-weight:500";' +
-    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\" data-id=\\""+escapeHtml(n.id)+"\\" onclick=\\"markNotifRead(this.dataset.id)\\">"+escapeHtml(n.title)+"<br><span style=\\"font-size:10px;color:#64748b\\">"+new Date(n.timestamp).toLocaleString()+"</span></div>"' +
+    'var style=n.priority==="Urgent"?"color:#e2e8f0;font-weight:500":"color:#94a3b8";' +
+    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\">"+escapeHtml(n.title)+"<br><span style=\\"font-size:10px;color:#64748b\\">"+escapeHtml(n.createdDate)+"</span></div>"' +
     '});el.innerHTML=html;' +
-    'var unread=notifs.filter(function(n){return!n.read}).length;' +
-    'var badge=document.getElementById("alertBadge");if(badge&&unread>0){badge.textContent=unread;badge.style.display="inline"}' +
-    '}).getUserNotifications()' +
-    '}' +
-    'function markNotifRead(id){' +
-    'google.script.run.withSuccessHandler(function(){loadNotifications()}).markNotificationRead(id)' +
+    'var badge=document.getElementById("alertBadge");if(badge&&notifs.length>0){badge.textContent=notifs.length;badge.style.display="inline"}' +
+    '}).getWebAppNotifications(UE,"member")' +
     '}' +
 
     // Initialize on load

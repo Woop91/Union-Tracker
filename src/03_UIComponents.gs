@@ -115,7 +115,13 @@ function createDashboardMenu() {
       .addItem('🔔 Send Survey Reminders Now', 'sendSurveyCompletionReminders')
       .addSeparator()
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
-      .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger'))
+      .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
+      .addItem('✅ Install ALL Survey Triggers', 'menuInstallSurveyTriggers'))
+
+    .addSubMenu(ui.createMenu('🗳️ Polls')
+      .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
+      .addItem('🔄 Draw Community Poll Now (manual)', 'autoSelectCommunityPoll')
+      .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets'))
 
     .addSubMenu(ui.createMenu('📅 Calendar & Meetings')
       .addItem('🏗️ Setup Union Events Calendar', 'SETUP_CALENDAR')
@@ -254,6 +260,8 @@ function createDashboardMenu() {
       .addItem('🚀 Initialize Dashboard', 'initializeDashboard')
       .addSeparator()
       .addItem('📋 Initialize Survey Engine', 'initSurveyEngine')
+      .addItem('✅ Install ALL Survey Triggers', 'menuInstallSurveyTriggers')
+      .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
       .addSeparator()
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')

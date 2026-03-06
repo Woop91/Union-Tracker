@@ -46,7 +46,8 @@ var PORTAL_EVENT_COLS = {
 
 var PORTAL_MINUTES_COLS = {
   ID: 0, MEETING_DATE: 1, TITLE: 2, BULLETS: 3, FULL_MINUTES: 4,
-  CREATED_BY: 5, CREATED_DATE: 6
+  CREATED_BY: 5, CREATED_DATE: 6,
+  DRIVE_DOC_URL: 7  // v4.20.18 — Google Doc URL saved to Minutes/ Drive folder
 };
 
 var PORTAL_POLL_COLS = {

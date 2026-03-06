@@ -177,7 +177,7 @@ function viewTestResults() {
  * Get or create the root Dashboard folder in Drive
  */
 function getOrCreateDashboardFolder_() {
-  var folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
+  var folderName = getDriveRootFolderName_();
   var folders = DriveApp.getFoldersByName(folderName);
 
   if (folders.hasNext()) {

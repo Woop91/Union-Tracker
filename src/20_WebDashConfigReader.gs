@@ -61,6 +61,8 @@ var ConfigReader = (function () {
       memberLabel:         'Member',
       // Insights cache TTL in minutes (default 5). Admins can override via Config tab.
       insightsCacheTTLMin: Number(_readCell(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN) || 5) || 5,
+      // Broadcast scope: 'yes' = stewards can send to all members, 'no' (default) = assigned only
+      broadcastScopeAll:   _readCell(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL) || 'no',
       // Org links — from Config tab columns
       calendarId:          _readCell(sheet, CONFIG_COLS.CALENDAR_ID) || '',
       driveFolderId:       _readCell(sheet, CONFIG_COLS.DRIVE_FOLDER_ID) || '',

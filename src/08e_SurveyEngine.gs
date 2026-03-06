@@ -767,3 +767,35 @@ function menuShowSurveyPeriodStatus() {
   ].join('\n');
   ui.alert('📋 Current Survey Period', msg, ui.ButtonSet.OK);
 }
+
+// ── Combined trigger installer ────────────────────────────────────────────────
+
+/**
+ * v4.22.0 — Installs BOTH survey triggers in one call.
+ * Run once after deployment:
+ *   1. Open the Sheet → Extensions → Apps Script → Run menuInstallSurveyTriggers
+ *   OR
+ *   2. Union Hub menu → Survey Engine → Install Survey Triggers
+ *
+ * Safe to re-run: removes existing handlers before creating new ones.
+ */
+function menuInstallSurveyTriggers() {
+  setupQuarterlyTrigger();
+  setupWeeklyReminderTrigger();
+
+  var msg = [
+    '✅ Both survey triggers installed:',
+    '',
+    '1. Quarterly auto-open — fires on the 1st of each month at 6 AM;',
+    '   auto-opens a new period on Jan 1, Apr 1, Jul 1, Oct 1.',
+    '',
+    '2. Weekly member reminders — fires every Tuesday at 9 AM;',
+    '   emails members who have not yet completed the active survey period.',
+  ].join('\n');
+
+  try {
+    SpreadsheetApp.getUi().alert('Survey Triggers Installed', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (_uiErr) {
+    Logger.log(msg);
+  }
+}

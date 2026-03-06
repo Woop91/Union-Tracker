@@ -43,7 +43,45 @@
   text-align: center; /* SINGLE SOURCE OF TRUTH for horizontal centering */
 }
 
-/* ─── TIER ROWS ──────────────────────────────────────────────── */
+/* ─── VIEWPORT FIT (v4.18.2) ─────────────────────────────────── */
+/* Wrapper scales the full chart to fit within the viewport width */
+.oc-viewport-fit {
+  width: 100%;
+  overflow: hidden;
+}
+.oc-scale-wrap {
+  transform-origin: top center;
+  transition: transform 0.2s ease;
+}
+/* Zoom control bar */
+.oc-zoom-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(12,14,20,0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-family: var(--ff-body);
+  font-size: 12px;
+  color: var(--mute);
+}
+.oc-zoom-bar button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--txt);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--ff-body);
+}
+.oc-zoom-bar button:hover { background: rgba(255,255,255,0.12); }
+.oc-zoom-label { min-width: 42px; text-align: center; font-weight: 600; color: var(--txt); }
+
 /* Each tier is just display:block — children are inline-block,
    so text-align:center on .page keeps them all on the same axis */
 .oc-wrap .tier {
@@ -325,6 +363,16 @@
 @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
 
 </style>
+<div class="oc-zoom-bar">
+  <button onclick="ocZoom(-0.1)">−</button>
+  <span class="oc-zoom-label" id="oc-zoom-lbl">100%</span>
+  <button onclick="ocZoom(+0.1)">+</button>
+  <button onclick="ocZoomFit()" style="margin-left:4px;">⊡ Fit</button>
+  <button onclick="ocZoomReset()" style="margin-left:2px;">↺ Reset</button>
+  <span style="margin-left:auto;font-size:11px;">Drag to scroll • Pinch to zoom</span>
+</div>
+<div class="oc-viewport-fit">
+<div class="oc-scale-wrap" id="oc-scale-wrap">
 <div class="oc-wrap">
 <div class="page">
 
@@ -1028,5 +1076,33 @@ function toggleOtherGroup(btn) {
   grp.style.display = hidden ? 'block' : 'none';
   btn.textContent = hidden ? '▼ Hide Other Chapters' : '▶ Show all 4 Other Chapters';
 }
+
+// ── Viewport fit & zoom (v4.18.2) ──────────────────────────────
+var _ocZoom = 1.0;
+var _ocWrap = null;
+function _ocApplyZoom() {
+  if (!_ocWrap) _ocWrap = document.getElementById('oc-scale-wrap');
+  if (!_ocWrap) return;
+  _ocZoom = Math.max(0.2, Math.min(2.0, _ocZoom));
+  _ocWrap.style.transform = 'scale(' + _ocZoom.toFixed(2) + ')';
+  // shrink the parent height to match scaled content to avoid dead space
+  var naturalH = _ocWrap.scrollHeight / _ocZoom;
+  _ocWrap.parentElement.style.height = (naturalH * _ocZoom) + 'px';
+  var lbl = document.getElementById('oc-zoom-lbl');
+  if (lbl) lbl.textContent = Math.round(_ocZoom * 100) + '%';
+}
+function ocZoom(delta) { _ocZoom += delta; _ocApplyZoom(); }
+function ocZoomReset() { _ocZoom = 1.0; _ocApplyZoom(); }
+function ocZoomFit() {
+  if (!_ocWrap) _ocWrap = document.getElementById('oc-scale-wrap');
+  if (!_ocWrap) return;
+  var containerW = _ocWrap.parentElement.clientWidth || window.innerWidth;
+  var contentW = _ocWrap.scrollWidth;
+  if (contentW > 0) { _ocZoom = Math.min(1.0, (containerW - 32) / contentW); }
+  _ocApplyZoom();
+}
+// Auto-fit on load
+window.addEventListener('load', function() { setTimeout(ocZoomFit, 100); });
+window.addEventListener('resize', function() { ocZoomFit(); });
 </script>
-</div>
+</div></div></div>
