@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 39 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 39 `.gs` + 8 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED — private repo only]`
+**DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -1286,3 +1286,40 @@ To add a new column to the Member Directory that auto-migrates to existing sheet
 - Grievance Log    → _addMissingGrievanceHeaders_()
 - Both functions follow identical contract: header-name match only, no data mutation,
   per-column hook, toast on change, Logger output
+
+---
+
+## 📋 CHANGE LOG — v4.22.x Resources Tab Overhaul
+
+### Changes made (session: 2026-03-06)
+
+**Issues fixed:**
+1. ✅ Dues gate removed from `renderMemberResources()` — labor rights content (Weingarten, Just Cause, etc.) must be accessible to all bargaining unit members regardless of dues status. Union-Tracker parity restored.
+2. ✅ Category mismatch resolved — steward form dropdown was using a completely different and incompatible list vs. the 📚 Resources sheet data validation.
+3. ✅ Category list is now fully dynamic — driven from new `📚 Resource Config` sheet, never hardcoded in client code.
+4. ✅ Steward manage list now sorted by Sort Order — previously showed items in insertion (sheet row) order.
+
+**Files changed:**
+- `src/01_Core.gs` — Added `SHEETS.RESOURCE_CONFIG`, `RESOURCE_CONFIG_HEADER_MAP_`, `RESOURCE_CONFIG_COLS`, and registered in dynamic column refresh registry.
+- `src/10b_SurveyDocSheets.gs` — Added `createResourceConfigSheet()` with 10 default categories matching 📚 Resources sheet validation.
+- `src/05_Integrations.gs` — Added `getWebAppResourceCategories()` (reads from 📚 Resource Config, auto-creates if missing, falls back to `_defaultResourceCategories_()` on error).
+- `src/member_view.html` — Removed `_isDuesPaying()` gate from `renderMemberResources()`.
+- `src/steward_view.html` — Replaced hardcoded category dropdown with live `getWebAppResourceCategories()` call; added sort on manage list.
+
+**New sheet: 📚 Resource Config**
+| Column | Purpose |
+|---|---|
+| Setting | Row type — currently only 'Category' |
+| Value | The category name |
+| Sort Order | Display order (numeric) |
+| Active | Yes / No — hides a category without deleting it |
+| Notes | Steward notes (not shown in UI) |
+
+**Default categories (in order):**
+Contract Article → Know Your Rights → Grievance Process → Forms & Templates → FAQ → Guide → Policy → Contact Info → Link → General
+
+**⚠️ CRITICAL RULES (do not violate):**
+- `RESOURCE_CONFIG_COLS` is built from `RESOURCE_CONFIG_HEADER_MAP_` via `buildColsFromMap_()` — never hardcode column numbers.
+- `createResourceConfigSheet()` checks for existing sheet first — NEVER overwrites manually entered data.
+- Categories read by UI at form-open time via `getWebAppResourceCategories()` — never cached in config bootstrap.
+- `_defaultResourceCategories_()` is a last-resort fallback only — the live sheet is the source of truth.

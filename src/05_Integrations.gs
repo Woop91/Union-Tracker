@@ -3836,6 +3836,65 @@ function disconnectConstantContact() {
 // ============================================================================
 
 /**
+ * Returns active resource categories from 📚 Resource Config sheet, sorted by Sort Order.
+ * Auto-creates the sheet with defaults if missing.
+ * Used by the steward manage form and any UI that needs the live category list.
+ * @returns {string[]} Category name strings, e.g. ['Contract Article', 'FAQ', ...]
+ */
+function getWebAppResourceCategories() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCE_CONFIG);
+
+    // Auto-create with defaults if missing
+    if (!sheet) {
+      if (typeof createResourceConfigSheet === 'function') {
+        sheet = createResourceConfigSheet(ss);
+      }
+      if (!sheet) return _defaultResourceCategories_();
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return _defaultResourceCategories_();
+
+    var data = sheet.getRange(2, 1, lastRow - 1, RESOURCE_CONFIG_COLS.NOTES).getValues();
+
+    var categories = data
+      .filter(function(row) {
+        var setting = String(row[RESOURCE_CONFIG_COLS.SETTING - 1] || '').trim();
+        var active  = String(row[RESOURCE_CONFIG_COLS.ACTIVE - 1]  || '').toLowerCase();
+        var value   = String(row[RESOURCE_CONFIG_COLS.VALUE - 1]   || '').trim();
+        return setting === 'Category' && active === 'yes' && value !== '';
+      })
+      .map(function(row) {
+        return {
+          name:  String(row[RESOURCE_CONFIG_COLS.VALUE - 1]).trim(),
+          order: Number(row[RESOURCE_CONFIG_COLS.SORT_ORDER - 1]) || 999
+        };
+      });
+
+    categories.sort(function(a, b) { return a.order - b.order; });
+    return categories.map(function(c) { return c.name; });
+
+  } catch (e) {
+    logError_('getWebAppResourceCategories', e);
+    return _defaultResourceCategories_();
+  }
+}
+
+/**
+ * Fallback category list — used only if the sheet is missing and createResourceConfigSheet
+ * cannot run (e.g. permissions issue). Matches the default rows in createResourceConfigSheet.
+ * @private
+ */
+function _defaultResourceCategories_() {
+  return [
+    'Contract Article', 'Know Your Rights', 'Grievance Process',
+    'Forms & Templates', 'FAQ', 'Guide', 'Policy', 'Contact Info', 'Link', 'General'
+  ];
+}
+
+/**
  * API function to get resources list for web app.
  * Reads from the 📚 Resources sheet, returns visible items sorted by Sort Order.
  * @param {string} [audience] - Filter by audience: 'All', 'Members', 'Stewards'. Defaults to 'All'.

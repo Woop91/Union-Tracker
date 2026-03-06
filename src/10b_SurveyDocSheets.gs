@@ -2219,3 +2219,80 @@ function createNotificationsSheet(ss) {
   return sheet;
 }
 
+/**
+ * Creates the 📚 Resource Config sheet for managing resource categories dynamically.
+ * Called automatically when getWebAppResourceCategories() finds the sheet missing.
+ * Only creates if it does not already exist — never overwrites manually entered data.
+ * @param {Spreadsheet} [ss]
+ * @returns {Sheet}
+ */
+function createResourceConfigSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+
+  // Never recreate if it already exists
+  var existing = ss.getSheetByName(SHEETS.RESOURCE_CONFIG);
+  if (existing) return existing;
+
+  var sheet = ss.insertSheet(SHEETS.RESOURCE_CONFIG);
+
+  // Headers from header map (single source of truth — 01_Core.gs)
+  var headers = getHeadersFromMap_(RESOURCE_CONFIG_HEADER_MAP_);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+  // Header formatting
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(RESOURCE_CONFIG_COLS.SETTING,    140);
+  sheet.setColumnWidth(RESOURCE_CONFIG_COLS.VALUE,      220);
+  sheet.setColumnWidth(RESOURCE_CONFIG_COLS.SORT_ORDER,  90);
+  sheet.setColumnWidth(RESOURCE_CONFIG_COLS.ACTIVE,      70);
+  sheet.setColumnWidth(RESOURCE_CONFIG_COLS.NOTES,      300);
+
+  // Data validation — Setting column
+  var settingRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Category'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, RESOURCE_CONFIG_COLS.SETTING, 200).setDataValidation(settingRule);
+
+  // Data validation — Active column
+  var activeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Yes', 'No'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, RESOURCE_CONFIG_COLS.ACTIVE, 200).setDataValidation(activeRule);
+
+  // Default categories — mirrors 📚 Resources sheet validation list
+  // These are the canonical category names used by the filter pills and the manage form.
+  var defaultCategories = [
+    ['Category', 'Contract Article',   1,  'Yes', 'Contract clauses and articles members should know'],
+    ['Category', 'Know Your Rights',   2,  'Yes', 'Member rights under labor law and contract'],
+    ['Category', 'Grievance Process',  3,  'Yes', 'Step-by-step grievance filing guidance'],
+    ['Category', 'Forms & Templates',  4,  'Yes', 'Printable or digital forms'],
+    ['Category', 'FAQ',                5,  'Yes', 'Frequently asked questions'],
+    ['Category', 'Guide',              6,  'Yes', 'How-to guides for members and stewards'],
+    ['Category', 'Policy',             7,  'Yes', 'Employer or union policies'],
+    ['Category', 'Contact Info',       8,  'Yes', 'Key contacts — union reps, HR, legal'],
+    ['Category', 'Link',               9,  'Yes', 'External links and web resources'],
+    ['Category', 'General',           10,  'Yes', 'Uncategorized or miscellaneous items']
+  ];
+
+  sheet.getRange(2, 1, defaultCategories.length, headers.length).setValues(defaultCategories);
+
+  // Freeze header row
+  sheet.setFrozenRows(1);
+
+  // Tab color — teal to match Resources
+  sheet.setTabColor('#0D9488');
+
+  // Apply filter for easy management
+  sheet.getRange(1, 1, defaultCategories.length + 1, headers.length).createFilter();
+
+  return sheet;
+}

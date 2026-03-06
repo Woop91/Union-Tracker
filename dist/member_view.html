@@ -1176,7 +1176,6 @@ function _renderMemberDirectory(target) {
 // ═══════════════════════════════════════
 
 function renderMemberResources(appContainer) {
-  if (!_isDuesPaying()) { _renderDuesGate(appContainer, 'Member Resources', function() { renderMemberHome(appContainer); }); return; }
   renderPageLayout(appContainer, 'member', 'resources', function(container) {
     _memberHeader(container, 'Resources');
     var content = el('div', { className: 'content' });

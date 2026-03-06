@@ -1680,6 +1680,8 @@ function renderStewardResources(appContainer) {
             tableWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'No resources yet. Add one above!'));
             return;
           }
+          // Sort by sortOrder so manage list matches what members see (v4.22.x)
+          resources.sort(function(a, b) { return (a.sortOrder || 999) - (b.sortOrder || 999); });
           resources.forEach(function(r) {
             var row = el('div', { className: 'res-manage-row' + (r.visible ? '' : ' hidden-res') });
             row.appendChild(el('span', { style: { fontSize: '20px', flexShrink: '0' } }, r.icon || '\uD83D\uDCC4'));
@@ -1737,7 +1739,35 @@ function renderStewardResources(appContainer) {
         }
 
         addField('Title *', 'title', 'text');
-        addField('Category', 'category', 'select', { options: ['General', 'Know Your Rights', 'Contracts', 'Benefits', 'Workplace Safety', 'Union History', 'Legal', 'Training', 'FAQs'], defaultVal: 'General' });
+
+        // Category: loaded dynamically from 📚 Resource Config sheet (v4.22.x)
+        var catGroup = el('div', { className: 'form-group' });
+        catGroup.appendChild(el('label', { className: 'form-label' }, 'Category'));
+        var catSelect = el('select', { className: 'form-input' });
+        var catPlaceholder = el('option', { value: '' }, 'Loading categories...');
+        catSelect.appendChild(catPlaceholder);
+        catSelect.disabled = true;
+        fields['category'] = catSelect;
+        catGroup.appendChild(catSelect);
+        formWrap.appendChild(catGroup);
+
+        serverCall().withSuccessHandler(function(cats) {
+          catSelect.innerHTML = '';
+          (cats && cats.length ? cats : ['General']).forEach(function(c) {
+            catSelect.appendChild(el('option', { value: c }, c));
+          });
+          catSelect.value = (existing && existing.category) || cats[0] || 'General';
+          catSelect.disabled = false;
+        }).withFailureHandler(function() {
+          catSelect.innerHTML = '';
+          ['Contract Article','Know Your Rights','Grievance Process','Forms & Templates',
+           'FAQ','Guide','Policy','Contact Info','Link','General'].forEach(function(c) {
+            catSelect.appendChild(el('option', { value: c }, c));
+          });
+          catSelect.value = (existing && existing.category) || 'General';
+          catSelect.disabled = false;
+        }).getWebAppResourceCategories();
+
         addField('Summary', 'summary', 'textarea');
         addField('Content', 'content', 'textarea', { style: { minHeight: '120px' } });
         addField('URL (optional)', 'url', 'text');
