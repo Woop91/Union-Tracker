@@ -1006,3 +1006,23 @@ Every contact logged via `logMemberContact()` now also appends to a per-member G
 
 ### RULE: public exposure of private helpers
 Private helpers that need to be called from outside the DataService IIFE must be exposed via the return object with a `Public` suffix to make the cross-boundary access explicit. Do NOT expose them as top-level functions — they must remain under the DataService namespace.
+
+---
+
+## 2026-03-06 — Contact Log Folder URL in Member Directory + member card link (v4.20.24)
+
+### New column: Contact Log Folder URL
+- Added to `MEMBER_HEADER_MAP_` in `01_Core.gs` as the last column
+- Header: `'Contact Log Folder URL'`
+- Auto-populated on first contact log: `getOrCreateMemberContactFolder_()` writes `https://drive.google.com/drive/folders/[ID]` to this column via header-name lookup (never by index)
+- Surfaced in `_buildUserRecord()` → `user.contactLogFolderUrl`
+- Surfaced in `getFullMemberProfile()` → `profile.contactLogFolderUrl`
+- HEADERS alias: `memberContactLogFolderUrl: ['contact log folder url', 'contact log folder']`
+
+### Member card
+- Full Profile expanded section shows `📂 Open in Drive` link when `profile.contactLogFolderUrl` is truthy
+- Matches pattern used for grievance Drive folder links
+- Hidden until first contact is logged (column value empty by default)
+
+### RULE
+Contact Log Folder URL is steward-visible only (in Full Profile). Members see their folder via the Drive share — they are NOT shown the URL in their own member view dashboard. Do not expose `contactLogFolderUrl` to the member-facing view.

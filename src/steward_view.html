@@ -772,6 +772,18 @@ function _showMemberDetail(container, itemEl, member) {
             pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
             extraRow.appendChild(pair);
           });
+          // Contact Log Folder link — shown only if URL exists (set on first contact)
+          if (profile.contactLogFolderUrl) {
+            var folderPair = el('div', { style: { minWidth: '100px' } });
+            folderPair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Contact Log'));
+            var folderLink = el('a', {
+              href: profile.contactLogFolderUrl,
+              target: '_blank',
+              style: { fontSize: '13px', color: 'var(--accent)', fontWeight: '500', textDecoration: 'none' }
+            }, '\uD83D\uDCC2 Open in Drive');
+            folderPair.appendChild(folderLink);
+            extraRow.appendChild(folderPair);
+          }
           actionArea.appendChild(extraRow);
         })
         .withFailureHandler(function() {
@@ -952,29 +964,82 @@ function renderBroadcast(appContainer) {
     _stewardHeader(container, 'Broadcast Message');
     var content = el('div', { className: 'content' });
 
-    // State for selected checkboxes
+    // State
     var selectedLocations = {};
     var selectedDays = {};
+    var selectedScope = 'mine'; // 'mine' | 'all'
+    var selectedDuesPaying = null; // null | 'paying' | 'nonpaying'
 
     // Recipient preview
     var recipientPreview = el('div', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '12px' } }, 'Loading filters...');
     content.appendChild(recipientPreview);
 
-    // Location filter (checkboxes)
+    // ── Scope toggle ──────────────────────────────────────
+    var scopeGroup = el('div', { className: 'form-group' });
+    scopeGroup.appendChild(el('label', { className: 'form-label' }, 'Recipients'));
+    var scopeBar = el('div', { style: { display: 'flex', gap: '6px', marginTop: '4px' } });
+
+    function buildScopePill(label, value) {
+      var pill = el('button', {
+        className: 'filter-tab' + (selectedScope === value ? ' active' : ''),
+        style: { fontSize: '12px', padding: '5px 12px' },
+        onClick: function() {
+          selectedScope = value;
+          scopeBar.querySelectorAll('.filter-tab').forEach(function(p) { p.className = 'filter-tab'; });
+          pill.className = 'filter-tab active';
+          updatePreview();
+        }
+      }, label);
+      scopeBar.appendChild(pill);
+    }
+    buildScopePill('My Members Only', 'mine');
+    buildScopePill('All Members', 'all');
+    scopeGroup.appendChild(scopeBar);
+    content.appendChild(scopeGroup);
+
+    // ── Location filter ───────────────────────────────────
     var locationGroup = el('div', { className: 'form-group' });
     locationGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Location'));
     var locationCheckboxes = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' } });
     locationGroup.appendChild(locationCheckboxes);
     content.appendChild(locationGroup);
 
-    // Office days filter (checkboxes)
+    // ── Office days filter ────────────────────────────────
     var daysGroup = el('div', { className: 'form-group' });
     daysGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Office Days'));
     var daysCheckboxes = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' } });
     daysGroup.appendChild(daysCheckboxes);
     content.appendChild(daysGroup);
 
-    // Build checkbox pill helper
+    // ── Dues paying filter (shown only if column exists in sheet) ──
+    var duesGroup = el('div', { className: 'form-group', style: { display: 'none' } });
+    duesGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Dues Status'));
+    var duesBar = el('div', { style: { display: 'flex', gap: '6px', marginTop: '4px' } });
+
+    function buildDuesPill(label, value) {
+      var pill = el('button', {
+        className: 'filter-tab',
+        style: { fontSize: '12px', padding: '5px 12px' },
+        onClick: function() {
+          if (selectedDuesPaying === value) {
+            selectedDuesPaying = null;
+            duesBar.querySelectorAll('.filter-tab').forEach(function(p) { p.className = 'filter-tab'; });
+          } else {
+            selectedDuesPaying = value;
+            duesBar.querySelectorAll('.filter-tab').forEach(function(p) { p.className = 'filter-tab'; });
+            pill.className = 'filter-tab active';
+          }
+          updatePreview();
+        }
+      }, label);
+      duesBar.appendChild(pill);
+    }
+    buildDuesPill('Dues Paying', 'paying');
+    buildDuesPill('Not Dues Paying', 'nonpaying');
+    duesGroup.appendChild(duesBar);
+    content.appendChild(duesGroup);
+
+    // ── Checkbox pill helper ──────────────────────────────
     function buildCheckboxPill(parentEl, label, stateObj) {
       var pill = el('button', {
         className: 'filter-tab',
@@ -992,14 +1057,16 @@ function renderBroadcast(appContainer) {
       var locs = Object.keys(selectedLocations).filter(function(k) { return selectedLocations[k]; });
       var days = Object.keys(selectedDays).filter(function(k) { return selectedDays[k]; });
       var parts = [];
+      parts.push(selectedScope === 'all' ? 'All Members' : 'My Members');
       if (locs.length > 0) parts.push(locs.length + ' location' + (locs.length > 1 ? 's' : ''));
       if (days.length > 0) parts.push(days.length + ' day' + (days.length > 1 ? 's' : ''));
-      recipientPreview.textContent = parts.length > 0 ? 'Filtering: ' + parts.join(', ') : 'Sending to all assigned members';
+      if (selectedDuesPaying === 'paying') parts.push('dues paying only');
+      if (selectedDuesPaying === 'nonpaying') parts.push('non-dues paying only');
+      recipientPreview.textContent = 'Sending to: ' + parts.join(' · ');
     }
 
-    // Fetch available filter options
+    // ── Fetch filter options ──────────────────────────────
     serverCall().withSuccessHandler(function(opts) {
-      // "Select All" for locations
       if (opts.locations.length > 0) {
         var allLocBtn = el('button', {
           className: 'filter-tab', style: { fontSize: '11px', padding: '4px 10px', fontWeight: '600' },
@@ -1024,13 +1091,16 @@ function renderBroadcast(appContainer) {
         daysCheckboxes.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No office day data available'));
       }
 
+      // Show dues paying filter only if the column exists in the sheet
+      if (opts.hasDuesPayingColumn) duesGroup.style.display = '';
+
       updatePreview();
     }).withFailureHandler(function() {
       recipientPreview.textContent = 'Failed to load filters. You can still send to all members.';
       recipientPreview.style.color = 'var(--danger)';
     }).dataGetBroadcastFilterOptions(CURRENT_USER.email);
 
-    // Message
+    // ── Message ───────────────────────────────────────────
     var msgGroup = el('div', { className: 'form-group' });
     msgGroup.appendChild(el('label', { className: 'form-label' }, 'Message'));
     var msgTextarea = el('textarea', { className: 'msg-textarea', placeholder: 'Type your message to members...' });
@@ -1045,11 +1115,12 @@ function renderBroadcast(appContainer) {
       onClick: function() {
         var msg = msgTextarea.value.trim();
         if (!msg) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger)'; return; }
-        var filter = {};
+        var filter = { scope: selectedScope };
         var locs = Object.keys(selectedLocations).filter(function(k) { return selectedLocations[k]; });
         var days = Object.keys(selectedDays).filter(function(k) { return selectedDays[k]; });
         if (locs.length > 0) filter.location = locs.join(',');
         if (days.length > 0) filter.officeDays = days.join(',');
+        if (selectedDuesPaying) filter.duesPaying = selectedDuesPaying;
         statusMsg.textContent = 'Sending...';
         statusMsg.style.color = 'var(--muted)';
         serverCall().withSuccessHandler(function(result) {

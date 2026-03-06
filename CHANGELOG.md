@@ -5,6 +5,15 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.24] - 2026-03-06
+
+### Added
+- **`CONTACT_LOG_FOLDER_URL`** column added to `MEMBER_HEADER_MAP_` (`01_Core.gs`) — header `'Contact Log Folder URL'`. Auto-set on first contact; steward-read-only in practice. Dynamic column, never hardcoded by index.
+- **`memberContactLogFolderUrl`** header alias added to `HEADERS` object (`21_WebDashDataService.gs`) — aliases: `['contact log folder url', 'contact log folder']`.
+- **`contactLogFolderUrl`** added to `_buildUserRecord()` and `getFullMemberProfile()` return objects.
+- **`getOrCreateMemberContactFolder_()`** — on first folder creation, writes the Drive folder URL back to the member's `Contact Log Folder URL` column in Member Directory (by header name lookup, never by index). Non-fatal.
+- **Member card Full Profile section** (`steward_view.html`) — when `profile.contactLogFolderUrl` is set, a `📂 Open in Drive` link is shown in the expanded profile area, alongside Job Title / Supervisor / Joined / City. Link opens in a new tab. Hidden when no folder exists yet (first contact has not been logged).
+
 ## [4.20.23] - 2026-03-06
 
 ### Changed

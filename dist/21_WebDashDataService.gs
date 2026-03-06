@@ -34,6 +34,7 @@ var DataService = (function () {
     memberPhone:     ['phone', 'phone number', 'cell', 'mobile'],
     memberJoined:    ['joined', 'join date', 'member since', 'date joined'],
     memberDuesStatus:['dues status', 'dues', 'status'],
+    memberDuesPaying:['dues paying', 'is dues paying', 'dues paid', 'paying dues'],
     memberId:        ['member id', 'id', 'member number'],
     memberWorkLocation: ['work location', 'location', 'office location'],
     memberOfficeDays:   ['office days', 'in-office days', 'days in office'],
@@ -46,6 +47,7 @@ var DataService = (function () {
     memberHasOpenGrievance: ['has open grievance?', 'has open grievance', 'open grievance'],
     memberSupervisor: ['supervisor'],
     memberJobTitle:  ['job title', 'title', 'position'],
+    memberContactLogFolderUrl: ['contact log folder url', 'contact log folder'],
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -362,6 +364,7 @@ var DataService = (function () {
       supervisor: user.supervisor,
       jobTitle: user.jobTitle,
       joined: user.joined,
+      contactLogFolderUrl: user.contactLogFolderUrl || '',
     };
   }
 
@@ -832,6 +835,7 @@ var DataService = (function () {
         officeDays: rec.officeDays,
         hasOpenGrievance: rec.hasOpenGrievance,
         duesStatus: rec.duesStatus,
+        duesPaying: rec.duesPaying,
       });
     }
 
@@ -963,25 +967,35 @@ var DataService = (function () {
     var auth = checkWebAppAuthorization('steward'); if (!auth || !auth.isAuthorized) return { success: false, sentCount: 0, message: 'Unauthorized' };
     if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
 
-    // Use all members when no specific steward filter, otherwise use assigned members
-    var members = getAllMembers();
+    // Scope: 'mine' = only members assigned to this steward, 'all' = all members
+    var scope = (filter && filter.scope === 'all') ? 'all' : 'mine';
+    var members = (scope === 'all') ? getAllMembers() : getStewardMembers(stewardEmail);
     if (members.length === 0) return { success: false, sentCount: 0, message: 'No members found.' };
 
     // Apply filters
     var filtered = members.filter(function(m) {
-      if (filter && filter.location && m.workLocation) {
-        if (m.workLocation.toLowerCase() !== filter.location.toLowerCase()) return false;
+      // Multi-location: split comma-delimited string and check any match
+      if (filter && filter.location) {
+        var filterLocs = filter.location.split(',').map(function(l) { return l.trim().toLowerCase(); });
+        var memberLoc = (m.workLocation || '').toLowerCase();
+        if (!filterLocs.some(function(l) { return l === memberLoc; })) return false;
       }
+      // Office days: any match
       if (filter && filter.officeDays && m.officeDays) {
         var filterDays = filter.officeDays.toLowerCase().split(',').map(function(d) { return d.trim(); });
         var memberDays = m.officeDays.toLowerCase();
-        var hasMatch = filterDays.some(function(d) { return memberDays.indexOf(d) !== -1; });
-        if (!hasMatch) return false;
+        if (!filterDays.some(function(d) { return memberDays.indexOf(d) !== -1; })) return false;
+      }
+      // Dues paying: 'paying' = only dues paying, 'nonpaying' = only non-dues paying
+      if (filter && filter.duesPaying) {
+        var dp = m.duesPaying; // true, false, or null (column absent)
+        if (filter.duesPaying === 'paying' && dp !== true) return false;
+        if (filter.duesPaying === 'nonpaying' && dp !== false) return false;
       }
       return true;
     });
 
-    if (filtered.length === 0) return { success: false, sentCount: 0, message: 'No members match the filter.' };
+    if (filtered.length === 0) return { success: false, sentCount: 0, message: 'No members match the selected filters.' };
 
     var sentCount = 0;
     var config = ConfigReader.getConfig();
@@ -999,6 +1013,7 @@ var DataService = (function () {
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('BROADCAST_SENT', {
         steward: stewardEmail,
+        scope: scope,
         recipientCount: sentCount,
         filter: JSON.stringify(filter || {}),
       });
@@ -1193,6 +1208,13 @@ var DataService = (function () {
       phone: String(_getVal(row, colMap, HEADERS.memberPhone, '')).trim() || null,
       joined: _getVal(row, colMap, HEADERS.memberJoined, ''),
       duesStatus: String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim(),
+      duesPaying: (function() {
+        var raw = _getVal(row, colMap, HEADERS.memberDuesPaying, null);
+        if (raw === null || raw === '') return null; // column absent — unknown
+        if (typeof raw === 'boolean') return raw;
+        var s = String(raw).trim().toLowerCase();
+        return s === 'true' || s === 'yes' || s === '1';
+      })(),
       memberId: String(_getVal(row, colMap, HEADERS.memberId, '')).trim(),
       workLocation: String(_getVal(row, colMap, HEADERS.memberWorkLocation, '')).trim(),
       officeDays: String(_getVal(row, colMap, HEADERS.memberOfficeDays, '')).trim(),
@@ -1205,6 +1227,7 @@ var DataService = (function () {
       zip: String(_getVal(row, colMap, HEADERS.memberZip, '')).trim(),
       supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
+      contactLogFolderUrl: String(_getVal(row, colMap, HEADERS.memberContactLogFolderUrl, '')).trim(),
     };
   }
 
@@ -1408,6 +1431,34 @@ var DataService = (function () {
         } catch (shareErr) {
           Logger.log('getOrCreateMemberContactFolder_ share error for ' + memberEmail + ': ' + shareErr.message);
           // Non-fatal — folder created, sharing failed (e.g. external domain restriction)
+        }
+
+        // Write folder URL to Member Directory — Contact Log Folder URL column
+        try {
+          var folderUrl = 'https://drive.google.com/drive/folders/' + memberFolder.getId();
+          var mDirSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET);
+          if (mDirSheet) {
+            var mDirData    = mDirSheet.getDataRange().getValues();
+            var mDirHeaders = mDirData[0];
+            var mDirEmailIdx = -1, mDirFolderIdx = -1;
+            for (var mh = 0; mh < mDirHeaders.length; mh++) {
+              var mhl = String(mDirHeaders[mh]).toLowerCase().trim();
+              if (mhl === 'email') mDirEmailIdx = mh;
+              else if (mhl === 'contact log folder url') mDirFolderIdx = mh;
+            }
+            if (mDirEmailIdx !== -1 && mDirFolderIdx !== -1) {
+              var mNorm2 = memberEmail.toLowerCase().trim();
+              for (var mr = 1; mr < mDirData.length; mr++) {
+                if (String(mDirData[mr][mDirEmailIdx]).toLowerCase().trim() === mNorm2) {
+                  mDirSheet.getRange(mr + 1, mDirFolderIdx + 1).setValue(folderUrl);
+                  break;
+                }
+              }
+            }
+          }
+        } catch (urlWriteErr) {
+          Logger.log('getOrCreateMemberContactFolder_ URL writeback error: ' + urlWriteErr.message);
+          // Non-fatal
         }
       }
 
@@ -3316,12 +3367,12 @@ function dataGetBatchData(ignoredEmail, ignoredRole) {
 // Broadcast filter options (CR-AUTH-3: steward auth required)
 function dataGetBroadcastFilterOptions() {
   var s = _requireStewardAuth();
-  if (!s) return { locations: [], officeDays: [], duesStatuses: [], totalMembers: 0 };
+  if (!s) return { locations: [], officeDays: [], hasDuesPayingColumn: false, totalMembers: 0 };
   try {
     var members = DataService.getAllMembers();
     var locations = {};
     var officeDays = {};
-    var duesStatuses = {};
+    var hasDuesPayingColumn = false;
     members.forEach(function(m) {
       if (m.workLocation) locations[m.workLocation] = true;
       var days = String(m.officeDays || '');
@@ -3331,17 +3382,18 @@ function dataGetBroadcastFilterOptions() {
           if (day) officeDays[day] = true;
         });
       }
-      if (m.duesStatus) duesStatuses[m.duesStatus] = true;
+      // Detect if dues paying column exists (null = absent, true/false = present)
+      if (m.duesPaying !== null && m.duesPaying !== undefined) hasDuesPayingColumn = true;
     });
     return {
       locations: Object.keys(locations).sort(),
       officeDays: Object.keys(officeDays).sort(),
-      duesStatuses: Object.keys(duesStatuses).sort(),
+      hasDuesPayingColumn: hasDuesPayingColumn,
       totalMembers: members.length
     };
   } catch (e) {
     Logger.log('dataGetBroadcastFilterOptions error: ' + e.message + '\n' + (e.stack || ''));
-    return { locations: [], officeDays: [], duesStatuses: [], totalMembers: 0 };
+    return { locations: [], officeDays: [], hasDuesPayingColumn: false, totalMembers: 0 };
   }
 }
 

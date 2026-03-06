@@ -1332,7 +1332,8 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'CITY',               header: 'City' },
   { key: 'STATE',              header: 'State' },
   { key: 'ZIP_CODE',           header: 'Zip Code' },
-  { key: 'DUES_STATUS',        header: 'Dues Status' }
+  { key: 'DUES_STATUS',             header: 'Dues Status' },
+  { key: 'CONTACT_LOG_FOLDER_URL',  header: 'Contact Log Folder URL' }   // Drive folder URL for per-member contact log — auto-set on first contact
 ];
 
 // CONVENTION: Column constants are 1-indexed (Range API). Use COL - 1 for 0-indexed array access.
