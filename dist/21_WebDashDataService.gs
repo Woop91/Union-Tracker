@@ -1419,24 +1419,28 @@ var DataService = (function () {
     var sheet = _ensureStewardTasks();
     var id = 'ST_' + Date.now().toString(36);
     sheet.appendRow([id, ownerEmail, title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
+    _invalidateSheetCache(SHEETS.STEWARD_TASKS);
     return { success: true, message: 'Task created.', taskId: id };
   }
 
   function getTasks(stewardEmail, statusFilter) {
-    var sheet = _ensureStewardTasks();
-    if (sheet.getLastRow() <= 1) return [];
-    var data = sheet.getDataRange().getValues();
+    // Use _getCachedSheetData for same-execution and cross-request caching.
+    var cached = _getCachedSheetData(SHEETS.STEWARD_TASKS);
+    var data = cached ? cached.data : null;
+    if (!data || data.length <= 1) return [];
     var tasks = [];
     var sEmail = stewardEmail.toLowerCase().trim();
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][1]).toLowerCase().trim() !== sEmail) continue;
+      // Only steward tasks (col 11 blank or not 'member')
+      if (String(data[i][10] || '').toLowerCase().trim() === 'member') continue;
       var status = String(data[i][6]).toLowerCase().trim();
       if (statusFilter && status !== statusFilter) continue;
       var dueDateRaw = data[i][7];
       var dueStr = dueDateRaw instanceof Date ? _formatDate(dueDateRaw) : String(dueDateRaw || '');
       var dueDays = null;
       if (dueDateRaw instanceof Date) {
-        dueDays = Math.ceil((dueDateRaw.getTime() - Date.now()) / (86400000));
+        dueDays = Math.ceil((dueDateRaw.getTime() - Date.now()) / 86400000);
       }
       tasks.push({ id: data[i][0], title: data[i][2], description: data[i][3], memberEmail: data[i][4], priority: data[i][5], status: status, dueDate: dueStr, dueDays: dueDays, created: data[i][8] instanceof Date ? _formatDate(data[i][8]) : '' });
     }
@@ -1455,9 +1459,11 @@ var DataService = (function () {
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] === taskId && String(data[i][1]).toLowerCase().trim() === stewardEmail.toLowerCase().trim()) {
-        if (updates.status) sheet.getRange(i + 1, 7).setValue(escapeForFormula(updates.status));
+        if (updates.status)   sheet.getRange(i + 1, 7).setValue(escapeForFormula(updates.status));
         if (updates.priority) sheet.getRange(i + 1, 6).setValue(escapeForFormula(updates.priority));
-        if (updates.title) sheet.getRange(i + 1, 3).setValue(escapeForFormula(updates.title.substring(0, 200)));
+        if (updates.title)    sheet.getRange(i + 1, 3).setValue(escapeForFormula(updates.title.substring(0, 200)));
+        if (updates.dueDate !== undefined) sheet.getRange(i + 1, 8).setValue(updates.dueDate || '');
+        _invalidateSheetCache(SHEETS.STEWARD_TASKS);
         return { success: true };
       }
     }
@@ -1472,6 +1478,7 @@ var DataService = (function () {
       if (data[i][0] === taskId && String(data[i][1]).toLowerCase().trim() === stewardEmail.toLowerCase().trim()) {
         sheet.getRange(i + 1, 7).setValue('completed');
         sheet.getRange(i + 1, 10).setValue(new Date());
+        _invalidateSheetCache(SHEETS.STEWARD_TASKS);
         return { success: true };
       }
     }
@@ -1498,14 +1505,15 @@ var DataService = (function () {
       priority || 'medium', 'open', dueDate || '', new Date(), '',
       'member', stewardEmail.toLowerCase().trim()
     ]);
+    _invalidateSheetCache(SHEETS.STEWARD_TASKS);
     logAuditEvent('MEMBER_TASK_CREATED', 'Task ' + id + ' assigned to ' + memberEmail + ' by ' + stewardEmail);
     return { success: true, message: 'Task assigned to member.', taskId: id };
   }
 
   function getMemberTasks(memberEmail, statusFilter) {
-    var sheet = _ensureStewardTasks();
-    if (sheet.getLastRow() <= 1) return [];
-    var data = sheet.getDataRange().getValues();
+    var cached = _getCachedSheetData(SHEETS.STEWARD_TASKS);
+    var data = cached ? cached.data : null;
+    if (!data || data.length <= 1) return [];
     var tasks = [];
     var mEmail = memberEmail.toLowerCase().trim();
     for (var i = 1; i < data.length; i++) {
@@ -1543,6 +1551,7 @@ var DataService = (function () {
           String(data[i][4]).toLowerCase().trim() === mEmail) {
         sheet.getRange(i + 1, 7).setValue('completed');
         sheet.getRange(i + 1, 10).setValue(new Date());
+        _invalidateSheetCache(SHEETS.STEWARD_TASKS);
         logAuditEvent('MEMBER_TASK_COMPLETED', 'Task ' + taskId + ' completed by ' + memberEmail);
         return { success: true };
       }
@@ -1550,10 +1559,30 @@ var DataService = (function () {
     return { success: false, message: 'Task not found.' };
   }
 
-  function getStewardAssignedMemberTasks(stewardEmail) {
+  function stewardCompleteMemberTask(stewardEmail, taskId) {
+    // Allows the assigning steward to mark a member task complete on the member's behalf.
     var sheet = _ensureStewardTasks();
-    if (sheet.getLastRow() <= 1) return [];
+    if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
     var data = sheet.getDataRange().getValues();
+    var sEmail = stewardEmail.toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === taskId &&
+          String(data[i][10] || '').toLowerCase().trim() === 'member' &&
+          String(data[i][11] || '').toLowerCase().trim() === sEmail) {
+        sheet.getRange(i + 1, 7).setValue('completed');
+        sheet.getRange(i + 1, 10).setValue(new Date());
+        _invalidateSheetCache(SHEETS.STEWARD_TASKS);
+        logAuditEvent('MEMBER_TASK_COMPLETED_BY_STEWARD', 'Task ' + taskId + ' marked complete by steward ' + stewardEmail);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Task not found or not yours to complete.' };
+  }
+
+  function getStewardAssignedMemberTasks(stewardEmail) {
+    var cached = _getCachedSheetData(SHEETS.STEWARD_TASKS);
+    var data = cached ? cached.data : null;
+    if (!data || data.length <= 1) return [];
     var tasks = [];
     var sEmail = stewardEmail.toLowerCase().trim();
     for (var i = 1; i < data.length; i++) {
@@ -2839,7 +2868,7 @@ function dataSubmitSurveyResponse(ignoredEmail, responses) { var e = _resolveCal
 function dataLogMemberContact(ignoredStewardEmail, memberEmail, type, notes, duration) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.logMemberContact(s, memberEmail, type, notes, duration); }
 function dataGetMemberContactHistory(ignoredStewardEmail, memberEmail) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getMemberContactHistory(s, memberEmail); }
 function dataGetStewardContactLog() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardContactLog(s); }
-function dataCreateTask(ignoredStewardEmail, title, desc, memberEmail, priority, dueDate) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createTask(s, title, desc, memberEmail, priority, dueDate); }
+function dataCreateTask(ignoredStewardEmail, title, desc, memberEmail, priority, dueDate, assignToEmail) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assignToEmail || ''); }
 function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, desc, memberEmail, priority, dueDate) {
   var s = _requireStewardAuth();
   if (!s) return { success: false, message: 'Steward access required.' };
@@ -2863,8 +2892,11 @@ function dataCreateMemberTask(ignoredStewardEmail, memberEmail, title, desc, pri
 function dataGetMemberTasks(ignoredEmail, statusFilter) { var e = _resolveCallerEmail(); return e ? DataService.getMemberTasks(e, statusFilter) : []; }
 function dataCompleteMemberTask(ignoredEmail, taskId) { var e = _resolveCallerEmail(); return e ? DataService.completeMemberTask(e, taskId) : { success: false, message: 'Not authenticated.' }; }
 function dataGetStewardAssignedMemberTasks() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardAssignedMemberTasks(s); }
+// BUG-TASKS-03: steward completing a member task on the member's behalf
+function dataStaffCompleteMemberTask(taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.stewardCompleteMemberTask(s, taskId); }
 
 // v4.16.0 — unwired sheet wrappers (CR-AUTH-3: server-side identity + role checks)
+function dataUpdateTask(ignoredEmail, taskId, updates) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.updateTask(s, taskId, updates); }
 function dataGetAllStewardPerformance() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllStewardPerformance(); }
 function dataGetCaseChecklist(caseId) { var e = _resolveCallerEmail(); return e ? DataService.getCaseChecklist(caseId) : []; }
 function dataToggleChecklistItem(checklistId, completed) { var e = _resolveCallerEmail(); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }

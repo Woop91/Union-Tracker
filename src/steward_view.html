@@ -1978,16 +1978,61 @@ function _renderTaskList(container, statusFilter) {
       if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
 
       if (task.status !== 'completed') {
-        var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
-        actions.appendChild(el('button', {
-          style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
-          onClick: function() {
-            serverCall().withSuccessHandler(function() {
-              if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
-              renderStewardTasks(document.getElementById('app'));
-            }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteTask(CURRENT_USER.email, task.id);
-          }
-        }, '\u2705 Complete'));
+        var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' } });
+
+        // Complete button
+        (function(t) {
+          actions.appendChild(el('button', {
+            style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+            onClick: function() {
+              serverCall().withSuccessHandler(function() {
+                if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+                renderStewardTasks(document.getElementById('app'));
+              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataCompleteTask(CURRENT_USER.email, t.id);
+            }
+          }, '\u2705 Complete'));
+        })(task);
+
+        // Edit button — toggles inline edit form
+        (function(t, cardEl) {
+          var editing = false;
+          var editBtn = el('button', {
+            style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', fontWeight: '600' },
+          }, '\u270F\uFE0F Edit');
+          var editForm = null;
+          editBtn.onclick = function() {
+            editing = !editing;
+            if (editForm) { editForm.remove(); editForm = null; editBtn.textContent = '\u270F\uFE0F Edit'; return; }
+            editBtn.textContent = 'Cancel';
+            editForm = el('div', { style: { marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' } });
+            var titleIn = el('input', { className: 'form-input', style: { fontSize: '12px' }, value: t.title });
+            var priSel = el('select', { className: 'form-select', style: { fontSize: '12px' } });
+            ['high', 'medium', 'low'].forEach(function(p) {
+              var o = el('option', { value: p }, p.charAt(0).toUpperCase() + p.slice(1));
+              if (p === t.priority) o.selected = true;
+              priSel.appendChild(o);
+            });
+            var dueIn = el('input', { className: 'form-input', type: 'date', style: { fontSize: '12px' }, value: t.dueDate || '' });
+            var saveBtn = el('button', {
+              className: 'btn btn-primary', style: { fontSize: '11px', padding: '4px 12px' },
+              onClick: function() {
+                var updates = { title: titleIn.value.trim(), priority: priSel.value, dueDate: dueIn.value };
+                if (!updates.title) { alert('Title required.'); return; }
+                serverCall().withSuccessHandler(function(r) {
+                  if (r && r.success) { renderStewardTasks(document.getElementById('app')); }
+                  else { alert('Update failed.'); }
+                }).withFailureHandler(function() { alert('Update failed.'); }).dataUpdateTask(CURRENT_USER.email, t.id, updates);
+              }
+            }, 'Save');
+            editForm.appendChild(titleIn);
+            editForm.appendChild(priSel);
+            editForm.appendChild(dueIn);
+            editForm.appendChild(saveBtn);
+            cardEl.appendChild(editForm);
+          };
+          actions.appendChild(editBtn);
+        })(task, card);
+
         card.appendChild(actions);
       }
       container.appendChild(card);
@@ -2033,6 +2078,25 @@ function _renderStewardMemberTasks(container) {
       if (task.memberEmail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Assigned to: ' + task.memberEmail.split('@')[0]));
       if (task.dueDate) card.appendChild(el('div', { style: { fontSize: '11px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, 'Due: ' + task.dueDate));
       if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+      // BUG-TASKS-03: steward can complete member tasks they assigned
+      if (task.status !== 'completed') {
+        var mActions = el('div', { style: { marginTop: '8px' } });
+        (function(t) {
+          mActions.appendChild(el('button', {
+            style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+            onClick: function() {
+              if (!confirm('Mark this member task as complete?')) return;
+              serverCall().withSuccessHandler(function(r) {
+                if (r && r.success) {
+                  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+                  _renderStewardMemberTasks(container.parentNode || container);
+                } else { alert('Failed to complete task.'); }
+              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataStaffCompleteMemberTask(t.id);
+            }
+          }, '\u2705 Complete for member'));
+        })(task);
+        card.appendChild(mActions);
+      }
       container.appendChild(card);
     });
   }).withFailureHandler(function() {

@@ -895,3 +895,28 @@ All fixed with `_resolveCallerEmail()` minimum auth (both steward and member rol
 **CONFIRMED CLEAN:** dataGetFullProfile, dataUpdateProfile, dataCreateTaskForSteward, dataGetBatchData, dataGetBroadcastFilterOptions, dataGetWelcomeData, dataMarkWelcomeDismissed — all verified guarded internally.
 
 **STANDING RULE (addendum to CLAUDE.md):** Every new `function data*` wrapper MUST include either `_resolveCallerEmail()` or `_requireStewardAuth()` as its first statement. No exceptions.
+
+---
+
+## 2026-03-06 — Full task system fixes (patch 13)
+
+**BUG-TASKS-01/06: _Steward_Tasks caching**
+- getTasks, getMemberTasks, getStewardAssignedMemberTasks use _getCachedSheetData. Same-execution + 2-min cross-request cache.
+- All write functions (createTask, completeTask, updateTask, createMemberTask, completeMemberTask, stewardCompleteMemberTask) call _invalidateSheetCache on write.
+- getTasks now excludes member tasks (col 11 = member) from steward list.
+
+**BUG-TASKS-02: dataUpdateTask wrapper + inline edit UI**
+- New wrapper: dataUpdateTask(ignoredEmail, taskId, updates) with steward auth.
+- updateTask backend supports dueDate changes.
+- Frontend: open task cards have Edit button toggling inline form (title, priority, due date). No page reload on save.
+
+**BUG-TASKS-03: Steward can complete member tasks**
+- New backend: stewardCompleteMemberTask validates task ownership (col 11=member, col 12=stewardEmail).
+- New wrapper: dataStaffCompleteMemberTask(taskId) with steward auth.
+- Frontend: Member Tasks sub-tab shows Complete for member button on open tasks. Confirm dialog guards it. Audit logged.
+
+**BUG-TASKS-04: IIFE closures for task loop captures**
+- Complete and edit button callbacks now use IIFEs to correctly capture task reference in loop.
+
+**BUG-TASKS-05: dataCreateTask exposes assignToEmail**
+- Wrapper extended with optional assignToEmail param passed through to backend.
