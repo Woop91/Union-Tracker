@@ -397,6 +397,7 @@ var DataService = (function () {
       zip:          HEADERS.memberZip,
       workLocation: HEADERS.memberWorkLocation,
       officeDays:   HEADERS.memberOfficeDays,
+      sharePhone:   HEADERS.memberSharePhone,   // steward opt-in: phone visible to members
     };
 
     for (var i = 1; i < data.length; i++) {
@@ -795,11 +796,11 @@ var DataService = (function () {
       return {
         calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
         driveFolderUrl: getOrCreateSheetFolder_(),
-        surveyFormUrl: config.satisfactionFormUrl || '',
+        // surveyFormUrl removed v4.22.7 — survey is native webapp
         orgWebsite: config.orgWebsite || '',
       };
     } catch (_e) {
-      return { calendarUrl: '', driveFolderUrl: '', surveyFormUrl: '', orgWebsite: '' };
+      return { calendarUrl: '', driveFolderUrl: '', orgWebsite: '' };
     }
   }
 

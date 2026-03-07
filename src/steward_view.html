@@ -24,6 +24,7 @@ function initStewardView(container) {
     AppState.memberCount = batch.memberCount || 0;
     AppState.taskCount = batch.taskCount || 0;
     AppState.overdueTaskCount = batch.overdueTaskCount || 0;
+    AppState.qaUnansweredCount = batch.qaUnansweredCount || 0;
     AppState.loading = false;
     renderStewardDashboard(container);
     _checkDeepLink('steward');
@@ -427,16 +428,39 @@ function _refreshNavBadges() {
       var open = (tasks || []).filter(function(t) { return t.status !== 'completed'; });
       AppState.taskCount = open.length;
       AppState.overdueTaskCount = open.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
-      var appRoot = document.getElementById('app') || document;
-      var existingNav = appRoot.querySelector('.bottom-nav');
-      if (existingNav && existingNav.parentNode) {
-        var parent = existingNav.parentNode;
-        var replacement = document.createElement('div');
-        parent.replaceChild(replacement, existingNav);
-        renderBottomNav(replacement, 'steward', AppState.activeTab || 'cases');
-        var newNav = replacement.querySelector('.bottom-nav');
-        if (newNav) parent.replaceChild(newNav, replacement);
-      }
+
+      // Re-fetch unanswered Q&A count in same callback chain to avoid extra round-trip
+      serverCall().withSuccessHandler(function(qaResult) {
+        var count = 0;
+        if (qaResult && qaResult.questions) {
+          for (var i = 0; i < qaResult.questions.length; i++) {
+            var q = qaResult.questions[i];
+            if (q.answerCount === 0 && q.status !== 'resolved' && q.status !== 'deleted') count++;
+          }
+        }
+        AppState.qaUnansweredCount = count;
+        var appRoot = document.getElementById('app') || document;
+        var existingNav = appRoot.querySelector('.bottom-nav');
+        if (existingNav && existingNav.parentNode) {
+          var parent = existingNav.parentNode;
+          var replacement = document.createElement('div');
+          parent.replaceChild(replacement, existingNav);
+          renderBottomNav(replacement, 'steward', AppState.activeTab || 'cases');
+          var newNav = replacement.querySelector('.bottom-nav');
+          if (newNav) parent.replaceChild(newNav, replacement);
+        }
+      }).withFailureHandler(function() {
+        var appRoot = document.getElementById('app') || document;
+        var existingNav = appRoot.querySelector('.bottom-nav');
+        if (existingNav && existingNav.parentNode) {
+          var parent = existingNav.parentNode;
+          var replacement = document.createElement('div');
+          parent.replaceChild(replacement, existingNav);
+          renderBottomNav(replacement, 'steward', AppState.activeTab || 'cases');
+          var newNav = replacement.querySelector('.bottom-nav');
+          if (newNav) parent.replaceChild(newNav, replacement);
+        }
+      }).qaGetQuestions(CURRENT_USER.email, 1, 999, 'recent');
     }).withFailureHandler(function() {}).dataGetTasks(CURRENT_USER.email, null);
   }, 600);
 }
@@ -492,6 +516,21 @@ function renderBottomNav(container, role, activeTab) {
             padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
           }
         }, mc > 99 ? '99+' : String(mc)));
+      }
+    }
+
+    // Badge: unanswered Q&A count on More tab
+    if (tab.id === 'more_steward' && role === 'steward') {
+      var qaUnans = AppState.qaUnansweredCount || 0;
+      if (qaUnans > 0) {
+        iconWrap.appendChild(el('span', {
+          style: {
+            position: 'absolute', top: '-4px', right: '-6px',
+            background: 'var(--warning, #f59e0b)', color: '#000',
+            fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+            padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+          }
+        }, qaUnans > 9 ? '9+' : String(qaUnans)));
       }
     }
 
@@ -1226,6 +1265,23 @@ function renderStewardNotifications(appContainer) {
                 card.style.transition = 'opacity 0.3s';
                 setTimeout(function() { card.remove(); }, 300);
                 AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
+                // Bell total = notifications + unanswered Q&A
+                var _bellTotal = AppState.notificationCount + (AppState.qaUnansweredCount || 0);
+                var badge = document.querySelector('.notif-bell-badge');
+                if (_bellTotal > 0) {
+                  if (badge) badge.textContent = String(_bellTotal);
+                  else {
+                    var bellWrap = document.querySelector('.notif-bell-wrap');
+                    if (bellWrap) {
+                      var nb = document.createElement('span');
+                      nb.className = 'notif-bell-badge';
+                      nb.textContent = String(_bellTotal);
+                      bellWrap.appendChild(nb);
+                    }
+                  }
+                } else {
+                  if (badge) badge.remove();
+                }
               }
             }).dismissWebAppNotification(n.id);
           }}, '\u2715');
@@ -1992,6 +2048,98 @@ function renderStewardMore(appContainer) {
   renderPageLayout(appContainer, 'steward', 'more_steward', function(container) {
     _stewardHeader(container, 'More');
     var content = el('div', { className: 'content' });
+
+    // ── Share Phone toggle card ───────────────────────────────────────────
+    var phoneCard = el('div', { className: 'card card-glass', style: { padding: '14px 16px', marginBottom: '14px' } });
+    var phoneRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
+    phoneRow.appendChild(el('span', { style: { fontSize: '18px', flexShrink: '0' } }, '📞'));
+    var phoneLabel = el('div', { style: { flex: '1' } });
+    phoneLabel.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, 'Share My Phone Number'));
+    phoneLabel.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px' } }, 'Allow members to see your phone in the directory'));
+    phoneRow.appendChild(phoneLabel);
+
+    // Toggle switch
+    var toggleWrap = el('div', { style: { position: 'relative', width: '44px', height: '24px', flexShrink: '0' } });
+    var toggleInput = el('input', {
+      type: 'checkbox',
+      style: { opacity: '0', width: '0', height: '0', position: 'absolute' },
+      checked: !!(CURRENT_USER && CURRENT_USER.sharePhone),
+    });
+    var toggleTrack = el('div', {
+      style: {
+        position: 'absolute', top: '0', left: '0', right: '0', bottom: '0',
+        borderRadius: '12px', cursor: 'pointer', transition: 'background 0.2s',
+        background: (CURRENT_USER && CURRENT_USER.sharePhone) ? 'var(--accent)' : 'var(--surface)',
+        border: '1px solid var(--border)',
+      }
+    });
+    var toggleThumb = el('div', {
+      style: {
+        position: 'absolute', top: '3px',
+        left: (CURRENT_USER && CURRENT_USER.sharePhone) ? '23px' : '3px',
+        width: '16px', height: '16px', borderRadius: '50%',
+        background: (CURRENT_USER && CURRENT_USER.sharePhone) ? '#fff' : 'var(--muted)',
+        transition: 'left 0.2s, background 0.2s',
+        pointerEvents: 'none',
+      }
+    });
+    toggleTrack.appendChild(toggleThumb);
+    toggleWrap.appendChild(toggleInput);
+    toggleWrap.appendChild(toggleTrack);
+
+    // Status label
+    var statusLabel = el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--muted)', textAlign: 'center', marginTop: '2px' } },
+      (CURRENT_USER && CURRENT_USER.sharePhone) ? 'ON' : 'OFF');
+    var toggleCol = el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flexShrink: '0' } });
+    toggleCol.appendChild(toggleWrap);
+    toggleCol.appendChild(statusLabel);
+    phoneRow.appendChild(toggleCol);
+    phoneCard.appendChild(phoneRow);
+
+    // Saving state row
+    var saveRow = el('div', { style: { display: 'none', fontSize: '11px', color: 'var(--muted)', marginTop: '8px', textAlign: 'right' } }, 'Saving…');
+    phoneCard.appendChild(saveRow);
+
+    // Toggle interaction
+    var _currentVal = !!(CURRENT_USER && CURRENT_USER.sharePhone);
+    function _applyToggleVisuals(val) {
+      toggleTrack.style.background = val ? 'var(--accent)' : 'var(--surface)';
+      toggleThumb.style.left = val ? '23px' : '3px';
+      toggleThumb.style.background = val ? '#fff' : 'var(--muted)';
+      statusLabel.textContent = val ? 'ON' : 'OFF';
+    }
+    toggleTrack.addEventListener('click', function() {
+      var newVal = !_currentVal;
+      _currentVal = newVal;
+      _applyToggleVisuals(newVal);
+      saveRow.style.display = 'block';
+      saveRow.textContent = 'Saving\u2026';
+      saveRow.style.color = 'var(--muted)';
+      serverCall().withSuccessHandler(function(result) {
+        saveRow.style.display = 'block';
+        if (result && result.success) {
+          if (CURRENT_USER) CURRENT_USER.sharePhone = newVal;
+          saveRow.textContent = newVal ? '\u2705 Phone visible to members' : '\u2705 Phone hidden from members';
+          saveRow.style.color = 'var(--success)';
+        } else {
+          _currentVal = !newVal;
+          _applyToggleVisuals(!newVal);
+          saveRow.textContent = '\u26A0\uFE0F Save failed — try again';
+          saveRow.style.color = 'var(--danger)';
+        }
+        setTimeout(function() { saveRow.style.display = 'none'; }, 3000);
+      }).withFailureHandler(function() {
+        _currentVal = !newVal;
+        _applyToggleVisuals(!newVal);
+        saveRow.textContent = '\u26A0\uFE0F Save failed — try again';
+        saveRow.style.color = 'var(--danger)';
+        saveRow.style.display = 'block';
+        setTimeout(function() { saveRow.style.display = 'none'; }, 3000);
+      }).dataUpdateProfile(CURRENT_USER.email, { sharePhone: newVal ? 'Yes' : 'No' });
+    });
+
+    content.appendChild(phoneCard);
+    // ─────────────────────────────────────────────────────────────────────
     var menuItems = [
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
@@ -2038,6 +2186,19 @@ function renderStewardMore(appContainer) {
               padding: '2px 7px', whiteSpace: 'nowrap', alignSelf: 'center',
             }
           }, tc + ' open'));
+        }
+      }
+      // Unanswered Q&A badge on Q&A Forum entry
+      if (m.label === 'Q&A Forum') {
+        var qaU = AppState.qaUnansweredCount || 0;
+        if (qaU > 0) {
+          item.appendChild(el('span', {
+            style: {
+              background: 'var(--warning, #f59e0b)', color: '#000',
+              fontSize: '10px', fontWeight: '700', borderRadius: '10px',
+              padding: '2px 7px', whiteSpace: 'nowrap', alignSelf: 'center',
+            }
+          }, qaU + ' unanswered'));
         }
       }
       content.appendChild(item);
@@ -3327,8 +3488,8 @@ function _renderPollHistorySteward(container) {
   loadPage(page);
 }
 
-// ═══════════════════════════════════════
-// MINUTES MANAGEMENT (steward, v4.16.0)
+
+// MINUTES MANAGEMENT (steward, v4.20.18)
 // ═══════════════════════════════════════
 
 function renderStewardMinutes(appContainer) {
@@ -3339,6 +3500,8 @@ function renderStewardMinutes(appContainer) {
     var activeSubTab = 'recent';
     var subTabBar = el('div', { className: 'sub-tabs' });
     var subContent = el('div');
+
+    function switchToRecent() { activeSubTab = 'recent'; refreshSubTabs(); renderSub(); }
 
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
@@ -3353,7 +3516,7 @@ function renderStewardMinutes(appContainer) {
     function renderSub() {
       subContent.innerHTML = '';
       if (activeSubTab === 'recent') _renderMinutesList(subContent);
-      else _renderAddMinutes(subContent);
+      else _renderAddMinutes(subContent, switchToRecent);
     }
 
     refreshSubTabs();
@@ -3364,6 +3527,9 @@ function renderStewardMinutes(appContainer) {
   });
 }
 
+// Pagination: 10 per page, load 100 records (v4.20.18)
+var _MINUTES_PAGE_SIZE = 10;
+
 function _renderMinutesList(container) {
   showLoading(container);
   serverCall().withSuccessHandler(function(minutes) {
@@ -3372,44 +3538,91 @@ function _renderMinutesList(container) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting minutes yet.'));
       return;
     }
-    minutes.forEach(function(m) {
-      var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
-      var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
-      header.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.title));
-      header.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, m.meetingDate));
-      card.appendChild(header);
-      if (m.bullets) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5', whiteSpace: 'pre-wrap' } }, m.bullets));
 
-      var expanded = false;
-      var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes || '');
-      card.appendChild(fullDiv);
-      // Show Drive doc link if available (v4.20.18)
-      if (m.driveDocUrl && /^https?:\/\//i.test(m.driveDocUrl)) {
-        var driveLink = el('a', { href: m.driveDocUrl, target: '_blank', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', marginTop: '6px', textDecoration: 'none' } }, '\uD83D\uDCC4 Open Google Doc');
-        card.appendChild(driveLink);
+    var currentPage = 0;
+    var totalPages = Math.ceil(minutes.length / _MINUTES_PAGE_SIZE);
+    var listArea = el('div');
+    var pagerArea = el('div', { style: { marginTop: '12px' } });
+    container.appendChild(listArea);
+    container.appendChild(pagerArea);
+
+    function renderPage(page) {
+      currentPage = page;
+      listArea.innerHTML = '';
+      var start = page * _MINUTES_PAGE_SIZE;
+      var slice = minutes.slice(start, start + _MINUTES_PAGE_SIZE);
+
+      slice.forEach(function(m) {
+        var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
+        var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
+        header.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.title));
+        header.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, m.meetingDate));
+        card.appendChild(header);
+        if (m.bullets) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5', whiteSpace: 'pre-wrap' } }, m.bullets));
+
+        var expanded = false;
+        var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes || '');
+        card.appendChild(fullDiv);
+        if (m.driveDocUrl && /^https?:\/\//i.test(m.driveDocUrl)) {
+          card.appendChild(el('a', { href: m.driveDocUrl, target: '_blank', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', marginTop: '6px', textDecoration: 'none' } }, '\uD83D\uDCC4 Open Google Doc'));
+        }
+        if (m.fullMinutes) {
+          card.addEventListener('click', function() { expanded = !expanded; fullDiv.style.display = expanded ? 'block' : 'none'; });
+        }
+        listArea.appendChild(card);
+      });
+
+      // Pagination controls
+      pagerArea.innerHTML = '';
+      var pagerRow = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' } });
+      var prevBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '12px', opacity: page === 0 ? '0.3' : '1', pointerEvents: page === 0 ? 'none' : 'auto' },
+        onClick: function() { renderPage(page - 1); }
+      }, '← Prev');
+      var pageLabel = el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Page ' + (page + 1) + ' of ' + totalPages);
+      var nextBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '12px', opacity: page >= totalPages - 1 ? '0.3' : '1', pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' },
+        onClick: function() { renderPage(page + 1); }
+      }, 'Next →');
+      pagerRow.appendChild(prevBtn);
+      pagerRow.appendChild(pageLabel);
+      pagerRow.appendChild(nextBtn);
+      pagerArea.appendChild(pagerRow);
+
+      // Last page: show Drive folder link
+      if (page >= totalPages - 1 && CONFIG && CONFIG.minutesFolderId) {
+        var folderUrl = 'https://drive.google.com/drive/folders/' + CONFIG.minutesFolderId;
+        pagerArea.appendChild(el('div', { style: { textAlign: 'center', marginTop: '8px' } },
+          el('a', { href: folderUrl, target: '_blank', style: { fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCC2 View all minutes in Drive folder')
+        ));
       }
-      if (m.fullMinutes) {
-        card.addEventListener('click', function() {
-          expanded = !expanded;
-          fullDiv.style.display = expanded ? 'block' : 'none';
-        });
-      }
-      container.appendChild(card);
-    });
+    }
+
+    renderPage(0);
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load minutes.'));
-  }).dataGetMeetingMinutes(20);
+  }).dataGetMeetingMinutes(100);
 }
 
-function _renderAddMinutes(container) {
+function _renderAddMinutes(container, onSaveSuccess) {
+  // Warn if Minutes/ Drive folder not configured (v4.20.18)
+  if (CONFIG && !CONFIG.minutesFolderId) {
+    container.appendChild(el('div', { style: { background: 'rgba(255,170,0,0.10)', border: '1px solid rgba(255,170,0,0.4)', borderRadius: '6px', padding: '10px 12px', fontSize: '12px', color: '#ffaa00', marginBottom: '12px' } },
+      '⚠️ Minutes Drive folder not set in Config tab. Google Docs will save to root Drive.'
+    ));
+  }
+
   var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
   formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '12px' } }, 'Add Meeting Minutes'));
 
   var titleInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Meeting title...', style: { marginBottom: '8px', minHeight: '36px' } });
   formCard.appendChild(titleInput);
 
-  var dateInput = el('input', { type: 'date', className: 'msg-textarea', style: { marginBottom: '8px', minHeight: '36px' } });
+  // Pre-fill today (v4.20.18)
+  var today = new Date();
+  var todayStr = today.getFullYear() + '-' +
+    String(today.getMonth() + 1).padStart(2, '0') + '-' +
+    String(today.getDate()).padStart(2, '0');
+  var dateInput = el('input', { type: 'date', className: 'msg-textarea', value: todayStr, style: { marginBottom: '8px', minHeight: '36px' } });
   formCard.appendChild(dateInput);
 
   formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Key points (bullet format)'));
@@ -3430,8 +3643,9 @@ function _renderAddMinutes(container) {
       statusMsg.textContent = 'Saving...'; statusMsg.style.color = 'var(--muted)';
       serverCall().withSuccessHandler(function(result) {
         if (result && result.success) {
+          // Auto-switch to Recent tab on success so steward sees the new entry (v4.20.18)
+          if (typeof onSaveSuccess === 'function') { onSaveSuccess(); return; }
           statusMsg.textContent = 'Minutes saved!'; statusMsg.style.color = 'var(--success)';
-          titleInput.value = ''; dateInput.value = ''; bulletsInput.value = ''; fullInput.value = '';
         } else {
           statusMsg.textContent = (result && result.message) || 'Failed to save.'; statusMsg.style.color = 'var(--danger)';
         }
@@ -3443,6 +3657,7 @@ function _renderAddMinutes(container) {
 
   container.appendChild(formCard);
 }
+
 
 // ═══════════════════════════════════════
 // FEEDBACK PAGE (steward, v4.16.0)
