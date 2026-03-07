@@ -64,6 +64,7 @@ const BUILD_ORDER = [
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
+  '29_Migrations.gs',
 ];
 
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)
