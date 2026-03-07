@@ -60,7 +60,9 @@ function CREATE_DASHBOARD() {
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
       '• 📖 Config Guide (how to use Config tab)\n' +
-      '• 📊 Workload Tracker (member caseload tracking)\n\n' +
+      '• 📊 Workload Tracker (member caseload tracking)\n' +
+      '• 📚 Resources (educational content hub)\n' +
+      '• 📚 Resource Config (dynamic category management)\n\n' +
       'Note: All dashboards are now modal-based (popup windows).\n' +
       'Access them via: Union Hub > Dashboards menu.\n\n' +
       'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
@@ -165,6 +167,26 @@ function CREATE_DASHBOARD() {
     ss.toast('Setting up validations...', '🏗️ Progress', 3);
     setupDataValidations();
 
+    // Initialize Resources sheet and Resource Config sheet (v4.22.x)
+    // Both auto-create on first access but wired here so they're ready on setup.
+    if (typeof createResourcesSheet === 'function') {
+      try {
+        createResourcesSheet(ss);
+        ss.toast('📚 Resources sheet created', '🏗️ Progress', 2);
+      } catch (resError) {
+        Logger.log('Resources sheet skipped: ' + resError.message);
+      }
+    }
+
+    if (typeof createResourceConfigSheet === 'function') {
+      try {
+        createResourceConfigSheet(ss);
+        ss.toast('📚 Resource Config sheet created', '🏗️ Progress', 2);
+      } catch (rcError) {
+        Logger.log('Resource Config sheet skipped: ' + rcError.message);
+      }
+    }
+
     reorderSheetsToStandard(ss);
     ss.toast('Sheets reordered', '🏗️ Progress', 2);
 
@@ -256,6 +278,7 @@ function CREATE_DASHBOARD() {
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
         '• 📊 Workload Reporting (member caseload tracking)\n' +
+        '• 📚 Resources + Resource Config (educational content hub)\n' +
         '• Portal, Weekly Questions, Contact Log (web dashboard)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
