@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 39 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 39 `.gs` + 8 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED — private repo only]`
+**DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -1323,3 +1323,35 @@ Contract Article → Know Your Rights → Grievance Process → Forms & Template
 - `createResourceConfigSheet()` checks for existing sheet first — NEVER overwrites manually entered data.
 - Categories read by UI at form-open time via `getWebAppResourceCategories()` — never cached in config bootstrap.
 - `_defaultResourceCategories_()` is a last-resort fallback only — the live sheet is the source of truth.
+
+---
+
+## v4.22.6 — MADDS Org Chart Default (2026-03-06)
+
+**Change summary:** Replaced `src/org_chart.html` with the MADDS (Main Internal Breakout) chart sourced from the `Woop91/509d` repository (`org-chart/MADDS.html`, last updated 2026-03-01). This is now the default Org Chart view for both DDS-Dashboard and Union-Tracker.
+
+**Source:** `509d/org-chart/MADDS.html` — Full SEIU Local 509 organizational chart including: President → Officers → Chief of Staff → Directors → Coordinators → Public Sector Chapters (MassAbility expanded by default) → Other Chapters. Also contains Role Descriptions, Financial Overview, Staff Directory & Compensation, Career Paths, and Chapter Advisors & Internal Organizers sections.
+
+**Embedding approach (critical — do not revert):**
+The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the following conversions were made:
+- `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>` tags stripped; content wrapped in `<div class="madds-embed">`
+- CSS `:root {}` → `.madds-embed {}` (scopes CSS variables, prevents collision with app vars)
+- `html, body {}` → `.madds-embed {}`; `body {}` → `.madds-embed {}`
+- `body.light` → `.madds-embed.light` (light/dark mode toggle scoped to container)
+- `#mode-toggle` → `#madds-mode-toggle` (avoids ID collision with SPA)
+- `toggleMode()` → `maddstoggleMode()` (avoids function name collision)
+- `document.body.classList` → `document.querySelector('.madds-embed').classList`
+- `position: fixed` on mode-toggle → `position: sticky` (fixed breaks in embedded context)
+- Google Fonts `<link>` loaded dynamically via inline JS injector (static `<link>` tags don't load when injected via `.innerHTML`)
+
+**No server-side changes required.** The existing `getOrgChartHtml()` in `22_WebDashApp.gs` continues to serve `org_chart` via `HtmlService.createHtmlOutputFromFile('org_chart').getContent()`. The `renderOrgChart()` function in `index.html` is unchanged.
+
+**Files changed:**
+- `src/org_chart.html` — Replaced with MADDS chart fragment (3,266 lines)
+- `src/01_Core.gs` — Added v4.22.6 changelog entry; updated VERSION to "4.22.6"
+
+**⚠️ RULES:**
+- Do NOT rename `org_chart.html` — the GAS server function is hardcoded to `'org_chart'` filename.
+- If updating MADDS.html from the 509d repo, re-run the scoping conversions above — do NOT paste the raw standalone HTML directly.
+- Keep `.madds-embed` as the wrapper class and `#madds-mode-toggle` as the toggle ID.
+- The 509d repo is the source of truth for the chart content; the converted fragment lives in DDS-Dashboard and Union-Tracker `src/`.
