@@ -511,8 +511,8 @@ describe('getColumnLetter for all *_COLS values', () => {
 // ============================================================================
 
 describe('Header map column coverage completeness', () => {
-  test('MEMBER_HEADER_MAP_ length matches MEMBER_COLS.DUES_STATUS (last column)', () => {
-    expect(MEMBER_HEADER_MAP_.length).toBe(MEMBER_COLS.DUES_STATUS);
+  test('MEMBER_HEADER_MAP_ length matches MEMBER_COLS.MEMBER_ADMIN_FOLDER_URL (last column)', () => {
+    expect(MEMBER_HEADER_MAP_.length).toBe(MEMBER_COLS.MEMBER_ADMIN_FOLDER_URL);
   });
 
   test('GRIEVANCE_HEADER_MAP_ length matches max GRIEVANCE_COLS value', () => {

@@ -72,12 +72,11 @@ describe('WeeklyQuestions module', () => {
     expect(typeof WeeklyQuestions.getActiveQuestions).toBe('function');
     expect(typeof WeeklyQuestions.submitResponse).toBe('function');
     expect(typeof WeeklyQuestions.submitPoolQuestion).toBe('function');
-    expect(typeof WeeklyQuestions.getQuestionStats).toBe('function');
-    expect(typeof WeeklyQuestions.hasUserResponded).toBe('function');
     expect(typeof WeeklyQuestions.setStewardQuestion).toBe('function');
-    expect(typeof WeeklyQuestions.getPoolQuestions).toBe('function');
     expect(typeof WeeklyQuestions.selectRandomPoolQuestion).toBe('function');
+    expect(typeof WeeklyQuestions.closePoll).toBe('function');
     expect(typeof WeeklyQuestions.getHistory).toBe('function');
+    expect(typeof WeeklyQuestions.getPoolCount).toBe('function');
   });
 });
 
@@ -177,13 +176,10 @@ describe('WeeklyQuestions.setStewardQuestion', () => {
 // getQuestionStats
 // ============================================================================
 
-describe('WeeklyQuestions.getQuestionStats', () => {
-  test('returns total and counts', () => {
-    const responsesData = [['ID', 'Question ID', 'Email', 'Response', 'Submitted']];
-    setupSheets(null, responsesData);
-    const result = WeeklyQuestions.getQuestionStats('QID');
-    expect(result).toHaveProperty('total');
-    expect(result).toHaveProperty('counts');
+describe('WeeklyQuestions.getPoolCount', () => {
+  test('returns a number', () => {
+    const result = WeeklyQuestions.getPoolCount();
+    expect(typeof result).toBe('number');
   });
 });
 
@@ -235,8 +231,8 @@ describe('Global Wrappers', () => {
     expect(typeof wqSetStewardQuestion).toBe('function');
   });
 
-  test('wqGetPoolQuestions is defined', () => {
-    expect(typeof wqGetPoolQuestions).toBe('function');
+  test('wqGetPoolCount is defined', () => {
+    expect(typeof wqGetPoolCount).toBe('function');
   });
 
   test('wqInitSheets runs without error', () => {

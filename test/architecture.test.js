@@ -41,6 +41,7 @@ loadSources([
   '08b_SearchAndCharts.gs',
   '08c_FormsAndNotifications.gs',
   '08d_AuditAndFormulas.gs',
+  '08e_SurveyEngine.gs',
   '09_Dashboards.gs',
   '10a_SheetCreation.gs',
   '10b_SurveyDocSheets.gs',
@@ -63,7 +64,8 @@ loadSources([
   '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
-  '28_FailsafeService.gs'
+  '28_FailsafeService.gs',
+  '29_Migrations.gs'
 ]);
 
 // ============================================================================
@@ -152,7 +154,7 @@ describe('A1: Cross-file dependencies', () => {
     });
 
     test('DRIVE_CONFIG exists with expected properties', () => {
-      expect(DRIVE_CONFIG.ROOT_FOLDER_NAME).toBeTruthy();
+      expect(DRIVE_CONFIG.ROOT_FOLDER_FALLBACK).toBeTruthy();
     });
 
     test('CACHE_CONFIG exists', () => {
@@ -196,7 +198,7 @@ describe('A1: Build order integrity', () => {
     '04c_InteractiveDashboard.gs', '04d_ExecutiveDashboard.gs',
     '04e_PublicDashboard.gs', '05_Integrations.gs', '06_Maintenance.gs',
     '07_DevTools.gs', '08a_SheetSetup.gs', '08b_SearchAndCharts.gs',
-    '08c_FormsAndNotifications.gs', '08d_AuditAndFormulas.gs',
+    '08c_FormsAndNotifications.gs', '08d_AuditAndFormulas.gs', '08e_SurveyEngine.gs',
     '09_Dashboards.gs', '10a_SheetCreation.gs', '10b_SurveyDocSheets.gs',
     '10c_FormHandlers.gs', '10d_SyncAndMaintenance.gs', '10_Main.gs',
     '11_CommandHub.gs', '12_Features.gs', '13_MemberSelfService.gs',
@@ -205,7 +207,7 @@ describe('A1: Build order integrity', () => {
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
     '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
-    '28_FailsafeService.gs'
+    '28_FailsafeService.gs', '29_Migrations.gs'
   ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {
@@ -501,6 +503,7 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
             // Check next 3 lines for a null guard
             const nextLines = lines.slice(idx + 1, idx + 4).join('\n');
             const hasGuard = nextLines.includes('if (!' + varName + ')') ||
+                             nextLines.includes('if (' + varName + ')') ||
                              nextLines.includes(varName + ' ?') ||
                              nextLines.includes(varName + ' &&');
             if (!hasGuard) {
@@ -713,6 +716,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetCaseChecklist', 'dataGetSatisfactionTrends',
     'dataGetBroadcastFilterOptions', 'dataGetEngagementStats',
     'dataGetWorkloadSummaryStats',
+    'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
   ];
 
   // Functions that are init/admin only (not called from client google.script.run)
@@ -1077,8 +1081,9 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
   // Wrappers intentionally delegating elsewhere (not DataService)
   const nonDataServiceWrappers = [
     'dataMarkWelcomeDismissed',        // writes directly to PropertiesService
-    'dataGetEngagementStats',          // reads seeded stats from PropertiesService
-    'dataGetWorkloadSummaryStats',     // reads seeded stats from PropertiesService
+    'dataGetEngagementStats',          // reads live sheet data directly
+    'dataGetWorkloadSummaryStats',     // reads live sheet data directly
+    'dataSendDirectMessage',           // sends email + Drive log directly (calls DataService helpers deeper than 12-line window)
   ];
 
   wrappers

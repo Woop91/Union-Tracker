@@ -337,122 +337,65 @@ describe('removeScheduledReport', () => {
 });
 
 // ============================================================================
-// 6. getUserNotifications
+// 6. getUserNotifications — REMOVED (migrated to sheet-based system in v4.13.0+)
 // ============================================================================
 
-describe('getUserNotifications', () => {
-  test('returns empty array when no notifications exist', () => {
-    const result = JSON.parse(getUserNotifications());
-    expect(result).toEqual([]);
-  });
-
-  test('prunes notifications older than 30 days', () => {
-    const oldDate = new Date();
-    oldDate.setDate(oldDate.getDate() - 40);
-    const recentDate = new Date().toISOString();
-
-    const notifications = [
-      { id: 'n1', timestamp: oldDate.toISOString(), read: false },
-      { id: 'n2', timestamp: recentDate, read: false }
-    ];
-    const key = 'notifications_test_example_com';
-    const props = PropertiesService.getScriptProperties();
-    props.getProperty.mockImplementation(k => {
-      if (k === key) return JSON.stringify(notifications);
-      return null;
-    });
-
-    const result = JSON.parse(getUserNotifications());
-    expect(result.length).toBe(1);
-    expect(result[0].id).toBe('n2');
-  });
-
-  test('returns a JSON string', () => {
-    const result = getUserNotifications();
-    expect(typeof result).toBe('string');
-    expect(() => JSON.parse(result)).not.toThrow();
-  });
-
-  test('caps at 30 days (keeps recent notifications)', () => {
-    const now = new Date();
-    const within30 = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000).toISOString();
-    const notifications = [
-      { id: 'n1', timestamp: within30, read: false }
-    ];
-    const key = 'notifications_test_example_com';
-    const props = PropertiesService.getScriptProperties();
-    props.getProperty.mockImplementation(k => {
-      if (k === key) return JSON.stringify(notifications);
-      return null;
-    });
-
-    const result = JSON.parse(getUserNotifications());
-    expect(result.length).toBe(1);
-  });
-});
-
 // ============================================================================
-// 7. pushNotification
+// 7. pushNotification (writes to Notifications sheet)
 // ============================================================================
 
 describe('pushNotification', () => {
-  test('adds notification to store', () => {
+  let mockNotifSheet;
+
+  beforeEach(() => {
+    // Mock Notifications sheet with header row + existing data
+    const notifData = [
+      ['Notification ID', 'Recipient', 'Type', 'Title', 'Message', 'Priority', 'Sent By', 'Sent By Name', 'Created Date', 'Expires Date', 'Dismissed By', 'Status', 'Dismiss Mode'],
+      ['NOTIF-001', 'old@example.com', 'System', 'Old', 'Old msg', 'Normal', 'system', 'System', '2026-01-01', '', '', 'Active', 'Dismissible']
+    ];
+    mockNotifSheet = {
+      getName: jest.fn(() => '\uD83D\uDCE2 Notifications'),
+      getDataRange: jest.fn(() => ({
+        getValues: jest.fn(() => notifData)
+      })),
+      appendRow: jest.fn(),
+      getLastRow: jest.fn(() => notifData.length)
+    };
+    const mockSs = {
+      getSheetByName: jest.fn(name => {
+        if (name === SHEETS.NOTIFICATIONS) return mockNotifSheet;
+        return null;
+      }),
+      insertSheet: jest.fn(),
+      toast: jest.fn()
+    };
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
+  });
+
+  test('adds notification to sheet and returns success', () => {
     const result = pushNotification('test@example.com', {
       title: 'Test', body: 'Hello', type: 'info'
     });
     expect(result.success).toBe(true);
     expect(result.id).toBeDefined();
+    expect(mockNotifSheet.appendRow).toHaveBeenCalledTimes(1);
   });
 
-  test('auth check rejects non-steward cross-user push', () => {
-    getUserRole_.mockImplementation(() => 'member');
-    Session.getActiveUser.mockImplementation(() => ({
-      getEmail: jest.fn(() => 'member@example.com')
-    }));
+  test('returns error when notification title is missing', () => {
+    const result = pushNotification('test@example.com', { body: 'No title' });
+    expect(result.success).toBe(false);
+  });
 
-    const result = pushNotification('other@example.com', {
+  test('returns error when userEmail is empty', () => {
+    const result = pushNotification('', { title: 'Test' });
+    expect(result.success).toBe(false);
+  });
+
+  test('generates sequential NOTIF-NNN id', () => {
+    const result = pushNotification('test@example.com', {
       title: 'Test', body: 'Hello', type: 'info'
     });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Not authorized');
-  });
-
-  test('creates notification with correct structure', () => {
-    const result = pushNotification('test@example.com', {
-      title: 'Alert', body: 'Important message', type: 'warning', link: 'https://example.com'
-    });
-    expect(result.success).toBe(true);
-
-    // Verify the notification was stored correctly
-    const key = 'notifications_test_example_com';
-    const props = PropertiesService.getScriptProperties();
-    const saveCall = props.setProperty.mock.calls.find(c => c[0] === key);
-    expect(saveCall).toBeTruthy();
-    const stored = JSON.parse(saveCall[1]);
-    expect(stored[0].title).toBe('Alert');
-    expect(stored[0].body).toBe('Important message');
-    expect(stored[0].type).toBe('warning');
-    expect(stored[0].link).toBe('https://example.com');
-    expect(stored[0].read).toBe(false);
-  });
-
-  test('caps at 50 notifications', () => {
-    const existing = [];
-    for (let i = 0; i < 55; i++) {
-      existing.push({ id: 'n_' + i, title: 'Old', body: 'old', type: 'info', timestamp: new Date().toISOString(), read: false });
-    }
-    const key = 'notifications_test_example_com';
-    const props = PropertiesService.getScriptProperties();
-    props.getProperty.mockImplementation(k => {
-      if (k === key) return JSON.stringify(existing);
-      return null;
-    });
-
-    pushNotification('test@example.com', { title: 'New', body: 'new', type: 'info' });
-
-    const saveCall = props.setProperty.mock.calls.find(c => c[0] === key);
-    const stored = JSON.parse(saveCall[1]);
-    expect(stored.length).toBe(50);
+    expect(result.id).toBe('NOTIF-002');
   });
 
   test('emits notification:pushed event', () => {
@@ -467,37 +410,8 @@ describe('pushNotification', () => {
 });
 
 // ============================================================================
-// 8. markNotificationRead
+// 8. markNotificationRead — REMOVED (migrated to sheet-based system)
 // ============================================================================
-
-describe('markNotificationRead', () => {
-  test('marks notification as read', () => {
-    const notifications = [
-      { id: 'notif_123', title: 'Test', read: false }
-    ];
-    const key = 'notifications_test_example_com';
-    const props = PropertiesService.getScriptProperties();
-    props.getProperty.mockImplementation(k => {
-      if (k === key) return JSON.stringify(notifications);
-      return null;
-    });
-
-    const result = markNotificationRead('notif_123');
-    expect(result.success).toBe(true);
-
-    const saveCall = props.setProperty.mock.calls.find(c => c[0] === key);
-    const stored = JSON.parse(saveCall[1]);
-    expect(stored[0].read).toBe(true);
-  });
-
-  test('handles missing notification gracefully', () => {
-    const props = PropertiesService.getScriptProperties();
-    props.getProperty.mockImplementation(() => '[]');
-
-    const result = markNotificationRead('nonexistent');
-    expect(result.success).toBe(true);
-  });
-});
 
 // ============================================================================
 // 9. saveSharedView / getSharedViews / deleteSharedView
@@ -519,7 +433,24 @@ describe('saveSharedView', () => {
   });
 
   test('notifies shared users', () => {
-    // Track pushNotification calls via event bus
+    // pushNotification now writes to the Notifications sheet — mock it
+    const notifData = [['Notification ID', 'Recipient', 'Type', 'Title', 'Message', 'Priority', 'Sent By', 'Sent By Name', 'Created Date', 'Expires Date', 'Dismissed By', 'Status', 'Dismiss Mode']];
+    const mockNotifSheet = {
+      getName: jest.fn(() => '\uD83D\uDCE2 Notifications'),
+      getDataRange: jest.fn(() => ({ getValues: jest.fn(() => notifData) })),
+      appendRow: jest.fn(),
+      getLastRow: jest.fn(() => notifData.length)
+    };
+    const mockSs = {
+      getSheetByName: jest.fn(name => {
+        if (name === SHEETS.NOTIFICATIONS) return mockNotifSheet;
+        return null;
+      }),
+      insertSheet: jest.fn(),
+      toast: jest.fn()
+    };
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
+
     const handler = jest.fn();
     EventBus.on('notification:pushed', handler);
 

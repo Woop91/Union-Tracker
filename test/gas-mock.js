@@ -202,6 +202,7 @@ global.SpreadsheetApp = {
   newDataValidation: jest.fn(() => ({
     requireValueInList: jest.fn(function() { return this; }),
     setAllowInvalid: jest.fn(function() { return this; }),
+    setHelpText: jest.fn(function() { return this; }),
     build: jest.fn(() => ({}))
   })),
   ProtectionType: { SHEET: 'SHEET', RANGE: 'RANGE' }

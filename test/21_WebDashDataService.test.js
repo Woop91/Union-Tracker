@@ -346,7 +346,7 @@ describe('DataService.getGrievanceHotSpots', () => {
 // ============================================================================
 
 describe('DataService.getStewardDirectory', () => {
-  test('returns steward records sorted by name', () => {
+  test('returns steward records (unsorted — client applies smart sort)', () => {
     DataService._invalidateSheetCache('Member Directory');
     const headers = ['Email', 'Name', 'Role', 'Work Location', 'Office Days', 'Phone', 'Unit'];
     const data = [headers,
@@ -360,8 +360,8 @@ describe('DataService.getStewardDirectory', () => {
 
     const stewards = DataService.getStewardDirectory();
     expect(stewards.length).toBe(2);
-    expect(stewards[0].name).toBe('Alice');
-    expect(stewards[1].name).toBe('Zara');
+    const names = stewards.map(s => s.name).sort();
+    expect(names).toEqual(['Alice', 'Zara']);
     expect(stewards[0]).toHaveProperty('email');
     expect(stewards[0]).toHaveProperty('workLocation');
     expect(stewards[0]).toHaveProperty('phone');

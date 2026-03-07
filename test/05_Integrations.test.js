@@ -56,8 +56,8 @@ describe('CALENDAR_CONFIG', () => {
 // ============================================================================
 
 describe('DRIVE_CONFIG', () => {
-  test('has ROOT_FOLDER_NAME', () => {
-    expect(DRIVE_CONFIG.ROOT_FOLDER_NAME).toBeTruthy();
+  test('has ROOT_FOLDER_FALLBACK', () => {
+    expect(DRIVE_CONFIG.ROOT_FOLDER_FALLBACK).toBeTruthy();
   });
 
   test('SUBFOLDER_TEMPLATE contains placeholders', () => {

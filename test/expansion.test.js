@@ -68,14 +68,41 @@ describe('seedWeeklyQuestions', () => {
 // dataGetEngagementStats — requires seeded data (integration with DevTools)
 // ============================================================================
 
-describe('dataGetEngagementStats (with seeded data)', () => {
-  test('returns engagement data when seeded', () => {
-    PropertiesService.getScriptProperties().deleteAllProperties();
-    seedUnionStatsData();
+describe('dataGetEngagementStats (live sheet reads)', () => {
+  test('returns engagement data from sheet when members exist', () => {
+    // dataGetEngagementStats now reads directly from sheets (not PropertiesService).
+    // Mock _resolveCallerEmail for auth and provide a Member Directory with active members.
+    const origResolve = global._resolveCallerEmail;
+    global._resolveCallerEmail = jest.fn(() => 'steward@test.com');
+
+    const memberData = [
+      ['Email', 'Name', 'Dues Status', 'Hire Date'],
+      ['alice@test.com', 'Alice', 'Active', '2025-01-15'],
+      ['bob@test.com', 'Bob', 'Active', '2025-06-01'],
+    ];
+    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', memberData);
+    // Override getRange to be data-aware (the source uses getRange, not getDataRange)
+    memberSheet.getRange = jest.fn((row, col, numRows, numCols) => {
+      const nr = numRows || 1;
+      const nc = numCols || (memberData[0] ? memberData[0].length : 1);
+      const slice = memberData.slice(row - 1, row - 1 + nr).map(r => r.slice(col - 1, col - 1 + nc));
+      return {
+        getValues: jest.fn(() => slice),
+        getValue: jest.fn(() => (slice[0] && slice[0][0]) || ''),
+        setValue: jest.fn(),
+        setValues: jest.fn()
+      };
+    });
+    const mockSs = createMockSpreadsheet([memberSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
+
     const result = dataGetEngagementStats();
     expect(result).toBeDefined();
-    expect(result.surveyParticipation).toBeDefined();
+    expect(result).not.toBeNull();
+    expect(typeof result.surveyParticipation).toBe('number');
     expect(result.membershipTrends).toBeDefined();
     expect(Array.isArray(result.membershipTrends)).toBe(true);
+
+    global._resolveCallerEmail = origResolve;
   });
 });

@@ -3139,6 +3139,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
   try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
 
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { processed: 0, skipped: 0, errors: 0, message: 'No active spreadsheet.' };
   var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
   if (!sheet) {
     var msg = 'MeetingMinutes sheet not found \u2014 nothing to backfill.';
@@ -3328,6 +3329,7 @@ function dataGetEngagementStats() {
   if (!_caller) return null;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
 
     // ── Helper: get sheet data as 2-D array (skip header row) ──────────────
     function _rows(sheetName) {
@@ -3493,6 +3495,7 @@ function dataGetWorkloadSummaryStats() {
   if (!_caller) return null;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
     var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
     if (!vault || vault.getLastRow() <= 1) return null;
 
