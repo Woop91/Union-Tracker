@@ -835,6 +835,13 @@ function _addMissingMemberHeaders_(sheet) {
         .setAllowInvalid(false)
         .setHelpText('Yes = members can see this steward\'s phone number in the directory. No = phone is hidden from members.')
         .build();
+      // Seed 'No' into all existing data rows — default is opt-out.
+      var lastDataRow = Math.max(sheet.getLastRow(), 1);
+      if (lastDataRow > 1) {
+        var noValues = [];
+        for (var r = 0; r < lastDataRow - 1; r++) noValues.push(['No']);
+        sheet.getRange(2, targetCol, lastDataRow - 1, 1).setValues(noValues);
+      }
       sheet.getRange(2, targetCol, 4999, 1).setDataValidation(sharePhoneMissingRule);
     }
   }
