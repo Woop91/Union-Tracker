@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 39 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 39 `.gs` + 8 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
+**DDS Apps Script ID:** `[REDACTED]`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -1355,3 +1355,270 @@ The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the follo
 - If updating MADDS.html from the 509d repo, re-run the scoping conversions above — do NOT paste the raw standalone HTML directly.
 - Keep `.madds-embed` as the wrapper class and `#madds-mode-toggle` as the toggle ID.
 - The 509d repo is the source of truth for the chart content; the converted fragment lives in DDS-Dashboard and Union-Tracker `src/`.
+
+---
+
+## [2026-03-07] Org Chart Sync Script Added
+
+### Change
+Added `scripts/sync-org-chart.js` — a Node.js script that fetches `MADDS.html`
+from the private `Woop91/509d` repo (GitHub Contents API) and transforms it into
+the SPA-compatible `src/org_chart.html` used by DDS-Dashboard.
+
+### Wire-up
+- `package.json` → `"sync-org-chart": "node scripts/sync-org-chart.js"` (manual, not pre-deploy)
+- Requires `.env` at repo root with `GITHUB_509D_TOKEN=ghp_...` (gitignored)
+
+### Problem Solved
+`org_chart.html` was a manually synced copy of `509d/MADDS.html` with no automation.
+Any update to the 509d chart required a manual copy + transform + redeploy.
+
+### Transformations Applied (in order)
+1. Strip leading block comment
+2. Strip `<!DOCTYPE>` / `<html>` opening tags
+3. Strip preamble inside `<head>` (`<meta>`, `<title>`, Google Fonts `<link>`)
+   ⚠️ NOTE: In MADDS.html, `<head>` wraps the entire `<style>` block (closes AFTER `</style>`).
+   Must NOT use `<head>...</head>` greedy match — would delete all CSS.
+   Strip individual tags instead, then strip `</head>` separately.
+4. CSS scope: `:root {` → `.madds-embed {`
+5. CSS scope: `html, body {` → `.madds-embed {`
+6. CSS scope: `body.light` → `.madds-embed.light` (all)
+7. Replace `<body>` open + first button  **[before global #mode-toggle rename]**
+8. JS fn: `toggleMode` → `maddstoggleMode`, retarget `document.body` → `.madds-embed`  **[before rename]**
+9. CSS/HTML: rename all remaining `#mode-toggle` → `#madds-mode-toggle`
+10. CSS: `position: fixed` → `position: sticky` in `#madds-mode-toggle` block
+11. Replace closing `</script></body></html>` → `</script></div><font-loader script>`  **[before html strip]**
+12. Strip residual `</html>` / `</body>`
+
+### Verification Checks (12 checks — script aborts if any fail)
+Output must NOT contain: `:root {`, `body.light`, `id="mode-toggle"`, `onclick="toggleMode`, 
+`function toggleMode`, `<body>`, `<!DOCTYPE`
+Output MUST contain: `<div class="madds-embed">`, `maddstoggleMode`, `DM+Serif`, `</div>`, `position: sticky`
+
+---
+
+## Q&A Forum — Changes (2026-03-07)
+
+### Files Modified
+- `src/26_QAForum.gs`
+- `src/member_view.html`
+- `dist/26_QAForum.gs` (rebuilt)
+- `dist/member_view.html` (rebuilt)
+
+### Backend Changes (`26_QAForum.gs`)
+| Change | Reason |
+|---|---|
+| `submitAnswer()` — added steward-only guard: `if (!isSteward) return error` | Members should not be able to post answers |
+| `submitQuestion()` — added `_createNotificationInternal_()` call to notify 'All Stewards' | Stewards get alerted on new unanswered questions |
+| `submitAnswer()` — added `_createNotificationInternal_()` call to notify question author | Author gets alerted when their question receives an answer |
+| `resolveQuestion(email, questionId, isSteward)` — new function | Either question owner OR steward can close a thread |
+| `_createNotificationInternal_(recipient, type, title, message)` — new private helper | Writes to Notifications sheet without steward session requirement (system-generated) |
+| `qaSubmitAnswer()` global wrapper — now calls `_requireStewardAuth()` instead of `_resolveCallerEmail()` | Enforces steward-only at API boundary, not just inside module |
+| `qaResolveQuestion()` — new global wrapper | Auto-detects steward role via `checkWebAppAuthorization` |
+| `resolveQuestion` added to public API return object | Expose new function |
+
+### Frontend Changes (`member_view.html`)
+| Change | Reason |
+|---|---|
+| Answer form wrapped in `if (isSteward)` | Members cannot post answers |
+| "Mark Resolved" button: visible when `(q.isOwner || isSteward) && status !== 'resolved'` | Owner or steward can close thread |
+| ✓ Resolved badge added to question detail view | Visual confirmation of resolved state |
+| ✓ Resolved badge added to browse list question cards | Visible in list without opening detail |
+| Upvote/Flag/Resolve buttons section uses `flexWrap: 'wrap'` | Prevents button overflow on small screens |
+
+### Notification Schema Note
+`_createNotificationInternal_()` writes 13 columns matching NOTIFICATIONS_HEADER_MAP_ order:
+`ID | Recipient | Type | Title | Message | Priority | SenderEmail | SenderName | Date | ExpiresDate | DismissedBy | Status | DismissMode`
+Sender email = 'system', Sender name = 'Q&A Forum'.
+
+### Key Design Decisions
+- **Steward-only answers**: Enforced at BOTH backend module level AND global wrapper level (double guard)
+- **Notification routing**: New questions → 'All Stewards'; new answers → specific author email (NOT anonymous — if anonymous, the author email is still stored internally and gets notified)
+- **Resolved by**: Either party — question owner or steward. No separate "accepted answer" concept; resolved = closed thread
+- **`_createNotificationInternal_`** bypasses `sendWebAppNotification()` auth check intentionally — it is called in GAS execution context where the session belongs to the member/submitter, not a steward
+
+
+### [2026-03-07] sync-org-chart.js v2 — Multi-repo, All Branches
+
+Updated to commit org_chart.html to all branches of both repos:
+- `DDS-Dashboard` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
+- `Union-Tracker` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
+
+MADDS is now the sole org chart. Skip logic prevents empty commits when file is unchanged.
+Uses git clone to temp dir (GitHub Contents API returns 403 on write for these repos).
+
+---
+
+## Q&A Forum — Follow-up Changes (2026-03-07 session 2)
+
+### Files Modified
+- `src/21_WebDashDataService.gs` — added qaUnansweredCount to steward batch
+- `src/steward_view.html` — badge wiring, More menu badge, _refreshNavBadges update
+- `src/member_view.html` — showResolved toggle, filtering, nav badge refresh on action
+
+### Item 1 — Anonymous poster notifications
+No code change required. `submitAnswer()` reads author email from `_QA_Forum` col B
+(always stored internally even for anonymous posts). Notification is sent to that email.
+Anonymity only affects the *displayed* author name, not the stored email.
+
+### Item 2 — Steward unanswered Q&A badge
+| Location | What | Detail |
+|---|---|---|
+| `_getStewardBatchData()` | `qaUnansweredCount` field | Counts questions where answerCount === 0 AND status not in (resolved, deleted) |
+| `initStewardView()` | `AppState.qaUnansweredCount` | Wired from batch.qaUnansweredCount |
+| `renderBottomNav()` | Amber badge on `more_steward` tab | Amber (warning color), max display '9+' |
+| `renderStewardMore()` | Amber 'N unanswered' pill on Q&A Forum row | Same amber scheme as nav badge |
+| `_refreshNavBadges()` | Re-fetches qaGetQuestions(1,999) after task fetch | Recomputes count, re-renders nav so badge decrements immediately after steward answers |
+
+### Item 3 — Show Resolved toggle
+- `showResolved` boolean state variable, default `false`, scoped inside `renderQAForum()`
+- Persists across page/sort changes within the same session; resets on re-navigation
+- Server returns all non-deleted questions (including resolved). Filter applied client-side
+- Empty state message is context-aware: if hiding resolved and no open questions remain,
+  hints the user to toggle "Show Resolved"
+- `_refreshNavBadges()` called on `qaSubmitAnswer` success and `qaResolveQuestion` success
+  so the More tab badge and Q&A Forum row badge decrement without requiring page reload
+
+### Design Note — Client-side vs server-side filtering for resolved
+Chose client-side filtering (not a server param) because:
+- Server already paginates; adding a second filter param adds complexity
+- Page size is 20 and resolved threads accumulate slowly — no performance concern
+- Keeps `getQuestions()` API simple and single-purpose
+
+
+---
+
+## Q&A Forum — Follow-up Changes (2026-03-07 session 2)
+
+### Files Modified
+- `src/21_WebDashDataService.gs` — added qaUnansweredCount to steward batch
+- `src/steward_view.html` — badge wiring, More menu badge, _refreshNavBadges update
+- `src/member_view.html` — showResolved toggle, filtering, nav badge refresh on action
+
+### Item 1 — Anonymous poster notifications
+No code change required. submitAnswer() reads author email from _QA_Forum col B
+(always stored internally even for anonymous posts). Notification sent to that email.
+Anonymity only affects the displayed author name, not the stored email.
+
+### Item 2 — Steward unanswered Q&A badge
+_getStewardBatchData(): qaUnansweredCount = questions where answerCount === 0 AND status not in (resolved, deleted)
+AppState.qaUnansweredCount wired from batch on steward init.
+renderBottomNav(): amber badge on more_steward tab, max display '9+'.
+renderStewardMore(): amber 'N unanswered' pill on Q&A Forum row.
+_refreshNavBadges(): re-fetches qaGetQuestions(1,999) after task fetch, recomputes, re-renders nav.
+
+### Item 3 — Show Resolved toggle
+showResolved boolean state var, default false, scoped inside renderQAForum().
+Server returns all non-deleted questions including resolved. Filter is client-side.
+Empty state message context-aware: hints user to toggle if open list is empty.
+_refreshNavBadges() called on qaSubmitAnswer and qaResolveQuestion success for live badge decrement.
+
+### Design Note — Client-side filtering for resolved
+Chose client-side (not server param) because page size is 20 and resolved threads accumulate slowly.
+Keeps getQuestions() API simple.
+
+
+---
+
+## Q&A Forum — Bell Badge (2026-03-07 session 3)
+
+### Files Modified
+- `src/index.html` — sidebar bell badge total computation
+- `src/steward_view.html` — dismiss handler bell update
+- `src/member_view.html` — dismiss handler comment clarification
+
+### Bell Badge Logic
+Bell total = notificationCount + qaUnansweredCount (steward only).
+Member bell = notificationCount only.
+The two values are intentionally kept separate in AppState so each can
+be managed independently. Composite total computed only at render time.
+
+### Steward dismiss handler
+After dismissing a notification, bell badge re-renders with composite total.
+Handles edge case: if badge span doesn't exist (notifs were 0 but qa count > 0),
+creates and appends the badge span to .notif-bell-wrap.
+
+
+---
+
+## Steward Directory — Parity Fixes (2026-03-07)
+
+### Files Modified
+- `src/member_view.html`
+
+### Changes Made
+
+#### 1. Unit added to search — `_renderMemberDirectory` (line ~1068)
+Search in the member-facing steward list now includes `unit` field.
+Before: searched name + workLocation only.
+After: searches name + workLocation + unit.
+Matches parity with `renderStewardDirectoryPage` in `steward_view.html`.
+
+#### 2. Orphaned `renderStewardDirectory` removed (line ~3206, v4.12.0)
+This function was dead code — no nav path, no call site referenced it.
+All member-side directory rendering routes through `renderStewardContact` → `_renderMemberDirectory`.
+Replaced with tombstone comment: "renderStewardDirectory removed v4.23.3"
+
+### Confirmed Parity: member `_renderMemberDirectory` vs steward `renderStewardDirectoryPage`
+| Feature | Member | Steward |
+|---------|--------|---------|
+| Location pills | ✅ | ✅ |
+| Smart sort (location → in-office → alpha) | ✅ | ✅ |
+| Search: name | ✅ | ✅ |
+| Search: location | ✅ | ✅ |
+| Search: unit | ✅ (fixed) | ✅ |
+| vCard download | ✅ | ✅ |
+| officeDays + in-today indicator | ✅ | ✅ |
+| Phone shown | ✅ (intentional) | ✅ |
+
+### Phone Data Note
+Both roles receive phone numbers from the same `getStewardDirectory()` payload.
+This is intentional per user decision (2026-03-07). If this needs to change,
+add role-aware filtering in `getStewardDirectory()` in `21_WebDashDataService.gs`.
+
+---
+
+## Steward Phone Permission — Opt-In for Member Visibility (2026-03-07)
+
+### Files Modified
+- `src/21_WebDashDataService.gs`
+
+### Problem
+Phone numbers were included in `getStewardDirectory()` unconditionally.
+Both stewards and members received the same payload — members could see
+every steward's phone regardless of steward preference.
+
+### Solution: Opt-In Column + Role-Aware Redaction
+
+#### New HEADERS alias added
+```
+memberSharePhone: ['share phone', 'share phone number', 'phone visible', 'public phone', 'share contact']
+```
+Column absent or blank → defaults to `false` (opt-in required; no accidental exposure).
+
+#### New `sharePhone` field in `_buildUserRecord`
+Truthy values: `yes`, `true`, `1`. All others → `false`.
+
+#### `getStewardDirectory(callerIsSteward)` — updated signature
+- `callerIsSteward = true` → phone always returned (stewards see all peers)
+- `callerIsSteward = false` → phone only returned if `rec.sharePhone === true`
+
+#### `dataGetStewardDirectory()` wrapper — updated
+Resolves caller email → looks up their record → passes `callerIsSteward` flag.
+No change to the client-side HTML — phone field is already guarded with `if (s.phone)`.
+
+### Backward Compatibility
+- Existing sheets with no "Share Phone" column → all phones hidden from members by default.
+- Admins add the column and set `Yes` for stewards who consent.
+- No migration needed; purely additive.
+
+### Data Flow
+```
+dataGetStewardDirectory()
+  → _resolveCallerEmail() → e
+  → DataService.findUserByEmail(e) → callerRec
+  → callerIsSteward = callerRec.isSteward
+  → DataService.getStewardDirectory(callerIsSteward)
+    → for each steward rec:
+        phone = (callerIsSteward || rec.sharePhone) ? rec.phone : null
+```

@@ -48,6 +48,7 @@ var DataService = (function () {
     memberSupervisor: ['supervisor'],
     memberJobTitle:  ['job title', 'title', 'position'],
     memberAdminFolderUrl: ['member admin folder url', 'member admin folder', 'contact log folder url'],  // 'contact log folder url' retained as fallback alias for backward compat
+    memberSharePhone:    ['share phone', 'share phone number', 'phone visible', 'public phone', 'share contact'],
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -1230,6 +1231,14 @@ var DataService = (function () {
       supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
       memberAdminFolderUrl: String(_getVal(row, colMap, HEADERS.memberAdminFolderUrl, '')).trim(),
+      sharePhone: (function() {
+        var raw = _getVal(row, colMap, HEADERS.memberSharePhone, null);
+        // Column absent → treat as false (opt-in required)
+        if (raw === null || raw === '') return false;
+        if (typeof raw === 'boolean') return raw;
+        var s = String(raw).trim().toLowerCase();
+        return s === 'yes' || s === 'true' || s === '1';
+      })(),
     };
   }
 
@@ -1832,7 +1841,7 @@ var DataService = (function () {
   // PUBLIC: Steward Directory (v4.12.0)
   // ═══════════════════════════════════════
 
-  function getStewardDirectory() {
+  function getStewardDirectory(callerIsSteward) {
     var cached = _getCachedSheetData(MEMBER_SHEET);
     if (!cached) return [];
     var data = cached.data;
@@ -1841,12 +1850,14 @@ var DataService = (function () {
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
       if (!rec.isSteward) continue;
+      // Phone: stewards always see it; members only see it if the steward opted in
+      var phoneToReturn = (callerIsSteward || rec.sharePhone) ? rec.phone : null;
       stewards.push({
         name: rec.name,
         email: rec.email,
         workLocation: rec.workLocation,
         officeDays: rec.officeDays,
-        phone: rec.phone,
+        phone: phoneToReturn,
         unit: rec.unit,
       });
     }
@@ -2171,6 +2182,19 @@ var DataService = (function () {
       }
     } catch (_e) { /* non-fatal */ }
 
+    var qaUnansweredCount = 0;
+    try {
+      if (typeof QAForum !== 'undefined') {
+        var qaResult = QAForum.getQuestions(email, 1, 999, 'recent');
+        if (qaResult && qaResult.questions) {
+          for (var q = 0; q < qaResult.questions.length; q++) {
+            var qq = qaResult.questions[q];
+            if (qq.answerCount === 0 && qq.status !== 'resolved' && qq.status !== 'deleted') qaUnansweredCount++;
+          }
+        }
+      }
+    } catch (_e) { /* non-fatal */ }
+
     return {
       cases: cases,
       kpis: kpis,
@@ -2178,6 +2202,7 @@ var DataService = (function () {
       taskCount: taskCount,
       overdueTaskCount: overdueTaskCount,
       notificationCount: notifCount,
+      qaUnansweredCount: qaUnansweredCount,
     };
   }
 
@@ -3090,7 +3115,18 @@ function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, de
 function dataGetTasks(ignoredStewardEmail, statusFilter) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getTasks(s, statusFilter); }
 function dataCompleteTask(ignoredStewardEmail, taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
 function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
-function dataGetStewardDirectory() { var e = _resolveCallerEmail(); if (!e) return []; try { return DataService.getStewardDirectory(); } catch (err) { Logger.log('dataGetStewardDirectory error: ' + err.message + '\n' + (err.stack || '')); return []; } }
+function dataGetStewardDirectory() {
+  var e = _resolveCallerEmail();
+  if (!e) return [];
+  try {
+    var callerRec = DataService.findUserByEmail(e);
+    var callerIsSteward = callerRec && (callerRec.isSteward === true);
+    return DataService.getStewardDirectory(callerIsSteward);
+  } catch (err) {
+    Logger.log('dataGetStewardDirectory error: ' + err.message + '\n' + (err.stack || ''));
+    return [];
+  }
+}
 function dataGetGrievanceStats() { var s = _requireStewardAuth(); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats() { var e = _resolveCallerEmail(); return e ? DataService.getMembershipStats() : null; }
