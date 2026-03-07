@@ -40,6 +40,7 @@ const BUILD_ORDER = [
   '08b_SearchAndCharts.gs',
   '08c_FormsAndNotifications.gs',
   '08d_AuditAndFormulas.gs',
+  '08e_SurveyEngine.gs',
   '09_Dashboards.gs',
   '10a_SheetCreation.gs',
   '10b_SurveyDocSheets.gs',
@@ -69,7 +70,6 @@ const BUILD_ORDER = [
 
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)
 const HTML_FILES = [
-  'MultiSelectDialog.html',
   // Web-dashboard SPA templates
   'index.html',
   'styles.html',
@@ -173,5 +173,7 @@ if (shouldClean) {
     console.log('Production build: Excluding DevTools...\n');
   }
 
+  // Auto-clean before build to prevent orphaned files from persisting
+  clean();
   build(fileList);
 }
