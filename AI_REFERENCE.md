@@ -1734,3 +1734,19 @@ toggleTrack click → dataUpdateProfile({ sharePhone: 'Yes'|'No' })
 ### Security
 Steward can only update their own row (no _targetEmail passed). Allowlist in
 updateMemberProfile prevents any other column being modified via this path.
+
+---
+
+## Share Phone — Default 'No' Seeding (2026-03-07)
+
+### File Modified
+- `src/10a_SheetCreation.gs` — `_addMissingMemberHeaders_`
+
+### Change
+When the 'Share Phone' column is auto-added to an existing sheet,
+all current data rows are seeded with `'No'` before the dropdown validation is applied.
+This makes the default state explicit in the sheet (not blank) and ensures
+admins reading the sheet see the intent clearly.
+
+New sheets have no data rows at creation time, so seeding is not needed there.
+Blank cells in the column are still treated as `false` by the backend as a belt-and-suspenders fallback.
