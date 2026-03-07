@@ -66,7 +66,7 @@ var ConfigReader = (function () {
       // Org links — from Config tab columns
       calendarId:          _readCell(sheet, CONFIG_COLS.CALENDAR_ID) || '',
       driveFolderId:       _readCell(sheet, CONFIG_COLS.DRIVE_FOLDER_ID) || '',
-      satisfactionFormUrl: _readCell(sheet, CONFIG_COLS.SATISFACTION_FORM_URL) || '',
+      // satisfactionFormUrl removed v4.22.7 — survey is native webapp (see member_view.html renderSurveyFormPage)
       orgWebsite:          _readCell(sheet, CONFIG_COLS.ORG_WEBSITE) || '',
       // Dashboard folder structure (v4.20.17)
       dashboardRootFolderId:  _readCell(sheet, CONFIG_COLS.DASHBOARD_ROOT_FOLDER_ID) || '',

@@ -38,6 +38,7 @@ function showPublicMemberDashboard() {
  * @returns {string} JSON with all dashboard data
  */
 function getUnifiedDashboardData(includePII) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
@@ -882,21 +883,25 @@ function getUnifiedDashboardData(includePII) {
       qVal = parseFloat(satData[i][SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q53.push(qVal);
       qVal = parseFloat(satData[i][SATISFACTION_COLS.Q55_WIN_TOGETHER - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q55.push(qVal);
 
-      // Section averages (using SATISFACTION_COLS constants)
-      var avgOverall = parseFloat(satData[i][SATISFACTION_COLS.AVG_OVERALL_SAT - 1]) || 0;
-      var avgSteward = parseFloat(satData[i][SATISFACTION_COLS.AVG_STEWARD_RATING - 1]) || 0;
-      var avgChapter = parseFloat(satData[i][SATISFACTION_COLS.AVG_CHAPTER - 1]) || 0;
-      var avgLeadership = parseFloat(satData[i][SATISFACTION_COLS.AVG_LEADERSHIP - 1]) || 0;
-      var avgContract = parseFloat(satData[i][SATISFACTION_COLS.AVG_CONTRACT - 1]) || 0;
-      var avgComm = parseFloat(satData[i][SATISFACTION_COLS.AVG_COMMUNICATION - 1]) || 0;
-      var avgVoice = parseFloat(satData[i][SATISFACTION_COLS.AVG_MEMBER_VOICE - 1]) || 0;
-      var avgValue = parseFloat(satData[i][SATISFACTION_COLS.AVG_VALUE_ACTION - 1]) || 0;
-
-      if (avgOverall === 0) {
-        var q6 = parseFloat(satData[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]) || 0, q7 = parseFloat(satData[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
-        var q8 = parseFloat(satData[i][SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]) || 0, q9 = parseFloat(satData[i][SATISFACTION_COLS.Q9_RECOMMEND - 1]) || 0;
-        avgOverall = (q6 + q7 + q8 + q9) / 4;
+      // Section averages — computed inline (v4.23.0: no pre-computed AVG cols in dynamic schema)
+      function _avg4e(cols) {
+        var sum = 0, cnt = 0;
+        cols.forEach(function(colKey) {
+          var col = SATISFACTION_COLS[colKey];
+          if (!col) return;
+          var v = parseFloat(satData[i][col - 1]);
+          if (!isNaN(v) && v >= 1 && v <= 10) { sum += v; cnt++; }
+        });
+        return cnt > 0 ? sum / cnt : 0;
       }
+      var avgOverall    = _avg4e(['Q6_SATISFIED_REP','Q7_TRUST_UNION','Q8_FEEL_PROTECTED','Q9_RECOMMEND']);
+      var avgSteward    = _avg4e(['Q10_TIMELY_RESPONSE','Q11_TREATED_RESPECT','Q12_EXPLAINED_OPTIONS','Q13_FOLLOWED_THROUGH','Q14_ADVOCATED','Q15_SAFE_CONCERNS','Q16_CONFIDENTIALITY']);
+      var avgChapter    = _avg4e(['Q21_UNDERSTAND_ISSUES','Q22_CHAPTER_COMM','Q23_ORGANIZES','Q24_REACH_CHAPTER','Q25_FAIR_REP']);
+      var avgLeadership = _avg4e(['Q26_DECISIONS_CLEAR','Q27_UNDERSTAND_PROCESS','Q28_TRANSPARENT_FINANCE','Q29_ACCOUNTABLE','Q30_FAIR_PROCESSES','Q31_WELCOMES_OPINIONS']);
+      var avgContract   = _avg4e(['Q32_ENFORCES_CONTRACT','Q33_REALISTIC_TIMELINES','Q34_CLEAR_UPDATES','Q35_FRONTLINE_PRIORITY']);
+      var avgComm       = _avg4e(['Q41_CLEAR_ACTIONABLE','Q42_ENOUGH_INFO','Q43_FIND_EASILY','Q44_ALL_SHIFTS','Q45_MEETINGS_WORTH']);
+      var avgVoice      = _avg4e(['Q46_VOICE_MATTERS','Q47_SEEKS_INPUT','Q48_DIGNITY','Q49_NEWER_SUPPORTED','Q50_CONFLICT_RESPECT']);
+      var avgValue      = _avg4e(['Q51_GOOD_VALUE','Q52_PRIORITIES_NEEDS','Q53_PREPARED_MOBILIZE','Q54_HOW_INVOLVED','Q55_WIN_TOGETHER']);
 
       if (avgOverall > 0) sectionScores.overall.push(avgOverall);
       if (avgSteward > 0) sectionScores.steward.push(avgSteward);
@@ -1153,7 +1158,8 @@ function getUnifiedDashboardData(includePII) {
   try {
     configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '').trim();
+      // surveyUrl now points to member portal (native webapp survey); SATISFACTION_FORM_URL removed v4.22.7
+      data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '').trim();
       data.resourceLinks.contactFormUrl = String(configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).getValue() || '').trim();
       data.resourceLinks.customLink1Name = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_NAME).getValue() || '').trim();
       data.resourceLinks.customLink1Url = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_URL).getValue() || '').trim();
@@ -1250,7 +1256,7 @@ function getWebDashBatchData(email, role) {
     } catch (_e) { result.membershipStats = null; }
 
     // v4.16.0 — supplemental data from newly-wired sheets
-    try { result.activePolls = DataService.getActivePolls(email); } catch (_e) { result.activePolls = null; }
+    // activePolls removed v4.24.0 — polls now via wq* wrappers (24_WeeklyQuestions.gs)
     try { result.meetingMinutes = DataService.getMeetingMinutes(3); } catch (_e) { result.meetingMinutes = null; }
     if (isSteward) {
       try { result.satisfactionTrends = DataService.getSatisfactionTrends(); } catch (_e) { result.satisfactionTrends = null; }

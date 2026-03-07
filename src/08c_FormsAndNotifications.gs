@@ -25,10 +25,7 @@ function getFormUrlFromConfig(formType) {
       configCol = CONFIG_COLS.CONTACT_FORM_URL;
       defaultUrl = CONTACT_FORM_CONFIG.FORM_URL;
       break;
-    case 'satisfaction':
-      configCol = CONFIG_COLS.SATISFACTION_FORM_URL;
-      defaultUrl = SATISFACTION_FORM_CONFIG.FORM_URL;
-      break;
+    // 'satisfaction' case removed v4.22.7 — Google Form deprecated, survey is now native webapp only
     default:
       Logger.log('Unknown form type: ' + formType);
       return '';
@@ -88,12 +85,13 @@ function buildGrievanceFormUrl_(memberData, stewardData) {
 
 /**
  * Save form URLs to the Config tab for easy reference and updating
- * Writes Grievance Form, Contact Form, and Satisfaction Survey URLs to Config columns P, Q, AR
+ * Writes Grievance Form and Contact Form URLs to Config columns.
+ * (Satisfaction Survey URL removed v4.22.7 — survey is now native webapp only)
  */
 function saveFormUrlsToConfig() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   saveFormUrlsToConfig_silent(ss);
-  ss.toast('Form URLs saved to Config tab (columns P, Q, AR)', 'Saved', 3);
+  ss.toast('Form URLs saved to Config tab', 'Saved', 3);
 }
 
 /**
@@ -110,20 +108,15 @@ function saveFormUrlsToConfig_silent(ss) {
   }
 
   // Config layout: Row 1 = section headers, Row 2 = column headers, Row 3+ = data
-  // Set column headers in row 2
   configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue('Grievance Form URL');
   configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setValue('Contact Form URL');
-  configSheet.getRange(2, CONFIG_COLS.SATISFACTION_FORM_URL).setValue('Satisfaction Survey URL');
+  // SATISFACTION_FORM_URL removed v4.22.7 — no longer written
 
-  // Set form URLs in row 3 (data row)
   configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
   configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
-  configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).setValue(SATISFACTION_FORM_CONFIG.FORM_URL);
 
-  // Format as links
   configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
   configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
-  configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
 }
 
 // ============================================================================
@@ -664,202 +657,24 @@ function getSatisfactionSurveyLink() {
  *
  * @param {Object} e - Form submission event object with e.namedValues
  */
+/**
+ * @deprecated v4.21.0 — Google Form ingest path removed.
+ * In-app submitSurveyResponse() is now the only submission path.
+ * v4.23.0 — Updated to use dynamic col map if somehow triggered.
+ * Logs a warning and returns without writing to avoid column mismatch errors.
+ */
 function onSatisfactionFormSubmit(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
-
-  if (!satSheet) {
-    Logger.log('Member Satisfaction sheet not found');
-    return;
-  }
-
+  Logger.log(
+    'onSatisfactionFormSubmit called — this trigger is deprecated (v4.21.0). ' +
+    'All survey responses must go through submitSurveyResponse() in the webapp. ' +
+    'No data was written. Remove the Google Form trigger to stop this message.'
+  );
   try {
-    // Get form responses from event
-    var responses = e.namedValues || {};
-
-    // Build row data array matching SATISFACTION_COLS order
-    var newRow = [];
-
-    // Timestamp
-    newRow[SATISFACTION_COLS.TIMESTAMP - 1] = new Date();
-
-    // Work Context (Q1-5) - Note: Q3_SHIFT not in form, column left empty
-    newRow[SATISFACTION_COLS.Q1_WORKSITE - 1] = getFormValue_(responses, 'Worksite / Program / Region');
-    newRow[SATISFACTION_COLS.Q2_ROLE - 1] = getFormValue_(responses, 'Role / Job Group');
-    // Q3_SHIFT skipped - form does not have this question
-    newRow[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] = getFormValue_(responses, 'Time in current role');
-    newRow[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] = getFormValue_(responses, 'Contact with steward in past 12 months?');
-
-    // Overall Satisfaction (Q6-9)
-    newRow[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] = getFormValue_(responses, 'Satisfied with union representation');
-    newRow[SATISFACTION_COLS.Q7_TRUST_UNION - 1] = getFormValue_(responses, 'Trust union to act in best interests');
-    newRow[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] = getFormValue_(responses, 'Feel more protected at work');
-    newRow[SATISFACTION_COLS.Q9_RECOMMEND - 1] = getFormValue_(responses, 'Would recommend membership');
-
-    // Steward Ratings 3A (Q10-17)
-    newRow[SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1] = getFormValue_(responses, 'Responded in timely manner');
-    newRow[SATISFACTION_COLS.Q11_TREATED_RESPECT - 1] = getFormValue_(responses, 'Treated me with respect');
-    newRow[SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1] = getFormValue_(responses, 'Explained options clearly');
-    newRow[SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1] = getFormValue_(responses, 'Followed through on commitments');
-    newRow[SATISFACTION_COLS.Q14_ADVOCATED - 1] = getFormValue_(responses, 'Advocated effectively');
-    newRow[SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1] = getFormValue_(responses, 'Felt safe raising concerns');
-    newRow[SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1] = getFormValue_(responses, 'Handled confidentiality appropriately');
-    newRow[SATISFACTION_COLS.Q17_STEWARD_IMPROVE - 1] = getFormValue_(responses, 'What should stewards improve?');
-
-    // Steward Access 3B (Q18-20)
-    newRow[SATISFACTION_COLS.Q18_KNOW_CONTACT - 1] = getFormValue_(responses, 'Know how to contact steward/rep');
-    newRow[SATISFACTION_COLS.Q19_CONFIDENT_HELP - 1] = getFormValue_(responses, 'Confident I would get help');
-    newRow[SATISFACTION_COLS.Q20_EASY_FIND - 1] = getFormValue_(responses, 'Easy to figure out who to contact');
-
-    // Chapter Effectiveness (Q21-25)
-    newRow[SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1] = getFormValue_(responses, 'Reps understand my workplace issues');
-    newRow[SATISFACTION_COLS.Q22_CHAPTER_COMM - 1] = getFormValue_(responses, 'Chapter communication is regular and clear');
-    newRow[SATISFACTION_COLS.Q23_ORGANIZES - 1] = getFormValue_(responses, 'Chapter organizes members effectively');
-    newRow[SATISFACTION_COLS.Q24_REACH_CHAPTER - 1] = getFormValue_(responses, 'Know how to reach chapter contact');
-    newRow[SATISFACTION_COLS.Q25_FAIR_REP - 1] = getFormValue_(responses, 'Representation is fair across roles/shifts');
-
-    // Local Leadership (Q26-31)
-    newRow[SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1] = getFormValue_(responses, 'Leadership communicates decisions clearly');
-    newRow[SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1] = getFormValue_(responses, 'Understand how decisions are made');
-    newRow[SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1] = getFormValue_(responses, 'Union is transparent about finances');
-    newRow[SATISFACTION_COLS.Q29_ACCOUNTABLE - 1] = getFormValue_(responses, 'Leadership is accountable to feedback');
-    newRow[SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1] = getFormValue_(responses, 'Internal processes feel fair');
-    newRow[SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1] = getFormValue_(responses, 'Union welcomes differing opinions');
-
-    // Contract Enforcement (Q32-36)
-    newRow[SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1] = getFormValue_(responses, 'Union enforces contract effectively');
-    newRow[SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1] = getFormValue_(responses, 'Communicates realistic timelines');
-    newRow[SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1] = getFormValue_(responses, 'Provides clear updates on issues');
-    newRow[SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1] = getFormValue_(responses, 'Prioritizes frontline conditions');
-    newRow[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] = getFormValue_(responses, 'Filed grievance in past 24 months?');
-
-    // Representation Process 6A (Q37-40)
-    newRow[SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1] = getFormValue_(responses, 'Understood steps and timeline');
-    newRow[SATISFACTION_COLS.Q38_FELT_SUPPORTED - 1] = getFormValue_(responses, 'Felt supported throughout');
-    newRow[SATISFACTION_COLS.Q39_UPDATES_OFTEN - 1] = getFormValue_(responses, 'Received updates often enough');
-    newRow[SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1] = getFormValue_(responses, 'Outcome feels justified');
-
-    // Communication Quality (Q41-45)
-    newRow[SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1] = getFormValue_(responses, 'Communications are clear and actionable');
-    newRow[SATISFACTION_COLS.Q42_ENOUGH_INFO - 1] = getFormValue_(responses, 'Receive enough information');
-    newRow[SATISFACTION_COLS.Q43_FIND_EASILY - 1] = getFormValue_(responses, 'Can find information easily');
-    newRow[SATISFACTION_COLS.Q44_ALL_SHIFTS - 1] = getFormValue_(responses, 'Communications reach all locations');
-    newRow[SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1] = getFormValue_(responses, 'Meetings are worth attending');
-
-    // Member Voice & Culture (Q46-50)
-    newRow[SATISFACTION_COLS.Q46_VOICE_MATTERS - 1] = getFormValue_(responses, 'My voice matters in the union');
-    newRow[SATISFACTION_COLS.Q47_SEEKS_INPUT - 1] = getFormValue_(responses, 'Union actively seeks input');
-    newRow[SATISFACTION_COLS.Q48_DIGNITY - 1] = getFormValue_(responses, 'Members treated with dignity');
-    newRow[SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1] = getFormValue_(responses, 'Newer members are supported');
-    newRow[SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1] = getFormValue_(responses, 'Internal conflict handled respectfully');
-
-    // Value & Collective Action (Q51-55)
-    newRow[SATISFACTION_COLS.Q51_GOOD_VALUE - 1] = getFormValue_(responses, 'Union provides good value for dues');
-    newRow[SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1] = getFormValue_(responses, 'Priorities reflect member needs');
-    newRow[SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1] = getFormValue_(responses, 'Union prepared to mobilize');
-    newRow[SATISFACTION_COLS.Q54_HOW_INVOLVED - 1] = getFormValue_(responses, 'Understand how to get involved');
-    newRow[SATISFACTION_COLS.Q55_WIN_TOGETHER - 1] = getFormValue_(responses, 'Acting together, we can win improvements');
-
-    // Scheduling/Office Days (Q56-63)
-    newRow[SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1] = getFormValue_(responses, 'Understand proposed changes');
-    newRow[SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED - 1] = getFormValue_(responses, 'Feel adequately informed');
-    newRow[SATISFACTION_COLS.Q58_CLEAR_CRITERIA - 1] = getFormValue_(responses, 'Decisions use clear criteria');
-    newRow[SATISFACTION_COLS.Q59_WORK_EXPECTATIONS - 1] = getFormValue_(responses, 'Work can be done under expectations');
-    newRow[SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES - 1] = getFormValue_(responses, 'Approach supports effective outcomes');
-    newRow[SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING - 1] = getFormValue_(responses, 'Approach supports my wellbeing');
-    newRow[SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1] = getFormValue_(responses, 'My concerns would be taken seriously');
-    newRow[SATISFACTION_COLS.Q63_SCHEDULING_CHALLENGE - 1] = getFormValue_(responses, 'Biggest scheduling challenge?');
-
-    // Priorities & Close (Q64-67)
-    newRow[SATISFACTION_COLS.Q64_TOP_PRIORITIES - 1] = getFormMultiValue_(responses, 'Top 3 priorities (6-12 mo)');
-    newRow[SATISFACTION_COLS.Q65_ONE_CHANGE - 1] = getFormValue_(responses, '#1 change union should make');
-    newRow[SATISFACTION_COLS.Q66_KEEP_DOING - 1] = getFormValue_(responses, 'One thing union should keep doing');
-    newRow[SATISFACTION_COLS.Q67_ADDITIONAL - 1] = getFormValue_(responses, 'Additional comments (no names)');
-
-    // ========================================================================
-    // EMAIL VERIFICATION & VAULT STORAGE
-    // Survey answers go to the Satisfaction sheet (anonymous).
-    // Email + Member ID go to _Survey_Vault (protected, hidden).
-    // No PII is ever written to the Satisfaction sheet.
-    // ========================================================================
-
-    // Get email from form (try multiple common field names)
-    var email = getFormValue_(responses, 'Email Address') ||
-                getFormValue_(responses, 'Email') ||
-                getFormValue_(responses, 'email') ||
-                (e.response ? e.response.getRespondentEmail() : '') || '';
-    email = email.toString().toLowerCase().trim();
-
-    // NOTE: email is NOT written to newRow — it goes to the vault only
-    var currentQuarter = getCurrentQuarter();
-    var memberMatch = validateMemberEmail(email);
-    var verified = memberMatch ? 'Yes' : 'Pending Review';
-    var memberId = memberMatch ? memberMatch.memberId : '';
-
-    // ── Sanitize all user-supplied values to prevent formula injection ──
-    for (var fi = 0; fi < newRow.length; fi++) {
-      if (typeof newRow[fi] === 'string') {
-        newRow[fi] = escapeForFormula(newRow[fi]);
-      }
-    }
-
-    // ── Append ANONYMOUS response to Satisfaction sheet ──
-    // Use a lock around appendRow + getLastRow to prevent race conditions
-    // when two form submissions arrive simultaneously (F34d fix)
-    var formLock = LockService.getScriptLock();
-    formLock.waitLock(10000);
-    try {
-      satSheet.appendRow(newRow);
-      SpreadsheetApp.flush(); // ensure row is committed before reading back
-      var newRowNum = satSheet.getLastRow();
-    } finally {
-      formLock.releaseLock();
-    }
-
-    // ── Write hashed PII to vault (separate protected sheet) ──
-    // Supersede any previous entry from same email+quarter
-    if (memberMatch) {
-      supersedePreviousVaultEntry_(email, currentQuarter, newRowNum);
-    }
-    writeVaultEntry_(newRowNum, email, verified, memberId, currentQuarter);
-
-    // Compute section averages for the new row
-    computeSatisfactionRowAverages(newRowNum);
-
-    // Update dashboard summary values
-    syncSatisfactionValues();
-
-    // Update survey completion tracking if member was matched.
-    // This marks the member as "Completed" in _Survey_Tracking.
-    if (memberMatch && memberMatch.memberId) {
-      try {
-        updateSurveyTrackingOnSubmit_(memberMatch.memberId);
-      } catch (trackErr) {
-        Logger.log('Survey tracking update error: ' + trackErr.message);
-      }
-    }
-
-    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + verified + ' | Hashed PII stored in vault');
-
-    // Send thank-you email if respondent email available
-    if (email) {
-      try {
-        MailApp.sendEmail({
-          to: email,
-          subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Thank You for Your Feedback',
-          body: 'Thank you for completing the member satisfaction survey.\n\n' +
-            'Your feedback helps us improve our representation and services.\n\n' +
-            'Best regards,\nWFSE Local'
-        });
-      } catch (emailError) {
-        Logger.log('Could not send survey thank-you email: ' + emailError.message);
-      }
-    }
-
-  } catch (error) {
-    Logger.log('Error processing satisfaction survey submission: ' + error.message);
-    throw error;
-  }
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      '⚠️ Google Form survey trigger is deprecated. Use the member webapp to submit surveys.',
+      'Deprecated Trigger', 8
+    );
+  } catch(_ui) {}
 }
 
 /**
@@ -1872,12 +1687,12 @@ function sendSurveyCompletionReminders() {
     return 'No survey tracking data found.';
   }
 
-  // Get survey URL from Config using CONFIG_COLS constant (data in row 3)
+  // Survey is now native webapp — direct members to the member portal URL
   var surveyUrl = '';
   if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      surveyUrl = configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '';
-    } catch (_e) { /* no survey URL configured */ }
+      surveyUrl = configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '';
+    } catch (_e) { /* no portal URL configured */ }
   }
 
   var data = trackingSheet.getDataRange().getValues();
@@ -2087,28 +1902,53 @@ function showSurveyTrackingDialog() {
  *
  * @returns {Object} { period, sections, questions, sliderLabels }
  */
+// ============================================================================
+// SURVEY SCHEMA — v4.23.0 Dynamic (reads from 📋 Survey Questions sheet)
+// ============================================================================
+
+/**
+ * Returns the active survey questions, reading from the 📋 Survey Questions sheet.
+ * Caches result for 5 minutes. Call clearSurveyQuestionsCache() to force refresh.
+ *
+ * Falls back to creating the sheet (with seed data) if it doesn't exist.
+ *
+ * @returns {{ questions: Array, sections: Array, sliderLabels: Object, period: Object|null }}
+ */
 function getSurveyQuestions() {
+  var CACHE_KEY = 'surveyQuestions_v1';
+  try {
+    var cached = CacheService.getScriptCache().get(CACHE_KEY);
+    if (cached) return JSON.parse(cached);
+  } catch(_ce) {}
+
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
-    // ── Dynamic options from Config ──────────────────────────────────────
-    function _getConfigList(colConst) {
-      if (!configSheet || !colConst || colConst < 1) return [];
-      try {
-        var lastRow = configSheet.getLastRow();
-        if (lastRow < 3) return [];
-        var vals = configSheet.getRange(3, colConst, lastRow - 2, 1).getValues();
-        return vals.map(function(r) { return String(r[0]).trim(); })
-                   .filter(function(v) { return v !== ''; });
-      } catch(e) { return []; }
+    // Ensure Survey Questions sheet exists
+    var qSheet = ss.getSheetByName(SHEETS.SURVEY_QUESTIONS);
+    if (!qSheet || qSheet.getLastRow() < 2) {
+      createSurveyQuestionsSheet(ss);
+      qSheet = ss.getSheetByName(SHEETS.SURVEY_QUESTIONS);
     }
 
-    var worksites       = _getConfigList(CONFIG_COLS.OFFICE_LOCATIONS);
-    var roles           = _getConfigList(CONFIG_COLS.JOB_TITLES);
-    var priorityOptions = _getConfigList(CONFIG_COLS.SURVEY_PRIORITY_OPTIONS);
+    var QC = SURVEY_QUESTIONS_COLS;
 
-    // Fallback defaults if Config rows not yet populated
+    // Dynamic Config options
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    function _configList(col) {
+      if (!configSheet || !col || col < 1) return [];
+      try {
+        var lr = configSheet.getLastRow();
+        if (lr < 3) return [];
+        return configSheet.getRange(3, col, lr - 2, 1).getValues()
+          .map(function(r) { return String(r[0]).trim(); })
+          .filter(function(v) { return v !== ''; });
+      } catch(e) { return []; }
+    }
+    var worksites       = _configList(CONFIG_COLS.OFFICE_LOCATIONS);
+    var roles           = _configList(CONFIG_COLS.JOB_TITLES);
+    var priorityOptions = _configList(CONFIG_COLS.SURVEY_PRIORITY_OPTIONS);
+
     if (!worksites.length)       worksites       = ['Please add worksites to Config tab'];
     if (!roles.length)           roles           = ['Please add roles to Config tab'];
     if (!priorityOptions.length) priorityOptions = [
@@ -2117,138 +1957,193 @@ function getSurveyQuestions() {
       'Steward Support','Organizing','Other'
     ];
 
-    var shiftOptions   = ['Day','Evening','Night','Rotating/Variable'];
-    var tenureOptions  = ['Less than 1 year','1–3 years','4–7 years','8–15 years','15+ years'];
-    var yesNo          = ['Yes','No'];
-    var SL = 'slider-10';
-    var PARA = 'paragraph';
-    var sl  = { labelMin: 'Strongly Disagree', labelMax: 'Strongly Agree' };
+    // Read all rows from Survey Questions sheet
+    var rawData = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, 16).getValues();
 
-    // ── Question definitions ─────────────────────────────────────────────
-    // col = SATISFACTION_COLS value (1-indexed sheet column)
-    var questions = [
-      // ── Section 1: Work Context ────────────────────────────────────────
-      { id:'q1',  col: SATISFACTION_COLS.Q1_WORKSITE,        text:'What is your worksite / program / region?',          type:'dropdown',    section:'1', sectionKey:'WORK_CONTEXT',   required:true,  options: worksites },
-      { id:'q2',  col: SATISFACTION_COLS.Q2_ROLE,            text:'What is your role / job group?',                    type:'dropdown',    section:'1', sectionKey:'WORK_CONTEXT',   required:true,  options: roles },
-      { id:'q3',  col: SATISFACTION_COLS.Q3_SHIFT,           text:'What shift do you work?',                           type:'radio',       section:'1', sectionKey:'WORK_CONTEXT',   required:true,  options: shiftOptions },
-      { id:'q4',  col: SATISFACTION_COLS.Q4_TIME_IN_ROLE,    text:'How long have you been in your current role?',      type:'radio',       section:'1', sectionKey:'WORK_CONTEXT',   required:true,  options: tenureOptions },
-      { id:'q5',  col: SATISFACTION_COLS.Q5_STEWARD_CONTACT, text:'Have you had contact with a steward in the past 12 months?', type:'radio-branch', section:'1', sectionKey:'WORK_CONTEXT', required:true,  options: yesNo,
-        branchYes:'3A', branchNo:'3B' },
+    var questions  = [];
+    var seenSections = {};
+    var sections   = [];
 
-      // ── Section 2: Overall Satisfaction ───────────────────────────────
-      { id:'q6',  col: SATISFACTION_COLS.Q6_SATISFIED_REP,   text:'I am satisfied with my union representation.',          type:SL, section:'2', sectionKey:'OVERALL_SAT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q7',  col: SATISFACTION_COLS.Q7_TRUST_UNION,     text:'I trust the union to act in members\' best interests.', type:SL, section:'2', sectionKey:'OVERALL_SAT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q8',  col: SATISFACTION_COLS.Q8_FEEL_PROTECTED,  text:'I feel more protected at work because of my union.',    type:SL, section:'2', sectionKey:'OVERALL_SAT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q9',  col: SATISFACTION_COLS.Q9_RECOMMEND,       text:'I would recommend union membership to a coworker.',     type:SL, section:'2', sectionKey:'OVERALL_SAT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
+    rawData.forEach(function(row) {
+      var id         = String(row[QC.QUESTION_ID    - 1] || '').trim();
+      var secNum     = String(row[QC.SECTION_NUM    - 1] || '').trim();
+      var secKey     = String(row[QC.SECTION_KEY    - 1] || '').trim();
+      var secTitle   = String(row[QC.SECTION_TITLE  - 1] || '').trim();
+      var text       = String(row[QC.QUESTION_TEXT  - 1] || '').trim();
+      var type       = String(row[QC.TYPE           - 1] || '').trim().toLowerCase();
+      var required   = String(row[QC.REQUIRED       - 1] || 'Y').trim().toUpperCase() !== 'N';
+      var active     = String(row[QC.ACTIVE         - 1] || 'Y').trim().toUpperCase() !== 'N';
+      var optRaw     = String(row[QC.OPTIONS        - 1] || '').trim();
+      var branchPar  = String(row[QC.BRANCH_PARENT  - 1] || '').trim();
+      var branchVal  = String(row[QC.BRANCH_VALUE   - 1] || '').trim();
+      var branchTgt  = String(row[QC.BRANCH_TARGET  - 1] || '').trim();
+      var maxSel     = parseInt(String(row[QC.MAX_SELECTIONS - 1] || ''), 10) || 0;
+      var slMin      = String(row[QC.SLIDER_MIN     - 1] || 'Strongly Disagree').trim() || 'Strongly Disagree';
+      var slMax      = String(row[QC.SLIDER_MAX     - 1] || 'Strongly Agree').trim()   || 'Strongly Agree';
 
-      // ── Section 3A: Steward Ratings (Q5=Yes only) ─────────────────────
-      { id:'q10', col: SATISFACTION_COLS.Q10_TIMELY_RESPONSE, text:'My steward responded to me in a timely manner.',            type:SL, section:'3A', sectionKey:'STEWARD_3A', required:true,  branchParent:'q5', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q11', col: SATISFACTION_COLS.Q11_TREATED_RESPECT, text:'My steward treated me with respect.',                       type:SL, section:'3A', sectionKey:'STEWARD_3A', required:true,  branchParent:'q5', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q12', col: SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS,'text':'My steward explained my options clearly.',               type:SL, section:'3A', sectionKey:'STEWARD_3A', required:true,  branchParent:'q5', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q13', col: SATISFACTION_COLS.Q13_FOLLOWED_THROUGH, text:'My steward followed through on their commitments.',        type:SL, section:'3A', sectionKey:'STEWARD_3A', required:true,  branchParent:'q5', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q14', col: SATISFACTION_COLS.Q14_ADVOCATED,        text:'My steward advocated effectively on my behalf.',           type:SL, section:'3A', sectionKey:'STEWARD_3A', required:true,  branchParent:'q5', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q15', col: SATISFACTION_COLS.Q15_SAFE_CONCERNS,    text:'I felt safe raising concerns with my steward.',            type:SL, section:'3A', sectionKey:'STEWARD_3A', required:true,  branchParent:'q5', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q16', col: SATISFACTION_COLS.Q16_CONFIDENTIALITY,  text:'My steward handled confidentiality appropriately.',        type:SL, section:'3A', sectionKey:'STEWARD_3A', required:true,  branchParent:'q5', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q17', col: SATISFACTION_COLS.Q17_STEWARD_IMPROVE,  text:'What should stewards do to improve? (optional)',          type:PARA, section:'3A', sectionKey:'STEWARD_3A', required:false, branchParent:'q5', branchValue:'Yes' },
+      if (!id || !text) return; // skip blank rows
 
-      // ── Section 3B: Steward Access (Q5=No only) ────────────────────────
-      { id:'q18', col: SATISFACTION_COLS.Q18_KNOW_CONTACT, text:'I know how to contact a steward or union rep.',   type:SL, section:'3B', sectionKey:'STEWARD_3B', required:true,  branchParent:'q5', branchValue:'No', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q19', col: SATISFACTION_COLS.Q19_CONFIDENT_HELP,'text':'I am confident I would get help if I needed it.', type:SL, section:'3B', sectionKey:'STEWARD_3B', required:true,  branchParent:'q5', branchValue:'No', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q20', col: SATISFACTION_COLS.Q20_EASY_FIND,    text:'It is easy to figure out who to contact.',       type:SL, section:'3B', sectionKey:'STEWARD_3B', required:true,  branchParent:'q5', branchValue:'No', labelMin:sl.labelMin, labelMax:sl.labelMax },
+      // Required questions are always shown even if Active=N in the sheet
+      var effectiveActive = active || required;
 
-      // ── Section 4: Chapter Effectiveness ──────────────────────────────
-      { id:'q21', col: SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES, text:'Union reps understand my workplace issues.',              type:SL, section:'4', sectionKey:'CHAPTER', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q22', col: SATISFACTION_COLS.Q22_CHAPTER_COMM,      text:'Chapter communication is regular and clear.',            type:SL, section:'4', sectionKey:'CHAPTER', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q23', col: SATISFACTION_COLS.Q23_ORGANIZES,         text:'The chapter organizes members effectively.',             type:SL, section:'4', sectionKey:'CHAPTER', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q24', col: SATISFACTION_COLS.Q24_REACH_CHAPTER,     text:'I know how to reach my chapter contact.',                type:SL, section:'4', sectionKey:'CHAPTER', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q25', col: SATISFACTION_COLS.Q25_FAIR_REP,          text:'Representation is fair across roles and shifts.',        type:SL, section:'4', sectionKey:'CHAPTER', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
+      // Resolve options
+      var options = [];
+      if (optRaw === '[Config: Office Locations]') {
+        options = worksites;
+      } else if (optRaw === '[Config: Job Titles]') {
+        options = roles;
+      } else if (optRaw === '[Config: Survey Priority Options]') {
+        options = priorityOptions;
+      } else if (optRaw) {
+        options = optRaw.split('|').map(function(v) { return v.trim(); }).filter(Boolean);
+      }
 
-      // ── Section 5: Local Leadership ────────────────────────────────────
-      { id:'q26', col: SATISFACTION_COLS.Q26_DECISIONS_CLEAR,    text:'Leadership communicates decisions clearly.',            type:SL, section:'5', sectionKey:'LEADERSHIP', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q27', col: SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS, text:'I understand how decisions are made.',                 type:SL, section:'5', sectionKey:'LEADERSHIP', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q28', col: SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE,'text':'The union is transparent about its finances.',        type:SL, section:'5', sectionKey:'LEADERSHIP', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q29', col: SATISFACTION_COLS.Q29_ACCOUNTABLE,        text:'Leadership is accountable to member feedback.',         type:SL, section:'5', sectionKey:'LEADERSHIP', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q30', col: SATISFACTION_COLS.Q30_FAIR_PROCESSES,     text:'Internal union processes feel fair.',                   type:SL, section:'5', sectionKey:'LEADERSHIP', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q31', col: SATISFACTION_COLS.Q31_WELCOMES_OPINIONS,  text:'The union welcomes differing opinions.',                type:SL, section:'5', sectionKey:'LEADERSHIP', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
+      // Build question object (matches webapp expectations)
+      var q = {
+        id:          id,
+        text:        text,
+        type:        type,
+        section:     secNum,
+        sectionKey:  secKey,
+        sectionTitle: secTitle,
+        required:    required,
+        active:      effectiveActive,
+        options:     options,
+        labelMin:    slMin,
+        labelMax:    slMax
+      };
+      if (branchPar) {
+        q.branchParent = branchPar;
+        q.branchValue  = branchVal;
+        if (type === 'radio-branch' && branchTgt) {
+          // For root branch questions (q5, q36), store branch target
+          q.branchYes = (branchVal === 'Yes' || branchVal === '') ? branchTgt : '';
+          q.branchNo  = (branchVal === 'No')                      ? branchTgt : '';
+        }
+      }
+      if (type === 'radio-branch' && !branchPar) {
+        // Root branch question: branchYes/branchNo from Notes or derived
+        // Default derivation from seed: q5→3A/3B, q36→6A/7
+        if (id === 'q5')  { q.branchYes = '3A'; q.branchNo = '3B'; }
+        if (id === 'q36') { q.branchYes = '6A'; q.branchNo = '7';  }
+      }
+      if (maxSel > 0) q.maxSelections = maxSel;
 
-      // ── Section 6: Contract Enforcement ───────────────────────────────
-      { id:'q32', col: SATISFACTION_COLS.Q32_ENFORCES_CONTRACT,   text:'The union enforces our contract effectively.',         type:SL, section:'6', sectionKey:'CONTRACT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q33', col: SATISFACTION_COLS.Q33_REALISTIC_TIMELINES, text:'The union communicates realistic timelines.',          type:SL, section:'6', sectionKey:'CONTRACT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q34', col: SATISFACTION_COLS.Q34_CLEAR_UPDATES,       text:'The union provides clear updates on issues.',          type:SL, section:'6', sectionKey:'CONTRACT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q35', col: SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY,  text:'The union prioritizes frontline working conditions.',  type:SL, section:'6', sectionKey:'CONTRACT', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q36', col: SATISFACTION_COLS.Q36_FILED_GRIEVANCE,  text:'Have you filed a grievance in the past 24 months?', type:'radio-branch', section:'6', sectionKey:'CONTRACT', required:true,  options: yesNo,
-        branchYes:'6A', branchNo:'7' },
+      questions.push(q);
 
-      // ── Section 6A: Representation Process (Q36=Yes only) ─────────────
-      { id:'q37', col: SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS, text:'I understood the steps and timeline of my grievance.',    type:SL, section:'6A', sectionKey:'REPRESENTATION', required:true,  branchParent:'q36', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q38', col: SATISFACTION_COLS.Q38_FELT_SUPPORTED,   text:'I felt supported throughout the grievance process.',     type:SL, section:'6A', sectionKey:'REPRESENTATION', required:true,  branchParent:'q36', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q39', col: SATISFACTION_COLS.Q39_UPDATES_OFTEN,    text:'I received updates often enough during my case.',        type:SL, section:'6A', sectionKey:'REPRESENTATION', required:true,  branchParent:'q36', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q40', col: SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED, text:'The outcome of my grievance feels justified.',          type:SL, section:'6A', sectionKey:'REPRESENTATION', required:true,  branchParent:'q36', branchValue:'Yes', labelMin:sl.labelMin, labelMax:sl.labelMax },
+      // Build sections list (unique, in order of first appearance)
+      if (secKey && !seenSections[secKey]) {
+        seenSections[secKey] = true;
+        sections.push({ key: secKey, number: secNum, title: secTitle });
+      }
+    });
 
-      // ── Section 7: Communication Quality ──────────────────────────────
-      { id:'q41', col: SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE, text:'Union communications are clear and actionable.',           type:SL, section:'7', sectionKey:'COMMUNICATION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q42', col: SATISFACTION_COLS.Q42_ENOUGH_INFO,      text:'I receive enough information from the union.',             type:SL, section:'7', sectionKey:'COMMUNICATION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q43', col: SATISFACTION_COLS.Q43_FIND_EASILY,      text:'I can find information from the union easily.',            type:SL, section:'7', sectionKey:'COMMUNICATION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q44', col: SATISFACTION_COLS.Q44_ALL_SHIFTS,       text:'Communications reach members on all shifts and locations.',type:SL, section:'7', sectionKey:'COMMUNICATION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q45', col: SATISFACTION_COLS.Q45_MEETINGS_WORTH,   text:'Union meetings are worth attending.',                      type:SL, section:'7', sectionKey:'COMMUNICATION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-
-      // ── Section 8: Member Voice & Culture ─────────────────────────────
-      { id:'q46', col: SATISFACTION_COLS.Q46_VOICE_MATTERS, text:'My voice matters in this union.',                         type:SL, section:'8', sectionKey:'MEMBER_VOICE', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q47', col: SATISFACTION_COLS.Q47_SEEKS_INPUT,   text:'The union actively seeks member input.',                  type:SL, section:'8', sectionKey:'MEMBER_VOICE', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q48', col: SATISFACTION_COLS.Q48_DIGNITY,       text:'Members are treated with dignity by union leadership.',   type:SL, section:'8', sectionKey:'MEMBER_VOICE', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q49', col: SATISFACTION_COLS.Q49_NEWER_SUPPORTED,'text':'Newer members are well-supported.',                    type:SL, section:'8', sectionKey:'MEMBER_VOICE', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q50', col: SATISFACTION_COLS.Q50_CONFLICT_RESPECT,'text':'Internal conflicts are handled respectfully.',        type:SL, section:'8', sectionKey:'MEMBER_VOICE', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-
-      // ── Section 9: Value & Collective Action ──────────────────────────
-      { id:'q51', col: SATISFACTION_COLS.Q51_GOOD_VALUE,       text:'Union membership provides good value for my dues.',  type:SL, section:'9', sectionKey:'VALUE_ACTION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q52', col: SATISFACTION_COLS.Q52_PRIORITIES_NEEDS, text:'The union\'s priorities reflect member needs.',       type:SL, section:'9', sectionKey:'VALUE_ACTION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q53', col: SATISFACTION_COLS.Q53_PREPARED_MOBILIZE,'text':'The union is prepared to mobilize when needed.',    type:SL, section:'9', sectionKey:'VALUE_ACTION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q54', col: SATISFACTION_COLS.Q54_HOW_INVOLVED,     text:'I understand how to get more involved.',             type:SL, section:'9', sectionKey:'VALUE_ACTION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q55', col: SATISFACTION_COLS.Q55_WIN_TOGETHER,     text:'Acting together, we can win real improvements.',     type:SL, section:'9', sectionKey:'VALUE_ACTION', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-
-      // ── Section 10: Scheduling / Office Days ──────────────────────────
-      { id:'q56', col: SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES, text:'I understand proposed scheduling/office day changes.', type:SL, section:'10', sectionKey:'SCHEDULING', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q57', col: SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED,'text':'I am adequately informed about scheduling decisions.', type:SL, section:'10', sectionKey:'SCHEDULING', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q58', col: SATISFACTION_COLS.Q58_CLEAR_CRITERIA,     text:'Scheduling decisions use clear and fair criteria.',   type:SL, section:'10', sectionKey:'SCHEDULING', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q59', col: SATISFACTION_COLS.Q59_WORK_EXPECTATIONS,  text:'My work can reasonably be done under current expectations.', type:SL, section:'10', sectionKey:'SCHEDULING', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q60', col: SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES, text:'The current scheduling approach supports effective outcomes.', type:SL, section:'10', sectionKey:'SCHEDULING', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q61', col: SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING, text:'The scheduling approach supports my wellbeing.',       type:SL, section:'10', sectionKey:'SCHEDULING', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q62', col: SATISFACTION_COLS.Q62_CONCERNS_SERIOUS,   text:'My scheduling concerns would be taken seriously.',    type:SL, section:'10', sectionKey:'SCHEDULING', required:true, labelMin:sl.labelMin, labelMax:sl.labelMax },
-      { id:'q63', col: SATISFACTION_COLS.Q63_SCHEDULING_CHALLENGE,'text':'What is your biggest scheduling challenge? (optional)', type:PARA, section:'10', sectionKey:'SCHEDULING', required:false },
-
-      // ── Section 11: Priorities & Close ────────────────────────────────
-      { id:'q64', col: SATISFACTION_COLS.Q64_TOP_PRIORITIES, text:'Select your top 3 union priorities for the next 6–12 months.', type:'checkbox', section:'11', sectionKey:'PRIORITIES', required:true,  options: priorityOptions, maxSelections: 3 },
-      { id:'q65', col: SATISFACTION_COLS.Q65_ONE_CHANGE,     text:'The #1 change you want the union to make.',              type:PARA, section:'11', sectionKey:'PRIORITIES', required:true  },
-      { id:'q66', col: SATISFACTION_COLS.Q66_KEEP_DOING,     text:'One thing the union should keep doing.',                 type:PARA, section:'11', sectionKey:'PRIORITIES', required:true  },
-      { id:'q67', col: SATISFACTION_COLS.Q67_ADDITIONAL,     text:'Additional comments — please do not include names.',     type:PARA, section:'11', sectionKey:'PRIORITIES', required:false }
-    ];
-
-    var sections = [
-      { key:'WORK_CONTEXT',   number:'1',  title:'Work Context' },
-      { key:'OVERALL_SAT',    number:'2',  title:'Overall Satisfaction' },
-      { key:'STEWARD_3A',     number:'3A', title:'Steward Experience (if you had contact)' },
-      { key:'STEWARD_3B',     number:'3B', title:'Steward Access (if you had no contact)' },
-      { key:'CHAPTER',        number:'4',  title:'Chapter Effectiveness' },
-      { key:'LEADERSHIP',     number:'5',  title:'Local Leadership' },
-      { key:'CONTRACT',       number:'6',  title:'Contract Enforcement' },
-      { key:'REPRESENTATION', number:'6A', title:'Representation Process (if you filed a grievance)' },
-      { key:'COMMUNICATION',  number:'7',  title:'Communication Quality' },
-      { key:'MEMBER_VOICE',   number:'8',  title:'Member Voice & Culture' },
-      { key:'VALUE_ACTION',   number:'9',  title:'Value & Collective Action' },
-      { key:'SCHEDULING',     number:'10', title:'Scheduling & Office Days' },
-      { key:'PRIORITIES',     number:'11', title:'Priorities & Closing Thoughts' }
-    ];
-
-    return {
-      questions: questions,
-      sections: sections,
+    var result = {
+      questions:   questions,
+      sections:    sections,
       sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' },
-      period: getSurveyPeriod()
+      period:      getSurveyPeriod()
     };
 
-  } catch (e) {
+    // Cache 5 minutes
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(result), 300); } catch(_ce) {}
+
+    return result;
+
+  } catch(e) {
     Logger.log('getSurveyQuestions error: ' + e.message);
     return { questions: [], sections: [], sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' }, period: null };
+  }
+}
+
+// ── Satisfaction sheet column map (runtime, cached) ─────────────────────────
+
+/**
+ * Returns a map of header → 1-indexed column number for the Satisfaction sheet.
+ * Covers fixed prefix ('Timestamp', 'Period ID', 'Survey Version') + all question IDs (q1, q2…).
+ * Cached for 5 minutes. Invalidated by syncSatisfactionSheetColumns_() and clearSurveyQuestionsCache().
+ *
+ * @returns {Object} e.g. { 'Timestamp': 1, 'Period ID': 2, 'q1': 4, 'q2': 5, … }
+ */
+function getSatisfactionColMap_() {
+  var CACHE_KEY = 'satisfactionColMap_v1';
+  try {
+    var cached = CacheService.getScriptCache().get(CACHE_KEY);
+    if (cached) return JSON.parse(cached);
+  } catch(_ce) {}
+
+  try {
+    var satSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SATISFACTION);
+    if (!satSheet || satSheet.getLastColumn() < 1) return {};
+
+    var headers = satSheet.getRange(1, 1, 1, satSheet.getLastColumn()).getValues()[0];
+    var map = {};
+    headers.forEach(function(h, i) {
+      var key = String(h || '').trim();
+      if (key) map[key] = i + 1;
+    });
+
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(map), 300); } catch(_ce) {}
+    return map;
+
+  } catch(e) {
+    Logger.log('getSatisfactionColMap_ error: ' + e.message);
+    return {};
+  }
+}
+
+/**
+ * Ensures all active questions have a corresponding column in the Satisfaction sheet.
+ * Appends any missing question ID columns to the right. Never removes or moves columns.
+ * Invalidates the col map cache after adding columns.
+ *
+ * @param {Array} activeQuestions - Array of question objects from getSurveyQuestions()
+ * @returns {Object} Updated col map
+ */
+function syncSatisfactionSheetColumns_(activeQuestions) {
+  try {
+    var ss       = SpreadsheetApp.getActiveSpreadsheet();
+    var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+    if (!satSheet) return {};
+
+    // Ensure header row exists
+    if (satSheet.getLastRow() < 1 || satSheet.getLastColumn() < 1) {
+      // Sheet empty — rebuild via createSatisfactionSheet
+      createSatisfactionSheet(ss);
+      return getSatisfactionColMap_();
+    }
+
+    var colMap = getSatisfactionColMap_();
+
+    // Find questions missing from the sheet
+    var missing = (activeQuestions || []).filter(function(q) {
+      return q && q.id && !colMap[q.id];
+    });
+
+    if (missing.length === 0) return colMap;
+
+    // Append missing question ID headers
+    var nextCol = satSheet.getLastColumn() + 1;
+    missing.forEach(function(q) {
+      satSheet.getRange(1, nextCol)
+        .setValue(q.id)
+        .setFontWeight('bold')
+        .setBackground('#1a73e8')
+        .setFontColor('#ffffff');
+      satSheet.setColumnWidth(nextCol, 55);
+      colMap[q.id] = nextCol;
+      nextCol++;
+    });
+
+    // Invalidate cache so next call re-reads the updated headers
+    try { CacheService.getScriptCache().remove('satisfactionColMap_v1'); } catch(_ce) {}
+
+    Logger.log('syncSatisfactionSheetColumns_: Added ' + missing.length + ' column(s): ' + missing.map(function(q){return q.id;}).join(', '));
+    return colMap;
+
+  } catch(e) {
+    Logger.log('syncSatisfactionSheetColumns_ error: ' + e.message);
+    return getSatisfactionColMap_();
   }
 }
 
@@ -2266,12 +2161,28 @@ function getSurveyQuestions() {
  * @param {Object} responses   - { q1: val, q2: val, ... q67: val }
  * @returns {Object} { success: bool, message: string }
  */
+/**
+ * Submits an in-app satisfaction survey response.
+ *
+ * ANONYMITY MODEL:
+ *   - email resolved server-side from GAS Session — never sent from client
+ *   - email hashed with hashForVault_() — raw value never persisted
+ *   - Satisfaction sheet row: Timestamp + question ID columns only (zero PII)
+ *   - _Survey_Vault: hashed email + hashed member ID + period ID
+ *   - _Survey_Tracking: completion status only (no answers)
+ *
+ * v4.23.0: Row built dynamically via getSatisfactionColMap_() — no hardcoded positions.
+ *
+ * @param {string} callerEmail - Raw email from _resolveCallerEmail() (server-side only)
+ * @param {Object} responses   - { q1: val, q2: val, ... qN: val }
+ * @returns {Object} { success: bool, message: string }
+ */
 function submitSurveyResponse(callerEmail, responses) {
   if (!callerEmail || !responses) return { success: false, message: 'Not authenticated.' };
 
   return withScriptLock_(function() {
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss       = SpreadsheetApp.getActiveSpreadsheet();
       var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
       if (!satSheet) return { success: false, message: 'Survey sheet not found.' };
 
@@ -2281,9 +2192,9 @@ function submitSurveyResponse(callerEmail, responses) {
         return { success: false, message: 'No survey is currently open. Check back next quarter.' };
       }
 
-      // ── Hash email in-memory — raw value used only for tracking update below ──
-      var emailHash   = hashForVault_(callerEmail);
-      var periodId    = period.periodId;
+      // ── Hash email in-memory ─────────────────────────────────────────
+      var emailHash = hashForVault_(callerEmail);
+      var periodId  = period.periodId;
 
       // ── Vault duplicate check (period-scoped) ─────────────────────────
       var vaultSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT);
@@ -2292,114 +2203,70 @@ function submitSurveyResponse(callerEmail, responses) {
           2, 1, vaultSheet.getLastRow() - 1, vaultSheet.getLastColumn()
         ).getValues();
         for (var v = 0; v < vaultData.length; v++) {
-          var vHash    = String(vaultData[v][SURVEY_VAULT_COLS.EMAIL - 1]           || '');
-          var vPeriod  = String(vaultData[v][SURVEY_VAULT_COLS.QUARTER - 1]         || '');
-          var vLatest  = String(vaultData[v][SURVEY_VAULT_COLS.IS_LATEST - 1]       || '');
+          var vHash   = String(vaultData[v][SURVEY_VAULT_COLS.EMAIL   - 1] || '');
+          var vPeriod = String(vaultData[v][SURVEY_VAULT_COLS.QUARTER - 1] || '');
+          var vLatest = String(vaultData[v][SURVEY_VAULT_COLS.IS_LATEST - 1] || '');
           if (vHash === emailHash && vPeriod === periodId && vLatest !== 'Superseded') {
             return { success: false, message: 'You have already submitted a response for this survey period.' };
           }
         }
       }
 
-      // ── Build response row (Timestamp + 67 question columns) ─────────
-      // Column order matches SATISFACTION_COLS exactly.
-      // Unanswered conditional questions (branch not taken) → empty string.
-      // Numeric slider values clamped to 1-10.
+      // ── Get active questions + sync columns ───────────────────────────
+      var questionsData = getSurveyQuestions();
+      var allQuestions  = questionsData.questions || [];
+      var activeQs      = allQuestions.filter(function(q) { return q.active; });
+      var colMap        = syncSatisfactionSheetColumns_(activeQs);
+
+      // ── Value sanitizers ─────────────────────────────────────────────
       function _num(val) {
         var n = parseInt(val, 10);
         if (isNaN(n)) return '';
         return Math.min(10, Math.max(1, n));
       }
       function _txt(val) {
-        // Prevent formula injection per CR-FORMULA
         var s = String(val || '').trim();
-        if (s.charAt(0) === '=') s = "'" + s;
-        return s.substring(0, 3000); // cap free-text at 3k chars
+        if (s.charAt(0) === '=') s = "'" + s; // formula injection guard
+        return s.substring(0, 3000);
       }
       function _csv(val) {
-        // Checkbox: accept array or comma string
         if (Array.isArray(val)) return _txt(val.join(', '));
         return _txt(val);
       }
 
-      var r = responses;
-      var row = [
-        new Date(),                                    // A - Timestamp
-        _txt(r.q1),                                    // B - Q1 Worksite
-        _txt(r.q2),                                    // C - Q2 Role
-        _txt(r.q3),                                    // D - Q3 Shift
-        _txt(r.q4),                                    // E - Q4 Tenure
-        _txt(r.q5),                                    // F - Q5 Steward contact (branch)
-        _num(r.q6),                                    // G - Q6
-        _num(r.q7),                                    // H - Q7
-        _num(r.q8),                                    // I - Q8
-        _num(r.q9),                                    // J - Q9
-        _num(r.q10),                                   // K - Q10 (3A)
-        _num(r.q11),                                   // L
-        _num(r.q12),                                   // M
-        _num(r.q13),                                   // N
-        _num(r.q14),                                   // O
-        _num(r.q15),                                   // P
-        _num(r.q16),                                   // Q
-        _txt(r.q17),                                   // R - Q17 paragraph
-        _num(r.q18),                                   // S - Q18 (3B)
-        _num(r.q19),                                   // T
-        _num(r.q20),                                   // U
-        _num(r.q21),                                   // V - Q21 (Chapter)
-        _num(r.q22),                                   // W
-        _num(r.q23),                                   // X
-        _num(r.q24),                                   // Y
-        _num(r.q25),                                   // Z
-        _num(r.q26),                                   // AA - Q26 (Leadership)
-        _num(r.q27),                                   // AB
-        _num(r.q28),                                   // AC
-        _num(r.q29),                                   // AD
-        _num(r.q30),                                   // AE
-        _num(r.q31),                                   // AF
-        _num(r.q32),                                   // AG - Q32 (Contract)
-        _num(r.q33),                                   // AH
-        _num(r.q34),                                   // AI
-        _num(r.q35),                                   // AJ
-        _txt(r.q36),                                   // AK - Q36 grievance branch
-        _num(r.q37),                                   // AL - Q37 (6A)
-        _num(r.q38),                                   // AM
-        _num(r.q39),                                   // AN
-        _num(r.q40),                                   // AO
-        _num(r.q41),                                   // AP - Q41 (Comm)
-        _num(r.q42),                                   // AQ
-        _num(r.q43),                                   // AR
-        _num(r.q44),                                   // AS
-        _num(r.q45),                                   // AT
-        _num(r.q46),                                   // AU - Q46 (Voice)
-        _num(r.q47),                                   // AV
-        _num(r.q48),                                   // AW
-        _num(r.q49),                                   // AX
-        _num(r.q50),                                   // AY
-        _num(r.q51),                                   // AZ - Q51 (Value)
-        _num(r.q52),                                   // BA
-        _num(r.q53),                                   // BB
-        _num(r.q54),                                   // BC
-        _num(r.q55),                                   // BD
-        _num(r.q56),                                   // BE - Q56 (Scheduling)
-        _num(r.q57),                                   // BF
-        _num(r.q58),                                   // BG
-        _num(r.q59),                                   // BH
-        _num(r.q60),                                   // BI
-        _num(r.q61),                                   // BJ
-        _num(r.q62),                                   // BK
-        _txt(r.q63),                                   // BL - Q63 paragraph
-        _csv(r.q64),                                   // BM - Q64 checkboxes
-        _txt(r.q65),                                   // BN - Q65 paragraph
-        _txt(r.q66),                                   // BO - Q66 paragraph
-        _txt(r.q67)                                    // BP - Q67 paragraph
-      ];
+      // ── Build response row (sparse array, sized to last column) ────────
+      var totalCols = satSheet.getLastColumn();
+      var row = new Array(totalCols).fill('');
+
+      // Fixed prefix
+      var tsCol = colMap['Timestamp'];
+      var piCol = colMap['Period ID'];
+      var svCol = colMap['Survey Version'];
+      if (tsCol) row[tsCol - 1] = new Date();
+      if (piCol) row[piCol - 1] = periodId;
+      if (svCol) row[svCol - 1] = periodId + '-v' + questionsData.questions.length;
+
+      // Dynamic question columns
+      activeQs.forEach(function(q) {
+        var col = colMap[q.id];
+        if (!col || responses[q.id] === undefined) return;
+        var type = q.type;
+        var val;
+        if (type === 'slider-10') {
+          val = _num(responses[q.id]);
+        } else if (type === 'checkbox') {
+          val = _csv(responses[q.id]);
+        } else {
+          val = _txt(responses[q.id]);
+        }
+        row[col - 1] = val;
+      });
 
       satSheet.appendRow(row);
       var newResponseRow = satSheet.getLastRow();
 
       // ── Write vault entry (hashed PII only) ──────────────────────────
       if (vaultSheet) {
-        // Attempt member ID lookup (in-memory only — not stored in Satisfaction sheet)
         var memberId = '';
         try {
           var memberSheet = ss.getSheetByName(SHEETS.MEMBERS);
@@ -2416,18 +2283,18 @@ function submitSurveyResponse(callerEmail, responses) {
               }
             }
           }
-        } catch(ex) { /* vault entry written without member ID hash */ }
+        } catch(ex) {}
 
         var memberIdHash = memberId ? hashForVault_(memberId) : '';
         var vaultRow = new Array(8).fill('');
-        vaultRow[SURVEY_VAULT_COLS.RESPONSE_ROW - 1]     = newResponseRow;
-        vaultRow[SURVEY_VAULT_COLS.EMAIL - 1]             = emailHash;
-        vaultRow[SURVEY_VAULT_COLS.VERIFIED - 1]          = 'Yes';
+        vaultRow[SURVEY_VAULT_COLS.RESPONSE_ROW     - 1] = newResponseRow;
+        vaultRow[SURVEY_VAULT_COLS.EMAIL            - 1] = emailHash;
+        vaultRow[SURVEY_VAULT_COLS.VERIFIED         - 1] = 'Yes';
         vaultRow[SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] = memberIdHash;
-        vaultRow[SURVEY_VAULT_COLS.QUARTER - 1]           = periodId;
-        vaultRow[SURVEY_VAULT_COLS.IS_LATEST - 1]         = 'Latest';
-        vaultRow[SURVEY_VAULT_COLS.SUPERSEDED_BY - 1]     = '';
-        vaultRow[SURVEY_VAULT_COLS.REVIEWER_NOTES - 1]    = '';
+        vaultRow[SURVEY_VAULT_COLS.QUARTER          - 1] = periodId;
+        vaultRow[SURVEY_VAULT_COLS.IS_LATEST        - 1] = 'Latest';
+        vaultRow[SURVEY_VAULT_COLS.SUPERSEDED_BY    - 1] = '';
+        vaultRow[SURVEY_VAULT_COLS.REVIEWER_NOTES   - 1] = '';
         vaultSheet.appendRow(vaultRow);
       }
 
@@ -2441,29 +2308,136 @@ function submitSurveyResponse(callerEmail, responses) {
           if (tEmail === callerNorm) {
             var tLastCol = trackSheet.getLastColumn();
             var tRow = trackSheet.getRange(t + 1, 1, 1, tLastCol).getValues()[0];
-            tRow[SURVEY_TRACKING_COLS.CURRENT_STATUS   - 1] = 'Completed';
-            tRow[SURVEY_TRACKING_COLS.COMPLETED_DATE   - 1] = new Date();
-            tRow[SURVEY_TRACKING_COLS.TOTAL_COMPLETED  - 1] = (parseInt(tRow[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1], 10) || 0) + 1;
+            tRow[SURVEY_TRACKING_COLS.CURRENT_STATUS  - 1] = 'Completed';
+            tRow[SURVEY_TRACKING_COLS.COMPLETED_DATE  - 1] = new Date();
+            tRow[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1] = (parseInt(tRow[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1], 10) || 0) + 1;
             trackSheet.getRange(t + 1, 1, 1, tLastCol).setValues([tRow]);
             break;
           }
         }
       }
 
-      // ── Update period response count ───────────────────────────────────
+      // ── Update period response count + invalidate summary cache ────────
       try { incrementPeriodResponseCount_(periodId); } catch(ex) {}
-
-      // ── Invalidate satisfaction summary cache ─────────────────────────
-      try {
-        CacheService.getScriptCache().remove('satisfactionSummary_' + periodId);
-      } catch(ex) {}
+      try { CacheService.getScriptCache().remove('satisfactionSummary_' + periodId); } catch(ex) {}
 
       return { success: true, message: 'Thank you — your anonymous response has been recorded.' };
 
-    } catch (e) {
+    } catch(e) {
       Logger.log('submitSurveyResponse error: ' + e.message + '\n' + (e.stack || ''));
       return { success: false, message: 'Error submitting survey. Please try again.' };
     }
   }, 30);
 }
 
+
+// ============================================================================
+// SATISFACTION COLS COMPATIBILITY SHIM — v4.23.1
+// ============================================================================
+
+/**
+ * Returns a SATISFACTION_COLS-compatible object backed by the live Satisfaction
+ * sheet header→col map. Any function that reads SATISFACTION_COLS positionally
+ * should shadow the global at function entry:
+ *
+ *   var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+ *
+ * Q-keys map to their dynamic column positions (1-indexed).
+ * AVG_* and SUMMARY_START return 0 — these are no longer pre-computed in the sheet.
+ *   Callers that guard with `if (summaryStart > 0)` are safe; callers that write
+ *   to `sheet.getRange(..., summaryStart)` must add that guard.
+ *
+ * @param {Object} colMap - from getSatisfactionColMap_()
+ * @returns {Object} SATISFACTION_COLS-compatible map
+ */
+function buildSatisfactionColsShim_(colMap) {
+  colMap = colMap || {};
+  function c(key) { return colMap[key] || 0; }
+  return {
+    // Fixed prefix (v4.23.0)
+    TIMESTAMP:      c('Timestamp'),
+    // Question columns — keyed by question ID
+    Q1_WORKSITE:               c('q1'),
+    Q2_ROLE:                   c('q2'),
+    Q3_SHIFT:                  c('q3'),
+    Q4_TIME_IN_ROLE:           c('q4'),
+    Q5_STEWARD_CONTACT:        c('q5'),
+    Q6_SATISFIED_REP:          c('q6'),
+    Q7_TRUST_UNION:            c('q7'),
+    Q8_FEEL_PROTECTED:         c('q8'),
+    Q9_RECOMMEND:              c('q9'),
+    Q10_TIMELY_RESPONSE:       c('q10'),
+    Q11_TREATED_RESPECT:       c('q11'),
+    Q12_EXPLAINED_OPTIONS:     c('q12'),
+    Q13_FOLLOWED_THROUGH:      c('q13'),
+    Q14_ADVOCATED:             c('q14'),
+    Q15_SAFE_CONCERNS:         c('q15'),
+    Q16_CONFIDENTIALITY:       c('q16'),
+    Q17_STEWARD_IMPROVE:       c('q17'),
+    Q18_KNOW_CONTACT:          c('q18'),
+    Q19_CONFIDENT_HELP:        c('q19'),
+    Q20_EASY_FIND:             c('q20'),
+    Q21_UNDERSTAND_ISSUES:     c('q21'),
+    Q22_CHAPTER_COMM:          c('q22'),
+    Q23_ORGANIZES:             c('q23'),
+    Q24_REACH_CHAPTER:         c('q24'),
+    Q25_FAIR_REP:              c('q25'),
+    Q26_DECISIONS_CLEAR:       c('q26'),
+    Q27_UNDERSTAND_PROCESS:    c('q27'),
+    Q28_TRANSPARENT_FINANCE:   c('q28'),
+    Q29_ACCOUNTABLE:           c('q29'),
+    Q30_FAIR_PROCESSES:        c('q30'),
+    Q31_WELCOMES_OPINIONS:     c('q31'),
+    Q32_ENFORCES_CONTRACT:     c('q32'),
+    Q33_REALISTIC_TIMELINES:   c('q33'),
+    Q34_CLEAR_UPDATES:         c('q34'),
+    Q35_FRONTLINE_PRIORITY:    c('q35'),
+    Q36_FILED_GRIEVANCE:       c('q36'),
+    Q37_UNDERSTOOD_STEPS:      c('q37'),
+    Q38_FELT_SUPPORTED:        c('q38'),
+    Q39_UPDATES_OFTEN:         c('q39'),
+    Q40_OUTCOME_JUSTIFIED:     c('q40'),
+    Q41_CLEAR_ACTIONABLE:      c('q41'),
+    Q42_ENOUGH_INFO:           c('q42'),
+    Q43_FIND_EASILY:           c('q43'),
+    Q44_ALL_SHIFTS:            c('q44'),
+    Q45_MEETINGS_WORTH:        c('q45'),
+    Q46_VOICE_MATTERS:         c('q46'),
+    Q47_SEEKS_INPUT:           c('q47'),
+    Q48_DIGNITY:               c('q48'),
+    Q49_NEWER_SUPPORTED:       c('q49'),
+    Q50_CONFLICT_RESPECT:      c('q50'),
+    Q51_GOOD_VALUE:            c('q51'),
+    Q52_PRIORITIES_NEEDS:      c('q52'),
+    Q53_PREPARED_MOBILIZE:     c('q53'),
+    Q54_HOW_INVOLVED:          c('q54'),
+    Q55_WIN_TOGETHER:          c('q55'),
+    Q56_UNDERSTAND_CHANGES:    c('q56'),
+    Q57_ADEQUATELY_INFORMED:   c('q57'),
+    Q58_CLEAR_CRITERIA:        c('q58'),
+    Q59_WORK_EXPECTATIONS:     c('q59'),
+    Q60_EFFECTIVE_OUTCOMES:    c('q60'),
+    Q61_SUPPORTS_WELLBEING:    c('q61'),
+    Q62_CONCERNS_SERIOUS:      c('q62'),
+    Q63_SCHEDULING_CHALLENGE:  c('q63'),
+    Q64_TOP_PRIORITIES:        c('q64'),
+    Q65_ONE_CHANGE:            c('q65'),
+    Q66_KEEP_DOING:            c('q66'),
+    Q67_ADDITIONAL:            c('q67'),
+    // Summary/AVG columns — removed in v4.23.0 dynamic schema.
+    // All return 0. Callers must guard: if (summaryStart > 0) { ... }
+    // Use getSatisfactionSummary() for computed section averages.
+    SUMMARY_START:         0,
+    AVG_OVERALL_SAT:       0,
+    AVG_STEWARD_RATING:    0,
+    AVG_STEWARD_ACCESS:    0,
+    AVG_CHAPTER:           0,
+    AVG_LEADERSHIP:        0,
+    AVG_CONTRACT:          0,
+    AVG_REPRESENTATION:    0,
+    AVG_COMMUNICATION:     0,
+    AVG_MEMBER_VOICE:      0,
+    AVG_VALUE_ACTION:      0,
+    AVG_SCHEDULING:        0
+  };
+}

@@ -506,6 +506,7 @@ var WeeklyQuestions = (function () {
     getPoolCount:             getPoolCount,
     getPollFrequency:         getPollFrequency,
     setPollFrequency:         setPollFrequency,
+    Q_COLS:                   Q_COLS,  // v4.24.4 — exposed so autoSelectCommunityPoll avoids duplicating indices
   };
 
 })();
@@ -515,56 +516,77 @@ var WeeklyQuestions = (function () {
 // GLOBAL WRAPPERS
 // ═══════════════════════════════════════
 
-function wqGetActiveQuestions() {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
+function wqGetActiveQuestions(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
   return e ? WeeklyQuestions.getActiveQuestions(e) : { questions: [] };
 }
 
-function wqSubmitResponse(ignoredEmail, questionId, response) {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
+function wqSubmitResponse(sessionToken, questionId, response) {
+  var e = _resolveCallerEmail(sessionToken);
   return e ? WeeklyQuestions.submitResponse(e, questionId, response) : { success: false, message: 'Not authenticated.' };
 }
 
 // v4.23.0: options param added (array of 2–5 strings)
-function wqSetStewardQuestion(ignoredEmail, text, options) {
-  var e = _requireStewardAuth();
+function wqSetStewardQuestion(sessionToken, text, options) {
+  var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
   return WeeklyQuestions.setStewardQuestion(e, text, options);
 }
 
-function wqSubmitPoolQuestion(ignoredEmail, text, options) {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
+function wqSubmitPoolQuestion(sessionToken, text, options) {
+  var e = _resolveCallerEmail(sessionToken);
   return e ? WeeklyQuestions.submitPoolQuestion(e, text, options) : { success: false, message: 'Not authenticated.' };
 }
 
-function wqClosePoll(ignoredEmail, pollId) {
-  var e = _requireStewardAuth();
+function wqClosePoll(sessionToken, pollId) {
+  var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
   return WeeklyQuestions.closePoll(e, pollId);
 }
 
-function wqGetHistory(ignoredEmail, page, pageSize) {
-  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_e) {}
+function wqGetHistory(sessionToken, page, pageSize) {
+  var e = _resolveCallerEmail(sessionToken);
   return e ? WeeklyQuestions.getHistory(e, page, pageSize) : { questions: [], hasMore: false };
 }
 
 function wqGetPoolCount() { return WeeklyQuestions.getPoolCount(); }
 function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
 function wqGetPollFrequency() { return WeeklyQuestions.getPollFrequency(); }
-function wqSetPollFrequency(ignoredEmail, freq) {
-  var e = _requireStewardAuth();
+function wqSetPollFrequency(sessionToken, freq) {
+  var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
   return WeeklyQuestions.setPollFrequency(e, freq);
+}
+
+/**
+ * v4.24.2 — Steward-triggered community poll draw.
+ * Bypasses the day-of-week checks in autoSelectCommunityPoll so stewards
+ * can release the community poll manually without waiting for the Monday trigger.
+ * Steward-only. Calls selectRandomPoolQuestion() directly.
+ * Returns { success, message, questionId?, text? }
+ */
+function wqManualDrawCommunityPoll(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Steward access required.' };
+  try {
+    var result = WeeklyQuestions.selectRandomPoolQuestion();
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('POLL_COMMUNITY_MANUAL_DRAW', { steward: e, result: result.success ? 'ok' : 'failed' });
+    }
+    return result;
+  } catch (err) {
+    return { success: false, message: 'Draw failed: ' + err.message };
+  }
 }
 
 // Time trigger — runs every Monday but internally respects frequency.
 // For biweekly/monthly, it checks whether the period has actually changed
 // before drawing a new community poll (avoids drawing on off-weeks).
+// v4.24.3: Also skips if a community poll was already manually drawn this period.
 function autoSelectCommunityPoll() {
   try {
     var freq = WeeklyQuestions.getPollFrequency();
     var today = new Date();
-    var dayOfWeek = today.getDay(); // 0=Sun, 1=Mon
 
     // Biweekly: only draw on even-week Mondays
     if (freq === 'biweekly') {
@@ -576,11 +598,49 @@ function autoSelectCommunityPoll() {
       }
     }
 
-    // Monthly: only draw on the 1st of the month (trigger fires daily at start of month range)
+    // Monthly: only draw on the 1st of the month
     if (freq === 'monthly') {
       if (today.getDate() !== 1) {
         Logger.log('autoSelectCommunityPoll: monthly — not the 1st, skipping draw.');
         return;
+      }
+    }
+
+    // v4.24.3: Skip if a community poll already exists and is active for this period.
+    // Prevents the trigger from overwriting a poll that was manually released by a steward.
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) {
+      var qSheet = ss.getSheetByName(SHEETS.WEEKLY_QUESTIONS);
+      if (qSheet && qSheet.getLastRow() > 1) {
+        // Derive current period key (Monday of this week, or period start per frequency)
+        var d = new Date(today); d.setHours(0, 0, 0, 0);
+        var day = d.getDay();
+        var periodStart = new Date(d);
+        if (freq === 'monthly') {
+          periodStart = new Date(d.getFullYear(), d.getMonth(), 1);
+        } else {
+          periodStart.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); // Monday
+          if (freq === 'biweekly') {
+            var jan4b = new Date(periodStart.getFullYear(), 0, 4);
+            var wn = Math.ceil(((periodStart - jan4b) / 86400000 + jan4b.getDay() + 1) / 7);
+            if (wn % 2 !== 0) periodStart.setDate(periodStart.getDate() - 7);
+          }
+        }
+        var thisPeriod = periodStart.toISOString().split('T')[0];
+
+        var rows = qSheet.getDataRange().getValues();
+        // Use WeeklyQuestions.Q_COLS — single source of truth, no duplicated indices.
+        var qc = WeeklyQuestions.Q_COLS;
+        for (var i = 1; i < rows.length; i++) {
+          var wk = rows[i][qc.WEEK_START];
+          if (wk instanceof Date) wk = wk.toISOString().split('T')[0];
+          var src    = String(rows[i][qc.SOURCE]);
+          var active = String(rows[i][qc.ACTIVE]).toLowerCase();
+          if (String(wk) === thisPeriod && src === 'community' && (active === 'true' || active === 'yes' || active === '1')) {
+            Logger.log('autoSelectCommunityPoll: community poll already active for period ' + thisPeriod + ' — skipping draw.');
+            return;
+          }
+        }
       }
     }
 

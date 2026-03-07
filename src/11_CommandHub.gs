@@ -945,7 +945,7 @@ function applyConfigSectionColors() {
     { name: 'Contract & Legal', startCol: CC.CONTRACT_WORKLOAD || 33, endCol: CC.CONTRACT_NAME || 36, color: '#f1f8e9' }, // Light Light Green
     { name: 'Org Identity', startCol: CC.UNION_PARENT || 37, endCol: CC.ORG_WEBSITE || 39, color: '#eceff1' },      // Light Blue Grey
     { name: 'Extended Contact', startCol: CC.OFFICE_ADDRESSES || 40, endCol: CC.MAIN_CONTACT_EMAIL || 43, color: '#ede7f6' }, // Light Deep Purple
-    { name: 'Form Links', startCol: CC.SATISFACTION_FORM_URL || 44, endCol: CC.SATISFACTION_FORM_URL || 44, color: '#e1f5fe' }, // Light Light Blue
+    // 'Form Links' section removed v4.22.7 — SATISFACTION_FORM_URL deprecated; only Grievance + Contact form URLs remain (colored under Extended Contact)
     { name: 'Strategic Command Center', startCol: CC.CHIEF_STEWARD_EMAIL || 45, endCol: CC.PDF_FOLDER_ID || 51, color: '#f9fbe7' } // Light Lime
   ];
 
@@ -2046,6 +2046,7 @@ function getGrievanceCountForUnit(unitName) {
  * @returns {number} Average survey score (1-10), or 5 if no data
  */
 function getRecentSurveyAverage(unitName) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -2075,23 +2076,13 @@ function getRecentSurveyAverage(unitName) {
     var worksite = (row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '').toString().trim().toLowerCase();
 
     if (worksite.indexOf(unitLower) !== -1 || unitLower.indexOf(worksite) !== -1) {
-      // Get overall satisfaction average (pre-calculated column)
-      var avgScore = parseFloat(row[SATISFACTION_COLS.AVG_OVERALL_SAT - 1]);
-
-      if (!isNaN(avgScore) && avgScore > 0) {
-        scores.push(avgScore);
-      } else {
-        // Fallback: calculate from individual questions Q6-Q9
-        var q6 = parseFloat(row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1]) || 0;
-        var q7 = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
-        var q8 = parseFloat(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]) || 0;
-        var q9 = parseFloat(row[SATISFACTION_COLS.Q9_RECOMMEND - 1]) || 0;
-
-        var count = (q6 > 0 ? 1 : 0) + (q7 > 0 ? 1 : 0) + (q8 > 0 ? 1 : 0) + (q9 > 0 ? 1 : 0);
-        if (count > 0) {
-          scores.push((q6 + q7 + q8 + q9) / count);
-        }
-      }
+      // Compute overall satisfaction from Q6-Q9 (v4.23.0: no pre-computed AVG col)
+      var q6 = parseFloat(row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1]) || 0;
+      var q7 = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
+      var q8 = parseFloat(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]) || 0;
+      var q9 = parseFloat(row[SATISFACTION_COLS.Q9_RECOMMEND - 1]) || 0;
+      var count = (q6>0?1:0)+(q7>0?1:0)+(q8>0?1:0)+(q9>0?1:0);
+      if (count > 0) scores.push((q6+q7+q8+q9)/count);
     }
   }
 
@@ -2993,6 +2984,7 @@ function getSecureAllStewards_() {
  * @returns {Object} Satisfaction stats with avgTrust
  */
 function getSecureSatisfactionStats_() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 

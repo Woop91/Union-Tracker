@@ -9,13 +9,14 @@
  *   _Failsafe_Config — member digest preferences (7 columns)
  *
  * @fileoverview Failsafe Service IIFE module
- * @version 4.17.0
+ * @version 4.22.8
  * @requires 01_Core.gs, 06_Maintenance.gs
  */
 
 var FailsafeService = (function () {
 
   var BACKUP_FOLDER_NAME = 'DDS_Dashboard_Backups';
+  var MAX_BACKUP_FILES = 52; // ~1 year of weekly backups per sheet
 
   // ═══════════════════════════════════════
   // Sheet Setup
@@ -147,14 +148,30 @@ var FailsafeService = (function () {
         };
         var body = _composeMemberDigest(email, config);
         if (body) {
-          MailApp.sendEmail({
-            to: email,
-            subject: 'Your Union Dashboard Digest',
-            htmlBody: body,
-            noReply: true
-          });
-          sheet.getRange(i + 1, 4).setValue(now);
-          processed++;
+          var sendLock = LockService.getScriptLock();
+          // Try to acquire lock — if another execution already sent, skip
+          if (!sendLock.tryLock(5000)) {
+            Logger.log('Could not acquire send lock for ' + email + ', skipping to avoid duplicate.');
+            continue;
+          }
+          try {
+            // Re-read lastSent inside the lock to guard against concurrent executions
+            var freshRow = sheet.getRange(i + 1, 1, 1, 4).getValues()[0];
+            var freshLastSent = freshRow[3];
+            var freshDays = freshLastSent instanceof Date ? Math.ceil((now.getTime() - freshLastSent.getTime()) / 86400000) : 999;
+            var stillDue = (frequency === 'weekly' && freshDays >= 7) || (frequency === 'monthly' && freshDays >= 30);
+            if (!stillDue) { continue; } // Another execution already sent
+            MailApp.sendEmail({
+              to: email,
+              subject: 'Your Union Dashboard Digest',
+              htmlBody: body,
+              noReply: true
+            });
+            sheet.getRange(i + 1, 4).setValue(now);
+            processed++;
+          } finally {
+            sendLock.releaseLock();
+          }
         }
       } catch (err) {
         Logger.log('Digest send error for ' + email + ': ' + err.message);
@@ -325,6 +342,9 @@ var FailsafeService = (function () {
       }
     }
 
+    // Prune old backups — keep most recent MAX_BACKUP_FILES per sheet
+    _pruneOldBackups(folder, sheetsToBackup);
+
     logAuditEvent('FAILSAFE_BACKUP_CREATED', backedUp + ' sheets backed up to Drive');
     return { success: true, backedUp: backedUp, folderName: BACKUP_FOLDER_NAME };
   }
@@ -373,6 +393,29 @@ var FailsafeService = (function () {
   // Helpers
   // ═══════════════════════════════════════
 
+  function _pruneOldBackups(folder, sheetNames) {
+    sheetNames.forEach(function(sheetName) {
+      var prefix = sheetName.replace(/[^a-zA-Z0-9_-]/g, '');
+      var files = folder.getFilesByName; // iterator
+      // Collect all files matching this sheet prefix
+      var allFiles = [];
+      var iter = folder.getFiles();
+      while (iter.hasNext()) {
+        var f = iter.next();
+        var name = f.getName();
+        if (name.indexOf(prefix + '_') === 0 && name.slice(-4) === '.csv') {
+          allFiles.push({ file: f, name: name });
+        }
+      }
+      // Sort by name descending (name contains yyyy-MM-dd_HHmm so lexical = chronological)
+      allFiles.sort(function(a, b) { return b.name < a.name ? -1 : b.name > a.name ? 1 : 0; });
+      // Delete everything beyond MAX_BACKUP_FILES
+      for (var i = MAX_BACKUP_FILES; i < allFiles.length; i++) {
+        try { allFiles[i].file.setTrashed(true); } catch (e) { /* ignore */ }
+      }
+    });
+  }
+
   function _getOrCreateBackupFolder() {
     var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
     if (folders.hasNext()) return folders.next();
@@ -418,11 +461,61 @@ var FailsafeService = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function fsGetDigestConfig(email) { var e = _resolveCallerEmail() || email; return FailsafeService.getDigestConfig(e); }
-function fsUpdateDigestConfig(email, config) { var e = _resolveCallerEmail() || email; return FailsafeService.updateDigestConfig(e, config); }
-function fsProcessScheduledDigests() { return FailsafeService.processScheduledDigests(); }
-function fsTriggerBulkExport(stewardEmail) { var e = _requireStewardAuth(); if (!e) return null; return FailsafeService.triggerBulkExport(e); }
-function fsBackupCriticalSheets() { return FailsafeService.backupCriticalSheets(); }
-function fsSetupTriggers() { return FailsafeService.setupFailsafeTriggers(); }
-function fsRemoveTriggers() { return FailsafeService.removeFailsafeTriggers(); }
-function fsInitSheets() { return FailsafeService.initFailsafeSheet(); }
+// ═══════════════════════════════════════
+// GLOBAL WRAPPERS (callable from client via google.script.run)
+// ═══════════════════════════════════════
+// Auth model:
+//   fsGetDigestConfig / fsUpdateDigestConfig — server-resolved identity only; client email param ignored
+//   fsTriggerBulkExport / fsSetupTriggers / fsRemoveTriggers / fsBackupCriticalSheets / fsInitSheets — steward-only
+//
+// sessionToken: client passes SESSION_TOKEN (from PAGE_DATA.sessionToken) for magic link / session auth.
+// Server validates the token via Auth.resolveEmailFromToken() — the raw email is never trusted.
+
+function fsGetDigestConfig(sessionToken) {
+  // Server-resolved identity: SSO first, then verified session token
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
+  return FailsafeService.getDigestConfig(e);
+}
+
+function fsUpdateDigestConfig(sessionToken, config) {
+  // Server-resolved identity only — sessionToken verified server-side
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { success: false, message: 'Not authenticated.' };
+  return FailsafeService.updateDigestConfig(e, config);
+}
+
+function fsProcessScheduledDigests() {
+  // Scheduled trigger — no interactive auth; runs as script owner
+  return FailsafeService.processScheduledDigests();
+}
+
+function fsTriggerBulkExport(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+  return FailsafeService.triggerBulkExport(e);
+}
+
+function fsBackupCriticalSheets(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+  return FailsafeService.backupCriticalSheets();
+}
+
+function fsSetupTriggers(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+  return FailsafeService.setupFailsafeTriggers();
+}
+
+function fsRemoveTriggers(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+  return FailsafeService.removeFailsafeTriggers();
+}
+
+function fsInitSheets(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+  return FailsafeService.initFailsafeSheet();
+}

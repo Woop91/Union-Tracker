@@ -99,6 +99,16 @@ function setupDashboardDriveFolders() {
     var sub = _getOrCreateNamedFolder_(def.name, def.propKey, props, configSheet, rootFolder);
     if (!sub) { Logger.log('Could not create subfolder: ' + def.name); return; }
     result[def.propKey] = sub.getId();
+    // Minutes/ folder: anyone with link can view (members use the link to browse docs)
+    // All other subfolders inherit the root PRIVATE setting.
+    if (def.name === DRIVE_CONFIG.MINUTES_SUBFOLDER) {
+      try {
+        sub.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        Logger.log('Minutes folder set to view-only public link.');
+      } catch (mShareErr) {
+        Logger.log('Could not set Minutes folder sharing: ' + mShareErr.message);
+      }
+    }
     // Also write to Config sheet using the config-specific key
     _writeConfigFolderId_(configSheet, CONFIG_COLS[def.cfgKey], sub.getId(), sub.getUrl());
     Logger.log('Drive folder ready: ' + def.name + ' (' + sub.getId() + ')');
@@ -2952,10 +2962,10 @@ function getWebAppResourceLinks() {
   // Get form URLs from Config sheet using CONFIG_COLS constants (data in row 3)
   if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      var configRow = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      // satisfactionForm removed v4.22.7 — survey is native webapp
+      var configRow = configSheet.getRange(3, 1, 1, CONFIG_COLS.ORG_WEBSITE).getValues()[0];
       links.grievanceForm = configRow[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
-      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';;
-      links.satisfactionForm = configRow[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
+      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
       links.orgWebsite = configRow[CONFIG_COLS.ORG_WEBSITE - 1] || '';
     } catch (_e) {
       // Ignore errors reading config
@@ -3998,10 +4008,10 @@ function getWebAppResourcesListAll() {
  * @param {Object} data — { title, category, summary, content, url, icon, sortOrder, visible, audience }
  * @returns {Object} { success: boolean, resourceId: string, message: string }
  */
-function addWebAppResource(data) {
+function addWebAppResource(sessionToken, data) {
   try {
     // CR-AUTH-6: Verify steward role before allowing resource creation
-    var auth = checkWebAppAuthorization('steward');
+    var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4030,7 +4040,7 @@ function addWebAppResource(data) {
 
     var tz = Session.getScriptTimeZone();
     var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-    var addedBy = Session.getActiveUser().getEmail() || 'unknown';
+    var addedBy = auth.email || 'unknown';
 
     // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
     var newRow = [
@@ -4063,10 +4073,10 @@ function addWebAppResource(data) {
  * @param {Object} data — fields to update (title, category, summary, content, url, icon, sortOrder, visible, audience)
  * @returns {Object} { success: boolean, message: string }
  */
-function updateWebAppResource(resourceId, data) {
+function updateWebAppResource(sessionToken, resourceId, data) {
   try {
     // CR-AUTH-6: Verify steward role before allowing resource updates
-    var auth = checkWebAppAuthorization('steward');
+    var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4105,10 +4115,10 @@ function updateWebAppResource(resourceId, data) {
  * @param {string} resourceId — e.g. "RES-001"
  * @returns {Object} { success: boolean, message: string }
  */
-function deleteWebAppResource(resourceId) {
+function deleteWebAppResource(sessionToken, resourceId) {
   try {
     // CR-AUTH-6: Verify steward role before allowing resource deletion
-    var auth = checkWebAppAuthorization('steward');
+    var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4135,9 +4145,9 @@ function deleteWebAppResource(resourceId) {
  * @param {string} resourceId — e.g. "RES-001"
  * @returns {Object} { success: boolean, message: string }
  */
-function restoreWebAppResource(resourceId) {
+function restoreWebAppResource(sessionToken, resourceId) {
   try {
-    var auth = checkWebAppAuthorization('steward');
+    var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.authorized) return { success: false, message: auth.message || 'Unauthorized' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5003,8 +5013,12 @@ function getDeadlineCalendarHtml() {
  * @param {string} [userRole] — "steward" or "member" for audience matching
  * @returns {Object[]} array of notification objects
  */
-function getWebAppNotifications(userEmail, userRole) {
+function getWebAppNotifications(sessionToken, userRole) {
   try {
+    // CR-AUTH: resolve identity server-side — never trust client-supplied email
+    var userEmail = _resolveCallerEmail(sessionToken);
+    if (!userEmail) return [];
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
     if (!sheet) return [];
@@ -5015,8 +5029,12 @@ function getWebAppNotifications(userEmail, userRole) {
     var C = NOTIFICATIONS_COLS;
     var now = new Date();
     var results = [];
-    userEmail = (userEmail || '').toLowerCase().trim();
-    userRole = (userRole || 'member').toLowerCase();
+    userEmail = userEmail.toLowerCase().trim();
+    // CR-AUTH: derive role from server-verified identity, never trust client-supplied role param
+    var auth = checkWebAppAuthorization(null, sessionToken);
+    var serverRole = (auth && auth.role) ? auth.role.toLowerCase() : 'member';
+    // Treat 'both' (dual-role) and 'admin' as steward for notification targeting
+    userRole = (serverRole === 'steward' || serverRole === 'both' || serverRole === 'admin') ? 'steward' : 'member';
 
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
@@ -5091,9 +5109,9 @@ function getWebAppNotifications(userEmail, userRole) {
  * @param {string} userRole — 'member' or 'steward'
  * @returns {Object} { count: number }
  */
-function getWebAppNotificationCount(userEmail, userRole) {
+function getWebAppNotificationCount(sessionToken, userRole) {
   try {
-    var results = getWebAppNotifications(userEmail, userRole);
+    var results = getWebAppNotifications(sessionToken, userRole);
     return { count: results.length };
   } catch (e) {
     logError_('getWebAppNotificationCount', e);
@@ -5109,12 +5127,10 @@ function getWebAppNotificationCount(userEmail, userRole) {
  * @param {string} userEmail — the user dismissing
  * @returns {Object} { success: boolean, message: string }
  */
-function dismissWebAppNotification(notificationId) {
+function dismissWebAppNotification(sessionToken, notificationId) {
   try {
-    // CR-AUTH-4: Use server-side identity instead of client-supplied email (IDOR fix)
-    var userEmail = '';
-    try { userEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* SSO unavailable */ }
-    userEmail = (userEmail || '').toLowerCase().trim();
+    // CR-AUTH-4: Use server-side identity — never trust client-supplied email
+    var userEmail = _resolveCallerEmail(sessionToken);
     if (!userEmail) return { success: false, message: 'Authentication required' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5151,10 +5167,10 @@ function dismissWebAppNotification(notificationId) {
  * @param {Object} data — { recipient, type, title, message, priority, expiresDate }
  * @returns {Object} { success: boolean, notificationId: string, message: string }
  */
-function sendWebAppNotification(data) {
+function sendWebAppNotification(sessionToken, data) {
   try {
     // CR-AUTH-6: Verify steward role before allowing notification creation
-    var auth = checkWebAppAuthorization('steward');
+    var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5172,7 +5188,7 @@ function sendWebAppNotification(data) {
     }
 
     // Get steward info from session
-    var stewardEmail = Session.getActiveUser().getEmail() || 'unknown';
+    var stewardEmail = auth.email || 'unknown';
     var stewardName = data.senderName || stewardEmail.split('@')[0];
 
     // Generate next ID
@@ -5226,9 +5242,9 @@ function sendWebAppNotification(data) {
  * Includes dismissedCount so stewards can see reach/engagement.
  * @returns {Object[]} array of notification objects with status + dismissedCount
  */
-function getAllWebAppNotifications() {
+function getAllWebAppNotifications(sessionToken) {
   try {
-    var auth = checkWebAppAuthorization('steward');
+    var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return [];
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5291,9 +5307,9 @@ function getAllWebAppNotifications() {
  * @param {string} notificationId — e.g. 'NOTIF-003'
  * @returns {Object} { success, message }
  */
-function archiveWebAppNotification(notificationId) {
+function archiveWebAppNotification(sessionToken, notificationId) {
   try {
-    var auth = checkWebAppAuthorization('steward');
+    var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5490,7 +5506,9 @@ function SETUP_DRIVE_FOLDERS() {
   try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
   var msg = result.success
     ? '✅ Drive folders ready!\n\n' + result.rootFolderName + ': ' + result.rootFolderUrl +
-      '\n\nAll folder IDs have been saved to the Config sheet.'
+      '\n\nAll folder IDs have been saved to the Config sheet.' +
+      '\n\n📄 Minutes/ folder: set to "Anyone with link can view" (members can browse docs).' +
+      '\n🔒 All other subfolders: PRIVATE.'
     : '❌ Drive folder setup failed — check Apps Script logs.';
   if (ui) ui.alert('📁 Drive Folder Setup', msg, ui.ButtonSet.OK);
   else Logger.log('SETUP_DRIVE_FOLDERS: ' + JSON.stringify(result));

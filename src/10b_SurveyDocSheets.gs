@@ -1,484 +1,307 @@
 // ============================================================================
-// MEMBER SATISFACTION SHEET
+// SURVEY QUESTIONS SHEET — v4.23.0 Dynamic Schema
+// Owner-editable: Question Text, Active, Options, Slider Min/Max, Notes
+// Structural (do not edit): Question ID, Section Key, Type, Required, Branch cols
 // ============================================================================
 
 /**
- * Create the Member Satisfaction Tracking sheet
- * Tracks survey responses and calculates satisfaction metrics
- * @param {Spreadsheet} ss - Spreadsheet object
+ * Creates or non-destructively updates the 📋 Survey Questions sheet.
+ * Safe to re-run: only adds questions that don't already exist (by Question ID).
+ * Called by: CREATE_DASHBOARD setup, initSurveyEngine().
+ *
+ * @param {Spreadsheet} ss
  */
-function createSatisfactionSheet(ss) {
-  var sheet = getOrCreateSheet(ss, SHEETS.SATISFACTION);
-  // CR-11: Only clear if sheet has no meaningful user data (survey responses).
-  // If the sheet has > 2 rows of data, skip full clear and only update
-  // headers/formulas/dashboard areas to avoid destroying survey responses.
-  var hasUserData = sheet.getLastRow() > 2;
-  if (!hasUserData) {
-    sheet.clear();
-  }
+function createSurveyQuestionsSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.SURVEY_QUESTIONS);
+  var isNew = !sheet;
+  if (isNew) sheet = ss.insertSheet(SHEETS.SURVEY_QUESTIONS);
 
-  // Ensure sheet has enough columns (need 100+ for dashboard area)
-  var requiredCols = 100;
-  var currentCols = sheet.getMaxColumns();
-  if (currentCols < requiredCols) {
-    sheet.insertColumnsAfter(currentCols, requiredCols - currentCols);
-  }
+  var QC = SURVEY_QUESTIONS_COLS;
+  var NUM_COLS = 16;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GOOGLE FORM RESPONSE HEADERS (68 questions + timestamp)
-  // When you link a Google Form, these columns receive form responses
-  // ═══════════════════════════════════════════════════════════════════════════
-
+  // ── Headers ──────────────────────────────────────────────────────────────
   var headers = [
-    'Timestamp',                                    // A - Auto by Google Forms
-    // Work Context (Q1-5)
-    'Q1: Worksite/Program/Region',                  // B
-    'Q2: Role/Job Group',                           // C
-    'Q3: Shift',                                    // D
-    'Q4: Time in current role',                     // E
-    'Q5: Steward contact (12 mo)?',                 // F
-    // Overall Satisfaction (Q6-9)
-    'Q6: Satisfied with representation',            // G
-    'Q7: Trust union acts in best interest',        // H
-    'Q8: Feel protected at work',                   // I
-    'Q9: Would recommend membership',               // J
-    // Steward Ratings 3A (Q10-17)
-    'Q10: Timely response',                         // K
-    'Q11: Treated with respect',                    // L
-    'Q12: Explained options clearly',               // M
-    'Q13: Followed through',                        // N
-    'Q14: Advocated effectively',                   // O
-    'Q15: Safe raising concerns',                   // P
-    'Q16: Confidentiality',                         // Q
-    'Q17: Steward improvement suggestions',         // R
-    // Steward Access 3B (Q18-20)
-    'Q18: Know how to contact steward',             // S
-    'Q19: Confident would get help',                // T
-    'Q20: Easy to find who to contact',             // U
-    // Chapter Effectiveness (Q21-25)
-    'Q21: Reps understand issues',                  // V
-    'Q22: Chapter communication',                   // W
-    'Q23: Organizes effectively',                   // X
-    'Q24: Know chapter contact',                    // Y
-    'Q25: Fair representation',                     // Z
-    // Local Leadership (Q26-31)
-    'Q26: Decisions communicated clearly',          // AA
-    'Q27: Understand decision process',             // AB
-    'Q28: Transparent finances',                    // AC
-    'Q29: Leadership accountable',                  // AD
-    'Q30: Fair internal processes',                 // AE
-    'Q31: Welcomes differing opinions',             // AF
-    // Contract Enforcement (Q32-36)
-    'Q32: Enforces contract',                       // AG
-    'Q33: Realistic timelines',                     // AH
-    'Q34: Clear updates',                           // AI
-    'Q35: Frontline priority',                      // AJ
-    'Q36: Filed grievance (24 mo)?',                // AK
-    // Representation 6A (Q37-40)
-    'Q37: Understood steps/timeline',               // AL
-    'Q38: Felt supported',                          // AM
-    'Q39: Updates often enough',                    // AN
-    'Q40: Outcome justified',                       // AO
-    // Communication (Q41-45)
-    'Q41: Clear & actionable',                      // AP
-    'Q42: Enough information',                      // AQ
-    'Q43: Find info easily',                        // AR
-    'Q44: Reaches all shifts',                      // AS
-    'Q45: Meetings worth attending',                // AT
-    // Member Voice (Q46-50)
-    'Q46: Voice matters',                           // AU
-    'Q47: Seeks input',                             // AV
-    'Q48: Dignity',                                 // AW
-    'Q49: Newer members supported',                 // AX
-    'Q50: Conflict handled respectfully',           // AY
-    // Value & Action (Q51-55)
-    'Q51: Good value for dues',                     // AZ
-    'Q52: Priorities reflect needs',                // BA
-    'Q53: Prepared to mobilize',                    // BB
-    'Q54: Know how to get involved',                // BC
-    'Q55: Can win together',                        // BD
-    // Scheduling (Q56-63)
-    'Q56: Understand changes',                      // BE
-    'Q57: Adequately informed',                     // BF
-    'Q58: Clear criteria',                          // BG
-    'Q59: Work under expectations',                 // BH
-    'Q60: Effective outcomes',                      // BI
-    'Q61: Supports wellbeing',                      // BJ
-    'Q62: Concerns taken seriously',                // BK
-    'Q63: Scheduling challenge',                    // BL
-    // Priorities & Close (Q64-68)
-    'Q64: Top 3 priorities',                        // BM
-    'Q65: #1 change to make',                       // BN
-    'Q66: Keep doing',                              // BO
-    'Q67: Additional comments'                      // BP
+    'Question ID', 'Section', 'Section Key', 'Section Title',
+    'Question Text', 'Type', 'Required', 'Active', 'Options',
+    'Branch Parent', 'Branch Value', 'Branch Target', 'Max Selections',
+    'Slider Min Label', 'Slider Max Label', 'Notes'
   ];
 
-  // Set headers
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+  sheet.getRange(1, 1, 1, NUM_COLS)
+    .setValues([headers])
     .setFontWeight('bold')
-    .setBackground(COLORS.HEADER_BG)
-    .setFontColor(COLORS.HEADER_TEXT)
+    .setBackground('#1a73e8')
+    .setFontColor('#ffffff')
     .setWrap(true);
-
-  // Set column widths for response data
-  sheet.setColumnWidth(1, 140);  // Timestamp
-  for (var c = 2; c <= 69; c++) {
-    // Wider for paragraph columns (R, BL, BM, BN, BO, BP)
-    if (c === 18 || c === 64 || c === 65 || c === 66 || c === 67 || c === 68) {
-      sheet.setColumnWidth(c, 250);
-    } else {
-      sheet.setColumnWidth(c, 45);
-    }
-  }
-
-  // Freeze header row
   sheet.setFrozenRows(1);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION AVERAGE FORMULAS (Columns BT-CD) - For Charts
-  // These calculate section averages for each response row
-  // ═══════════════════════════════════════════════════════════════════════════
+  // Column widths
+  sheet.setColumnWidth(QC.QUESTION_ID, 80);
+  sheet.setColumnWidth(QC.SECTION_NUM, 65);
+  sheet.setColumnWidth(QC.SECTION_KEY, 110);
+  sheet.setColumnWidth(QC.SECTION_TITLE, 160);
+  sheet.setColumnWidth(QC.QUESTION_TEXT, 340);
+  sheet.setColumnWidth(QC.TYPE, 100);
+  sheet.setColumnWidth(QC.REQUIRED, 70);
+  sheet.setColumnWidth(QC.ACTIVE, 60);
+  sheet.setColumnWidth(QC.OPTIONS, 200);
+  sheet.setColumnWidth(QC.BRANCH_PARENT, 95);
+  sheet.setColumnWidth(QC.BRANCH_VALUE, 85);
+  sheet.setColumnWidth(QC.BRANCH_TARGET, 90);
+  sheet.setColumnWidth(QC.MAX_SELECTIONS, 90);
+  sheet.setColumnWidth(QC.SLIDER_MIN, 120);
+  sheet.setColumnWidth(QC.SLIDER_MAX, 120);
+  sheet.setColumnWidth(QC.NOTES, 260);
 
-  // Section average headers
-  var sectionHeaders = [
-    'Avg: Overall Sat',     // BT (72)
-    'Avg: Steward Rating',  // BU (73)
-    'Avg: Steward Access',  // BV (74)
-    'Avg: Chapter',         // BW (75)
-    'Avg: Leadership',      // BX (76)
-    'Avg: Contract',        // BY (77)
-    'Avg: Representation',  // BZ (78)
-    'Avg: Communication',   // CA (79)
-    'Avg: Member Voice',    // CB (80)
-    'Avg: Value/Action',    // CC (81)
-    'Avg: Scheduling'       // CD (82)
+  // ── Seed data ─────────────────────────────────────────────────────────────
+  // 16 cols per row:
+  // [id, section, sectionKey, sectionTitle, text, type, required, active,
+  //  options, branchParent, branchValue, branchTarget, maxSel, slMin, slMax, notes]
+  var SEED = [
+    // ── Section 1: Work Context ───────────────────────────────────────────
+    ['q1','1','WORK_CONTEXT','Work Context','What is your worksite / program / region?','dropdown','Y','Y','[Config: Office Locations]','','','','','','','Options from Config → Office Locations'],
+    ['q2','1','WORK_CONTEXT','Work Context','What is your role / job group?','dropdown','Y','Y','[Config: Job Titles]','','','','','','','Options from Config → Job Titles'],
+    ['q3','1','WORK_CONTEXT','Work Context','What shift do you work?','radio','Y','Y','Day|Evening|Night|Rotating/Variable','','','','','','',''],
+    ['q4','1','WORK_CONTEXT','Work Context','How long have you been in your current role?','radio','Y','Y','Less than 1 year|1–3 years|4–7 years|8–15 years|15+ years','','','','','','',''],
+    ['q5','1','WORK_CONTEXT','Work Context','Have you had contact with a steward in the past 12 months?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 3A, No → 3B'],
+    // ── Section 2: Overall Satisfaction ──────────────────────────────────
+    ['q6','2','OVERALL_SAT','Overall Satisfaction','I am satisfied with my union representation.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q7','2','OVERALL_SAT','Overall Satisfaction',"I trust the union to act in members' best interests.",'slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q8','2','OVERALL_SAT','Overall Satisfaction','I feel more protected at work because of my union.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q9','2','OVERALL_SAT','Overall Satisfaction','I would recommend union membership to a coworker.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    // ── Section 3A: Steward Experience (Q5=Yes) ───────────────────────────
+    ['q10','3A','STEWARD_3A','Steward Experience','My steward responded to me in a timely manner.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
+    ['q11','3A','STEWARD_3A','Steward Experience','My steward treated me with respect.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
+    ['q12','3A','STEWARD_3A','Steward Experience','My steward explained my options clearly.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
+    ['q13','3A','STEWARD_3A','Steward Experience','My steward followed through on their commitments.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
+    ['q14','3A','STEWARD_3A','Steward Experience','My steward advocated effectively on my behalf.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
+    ['q15','3A','STEWARD_3A','Steward Experience','I felt safe raising concerns with my steward.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
+    ['q16','3A','STEWARD_3A','Steward Experience','My steward handled confidentiality appropriately.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
+    ['q17','3A','STEWARD_3A','Steward Experience','What should stewards do to improve? (optional)','paragraph','N','Y','','q5','Yes','','','','','Optional. Only shown if Q5=Yes'],
+    // ── Section 3B: Steward Access (Q5=No) ───────────────────────────────
+    ['q18','3B','STEWARD_3B','Steward Access','I know how to contact a steward or union rep.','slider-10','Y','Y','','q5','No','','','Strongly Disagree','Strongly Agree','Only shown if Q5=No'],
+    ['q19','3B','STEWARD_3B','Steward Access','I am confident I would get help if I needed it.','slider-10','Y','Y','','q5','No','','','Strongly Disagree','Strongly Agree','Only shown if Q5=No'],
+    ['q20','3B','STEWARD_3B','Steward Access','It is easy to figure out who to contact.','slider-10','Y','Y','','q5','No','','','Strongly Disagree','Strongly Agree','Only shown if Q5=No'],
+    // ── Section 4: Chapter Effectiveness ─────────────────────────────────
+    ['q21','4','CHAPTER','Chapter Effectiveness','Union reps understand my workplace issues.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q22','4','CHAPTER','Chapter Effectiveness','Chapter communication is regular and clear.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q23','4','CHAPTER','Chapter Effectiveness','The chapter organizes members effectively.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q24','4','CHAPTER','Chapter Effectiveness','I know how to reach my chapter contact.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q25','4','CHAPTER','Chapter Effectiveness','Representation is fair across roles and shifts.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    // ── Section 5: Local Leadership ───────────────────────────────────────
+    ['q26','5','LEADERSHIP','Local Leadership','Leadership communicates decisions clearly.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q27','5','LEADERSHIP','Local Leadership','I understand how decisions are made.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q28','5','LEADERSHIP','Local Leadership','The union is transparent about its finances.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q29','5','LEADERSHIP','Local Leadership','Leadership is accountable to member feedback.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q30','5','LEADERSHIP','Local Leadership','Internal union processes feel fair.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q31','5','LEADERSHIP','Local Leadership','The union welcomes differing opinions.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    // ── Section 6: Contract Enforcement ──────────────────────────────────
+    ['q32','6','CONTRACT','Contract Enforcement','The union enforces our contract effectively.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q33','6','CONTRACT','Contract Enforcement','The union communicates realistic timelines.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q34','6','CONTRACT','Contract Enforcement','The union provides clear updates on issues.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q35','6','CONTRACT','Contract Enforcement','The union prioritizes frontline working conditions.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q36','6','CONTRACT','Contract Enforcement','Have you filed a grievance in the past 24 months?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 6A, No → Section 7'],
+    // ── Section 6A: Representation Process (Q36=Yes) ──────────────────────
+    ['q37','6A','REPRESENTATION','Representation Process','I understood the steps and timeline of my grievance.','slider-10','Y','Y','','q36','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q36=Yes'],
+    ['q38','6A','REPRESENTATION','Representation Process','I felt supported throughout the grievance process.','slider-10','Y','Y','','q36','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q36=Yes'],
+    ['q39','6A','REPRESENTATION','Representation Process','I received updates often enough during my case.','slider-10','Y','Y','','q36','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q36=Yes'],
+    ['q40','6A','REPRESENTATION','Representation Process','The outcome of my grievance feels justified.','slider-10','Y','Y','','q36','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q36=Yes'],
+    // ── Section 7: Communication Quality ──────────────────────────────────
+    ['q41','7','COMMUNICATION','Communication Quality','Union communications are clear and actionable.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q42','7','COMMUNICATION','Communication Quality','I receive enough information from the union.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q43','7','COMMUNICATION','Communication Quality','I can find information from the union easily.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q44','7','COMMUNICATION','Communication Quality','Communications reach members on all shifts and locations.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q45','7','COMMUNICATION','Communication Quality','Union meetings are worth attending.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    // ── Section 8: Member Voice & Culture ────────────────────────────────
+    ['q46','8','MEMBER_VOICE','Member Voice & Culture','My voice matters in this union.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q47','8','MEMBER_VOICE','Member Voice & Culture','The union actively seeks member input.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q48','8','MEMBER_VOICE','Member Voice & Culture','Members are treated with dignity by union leadership.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q49','8','MEMBER_VOICE','Member Voice & Culture','Newer members are well-supported.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q50','8','MEMBER_VOICE','Member Voice & Culture','Internal conflicts are handled respectfully.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    // ── Section 9: Value & Collective Action ──────────────────────────────
+    ['q51','9','VALUE_ACTION','Value & Collective Action','Union membership provides good value for my dues.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q52','9','VALUE_ACTION','Value & Collective Action',"The union's priorities reflect member needs.",'slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q53','9','VALUE_ACTION','Value & Collective Action','The union is prepared to mobilize when needed.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q54','9','VALUE_ACTION','Value & Collective Action','I understand how to get more involved.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q55','9','VALUE_ACTION','Value & Collective Action','Acting together, we can win real improvements.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    // ── Section 10: Scheduling & Office Days ──────────────────────────────
+    ['q56','10','SCHEDULING','Scheduling & Office Days','I understand proposed scheduling/office day changes.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q57','10','SCHEDULING','Scheduling & Office Days','I am adequately informed about scheduling decisions.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q58','10','SCHEDULING','Scheduling & Office Days','Scheduling decisions use clear and fair criteria.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q59','10','SCHEDULING','Scheduling & Office Days','My work can reasonably be done under current expectations.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q60','10','SCHEDULING','Scheduling & Office Days','The current scheduling approach supports effective outcomes.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q61','10','SCHEDULING','Scheduling & Office Days','The scheduling approach supports my wellbeing.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q62','10','SCHEDULING','Scheduling & Office Days','My scheduling concerns would be taken seriously.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q63','10','SCHEDULING','Scheduling & Office Days','What is your biggest scheduling challenge? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
+    // ── Section 11: Priorities & Closing Thoughts ─────────────────────────
+    ['q64','11','PRIORITIES','Priorities & Closing Thoughts','Select your top 3 union priorities for the next 6–12 months.','checkbox','Y','Y','[Config: Survey Priority Options]','','','','3','','','Options from Config → Survey Priority Options. Max 3 selections.'],
+    ['q65','11','PRIORITIES','Priorities & Closing Thoughts','The #1 change you want the union to make.','paragraph','Y','Y','','','','','','','',''],
+    ['q66','11','PRIORITIES','Priorities & Closing Thoughts','One thing the union should keep doing.','paragraph','Y','Y','','','','','','','',''],
+    ['q67','11','PRIORITIES','Priorities & Closing Thoughts','Additional comments — please do not include names.','paragraph','N','Y','','','','','','','','Optional']
   ];
 
-  sheet.getRange(1, SATISFACTION_COLS.SUMMARY_START, 1, sectionHeaders.length)
-    .setValues([sectionHeaders])
-    .setFontWeight('bold')
-    .setBackground(COLORS.UNION_GREEN)
-    .setFontColor(COLORS.WHITE)
-    .setWrap(true);
-
-  // H-11: Use SATISFACTION_COLS.SUMMARY_START constant instead of hardcoded 72-82
-  var summaryEnd = SATISFACTION_COLS.SUMMARY_START + sectionHeaders.length - 1;
-  for (var sc = SATISFACTION_COLS.SUMMARY_START; sc <= summaryEnd; sc++) {
-    sheet.setColumnWidth(sc, 65);
+  // Build set of existing question IDs so we don't overwrite user edits
+  var existingIds = {};
+  if (!isNew && sheet.getLastRow() > 1) {
+    var existingData = sheet.getRange(2, QC.QUESTION_ID, sheet.getLastRow() - 1, 1).getValues();
+    existingData.forEach(function(row) {
+      var id = String(row[0]).trim();
+      if (id) existingIds[id] = true;
+    });
   }
 
-  // Section averages are computed by syncSatisfactionValues()
-  // No formulas in visible sheet - values are written by JavaScript
+  // Append only missing questions
+  var toAdd = SEED.filter(function(row) { return !existingIds[String(row[0]).trim()]; });
+  if (toAdd.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, toAdd.length, NUM_COLS).setValues(toAdd).setWrap(false);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DASHBOARD / CHART DATA AREA (after summary columns + 1 gap column)
-  // Summary metrics for creating charts
-  // ═══════════════════════════════════════════════════════════════════════════
+    // Color rows by section
+    var sectionColors = {
+      WORK_CONTEXT:   '#e3f2fd', OVERALL_SAT:  '#e8f5e9',
+      STEWARD_3A:     '#f3e5f5', STEWARD_3B:   '#fce4ec',
+      CHAPTER:        '#fff3e0', LEADERSHIP:   '#fffde7',
+      CONTRACT:       '#e0f2f1', REPRESENTATION:'#e0f7fa',
+      COMMUNICATION:  '#e8eaf6', MEMBER_VOICE: '#fbe9e7',
+      VALUE_ACTION:   '#f9fbe7', SCHEDULING:   '#efebe9',
+      PRIORITIES:     '#f5f5f5'
+    };
+    toAdd.forEach(function(row, i) {
+      var color = sectionColors[String(row[2]).trim()] || '#ffffff';
+      sheet.getRange(startRow + i, 1, 1, NUM_COLS).setBackground(color);
+    });
+  }
 
-  // H-11: Derive dashStart from SATISFACTION_COLS instead of hardcoding 84
-  var dashStart = summaryEnd + 2; // 1 gap column after summary section
+  // ── Column notes for structural cols ─────────────────────────────────────
+  if (isNew) {
+    sheet.getRange(1, QC.QUESTION_ID).setNote('Do not change. Code references this ID to map responses to sheet columns.');
+    sheet.getRange(1, QC.SECTION_KEY).setNote('Do not change. Used by analytics to group questions into sections.');
+    sheet.getRange(1, QC.TYPE).setNote('Do not change. Determines slider/radio/dropdown/checkbox/paragraph rendering.');
+    sheet.getRange(1, QC.REQUIRED).setNote('Do not change for required questions. Setting N on a required question will not hide it.');
+    sheet.getRange(1, QC.BRANCH_PARENT).setNote(
+      'Do not change. Controls which section this question belongs to when branching is active.\n\n' +
+      'How wizard branching works:\n' +
+      '• A section is conditional when ALL its questions share the same Branch Parent + Branch Value.\n' +
+      '• Branch Parent = the Question ID whose answer gates this section (e.g. "q5").\n' +
+      '• Branch Value = the answer that must be selected to show this section (e.g. "Yes").\n\n' +
+      'To add a new conditional section:\n' +
+      '1. Add a radio-branch question (e.g. "q68") to the section where the branch choice appears.\n' +
+      '2. Add the new section\'s questions with Branch Parent = "q68" and Branch Value = the trigger answer.\n' +
+      '3. The wizard reads these columns at runtime — no code change needed.\n\n' +
+      '⚠️ Mixed rules (different parents in the same section) cause the section to always show.'
+    );
+    sheet.getRange(1, QC.ACTIVE).setNote('Y = shown to members. N = hidden. ⚠ Required questions are always shown regardless.');
+    sheet.getRange(1, QC.OPTIONS).setNote('Pipe-separated values for radio/dropdown/checkbox. [Config: ...] = read from Config tab.');
+    sheet.getRange(1, QC.QUESTION_TEXT).setNote('✏ Edit freely. Changes take effect on next survey load (cache clears every 5 minutes).');
+    sheet.getRange(1, QC.SLIDER_MIN).setNote('✏ Edit label shown at left end of slider. Default: Strongly Disagree');
+    sheet.getRange(1, QC.SLIDER_MAX).setNote('✏ Edit label shown at right end of slider. Default: Strongly Agree');
+    sheet.getRange(1, QC.NOTES).setNote('✏ Internal notes. Never shown to members.');
+  }
 
-  // Dashboard Header
-  sheet.getRange(1, dashStart).setValue('📊 SURVEY DASHBOARD')
-    .setFontWeight('bold')
-    .setFontSize(14)
-    .setBackground('#4285F4')
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange(1, dashStart, 1, 4).merge();
+  Logger.log('createSurveyQuestionsSheet: ' + (isNew ? 'Created' : 'Updated') + ' — ' + toAdd.length + ' questions added.');
+  return sheet;
+}
 
-  // Response Summary
-  sheet.getRange(3, dashStart).setValue('📈 RESPONSE SUMMARY')
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY);
-  sheet.getRange(3, dashStart, 1, 2).merge();
+// ── Cache invalidation (menu-callable) ───────────────────────────────────────
 
-  // Response summary labels (values populated by syncSatisfactionValues)
-  var responseSummary = [
-    ['Total Responses', ''],
-    ['Response Period', ''],
-    ['', ''],
-    ['📊 SECTION SCORES', ''],
-    ['Section', 'Avg Score'],
-    ['Overall Satisfaction', ''],
-    ['Steward Rating', ''],
-    ['Steward Access', ''],
-    ['Chapter Effectiveness', ''],
-    ['Local Leadership', ''],
-    ['Contract Enforcement', ''],
-    ['Representation', ''],
-    ['Communication', ''],
-    ['Member Voice', ''],
-    ['Value & Action', ''],
-    ['Scheduling', '']
-  ];
-  sheet.getRange(4, dashStart, responseSummary.length, 2).setValues(responseSummary);
+/**
+ * Clears the 5-minute script cache for survey questions and col map.
+ * Call after editing the Survey Questions sheet if you want changes to
+ * take effect immediately (otherwise auto-refreshes within 5 minutes).
+ * Menu: Survey Engine → Clear Survey Questions Cache
+ */
+function clearSurveyQuestionsCache() {
+  try {
+    var cache = CacheService.getScriptCache();
+    cache.remove('surveyQuestions_v1');
+    cache.remove('satisfactionColMap_v1');
+    Logger.log('clearSurveyQuestionsCache: Cache cleared.');
+    try {
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Survey questions cache cleared. Changes take effect immediately on next load.',
+        'Cache Cleared', 4
+      );
+    } catch(_ui) {}
+  } catch(e) {
+    Logger.log('clearSurveyQuestionsCache error: ' + e.message);
+  }
+}
 
-  // Format headers
-  sheet.getRange(7, dashStart, 1, 2).setFontWeight('bold').setBackground(COLORS.LIGHT_GRAY);
-  sheet.getRange(8, dashStart, 1, 2).setFontWeight('bold').setBackground('#E8F0FE');
+// ============================================================================
+// MEMBER SATISFACTION SHEET — v4.23.0 Dynamic Schema
+// Headers: Timestamp | Period ID | Survey Version | q1 | q2 | … | qN
+// Headers are Question IDs — never question text. getSurveyQuestions() maps
+// IDs to display text. Dynamic: new questions auto-append new columns.
+// ============================================================================
 
-  // Column widths for dashboard
-  sheet.setColumnWidth(dashStart, 170);
-  sheet.setColumnWidth(dashStart + 1, 100);
+/**
+ * Create the Member Satisfaction response sheet.
+ * - If no response data: clears and rebuilds with dynamic headers.
+ * - If response data exists: only syncs missing question columns (safe).
+ * @param {Spreadsheet} ss
+ */
+function createSatisfactionSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getOrCreateSheet(ss, SHEETS.SATISFACTION);
+  var hasUserData = sheet.getLastRow() > 2;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DEMOGRAPHICS BREAKDOWN (Column CH onwards)
-  // ═══════════════════════════════════════════════════════════════════════════
+  if (!hasUserData) {
+    // ── Fresh setup: clear and build dynamic headers from Survey Questions sheet ──
+    sheet.clear();
 
-  var demoStart = dashStart + 3; // Column CH (87)
+    // Ensure Survey Questions sheet is seeded first
+    var qSheet = ss.getSheetByName(SHEETS.SURVEY_QUESTIONS);
+    if (!qSheet) {
+      createSurveyQuestionsSheet(ss);
+    }
 
-  sheet.getRange(3, demoStart).setValue('👥 DEMOGRAPHICS')
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY);
-  sheet.getRange(3, demoStart, 1, 2).merge();
+    // Fixed prefix + question ID headers
+    var headers = ['Timestamp', 'Period ID', 'Survey Version'];
+    var qData = [];
+    try {
+      qSheet = ss.getSheetByName(SHEETS.SURVEY_QUESTIONS);
+      if (qSheet && qSheet.getLastRow() > 1) {
+        qData = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, 16).getValues();
+      }
+    } catch(e) { Logger.log('createSatisfactionSheet: could not read Survey Questions: ' + e.message); }
 
-  // Demographics labels (values populated by syncSatisfactionValues)
-  var demographics = [
-    ['Shift Breakdown', ''],
-    ['Day', ''],
-    ['Evening', ''],
-    ['Night', ''],
-    ['Rotating', ''],
-    ['', ''],
-    ['Tenure', ''],
-    ['<1 year', ''],
-    ['1-3 years', ''],
-    ['4-7 years', ''],
-    ['8-15 years', ''],
-    ['15+ years', ''],
-    ['', ''],
-    ['Steward Contact', ''],
-    ['Yes (12 mo)', ''],
-    ['No', ''],
-    ['', ''],
-    ['Filed Grievance', ''],
-    ['Yes (24 mo)', ''],
-    ['No', '']
-  ];
-  sheet.getRange(4, demoStart, demographics.length, 2).setValues(demographics);
+    qData.forEach(function(row) {
+      var id     = String(row[SURVEY_QUESTIONS_COLS.QUESTION_ID - 1] || '').trim();
+      var active = String(row[SURVEY_QUESTIONS_COLS.ACTIVE - 1] || '').trim().toUpperCase();
+      if (id && active !== 'N') headers.push(id);
+    });
 
-  // Format demographic headers
-  sheet.getRange(4, demoStart, 1, 2).setFontWeight('bold').setBackground('#E8F0FE');
-  sheet.getRange(10, demoStart, 1, 2).setFontWeight('bold').setBackground('#E8F0FE');
-  sheet.getRange(17, demoStart, 1, 2).setFontWeight('bold').setBackground('#E8F0FE');
-  sheet.getRange(21, demoStart, 1, 2).setFontWeight('bold').setBackground('#E8F0FE');
+    // Write headers
+    sheet.getRange(1, 1, 1, headers.length)
+      .setValues([headers])
+      .setFontWeight('bold')
+      .setBackground('#1a73e8')
+      .setFontColor('#ffffff')
+      .setWrap(false);
 
-  sheet.setColumnWidth(demoStart, 120);
-  sheet.setColumnWidth(demoStart + 1, 60);
+    // Column widths
+    sheet.setColumnWidth(SATISFACTION_PREFIX.TIMESTAMP,      140);
+    sheet.setColumnWidth(SATISFACTION_PREFIX.PERIOD_ID,       90);
+    sheet.setColumnWidth(SATISFACTION_PREFIX.SURVEY_VERSION,  90);
+    for (var c = SATISFACTION_PREFIX.DATA_START; c <= headers.length; c++) {
+      sheet.setColumnWidth(c, 55);
+    }
+    sheet.setFrozenRows(1);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CHART DATA TABLE (for bar/column charts)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  var chartStart = dashStart + 6; // Column CK (90)
-
-  sheet.getRange(3, chartStart).setValue('📉 CHART DATA (Select for Charts)')
-    .setFontWeight('bold')
-    .setBackground(COLORS.UNION_GREEN)
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange(3, chartStart, 1, 2).merge();
-
-  // Chart data labels (values populated by syncSatisfactionValues)
-  var chartData = [
-    ['Section', 'Score'],
-    ['Overall Satisfaction', 0],
-    ['Steward Rating', 0],
-    ['Steward Access', 0],
-    ['Chapter', 0],
-    ['Leadership', 0],
-    ['Contract', 0],
-    ['Representation', 0],
-    ['Communication', 0],
-    ['Member Voice', 0],
-    ['Value & Action', 0],
-    ['Scheduling', 0]
-  ];
-  sheet.getRange(4, chartStart, chartData.length, 2).setValues(chartData);
-
-  sheet.getRange(4, chartStart, 1, 2).setFontWeight('bold').setBackground(COLORS.LIGHT_GRAY);
-  sheet.setColumnWidth(chartStart, 140);
-  sheet.setColumnWidth(chartStart + 1, 60);
-
-  // Add border around chart data for easy selection
-  sheet.getRange(4, chartStart, chartData.length, 2).setBorder(true, true, true, true, false, false);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // GOOGLE FORM SETUP INSTRUCTIONS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  var instrStart = 26; // Row 26
-
-  sheet.getRange(instrStart, dashStart).setValue('🔗 GOOGLE FORM SETUP')
-    .setFontWeight('bold')
-    .setFontSize(12)
-    .setBackground('#4285F4')
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange(instrStart, dashStart, 1, 4).merge();
-
-  var instructions = [
-    ['1. Create Form:', 'https://docs.google.com/forms/create'],
-    ['2. Add 68 questions per outline below', ''],
-    ['3. Link form to this sheet:', ''],
-    ['   - In Form: Responses tab → Link to Sheets', ''],
-    ['   - Select this spreadsheet & sheet', ''],
-    ['4. Form responses auto-populate cols A-BP', ''],
-    ['5. Section averages auto-calculate in BT-CD', ''],
-    ['6. Create charts from Chart Data (col CK-CL)', '']
-  ];
-
-  for (var ins = 0; ins < instructions.length; ins++) {
-    sheet.getRange(instrStart + 1 + ins, dashStart).setValue(instructions[ins][0]);
-    if (instructions[ins][1]) {
-      sheet.getRange(instrStart + 1 + ins, dashStart + 1).setValue(instructions[ins][1])
-        .setFontColor('#1155CC');
+  } else {
+    // ── Response data exists: only append missing question columns ──────────
+    try {
+      var questionsData = getSurveyQuestions();
+      var activeQs = (questionsData.questions || []).filter(function(q) { return q.active; });
+      syncSatisfactionSheetColumns_(activeQs);
+    } catch(e) {
+      Logger.log('createSatisfactionSheet: sync error (non-fatal): ' + e.message);
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 68-QUESTION SURVEY OUTLINE (Reference for Google Form creation)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  var surveyStartRow = 38;
-
-  sheet.getRange(surveyStartRow, dashStart).setValue('📋 68-QUESTION SURVEY OUTLINE')
-    .setFontWeight('bold')
-    .setFontSize(12)
-    .setBackground('#34A853')
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange(surveyStartRow, dashStart, 1, 5).merge();
-
-  // Survey sections with all 68 questions
-  var surveyOutline = [
-    ['SECTION', 'Q#', 'QUESTION', 'TYPE', 'OPTIONS'],
-    ['', '', '', '', ''],
-    ['INTRO', '', 'Union Member Satisfaction Survey', 'Description', 'Anonymous, reported in aggregate'],
-    ['', '', '', '', ''],
-    ['1: WORK CONTEXT', '1', 'Worksite / Program / Region', 'Dropdown', '(Your worksites)'],
-    ['', '2', 'Role / Job Group', 'Dropdown', '(Your roles)'],
-    ['', '3', 'Shift', 'Multiple choice', 'Day | Evening | Night | Rotating'],
-    ['', '4', 'Time in current role', 'Multiple choice', '<1 yr | 1-3 yrs | 4-7 yrs | 8-15 yrs | 15+ yrs'],
-    ['', '5', 'Contact with steward in past 12 months?', 'MC + Branch', 'Yes → 3A | No → 3B'],
-    ['', '', '', '', ''],
-    ['2: OVERALL SAT', '6', 'Satisfied with union representation', '1-10 scale', ''],
-    ['', '7', 'Trust union to act in best interests', '1-10 scale', ''],
-    ['', '8', 'Feel more protected at work', '1-10 scale', ''],
-    ['', '9', 'Would recommend membership to coworker', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['3A: STEWARD (Contact)', '10', 'Responded in timely manner', '1-10 scale', ''],
-    ['', '11', 'Treated me with respect', '1-10 scale', ''],
-    ['', '12', 'Explained options clearly', '1-10 scale', ''],
-    ['', '13', 'Followed through on commitments', '1-10 scale', ''],
-    ['', '14', 'Advocated effectively', '1-10 scale', ''],
-    ['', '15', 'Felt safe raising concerns', '1-10 scale', ''],
-    ['', '16', 'Handled confidentiality appropriately', '1-10 scale', ''],
-    ['', '17', 'What should stewards improve?', 'Paragraph', 'Optional'],
-    ['', '', '', '', ''],
-    ['3B: STEWARD ACCESS', '18', 'Know how to contact steward/rep', '1-10 scale', ''],
-    ['', '19', 'Confident I would get help', '1-10 scale', ''],
-    ['', '20', 'Easy to figure out who to contact', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['4: CHAPTER', '21', 'Reps understand my workplace issues', '1-10 scale', ''],
-    ['', '22', 'Chapter communication is regular and clear', '1-10 scale', ''],
-    ['', '23', 'Chapter organizes members effectively', '1-10 scale', ''],
-    ['', '24', 'Know how to reach chapter contact', '1-10 scale', ''],
-    ['', '25', 'Representation is fair across roles/shifts', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['5: LEADERSHIP', '26', 'Leadership communicates decisions clearly', '1-10 scale', ''],
-    ['', '27', 'Understand how decisions are made', '1-10 scale', ''],
-    ['', '28', 'Union is transparent about finances', '1-10 scale', ''],
-    ['', '29', 'Leadership is accountable to feedback', '1-10 scale', ''],
-    ['', '30', 'Internal processes feel fair', '1-10 scale', ''],
-    ['', '31', 'Union welcomes differing opinions', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['6: CONTRACT', '32', 'Union enforces contract effectively', '1-10 scale', ''],
-    ['', '33', 'Communicates realistic timelines', '1-10 scale', ''],
-    ['', '34', 'Provides clear updates on issues', '1-10 scale', ''],
-    ['', '35', 'Prioritizes frontline conditions', '1-10 scale', ''],
-    ['', '36', 'Filed grievance in past 24 months?', 'MC + Branch', 'Yes → 6A | No → 7'],
-    ['', '', '', '', ''],
-    ['6A: REPRESENTATION', '37', 'Understood steps and timeline', '1-10 scale', ''],
-    ['', '38', 'Felt supported throughout', '1-10 scale', ''],
-    ['', '39', 'Received updates often enough', '1-10 scale', ''],
-    ['', '40', 'Outcome feels justified', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['7: COMMUNICATION', '41', 'Communications are clear and actionable', '1-10 scale', ''],
-    ['', '42', 'Receive enough information', '1-10 scale', ''],
-    ['', '43', 'Can find information easily', '1-10 scale', ''],
-    ['', '44', 'Communications reach all shifts/locations', '1-10 scale', ''],
-    ['', '45', 'Meetings are worth attending', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['8: MEMBER VOICE', '46', 'My voice matters in the union', '1-10 scale', ''],
-    ['', '47', 'Union actively seeks input', '1-10 scale', ''],
-    ['', '48', 'Members treated with dignity', '1-10 scale', ''],
-    ['', '49', 'Newer members are supported', '1-10 scale', ''],
-    ['', '50', 'Internal conflict handled respectfully', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['9: VALUE & ACTION', '51', 'Union provides good value for dues', '1-10 scale', ''],
-    ['', '52', 'Priorities reflect member needs', '1-10 scale', ''],
-    ['', '53', 'Union prepared to mobilize', '1-10 scale', ''],
-    ['', '54', 'Understand how to get involved', '1-10 scale', ''],
-    ['', '55', 'Acting together, we can win improvements', '1-10 scale', ''],
-    ['', '', '', '', ''],
-    ['10: SCHEDULING', '56', 'Understand proposed changes', '1-10 scale', ''],
-    ['', '57', 'Feel adequately informed', '1-10 scale', ''],
-    ['', '58', 'Decisions use clear criteria', '1-10 scale', ''],
-    ['', '59', 'Work can be done under expectations', '1-10 scale', ''],
-    ['', '60', 'Approach supports effective outcomes', '1-10 scale', ''],
-    ['', '61', 'Approach supports my wellbeing', '1-10 scale', ''],
-    ['', '62', 'My concerns would be taken seriously', '1-10 scale', ''],
-    ['', '63', 'Biggest scheduling challenge?', 'Paragraph', 'Optional'],
-    ['', '', '', '', ''],
-    ['11: PRIORITIES', '64', 'Top 3 priorities (6-12 mo)', 'Checkboxes', 'Contract | Workload | Scheduling | Pay | Safety | Training | Equity | Comm | Steward | Organizing | Other'],
-    ['', '65', '#1 change union should make', 'Paragraph', ''],
-    ['', '66', 'One thing union should keep doing', 'Paragraph', ''],
-    ['', '67', 'Additional comments (no names)', 'Paragraph', 'Optional'],
-    ['', '', '', '', ''],
-    ['BRANCHING:', '', 'Q5: Yes → Section 3A, No → Section 3B', '', ''],
-    ['', '', 'Q36: Yes → Section 6A, No → Section 7', '', '']
-  ];
-
-  sheet.getRange(surveyStartRow + 1, dashStart, surveyOutline.length, 5).setValues(surveyOutline);
-
-  // Format survey outline
-  sheet.getRange(surveyStartRow + 1, dashStart, 1, 5)
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY);
-
-  // Format section headers
-  for (var so = surveyStartRow + 2; so <= surveyStartRow + surveyOutline.length; so++) {
-    var sectionVal = sheet.getRange(so, dashStart).getValue();
-    if (sectionVal && sectionVal.toString().includes(':')) {
-      sheet.getRange(so, dashStart, 1, 5).setBackground('#E8F0FE').setFontWeight('bold');
-    }
-  }
-
-  // Column widths for survey outline
-  sheet.setColumnWidth(dashStart + 2, 280);  // Question column
-  sheet.setColumnWidth(dashStart + 3, 80);   // Type
-  sheet.setColumnWidth(dashStart + 4, 200);  // Options
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // NO VERIFICATION COLUMNS ON THIS SHEET (v4.8 — Vault Architecture)
-  // All email/member ID linkage is stored in the protected _Survey_Vault sheet.
-  // This sheet contains ZERO data that can link a response to a person.
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Delete excess columns after the dashboard/chart area (keep through col 82 + dashboard)
-  var maxCols = sheet.getMaxColumns();
-  if (maxCols > 89) {
-    sheet.deleteColumns(90, maxCols - 89);
-  }
-
-  // Populate computed values (no formulas in visible sheet)
-  syncSatisfactionValues();
-
-  // Ensure vault sheet exists for hashed PII isolation
-  setupSurveyVaultSheet();
-
-  Logger.log('Member Satisfaction sheet created — hashed PII stored in _Survey_Vault (protected)');
-
-  // Set tab color
   sheet.setTabColor(COLORS.UNION_GREEN);
+  Logger.log('createSatisfactionSheet: ' + (hasUserData ? 'Synced columns (data preserved)' : 'Rebuilt with dynamic headers'));
 }
 
 // ============================================================================
@@ -512,7 +335,7 @@ function createFeedbackSheet(ss) {
   sheet.setColumnWidth(FEEDBACK_COLS.TIMESTAMP, 140);
   sheet.setColumnWidth(FEEDBACK_COLS.SUBMITTED_BY, 120);
   sheet.setColumnWidth(FEEDBACK_COLS.CATEGORY, 120);
-  sheet.setColumnWidth(FEEDBACK_COLS.TYPE, 120);
+  // TYPE column removed v4.24.1
   sheet.setColumnWidth(FEEDBACK_COLS.PRIORITY, 80);
   sheet.setColumnWidth(FEEDBACK_COLS.TITLE, 200);
   sheet.setColumnWidth(FEEDBACK_COLS.DESCRIPTION, 350);
@@ -642,13 +465,7 @@ function createFeedbackSheet(ss) {
     .build();
   sheet.getRange(2, FEEDBACK_COLS.CATEGORY, 998, 1).setDataValidation(categoryRule);
 
-  // Type dropdown
-  var typeOptions = ['Bug', 'Feature Request', 'Improvement', 'Documentation', 'Question'];
-  var typeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(typeOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange(2, FEEDBACK_COLS.TYPE, 998, 1).setDataValidation(typeRule);
+  // TYPE dropdown removed v4.24.1 — Category covers same ground
 
   // Priority dropdown with conditional formatting
   var priorityOptions = ['Low', 'Medium', 'High', 'Critical'];
@@ -1633,7 +1450,9 @@ function createFAQSheet(ss) {
     ['Q: How do I populate the tracker for the first time?',
      'A: Click "Refresh Member List" in the Survey Completion Tracker dialog, or run populateSurveyTrackingFromMembers(). This copies all members from the Member Directory into the tracking sheet with initial status "Not Completed". Safe to re-run — it rebuilds from the directory.'],
     ['Q: Where is the survey tracking data stored?',
-     'A: Three separate sheets: (1) _Survey_Tracking stores completion status (who submitted, not what they answered). (2) _Survey_Vault stores SHA-256 hashed emails and hashed member IDs — these cannot be reversed to reveal identities. (3) The Satisfaction sheet stores anonymous survey answers with zero identifying data. Even with access to all three sheets, it is cryptographically impossible to link any answer to a person.']
+     'A: Three separate sheets: (1) _Survey_Tracking stores completion status (who submitted, not what they answered). (2) _Survey_Vault stores SHA-256 hashed emails and hashed member IDs — these cannot be reversed to reveal identities. (3) The Satisfaction sheet stores anonymous survey answers with zero identifying data. Even with access to all three sheets, it is cryptographically impossible to link any answer to a person.'],
+    ['Q: The survey system is installed — why aren\'t members seeing it yet?',
+     'A: The survey engine is deployed and ready but has NOT been initialized. A one-time setup is required before members can access it.\n\nBEFORE initializing, do these steps:\n  1. Open the \u{1F4CB} Survey Questions sheet. You can edit: Question Text (col 5), Active on/off (col 8), Options (col 9), Slider Labels (cols 14-15). No redeployment needed for any of these edits.\n  2. Check the Config tab \u2192 Survey Priority Options row to set the Q64 top-priority choices.\n\nWhen ready to go live:\n  Go to Extensions \u2192 Apps Script \u2192 find initSurveyEngine() \u2192 run it once.\n\nThis creates the first active survey period, installs the quarterly auto-trigger, and immediately enables the survey for all members.\n\nWARNING: Running initSurveyEngine() opens a live survey period and will notify members. Do not run it until you are fully ready.']
   ];
 
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {

@@ -34,13 +34,13 @@ function initStewardView(container) {
   // Fallback: load individually (batch unavailable)
   serverCall().withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
-  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(CURRENT_USER.email, 'steward');
+  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(SESSION_TOKEN, 'steward');
 
   // Fire member and task count fetches in parallel — non-blocking.
   // AppState is updated when they arrive; badges render on next nav redraw.
   serverCall().withSuccessHandler(function(members) {
     AppState.memberCount = (members || []).length;
-  }).withFailureHandler(function() { AppState.memberCount = 0; }).dataGetAllMembers();
+  }).withFailureHandler(function() { AppState.memberCount = 0; }).dataGetAllMembers(SESSION_TOKEN);
 
   serverCall().withSuccessHandler(function(tasks) {
     var open = (tasks || []).filter(function(t) { return t.status !== 'completed'; });
@@ -49,7 +49,7 @@ function initStewardView(container) {
   }).withFailureHandler(function() {
     AppState.taskCount = 0;
     AppState.overdueTaskCount = 0;
-  }).dataGetTasks(CURRENT_USER.email, null);
+  }).dataGetTasks(SESSION_TOKEN, null);
 
   serverCall()
     .withSuccessHandler(function(cases) {
@@ -67,14 +67,14 @@ function initStewardView(container) {
           renderStewardDashboard(container);
           _checkDeepLink('steward');
         })
-        .dataGetStewardKPIs(CURRENT_USER.email);
+        .dataGetStewardKPIs(SESSION_TOKEN);
     })
     .withFailureHandler(function() {
       AppState.cases = [];
       AppState.loading = false;
       renderStewardDashboard(container);
     })
-    .dataGetStewardCases(CURRENT_USER.email);
+    .dataGetStewardCases(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════
@@ -154,7 +154,7 @@ function renderStewardDashboard(appContainer) {
         if (cards[1]) { cards[1].textContent = String(stats.overdueCount || 0); if (stats.overdueCount > 0) cards[1].style.color = 'var(--danger)'; }
         if (cards[2]) { cards[2].textContent = String(stats.dueSoonCount || 0); if (stats.dueSoonCount > 0) cards[2].style.color = 'var(--warning)'; }
         if (cards[3]) cards[3].textContent = String(stats.settledCount || stats.wonCount || 0);
-      }).dataGetGrievanceStats();
+      }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
       var kpiItems = [
         { label: 'My Cases', value: kpis.totalCases || 0 },
@@ -291,7 +291,7 @@ function _maybeShowWelcome(slot, viewRole) {
     }, 'Got it!'));
 
     slot.appendChild(card);
-  }).dataGetWelcomeData(CURRENT_USER.email);
+  }).dataGetWelcomeData(SESSION_TOKEN);
 }
 
 /**
@@ -304,7 +304,7 @@ function _dismissWelcome(cardEl) {
     cardEl.style.transition = 'opacity 0.3s ease';
     setTimeout(function() { cardEl.remove(); }, 300);
   }
-  serverCall().withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
+  serverCall().withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(SESSION_TOKEN);
 }
 
 function renderCaseList(container, filter) {
@@ -353,7 +353,7 @@ function renderCaseList(container, filter) {
         }
       }).withFailureHandler(function() {
         agencyCharts.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load agency stats.'));
-      }).dataGetGrievanceStats();
+      }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
         'No ' + filter + ' cases.'));
@@ -421,7 +421,7 @@ function _refreshNavBadges() {
     // Re-fetch KPIs (case overdue count may have changed)
     serverCall().withSuccessHandler(function(kpis) {
       if (kpis) AppState.kpis = kpis;
-    }).withFailureHandler(function() {}).dataGetStewardKPIs(CURRENT_USER.email);
+    }).withFailureHandler(function() {}).dataGetStewardKPIs(SESSION_TOKEN);
 
     // Re-fetch open tasks, then swap nav
     serverCall().withSuccessHandler(function(tasks) {
@@ -460,8 +460,8 @@ function _refreshNavBadges() {
           var newNav = replacement.querySelector('.bottom-nav');
           if (newNav) parent.replaceChild(newNav, replacement);
         }
-      }).qaGetQuestions(CURRENT_USER.email, 1, 999, 'recent');
-    }).withFailureHandler(function() {}).dataGetTasks(CURRENT_USER.email, null);
+      }).qaGetQuestions(SESSION_TOKEN, 1, 999, 'recent');
+    }).withFailureHandler(function() {}).dataGetTasks(SESSION_TOKEN, null);
   }, 600);
 }
 
@@ -595,7 +595,7 @@ function renderStewardMembers(appContainer) {
           var searchEl = content.querySelector('.search-input');
           if (searchEl) content.insertBefore(locCard, searchEl);
           else content.appendChild(locCard);
-        }).withFailureHandler(function() { /* chart optional — skip on error */ }).dataGetStewardMemberStats(CURRENT_USER.email);
+        }).withFailureHandler(function() { /* chart optional — skip on error */ }).dataGetStewardMemberStats(SESSION_TOKEN);
       }
 
       // Sort & Filter controls
@@ -665,7 +665,7 @@ function renderStewardMembers(appContainer) {
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--danger)' } }, 'Failed to load members. Try refreshing.'));
-    }).dataGetAllMembers();
+    }).dataGetAllMembers(SESSION_TOKEN);
   });
 }
 
@@ -892,7 +892,7 @@ function _showMemberDetail(container, itemEl, member) {
               statusMsg.style.color = 'var(--danger)';
               submitBtn.disabled = false;
             })
-            .dataLogMemberContact(CURRENT_USER.email, member.email, selectedType, notesInput.value.trim(), '');
+            .dataLogMemberContact(SESSION_TOKEN, member.email, selectedType, notesInput.value.trim(), '');
         }
       }, 'Log');
       var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
@@ -946,7 +946,7 @@ function _showMemberDetail(container, itemEl, member) {
               statusMsg.style.color = 'var(--danger)';
               sendBtn.disabled = false;
             })
-            .dataSendDirectMessage(CURRENT_USER.email, member.email, subjectInput.value.trim(), bodyInput.value.trim());
+            .dataSendDirectMessage(SESSION_TOKEN, member.email, subjectInput.value.trim(), bodyInput.value.trim());
         }
       }, 'Send');
       var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
@@ -981,7 +981,7 @@ function _showMemberDetail(container, itemEl, member) {
           caseFolderBtn.textContent = '\uD83D\uDCC2 Case Folder';
           actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '6px' } }, 'Failed to fetch case folder.'));
         })
-        .dataGetMemberCaseFolderUrl(CURRENT_USER.email, member.email);
+        .dataGetMemberCaseFolderUrl(SESSION_TOKEN, member.email);
     }
   }, '\uD83D\uDCC2 Case Folder');
 
@@ -1141,7 +1141,7 @@ function renderBroadcast(appContainer) {
     }).withFailureHandler(function() {
       recipientPreview.textContent = 'Failed to load filters. You can still send to all members.';
       recipientPreview.style.color = 'var(--danger)';
-    }).dataGetBroadcastFilterOptions(CURRENT_USER.email);
+    }).dataGetBroadcastFilterOptions(SESSION_TOKEN);
 
     // ── Subject line ──────────────────────────────────────
     var subjectGroup = el('div', { className: 'form-group' });
@@ -1188,7 +1188,7 @@ function renderBroadcast(appContainer) {
         }).withFailureHandler(function() {
           statusMsg.textContent = 'Error sending. Try again.';
           statusMsg.style.color = 'var(--danger)';
-        }).dataSendBroadcast(CURRENT_USER.email, filter, msg, customSubject);
+        }).dataSendBroadcast(SESSION_TOKEN, filter, msg, customSubject);
       }
     }, 'Send Broadcast'));
 
@@ -1283,7 +1283,7 @@ function renderStewardNotifications(appContainer) {
                   if (badge) badge.remove();
                 }
               }
-            }).dismissWebAppNotification(n.id);
+            }).dismissWebAppNotification(SESSION_TOKEN, n.id);
           }}, '\u2715');
           card.appendChild(dismissBtn);
           target.appendChild(card);
@@ -1291,7 +1291,7 @@ function renderStewardNotifications(appContainer) {
       }).withFailureHandler(function() {
         target.innerHTML = '';
         target.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--danger)' } }, 'Failed to load notifications.'));
-      }).getWebAppNotifications(CURRENT_USER.email, 'steward');
+      }).getWebAppNotifications(SESSION_TOKEN, 'steward');
     }
 
     // --- Compose: send new notification ---
@@ -1455,7 +1455,7 @@ function renderStewardNotifications(appContainer) {
           sendBtn.disabled = false;
           statusMsg.textContent = 'Error sending. Try again.';
           statusMsg.style.color = 'var(--danger)';
-        }).sendWebAppNotification({
+        }).sendWebAppNotification(SESSION_TOKEN, {
           recipient: selectedRecipient,
           type: typeSelect.value,
           title: titleInput.value.trim(),
@@ -1540,7 +1540,7 @@ function renderStewardNotifications(appContainer) {
                 }).withFailureHandler(function() {
                   archiveBtn.textContent = 'Archive';
                   archiveBtn.disabled = false;
-                }).archiveWebAppNotification(n.id);
+                }).archiveWebAppNotification(SESSION_TOKEN, n.id);
               }
             }, 'Archive');
             row.appendChild(archiveBtn);
@@ -1551,7 +1551,7 @@ function renderStewardNotifications(appContainer) {
       }).withFailureHandler(function() {
         target.innerHTML = '';
         target.appendChild(el('div', { style: { padding: '24px', color: 'var(--danger)' } }, 'Failed to load.'));
-      }).getAllWebAppNotifications();
+      }).getAllWebAppNotifications(SESSION_TOKEN);
     }
 
     refreshSubTabs();
@@ -1750,12 +1750,12 @@ function renderStewardResources(appContainer) {
             if (r.visible) {
               row.appendChild(el('button', { className: 'icon-btn', style: { fontSize: '14px', color: 'var(--danger)' }, onClick: function() {
                 if (confirm('Hide "' + r.title + '"? It can be restored later.')) {
-                  serverCall().withSuccessHandler(function() { loadResourceList(); }).deleteWebAppResource(r.id);
+                  serverCall().withSuccessHandler(function() { loadResourceList(); }).deleteWebAppResource(SESSION_TOKEN, r.id);
                 }
               }}, '\uD83D\uDDD1'));
             } else {
               row.appendChild(el('button', { className: 'icon-btn', style: { fontSize: '14px', color: 'var(--success)' }, onClick: function() {
-                serverCall().withSuccessHandler(function() { loadResourceList(); }).restoreWebAppResource(r.id);
+                serverCall().withSuccessHandler(function() { loadResourceList(); }).restoreWebAppResource(SESSION_TOKEN, r.id);
               }}, '\u21A9'));
             }
             tableWrap.appendChild(row);
@@ -1885,7 +1885,7 @@ function renderStewardResources(appContainer) {
             }).withFailureHandler(function() {
               saveBtn.textContent = 'Save'; saveBtn.disabled = false;
               statusMsg.textContent = 'Error saving.'; statusMsg.style.color = 'var(--danger)';
-            }).updateWebAppResource(existing.id, payload);
+            }).updateWebAppResource(SESSION_TOKEN, existing.id, payload);
           } else {
             serverCall().withSuccessHandler(function(r) {
               saveBtn.textContent = 'Save'; saveBtn.disabled = false;
@@ -1894,7 +1894,7 @@ function renderStewardResources(appContainer) {
             }).withFailureHandler(function() {
               saveBtn.textContent = 'Save'; saveBtn.disabled = false;
               statusMsg.textContent = 'Error saving.'; statusMsg.style.color = 'var(--danger)';
-            }).addWebAppResource(payload);
+            }).addWebAppResource(SESSION_TOKEN, payload);
           }
         }}, 'Save');
         var cancelBtn = el('button', { className: 'btn', style: { background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }, onClick: function() {
@@ -1961,7 +1961,7 @@ function renderSurveyTracking(appContainer) {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) renderSurveyTracking(appContainer);
             else alert('Error: ' + (r && r.message));
-          }).dataOpenNewSurveyPeriod();
+          }).dataOpenNewSurveyPeriod(SESSION_TOKEN);
         } }, 'Open New Period'));
         periodBar.appendChild(closedBar);
       }
@@ -2009,7 +2009,7 @@ function renderSurveyTracking(appContainer) {
           kpiRow.appendChild(kpi);
         });
         kpiWrap.appendChild(kpiRow);
-      }).withFailureHandler(function() {}).dataGetSatisfactionSummary();
+      }).withFailureHandler(function() {}).dataGetSatisfactionSummary(SESSION_TOKEN);
 
       // ── Pending member list ────────────────────────────────────────────
       if (!total) {
@@ -2036,7 +2036,7 @@ function renderSurveyTracking(appContainer) {
     }).withFailureHandler(function() {
       dataWrap.innerHTML = '';
       dataWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load survey data.'));
-    }).dataGetPendingSurveyMembers();
+    }).dataGetPendingSurveyMembers(SESSION_TOKEN);
   });
 }
 
@@ -2135,7 +2135,7 @@ function renderStewardMore(appContainer) {
         saveRow.style.color = 'var(--danger)';
         saveRow.style.display = 'block';
         setTimeout(function() { saveRow.style.display = 'none'; }, 3000);
-      }).dataUpdateProfile(CURRENT_USER.email, { sharePhone: newVal ? 'Yes' : 'No' });
+      }).dataUpdateProfile(SESSION_TOKEN, { sharePhone: newVal ? 'Yes' : 'No' });
     });
 
     content.appendChild(phoneCard);
@@ -2275,7 +2275,7 @@ function _renderContactForm(container) {
     serverCall()
       .withSuccessHandler(function(m) { _acMembers = m || []; cb(_acMembers); })
       .withFailureHandler(function() { _acMembers = []; cb(_acMembers); })
-      .dataGetAllMembers();
+      .dataGetAllMembers(SESSION_TOKEN);
   }
   memberInput.addEventListener('input', function() {
     var q = memberInput.value.toLowerCase().trim();
@@ -2346,7 +2346,7 @@ function _renderContactForm(container) {
         statusMsg.textContent = r && r.success ? 'Contact logged!' : 'Error logging contact.';
         statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
         if (r && r.success) { memberInput.value = ''; notesInput.value = ''; }
-      }).dataLogMemberContact(CURRENT_USER.email, email, selectedType, notesInput.value.trim(), '');
+      }).dataLogMemberContact(SESSION_TOKEN, email, selectedType, notesInput.value.trim(), '');
     }
   }, 'Log Contact'));
 }
@@ -2369,7 +2369,7 @@ function _renderRecentContacts(container) {
       if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
       container.appendChild(card);
     });
-  }).dataGetStewardContactLog(CURRENT_USER.email);
+  }).dataGetStewardContactLog(SESSION_TOKEN);
 }
 
 function _renderContactByMember(container) {
@@ -2400,7 +2400,7 @@ function _renderContactByMember(container) {
           if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
           resultArea.appendChild(card);
         });
-      }).dataGetMemberContactHistory(CURRENT_USER.email, email);
+      }).dataGetMemberContactHistory(SESSION_TOKEN, email);
     }
   }, 'Search'));
 }
@@ -2493,7 +2493,7 @@ function _renderTaskList(container, statusFilter) {
               serverCall().withSuccessHandler(function() {
                 if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                 renderStewardTasks(document.getElementById('app'));
-              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataCompleteTask(CURRENT_USER.email, t.id);
+              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataCompleteTask(SESSION_TOKEN, t.id);
             }
           }, '\u2705 Complete'));
         })(task);
@@ -2528,7 +2528,7 @@ function _renderTaskList(container, statusFilter) {
                     if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                     renderStewardTasks(document.getElementById('app'));
                   } else { alert('Update failed.'); }
-                }).withFailureHandler(function() { alert('Update failed.'); }).dataUpdateTask(CURRENT_USER.email, t.id, updates);
+                }).withFailureHandler(function() { alert('Update failed.'); }).dataUpdateTask(SESSION_TOKEN, t.id, updates);
               }
             }, 'Save');
             editForm.appendChild(titleIn);
@@ -2544,7 +2544,7 @@ function _renderTaskList(container, statusFilter) {
       }
       container.appendChild(card);
     });
-  }).dataGetTasks(CURRENT_USER.email, statusFilter);
+  }).dataGetTasks(SESSION_TOKEN, statusFilter);
 }
 
 function _renderStewardMemberTasks(container) {
@@ -2609,7 +2609,7 @@ function _renderStewardMemberTasks(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load member tasks.'));
-  }).dataGetStewardAssignedMemberTasks(CURRENT_USER.email);
+  }).dataGetStewardAssignedMemberTasks(SESSION_TOKEN);
 }
 
 function _renderNewTaskForm(container, onCreated) {
@@ -2658,9 +2658,9 @@ function _renderNewTaskForm(container, onCreated) {
               }
             });
           }
-        }).withFailureHandler(function() { /* optional — assignment defaults to self */ }).dataGetStewardDirectory();
+        }).withFailureHandler(function() { /* optional — assignment defaults to self */ }).dataGetStewardDirectory(SESSION_TOKEN);
       }
-    }).dataIsChiefSteward(CURRENT_USER.email);
+    }).dataIsChiefSteward(SESSION_TOKEN);
   }
   _checkChief();
 
@@ -2714,18 +2714,18 @@ function _renderNewTaskForm(container, onCreated) {
         if (!memEmail) { statusMsg.textContent = 'Enter member email.'; statusMsg.style.color = 'var(--danger)'; return; }
         serverCall().withSuccessHandler(function(r) {
           if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = r ? r.message : 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-        }).dataCreateMemberTask(CURRENT_USER.email, memEmail, title, descInput.value.trim(), priSelect.value, dueInput.value || '');
+        }).dataCreateMemberTask(SESSION_TOKEN, memEmail, title, descInput.value.trim(), priSelect.value, dueInput.value || '');
       } else {
         // Create steward task
         var assignee = assignSelect ? assignSelect.value : '';
         if (assignee) {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-          }).dataCreateTaskForSteward(CURRENT_USER.email, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+          }).dataCreateTaskForSteward(SESSION_TOKEN, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         } else {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-          }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+          }).dataCreateTask(SESSION_TOKEN, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         }
       }
     }
@@ -2774,7 +2774,7 @@ function renderInsightsPage(appContainer) {
     }).withFailureHandler(function() {
       statsData = (cache && cache.stats) || { available: false };
       tryRender();
-    }).dataGetGrievanceStats();
+    }).dataGetGrievanceStats(SESSION_TOKEN);
 
     serverCall().withSuccessHandler(function(spots) {
       hotSpotsData = spots || [];
@@ -2782,7 +2782,7 @@ function renderInsightsPage(appContainer) {
     }).withFailureHandler(function() {
       hotSpotsData = (cache && cache.hotSpots) || [];
       tryRender();
-    }).dataGetGrievanceHotSpots();
+    }).dataGetGrievanceHotSpots(SESSION_TOKEN);
 
     serverCall().withSuccessHandler(function(perf) {
       perfData = perf || [];
@@ -2790,7 +2790,7 @@ function renderInsightsPage(appContainer) {
     }).withFailureHandler(function() {
       perfData = (cache && cache.perf) || [];
       tryRender();
-    }).dataGetAllStewardPerformance();
+    }).dataGetAllStewardPerformance(SESSION_TOKEN);
 
     serverCall().withSuccessHandler(function(sat) {
       satData = sat || { categories: [] };
@@ -2798,7 +2798,7 @@ function renderInsightsPage(appContainer) {
     }).withFailureHandler(function() {
       satData = (cache && cache.sat) || { categories: [] };
       tryRender();
-    }).dataGetSatisfactionTrends();
+    }).dataGetSatisfactionTrends(SESSION_TOKEN);
   });
 }
 
@@ -3159,7 +3159,7 @@ function renderStewardDirectoryPage(appContainer) {
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load directory.'));
-    }).dataGetStewardDirectory();
+    }).dataGetStewardDirectory(SESSION_TOKEN);
   });
 }
 
@@ -3222,7 +3222,7 @@ function _renderCaseChecklist(container, caseId) {
                 progRow.lastChild.textContent = newCompleted + '/' + items.length + ' (' + newPct + '%)';
               }
               cb.style.opacity = '1';
-            }).withFailureHandler(function() { cb.style.opacity = '1'; }).dataToggleChecklistItem(item.checklistId, !item.completed, CURRENT_USER.email);
+            }).withFailureHandler(function() { cb.style.opacity = '1'; }).dataToggleChecklistItem(SESSION_TOKEN, item.checklistId, !item.completed);
           }
         });
         var cb = el('span', { style: { fontSize: '16px', color: item.completed ? 'var(--success)' : 'var(--muted)', cursor: 'pointer' } }, item.completed ? '\u2611' : '\u2610');
@@ -3344,7 +3344,7 @@ function _renderLivePollsSteward(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
-  }).wqGetActiveQuestions();
+  }).wqGetActiveQuestions(SESSION_TOKEN);
 }
 
 function _renderCreateStewardPoll(container) {
@@ -3429,11 +3429,53 @@ function _renderCreateStewardPoll(container) {
   freqCard.appendChild(freqStatus);
   container.appendChild(freqCard);
 
-  // Pool count info
+  // Community pool card — pool count + manual draw trigger
   serverCall().withSuccessHandler(function(count) {
-    var infoDiv = el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '14px', padding: '10px', border: '1px solid var(--border)', borderRadius: '8px' } },
-      '🌐 Community pool: ' + (count || 0) + ' poll' + (count !== 1 ? 's' : '') + ' submitted by members. One is drawn randomly each period — you cannot select which one.');
-    container.appendChild(infoDiv);
+    var poolCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginTop: '14px' } });
+    poolCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, '🌐 Community Poll Pool'));
+    poolCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } },
+      (count || 0) + ' question' + (count !== 1 ? 's' : '') + ' in the pool. One is drawn randomly each period — you cannot select which one. Use this to release the community poll now without waiting for the Monday trigger.'));
+
+    var drawStatus = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '6px' } });
+    var drawBtn = el('button', {
+      className: 'btn btn-secondary',
+      style: { width: 'auto', padding: '8px 18px', fontSize: '12px' },
+      onClick: function() {
+        if (count === 0) {
+          drawStatus.textContent = 'Pool is empty — members must submit poll questions first.';
+          drawStatus.style.color = 'var(--danger)';
+          return;
+        }
+        drawBtn.textContent = 'Drawing…';
+        drawBtn.disabled = true;
+        drawStatus.textContent = '';
+        serverCall().withSuccessHandler(function(result) {
+          drawBtn.disabled = false;
+          drawBtn.textContent = 'Draw Community Poll';
+          if (result && result.success) {
+            drawStatus.textContent = '✅ Community poll released: "' + (result.text || '').substring(0, 60) + (result.text && result.text.length > 60 ? '…' : '') + '"';
+            drawStatus.style.color = 'var(--success)';
+          } else {
+            drawStatus.textContent = (result && result.message) || 'Draw failed.';
+            drawStatus.style.color = 'var(--danger)';
+          }
+        }).withFailureHandler(function() {
+          drawBtn.disabled = false;
+          drawBtn.textContent = 'Draw Community Poll';
+          drawStatus.textContent = 'Request failed.';
+          drawStatus.style.color = 'var(--danger)';
+        }).wqManualDrawCommunityPoll();
+      }
+    }, 'Draw Community Poll');
+
+    if (count === 0) {
+      drawBtn.disabled = true;
+      drawBtn.title = 'No questions in pool yet';
+    }
+
+    poolCard.appendChild(drawBtn);
+    poolCard.appendChild(drawStatus);
+    container.appendChild(poolCard);
   }).wqGetPoolCount();
 }
 
@@ -3651,7 +3693,7 @@ function _renderAddMinutes(container, onSaveSuccess) {
         }
       }).withFailureHandler(function() {
         statusMsg.textContent = 'Failed to save minutes.'; statusMsg.style.color = 'var(--danger)';
-      }).dataAddMeetingMinutes(CURRENT_USER.email, { title: title, meetingDate: dateInput.value, bullets: bulletsInput.value.trim(), fullMinutes: fullInput.value.trim() });
+      }).dataAddMeetingMinutes(SESSION_TOKEN, { title: title, meetingDate: dateInput.value, bullets: bulletsInput.value.trim(), fullMinutes: fullInput.value.trim() });
     }
   }, 'Save Minutes'));
 
@@ -3747,7 +3789,7 @@ function _renderFeedbackForm(container) {
         }
       }).withFailureHandler(function() {
         statusMsg.textContent = 'Failed to submit.'; statusMsg.style.color = 'var(--danger)';
-      }).dataSubmitFeedback(CURRENT_USER.email, {
+      }).dataSubmitFeedback(SESSION_TOKEN, {
         category: categorySelect.value, type: '', priority: selectedPriority,
         title: title, description: descInput.value.trim()
       });
@@ -3782,7 +3824,7 @@ function _renderMyFeedback(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load feedback.'));
-  }).dataGetMyFeedback(CURRENT_USER.email);
+  }).dataGetMyFeedback(); // email resolved server-side (v4.24.1)
 }
 
 // ═══════════════════════════════════════
@@ -3809,7 +3851,7 @@ function renderFailsafePage(appContainer) {
           else { exportStatus.textContent = r ? r.message : 'Error.'; exportStatus.style.color = 'var(--danger)'; }
         }).withFailureHandler(function() {
           exportStatus.textContent = 'Failed to send exports.'; exportStatus.style.color = 'var(--danger)';
-        }).fsTriggerBulkExport(CURRENT_USER.email);
+        }).fsTriggerBulkExport(SESSION_TOKEN);
       }
     }, 'Send Data to All Members'));
     content.appendChild(exportCard);
@@ -3829,7 +3871,7 @@ function renderFailsafePage(appContainer) {
           else { backupStatus.textContent = 'Backup failed.'; backupStatus.style.color = 'var(--danger)'; }
         }).withFailureHandler(function() {
           backupStatus.textContent = 'Backup failed.'; backupStatus.style.color = 'var(--danger)';
-        }).fsBackupCriticalSheets();
+        }).fsBackupCriticalSheets(SESSION_TOKEN);
       }
     }, 'Backup Now'));
     content.appendChild(backupCard);
@@ -3848,7 +3890,7 @@ function renderFailsafePage(appContainer) {
         serverCall().withSuccessHandler(function(r) {
           triggerStatus.textContent = r && r.success ? r.message : 'Error.';
           triggerStatus.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
-        }).fsSetupTriggers();
+        }).fsSetupTriggers(SESSION_TOKEN);
       }
     }, 'Install Triggers'));
     triggerBtns.appendChild(el('button', {
@@ -3858,7 +3900,7 @@ function renderFailsafePage(appContainer) {
         serverCall().withSuccessHandler(function(r) {
           triggerStatus.textContent = r && r.success ? r.removed + ' triggers removed.' : 'Error.';
           triggerStatus.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
-        }).fsRemoveTriggers();
+        }).fsRemoveTriggers(SESSION_TOKEN);
       }
     }, 'Remove Triggers'));
     triggerCard.appendChild(triggerBtns);

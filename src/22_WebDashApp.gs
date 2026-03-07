@@ -91,9 +91,15 @@ function doGetWebDashboard(e) {
     }
 
     // Handle "remember me" — create session token if requested
+    // Also echo back an existing validated session token so the client always has
+    // SESSION_TOKEN populated for non-SSO auth (magic link + remember me, or returning
+    // session users). This is safe: the token was already validated by resolveUser().
     var sessionToken = null;
     if (e.parameter.remember === '1' && user.method === 'magic') {
       sessionToken = Auth.createSessionToken(user.email);
+    } else if (user.method === 'session' && e.parameter.sessionToken) {
+      // Echo back the already-validated session token so the client can use it
+      sessionToken = e.parameter.sessionToken;
     }
 
     // Route to appropriate dashboard
@@ -235,6 +241,11 @@ function _sanitizeConfig(config) {
     // surveyFormUrl removed v4.22.7 — survey is native webapp (renderSurveyFormPage in member_view.html)
     orgWebsite: config.orgWebsite || '',
     broadcastScopeAll: (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes'),
+    // v4.20.18: folder IDs needed client-side for Drive links and warnings
+    minutesFolderId:    config.minutesFolderId    || '',
+    grievancesFolderId: config.grievancesFolderId || '',
+    // v4.20.18: insights cache TTL exposed so client can show staleness info
+    insightsCacheTTLMin: config.insightsCacheTTLMin || 5,
   };
 }
 

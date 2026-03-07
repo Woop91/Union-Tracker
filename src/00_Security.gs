@@ -261,7 +261,17 @@ function sanitizeForQuery(value) {
  * @param {string} [requiredRole] - Optional role requirement ('steward', 'admin')
  * @returns {Object} Authorization result with isAuthorized and user info
  */
-function checkWebAppAuthorization(requiredRole) {
+/**
+ * Checks if the caller is authorized for the given role.
+ *
+ * In "Execute as: Me" web apps, Session.getActiveUser() returns empty for
+ * magic link / session token users. Pass sessionToken to cover that path.
+ *
+ * @param {string} requiredRole - 'steward', 'admin', or any role
+ * @param {string=} sessionToken - Optional session token to verify identity when SSO unavailable
+ * @returns {Object} { isAuthorized, user, email, role, message }
+ */
+function checkWebAppAuthorization(requiredRole, sessionToken) {
   var result = {
     isAuthorized: false,
     user: null,
@@ -276,6 +286,12 @@ function checkWebAppAuthorization(requiredRole) {
     // getActiveUser() returns the real user who is making the request.
     var user = Session.getActiveUser();
     var email = user ? user.getEmail() : null;
+
+    // Fallback for magic link / session token users (getActiveUser() is empty in Execute-as-Me)
+    if (!email && sessionToken && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
+      email = Auth.resolveEmailFromToken(sessionToken) || null;
+      user = null; // no GAS user object available for token-based auth
+    }
 
     if (!email) {
       result.message = 'Authentication required';

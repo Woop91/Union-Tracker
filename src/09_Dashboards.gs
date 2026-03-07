@@ -520,6 +520,7 @@ function getSatisfactionDashboardHtml() {
  * Get overview data for satisfaction dashboard
  */
 function getSatisfactionOverviewData() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -588,8 +589,10 @@ function getSatisfactionOverviewData() {
     data.npsScore = Math.round(((promoters - detractors) / validCount) * 100);
   }
 
-  // Get steward ratings (Q10-Q16, columns K-Q)
-  var stewardRange = sheet.getRange(2, SATISFACTION_COLS.Q10_TIMELY_RESPONSE, data.totalResponses, 7).getValues();
+  // Get steward ratings (Q10-Q16) — guard against col=0 when schema not yet initialized
+  var stewardRange = (SATISFACTION_COLS.Q10_TIMELY_RESPONSE > 0)
+    ? sheet.getRange(2, SATISFACTION_COLS.Q10_TIMELY_RESPONSE, data.totalResponses, 7).getValues()
+    : [];
   var sumSteward = 0, stewardCount = 0;
 
   stewardRange.forEach(function(row) {
@@ -608,8 +611,10 @@ function getSatisfactionOverviewData() {
     data.avgSteward = sumSteward / stewardCount;
   }
 
-  // Get leadership ratings (Q26-Q31, columns AA-AF)
-  var leadershipRange = sheet.getRange(2, SATISFACTION_COLS.Q26_DECISIONS_CLEAR, data.totalResponses, 6).getValues();
+  // Get leadership ratings (Q26-Q31) — guard against col=0 when schema not yet initialized
+  var leadershipRange = (SATISFACTION_COLS.Q26_DECISIONS_CLEAR > 0)
+    ? sheet.getRange(2, SATISFACTION_COLS.Q26_DECISIONS_CLEAR, data.totalResponses, 6).getValues()
+    : [];
   var sumLeadership = 0, leadershipCount = 0;
 
   leadershipRange.forEach(function(row) {
@@ -700,6 +705,7 @@ function getSatisfactionOverviewData() {
  * @returns {Object} Aggregate satisfaction metrics
  */
 function getAggregateSatisfactionStats() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -716,7 +722,7 @@ function getAggregateSatisfactionStats() {
 
   // Get data starting from row 2 (skip header)
   var lastRow = sheet.getLastRow();
-  var data = sheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.AVG_SCHEDULING || 82).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
 
   // Load vault data to check verified/isLatest status (PII stays in vault)
   var vaultMap = getVaultDataMap_();
@@ -760,26 +766,23 @@ function getAggregateSatisfactionStats() {
       trustCount++;
     }
 
-    // Steward Rating (average of Q10-Q16)
-    var stewardAvg = parseFloat(row[SATISFACTION_COLS.AVG_STEWARD_RATING - 1]);
-    if (!isNaN(stewardAvg)) {
-      stewardSum += stewardAvg;
-      stewardCount++;
-    }
+    // Steward Rating — inline average of Q10-Q16 (v4.23.0: no pre-computed AVG col)
+    var stewardVals = [SATISFACTION_COLS.Q10_TIMELY_RESPONSE,SATISFACTION_COLS.Q11_TREATED_RESPECT,SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS,SATISFACTION_COLS.Q13_FOLLOWED_THROUGH,SATISFACTION_COLS.Q14_ADVOCATED,SATISFACTION_COLS.Q15_SAFE_CONCERNS,SATISFACTION_COLS.Q16_CONFIDENTIALITY]
+      .map(function(col){return col ? parseFloat(row[col-1]) : NaN;}).filter(function(v){return !isNaN(v)&&v>=1&&v<=10;});
+    var stewardAvg = stewardVals.length ? stewardVals.reduce(function(a,b){return a+b;},0)/stewardVals.length : NaN;
+    if (!isNaN(stewardAvg)) { stewardSum += stewardAvg; stewardCount++; }
 
-    // Leadership (average of Q26-Q31)
-    var leadershipAvg = parseFloat(row[SATISFACTION_COLS.AVG_LEADERSHIP - 1]);
-    if (!isNaN(leadershipAvg)) {
-      leadershipSum += leadershipAvg;
-      leadershipCount++;
-    }
+    // Leadership — inline average of Q26-Q31
+    var ldVals = [SATISFACTION_COLS.Q26_DECISIONS_CLEAR,SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS,SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE,SATISFACTION_COLS.Q29_ACCOUNTABLE,SATISFACTION_COLS.Q30_FAIR_PROCESSES,SATISFACTION_COLS.Q31_WELCOMES_OPINIONS]
+      .map(function(col){return col ? parseFloat(row[col-1]) : NaN;}).filter(function(v){return !isNaN(v)&&v>=1&&v<=10;});
+    var leadershipAvg = ldVals.length ? ldVals.reduce(function(a,b){return a+b;},0)/ldVals.length : NaN;
+    if (!isNaN(leadershipAvg)) { leadershipSum += leadershipAvg; leadershipCount++; }
 
-    // Communication (average of Q41-Q45)
-    var commAvg = parseFloat(row[SATISFACTION_COLS.AVG_COMMUNICATION - 1]);
-    if (!isNaN(commAvg)) {
-      commSum += commAvg;
-      commCount++;
-    }
+    // Communication — inline average of Q41-Q45
+    var commVals = [SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE,SATISFACTION_COLS.Q42_ENOUGH_INFO,SATISFACTION_COLS.Q43_FIND_EASILY,SATISFACTION_COLS.Q44_ALL_SHIFTS,SATISFACTION_COLS.Q45_MEETINGS_WORTH]
+      .map(function(col){return col ? parseFloat(row[col-1]) : NaN;}).filter(function(v){return !isNaN(v)&&v>=1&&v<=10;});
+    var commAvg = commVals.length ? commVals.reduce(function(a,b){return a+b;},0)/commVals.length : NaN;
+    if (!isNaN(commAvg)) { commSum += commAvg; commCount++; }
 
     // Track by quarter for trend (quarter stored in vault, attached above)
     var quarter = row._vaultQuarter || '';
@@ -818,6 +821,7 @@ function getAggregateSatisfactionStats() {
  * Get individual response data for satisfaction dashboard
  */
 function getSatisfactionResponseData() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (!sheet) return [];
@@ -830,15 +834,18 @@ function getSatisfactionResponseData() {
   var numRows = lastRow - 1;
   var tz = Session.getScriptTimeZone();
 
-  // Get worksite, role, shift, time in role, steward contact, and satisfaction scores
-  var worksiteData = sheet.getRange(2, SATISFACTION_COLS.Q1_WORKSITE, numRows, 1).getValues();
-  var roleData = sheet.getRange(2, SATISFACTION_COLS.Q2_ROLE, numRows, 1).getValues();
-  var shiftData = sheet.getRange(2, SATISFACTION_COLS.Q3_SHIFT, numRows, 1).getValues();
-  var timeData = sheet.getRange(2, SATISFACTION_COLS.Q4_TIME_IN_ROLE, numRows, 1).getValues();
-  var stewardContactData = sheet.getRange(2, SATISFACTION_COLS.Q5_STEWARD_CONTACT, numRows, 1).getValues();
-  var timestampData = sheet.getRange(2, 1, numRows, 1).getValues();
-  var satisfactionData = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numRows, 4).getValues();
-  var stewardRatingsData = sheet.getRange(2, SATISFACTION_COLS.Q10_TIMELY_RESPONSE, numRows, 7).getValues();
+  // Read all data as a single batch — avoids col=0 errors when schema not yet initialized
+  var _allData = sheet.getRange(2, 1, numRows, sheet.getLastColumn()).getValues();
+  function _col1(colIdx) { return _allData.map(function(r) { return [colIdx > 0 ? (r[colIdx-1] || '') : '']; }); }
+  function _colN(colIdx, n) { return _allData.map(function(r) { return colIdx > 0 ? r.slice(colIdx-1, colIdx-1+n) : new Array(n).fill(''); }); }
+  var timestampData       = _col1(1);
+  var worksiteData        = _col1(SATISFACTION_COLS.Q1_WORKSITE);
+  var roleData            = _col1(SATISFACTION_COLS.Q2_ROLE);
+  var shiftData           = _col1(SATISFACTION_COLS.Q3_SHIFT);
+  var timeData            = _col1(SATISFACTION_COLS.Q4_TIME_IN_ROLE);
+  var stewardContactData  = _col1(SATISFACTION_COLS.Q5_STEWARD_CONTACT);
+  var satisfactionData    = _colN(SATISFACTION_COLS.Q6_SATISFIED_REP, 4);
+  var stewardRatingsData  = _colN(SATISFACTION_COLS.Q10_TIMELY_RESPONSE, 7);
 
   var responses = [];
   for (var i = 0; i < numRows; i++) {
@@ -895,6 +902,7 @@ function getSatisfactionResponseData() {
  * Get section-level data for satisfaction dashboard
  */
 function getSatisfactionSectionData() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -959,6 +967,7 @@ function getSatisfactionSectionData() {
  * Get trend data for satisfaction dashboard - responses over time
  */
 function getSatisfactionTrendData(period) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -978,8 +987,12 @@ function getSatisfactionTrendData(period) {
   var numRows = lastRow - 1;
   var tz = Session.getScriptTimeZone();
 
-  var timestamps = sheet.getRange(2, 1, numRows, 1).getValues();
-  var satisfactionData = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numRows, 4).getValues();
+  var _allData2 = sheet.getRange(2, 1, numRows, sheet.getLastColumn()).getValues();
+  var timestamps = _allData2.map(function(r) { return [r[0]]; });
+  var satisfactionData = _allData2.map(function(r) {
+    var c = SATISFACTION_COLS.Q6_SATISFIED_REP;
+    return c > 0 ? r.slice(c-1, c+3) : ['','','',''];
+  });
 
   // Filter by period
   var now = new Date();
@@ -1031,7 +1044,10 @@ function getSatisfactionTrendData(period) {
 
   // Get common issues/priorities for trend
   try {
-    var prioritiesData = sheet.getRange(2, SATISFACTION_COLS.Q64_TOP_PRIORITIES, numRows, 1).getValues();
+    var _q64col = SATISFACTION_COLS.Q64_TOP_PRIORITIES;
+    var prioritiesData = _q64col > 0
+      ? sheet.getRange(2, _q64col, numRows, 1).getValues()
+      : _allData2.map(function(r) { return ['']; });
     var issueMap = {};
     for (i = 0; i < numRows; i++) {
       ts = timestamps[i][0];
@@ -1123,6 +1139,7 @@ function getSatisfactionInsightsData() {
  * Get drill-down data for specific categories
  */
 function getSatisfactionDrillData(type) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -1137,9 +1154,10 @@ function getSatisfactionDrillData(type) {
 
   if (type === 'responses') {
     // Show recent responses
-    var timestamps = sheet.getRange(2, 1, numRows, 1).getValues();
-    var worksiteData = sheet.getRange(2, SATISFACTION_COLS.Q1_WORKSITE, numRows, 1).getValues();
-    var satisfactionData = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numRows, 4).getValues();
+    var _allData3 = sheet.getRange(2, 1, numRows, sheet.getLastColumn()).getValues();
+    var timestamps = _allData3.map(function(r) { return [r[0]]; });
+    var worksiteData = _allData3.map(function(r) { var c=SATISFACTION_COLS.Q1_WORKSITE; return [c>0?r[c-1]:'']; });
+    var satisfactionData = _allData3.map(function(r) { var c=SATISFACTION_COLS.Q6_SATISFIED_REP; return c>0?r.slice(c-1,c+3):['','','','']; });
 
     for (var i = 0; i < numRows; i++) {
       var ts = timestamps[i][0];
@@ -1165,6 +1183,7 @@ function getSatisfactionDrillData(type) {
  * Get location-specific drill-down data
  */
 function getSatisfactionLocationDrill(location) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -1177,10 +1196,11 @@ function getSatisfactionLocationDrill(location) {
   var numRows = lastRow - 1;
   var tz = Session.getScriptTimeZone();
 
-  var timestamps = sheet.getRange(2, 1, numRows, 1).getValues();
-  var worksiteData = sheet.getRange(2, SATISFACTION_COLS.Q1_WORKSITE, numRows, 1).getValues();
-  var roleData = sheet.getRange(2, SATISFACTION_COLS.Q2_ROLE, numRows, 1).getValues();
-  var satisfactionData = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numRows, 4).getValues();
+  var _allData4 = sheet.getRange(2, 1, numRows, sheet.getLastColumn()).getValues();
+  var timestamps = _allData4.map(function(r) { return [r[0]]; });
+  var worksiteData = _allData4.map(function(r) { var c=SATISFACTION_COLS.Q1_WORKSITE; return [c>0?r[c-1]:'']; });
+  var roleData = _allData4.map(function(r) { var c=SATISFACTION_COLS.Q2_ROLE; return [c>0?r[c-1]:'']; });
+  var satisfactionData = _allData4.map(function(r) { var c=SATISFACTION_COLS.Q6_SATISFIED_REP; return c>0?r.slice(c-1,c+3):['','','','']; });
 
   var totalScore = 0;
 
@@ -1213,6 +1233,7 @@ function getSatisfactionLocationDrill(location) {
  * Get analytics data for satisfaction dashboard insights
  */
 function getSatisfactionAnalyticsData() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -1233,12 +1254,13 @@ function getSatisfactionAnalyticsData() {
 
   var numRows = lastRow - 1;
 
-  // Get all relevant data in one batch
-  var worksiteData = sheet.getRange(2, SATISFACTION_COLS.Q1_WORKSITE, numRows, 1).getValues();
-  var roleData = sheet.getRange(2, SATISFACTION_COLS.Q2_ROLE, numRows, 1).getValues();
-  var stewardContactData = sheet.getRange(2, SATISFACTION_COLS.Q5_STEWARD_CONTACT, numRows, 1).getValues();
-  var satisfactionData = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numRows, 4).getValues();
-  var prioritiesData = sheet.getRange(2, SATISFACTION_COLS.Q64_TOP_PRIORITIES, numRows, 1).getValues();
+  // Read all data as single batch — avoids col=0 errors when schema not yet initialized
+  var _allData5 = sheet.getRange(2, 1, numRows, sheet.getLastColumn()).getValues();
+  var worksiteData       = _allData5.map(function(r){var c=SATISFACTION_COLS.Q1_WORKSITE;       return [c>0?r[c-1]:''];});
+  var roleData           = _allData5.map(function(r){var c=SATISFACTION_COLS.Q2_ROLE;           return [c>0?r[c-1]:''];});
+  var stewardContactData = _allData5.map(function(r){var c=SATISFACTION_COLS.Q5_STEWARD_CONTACT;return [c>0?r[c-1]:''];});
+  var satisfactionData   = _allData5.map(function(r){var c=SATISFACTION_COLS.Q6_SATISFIED_REP;  return c>0?r.slice(c-1,c+3):['','','',''];});
+  var prioritiesData     = _allData5.map(function(r){var c=SATISFACTION_COLS.Q64_TOP_PRIORITIES;return [c>0?r[c-1]:''];});
 
   // Calculate average score for each response
   var scores = [];
@@ -1408,6 +1430,7 @@ function getSatisfactionAnalyticsData() {
  * Calculates section averages and dashboard metrics
  */
 function syncSatisfactionValues() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -1430,10 +1453,10 @@ function syncSatisfactionValues() {
   // Calculate section averages for each row
   var sectionAverages = computeSectionAverages_(responseData);
 
-  // Write section averages to summary area
+  // Write section averages to summary area (v4.23.0: skipped — dynamic schema has no summary cols)
   var summaryStart = SATISFACTION_COLS.SUMMARY_START;
-  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
-  if (sectionAverages.length > 0) {
+  var summaryCols = Math.max(1, (SATISFACTION_COLS.AVG_SCHEDULING || 0) - (SATISFACTION_COLS.AVG_OVERALL_SAT || 0) + 1);
+  if (sectionAverages.length > 0 && summaryStart > 0) {
     sheet.getRange(2, summaryStart, sectionAverages.length, summaryCols).setValues(sectionAverages);
   }
 
@@ -1450,6 +1473,7 @@ function syncSatisfactionValues() {
  * @private
  */
 function computeSectionAverages_(responseData) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var results = [];
 
   for (var r = 0; r < responseData.length; r++) {
@@ -1529,6 +1553,7 @@ function computeAverage_(row, startIdx, endIdx) {
  * @private
  */
 function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var dashStart = 84; // Column CF
   var demoStart = 87; // Column CH
   var chartStart = 90; // Column CK
@@ -1647,6 +1672,7 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
  * @param {number} row - Row number of the new response
  */
 function computeSatisfactionRowAverages(row) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -1672,10 +1698,12 @@ function computeSatisfactionRowAverages(row) {
   averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
   averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
-  // Write section averages to summary area
+  // Write section averages to summary area (v4.23.0: skipped — dynamic schema has no summary cols)
   var summaryStart = SATISFACTION_COLS.SUMMARY_START;
-  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
-  sheet.getRange(row, summaryStart, 1, summaryCols).setValues([averages]);
+  var summaryCols = Math.max(1, (SATISFACTION_COLS.AVG_SCHEDULING || 0) - (SATISFACTION_COLS.AVG_OVERALL_SAT || 0) + 1);
+  if (summaryStart > 0) {
+    sheet.getRange(row, summaryStart, 1, summaryCols).setValues([averages]);
+  }
 }
 
 // ============================================================================
@@ -3445,6 +3473,7 @@ function getFlaggedSubmissionsHtml() {
  * @returns {Object} Pending submissions data (email, date, row number - NO survey answers)
  */
 function getFlaggedSubmissionsData() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -3798,6 +3827,7 @@ function getPublicOverviewData() {
  * @returns {Object} Survey statistics
  */
 function getPublicSurveyData(includeHistory) {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);

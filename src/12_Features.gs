@@ -2941,6 +2941,7 @@ function refreshLookerMembers_() {
  * @returns {number} Number of rows exported
  */
 function refreshLookerSatisfaction_() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sourceSheet = ss.getSheetByName(SHEETS.SATISFACTION || '📊 Member Satisfaction');
   const targetSheet = ss.getSheetByName(LOOKER_CONFIG.SHEETS.SATISFACTION);
@@ -3447,6 +3448,7 @@ function refreshLookerAnonMembers_() {
  * @returns {number} Number of rows exported
  */
 function refreshLookerAnonSatisfaction_() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sourceSheet = ss.getSheetByName(SHEETS.SATISFACTION || '📊 Member Satisfaction');
   const targetSheet = ss.getSheetByName(LOOKER_CONFIG.SHEETS_ANON.SATISFACTION);

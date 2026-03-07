@@ -176,6 +176,17 @@ var QAForum = (function () {
         'active', 0, '', 0, now, now
       ]);
       logAuditEvent('QA_QUESTION_SUBMITTED', 'Question ' + id + ' by ' + (isAnonymous ? 'anonymous' : email));
+
+      // Notify all stewards of the new unanswered question
+      var preview = text.substring(0, 120) + (text.length > 120 ? '...' : '');
+      var authorLabel = isAnonymous ? 'A member' : (name || 'A member');
+      _createNotificationInternal_(
+        'All Stewards',
+        'Q&A Forum',
+        'New Question in Q&A Forum',
+        authorLabel + ' posted: "' + preview + '"'
+      );
+
       return { success: true, questionId: id };
     } finally {
       lock.releaseLock();
@@ -184,6 +195,7 @@ var QAForum = (function () {
 
   function submitAnswer(email, name, questionId, text, isSteward) {
     if (!email || !questionId || !text || !text.trim()) return { success: false, message: 'Answer text is required.' };
+    if (!isSteward) return { success: false, message: 'Only stewards can post answers.' };
     text = _sanitize(text.trim().substring(0, 2000));
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -196,12 +208,14 @@ var QAForum = (function () {
     try {
       var id = 'ANS_' + Date.now().toString(36);
       ansSheet.appendRow([
-        id, questionId, email.toLowerCase().trim(), name || 'Member',
-        isSteward ? true : false, text, 'active', new Date()
+        id, questionId, email.toLowerCase().trim(), name || 'Steward',
+        true, text, 'active', new Date()
       ]);
 
-      // Increment answer count on question
+      // Increment answer count on question and get author email for notification
       var forumSheet = ss.getSheetByName(SHEETS.QA_FORUM);
+      var questionAuthorEmail = null;
+      var questionText = '';
       if (forumSheet && forumSheet.getLastRow() > 1) {
         var data = forumSheet.getDataRange().getValues();
         for (var i = 1; i < data.length; i++) {
@@ -209,10 +223,24 @@ var QAForum = (function () {
             var currentCount = parseInt(data[i][8], 10) || 0;
             forumSheet.getRange(i + 1, 9).setValue(currentCount + 1);
             forumSheet.getRange(i + 1, 11).setValue(new Date());
+            questionAuthorEmail = String(data[i][1] || '').toLowerCase().trim();
+            questionText = String(data[i][4] || '').substring(0, 80);
             break;
           }
         }
       }
+
+      // Notify the question author that their question received an answer
+      if (questionAuthorEmail) {
+        var preview = questionText + (questionText.length >= 80 ? '...' : '');
+        _createNotificationInternal_(
+          questionAuthorEmail,
+          'Q&A Forum',
+          'Your Question Got an Answer',
+          (name || 'A steward') + ' answered your question: "' + preview + '"'
+        );
+      }
+
       logAuditEvent('QA_ANSWER_SUBMITTED', 'Answer ' + id + ' on question ' + questionId);
       return { success: true, answerId: id };
     } finally {
@@ -350,8 +378,80 @@ var QAForum = (function () {
   }
 
   // ═══════════════════════════════════════
+  // Resolve
+  // ═══════════════════════════════════════
+
+  /**
+   * Marks a question as resolved. Allowed by: question owner OR any steward.
+   * @param {string} email - Caller's email (server-resolved)
+   * @param {string} questionId
+   * @param {boolean} isSteward - Whether caller is a steward
+   */
+  function resolveQuestion(email, questionId, isSteward) {
+    if (!email || !questionId) return { success: false, message: 'Missing data.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+    var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
+    if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Question not found.' };
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === questionId) {
+        var isOwner = String(data[i][1]).toLowerCase().trim() === email.toLowerCase().trim();
+        if (!isOwner && !isSteward) return { success: false, message: 'Not authorized to resolve this question.' };
+        var current = String(data[i][5] || '').toLowerCase().trim();
+        if (current === 'deleted') return { success: false, message: 'Question not found.' };
+        sheet.getRange(i + 1, 6).setValue('resolved');
+        sheet.getRange(i + 1, 11).setValue(new Date());
+        logAuditEvent('QA_QUESTION_RESOLVED', 'Question ' + questionId + ' resolved by ' + email);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Question not found.' };
+  }
+
+  // ═══════════════════════════════════════
   // Helpers
   // ═══════════════════════════════════════
+
+  /**
+   * Internal notification writer — bypasses steward auth for system-generated notifications.
+   * Writes directly to the Notifications sheet using the same schema as sendWebAppNotification().
+   * @private
+   */
+  function _createNotificationInternal_(recipient, type, title, message) {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return;
+      var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+      if (!sheet) {
+        if (typeof createNotificationsSheet === 'function') sheet = createNotificationsSheet(ss);
+        else return;
+      }
+      var allData = sheet.getDataRange().getValues();
+      var maxNum = 0;
+      var C = NOTIFICATIONS_COLS;
+      for (var i = 1; i < allData.length; i++) {
+        var existId = String(allData[i][C.NOTIFICATION_ID - 1] || '');
+        var match = existId.match(/NOTIF-(\d+)/);
+        if (match) { var num = parseInt(match[1], 10); if (num > maxNum) maxNum = num; }
+      }
+      var nextId = 'NOTIF-' + String(maxNum + 1).padStart(3, '0');
+      var tz = Session.getScriptTimeZone();
+      var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+      sheet.appendRow([
+        nextId,
+        escapeForFormula ? escapeForFormula(recipient) : recipient,
+        escapeForFormula ? escapeForFormula(type) : type,
+        escapeForFormula ? escapeForFormula(title) : title,
+        escapeForFormula ? escapeForFormula(message) : message,
+        'Normal', 'system', 'Q&A Forum', today, '', '', 'Active', 'Dismissible'
+      ]);
+    } catch (e) {
+      Logger.log('QAForum._createNotificationInternal_ error: ' + e.message);
+    }
+  }
 
   function _fmtDate(date) {
     var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -381,7 +481,8 @@ var QAForum = (function () {
     upvoteQuestion: upvoteQuestion,
     moderateQuestion: moderateQuestion,
     moderateAnswer: moderateAnswer,
-    getFlaggedContent: getFlaggedContent
+    getFlaggedContent: getFlaggedContent,
+    resolveQuestion: resolveQuestion
   };
 
 })();
@@ -391,12 +492,13 @@ var QAForum = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function qaGetQuestions(email, page, pageSize, sort) { var e = _resolveCallerEmail() || email; return QAForum.getQuestions(e, page, pageSize, sort); }
-function qaGetQuestionDetail(email, questionId) { var e = _resolveCallerEmail() || email; return QAForum.getQuestionDetail(e, questionId); }
-function qaSubmitQuestion(email, name, text, isAnonymous) { var e = _resolveCallerEmail() || email; return QAForum.submitQuestion(e, name, text, isAnonymous); }
-function qaSubmitAnswer(email, name, questionId, text, isSteward) { var e = _resolveCallerEmail() || email; return QAForum.submitAnswer(e, name, questionId, text, isSteward); }
-function qaUpvoteQuestion(email, questionId) { var e = _resolveCallerEmail() || email; return QAForum.upvoteQuestion(e, questionId); }
-function qaModerateQuestion(stewardEmail, questionId, action) { var e = _requireStewardAuth(); if (!e) return null; return QAForum.moderateQuestion(e, questionId, action); }
-function qaModerateAnswer(stewardEmail, answerId, action) { var e = _requireStewardAuth(); if (!e) return null; return QAForum.moderateAnswer(e, answerId, action); }
-function qaGetFlaggedContent(stewardEmail) { var e = _requireStewardAuth(); if (!e) return null; return QAForum.getFlaggedContent(e); }
+function qaGetQuestions(sessionToken, email, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken) || email; return QAForum.getQuestions(e, page, pageSize, sort); }
+function qaGetQuestionDetail(sessionToken, email, questionId) { var e = _resolveCallerEmail(sessionToken) || email; return QAForum.getQuestionDetail(e, questionId); }
+function qaSubmitQuestion(sessionToken, email, name, text, isAnonymous) { var e = _resolveCallerEmail(sessionToken) || email; return QAForum.submitQuestion(e, name, text, isAnonymous); }
+function qaSubmitAnswer(sessionToken, email, name, questionId, text, isSteward) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.submitAnswer(e, name, questionId, text, true); }
+function qaUpvoteQuestion(sessionToken, email, questionId) { var e = _resolveCallerEmail(sessionToken) || email; return QAForum.upvoteQuestion(e, questionId); }
+function qaModerateQuestion(sessionToken, stewardEmail, questionId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return QAForum.moderateQuestion(e, questionId, action); }
+function qaModerateAnswer(sessionToken, stewardEmail, answerId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return QAForum.moderateAnswer(e, answerId, action); }
+function qaGetFlaggedContent(sessionToken, stewardEmail) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return QAForum.getFlaggedContent(e); }
+function qaResolveQuestion(sessionToken, email, questionId) { var e = _resolveCallerEmail(sessionToken) || email; var isSteward = false; try { var auth = checkWebAppAuthorization('steward'); isSteward = auth.isAuthorized; } catch(_) {} return QAForum.resolveQuestion(e, questionId, isSteward); }
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

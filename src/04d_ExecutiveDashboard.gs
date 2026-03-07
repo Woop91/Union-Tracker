@@ -137,21 +137,19 @@ function getDashboardStats() {
     }
   }
 
-  // Get morale score from satisfaction data
+  // Get morale score from satisfaction data (v4.23.0: dynamic via getSatisfactionSummary)
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (satSheet && satSheet.getLastRow() > 1) {
-    var satData = satSheet.getDataRange().getValues();
-    var totalScore = 0;
-    var scoreCount = 0;
-    for (var s = 1; s < satData.length; s++) {
-      var avgScore = parseFloat(satData[s][SATISFACTION_COLS.AVG_OVERALL_SAT - 1]);
-      if (!isNaN(avgScore) && avgScore > 0) {
-        totalScore += avgScore;
-        scoreCount++;
+    try {
+      var summary = getSatisfactionSummary();
+      if (summary && summary.sections && summary.sections['OVERALL_SAT']) {
+        var overallAvg = summary.sections['OVERALL_SAT'].avg;
+        if (overallAvg !== null && !isNaN(overallAvg)) {
+          stats.moraleScore = Math.round(overallAvg * 10) / 10;
+        }
       }
-    }
-    if (scoreCount > 0) {
-      stats.moraleScore = Math.round((totalScore / scoreCount) * 10) / 10;
+    } catch(e) {
+      Logger.log('Error reading satisfaction summary for morale score: ' + e.message);
     }
   }
 

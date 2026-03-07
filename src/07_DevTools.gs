@@ -303,9 +303,6 @@ function SEED_PHASE_3() {
   ss.toast('Seeding steward tasks...', '🌱 Phase 3', 2);
   seedStewardTasksData();
 
-  ss.toast('Seeding polls...', '🌱 Phase 3', 2);
-  seedPollsData();
-
   ss.toast('Seeding meeting minutes...', '🌱 Phase 3', 2);
   seedMinutesData();
 
@@ -638,6 +635,7 @@ function seedSurveyTrackingData() {
  * Demonstrates form response data with branching logic
  */
 function seedSatisfactionData() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -728,7 +726,9 @@ function seedSatisfactionData() {
     return arr.slice(0, 3).join(', ');
   }
 
-  var maxCol = SATISFACTION_COLS.Q67_ADDITIONAL; // last seeded column
+  // v4.23.0: maxCol derived from live sheet header count (dynamic schema)
+  var satSheetForSeed = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SATISFACTION);
+  var maxCol = satSheetForSeed ? satSheetForSeed.getLastColumn() : Math.max(SATISFACTION_COLS.Q67_ADDITIONAL, 70);
 
   for (i = 0; i < 50; i++) {
     // Spread responses over last 60 days
@@ -1798,116 +1798,138 @@ function seedCalendarEvents() {
 function seedWeeklyQuestions() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // --- Question Pool ---
+  // Schema from 24_WeeklyQuestions.gs:
+  // _Weekly_Questions:  ID | Text | Options (JSON) | Source | Submitted By | Week Start | Active | Created
+  // _Weekly_Responses:  ID | Question ID | Email Hash | Response | Timestamp
+  // _Question_Pool:     ID | Text | Options (JSON) | Submitted By Hash | Status | Created
+
+  // --- Question Pool (member-submitted candidates for random draw) ---
   var poolSheet = ss.getSheetByName(SHEETS.QUESTION_POOL);
   if (!poolSheet) {
     Logger.log('_Question_Pool sheet not found. Skipping weekly questions seed.');
     return;
   }
 
-  var questions = [
-    { q: 'What is one thing management could do to improve your workday?', cat: 'Management' },
-    { q: 'How well does your supervisor communicate expectations?', cat: 'Management' },
-    { q: 'Do you feel your workload is manageable this week?', cat: 'Workload' },
-    { q: 'How would you rate the physical safety of your workplace?', cat: 'Safety' },
-    { q: 'Have you experienced any scheduling issues recently?', cat: 'Scheduling' },
-    { q: 'Do you feel respected by your coworkers?', cat: 'Culture' },
-    { q: 'How confident are you in the grievance process?', cat: 'Union' },
-    { q: 'What training would help you most right now?', cat: 'Development' },
-    { q: 'How well does the union communicate with you?', cat: 'Union' },
-    { q: 'Do you feel your pay is fair for the work you do?', cat: 'Compensation' },
-    { q: 'How likely are you to recommend this workplace to a friend?', cat: 'Culture' },
-    { q: 'What is one thing the union should prioritize in negotiations?', cat: 'Union' },
-    { q: 'Do you have the tools and resources you need to do your job?', cat: 'Resources' },
-    { q: 'How would you rate your work-life balance?', cat: 'Wellbeing' },
-    { q: 'Have you witnessed any policy violations this month?', cat: 'Safety' },
-    { q: 'How accessible is your steward when you need help?', cat: 'Union' },
-    { q: 'What would make you feel more valued at work?', cat: 'Culture' },
-    { q: 'Are overtime expectations reasonable in your unit?', cat: 'Workload' },
-    { q: 'How would you rate the cleanliness of your workspace?', cat: 'Safety' },
-    { q: 'Do you feel informed about upcoming contract changes?', cat: 'Union' },
-    { q: 'What is your biggest workplace frustration right now?', cat: 'General' },
-    { q: 'How well does management handle employee concerns?', cat: 'Management' },
-  ];
-
-  // Write pool — matches 24_WeeklyQuestions.gs initWeeklyQuestionSheets():
-  // [ID, Text, Submitted By Hash, Status, Created]
-  var poolHeaders = poolSheet.getRange(1, 1, 1, 5).getValues()[0];
-  if (!poolHeaders[0]) {
-    poolSheet.getRange(1, 1, 1, 5).setValues([['ID', 'Text', 'Submitted By Hash', 'Status', 'Created']]);
+  if (poolSheet.getLastRow() > 1) {
+    Logger.log('_Question_Pool already has data. Skipping seed.');
+    return;
   }
 
-  var poolRows = questions.map(function(q, idx) {
-    var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-pool-' + idx)
-      .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
-    return ['WP_SEED_' + (idx + 1), q.q, fakeHash, 'pending', new Date()];
-  });
-  poolSheet.getRange(2, 1, poolRows.length, 5).setValues(poolRows);
+  var poolQuestions = [
+    { text: 'How satisfied are you with the office day scheduling process?',
+      options: ['Very satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very dissatisfied'] },
+    { text: 'Has management communicated the new policy changes clearly to you?',
+      options: ['Yes, fully', 'Somewhat', 'Not really', 'Not at all'] },
+    { text: 'Should we push for a 4-day work week in the next contract?',
+      options: ['Strongly support', 'Support', 'Neutral', 'Oppose'] },
+    { text: 'How manageable is your current caseload?',
+      options: ['Very manageable', 'Manageable', 'Somewhat overwhelming', 'Very overwhelming'] },
+    { text: 'What is your top priority for the next contract negotiation?',
+      options: ['Higher wages', 'Better benefits', 'Manageable caseloads', 'Schedule flexibility'] },
+    { text: 'How accessible is your steward when you need support?',
+      options: ['Always available', 'Usually available', 'Sometimes available', 'Rarely available'] },
+    { text: 'Do you feel informed about the grievance process?',
+      options: ['Very informed', 'Somewhat informed', 'Not very informed', 'Not informed at all'] },
+    { text: 'Best time for monthly general membership meetings?',
+      options: ['Weekday 5pm', 'Weekday 6pm', 'Saturday 10am', 'Virtual anytime'] },
+    { text: 'How confident are you in the union\'s ability to represent you?',
+      options: ['Very confident', 'Somewhat confident', 'Not very confident', 'Not confident at all'] },
+    { text: 'How would you rate communication from union leadership?',
+      options: ['Excellent', 'Good', 'Fair', 'Poor'] },
+    { text: 'Do you feel respected by management in your daily work?',
+      options: ['Always', 'Usually', 'Sometimes', 'Rarely or never'] },
+    { text: 'How well does your team collaborate on shared cases?',
+      options: ['Extremely well', 'Well', 'Somewhat well', 'Not well'] },
+  ];
 
-  // --- Active Weekly Questions (pick 2) ---
-  // Matches 24_WeeklyQuestions.gs: [ID, Text, Source, Submitted By, Week Start, Active, Created]
+  var poolRows = poolQuestions.map(function(q, idx) {
+    var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-pool-member-' + idx)
+      .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+    return [
+      'WP_SEED_' + (idx + 1),           // ID
+      q.text,                            // Text
+      JSON.stringify(q.options),         // Options (JSON) — required by _parseOptions()
+      fakeHash,                          // Submitted By Hash
+      'pending',                         // Status
+      new Date()                         // Created
+    ];
+  });
+
+  poolSheet.getRange(2, 1, poolRows.length, 6).setValues(poolRows);
+
+  // --- Active Weekly Questions for the current period (2 polls: 1 steward, 1 community) ---
   var wqSheet = ss.getSheetByName(SHEETS.WEEKLY_QUESTIONS);
-  if (wqSheet) {
-    var wqHeaders = wqSheet.getRange(1, 1, 1, 7).getValues()[0];
-    if (!wqHeaders[0]) {
-      wqSheet.getRange(1, 1, 1, 7).setValues([['ID', 'Text', 'Source', 'Submitted By', 'Week Start', 'Active', 'Created']]);
-    }
+  if (wqSheet && wqSheet.getLastRow() <= 1) {
     var now = new Date();
     var weekStart = new Date(now);
     weekStart.setHours(0, 0, 0, 0);
     var day = weekStart.getDay();
-    weekStart.setDate(weekStart.getDate() - day + (day === 0 ? -6 : 1)); // Monday
+    weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1)); // Monday of this week
     var weekStr = weekStart.toISOString().split('T')[0];
 
+    var stewardOpts = ['Higher wages', 'Reduced caseloads', 'Better benefits', 'More schedule flexibility'];
+    var communityOpts = ['Always available', 'Usually available', 'Sometimes available', 'Rarely available'];
+
     var activeQs = [
-      ['WQ-001', questions[0].q, 'steward', '', weekStr, 'TRUE', now],
-      ['WQ-002', questions[6].q, 'pool', '', weekStr, 'TRUE', now],
+      [
+        'WQ-SEED-001',                         // ID
+        'What should be the union\'s top priority in our next contract negotiation?', // Text
+        JSON.stringify(stewardOpts),           // Options (JSON)
+        'steward',                             // Source
+        '',                                    // Submitted By (steward email — empty for seed)
+        weekStr,                               // Week Start
+        'TRUE',                                // Active
+        now                                    // Created
+      ],
+      [
+        'WQ-SEED-002',
+        'How accessible is your steward when you need support?',
+        JSON.stringify(communityOpts),
+        'community',
+        '',
+        weekStr,
+        'TRUE',
+        now
+      ],
     ];
-    wqSheet.getRange(2, 1, 2, 7).setValues(activeQs);
-  }
+    wqSheet.getRange(2, 1, activeQs.length, 8).setValues(activeQs);
 
-  // --- Sample Responses (10 anonymous responses per question) ---
-  // Matches 24_WeeklyQuestions.gs: [ID, Question ID, Email Hash, Response, Timestamp]
-  var wrSheet = ss.getSheetByName(SHEETS.WEEKLY_RESPONSES);
-  if (wrSheet) {
-    var wrHeaders = wrSheet.getRange(1, 1, 1, 5).getValues()[0];
-    if (!wrHeaders[0]) {
-      wrSheet.getRange(1, 1, 1, 5).setValues([['ID', 'Question ID', 'Email Hash', 'Response', 'Timestamp']]);
-    }
+    // --- Sample anonymous responses (10 per question) ---
+    var wrSheet = ss.getSheetByName(SHEETS.WEEKLY_RESPONSES);
+    if (wrSheet && wrSheet.getLastRow() <= 1) {
+      var responseDist = {
+        'WQ-SEED-001': [
+          'Higher wages', 'Reduced caseloads', 'Higher wages', 'Better benefits',
+          'Reduced caseloads', 'Higher wages', 'More schedule flexibility', 'Reduced caseloads',
+          'Higher wages', 'Better benefits'
+        ],
+        'WQ-SEED-002': [
+          'Usually available', 'Always available', 'Sometimes available', 'Usually available',
+          'Always available', 'Usually available', 'Rarely available', 'Sometimes available',
+          'Usually available', 'Always available'
+        ]
+      };
 
-    var sampleResponses = {
-      'WQ-001': [
-        'Better communication about policy changes',
-        'More consistent scheduling',
-        'Actually listen to our feedback',
-        'Reduce the paperwork burden',
-        'Provide adequate staffing',
-        'Be more transparent about decisions',
-        'Stop the micromanaging',
-        'Give us the tools we need',
-        'Recognize good work more often',
-        'Flexible scheduling options',
-      ],
-      'WQ-002': [
-        '8', '7', '9', '6', '5', '8', '7', '9', '6', '8',
-      ],
-    };
-
-    var responseRows = [];
-    now = new Date();
-    Object.keys(sampleResponses).forEach(function(qId) {
-      sampleResponses[qId].forEach(function(resp, idx) {
-        var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-user-' + idx + '-' + qId)
-          .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
-        var respId = 'WR_SEED_' + qId + '_' + (idx + 1);
-        responseRows.push([respId, qId, fakeHash, resp, new Date(now.getTime() - idx * 3600000)]);
+      var responseRows = [];
+      Object.keys(responseDist).forEach(function(qId) {
+        responseDist[qId].forEach(function(resp, idx) {
+          var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-voter-' + qId + '-' + idx)
+            .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+          responseRows.push([
+            'WR_SEED_' + qId + '_' + (idx + 1), // ID
+            qId,                                  // Question ID
+            fakeHash,                             // Email Hash (no PII)
+            resp,                                 // Response
+            new Date(now.getTime() - idx * 3600000) // Timestamp
+          ]);
+        });
       });
-    });
 
-    wrSheet.getRange(2, 1, responseRows.length, 5).setValues(responseRows);
+      wrSheet.getRange(2, 1, responseRows.length, 5).setValues(responseRows);
+    }
   }
 
-  Logger.log('Seeded ' + questions.length + ' pool questions, 2 active questions, 20 responses');
+  Logger.log('seedWeeklyQuestions: ' + poolRows.length + ' pool questions, 2 active polls, 20 responses seeded.');
 }
 
 // ============================================================================
@@ -2315,50 +2337,8 @@ function seedStewardTasksData() {
 }
 
 // ============================================================================
-// SEED: POLLS
+// SEED: POLLS — removed v4.24.0 (FlashPolls replaced by _Weekly_Questions in 24_WeeklyQuestions.gs)
 // ============================================================================
-
-/**
- * Seeds 3 sample polls with vote data into FlashPolls and PollResponses.
- */
-function seedPollsData() {
-  var pollSheet = getOrCreatePollsSheet();
-  var responseSheet = getOrCreatePollResponsesSheet();
-
-  if (pollSheet.getLastRow() > 1) {
-    Logger.log('Polls already have data. Skipping seed.');
-    return;
-  }
-
-  var now = new Date();
-  var ownerEmail = '';
-  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
-  if (!ownerEmail) ownerEmail = 'steward@example.org';
-
-  var polls = [
-    ['POLL_SEED_1', 'Should we push for a 4-day work week in negotiations?', 'Yes,No,Need more info', 'TRUE', '', ownerEmail, new Date(now.getTime() - 5 * 86400000)],
-    ['POLL_SEED_2', 'What is your top priority for the next contract?', 'Higher wages,Better benefits,Manageable caseloads,Schedule flexibility', 'TRUE', '', ownerEmail, new Date(now.getTime() - 3 * 86400000)],
-    ['POLL_SEED_3', 'Best time for monthly general membership meetings?', 'Weekday 5pm,Weekday 6pm,Saturday 10am,Virtual anytime', 'TRUE', '', ownerEmail, now],
-  ];
-
-  pollSheet.getRange(2, 1, polls.length, 7).setValues(polls);
-
-  // Seed some vote responses for the first 2 polls
-  var responses = [
-    ['POLL_SEED_1', 'voter1@example.org', 'Yes', new Date(now.getTime() - 4 * 86400000)],
-    ['POLL_SEED_1', 'voter2@example.org', 'Yes', new Date(now.getTime() - 4 * 86400000)],
-    ['POLL_SEED_1', 'voter3@example.org', 'No', new Date(now.getTime() - 3 * 86400000)],
-    ['POLL_SEED_1', 'voter4@example.org', 'Need more info', new Date(now.getTime() - 3 * 86400000)],
-    ['POLL_SEED_1', 'voter5@example.org', 'Yes', new Date(now.getTime() - 2 * 86400000)],
-    ['POLL_SEED_2', 'voter1@example.org', 'Higher wages', new Date(now.getTime() - 2 * 86400000)],
-    ['POLL_SEED_2', 'voter2@example.org', 'Manageable caseloads', new Date(now.getTime() - 2 * 86400000)],
-    ['POLL_SEED_2', 'voter3@example.org', 'Higher wages', new Date(now.getTime() - 1 * 86400000)],
-    ['POLL_SEED_2', 'voter4@example.org', 'Better benefits', new Date(now.getTime() - 1 * 86400000)],
-  ];
-
-  responseSheet.getRange(2, 1, responses.length, 4).setValues(responses);
-  Logger.log('Seeded ' + polls.length + ' polls with ' + responses.length + ' votes');
-}
 
 // ============================================================================
 // SEED: MEETING MINUTES
@@ -3966,8 +3946,7 @@ function test_PortalMinutesCols_Complete() {
 
   // Spot-check other portal col objects for existence (full coverage in test_PortalColsNoHardcodedIndices)
   Assert.isDefined(typeof PORTAL_EVENT_COLS,          'PORTAL_EVENT_COLS must exist');
-  Assert.isDefined(typeof PORTAL_POLL_COLS,            'PORTAL_POLL_COLS must exist');
-  Assert.isDefined(typeof PORTAL_POLL_RESPONSE_COLS,   'PORTAL_POLL_RESPONSE_COLS must exist');
+  // PORTAL_POLL_COLS / PORTAL_POLL_RESPONSE_COLS removed v4.24.0
   Assert.isDefined(typeof PORTAL_STEWARD_LOG_COLS,     'PORTAL_STEWARD_LOG_COLS must exist');
   Assert.isDefined(typeof PORTAL_MEGA_SURVEY_COLS,     'PORTAL_MEGA_SURVEY_COLS must exist');
 }
@@ -3982,8 +3961,7 @@ function test_PortalColsNoHardcodedIndices() {
   var colObjects = [
     { name: 'PORTAL_MINUTES_COLS',       obj: PORTAL_MINUTES_COLS },
     { name: 'PORTAL_EVENT_COLS',         obj: PORTAL_EVENT_COLS },
-    { name: 'PORTAL_POLL_COLS',          obj: PORTAL_POLL_COLS },
-    { name: 'PORTAL_POLL_RESPONSE_COLS', obj: PORTAL_POLL_RESPONSE_COLS },
+    // PORTAL_POLL_COLS / PORTAL_POLL_RESPONSE_COLS removed v4.24.0
     { name: 'PORTAL_GRIEVANCE_COLS',     obj: PORTAL_GRIEVANCE_COLS },
     { name: 'PORTAL_STEWARD_LOG_COLS',   obj: PORTAL_STEWARD_LOG_COLS },
     { name: 'PORTAL_MEGA_SURVEY_COLS',   obj: PORTAL_MEGA_SURVEY_COLS },

@@ -29,7 +29,7 @@
     var CURRENT_VIEW = PAGE_DATA.view;
     var CURRENT_USER = PAGE_DATA.user || null;
     var IS_DUAL_ROLE = PAGE_DATA.isDualRole || false;
-    var SESSION_TOKEN = PAGE_DATA.sessionToken || null;
+    var SESSION_TOKEN = PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
     var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
     // Web app URL for redirects (injected server-side, avoids iframe URL issues)
@@ -140,6 +140,8 @@
         document.body.style.background = t.bg;
         document.body.style.color = t.text;
         document.body.style.fontFamily = t.fontBody;
+        // Expose theme mode on root for CSS selectors (e.g. category badges)
+        root.dataset.themeMode = t.mode || 'light';
         // Invalidate chart color cache on theme change
         if (typeof ChartHelper !== 'undefined' && ChartHelper.invalidateColorCache) {
           ChartHelper.invalidateColorCache();
@@ -433,8 +435,10 @@
         _handleTabNav(role, 'notifications');
       }});
       bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
-      if (AppState.notificationCount > 0) {
-        bellWrap.appendChild(el('span', { className: 'notif-bell-badge' }, String(AppState.notificationCount)));
+      // For stewards, bell total includes unanswered Q&A questions
+      var _bellTotal = (AppState.notificationCount || 0) + (role === 'steward' ? (AppState.qaUnansweredCount || 0) : 0);
+      if (_bellTotal > 0) {
+        bellWrap.appendChild(el('span', { className: 'notif-bell-badge' }, String(_bellTotal)));
       }
       header.appendChild(bellWrap);
       sidebar.appendChild(header);

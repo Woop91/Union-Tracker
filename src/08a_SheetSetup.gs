@@ -131,6 +131,9 @@ function CREATE_DASHBOARD() {
     ss.toast('Setting up hidden sheets...', '🏗️ Progress', 3);
     setupHiddenSheets(ss);
 
+    createSurveyQuestionsSheet(ss);
+    ss.toast('Created Survey Questions', '🏗️ Progress', 2);
+
     createSatisfactionSheet(ss);
     ss.toast('Created Member Satisfaction', '🏗️ Progress', 2);
 
