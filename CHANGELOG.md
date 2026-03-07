@@ -5,6 +5,12 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.26] - 2026-03-06
+
+### Added
+- **`29_Migrations.gs`** — new file for one-time schema/data migrations. Idempotent (safe to re-run).
+- **`migrateContactLogFolderUrlColumn()`** — copies Drive folder URLs from the old `'Contact Log Folder URL'` column to the new `'Member Admin Folder URL'` column in Member Directory, then clears the old column. Exits cleanly if already migrated, or if new column is absent (prompts to run CREATE_DASHBOARD first). Run once from Apps Script editor after deploying v4.20.25 to an existing deployment.
+
 ## [4.20.25] - 2026-03-06
 
 ### Changed (Breaking — Drive folder restructure)
