@@ -62,7 +62,6 @@ module.exports = [
 
         // Security functions (00_Security.gs)
         escapeHtml: 'readonly',
-        sanitizeForHtml: 'readonly',
         sanitizeObjectForHtml: 'readonly',
         escapeForFormula: 'readonly',
         safeSheetNameForFormula: 'readonly',
@@ -80,11 +79,6 @@ module.exports = [
         isValidMemberId: 'readonly',
         isValidGrievanceId: 'readonly',
 
-        // Time utilities
-        calculateDeadline: 'readonly',
-        daysBetween: 'readonly',
-        getDeadlineUrgency: 'readonly',
-
         // Error handling (01_Core.gs)
         handleError: 'readonly',
         withErrorHandling: 'readonly',
@@ -92,11 +86,7 @@ module.exports = [
         errorResponse: 'readonly',
         isTruthyValue: 'readonly',
         PerformanceTimer: 'readonly',
-        sanitizeHtml: 'readonly',
-        sanitizeForQuery: 'readonly',
-        sanitizeEmail: 'readonly',
-        sanitizePhone: 'readonly',
-        sanitizeSheetName: 'readonly'
+        sanitizeForQuery: 'readonly'
       }
     },
 
@@ -133,7 +123,7 @@ module.exports = [
       // Enable gradually as code is cleaned up
       'no-undef': 'off',
       'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', vars: 'local' }],
-      'no-redeclare': 'off',
+      'no-redeclare': ['error', { builtinGlobals: false }],
       'no-empty': 'off',
       'eqeqeq': 'warn',
       'semi': 'off',
@@ -154,15 +144,15 @@ module.exports = [
       'getter-return': 'off',
       'no-constant-condition': 'off',
       'no-control-regex': 'off',
-      'no-debugger': 'off',
-      'no-dupe-args': 'off',
+      'no-debugger': 'error',
+      'no-dupe-args': 'error',
       'no-dupe-else-if': 'off',
       'no-empty-character-class': 'off',
       'no-ex-assign': 'off',
       'no-extra-boolean-cast': 'off',
-      'no-invalid-regexp': 'off',
+      'no-invalid-regexp': 'error',
       'no-irregular-whitespace': 'off',
-      'no-loss-of-precision': 'off',
+      'no-loss-of-precision': 'error',
       'no-misleading-character-class': 'off',
       'no-obj-calls': 'off',
       'no-regex-spaces': 'off',
