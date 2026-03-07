@@ -1676,3 +1676,61 @@ Position: immediately after `IS_STEWARD`. Accessible as `MEMBER_COLS.SHARE_PHONE
 `No` (or blank/absent) = phone hidden from members.
 
 ### Column width: 110px. Not hidden. No conditional formatting needed.
+
+---
+
+## Share Phone — Steward Self-Toggle (2026-03-07)
+
+### Files Modified
+- `src/21_WebDashDataService.gs` — updateMemberProfile, getFullMemberProfile
+- `src/22_WebDashApp.gs` — _serveDashboard safeUser
+- `src/steward_view.html` — renderStewardMore
+
+### How It Works
+1. `_serveDashboard`: `sharePhone` added to `safeUser` → available as `CURRENT_USER.sharePhone` on page load.
+2. `updateMemberProfile`: `sharePhone` added to `editableFields` allowlist, mapped to `HEADERS.memberSharePhone`.
+   Writes `'Yes'` or `'No'` string to the "Share Phone" column. Existing field allowlist protects
+   all other columns from being modified by this path.
+3. UI: Toggle switch card at top of `renderStewardMore()` (the "More" tab).
+   - Reflects current `CURRENT_USER.sharePhone` state on render.
+   - On click: optimistic UI update → `dataUpdateProfile({ sharePhone: 'Yes'|'No' })` → 
+     success confirms, failure reverts visuals + shows error.
+   - Updates `CURRENT_USER.sharePhone` in-memory on success (no page reload needed).
+   - 3-second auto-dismiss on status message.
+
+### Write path
+```
+toggleTrack click
+  → dataUpdateProfile(email, { sharePhone: 'Yes'|'No' })
+    → DataService.updateMemberProfile(email, { sharePhone: 'Yes'|'No' })
+      → writes to 'Share Phone' column in Member Directory
+```
+
+### Security
+dataUpdateProfile uses `_resolveCallerEmail()` — steward can only update their own row
+unless they pass `updates._targetEmail` (admin override path). sharePhone update never
+passes _targetEmail, so it always writes to the caller's own row.
+
+---
+
+## Share Phone — Steward Self-Toggle (2026-03-07)
+
+### Files Modified
+- `src/21_WebDashDataService.gs` — updateMemberProfile
+- `src/22_WebDashApp.gs` — _serveDashboard safeUser
+- `src/steward_view.html` — renderStewardMore
+
+### How It Works
+1. `_serveDashboard`: `sharePhone` added to `safeUser` → `CURRENT_USER.sharePhone` on load.
+2. `updateMemberProfile`: `sharePhone` in `editableFields` → writes `'Yes'`/`'No'` to column.
+3. UI: Toggle card at top of renderStewardMore. Optimistic update, success/failure feedback, 3s dismiss.
+
+### Write path
+```
+toggleTrack click → dataUpdateProfile({ sharePhone: 'Yes'|'No' })
+  → DataService.updateMemberProfile → 'Share Phone' column in Member Directory
+```
+
+### Security
+Steward can only update their own row (no _targetEmail passed). Allowlist in
+updateMemberProfile prevents any other column being modified via this path.

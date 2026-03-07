@@ -164,6 +164,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     officeDays: userRecord.officeDays || '',
     assignedSteward: userRecord.assignedSteward || '',
     hasOpenGrievance: userRecord.hasOpenGrievance || false,
+    sharePhone: userRecord.sharePhone === true,  // steward phone opt-in; false if column absent
   };
 
   template.pageData = JSON.stringify({
@@ -231,7 +232,7 @@ function _sanitizeConfig(config) {
     calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
     calendarId: config.calendarId || '',
     driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
-    surveyFormUrl: config.satisfactionFormUrl || '',
+    // surveyFormUrl removed v4.22.7 — survey is native webapp (renderSurveyFormPage in member_view.html)
     orgWebsite: config.orgWebsite || '',
     broadcastScopeAll: (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes'),
   };
