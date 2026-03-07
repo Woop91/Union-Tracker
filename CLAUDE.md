@@ -21,23 +21,38 @@ For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos,
 
 ## Repos & Sync
 
-- **DDS-Dashboard** (private): Primary repo. **Single branch: `Main` only.** All work happens here first.
-- **Union-Tracker** (public): Mirror minus Workload Tracker. **Single branch: `Main` only.**
-- DDS Apps Script ID: `[REDACTED — DDS private]`
+- **DDS-Dashboard** (private): Primary repo. Branches: `Main` (production), `staging` (pre-deploy mirror).
+- **Union-Tracker** (public): Mirror of DDS. Branches: `Main`, `staging`.
+- DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in UT** (public repo).
 
 ### Default Working Directory
-DDS `Main` on GitHub is always the default working branch. All code changes start here.
+DDS `Main` is always the default working branch. **All commits go to `Main` first.**
+
+### Branch Commit Order — MANDATORY
+**NEVER commit directly to `staging`.** The only permitted flow is:
+
+```
+1. git checkout Main
+2. git add / git commit          ← ALL commits land here first
+3. git push origin Main
+4. git checkout staging
+5. git merge Main --no-edit
+6. git push origin staging
+```
+
+Repeat for UT (with DDS Script ID redacted from AI_REFERENCE.md if re-copied).
+
+Committing to `staging` first and cherry-picking to `Main` creates divergent histories with duplicate commit hashes. **This is a bug.** If it happens, fix it immediately: merge `origin/staging` into `Main`, push `Main`, then fast-forward `staging` from `Main`.
 
 ### Sync Flow
 ```
-DDS Main (GitHub) → UT Main (GitHub)
-         ↕
-  Local DDS repo (fallback)
+DDS Main → DDS staging
+DDS Main → UT Main → UT staging
 ```
-- Every commit to DDS Main must be synced to UT Main.
-- Before any push, check the local DDS repo for changes not yet on GitHub. If found, pull or merge them first.
+- Every commit to DDS Main must be synced to UT Main, then both stagings updated.
+- Before any push, fetch origin and rebase/merge remote changes to avoid rejected pushes.
 
 ### Repo Differences
 DDS and UT are **identical**. No file exclusions remain (the standalone Workload Tracker portal was removed in v4.20.0 — the workload tracker is now fully integrated into the SPA in both repos).
