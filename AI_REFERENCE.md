@@ -1622,3 +1622,57 @@ dataGetStewardDirectory()
     → for each steward rec:
         phone = (callerIsSteward || rec.sharePhone) ? rec.phone : null
 ```
+
+---
+
+## Share Phone Column — Sheet Definition (2026-03-07)
+
+### Files Modified
+- `src/01_Core.gs` — MEMBER_HEADER_MAP_
+- `src/10a_SheetCreation.gs` — createMemberDirectory, _addMissingMemberHeaders_
+
+### Column Added to MEMBER_HEADER_MAP_
+```
+{ key: 'SHARE_PHONE', header: 'Share Phone' }
+```
+Position: immediately after `IS_STEWARD`. Accessible as `MEMBER_COLS.SHARE_PHONE`.
+
+### Sheet Behavior
+- **New sheets**: Yes/No dropdown validation applied at column creation with help text.
+- **Existing sheets**: `_addMissingMemberHeaders_()` detects 'share phone' is missing,
+  appends it, and applies the same dropdown + column width (110px) automatically.
+  No manual migration required — re-running CREATE_DASHBOARD or any menu action
+  that calls createMemberDirectory will add the column.
+
+### Dropdown values
+`Yes` = steward opts in; phone shown to members.
+`No` (or blank/absent) = phone hidden from members.
+
+### Column width: 110px. Not hidden. No conditional formatting needed.
+
+---
+
+## Share Phone Column — Sheet Definition (2026-03-07)
+
+### Files Modified
+- `src/01_Core.gs` — MEMBER_HEADER_MAP_
+- `src/10a_SheetCreation.gs` — createMemberDirectory, _addMissingMemberHeaders_
+
+### Column Added to MEMBER_HEADER_MAP_
+```
+{ key: 'SHARE_PHONE', header: 'Share Phone' }
+```
+Position: immediately after `IS_STEWARD`. Accessible as `MEMBER_COLS.SHARE_PHONE`.
+
+### Sheet Behavior
+- **New sheets**: Yes/No dropdown validation applied at column creation with help text.
+- **Existing sheets**: `_addMissingMemberHeaders_()` detects 'share phone' is missing,
+  appends it, and applies the same dropdown + column width (110px) automatically.
+  No manual migration required — re-running CREATE_DASHBOARD or any menu action
+  that calls createMemberDirectory will add the column.
+
+### Dropdown values
+`Yes` = steward opts in; phone shown to members.
+`No` (or blank/absent) = phone hidden from members.
+
+### Column width: 110px. Not hidden. No conditional formatting needed.

@@ -826,6 +826,17 @@ function _addMissingMemberHeaders_(sheet) {
         .setRanges([duesRange]).build();
       sheet.setConditionalFormatRules(existingRules.concat([duesTrueRule, duesFalseRule]));
     }
+
+    // Share Phone: Yes/No dropdown (steward opt-in for member phone visibility)
+    if (normalised === 'share phone') {
+      sheet.setColumnWidth(targetCol, 110);
+      var sharePhoneMissingRule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(['Yes', 'No'], true)
+        .setAllowInvalid(false)
+        .setHelpText('Yes = members can see this steward\'s phone number in the directory. No = phone is hidden from members.')
+        .build();
+      sheet.getRange(2, targetCol, 4999, 1).setDataValidation(sharePhoneMissingRule);
+    }
   }
 
   return added;
@@ -980,6 +991,17 @@ function createMemberDirectory(ss) {
 
   // Hide PIN Hash column (sensitive data — should not be visible in the sheet)
   sheet.hideColumns(MEMBER_COLS.PIN_HASH, 1);
+
+  // Share Phone column — Yes/No dropdown (steward opt-in for member phone visibility)
+  if (MEMBER_COLS.SHARE_PHONE) {
+    sheet.setColumnWidth(MEMBER_COLS.SHARE_PHONE, 110);
+    var sharePhoneRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['Yes', 'No'], true)
+      .setAllowInvalid(false)
+      .setHelpText('Yes = members can see this steward\'s phone number in the directory. No = phone is hidden from members.')
+      .build();
+    sheet.getRange(2, MEMBER_COLS.SHARE_PHONE, 4999, 1).setDataValidation(sharePhoneRule);
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances

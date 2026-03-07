@@ -1315,6 +1315,7 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'SUPERVISOR',         header: 'Supervisor' },
   { key: 'MANAGER',            header: 'Manager' },
   { key: 'IS_STEWARD',         header: 'Is Steward' },
+  { key: 'SHARE_PHONE',        header: 'Share Phone' },       // Opt-in: steward allows members to see their phone number (Yes/No)
   { key: 'COMMITTEES',         header: 'Committees' },
   { key: 'ASSIGNED_STEWARD',   header: 'Assigned Steward' },
   { key: 'LAST_VIRTUAL_MTG',   header: 'Last Virtual Mtg' },
