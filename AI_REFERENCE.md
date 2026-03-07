@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 39 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 39 `.gs` + 8 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
+**DDS Apps Script ID:** `[REDACTED — private repo only]`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
