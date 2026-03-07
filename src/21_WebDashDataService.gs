@@ -3037,7 +3037,8 @@ function dataSendDirectMessage(ignoredEmail, memberEmail, subject, body) {
     try {
       var sRecord = (typeof findUserByEmail === 'function') ? findUserByEmail(s) : null;
       var sName   = (sRecord && sRecord.name) ? sRecord.name : s;
-      var memberFolder = DataService.getOrCreateMemberContactFolderPublic(memberEmail.trim().toLowerCase());
+      var adminResult  = DataService.getOrCreateMemberContactFolderPublic(memberEmail.trim().toLowerCase());
+      var memberFolder = (adminResult && adminResult.masterFolder) ? adminResult.masterFolder : null;
       if (memberFolder) {
         var folderName = memberFolder.getName();
         var contactSS  = DataService.getOrCreateMemberContactSheetPublic(memberFolder, folderName);
