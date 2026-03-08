@@ -23,6 +23,12 @@ function initSurveyEngine() {
   var log = [];
 
   try {
+    // 0. Survey Questions sheet (seed if not exists — owner edits question text here)
+    createSurveyQuestionsSheet(ss2);
+    log.push('✅ 📋 Survey Questions sheet ready');
+  } catch(e) { log.push('❌ Survey Questions sheet: ' + e.message); }
+
+  try {
     // 1. Hidden sheet
     setupSurveyPeriodsSheet();
     log.push('✅ _Survey_Periods sheet ready');
@@ -156,7 +162,7 @@ function setupSurveyPeriodsSheet() {
   sheet.setFrozenRows(1);
 
   // Hide the sheet at API level
-  try { setSheetVeryHidden_(sheet); } catch(e) { sheet.hideSheet(); }
+  try { setSheetVeryHidden_(sheet); } catch(_e) { sheet.hideSheet(); }
 
   Logger.log('setupSurveyPeriodsSheet: _Survey_Periods created.');
 }
@@ -537,67 +543,81 @@ function getPendingSurveyMembers() {
  *   sections: { OVERALL_SAT: {avg, count}, STEWARD_3A: {...}, ... }
  * }
  */
+/**
+ * Returns aggregate section averages for the current survey period.
+ * v4.23.0: Fully dynamic — sections and questions read from 📋 Survey Questions sheet.
+ * No hardcoded section definitions. Only slider-10 questions contribute to averages.
+ * Reads only numeric columns from anonymous Satisfaction sheet — no PII involved.
+ * Plain values (not Sheets formulas). Cached 10 minutes per period.
+ *
+ * @returns {{ periodId, periodName, responseCount, sections: Object }}
+ */
 function getSatisfactionSummary() {
   try {
-    var period = getSurveyPeriod();
+    var period   = getSurveyPeriod();
     var periodId = period ? period.periodId : 'unknown';
 
-    // Check cache first
     var cacheKey = 'satisfactionSummary_' + periodId;
     try {
       var cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch(ce) {}
+    } catch(_ce) {}
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss       = SpreadsheetApp.getActiveSpreadsheet();
     var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
     if (!satSheet || satSheet.getLastRow() < 2) {
-      return { periodId: periodId, responseCount: 0, sections: {} };
+      return { periodId: periodId, periodName: period ? period.name : '', responseCount: 0, sections: {} };
     }
 
-    var lastRow = satSheet.getLastRow();
+    // ── Get col map and all data ──────────────────────────────────────────
+    var colMap      = getSatisfactionColMap_();
+    var lastRow     = satSheet.getLastRow();
+    var lastCol     = satSheet.getLastColumn();
     var dataRowCount = lastRow - 1;
+    var allData     = satSheet.getRange(2, 1, dataRowCount, lastCol).getValues();
 
-    // Read all numeric columns in one batch (cols 1 through Q67 col = 68 cols)
-    var allData = satSheet.getRange(2, 1, dataRowCount, 68).getValues();
+    // ── Get slider questions grouped by section from Survey Questions sheet ──
+    var questionsData = getSurveyQuestions();
+    var allQs = questionsData.questions || [];
 
-    // Column groups to average (0-indexed into allData row arrays)
-    // SATISFACTION_COLS values are 1-indexed, so subtract 1 for array access
-    var SC = SATISFACTION_COLS;
-    var sectionDefs = [
-      { key: 'OVERALL_SAT',    name: 'Overall Satisfaction',      cols: [SC.Q6_SATISFIED_REP-1, SC.Q7_TRUST_UNION-1, SC.Q8_FEEL_PROTECTED-1, SC.Q9_RECOMMEND-1] },
-      { key: 'STEWARD_3A',     name: 'Steward Ratings',           cols: [SC.Q10_TIMELY_RESPONSE-1, SC.Q11_TREATED_RESPECT-1, SC.Q12_EXPLAINED_OPTIONS-1, SC.Q13_FOLLOWED_THROUGH-1, SC.Q14_ADVOCATED-1, SC.Q15_SAFE_CONCERNS-1, SC.Q16_CONFIDENTIALITY-1] },
-      { key: 'STEWARD_3B',     name: 'Steward Access',            cols: [SC.Q18_KNOW_CONTACT-1, SC.Q19_CONFIDENT_HELP-1, SC.Q20_EASY_FIND-1] },
-      { key: 'CHAPTER',        name: 'Chapter Effectiveness',     cols: [SC.Q21_UNDERSTAND_ISSUES-1, SC.Q22_CHAPTER_COMM-1, SC.Q23_ORGANIZES-1, SC.Q24_REACH_CHAPTER-1, SC.Q25_FAIR_REP-1] },
-      { key: 'LEADERSHIP',     name: 'Local Leadership',          cols: [SC.Q26_DECISIONS_CLEAR-1, SC.Q27_UNDERSTAND_PROCESS-1, SC.Q28_TRANSPARENT_FINANCE-1, SC.Q29_ACCOUNTABLE-1, SC.Q30_FAIR_PROCESSES-1, SC.Q31_WELCOMES_OPINIONS-1] },
-      { key: 'CONTRACT',       name: 'Contract Enforcement',      cols: [SC.Q32_ENFORCES_CONTRACT-1, SC.Q33_REALISTIC_TIMELINES-1, SC.Q34_CLEAR_UPDATES-1, SC.Q35_FRONTLINE_PRIORITY-1] },
-      { key: 'REPRESENTATION', name: 'Representation Process',    cols: [SC.Q37_UNDERSTOOD_STEPS-1, SC.Q38_FELT_SUPPORTED-1, SC.Q39_UPDATES_OFTEN-1, SC.Q40_OUTCOME_JUSTIFIED-1] },
-      { key: 'COMMUNICATION',  name: 'Communication Quality',     cols: [SC.Q41_CLEAR_ACTIONABLE-1, SC.Q42_ENOUGH_INFO-1, SC.Q43_FIND_EASILY-1, SC.Q44_ALL_SHIFTS-1, SC.Q45_MEETINGS_WORTH-1] },
-      { key: 'MEMBER_VOICE',   name: 'Member Voice & Culture',    cols: [SC.Q46_VOICE_MATTERS-1, SC.Q47_SEEKS_INPUT-1, SC.Q48_DIGNITY-1, SC.Q49_NEWER_SUPPORTED-1, SC.Q50_CONFLICT_RESPECT-1] },
-      { key: 'VALUE_ACTION',   name: 'Value & Collective Action', cols: [SC.Q51_GOOD_VALUE-1, SC.Q52_PRIORITIES_NEEDS-1, SC.Q53_PREPARED_MOBILIZE-1, SC.Q54_HOW_INVOLVED-1, SC.Q55_WIN_TOGETHER-1] },
-      { key: 'SCHEDULING',     name: 'Scheduling & Office Days',  cols: [SC.Q56_UNDERSTAND_CHANGES-1, SC.Q57_ADEQUATELY_INFORMED-1, SC.Q58_CLEAR_CRITERIA-1, SC.Q59_WORK_EXPECTATIONS-1, SC.Q60_EFFECTIVE_OUTCOMES-1, SC.Q61_SUPPORTS_WELLBEING-1, SC.Q62_CONCERNS_SERIOUS-1] }
-    ];
+    // Build section map: sectionKey → { name, questionIds[] }
+    // Only include slider-10 questions that have a column in the sheet
+    var sectionMap = {};
+    var sectionOrder = [];
+    allQs.forEach(function(q) {
+      if (q.type !== 'slider-10') return;
+      var col = colMap[q.id];
+      if (!col) return; // question not yet in satisfaction sheet
+      if (!sectionMap[q.sectionKey]) {
+        sectionMap[q.sectionKey] = { name: q.sectionTitle, qIds: [] };
+        sectionOrder.push(q.sectionKey);
+      }
+      sectionMap[q.sectionKey].qIds.push(q.id);
+    });
 
+    // ── Compute section averages ─────────────────────────────────────────
     var sections = {};
-    for (var s = 0; s < sectionDefs.length; s++) {
-      var def   = sectionDefs[s];
+    sectionOrder.forEach(function(key) {
+      var def   = sectionMap[key];
       var total = 0;
       var count = 0;
-      for (var row = 0; row < allData.length; row++) {
-        for (var c = 0; c < def.cols.length; c++) {
-          var val = parseFloat(allData[row][def.cols[c]]);
+      allData.forEach(function(row) {
+        def.qIds.forEach(function(qId) {
+          var col = colMap[qId];
+          if (!col) return;
+          var val = parseFloat(row[col - 1]);
           if (!isNaN(val) && val >= 1 && val <= 10) {
             total += val;
             count++;
           }
-        }
-      }
-      sections[def.key] = {
+        });
+      });
+      sections[key] = {
         name:  def.name,
         avg:   count > 0 ? Math.round((total / count) * 10) / 10 : null,
         count: count
       };
-    }
+    });
 
     var result = {
       periodId:      periodId,
@@ -606,16 +626,12 @@ function getSatisfactionSummary() {
       sections:      sections
     };
 
-    // Cache for 10 minutes
-    try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 600);
-    } catch(ce) {}
-
+    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 600); } catch(_ce) {}
     return result;
 
   } catch(e) {
     Logger.log('getSatisfactionSummary error: ' + e.message);
-    return { periodId: null, responseCount: 0, sections: {} };
+    return { periodId: null, periodName: '', responseCount: 0, sections: {} };
   }
 }
 
@@ -704,24 +720,31 @@ function setupWeeklyReminderTrigger() {
 /**
  * Webapp-callable: returns pending survey members for steward dashboard.
  */
-function dataGetPendingSurveyMembers() {
-  var s = _requireStewardAuth();
+function dataGetPendingSurveyMembers(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
   if (!s) return { total: 0, pending: 0, completed: 0, rate: 0, members: [] };
   return getPendingSurveyMembers();
 }
 
 /**
  * Webapp-callable: returns satisfaction section averages.
+ * Accessible to any authenticated user (member OR steward) — data is fully
+ * anonymised aggregate stats with no PII. Members see results in Survey Results
+ * page; stewards see them in the Insights panel.
+ * @param {string} sessionToken
  */
-function dataGetSatisfactionSummary() {
+function dataGetSatisfactionSummary(sessionToken) {
+  // _resolveCallerEmail accepts steward OR member session tokens
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { periodId: null, periodName: '', responseCount: 0, sections: {} };
   return getSatisfactionSummary();
 }
 
 /**
  * Webapp-callable: steward opens a new survey period manually.
  */
-function dataOpenNewSurveyPeriod() {
-  var s = _requireStewardAuth();
+function dataOpenNewSurveyPeriod(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, message: 'Not authorized.' };
   return openNewSurveyPeriod(s);
 }

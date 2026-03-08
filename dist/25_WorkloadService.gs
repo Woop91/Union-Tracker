@@ -1116,12 +1116,12 @@ var WorkloadService = (function() {
 // GLOBAL WRAPPERS (google.script.run calls from SPA)
 // ============================================================================
 
-function processWorkloadFormSSO(email, formData) { return WorkloadService.processFormSSO(email, formData); }
-function getWorkloadHistorySSO(email) { return WorkloadService.getHistorySSO(email); }
-function getWorkloadDashboardDataSSO(email) { return WorkloadService.getDashboardDataSSO(email); }
-function getWorkloadReminderSSO(email) { return WorkloadService.getReminderSSO(email); }
-function setWorkloadReminderSSO(email, prefs) { return WorkloadService.setReminderSSO(email, prefs); }
-function exportWorkloadHistoryCSV(email) { return WorkloadService.exportHistoryCSV(email); }
+function processWorkloadFormSSO(sessionToken, formData) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.processFormSSO(e, formData) : { success: false, message: 'Not authenticated.' }; }
+function getWorkloadHistorySSO(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.getHistorySSO(e) : { success: false, history: [], message: 'Not authenticated.' }; }
+function getWorkloadDashboardDataSSO(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.getDashboardDataSSO(e) : { success: false, message: 'Not authenticated.' }; }
+function getWorkloadReminderSSO(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.getReminderSSO(e) : { success: false, reminder: null, message: 'Not authenticated.' }; }
+function setWorkloadReminderSSO(sessionToken, prefs) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.setReminderSSO(e, prefs) : { success: false, message: 'Not authenticated.' }; }
+function exportWorkloadHistoryCSV(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.exportHistoryCSV(e) : { success: false, message: 'Not authenticated.' }; }
 function getWorkloadSubCategories() { return WorkloadService.getSubCategories(); }
 
 // ============================================================================

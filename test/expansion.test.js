@@ -96,7 +96,7 @@ describe('dataGetEngagementStats (live sheet reads)', () => {
     const mockSs = createMockSpreadsheet([memberSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
 
-    const result = dataGetEngagementStats();
+    const result = dataGetEngagementStats('test-session-token');
     expect(result).toBeDefined();
     expect(result).not.toBeNull();
     expect(typeof result.surveyParticipation).toBe('number');

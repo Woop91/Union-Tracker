@@ -3307,12 +3307,16 @@ function syncFeedbackValues() {
   var critical = 0;
 
   if (lastRow >= 2) {
-    // Get data from columns Type, Status, Priority
-    var typeCol = FEEDBACK_COLS.TYPE;
+    // Get data from columns Category, Status, Priority
+    // TYPE column removed v4.24.1 — Category covers same ground
+    var categoryCol = FEEDBACK_COLS.CATEGORY;
     var statusCol = FEEDBACK_COLS.STATUS;
     var priorityCol = FEEDBACK_COLS.PRIORITY;
 
-    var data = sheet.getRange(2, 1, lastRow - 1, Math.max(typeCol, statusCol, priorityCol)).getValues();
+    var maxCol = Math.max(categoryCol || 0, statusCol || 0, priorityCol || 0);
+    if (maxCol < 1) return; // guard: no valid columns resolved
+
+    var data = sheet.getRange(2, 1, lastRow - 1, maxCol).getValues();
 
     for (var r = 0; r < data.length; r++) {
       var row = data[r];
@@ -3320,13 +3324,13 @@ function syncFeedbackValues() {
 
       totalItems++;
 
-      var type = row[typeCol - 1];
-      var status = row[statusCol - 1];
-      var priority = row[priorityCol - 1];
+      var category = categoryCol ? row[categoryCol - 1] : '';
+      var status = statusCol ? row[statusCol - 1] : '';
+      var priority = priorityCol ? row[priorityCol - 1] : '';
 
-      if (type === 'Bug') bugs++;
-      else if (type === 'Feature Request') features++;
-      else if (type === 'Improvement') improvements++;
+      if (category === 'Bug' || category === 'Performance') bugs++;
+      else if (category === 'Integration' || category === 'UI/UX') features++;
+      else if (category === 'Reports' || category === 'Search') improvements++;
 
       if (status === 'New' || status === 'In Progress') newOpen++;
       else if (status === 'Resolved') resolved++;

@@ -27,7 +27,7 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 - Node.js build system
 - ESLint for code quality (v9.x flat config)
 
-**Version:** 4.13.0
+**Version:** 4.24.4
 
 ---
 
@@ -36,9 +36,9 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 ### High-Level Structure
 
 ```
-DDS-Dashboard/
-├── src/                    # 37 source files (.gs) + 7 HTML
-├── test/                   # Jest unit tests (1300+ tests)
+Union-Tracker/
+├── src/                    # 42 source files (.gs) + 7 HTML
+├── test/                   # Jest unit tests (2059 tests across 36 suites)
 ├── dist/                   # Build output (auto-generated)
 ├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration
@@ -51,7 +51,7 @@ DDS-Dashboard/
 
 ### Modular Design (v4.6.0)
 
-The codebase follows a layered architecture with 37 modules organized by numbered prefix:
+The codebase follows a layered architecture with 42 modules organized by numbered prefix:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -107,6 +107,7 @@ The codebase follows a layered architecture with 37 modules organized by numbere
 | `08b_SearchAndCharts.gs` | Search functions, chart generation | `desktopSearch`, `buildChart` |
 | `08c_FormsAndNotifications.gs` | Form handling, notifications, deadline alerts | `sendDeadlineAlerts`, `processFormSubmission` |
 | `08d_AuditAndFormulas.gs` | Audit log, formula sync, hidden calc sheets | `logAuditEntry`, `setupCalcFormulasSheet` |
+| `08e_SurveyEngine.gs` | Dynamic survey schema engine (Option B) | `buildSurveyForm`, `processSurveySubmission` |
 
 ### UI Modules
 
@@ -166,17 +167,26 @@ The codebase follows a layered architecture with 37 modules organized by numbere
 | `24_WeeklyQuestions.gs` | Weekly check-in questions | `getWeeklyQuestions`, `submitWeeklyResponse` |
 | `25_WorkloadService.gs` | SPA-integrated workload (IIFE: WorkloadService) | `getWorkloadFormData`, `submitWorkloadData` |
 
+### Extended Services
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `26_QAForum.gs` | Q&A Forum with steward-only answers and resolve | `getQAForumData`, `postQuestion`, `postAnswer`, `resolveQuestion` |
+| `27_TimelineService.gs` | Timeline activity feed with inline edit | `getTimelineEntries`, `addTimelineEntry`, `editTimelineEntry` |
+| `28_FailsafeService.gs` | Security and reliability failsafe layer | `FailsafeService.getFiles`, `FailsafeService.validateAccess` |
+| `29_Migrations.gs` | Schema migration runner | `runMigrations`, `getMigrationStatus` |
+
 ### HTML Templates
 
 | File | Purpose |
 |------|---------|
-| `MultiSelectDialog.html` | Multi-select dialog HTML template |
 | `index.html` | SPA entry point |
 | `styles.html` | SPA shared styles |
+| `auth_view.html` | SSO/magic link authentication view |
 | `steward_view.html` | Steward dashboard SPA view |
 | `member_view.html` | Member dashboard SPA view |
-| `portal_sheets.html` | Portal sheets management UI |
-| `weekly_questions.html` | Weekly questions UI |
+| `error_view.html` | Error/access denied page |
+| `org_chart.html` | Organizational chart view |
 
 ### Development Module (Remove in Production)
 
@@ -345,7 +355,7 @@ npm run deploy
 
 ### Build Order
 
-Files must be concatenated in dependency order (37 files):
+Files must be concatenated in dependency order (42 files):
 
 ```javascript
 const BUILD_ORDER = [
@@ -366,6 +376,7 @@ const BUILD_ORDER = [
   '08b_SearchAndCharts.gs',       // Search functions, chart generation
   '08c_FormsAndNotifications.gs', // Form handling, notifications, deadline alerts
   '08d_AuditAndFormulas.gs',      // Audit log, formula sync, hidden calc sheets
+  '08e_SurveyEngine.gs',          // Dynamic survey schema engine (Option B)
   '09_Dashboards.gs',             // Satisfaction, Sync, Public dashboards
   '10a_SheetCreation.gs',         // Config, Member Directory, Grievance Log creation
   '10b_SurveyDocSheets.gs',       // Satisfaction, Feedback, FAQ, Getting Started sheets
@@ -385,7 +396,11 @@ const BUILD_ORDER = [
   '22_WebDashApp.gs',             // SPA entry point and routing
   '23_PortalSheets.gs',           // Hidden sheet management for SPA
   '24_WeeklyQuestions.gs',        // Weekly check-in questions
-  '25_WorkloadService.gs'         // SPA-integrated workload (IIFE: WorkloadService)
+  '25_WorkloadService.gs',        // SPA-integrated workload (IIFE: WorkloadService)
+  '26_QAForum.gs',                // Q&A Forum with steward-only answers
+  '27_TimelineService.gs',        // Timeline activity feed with inline edit
+  '28_FailsafeService.gs',        // Security and reliability failsafe layer
+  '29_Migrations.gs'              // Schema migration runner
 ];
 ```
 
@@ -395,7 +410,7 @@ const BUILD_ORDER = [
 
 ### Jest Test Suite (Primary)
 
-The project uses **Jest v29.7.0** as its primary test framework, with 1300+ tests across 21+ test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
+The project uses **Jest v29.7.0** as its primary test framework, with 2059 tests across 36 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
 
 #### Running Tests
 
@@ -414,6 +429,9 @@ test/
 ├── gas-mock.js                    # GAS global mocks (SpreadsheetApp, Logger, etc.)
 ├── load-source.js                 # Loads .gs source files into Node.js global scope
 ├── modules.test.js                # Cross-module integration tests
+├── architecture.test.js           # Architecture validation tests
+├── columns.test.js                # Column constant tests
+├── expansion.test.js              # Expansion and growth tests
 ├── 00_DataAccess.test.js          # Data Access Layer tests
 ├── 00_Security.test.js            # Security module tests
 ├── 01_Core.test.js                # Core constants and error handling tests
@@ -428,10 +446,24 @@ test/
 ├── 09_Dashboards.test.js          # Dashboard tests
 ├── 10_Code.test.js                # Code and sheet creation tests
 ├── 10_Main.test.js                # Main entry point tests
+├── 10d_SyncAndMaintenance.test.js # Sync and maintenance tests
 ├── 11_CommandHub.test.js          # Command hub tests
 ├── 12_Features.test.js            # Features and checklist tests
 ├── 13_MemberSelfService.test.js   # Member self-service portal tests
-└── 14_MeetingCheckIn.test.js      # Meeting check-in system tests
+├── 14_MeetingCheckIn.test.js      # Meeting check-in system tests
+├── 15_EventBus.test.js            # EventBus pub/sub tests
+├── 16_DashboardEnhancements.test.js # Dashboard enhancements tests
+├── 17_CorrelationEngine.test.js   # Correlation engine tests
+├── 19_WebDashAuth.test.js         # Web dashboard auth tests
+├── 20_WebDashConfigReader.test.js # Config reader tests
+├── 21_WebDashDataService.test.js  # Web data service tests
+├── 22_WebDashApp.test.js          # Web dashboard app tests
+├── 23_PortalSheets.test.js        # Portal sheets tests
+├── 24_WeeklyQuestions.test.js     # Weekly questions tests
+├── 25_WorkloadService.test.js     # Workload service tests
+├── 26_QAForum.test.js             # Q&A Forum tests
+├── 27_TimelineService.test.js     # Timeline service tests
+└── 28_FailsafeService.test.js     # Failsafe service tests
 ```
 
 #### Writing Tests

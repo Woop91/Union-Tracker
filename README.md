@@ -1,8 +1,8 @@
 # Strategic Command Center
 
-**Version 4.13.0** | Union Steward Dashboard for Google Sheets
+**Version 4.24.4** | Union Steward Dashboard for Google Sheets
 
-A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 37-file modular architecture and a full SPA web dashboard.
+A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 42-file modular architecture and a full SPA web dashboard.
 
 ---
 
@@ -83,7 +83,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Click the **+** button next to "Files" to create a new script file
    - Name it to match the source file (without the `.gs` extension)
    - Paste the contents from the corresponding `src/` file
-   - Repeat for all 37 `.gs` files and 7 `.html` files
+   - Repeat for all 42 `.gs` files and 7 `.html` files
 
 5. **Run the initial setup:**
    - Select `CREATE_DASHBOARD` from the function dropdown
@@ -158,7 +158,7 @@ When you're ready to move from testing to real data:
 2. Delete `07_DevTools.gs` from your Apps Script project (Extensions > Apps Script > right-click > Delete)
 3. Refresh the sheet -- the Demo menu disappears automatically
 
-After that, you have **36 production `.gs` files + 7 `.html` files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
+After that, you have **41 production `.gs` files + 7 `.html` files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
 
 ---
 
@@ -275,7 +275,7 @@ After that, you have **36 production `.gs` files + 7 `.html` files** and a clean
 - Full single-page application with Google SSO + magic link authentication
 - Role-based views: `steward_view.html` and `member_view.html`
 - Deep-link routing: `?page=X` pre-selects tabs via `PAGE_DATA.initialTab`
-- 6 SPA modules: Auth, ConfigReader, DataService, WebDashApp, PortalSheets, WeeklyQuestions
+- 11 SPA modules: Auth, ConfigReader, DataService, WebDashApp, PortalSheets, WeeklyQuestions, WorkloadService, QAForum, TimelineService, FailsafeService, Migrations
 - Hidden sheets: `_Weekly_Questions`, `_Contact_Log`, `_Steward_Tasks`
 - Auto-configures auth on first run — no manual ScriptProperties setup
 
@@ -284,6 +284,33 @@ After that, you have **36 production `.gs` files + 7 `.html` files** and a clean
 - Steward notification management — compose/inbox/manage tabs
 - EventBus auto-notifications for grievance deadlines and status changes
 - Member notification view with dismiss functionality
+
+### Q&A Forum (v4.22.6+)
+- Steward-member Q&A communication through the web dashboard
+- Steward-only answers, question resolve/reopen functionality
+- Unanswered count on notification bell badge
+- Anonymous question notifications and show-resolved toggle
+
+### Timeline Service (v4.22.9+)
+- Chronological activity feed in the web dashboard
+- Inline editing, meeting minutes linking, load more pagination
+- Dynamic year filter, calendar icon links, theme-aware category badges
+
+### Dynamic Survey Engine (v4.23.0)
+- Fully dynamic survey schema driven by configuration
+- Replaced hardcoded survey form URL with dynamic config
+
+### Share Phone (v4.23.4+)
+- Steward phone opt-in permission for member visibility
+- Self-toggle in web dashboard, default 'No' seeding
+
+### FailsafeService (v4.22.8+)
+- Critical operation wrapper with retry logic and graceful degradation
+- Session token auth for magic link and session users
+
+### Org Chart (v4.22.6)
+- MADDS organizational chart as default view
+- Automated sync via `scripts/sync-org-chart.js`
 
 ### Looker Studio Integration
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
@@ -440,7 +467,7 @@ npm run build          # Copy individual .gs + .html files to dist/
 npm run build --prod   # Production build (excludes DevTools)
 npm run lint           # ESLint code quality checks
 npm run lint:fix       # Auto-fix ESLint issues
-npm run test:unit      # Run 1300+ Jest unit tests
+npm run test:unit      # Run 2059 Jest unit tests (36 suites)
 npm test               # Full pipeline: lint + build + test
 npm run clean          # Clean dist directory
 npm run deploy         # Deploy to Google Apps Script (requires clasp)
@@ -460,7 +487,7 @@ See the [Developer Guide](DEVELOPER_GUIDE.md) for architecture details, code pat
 
 ## Architecture
 
-The codebase uses a 37-file modular architecture (+ 7 HTML templates) with numbered prefixes that indicate load order and purpose:
+The codebase uses a 42-file modular architecture (+ 7 HTML templates) with numbered prefixes that indicate load order and purpose:
 
 | Prefix | Layer | Files |
 |--------|-------|-------|
@@ -471,7 +498,7 @@ The codebase uses a 37-file modular architecture (+ 7 HTML templates) with numbe
 | 05 | Integrations | `05_Integrations.gs` (Drive, Calendar, WebApp, doGet router) |
 | 06 | Maintenance | `06_Maintenance.gs` (diagnostics, cache, undo) |
 | 07 | Dev Tools | `07_DevTools.gs` (remove before production) |
-| 08 | Sheet Utilities | `08a_SheetSetup.gs`, `08b_SearchAndCharts.gs`, `08c_FormsAndNotifications.gs`, `08d_AuditAndFormulas.gs` |
+| 08 | Sheet Utilities | `08a_SheetSetup.gs`, `08b_SearchAndCharts.gs`, `08c_FormsAndNotifications.gs`, `08d_AuditAndFormulas.gs`, `08e_SurveyEngine.gs` |
 | 09 | Dashboards | `09_Dashboards.gs` |
 | 10 | Business Logic | `10_Main.gs`, `10a_SheetCreation.gs`, `10b_SurveyDocSheets.gs`, `10c_FormHandlers.gs`, `10d_SyncAndMaintenance.gs` |
 | 11 | Command Hub | `11_CommandHub.gs` |
@@ -482,15 +509,16 @@ The codebase uses a 37-file modular architecture (+ 7 HTML templates) with numbe
 | 16 | Enhancements | `16_DashboardEnhancements.gs` (date ranges, chart export, drill-down) |
 | 17 | Analytics | `17_CorrelationEngine.gs` (cross-dimensional correlation) |
 | 19-25 | SPA Web Dashboard | `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`, `25_WorkloadService.gs` |
-| -- | HTML | `MultiSelectDialog.html`, `index.html`, `styles.html`, `steward_view.html`, `member_view.html`, `portal_sheets.html`, `weekly_questions.html` |
+| 26-29 | Extended Services | `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`, `29_Migrations.gs` |
+| -- | HTML | `index.html`, `styles.html`, `auth_view.html`, `steward_view.html`, `member_view.html`, `error_view.html`, `org_chart.html` |
 
-> **Note:** Union-Tracker excludes `18_WorkloadTracker.gs` and `WorkloadTracker.html` (DDS-only standalone workload portal). Workload functionality is embedded in the SPA via `25_WorkloadService.gs` and `member_view.html`.
+> **Note:** No prefix 18 exists in this repo (the standalone WorkloadTracker was removed). Workload functionality is embedded in the SPA via `25_WorkloadService.gs`.
 
 ### Design Principles
 
 - **Separation of Concerns**: Each file has one clear purpose
 - **Numbered Prefixes**: Show dependency order for build concatenation
-- **Production Ready**: Delete `07_DevTools.gs` for a 36-file production deployment
+- **Production Ready**: Delete `07_DevTools.gs` for a 41-file production deployment
 - **Failure Isolation**: A bug in Calendar sync won't break the Member Directory
 - **Self-Healing**: Hidden calculation sheets auto-repair their formulas
 - **Performance**: CacheService integration and batch operations handle 5,000+ members
@@ -587,13 +615,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| **4.24.4** | 2026-03-07 | Auth sweep complete, Q_COLS API, FlashPolls removed, QAForum wrapper fixes |
+| **4.23.0** | 2026-03 | Dynamic survey engine (Option B), Share Phone feature, steward directory parity |
+| **4.22.0** | 2026-03 | Notification overhaul, Q&A Forum, Timeline, org chart, FailsafeService, events hardening |
+| **4.20.18** | 2026-03 | Minutes tab fixes, per-member admin folders, column auto-migration |
 | **4.13.0** | 2026-02-25 | Notification bell/EventBus auto-alerts, individual-file build, WorkloadService SPA module |
 | **4.12.2** | 2026-02-25 | SPA web dashboard, SSO + magic link auth, deep-link routing, hidden sheets |
 | **4.12.0** | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
 | **4.11.0** | 2026-02-24 | Resources hub, meeting check-in route, design refresh |
 | **4.10.0** | 2026-02-23 | Workload Tracker module, 8 workload categories, privacy controls, email reminders, 5 new hidden sheets |
 | **4.9.1** | 2026-02-23 | Security vulnerability fix pass — 22 findings fixed, XSS hardening, formula injection protection |
-| **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 1300+ tests across 21 suites |
+| **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 2059 tests across 36 suites |
 | **4.8.2** | 2026-02-16 | State field added to member contact surfaces |
 | **4.8.1** | 2026-02-15 | 5 new contact form fields, unified name-based Member ID system |
 | **4.8.0** | 2026-02-15 | Security event alerting, zero-knowledge survey vault, event bus architecture |

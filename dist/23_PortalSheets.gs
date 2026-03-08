@@ -7,12 +7,11 @@
  *   PortalMemberDirectory (hidden) — portal profile extensions (office days, badges, etc.)
  *   Events               — upcoming union events and meetings
  *   MeetingMinutes       — union meeting notes with bullet summaries
- *   FlashPolls           — active quick-vote polls
- *   PollResponses (hidden) — individual poll vote records
  *   PortalGrievances (hidden) — portal grievance cases (separate from Grievance Log)
  *   StewardLog (hidden)  — steward-member interaction audit trail
  *   MegaSurvey (hidden)  — 56-question survey progress
  *
+ * Note: FlashPolls/PollResponses removed v4.24.0 — replaced by 24_WeeklyQuestions.gs.
  * Note: Sheet names PortalMemberDirectory and PortalGrievances are distinct from
  * DDS's existing "Member Directory" and "Grievance Log" sheets to avoid schema collision.
  */
@@ -50,15 +49,6 @@ var PORTAL_MINUTES_COLS = {
   DRIVE_DOC_URL: 7  // v4.20.18 — Google Doc URL saved to Minutes/ Drive folder
 };
 
-var PORTAL_POLL_COLS = {
-  ID: 0, QUESTION: 1, OPTIONS: 2, ACTIVE: 3, UNIT: 4,
-  CREATED_BY: 5, CREATED_DATE: 6
-};
-
-var PORTAL_POLL_RESPONSE_COLS = {
-  POLL_ID: 0, EMAIL: 1, RESPONSE: 2, TIMESTAMP: 3
-};
-
 var PORTAL_GRIEVANCE_COLS = {
   ID: 0, MEMBER_EMAIL: 1, STEWARD_EMAIL: 2, STEP: 3, STATUS: 4,
   DESCRIPTION: 5, GDRIVE_LINK: 6, ZOOM_LINK: 7, DEADLINES: 8,
@@ -84,8 +74,7 @@ var PORTAL_SHEET_NAMES_ = {
   MEMBER_DIR:      (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_MEMBER_DIR)     ? SHEETS.PORTAL_MEMBER_DIR     : 'PortalMemberDirectory',
   EVENTS:          (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_EVENTS)         ? SHEETS.PORTAL_EVENTS         : 'Events',
   MINUTES:         (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_MINUTES)        ? SHEETS.PORTAL_MINUTES        : 'MeetingMinutes',
-  POLLS:           (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_POLLS)          ? SHEETS.PORTAL_POLLS          : 'FlashPolls',
-  POLL_RESPONSES:  (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_POLL_RESPONSES) ? SHEETS.PORTAL_POLL_RESPONSES : 'PollResponses',
+  // POLLS / POLL_RESPONSES removed v4.24.0 — replaced by _Weekly_Questions/_Weekly_Responses in 24_WeeklyQuestions.gs
   GRIEVANCES:      (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_GRIEVANCES)     ? SHEETS.PORTAL_GRIEVANCES     : 'PortalGrievances',
   STEWARD_LOG:     (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_STEWARD_LOG)    ? SHEETS.PORTAL_STEWARD_LOG    : 'StewardLog',
   MEGA_SURVEY:     (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_MEGA_SURVEY)    ? SHEETS.PORTAL_MEGA_SURVEY    : 'MegaSurvey'
@@ -135,24 +124,30 @@ function getOrCreateEventsSheet() {
 }
 
 function getOrCreateMinutesSheet() {
-  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MINUTES, [
+  var sheet = portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MINUTES, [
     'ID', 'MeetingDate', 'Title', 'Bullets', 'FullMinutes',
-    'CreatedBy', 'CreatedDate'
+    'CreatedBy', 'CreatedDate', 'DriveDocUrl'  // col 8 — v4.20.18 fix: matches PORTAL_MINUTES_COLS.DRIVE_DOC_URL=7
   ], false);
+
+  // Migration (v4.20.18): existing sheets created before v4.20.18 have only 7 headers.
+  // Add DriveDocUrl header to col H if missing — safe to re-run.
+  try {
+    var headerRange = sheet.getRange(1, PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1); // col 8
+    if (!headerRange.getValue()) {
+      headerRange.setValue('DriveDocUrl')
+        .setFontWeight('bold')
+        .setBackground('#1a1a2e')
+        .setFontColor('#ffffff');
+      Logger.log('getOrCreateMinutesSheet: migrated — added DriveDocUrl header to col 8');
+    }
+  } catch (migErr) {
+    Logger.log('getOrCreateMinutesSheet: migration check failed (non-fatal): ' + migErr.message);
+  }
+
+  return sheet;
 }
 
-function getOrCreatePollsSheet() {
-  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.POLLS, [
-    'ID', 'Question', 'Options', 'Active', 'Unit',
-    'CreatedBy', 'CreatedDate'
-  ], false);
-}
-
-function getOrCreatePollResponsesSheet() {
-  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.POLL_RESPONSES, [
-    'PollID', 'Email', 'Response', 'Timestamp'
-  ], true);
-}
+// getOrCreatePollsSheet + getOrCreatePollResponsesSheet removed v4.24.0 — FlashPolls replaced by 24_WeeklyQuestions.gs
 
 function getOrCreatePortalGrievanceSheet() {
   return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.GRIEVANCES, [
@@ -176,15 +171,13 @@ function getOrCreateMegaSurveySheet() {
 }
 
 /**
- * Creates all 8 portal sheets. Called from CREATE_DASHBOARD()
- * in 08a_SheetSetup.gs, and directly via initPortalSheetsManual().
+ * Creates all 6 portal sheets (FlashPolls/PollResponses removed v4.24.0).
+ * Called from CREATE_DASHBOARD() in 08a_SheetSetup.gs, and directly via initPortalSheetsManual().
  */
 function initPortalSheets() {
   getOrCreatePortalMemberDirectory();
   getOrCreateEventsSheet();
   getOrCreateMinutesSheet();
-  getOrCreatePollsSheet();
-  getOrCreatePollResponsesSheet();
   getOrCreatePortalGrievanceSheet();
   getOrCreateStewardLogSheet();
   getOrCreateMegaSurveySheet();
@@ -197,5 +190,5 @@ function initPortalSheets() {
  */
 function initPortalSheetsManual() {
   initPortalSheets();
-  SpreadsheetApp.getUi().alert('Portal sheets created successfully.\n\nNew sheets: PortalMemberDirectory, Events, MeetingMinutes, FlashPolls, PollResponses, PortalGrievances, StewardLog, MegaSurvey');
+  SpreadsheetApp.getUi().alert('Portal sheets created successfully.\n\nSheets: PortalMemberDirectory, Events, MeetingMinutes, PortalGrievances, StewardLog, MegaSurvey\n\nNote: FlashPolls/PollResponses removed — polls now in _Weekly_Questions/_Weekly_Responses.');
 }

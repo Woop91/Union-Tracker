@@ -43,7 +43,7 @@ describe('addNewMember row construction', () => {
   test('row array has correct length (QUICK_ACTIONS columns)', () => {
     const row = buildMemberRow({ firstName: 'John', lastName: 'Smith' });
     expect(row.length).toBe(MEMBER_COLS.QUICK_ACTIONS);
-    expect(row.length).toBe(32);
+    expect(row.length).toBe(33);
   });
 
   test('Member ID is in correct position', () => {

@@ -502,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.22.6",
+  VERSION: "4.24.4",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -686,7 +686,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.20.15';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.22.9';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
@@ -706,11 +706,19 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.24.7', date: '2026-03-07', codename: 'Auth Sweep Final — Role Derivation + Residual Fixes', changes: 'FINAL: Three remaining issues closed. (1) getWebAppNotifications: userRole param was still client-trusted — replaced with server-derived role from checkWebAppAuthorization(null,sessionToken).auth.role; treats both/admin as steward for notification targeting. userRole param kept on getWebAppNotificationCount for API compat but ignored server-side. (2) addWebAppResource + sendWebAppNotification: had secondary Session.getActiveUser() call inside function body for audit log (addedBy/stewardEmail) — replaced with auth.email already resolved at function top. (3) getWebAppNotifications: for-loop header (for var i=1) was accidentally stripped during earlier str_replace; restored. restoreFromSnapshot() confirmed sheets-side only (uses ss.toast, never called from client views) — no fix needed.' },
+  { version: '4.24.6', date: '2026-03-07', codename: 'Survey Post-Review Fix Batch', changes: '12-issue fix batch from survey system code review. (1) getSatisfactionTrends() fully rewritten — delegates to getSatisfactionSummary(), returns {overall, responseCount, categories[{name,avg}]} matching frontend shape; Insights satisfaction section renders for first time ever. (2) dataGetSatisfactionSummary(sessionToken) — added param, switched _requireStewardAuth→_resolveCallerEmail; both member and steward views can read aggregate anonymous stats; both HTML callers updated to pass SESSION_TOKEN. (3) Survey Version: periodId+"-v"+count replaces bare question count. (4) getActiveSectionKeys() branch rules fully dynamic from questions array via _sectionBranchRules{}. (5) localStorage→window._surveyDraft in-memory store (GAS iframe blocks localStorage). (6) buildSatisfactionColsShim_() in 08c — all deprecated SATISFACTION_COLS key names mapped to dynamic positions; injected into 20 functions across 5 files. (7) Summary write-back guarded if (summaryStart>0). (8) AVG_* per-row reads replaced with inline q-id computations. (9) DevTools maxCol: satSheet.getLastColumn(). (10) 11_CommandHub AVG fallback collapsed. (11) 28 double-paren syntax errors in 21_WebDashDataService.gs — all functions now parse correctly. (12) 5 blocks of getRange+SATISFACTION_COLS col replaced with single full-row reads+slice; stewardRange/leadershipRange ternary guards added.' },
+  { version: '4.23.2', date: '2026-03-07', codename: 'Complete Session Token Auth Sweep', changes: 'SWEEP: All remaining client-callable server functions still trusting client-supplied email or using bare getActiveUser() now fixed. 05_Integrations.gs: getWebAppNotifications(sessionToken, role), getWebAppNotificationCount(sessionToken, role), dismissWebAppNotification(sessionToken, id), getAllWebAppNotifications(sessionToken), archiveWebAppNotification(sessionToken, id), addWebAppResource(sessionToken, data), updateWebAppResource(sessionToken, id, data), deleteWebAppResource(sessionToken, id), restoreWebAppResource(sessionToken, id), sendWebAppNotification(sessionToken, data) — all now use _resolveCallerEmail(sessionToken) or checkWebAppAuthorization(role, sessionToken). 25_WorkloadService.gs: processWorkloadFormSSO, getWorkloadHistorySSO, getWorkloadDashboardDataSSO, getWorkloadReminderSSO, setWorkloadReminderSSO, exportWorkloadHistoryCSV — all now use _resolveCallerEmail(sessionToken). FIX: tlGetTimelineEvents client call in member_view.html was missing SESSION_TOKEN (first arg silently treated as page number). CLIENT: 25 additional call sites in steward_view.html and member_view.html updated to pass SESSION_TOKEN.' },
+  { version: '4.23.1', date: '2026-03-07', codename: 'System-Wide Session Token Auth Fix', changes: 'SYSTEMIC FIX: All 42+ server wrapper functions that call _requireStewardAuth() or _resolveCallerEmail() now accept sessionToken as first parameter. Root cause: getActiveUser() returns empty in Execute-as-Me webapp for magic link / session token users — every steward operation was silently broken for non-SSO auth. Server: sessionToken param added to all wrappers across 21_WebDashDataService.gs (36 functions), 08e_SurveyEngine.gs (2), 24_WeeklyQuestions.gs (8), 26_QAForum.gs (4), 27_TimelineService.gs (5). Direct Session.getActiveUser() calls in wq wrappers replaced with _resolveCallerEmail(sessionToken). Client: steward_view.html + member_view.html updated to pass SESSION_TOKEN instead of CURRENT_USER.email to all server calls. Q1 fix: server echoes back session token in pageData for method=session users (22_WebDashApp.gs). CLIENT: SESSION_TOKEN now reads PAGE_DATA.sessionToken || localStorage fallback. dataToggleChecklistItem double-paren syntax error fixed.' },
+  { version: '4.23.0', date: '2026-03-07', codename: 'Dynamic Survey Schema', changes: 'Option B fully dynamic survey schema. New sheet: 📋 Survey Questions (16 cols: Question ID, Section, Section Key, Section Title, Question Text, Type, Required, Active, Options, Branch Parent, Branch Value, Branch Target, Max Selections, Slider Min/Max, Notes). Owner edits Question Text, Active, Options, Slider Labels, Notes directly — no deployment needed. Adding a new row to Survey Questions auto-creates a new column in 📊 Member Satisfaction on next submission. Setting Active=N deactivates a question. Satisfaction sheet rebuilt with dynamic headers: Timestamp | Period ID | Survey Version | q1 | q2 … qN. New functions: createSurveyQuestionsSheet() (seeds 67 questions, color-coded by section, non-destructive on re-run), getSatisfactionColMap_() (runtime header→col lookup, 5-min cache), syncSatisfactionSheetColumns_() (auto-appends missing question columns), clearSurveyQuestionsCache() (menu-callable). Rewrites: getSurveyQuestions() reads from sheet with 5-min cache; submitSurveyResponse() builds row via col map not hardcoded positions; getSatisfactionSummary() groups questions dynamically by Section Key. 04c and 04d updated to use getSatisfactionColMap_(). SATISFACTION_COLS kept as deprecated reference. New constants: SHEETS.SURVEY_QUESTIONS, SURVEY_QUESTIONS_COLS, SATISFACTION_PREFIX. Wired into CREATE_DASHBOARD setup and initSurveyEngine().' },
+  { version: '4.22.7', date: '2026-03-07', codename: 'Survey Form URL Deprecation Cleanup', changes: 'Full removal of SATISFACTION_FORM_URL / satisfactionFormUrl / surveyFormUrl across 8 files. Deprecated since v4.21.0 (Google Form integration replaced by native webapp survey), now fully removed. 01_Core.gs: constant replaced with comment. 08c: satisfaction case removed from getFormUrlFromConfig(); saveFormUrlsToConfig_silent() no longer writes/formats satisfaction URL; sendSurveyCompletionReminders() now reads MOBILE_DASHBOARD_URL (member portal) instead of form URL. 04c: satisfactionForm removed from resource links; range now stops at ORG_WEBSITE. 04e: surveyUrl now reads MOBILE_DASHBOARD_URL. 05_Integrations: satisfactionForm removed from resource links, double-semicolon typo fixed. 11_CommandHub: Form Links color section removed. 20_WebDashConfigReader: satisfactionFormUrl line removed. 21_WebDashDataService: surveyFormUrl removed from resource links response. 22_WebDashApp: surveyFormUrl removed from sanitized config. member_view.html: dead else-if fallback branch removed from survey banner onClick handler.' },
   { version: '4.22.6', date: '2026-03-06', codename: 'MADDS Org Chart Default', changes: 'Replace org_chart.html with MADDS chart sourced from 509d repo (Woop91/509d). Full Local 509 org chart (SEIU Local 509 — Main Internal Breakout Chart, updated 2026-03-01) is now default in both DDS-Dashboard and Union-Tracker. Conversion: CSS scoped to .madds-embed wrapper, :root vars moved into .madds-embed scope, body/body.light → .madds-embed/.madds-embed.light, #mode-toggle renamed #madds-mode-toggle, toggleMode() renamed maddstoggleMode() to avoid SPA collisions, Google Fonts loaded dynamically. Serves same HTML fragment via existing getOrgChartHtml() in 22_WebDashApp.gs — no server-side changes required.' },
   { version: '4.22.6', date: '2026-03-06', codename: 'Events Sentinel Propagation Fix', changes: 'Bug fix: home widget events section crashed when getUpcomingEvents returned a sentinel object ({_notConfigured} or {_calNotFound}) — events.length on a plain object returns undefined, rendering "undefined" in KPI counter and crashing forEach. Added Array.isArray guard before rendering and before DataCache.set. DataCache.set now only caches actual arrays; sentinel objects are dropped, preventing the bad value from poisoning the client-side cache on subsequent home re-renders.' },
   { version: '4.22.4', date: '2026-03-06', codename: 'Events Access & Calendar Targeting', changes: 'Events tab dues gate removed — any authenticated member can view events regardless of dues status. More menu Events item lock icon removed. Create Event button URL now includes &src=calendarId param so new events land on the union calendar, not the steward personal calendar. No structural changes to backend auth — dataGetUpcomingEvents still requires valid session.' },
   { version: '4.22.3', date: '2026-03-06', codename: 'Events Tab Hardening', changes: 'Bug fix: ISO date formatter in Add-to-Calendar URLs changed from .replace(\".000Z\",\"Z\") to .replace(/\\.\\d+Z$/,\"Z\") — handles any millisecond value (was silently broken for non-.000 ms values). Bug fix: CalendarApp.getCalendarById() returning null now returns {_calNotFound:true} sentinel instead of [] — distinguishes typo/permission error from genuinely empty calendar. Frontend handles _calNotFound with diagnostic message. Bug fix: Add-to-Calendar URL now includes &details= param (ev.description) in both home widget and Events page — was silently omitted. Feature: Steward Events page now shows \"Manage in Google Calendar\" and \"Create Event\" action buttons when a calendarId is configured. _sanitizeConfig in 22_WebDashApp.gs now exposes calendarId (non-sensitive) so frontend can conditionally show management links.' },
   { version: '4.22.2', date: '2026-03-06', codename: 'Notification Cleanup Pass', changes: 'Bug fix: steward inbox dismiss was passing stale second arg (CURRENT_USER.email) to dismissWebAppNotification() — function only accepts notificationId, gets identity from Session server-side. Arg removed. Dead empty2 block removed from member_view.html renderMemberNotifications — visible=notifications made the unreachable second empty-state check redundant. 04e_PublicDashboard.gs: inline JS notification calls updated from deleted getUserNotifications/markNotificationRead to getWebAppNotifications. Dead DataService.getMemberNotifications guard replaced with [] constant and comment. All four issues are in 04e which is confirmed orphaned (not routed in doGet).' },
+  { version: '4.22.9', date: '2026-03-07', codename: 'FailsafeService Session Token Auth Fix', changes: 'FIX: Auth broken for magic link / session token users in Execute-as-Me webapp. Root cause: Session.getActiveUser() returns empty in this deployment mode for non-SSO users. Fix: Auth.resolveEmailFromToken() exposed in Auth public API. _resolveCallerEmail(sessionToken) now tries SSO first then verifies session token server-side. checkWebAppAuthorization(requiredRole, sessionToken) accepts optional token fallback. _requireStewardAuth(sessionToken) passes token through. All 8 fs* global wrappers updated to accept sessionToken param. Client calls in steward_view.html (3 trigger/backup buttons) and member_view.html (2 digest calls) updated to pass SESSION_TOKEN instead of CURRENT_USER.email. Security preserved: raw email never trusted, only server-validated token resolves identity.' },
+  { version: '4.22.8', date: '2026-03-07', codename: 'FailsafeService Security & Reliability Fixes', changes: 'SEC: fsGetDigestConfig/fsUpdateDigestConfig no longer accept client-supplied email — server-resolved identity only, no fallback to client param. SEC: fsBackupCriticalSheets, fsSetupTriggers, fsRemoveTriggers, fsInitSheets now require _requireStewardAuth(). RELIABILITY: processScheduledDigests wraps send+lastSent-write in per-member ScriptLock with double-check re-read to prevent duplicate digests from concurrent trigger executions. STORAGE: backupCriticalSheets prunes old CSVs via _pruneOldBackups() keeping MAX_BACKUP_FILES=52 per sheet using file.setTrashed(). HEADER: stale @version 4.17.0 updated to 4.22.8.' },
   { version: '4.22.1', date: '2026-03-06', codename: 'Notification Manage Hardening', changes: 'Migration function MIGRATE_ADD_DISMISS_MODE_COLUMN() added to 05_Integrations.gs — safe one-time runner that appends Dismiss_Mode header to existing Notifications sheet and backfills all rows with "Dismissible". New archiveWebAppNotification(notificationId) in 05_Integrations.gs — steward-auth-gated, sets Status=Archived, non-destructive. Archive button added to each Active row in steward Manage tab (steward_view.html) — updates status pill in-place, hides button after success. Expired/Archived rows remain visible in Manage tab for auditing.' },
   { version: '4.22.0', date: '2026-03-06', codename: 'Notification System Overhaul', changes: 'Bug fix: sort in getWebAppNotifications() now reverses first then sorts by priority — previously Urgent notifications landed at the bottom. New DISMISS_MODE column (Dismissible | Timed) added to NOTIFICATIONS_HEADER_MAP_ (col 13). Dismissible: member can permanently dismiss (writes to Dismissed_By column). Timed: auto-expires on Expires_Date, dismiss button hidden, "Auto-expires" badge shown to member. Compose form gets dismiss mode toggle with Timed validation requiring an expiry date. Member dismiss changed from 1-hour localStorage TTL to permanent backend write via dismissWebAppNotification(). Bell badge DOM re-renders correctly on dismiss. Manage tab fixed: now calls getAllWebAppNotifications() (new function, steward-auth-gated) returning all rows with dismissedCount + status — was incorrectly calling getWebAppNotifications() which filtered to the steward\'s own inbox. Dead code removed: getUserNotifications(), markNotificationRead(), broadcastStewardNotification() (all ScriptProperties-based, orphaned since v4.13.0 Notifications sheet). getWebAppNotificationsHtml() removed — 345 lines of standalone ?page=notifications HTML never routed in doGet(). pushNotification() rerouted from ScriptProperties to Notifications sheet (still called by saveSharedView()).' },
   { version: '4.21.0', date: '2026-03-05', codename: 'Native Survey Engine', changes: 'Deprecate Google Form integration entirely. Full webapp-native satisfaction survey: getSurveyQuestions() returns all 67 questions with types (slider-10, dropdown, radio, checkbox, paragraph), branching rules (Q5→3A/3B, Q36→6A), and slider labels. submitSurveyResponse() maps all 67 SATISFACTION_COLS, period-aware vault dedup per SURVEY_PERIODS sheet. New: getSurveyPeriod(), autoTriggerQuarterlyPeriod(), archiveSurveyPeriod_() (Drive export to Past Survey Questions/), getPendingSurveyMembers(), getSatisfactionSummary() (section averages as plain values). New hidden sheet _Survey_Periods (SURVEY_PERIODS_COLS, 8 cols). New Config cols: Survey Priority Options (Q64 dynamic), Past Surveys Folder ID. Quarterly time trigger installed via setupQuarterlyTrigger(). Survey-open notifications pushed to all active members on period start. Slider label: 1=Strongly Disagree / 10=Strongly Agree (universal across all 52 scale questions). Anonymity architecture preserved: three-layer separation (Satisfaction sheet=anonymous scores, _Survey_Vault=hashed PII only, _Survey_Tracking=completion status only).' },
@@ -832,6 +840,7 @@ var SHEETS = {
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
   // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
   SATISFACTION: '📊 Member Satisfaction',
+  SURVEY_QUESTIONS: '📋 Survey Questions',
   FEEDBACK: '💡 Feedback & Development',
   // Help & Documentation sheets
   GETTING_STARTED: '📚 Getting Started',
@@ -1315,6 +1324,7 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'SUPERVISOR',         header: 'Supervisor' },
   { key: 'MANAGER',            header: 'Manager' },
   { key: 'IS_STEWARD',         header: 'Is Steward' },
+  { key: 'SHARE_PHONE',        header: 'Share Phone' },       // Opt-in: steward allows members to see their phone number (Yes/No)
   { key: 'COMMITTEES',         header: 'Committees' },
   { key: 'ASSIGNED_STEWARD',   header: 'Assigned Steward' },
   { key: 'LAST_VIRTUAL_MTG',   header: 'Last Virtual Mtg' },
@@ -1486,7 +1496,7 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'MAIN_FAX',              header: 'Main Fax' },
   { key: 'MAIN_CONTACT_NAME',     header: 'Main Contact Name' },
   { key: 'MAIN_CONTACT_EMAIL',    header: 'Main Contact Email' },
-  { key: 'SATISFACTION_FORM_URL', header: 'Satisfaction Survey URL' },
+  // SATISFACTION_FORM_URL removed v4.22.7 — deprecated since v4.21.0 (Google Form integration replaced by native webapp survey)
   { key: 'CHIEF_STEWARD_EMAIL',   header: 'Chief Steward Email' },
   { key: 'UNIT_CODES',            header: 'Unit Codes' },
   { key: 'ARCHIVE_FOLDER_ID',     header: 'Archive Folder ID' },
@@ -1547,7 +1557,41 @@ var SURVEY_PERIODS_HEADER_MAP_ = [
 var SURVEY_PERIODS_COLS = buildColsFromMap_(SURVEY_PERIODS_HEADER_MAP_);
 
 // ============================================================================
-// STEWARD PERFORMANCE CALC COLUMNS — Auto-derived from header map
+// SURVEY QUESTIONS SHEET COLUMNS — v4.23.0 Dynamic Schema
+// Sheet: '📋 Survey Questions'
+// Owner edits: Question Text (col 5), Active (col 8), Options (col 9),
+//              Slider Min/Max (cols 14-15), Notes (col 16)
+// Structural (code-managed): cols 1-4, 6-7, 10-13
+// ============================================================================
+
+var SURVEY_QUESTIONS_HEADER_MAP_ = [
+  { key: 'QUESTION_ID',    header: 'Question ID' },
+  { key: 'SECTION_NUM',    header: 'Section' },
+  { key: 'SECTION_KEY',    header: 'Section Key' },
+  { key: 'SECTION_TITLE',  header: 'Section Title' },
+  { key: 'QUESTION_TEXT',  header: 'Question Text' },
+  { key: 'TYPE',           header: 'Type' },
+  { key: 'REQUIRED',       header: 'Required' },
+  { key: 'ACTIVE',         header: 'Active' },
+  { key: 'OPTIONS',        header: 'Options' },
+  { key: 'BRANCH_PARENT',  header: 'Branch Parent' },
+  { key: 'BRANCH_VALUE',   header: 'Branch Value' },
+  { key: 'BRANCH_TARGET',  header: 'Branch Target' },
+  { key: 'MAX_SELECTIONS', header: 'Max Selections' },
+  { key: 'SLIDER_MIN',     header: 'Slider Min Label' },
+  { key: 'SLIDER_MAX',     header: 'Slider Max Label' },
+  { key: 'NOTES',          header: 'Notes' }
+];
+var SURVEY_QUESTIONS_COLS = buildColsFromMap_(SURVEY_QUESTIONS_HEADER_MAP_);
+
+// Satisfaction sheet fixed prefix columns (v4.23.0).
+// Question data starts at DATA_START. Question IDs (q1, q2…) are used as headers.
+var SATISFACTION_PREFIX = {
+  TIMESTAMP:      1,
+  PERIOD_ID:      2,
+  SURVEY_VERSION: 3,
+  DATA_START:     4
+};
 // ============================================================================
 
 var STEWARD_PERF_HEADER_MAP_ = [
@@ -1601,7 +1645,10 @@ var EVENT_AUDIT_HEADER_MAP_ = [
 var EVENT_AUDIT_COLS = buildColsFromMap_(EVENT_AUDIT_HEADER_MAP_);
 
 // ============================================================================
-// SATISFACTION SURVEY COLUMNS (Google Form Response + Summary)
+// SATISFACTION SURVEY COLUMNS
+// @deprecated v4.23.0 — column positions are now dynamic.
+// Use getSatisfactionColMap_() for runtime column lookups.
+// Kept as reference/fallback for legacy direct-sheet reads in 04c/04d.
 // ============================================================================
 
 /**
@@ -1889,7 +1936,6 @@ var FEEDBACK_HEADER_MAP_ = [
   { key: 'TIMESTAMP',    header: 'Timestamp' },
   { key: 'SUBMITTED_BY', header: 'Submitted By' },
   { key: 'CATEGORY',     header: 'Category' },
-  { key: 'TYPE',         header: 'Type' },
   { key: 'PRIORITY',     header: 'Priority' },
   { key: 'TITLE',        header: 'Title' },
   { key: 'DESCRIPTION',  header: 'Description' },
@@ -1897,7 +1943,7 @@ var FEEDBACK_HEADER_MAP_ = [
   { key: 'ASSIGNED_TO',  header: 'Assigned To' },
   { key: 'RESOLUTION',   header: 'Resolution' },
   { key: 'NOTES',        header: 'Notes' }
-];
+]; // v4.24.1: Removed TYPE — was never populated by form (Category covers same ground)
 
 var FEEDBACK_COLS = buildColsFromMap_(FEEDBACK_HEADER_MAP_);
 

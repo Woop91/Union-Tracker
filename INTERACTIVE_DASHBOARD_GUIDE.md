@@ -608,7 +608,7 @@ Potential additions (from Future Features sheet):
 
 ---
 
-**Version:** 4.13.0
-**Last Updated:** 2026-02-25
+**Version:** 4.24.4
+**Last Updated:** 2026-03-07
 
-*A personal project providing data-driven insights for representatives* 📊
+*A personal project providing data-driven insights for representatives*

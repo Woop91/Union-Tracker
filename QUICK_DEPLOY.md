@@ -1,6 +1,6 @@
 # Quick Deploy - Union Steward Dashboard
 
-**Version:** 4.13.0 | **Architecture:** 44-File Modular
+**Version:** 4.24.4 | **Architecture:** 48-File Modular
 
 Deploy the Union Steward Dashboard to a Google Sheet using the source files in `src/`.
 
@@ -8,7 +8,7 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 
 ## What You Get
 
-- 37 .gs files + 7 .html files (36 .gs in production, after removing DevTools)
+- 42 .gs files + 7 .html files (41 .gs in production, after removing DevTools)
 - SPA web dashboard with SSO and magic link authentication
 - Visible sheets: Config, Member Directory, Grievance Log, Dashboard, Member Satisfaction, Getting Started, FAQ, Config Guide
 - 18+ hidden sheets including calculation, workload, weekly questions, contact log, steward tasks, resources, and notifications
@@ -48,7 +48,7 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 1. Click **+** next to "Files" to add a new script file
 2. Name it exactly as shown (without the `.gs` extension)
 3. Paste the contents from the corresponding source file
-4. Repeat for all 37 .gs files plus the 7 .html files
+4. Repeat for all 42 .gs files plus the 7 .html files
 
 **Files to copy (in order):**
 
@@ -71,6 +71,7 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 | `08b_SearchAndCharts` | `src/08b_SearchAndCharts.gs` |
 | `08c_FormsAndNotifications` | `src/08c_FormsAndNotifications.gs` |
 | `08d_AuditAndFormulas` | `src/08d_AuditAndFormulas.gs` |
+| `08e_SurveyEngine` | `src/08e_SurveyEngine.gs` |
 | `09_Dashboards` | `src/09_Dashboards.gs` |
 | `10a_SheetCreation` | `src/10a_SheetCreation.gs` |
 | `10b_SurveyDocSheets` | `src/10b_SurveyDocSheets.gs` |
@@ -91,13 +92,17 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 | `23_PortalSheets` | `src/23_PortalSheets.gs` |
 | `24_WeeklyQuestions` | `src/24_WeeklyQuestions.gs` |
 | `25_WorkloadService` | `src/25_WorkloadService.gs` |
-| `MultiSelectDialog` | `src/MultiSelectDialog.html` (create as HTML file) |
+| `26_QAForum` | `src/26_QAForum.gs` |
+| `27_TimelineService` | `src/27_TimelineService.gs` |
+| `28_FailsafeService` | `src/28_FailsafeService.gs` |
+| `29_Migrations` | `src/29_Migrations.gs` |
 | `index` | `src/index.html` (create as HTML file) |
 | `styles` | `src/styles.html` (create as HTML file) |
+| `auth_view` | `src/auth_view.html` (create as HTML file) |
 | `steward_view` | `src/steward_view.html` (create as HTML file) |
 | `member_view` | `src/member_view.html` (create as HTML file) |
-| `portal_sheets` | `src/portal_sheets.html` (create as HTML file) |
-| `weekly_questions` | `src/weekly_questions.html` (create as HTML file) |
+| `error_view` | `src/error_view.html` (create as HTML file) |
+| `org_chart` | `src/org_chart.html` (create as HTML file) |
 
 **Save** the project (Ctrl+S).
 
@@ -205,5 +210,5 @@ See [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) for the full production transition 
 
 ---
 
-**Version:** 4.13.0 (44-File Modular Architecture)
-**Last Updated:** 2026-02-25
+**Version:** 4.24.4 (48-File Modular Architecture)
+**Last Updated:** 2026-03-07

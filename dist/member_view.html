@@ -34,7 +34,7 @@ function initMemberView(container) {
   // Fallback: load individually (batch unavailable)
   serverCall().withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
-  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(CURRENT_USER.email, 'member');
+  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(SESSION_TOKEN, 'member');
 
   serverCall()
     .withSuccessHandler(function(grievances) {
@@ -49,7 +49,7 @@ function initMemberView(container) {
       renderMemberHome(container);
       _checkDeepLink('member');
     })
-    .dataGetMemberGrievances(CURRENT_USER.email);
+    .dataGetMemberGrievances(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════
@@ -178,11 +178,7 @@ function renderMemberHome(appContainer) {
         banner.appendChild(el('button', {
           className: 'survey-banner-btn',
           onClick: function() {
-            if (typeof renderSurveyFormPage === 'function') {
-              renderSurveyFormPage(document.getElementById('app'));
-            } else if (CONFIG.surveyFormUrl) {
-              window.open(CONFIG.surveyFormUrl, '_blank');
-            }
+            renderSurveyFormPage(document.getElementById('app'));
           }
         }, 'Take Survey'));
         // Insert after header
@@ -529,7 +525,7 @@ function renderMyCases(appContainer) {
           }
         }).withFailureHandler(function() {
           folderBtn.textContent = '\uD83D\uDCC1 Create Case Folder'; folderBtn.disabled = false;
-        }).dataCreateGrievanceDrive(CURRENT_USER.email);
+        }).dataCreateGrievanceDrive(SESSION_TOKEN);
       } }, '\uD83D\uDCC1 Create Case Folder');
       btnRow.appendChild(startBtn);
       btnRow.appendChild(folderBtn);
@@ -551,7 +547,7 @@ function renderMyCases(appContainer) {
             else { btn.textContent = '\uD83D\uDCC1 Folder'; btn.disabled = false; }
           }).withFailureHandler(function() {
             btn.textContent = '\uD83D\uDCC1 Folder'; btn.disabled = false;
-          }).dataCreateGrievanceDrive(CURRENT_USER.email);
+          }).dataCreateGrievanceDrive(SESSION_TOKEN);
         }
       }, '\uD83D\uDCC1 Case Folder'));
       content.appendChild(newCaseBar);
@@ -625,7 +621,7 @@ function _showGrievanceIntakeForm(parentContent) {
     }).withFailureHandler(function() {
       statusMsg.textContent = 'Error submitting. Please try again.'; statusMsg.style.color = 'var(--danger)';
       submitBtn.textContent = 'Submit Draft'; submitBtn.disabled = false;
-    }).dataStartGrievanceDraft(CURRENT_USER.email, { title: title, category: category, description: description });
+    }).dataStartGrievanceDraft(SESSION_TOKEN, { title: title, category: category, description: description });
   } }, 'Submit Draft');
   var cancelBtn = el('button', { className: 'btn', style: { flex: '1', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }, onClick: function() {
     renderMyCases(document.getElementById('app'));
@@ -714,7 +710,7 @@ function _renderPastCasesSection(parentContainer) {
   }).withFailureHandler(function() {
     listArea.innerHTML = '';
     listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: '13px' } }, 'Unable to load past cases.'));
-  }).dataGetMemberGrievanceHistory(CURRENT_USER.email);
+  }).dataGetMemberGrievanceHistory(SESSION_TOKEN);
 }
 
 function _getOutcomeColor(status) {
@@ -814,7 +810,7 @@ function _maybeShowMemberWelcome(slot) {
     }, 'Got it!'));
 
     slot.appendChild(card);
-  }).dataGetWelcomeData(CURRENT_USER.email);
+  }).dataGetWelcomeData(SESSION_TOKEN);
 }
 
 /**
@@ -827,7 +823,7 @@ function _dismissMemberWelcome(cardEl) {
     cardEl.style.transition = 'opacity 0.3s ease';
     setTimeout(function() { cardEl.remove(); }, 300);
   }
-  serverCall().withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(CURRENT_USER.email);
+  serverCall().withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════
@@ -934,7 +930,7 @@ function renderStewardContact(appContainer) {
     }).withFailureHandler(function() {
       assignedSection.innerHTML = '';
       assignedSection.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', padding: '10px 0' } }, 'Could not load your assigned ' + CONFIG.stewardLabel.toLowerCase() + '.'));
-    }).dataGetAssignedSteward(CURRENT_USER.email);
+    }).dataGetAssignedSteward(SESSION_TOKEN);
 
     // ── Section 2: Full directory ─────────────────────────────────────────
     var dirSection = el('div');
@@ -980,7 +976,7 @@ function _showStewardPicker(targetSection) {
             if (result && result.success) renderStewardContact(document.getElementById('app'));
           }).withFailureHandler(function() {
             selectBtn.textContent = 'Select'; selectBtn.disabled = false;
-          }).dataAssignSteward(CURRENT_USER.email, s.email);
+          }).dataAssignSteward(SESSION_TOKEN, s.email);
         }
       }, 'Select');
       item.appendChild(selectBtn);
@@ -989,7 +985,7 @@ function _showStewardPicker(targetSection) {
   }).withFailureHandler(function() {
     targetSection.innerHTML = '';
     targetSection.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px', padding: '10px 0' } }, 'Failed to load stewards.'));
-  }).dataGetAvailableStewards(CURRENT_USER.email);
+  }).dataGetAvailableStewards(SESSION_TOKEN);
 }
 
 // ── Full member directory ─────────────────────────────────────────────────
@@ -1066,7 +1062,8 @@ function _renderMemberDirectory(target) {
         if (activeLocFilter && (s.workLocation || '') !== activeLocFilter) return false;
         if (!query) return true;
         return (s.name || '').toLowerCase().indexOf(query) !== -1
-          || (s.workLocation || '').toLowerCase().indexOf(query) !== -1;
+          || (s.workLocation || '').toLowerCase().indexOf(query) !== -1
+          || (s.unit || '').toLowerCase().indexOf(query) !== -1;
       });
 
       if (filtered.length === 0) {
@@ -1151,7 +1148,7 @@ function _renderMemberDirectory(target) {
             e.stopPropagation();
             serverCall().withSuccessHandler(function(result) {
               if (result && result.success) renderStewardContact(document.getElementById('app'));
-            }).dataAssignSteward(CURRENT_USER.email, s.email);
+            }).dataAssignSteward(SESSION_TOKEN, s.email);
           }
         }, 'Select as my ' + CONFIG.stewardLabel));
 
@@ -1168,7 +1165,7 @@ function _renderMemberDirectory(target) {
   }).withFailureHandler(function() {
     while (target.children.length > 1) target.removeChild(target.lastChild);
     target.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '13px', padding: '10px 0' } }, 'Failed to load directory.'));
-  }).dataGetStewardDirectory();
+  }).dataGetStewardDirectory(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════
@@ -1367,7 +1364,7 @@ function renderUpdateProfile(appContainer) {
           saveBtn.disabled = false;
           statusMsg.textContent = 'Error saving. Please try again.';
           statusMsg.style.color = 'var(--danger)';
-        }).dataUpdateProfile(CURRENT_USER.email, updates);
+        }).dataUpdateProfile(SESSION_TOKEN, updates);
       }}, 'Save Changes');
       form.appendChild(saveBtn);
 
@@ -1375,7 +1372,7 @@ function renderUpdateProfile(appContainer) {
 
       // Digest settings section (v4.17.0)
       _renderDigestSettings(content);
-    }).dataGetFullProfile(CURRENT_USER.email);
+    }).dataGetFullProfile(SESSION_TOKEN);
   });
 }
 
@@ -1444,11 +1441,12 @@ function renderMemberNotifications(appContainer) {
                 card.style.transition = 'opacity 0.3s';
                 setTimeout(function() {
                   card.remove();
-                  // Re-render bell badge with updated count
+                  // Re-render bell badge with updated count (members: notif only)
                   AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
+                  var _bellTotal = AppState.notificationCount;
                   var badge = document.querySelector('.notif-bell-badge');
-                  if (AppState.notificationCount > 0) {
-                    if (badge) badge.textContent = String(AppState.notificationCount);
+                  if (_bellTotal > 0) {
+                    if (badge) badge.textContent = String(_bellTotal);
                   } else {
                     if (badge) badge.remove();
                   }
@@ -1460,7 +1458,7 @@ function renderMemberNotifications(appContainer) {
             }).withFailureHandler(function() {
               dismissBtn.textContent = '\u2715';
               dismissBtn.disabled = false;
-            }).dismissWebAppNotification(n.id);
+            }).dismissWebAppNotification(SESSION_TOKEN, n.id);
           }}, '\u2715');
           card.appendChild(dismissBtn);
         }
@@ -1470,7 +1468,7 @@ function renderMemberNotifications(appContainer) {
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--danger)' } }, 'Failed to load notifications. Please try again.'));
-    }).getWebAppNotifications(CURRENT_USER.email, 'member');
+    }).getWebAppNotifications(SESSION_TOKEN, 'member');
   });
 }
 
@@ -1597,7 +1595,7 @@ function renderSurveyFormPage(appContainer) {
         _renderSurveyWizard(content, questions, sectionMeta, sliderLabels, period, appContainer);
       }).withFailureHandler(function() {
         _renderSurveyWizard(content, questions, sectionMeta, sliderLabels, period, appContainer);
-      }).dataGetSurveyStatus();
+      }).dataGetSurveyStatus(SESSION_TOKEN);
 
     }).withFailureHandler(function(err) {
       content.innerHTML = '';
@@ -1606,7 +1604,7 @@ function renderSurveyFormPage(appContainer) {
       errCard.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--danger)', marginBottom: '10px' } }, 'Failed to load survey.'));
       errCard.appendChild(el('button', { className: 'btn btn-primary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { renderSurveyFormPage(appContainer); } }, 'Retry'));
       content.appendChild(errCard);
-    }).dataGetSurveyQuestions();
+    }).dataGetSurveyQuestions(SESSION_TOKEN);
   });
 }
 
@@ -1623,40 +1621,82 @@ function _renderSurveyWizard(container, questions, sectionMeta, sliderLabels, pe
   container.innerHTML = '';
 
   var responses = {};
-  var STORAGE_KEY = 'dds_survey_progress_v2';
 
-  // Restore saved progress (keyed to period so stale drafts don't persist)
-  try {
-    var saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      var parsed = JSON.parse(saved);
-      if (parsed.periodId === period.periodId) {
-        responses = parsed.responses || {};
-      }
-    }
-  } catch(e) {}
+  // ── In-memory draft store (replaces localStorage, which is blocked in GAS iframe sandboxes).
+  // Scoped to the window object so it survives re-renders within the same page session.
+  // Resets on full page reload — acceptable since a full reload re-checks completion status.
+  if (!window._surveyDraft) window._surveyDraft = {};
+  var _draft = window._surveyDraft;
+
+  // Restore saved progress (keyed to period so stale drafts from a prior period don't restore)
+  if (_draft.periodId === period.periodId && _draft.responses) {
+    responses = _draft.responses;
+  } else {
+    // New period or no draft — reset
+    _draft.periodId  = period.periodId;
+    _draft.responses = {};
+    _draft.stepKey   = null;
+  }
 
   function saveProgress(stepKey) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ periodId: period.periodId, stepKey: stepKey, responses: responses })); } catch(e) {}
+    _draft.responses = responses;
+    _draft.stepKey   = stepKey;
   }
   function clearProgress() {
-    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+    _draft.periodId  = null;
+    _draft.responses = {};
+    _draft.stepKey   = null;
   }
 
-  // ── Build ordered section list ───────────────────────────────────────────
-  // sectionMeta already in correct display order (1, 2, 3A, 3B, 4 … 11)
-  // We compute active sections dynamically based on branch answers each render.
-  var ALWAYS_SECTIONS = { WORK_CONTEXT:1, OVERALL_SAT:1, CHAPTER:1, LEADERSHIP:1,
-    CONTRACT:1, COMMUNICATION:1, MEMBER_VOICE:1, VALUE_ACTION:1, SCHEDULING:1, PRIORITIES:1 };
+  // ── Build section branch rules dynamically from questions array ─────────
+  // For each section key, check if any question in it has a branchParent.
+  // If so, that section should only appear when branchParent's answer === branchValue.
+  // This means owner can add new conditional sections in the Survey Questions sheet
+  // without touching the webapp code.
+  //
+  // Rule derivation: a section is conditional if ALL questions in it share the
+  // same branchParent + branchValue (i.e. the whole section is gated).
+  // Always-sections (no branchParent on any question) are shown unconditionally.
+  var _sectionBranchRules = {}; // sectionKey → { parentId, parentValue } | null
+  (function() {
+    var sectionQs = {}; // sectionKey → [questions]
+    questions.forEach(function(q) {
+      if (!sectionQs[q.sectionKey]) sectionQs[q.sectionKey] = [];
+      sectionQs[q.sectionKey].push(q);
+    });
+
+    Object.keys(sectionQs).forEach(function(key) {
+      var qs = sectionQs[key];
+      // Collect distinct branchParent+branchValue combos (ignoring blanks)
+      var parents = {};
+      qs.forEach(function(q) {
+        if (q.branchParent) {
+          var ruleKey = q.branchParent + '|' + (q.branchValue || '');
+          parents[ruleKey] = { parentId: q.branchParent, parentValue: q.branchValue || '' };
+        }
+      });
+      var ruleKeys = Object.keys(parents);
+      // Section is conditional only if every non-required question has the same single parent rule
+      // (Multiple rules in one section means mixed gating — treat as always-shown)
+      if (ruleKeys.length === 1) {
+        _sectionBranchRules[key] = parents[ruleKeys[0]];
+      } else {
+        _sectionBranchRules[key] = null; // always shown
+      }
+    });
+  })();
 
   function getActiveSectionKeys() {
     var active = [];
     sectionMeta.forEach(function(s) {
-      var k = s.key;
-      if (ALWAYS_SECTIONS[k]) { active.push(k); return; }
-      if (k === 'STEWARD_3A' && String(responses.q5 || '') === 'Yes') { active.push(k); return; }
-      if (k === 'STEWARD_3B' && String(responses.q5 || '') === 'No')  { active.push(k); return; }
-      if (k === 'REPRESENTATION' && String(responses.q36 || '') === 'Yes') { active.push(k); return; }
+      var rule = _sectionBranchRules[s.key];
+      if (!rule) {
+        active.push(s.key); // no gate — always shown
+        return;
+      }
+      // Gate: show only if the parent question's current answer matches the required value
+      var parentAnswer = String(responses[rule.parentId] || '').trim();
+      if (parentAnswer === rule.parentValue) active.push(s.key);
     });
     return active;
   }
@@ -1664,15 +1704,12 @@ function _renderSurveyWizard(container, questions, sectionMeta, sliderLabels, pe
   // Index into active sections
   var currentSectionIdx = 0;
 
-  // Restore step from storage
-  try {
-    var savedStep = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}').stepKey;
-    if (savedStep) {
-      var activeSecs = getActiveSectionKeys();
-      var savedIdx = activeSecs.indexOf(savedStep);
-      if (savedIdx >= 0) currentSectionIdx = savedIdx;
-    }
-  } catch(e) {}
+  // Restore step from in-memory draft
+  if (_draft.stepKey) {
+    var activeSecs = getActiveSectionKeys();
+    var savedIdx = activeSecs.indexOf(_draft.stepKey);
+    if (savedIdx >= 0) currentSectionIdx = savedIdx;
+  }
 
   // ── Fixed UI elements ────────────────────────────────────────────────────
   var privacyBanner = el('div', {
@@ -2050,7 +2087,7 @@ function _showSurveyError(stepContainer, navRow, message, responses, appContaine
     serverCall().withSuccessHandler(function(result) {
       stepContainer.innerHTML = '';
       if (result && result.success) {
-        try { localStorage.removeItem('dds_survey_progress_v2'); } catch(e) {}
+        clearProgress();
         var doneCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
         doneCard.appendChild(el('div', { style: { fontSize: '56px', marginBottom: '12px' } }, '\u2705'));
         doneCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Thank you!'));
@@ -2146,7 +2183,7 @@ function renderSurveyResultsPage(appContainer) {
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Failed to load survey results.'));
-    }).dataGetSatisfactionSummary();
+    }).dataGetSatisfactionSummary(SESSION_TOKEN);
   });
 }
 
@@ -2436,7 +2473,7 @@ function _renderWTSubmit(container) {
       }).withFailureHandler(function() {
         statusMsg.textContent = 'Error submitting. Try again.';
         statusMsg.style.color = 'var(--danger)';
-      }).processWorkloadFormSSO(CURRENT_USER.email, formData);
+      }).processWorkloadFormSSO(SESSION_TOKEN, formData);
     }
   }, 'Submit to Secure Ledger'));
 
@@ -2606,7 +2643,7 @@ function _renderWTHistory(container) {
           a.href = url; a.download = 'workload_history.csv'; a.click();
           URL.revokeObjectURL(url);
           exportBtn.textContent = 'Export CSV';
-        }).exportWorkloadHistoryCSV(CURRENT_USER.email);
+        }).exportWorkloadHistoryCSV(SESSION_TOKEN);
       }
     }, 'Export CSV');
     container.appendChild(exportBtn);
@@ -2675,7 +2712,7 @@ function _renderWTHistory(container) {
 
       container.appendChild(card);
     });
-  }).getWorkloadHistorySSO(CURRENT_USER.email);
+  }).getWorkloadHistorySSO(SESSION_TOKEN);
 }
 
 // ── Stats Tab ───────────────────────────────────────────────────────────────
@@ -2769,7 +2806,7 @@ function _renderWTStats(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Unable to load statistics.'));
-  }).getWorkloadDashboardDataSSO(CURRENT_USER.email);
+  }).getWorkloadDashboardDataSSO(SESSION_TOKEN);
 }
 
 function _wtStatCard(value, label) {
@@ -2854,7 +2891,7 @@ function _renderWTReminders(container) {
         }).withFailureHandler(function() {
           statusMsg.textContent = 'Error saving. Try again.';
           statusMsg.style.color = 'var(--danger)';
-        }).setWorkloadReminderSSO(CURRENT_USER.email, {
+        }).setWorkloadReminderSSO(SESSION_TOKEN, {
           enabled: toggle.checked,
           frequency: freqSelect.value,
           day: daySelect.value,
@@ -2867,7 +2904,7 @@ function _renderWTReminders(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Unable to load reminder settings.'));
-  }).getWorkloadReminderSSO(CURRENT_USER.email);
+  }).getWorkloadReminderSSO(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════
@@ -3061,7 +3098,7 @@ function _renderGrievanceStats(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load grievance stats.'));
-  }).dataGetGrievanceStats();
+  }).dataGetGrievanceStats(SESSION_TOKEN);
 }
 
 function _renderHotSpots(container) {
@@ -3089,7 +3126,7 @@ function _renderHotSpots(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load data.'));
-  }).dataGetGrievanceHotSpots();
+  }).dataGetGrievanceHotSpots(SESSION_TOKEN);
 }
 
 function _renderMembershipStats(container) {
@@ -3116,7 +3153,7 @@ function _renderMembershipStats(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load membership stats.'));
-  }).dataGetMembershipStats();
+  }).dataGetMembershipStats(SESSION_TOKEN);
 }
 
 function _renderEngagementStats(container) {
@@ -3164,7 +3201,7 @@ function _renderEngagementStats(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load engagement stats.'));
-  }).dataGetEngagementStats();
+  }).dataGetEngagementStats(SESSION_TOKEN);
 }
 
 function _renderWorkloadSummaryStats(container) {
@@ -3195,79 +3232,11 @@ function _renderWorkloadSummaryStats(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load workload stats.'));
-  }).dataGetWorkloadSummaryStats();
+  }).dataGetWorkloadSummaryStats(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════
-// STEWARD DIRECTORY (v4.12.0)
-// ═══════════════════════════════════════
-
-function renderStewardDirectory(appContainer) {
-  renderPageLayout(appContainer, 'member', 'stewarddirectory', function(container) {
-    _memberHeader(container, CONFIG.stewardLabel + ' Directory');
-    var content = el('div', { className: 'content' });
-    showLoading(content);
-    container.appendChild(content);
-
-    serverCall().withSuccessHandler(function(stewards) {
-      content.innerHTML = '';
-      if (!stewards || stewards.length === 0) {
-        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
-        return;
-      }
-
-      var searchInput = el('input', { className: 'search-input', placeholder: 'Search by name or location...', onInput: function() { renderList(searchInput.value.toLowerCase()); } });
-      content.appendChild(searchInput);
-      var listArea = el('div');
-      content.appendChild(listArea);
-
-      function renderList(query) {
-        listArea.innerHTML = '';
-        var filtered = query ? stewards.filter(function(s) {
-          return (s.name || '').toLowerCase().indexOf(query) !== -1 || (s.workLocation || '').toLowerCase().indexOf(query) !== -1;
-        }) : stewards;
-        filtered.forEach(function(s, i) {
-          var card = el('div', { className: 'card card-glass card-fade-in', style: { padding: '14px 16px', marginBottom: '6px', animationDelay: (i * 0.05) + 's' } });
-          var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
-          topRow.appendChild(el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase()));
-          var info = el('div', { style: { flex: '1' } });
-          info.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, s.name || s.email));
-          var meta = [];
-          if (s.workLocation) meta.push(s.workLocation);
-          if (s.officeDays) meta.push(s.officeDays);
-          if (s.unit) meta.push(s.unit);
-          info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
-          topRow.appendChild(info);
-          card.appendChild(topRow);
-
-          // Contact details (expandable)
-          var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
-          if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, '\u2709\uFE0F ' + s.email));
-          if (s.phone) details.appendChild(el('a', { href: 'tel:' + s.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '4px' } }, '\uD83D\uDCDE ' + s.phone));
-          details.appendChild(el('button', {
-            style: { fontSize: '11px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', fontWeight: '600', marginTop: '6px' },
-            onClick: function(e) {
-              e.stopPropagation();
-              serverCall().withSuccessHandler(function(result) {
-                if (result && result.success) renderStewardContact(document.getElementById('app'));
-              }).dataAssignSteward(CURRENT_USER.email, s.email);
-            }
-          }, 'Select as my ' + CONFIG.stewardLabel));
-          card.appendChild(details);
-
-          card.addEventListener('click', function() {
-            details.style.display = details.style.display === 'none' ? 'block' : 'none';
-          });
-          card.style.cursor = 'pointer';
-          listArea.appendChild(card);
-        });
-      }
-      renderList('');
-    }).dataGetStewardDirectory();
-  });
-}
-
-// ═══════════════════════════════════════
+// renderStewardDirectory removed v4.23.3 — was orphaned dead code; all nav routes to renderStewardContact > _renderMemberDirectory
 // _renderQuestionSubmission removed v4.23.0 — integrated into renderPollsPage > Submit a Poll tab
 
 // ═══════════════════════════════════════
@@ -3383,7 +3352,7 @@ function renderMeetingsPage(appContainer) {
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load meetings.'));
-    }).dataGetMemberMeetings(CURRENT_USER.email);
+    }).dataGetMemberMeetings(SESSION_TOKEN);
   });
 }
 
@@ -3593,7 +3562,7 @@ function _renderThisWeekPolls(target) {
     }).withFailureHandler(function() {
       target.innerHTML = '';
       target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
-    }).wqGetActiveQuestions();
+    }).wqGetActiveQuestions(SESSION_TOKEN);
   }).withFailureHandler(function() {
     // Frequency load failed — fall back to loading polls anyway
     serverCall().withSuccessHandler(function(data) {
@@ -3609,7 +3578,7 @@ function _renderThisWeekPolls(target) {
         _renderPollVoteUI(qCard, q);
         target.appendChild(qCard);
       });
-    }).wqGetActiveQuestions();
+    }).wqGetActiveQuestions(SESSION_TOKEN);
   }).wqGetPollFrequency();
 }
 
@@ -3679,44 +3648,65 @@ function _renderSubmitPoll(target) {
 }
 
 // ═══════════════════════════════════════
-// MINUTES PAGE (member, v4.16.0)
+// MINUTES PAGE (member, v4.20.18+)
 // ═══════════════════════════════════════
 
 function renderMinutesPage(appContainer) {
   renderPageLayout(appContainer, 'member', 'minutes', function(container) {
     _memberHeader(container, 'Meeting Minutes', 'Notes from recent meetings');
+
+    // Start a Grievance shortcut — always shown; navigates to intake form (v4.20.18)
+    // Fix v4.20.18a: removed bad condition (!CONFIG.grievancesFolderId === false)
+    // Fix v4.20.18a: corrected function name renderMyCasesPage → renderMyCases
+    var grievCta = el('div', { className: 'card card-glass', style: { padding: '12px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } });
+    grievCta.appendChild(el('span', { style: { fontSize: '13px', color: 'var(--text)' } }, 'Have a workplace issue?'));
+    grievCta.appendChild(el('button', { className: 'btn btn-primary', style: { fontSize: '12px', padding: '6px 12px' },
+      onClick: function() {
+        var app = document.getElementById('app');
+        if (app) renderMyCases(app);
+      }
+    }, '\uD83D\uDCDD Start a Grievance'));
+    container.appendChild(grievCta);
+
+    // Separate content area for the list — showLoading only clears this div, not the CTA above
     var content = el('div', { className: 'content' });
     showLoading(content);
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(minutes) {
-      content.innerHTML = '';
+      content.innerHTML = ''; // safe: CTA is in container, not content
+
       if (!minutes || minutes.length === 0) {
         content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting minutes posted yet.'));
         return;
       }
 
-      // Search filter
+      var PAGE_SIZE = 10;
+      var totalPages = Math.ceil(minutes.length / PAGE_SIZE);
+
       var filterInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Search minutes...', style: { marginBottom: '10px', minHeight: '36px' } });
       content.appendChild(filterInput);
 
       var listArea = el('div');
+      var pagerArea = el('div', { style: { marginTop: '12px' } });
       content.appendChild(listArea);
+      content.appendChild(pagerArea);
 
-      function renderFiltered(query) {
+      var filtered = minutes;
+      var currentPage = 0;
+
+      function renderPage(page) {
+        currentPage = page;
         listArea.innerHTML = '';
-        var q = (query || '').toLowerCase();
-        var filtered = minutes.filter(function(m) {
-          if (!q) return true;
-          return (m.title || '').toLowerCase().indexOf(q) !== -1 || (m.meetingDate || '').toLowerCase().indexOf(q) !== -1 || (m.bullets || '').toLowerCase().indexOf(q) !== -1;
-        });
+        var start = page * PAGE_SIZE;
+        var slice = filtered.slice(start, start + PAGE_SIZE);
+        var tp = Math.ceil(filtered.length / PAGE_SIZE) || 1;
 
-        if (filtered.length === 0) {
+        if (slice.length === 0) {
           listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No matching minutes.'));
-          return;
         }
 
-        filtered.forEach(function(m) {
+        slice.forEach(function(m) {
           var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
           var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
           header.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.title));
@@ -3731,19 +3721,53 @@ function renderMinutesPage(appContainer) {
               fullDiv.style.display = fullDiv.style.display === 'none' ? 'block' : 'none';
             });
           }
-
           listArea.appendChild(card);
         });
+
+        // Pager
+        pagerArea.innerHTML = '';
+        if (tp > 1) {
+          var pagerRow = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' } });
+          var prevBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '12px', opacity: page === 0 ? '0.3' : '1', pointerEvents: page === 0 ? 'none' : 'auto' },
+            onClick: function() { renderPage(page - 1); }
+          }, '← Prev');
+          var pageLabel = el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Page ' + (page + 1) + ' of ' + tp);
+          var nextBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '12px', opacity: page >= tp - 1 ? '0.3' : '1', pointerEvents: page >= tp - 1 ? 'none' : 'auto' },
+            onClick: function() { renderPage(page + 1); }
+          }, 'Next →');
+          pagerRow.appendChild(prevBtn);
+          pagerRow.appendChild(pageLabel);
+          pagerRow.appendChild(nextBtn);
+          pagerArea.appendChild(pagerRow);
+        }
+
+        // Last page: minutes folder link (view-only)
+        if (page >= tp - 1 && CONFIG && CONFIG.minutesFolderId) {
+          var folderUrl = 'https://drive.google.com/drive/folders/' + CONFIG.minutesFolderId;
+          pagerArea.appendChild(el('div', { style: { textAlign: 'center', marginTop: '8px' } },
+            el('a', { href: folderUrl, target: '_blank', style: { fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCC2 Browse all minutes in Drive')
+          ));
+        }
       }
 
-      filterInput.addEventListener('input', function() { renderFiltered(filterInput.value); });
-      renderFiltered('');
+      filterInput.addEventListener('input', function() {
+        var q = filterInput.value.toLowerCase();
+        filtered = q ? minutes.filter(function(m) {
+          return (m.title || '').toLowerCase().indexOf(q) !== -1 ||
+                 (m.meetingDate || '').toLowerCase().indexOf(q) !== -1 ||
+                 (m.bullets || '').toLowerCase().indexOf(q) !== -1;
+        }) : minutes;
+        renderPage(0);
+      });
+
+      renderPage(0);
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load minutes.'));
-    }).dataGetMeetingMinutes(20);
+    }).dataGetMeetingMinutes(100);
   });
 }
+
 
 // ═══════════════════════════════════════
 // MY TASKS PAGE (v4.17.0 — member task assignment)
@@ -3819,7 +3843,7 @@ function renderMemberTasks(appContainer) {
                   // changes the steward's open/overdue task totals.
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                   renderMemberTasks(document.getElementById('app'));
-                }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
+                }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(SESSION_TOKEN, task.id);
               }
             }, '\u2705 Complete'));
             card.appendChild(actions);
@@ -3829,7 +3853,7 @@ function renderMemberTasks(appContainer) {
       }).withFailureHandler(function() {
         subContent.innerHTML = '';
         subContent.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load tasks.'));
-      }).dataGetMemberTasks(CURRENT_USER.email, statusFilter);
+      }).dataGetMemberTasks(SESSION_TOKEN, statusFilter);
     }
 
     refreshSubTabs();
@@ -3858,6 +3882,7 @@ function renderQAForum(appContainer, role) {
     var subContent = el('div');
     var currentPage = 1;
     var currentSort = 'recent';
+    var showResolved = false;
 
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
@@ -3879,8 +3904,8 @@ function renderQAForum(appContainer, role) {
     }
 
     function _renderQABrowse(cont) {
-      // Sort toggle
-      var sortBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
+      // Sort toggle + Show Resolved toggle
+      var sortBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' } });
       ['recent', 'popular'].forEach(function(s) {
         sortBar.appendChild(el('button', {
           className: 'sub-tab' + (currentSort === s ? ' active' : ''),
@@ -3888,6 +3913,14 @@ function renderQAForum(appContainer, role) {
           onClick: function() { currentSort = s; currentPage = 1; _renderQABrowse(cont); }
         }, s.charAt(0).toUpperCase() + s.slice(1)));
       });
+      // Show Resolved toggle
+      var resolvedToggle = el('button', {
+        className: 'sub-tab' + (showResolved ? ' active' : ''),
+        style: { fontSize: '11px', padding: '4px 12px', marginLeft: 'auto' },
+        onClick: function() { showResolved = !showResolved; currentPage = 1; _renderQABrowse(cont); }
+      }, showResolved ? '\u2713 Showing Resolved' : 'Show Resolved');
+      sortBar.appendChild(resolvedToggle);
+
       cont.innerHTML = '';
       cont.appendChild(sortBar);
 
@@ -3897,11 +3930,16 @@ function renderQAForum(appContainer, role) {
 
       serverCall().withSuccessHandler(function(result) {
         listArea.innerHTML = '';
-        if (!result || !result.questions || result.questions.length === 0) {
-          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No questions yet. Be the first to ask!'));
+        var questions = result ? result.questions || [] : [];
+        // Filter resolved unless toggle is on
+        if (!showResolved) {
+          questions = questions.filter(function(q) { return q.status !== 'resolved'; });
+        }
+        if (questions.length === 0) {
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, showResolved ? 'No questions yet. Be the first to ask!' : 'No open questions. Toggle "Show Resolved" to see resolved threads.'));
           return;
         }
-        result.questions.forEach(function(q) {
+        questions.forEach(function(q) {
           var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '8px', cursor: 'pointer' } });
           card.addEventListener('click', function() { _renderQuestionDetail(cont, q.id); });
           var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
@@ -3914,12 +3952,16 @@ function renderQAForum(appContainer, role) {
           meta.appendChild(el('span', {}, q.created));
           meta.appendChild(el('span', {}, '\u25B2 ' + q.upvoteCount));
           meta.appendChild(el('span', {}, q.answerCount + ' answer' + (q.answerCount !== 1 ? 's' : '')));
+          if (q.status === 'resolved') {
+            meta.appendChild(el('span', { style: { color: 'var(--success)', fontWeight: '600' } }, '\u2713 Resolved'));
+          }
           card.appendChild(meta);
           listArea.appendChild(card);
         });
 
-        // Pagination
-        if (result.total > result.pageSize) {
+        // Pagination — based on filtered count
+        var filteredTotal = questions.length;
+        if (result && result.total > result.pageSize) {
           var totalPages = Math.ceil(result.total / result.pageSize);
           var pageBar = el('div', { style: { display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '12px' } });
           if (currentPage > 1) pageBar.appendChild(el('button', { className: 'sub-tab', onClick: function() { currentPage--; _renderQABrowse(cont); } }, 'Prev'));
@@ -3930,7 +3972,7 @@ function renderQAForum(appContainer, role) {
       }).withFailureHandler(function() {
         listArea.innerHTML = '';
         listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load questions.'));
-      }).qaGetQuestions(CURRENT_USER.email, currentPage, 20, currentSort);
+      }).qaGetQuestions(SESSION_TOKEN, currentPage, 20, currentSort);
     }
 
     function _renderQuestionDetail(cont, questionId) {
@@ -3953,21 +3995,41 @@ function renderQAForum(appContainer, role) {
         qMeta.appendChild(el('span', {}, q.created));
         qCard.appendChild(qMeta);
 
-        // Upvote + Flag buttons
-        var actions = el('div', { style: { display: 'flex', gap: '8px' } });
+        // Upvote + Flag + Resolve buttons
+        var actions = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
         actions.appendChild(el('button', {
           style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
           onClick: function() {
             serverCall().withSuccessHandler(function(r) {
               if (r && r.success) _renderQuestionDetail(cont, questionId);
-            }).withFailureHandler(function(e) { console.error(e.message); }).qaUpvoteQuestion(CURRENT_USER.email, questionId);
+            }).withFailureHandler(function(e) { console.error(e.message); }).qaUpvoteQuestion(SESSION_TOKEN, questionId);
           }
         }, '\u25B2 ' + q.upvoteCount));
         if (isSteward && q.status !== 'flagged') {
           actions.appendChild(el('button', {
             style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-            onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).qaModerateQuestion(CURRENT_USER.email, questionId, 'flag'); }
+            onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).qaModerateQuestion(SESSION_TOKEN, questionId, 'flag'); }
           }, 'Flag'));
+        }
+        // Mark Resolved: available to question owner (member) or any steward
+        if (q.status !== 'resolved' && q.status !== 'deleted' && (q.isOwner || isSteward)) {
+          actions.appendChild(el('button', {
+            style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
+            onClick: function() {
+              serverCall().withSuccessHandler(function(r) {
+                if (r && r.success) {
+                  _renderQuestionDetail(cont, questionId);
+                  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+                }
+              }).withFailureHandler(function(e) { console.error(e.message); }).qaResolveQuestion(SESSION_TOKEN, questionId);
+            }
+          }, '\u2713 Mark Resolved'));
+        }
+        // Resolved badge
+        if (q.status === 'resolved') {
+          actions.appendChild(el('span', {
+            style: { fontSize: '11px', padding: '3px 8px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600', alignSelf: 'center' }
+          }, '\u2713 Resolved'));
         }
         qCard.appendChild(actions);
         cont.appendChild(qCard);
@@ -3989,25 +4051,29 @@ function renderQAForum(appContainer, role) {
           });
         }
 
-        // Reply form
-        cont.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginTop: '16px', marginBottom: '8px' } }, 'Your Answer'));
-        var ansInput = el('textarea', { className: 'msg-textarea', placeholder: 'Write your answer...', style: { minHeight: '60px' } });
-        cont.appendChild(ansInput);
-        var ansStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
-        cont.appendChild(ansStatus);
-        cont.appendChild(el('button', {
-          className: 'btn btn-primary', style: { marginTop: '8px' },
-          onClick: function() {
-            var text = ansInput.value.trim();
-            if (!text) { ansStatus.textContent = 'Write an answer first.'; ansStatus.style.color = 'var(--danger)'; return; }
-            ansStatus.textContent = 'Posting...'; ansStatus.style.color = 'var(--muted)';
-            serverCall().withSuccessHandler(function(r) {
-              if (r && r.success) _renderQuestionDetail(cont, questionId);
-              else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
-            }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitAnswer(CURRENT_USER.email, CURRENT_USER.name || '', questionId, text, isSteward);
-          }
-        }, 'Post Answer'));
-      }).qaGetQuestionDetail(CURRENT_USER.email, questionId);
+        // Reply form — stewards only
+        if (isSteward) {
+          cont.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginTop: '16px', marginBottom: '8px' } }, 'Your Answer'));
+          var ansInput = el('textarea', { className: 'msg-textarea', placeholder: 'Write your answer...', style: { minHeight: '60px' } });
+          cont.appendChild(ansInput);
+          var ansStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+          cont.appendChild(ansStatus);
+          cont.appendChild(el('button', {
+            className: 'btn btn-primary', style: { marginTop: '8px' },
+            onClick: function() {
+              var text = ansInput.value.trim();
+              if (!text) { ansStatus.textContent = 'Write an answer first.'; ansStatus.style.color = 'var(--danger)'; return; }
+              ansStatus.textContent = 'Posting...'; ansStatus.style.color = 'var(--muted)';
+              serverCall().withSuccessHandler(function(r) {
+                if (r && r.success) {
+                  _renderQuestionDetail(cont, questionId);
+                  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+                } else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
+              }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitAnswer(SESSION_TOKEN, CURRENT_USER.name || '', questionId, text, true);
+            }
+          }, 'Post Answer'));
+        }
+      }).qaGetQuestionDetail(SESSION_TOKEN, questionId);
     }
 
     function _renderAskForm(cont) {
@@ -4037,7 +4103,7 @@ function renderQAForum(appContainer, role) {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
             else { statusMsg.textContent = r ? r.message : 'Error posting.'; statusMsg.style.color = 'var(--danger)'; }
-          }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitQuestion(CURRENT_USER.email, CURRENT_USER.name || '', text, anonCheck.checked);
+          }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitQuestion(SESSION_TOKEN, CURRENT_USER.name || '', text, anonCheck.checked);
         }
       }, 'Post Question'));
     }
@@ -4060,11 +4126,11 @@ function renderQAForum(appContainer, role) {
             var acts = el('div', { style: { display: 'flex', gap: '6px' } });
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'approve'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'approve'); }
             }, 'Approve'));
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'delete'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'delete'); }
             }, 'Delete'));
             card.appendChild(acts);
             cont.appendChild(card);
@@ -4080,17 +4146,17 @@ function renderQAForum(appContainer, role) {
             var acts = el('div', { style: { display: 'flex', gap: '6px' } });
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'approve'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'approve'); }
             }, 'Approve'));
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'delete'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'delete'); }
             }, 'Delete'));
             card.appendChild(acts);
             cont.appendChild(card);
           });
         }
-      }).qaGetFlaggedContent(CURRENT_USER.email);
+      }).qaGetFlaggedContent(SESSION_TOKEN);
     }
 
     refreshSubTabs();
@@ -4213,7 +4279,7 @@ function renderTimelinePage(appContainer) {
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
               onClick: function() {
-                serverCall().withSuccessHandler(function() { _renderTimeline(cont); }).tlDeleteTimelineEvent(CURRENT_USER.email, evt.id);
+                serverCall().withSuccessHandler(function() { _renderTimeline(cont); }).tlDeleteTimelineEvent(SESSION_TOKEN, evt.id);
               }
             }, 'Delete'));
             card.appendChild(acts);
@@ -4227,7 +4293,7 @@ function renderTimelinePage(appContainer) {
       }).withFailureHandler(function() {
         listArea.innerHTML = '';
         listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
-      }).tlGetTimelineEvents(1, 50, filterYear || null, filterCategory || null);
+      }).tlGetTimelineEvents(SESSION_TOKEN, 1, 50, filterYear || null, filterCategory || null);
     }
 
     function _renderAddEventForm(cont) {
@@ -4282,7 +4348,7 @@ function renderTimelinePage(appContainer) {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { activeSubTab = 'timeline'; refreshSubTabs(); renderTLSubContent(); }
             else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
-          }).tlAddTimelineEvent(CURRENT_USER.email, eventData);
+          }).tlAddTimelineEvent(SESSION_TOKEN, eventData);
         }
       }, 'Create Event'));
     }
@@ -4314,7 +4380,7 @@ function renderTimelinePage(appContainer) {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { statusMsg.textContent = r.imported + ' events imported!'; statusMsg.style.color = 'var(--success)'; }
             else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
-          }).tlImportCalendarEvents(CURRENT_USER.email, startInput.value, endInput.value);
+          }).tlImportCalendarEvents(SESSION_TOKEN, startInput.value, endInput.value);
         }
       }, 'Import Events'));
     }
@@ -4394,10 +4460,10 @@ function _renderDigestSettings(container) {
         serverCall().withSuccessHandler(function(r) {
           statusMsg.textContent = r && r.success ? 'Digest settings saved!' : (r && r.message) || 'Error.';
           statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
-        }).fsUpdateDigestConfig(CURRENT_USER.email, digestConfig);
+        }).fsUpdateDigestConfig(SESSION_TOKEN, digestConfig);
       }
     }, 'Save Digest Settings'));
-  }).fsGetDigestConfig(CURRENT_USER.email);
+  }).fsGetDigestConfig(SESSION_TOKEN);
 
   container.appendChild(section);
 }

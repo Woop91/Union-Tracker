@@ -36,8 +36,26 @@ loadSources([
   '01_Core.gs',
   '02_DataManagers.gs',
   '03_UIComponents.gs',
+  '08c_FormsAndNotifications.gs',
   '09_Dashboards.gs'
 ]);
+
+// Mock getSatisfactionColMap_ to return static positions matching SATISFACTION_COLS
+// (the dynamic version reads sheet headers which don't exist in test mocks)
+global.getSatisfactionColMap_ = jest.fn(() => ({
+  'Timestamp': 1, 'q1': 2, 'q2': 3, 'q3': 4, 'q4': 5, 'q5': 6,
+  'q6': 7, 'q7': 8, 'q8': 9, 'q9': 10,
+  'q10': 11, 'q11': 12, 'q12': 13, 'q13': 14, 'q14': 15, 'q15': 16, 'q16': 17, 'q17': 18,
+  'q18': 19, 'q19': 20, 'q20': 21,
+  'q21': 22, 'q22': 23, 'q23': 24, 'q24': 25, 'q25': 26,
+  'q26': 27, 'q27': 28, 'q28': 29, 'q29': 30, 'q30': 31, 'q31': 32,
+  'q32': 33, 'q33': 34, 'q34': 35, 'q35': 36,
+  'q36': 37, 'q37': 38, 'q38': 39, 'q39': 40, 'q40': 41,
+  'q41': 42, 'q42': 43, 'q43': 44, 'q44': 45, 'q45': 46,
+  'q46': 47, 'q47': 48, 'q48': 49, 'q49': 50, 'q50': 51,
+  'q51': 52, 'q52': 53, 'q53': 54, 'q54': 55, 'q55': 56,
+  'q56': 57, 'q57': 58, 'q58': 59, 'q59': 60, 'q60': 61, 'q61': 62, 'q62': 63
+}));
 
 // ============================================================================
 // computeAverage_ - pure math function

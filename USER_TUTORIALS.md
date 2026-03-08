@@ -1,7 +1,7 @@
 # Dashboard - User Tutorials
 
-**Version:** 4.13.0
-**Last Updated:** 2026-02-25
+**Version:** 4.24.4
+**Last Updated:** 2026-03-07
 
 Quick, practical tutorials for common tasks in the Dashboard.
 
@@ -737,5 +737,5 @@ Share direct links to specific pages by adding `?page=` to the URL:
 
 ---
 
-**Version:** 4.13.0
-**Last Updated:** 2026-02-25
+**Version:** 4.24.4
+**Last Updated:** 2026-03-07

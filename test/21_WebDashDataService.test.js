@@ -395,7 +395,7 @@ describe('dataMarkWelcomeDismissed', () => {
 
   test('stores dismissal timestamp in Script Properties', () => {
     PropertiesService.getScriptProperties().deleteAllProperties();
-    const result = dataMarkWelcomeDismissed('test@example.com');
+    const result = dataMarkWelcomeDismissed('test-session-token');
     expect(result.success).toBe(true);
     const allProps = PropertiesService.getScriptProperties().getProperties();
     const dismissKey = Object.keys(allProps).find(k => k.startsWith('WELCOME_DISMISSED_'));
@@ -403,11 +403,11 @@ describe('dataMarkWelcomeDismissed', () => {
   });
 
   test('returns failure when no authenticated user', () => {
-    const origGetEmail = Session.getActiveUser().getEmail;
-    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => '') }));
-    const result = dataMarkWelcomeDismissed();
+    const origResolve = global._resolveCallerEmail;
+    global._resolveCallerEmail = jest.fn(() => null);
+    const result = dataMarkWelcomeDismissed('test-session-token');
     expect(result.success).toBe(false);
-    Session.getActiveUser = jest.fn(() => ({ getEmail: origGetEmail }));
+    global._resolveCallerEmail = origResolve;
   });
 });
 
@@ -422,7 +422,7 @@ describe('dataGetEngagementStats', () => {
 
   test('returns null when no stats are seeded', () => {
     PropertiesService.getScriptProperties().deleteAllProperties();
-    const result = dataGetEngagementStats();
+    const result = dataGetEngagementStats('test-session-token');
     expect(result).toBeNull();
   });
 });
@@ -453,7 +453,7 @@ describe('dataGetBroadcastFilterOptions', () => {
     const mockSS = createMockSpreadsheet([memberSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
 
-    const filters = dataGetBroadcastFilterOptions();
+    const filters = dataGetBroadcastFilterOptions('test-session-token');
     expect(filters).toBeDefined();
     expect(filters.locations).toBeDefined();
     expect(Array.isArray(filters.locations)).toBe(true);
@@ -490,7 +490,7 @@ describe('Global wrappers', () => {
   });
 
   test('dataGetStewardDirectory delegates to DataService.getStewardDirectory', () => {
-    const result = dataGetStewardDirectory();
+    const result = dataGetStewardDirectory('test-session-token');
     expect(Array.isArray(result)).toBe(true);
   });
 

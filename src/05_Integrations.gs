@@ -322,7 +322,7 @@ function getOrCreateMemberAdminFolder(memberEmail) {
     var membersRoot = null;
     var storedMembersId = props.getProperty('MEMBERS_FOLDER_ID') || '';
     if (storedMembersId) {
-      try { membersRoot = DriveApp.getFolderById(storedMembersId); } catch (e) { membersRoot = null; }
+      try { membersRoot = DriveApp.getFolderById(storedMembersId); } catch (_e) { membersRoot = null; }
     }
     if (!membersRoot) {
       // Resolve via dashboard root
@@ -332,7 +332,7 @@ function getOrCreateMemberAdminFolder(memberEmail) {
           var dashRoot = DriveApp.getFolderById(dashRootId);
           var mIter = dashRoot.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
           membersRoot = mIter.hasNext() ? mIter.next() : dashRoot.createFolder(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
-        } catch (e) { membersRoot = null; }
+        } catch (_e) { membersRoot = null; }
       }
       if (!membersRoot) {
         var fallbackIter = DriveApp.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
@@ -471,7 +471,7 @@ function setupDriveFolderForGrievance(grievanceId) {
       var membersRootId = props.getProperty('MEMBERS_FOLDER_ID') || '';
       var membersRoot   = null;
       if (membersRootId) {
-        try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (e) {}
+        try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (_e) {}
       }
       if (!membersRoot) membersRoot = getOrCreateRootFolder(); // ultimate fallback to dashboard root
       var memberFolderName = (lastName && firstName)

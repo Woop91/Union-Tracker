@@ -1,7 +1,7 @@
 # AI REFERENCE DOCUMENT — DDS-Dashboard
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
-# Last updated: 2026-02-25
+# Last updated: 2026-03-07
 # Consolidation note: On 2026-02-25, duplicate sections were replaced with
 # pointers to their canonical source files. No information was removed.
 
@@ -33,8 +33,8 @@ Read these files **in this order** when onboarding to this codebase:
 **Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users) at MassAbility DDS (SEIU 509).
-**Architecture:** 39 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
-**Current build:** 39 `.gs` + 8 `.html` files in `dist/` (individual file mode, NOT consolidated).
+**Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
+**Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
 **DDS Apps Script ID:** `[REDACTED]`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
@@ -55,7 +55,7 @@ Read these files **in this order** when onboarding to this codebase:
 
 ### Build Pipeline
 ```
-src/*.gs (39 files) + src/*.html (8 files)
+src/*.gs (42 files) + src/*.html (7 files)
     → build.js (copy-files mode) → dist/*.gs + dist/*.html (individual files)
                                     dist/appsscript.json (manifest)
     → clasp push → Google Apps Script project
@@ -73,13 +73,15 @@ src/*.gs (39 files) + src/*.html (8 files)
 | `05_` | Integrations | Drive, Calendar, Email, Web App API functions |
 | `06_` | Maintenance | Admin tools, undo/redo, audit |
 | `07_` | DevTools | Dev-only utilities (**excluded in prod build**) |
-| `08a-d` | Sheet utils | Setup, search, forms, audit formulas |
+| `08a-e` | Sheet utils | Setup, search, forms, audit formulas, survey engine |
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
-| `18_` | Workload Tracker | **DDS ONLY** — excluded from Union-Tracker |
-| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, weekly questions |
-| `25_` | Workload Service | SPA-integrated workload tracking (SSO auth, separate from standalone WT portal) |
+| `19_-25_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, workload service |
+| `26_` | Q&A Forum | Steward-member Q&A with steward-only answers, resolve/reopen |
+| `27_` | Timeline Service | Activity feed with inline edit, pagination, calendar links |
+| `28_` | Failsafe Service | Security & reliability guardrails |
+| `29_` | Migrations | Column auto-migration for schema changes |
 
 ### HTML Files in src/
 | File | Purpose |
@@ -88,10 +90,9 @@ src/*.gs (39 files) + src/*.html (8 files)
 | `steward_view.html` | Steward command center |
 | `member_view.html` | Member dashboard |
 | `auth_view.html` | Login/auth page |
-| `error_view.html` | Error display |
+| `error_view.html` | Error display page |
 | `styles.html` | Shared CSS |
-| `MultiSelectDialog.html` | Multi-select dropdown UI |
-| `WorkloadTracker.html` | WT portal (**DDS only**) |
+| `org_chart.html` | Organizational chart view |
 
 ### Web App Routing (doGet)
 ```
@@ -105,10 +106,13 @@ doGet(e)
 ├── ?page=links    → Links page
 ├── ?page=selfservice → Member self-service (Google auth or PIN)
 ├── ?page=portal   → Public portal
-├── ?page=workload → Workload tracker (DDS only)
+├── ?page=workload → Workload tracker
 ├── ?page=checkin  → Meeting check-in (v4.11.0)
 ├── ?page=resources → SPA with resources tab pre-selected (v4.11.0)
 ├── ?page=notifications → SPA with notifications tab pre-selected (v4.12.0)
+├── ?page=qa-forum → Q&A Forum (v4.22.6)
+├── ?page=timeline → Timeline activity feed (v4.22.9)
+├── ?page=org-chart → Org chart view (v4.22.6)
 └── Deep-link: ?page=X → SPA reads PAGE_DATA.initialTab → _handleTabNav()
 ```
 
@@ -155,10 +159,13 @@ Sent By | Sent By Name | Created Date | Expires Date | Dismissed By | Status
 - Dismissed_By: comma-separated emails (per-member tracking)
 - Active until: Expires Date passes, member dismisses, or steward archives
 
-### Hidden Sheets (v4.12.2)
+### Hidden Sheets (v4.12.2+)
 - `_Weekly_Questions` — weekly engagement questions
 - `_Contact_Log` — steward-member interaction log (8 columns)
 - `_Steward_Tasks` — steward task management (10 columns)
+- `_QA_Forum` — Q&A Forum questions and answers (v4.22.6)
+- `_Timeline` — Timeline activity feed entries (v4.22.9)
+- `_Surveys` — Dynamic survey schema and responses (v4.23.0)
 
 ### Architectural Rule: No Formulas in Visible Sheets
 All visible sheets (Dashboard, Member Satisfaction, Feedback) contain only VALUES, never formulas. Data is recomputed by JavaScript on each change. No broken formula references, no circular dependencies, no formula chains.
@@ -219,7 +226,7 @@ Records **why** architectural choices were made, so future LLMs don't undo them.
 | 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
 | 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
 | 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
-| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ is standalone portal (PIN auth). Different auth models = separate modules. |
+| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). 18_ later removed; 25_ is the sole workload module. |
 
 ---
 

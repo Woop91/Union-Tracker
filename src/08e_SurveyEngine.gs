@@ -162,7 +162,7 @@ function setupSurveyPeriodsSheet() {
   sheet.setFrozenRows(1);
 
   // Hide the sheet at API level
-  try { setSheetVeryHidden_(sheet); } catch(e) { sheet.hideSheet(); }
+  try { setSheetVeryHidden_(sheet); } catch(_e) { sheet.hideSheet(); }
 
   Logger.log('setupSurveyPeriodsSheet: _Survey_Periods created.');
 }

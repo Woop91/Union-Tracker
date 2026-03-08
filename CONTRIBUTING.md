@@ -30,8 +30,8 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/Union-Tracker.git
+   cd Union-Tracker
    ```
 
 2. **Install dependencies**
@@ -53,7 +53,7 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 ```
 .
-├── src/                    # Source files (27 .gs + 1 .html)
+├── src/                    # Source files (42 .gs + 7 .html)
 │   ├── 00_Security.gs              # Security utilities, XSS prevention
 │   ├── 00_DataAccess.gs            # Data Access Layer
 │   ├── 01_Core.gs                  # Error handling + Constants
@@ -71,6 +71,7 @@ Please be respectful and constructive in all interactions. We're all working tow
 │   ├── 08b_SearchAndCharts.gs      # Search functions, chart generation
 │   ├── 08c_FormsAndNotifications.gs # Forms, notifications, alerts
 │   ├── 08d_AuditAndFormulas.gs     # Audit log, formula sync
+│   ├── 08e_SurveyEngine.gs         # Dynamic survey schema engine
 │   ├── 09_Dashboards.gs            # Dashboards and sync
 │   ├── 10a_SheetCreation.gs        # Sheet creation functions
 │   ├── 10b_SurveyDocSheets.gs      # Survey, FAQ, Getting Started sheets
@@ -81,11 +82,31 @@ Please be respectful and constructive in all interactions. We're all working tow
 │   ├── 12_Features.gs              # Dynamic Engine, Looker Studio
 │   ├── 13_MemberSelfService.gs     # PIN authentication portal
 │   ├── 14_MeetingCheckIn.gs        # Meeting check-in system
-│   └── MultiSelectDialog.html
+│   ├── 15_EventBus.gs              # Pub/sub event system
+│   ├── 16_DashboardEnhancements.gs # Date ranges, chart export, drill-down
+│   ├── 17_CorrelationEngine.gs     # Cross-dimensional correlation analysis
+│   ├── 19_WebDashAuth.gs           # Google SSO + magic link auth
+│   ├── 20_WebDashConfigReader.gs   # Column-based Config tab reader
+│   ├── 21_WebDashDataService.gs    # Unified data service for SPA
+│   ├── 22_WebDashApp.gs            # SPA entry point and routing
+│   ├── 23_PortalSheets.gs          # Hidden sheet management for SPA
+│   ├── 24_WeeklyQuestions.gs        # Weekly check-in questions
+│   ├── 25_WorkloadService.gs       # SPA-integrated workload
+│   ├── 26_QAForum.gs               # Q&A Forum with steward-only answers
+│   ├── 27_TimelineService.gs       # Timeline activity feed
+│   ├── 28_FailsafeService.gs       # Security and reliability failsafe
+│   ├── 29_Migrations.gs            # Schema migration runner
+│   ├── index.html                   # SPA entry point
+│   ├── styles.html                  # SPA shared styles
+│   ├── auth_view.html               # SSO/magic link auth view
+│   ├── steward_view.html            # Steward dashboard SPA view
+│   ├── member_view.html             # Member dashboard SPA view
+│   ├── error_view.html              # Error/access denied page
+│   └── org_chart.html               # Organizational chart view
 ├── test/                   # Jest unit tests
 │   ├── gas-mock.js         # GAS environment mocks
 │   ├── load-source.js      # Source file loader
-│   └── *.test.js           # Test files (950+ tests)
+│   └── *.test.js           # Test files (2059 tests across 36 suites)
 ├── dist/                   # Built output (auto-generated)
 ├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration
@@ -114,6 +135,20 @@ Please be respectful and constructive in all interactions. We're all working tow
 | 12_ | Feature extensions (Dynamic Engine, Looker) |
 | 13_ | Member self-service (PIN auth) |
 | 14_ | Meeting check-in system |
+| 15_ | Event bus (pub/sub) |
+| 16_ | Dashboard enhancements |
+| 17_ | Correlation engine |
+| 19_ | Web dashboard authentication |
+| 20_ | Web dashboard config reader |
+| 21_ | Web dashboard data service |
+| 22_ | Web dashboard app / routing |
+| 23_ | Portal sheets management |
+| 24_ | Weekly questions |
+| 25_ | Workload service |
+| 26_ | Q&A Forum |
+| 27_ | Timeline service |
+| 28_ | Failsafe service |
+| 29_ | Migrations |
 
 ## Coding Standards
 

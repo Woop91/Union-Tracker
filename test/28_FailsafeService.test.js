@@ -92,7 +92,8 @@ beforeEach(() => {
     getId: jest.fn(() => 'backup-folder-id'),
     getUrl: jest.fn(() => 'https://drive.google.com/backup-folder'),
     createFile: jest.fn(() => ({ getId: jest.fn(() => 'file-id') })),
-    setDescription: jest.fn()
+    setDescription: jest.fn(),
+    getFiles: jest.fn(() => ({ hasNext: jest.fn(() => false) }))
   };
   DriveApp.getFoldersByName.mockReturnValue({
     hasNext: jest.fn(() => false)
@@ -403,7 +404,8 @@ describe('FailsafeService.backupCriticalSheets', () => {
 
   test('backs up sheets to CSV files', () => {
     var mockFolder = {
-      createFile: jest.fn(() => ({ getId: jest.fn(() => 'csv-file-id') }))
+      createFile: jest.fn(() => ({ getId: jest.fn(() => 'csv-file-id') })),
+      getFiles: jest.fn(() => ({ hasNext: jest.fn(() => false) }))
     };
     DriveApp.getFoldersByName.mockReturnValue({
       hasNext: jest.fn(() => true),
@@ -428,7 +430,8 @@ describe('FailsafeService.backupCriticalSheets', () => {
 
   test('skips empty sheets', () => {
     var mockFolder = {
-      createFile: jest.fn()
+      createFile: jest.fn(),
+      getFiles: jest.fn(() => ({ hasNext: jest.fn(() => false) }))
     };
     DriveApp.getFoldersByName.mockReturnValue({
       hasNext: jest.fn(() => true),
@@ -447,7 +450,8 @@ describe('FailsafeService.backupCriticalSheets', () => {
 
   test('returns backedUp count and folderName', () => {
     var mockFolder = {
-      createFile: jest.fn(() => ({ getId: jest.fn(() => 'id') }))
+      createFile: jest.fn(() => ({ getId: jest.fn(() => 'id') })),
+      getFiles: jest.fn(() => ({ hasNext: jest.fn(() => false) }))
     };
     DriveApp.getFoldersByName.mockReturnValue({
       hasNext: jest.fn(() => true),

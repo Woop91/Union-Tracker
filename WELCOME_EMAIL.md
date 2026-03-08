@@ -139,4 +139,4 @@ Wardis
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-Version 4.13.0 | Questions or Feedback? Contact wardis@pm.me
+Version 4.24.4 | Questions or Feedback? Contact wardis@pm.me

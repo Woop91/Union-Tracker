@@ -1943,7 +1943,7 @@ function getSurveyQuestions() {
         return configSheet.getRange(3, col, lr - 2, 1).getValues()
           .map(function(r) { return String(r[0]).trim(); })
           .filter(function(v) { return v !== ''; });
-      } catch(e) { return []; }
+      } catch(_e) { return []; }
     }
     var worksites       = _configList(CONFIG_COLS.OFFICE_LOCATIONS);
     var roles           = _configList(CONFIG_COLS.JOB_TITLES);
@@ -2283,7 +2283,7 @@ function submitSurveyResponse(callerEmail, responses) {
               }
             }
           }
-        } catch(ex) {}
+        } catch(_ex) {}
 
         var memberIdHash = memberId ? hashForVault_(memberId) : '';
         var vaultRow = new Array(8).fill('');
@@ -2318,8 +2318,8 @@ function submitSurveyResponse(callerEmail, responses) {
       }
 
       // ── Update period response count + invalidate summary cache ────────
-      try { incrementPeriodResponseCount_(periodId); } catch(ex) {}
-      try { CacheService.getScriptCache().remove('satisfactionSummary_' + periodId); } catch(ex) {}
+      try { incrementPeriodResponseCount_(periodId); } catch(_ex) {}
+      try { CacheService.getScriptCache().remove('satisfactionSummary_' + periodId); } catch(_ex) {}
 
       return { success: true, message: 'Thank you — your anonymous response has been recorded.' };
 

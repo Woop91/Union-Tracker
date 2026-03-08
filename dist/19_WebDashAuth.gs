@@ -315,6 +315,14 @@ var Auth = (function () {
     createSessionToken: createSessionToken,
     invalidateSession: invalidateSession,
     cleanupExpiredTokens: cleanupExpiredTokens,
+    /**
+     * Resolve a verified email from a session token.
+     * Used by auth helpers when Session.getActiveUser() is empty
+     * (magic link / session token users in Execute-as-Me web apps).
+     * @param {string} token
+     * @returns {string|null} verified email or null
+     */
+    resolveEmailFromToken: _validateSessionToken,
   };
 
 })();

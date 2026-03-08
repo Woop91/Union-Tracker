@@ -1,9 +1,9 @@
 # Strategic Command Center - Complete Features Reference
 
-**Version:** 4.13.0 | **Codename:** SPA Web Dashboard & Notifications
-**Last Updated:** February 2026
+**Version:** 4.24.4 | **Codename:** Q&A Forum, Timeline, Dynamic Survey & Auth Sweep
+**Last Updated:** March 2026
 
-> **New in v4.13.0:** Notification bell with unread badge, EventBus auto-notifications, WorkloadService SPA module, individual-file build system
+> **New in v4.24.4:** Q&A Forum with steward-only answers, Timeline activity feed with inline editing, Dynamic Survey Engine (Option B), Share Phone steward opt-in, FailsafeService security layer, schema migrations, org chart, auth session token sweep across all services
 
 This document provides a comprehensive, searchable reference of all features in the Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -40,6 +40,13 @@ This document provides a comprehensive, searchable reference of all features in 
 27. [Notifications System](#27-notifications-system)
 28. [SPA Web Dashboard](#28-spa-web-dashboard)
 29. [Notification Bell & EventBus Alerts](#29-notification-bell--eventbus-alerts)
+30. [Q&A Forum](#30-qa-forum)
+31. [Timeline Service](#31-timeline-service)
+32. [Dynamic Survey Engine](#32-dynamic-survey-engine)
+33. [Share Phone](#33-share-phone)
+34. [FailsafeService](#34-failsafeservice)
+35. [Migrations](#35-migrations)
+36. [Org Chart](#36-org-chart)
 
 ---
 
@@ -681,7 +688,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 > **Files:** `25_WorkloadService.gs` (SPA module) | **Version:** 4.10.0 / 4.13.0
 >
-> **Note:** The standalone PIN-auth portal (`18_WorkloadTracker.gs` / `WorkloadTracker.html`) is DDS-Dashboard only. Union-Tracker uses the SPA workload module exclusively.
+> **Note:** Union-Tracker uses the SPA workload module exclusively (`25_WorkloadService.gs`).
 
 ### SPA Workload Module (v4.13.0)
 
@@ -819,10 +826,104 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ---
 
+## 30. Q&A Forum
+
+> **File:** `26_QAForum.gs` | **Version:** 4.22.6
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Post Question** | Members post questions (optionally anonymous) | `postQuestion(data, sessionToken)` | question, ask, anonymous |
+| **Steward-Only Answers** | Only stewards can answer questions | `postAnswer(data, sessionToken)` | answer, steward, reply |
+| **Resolve / Reopen** | Stewards mark questions as resolved or reopen them | `resolveQuestion(id, sessionToken)` | resolve, close, reopen |
+| **Unanswered Badge** | Unanswered count appears on notification bell | Within SPA views | badge, count, bell |
+| **Show-Resolved Toggle** | Filter resolved questions in or out | Within SPA views | filter, toggle, resolved |
+| **Anonymous Notifications** | Stewards alerted to new anonymous questions | Via EventBus | anonymous, alert, notification |
+
+---
+
+## 31. Timeline Service
+
+> **File:** `27_TimelineService.gs` | **Version:** 4.22.9
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Activity Feed** | Chronological feed of organizational events | `getTimelineEntries(params, sessionToken)` | feed, activity, events |
+| **Inline Editing** | Edit timeline entries directly in the feed | `editTimelineEntry(data, sessionToken)` | edit, inline, update |
+| **Meeting Minutes Link** | Entries can link to meetingMinutesId | Within timeline data | minutes, link, meeting |
+| **Load More Pagination** | Scroll through history with progressive loading | Within SPA views | pagination, load, scroll |
+| **Dynamic Year Filter** | Filter entries by year | Within SPA views | year, filter, date |
+| **Calendar Icon Links** | Quick link to related calendar events | Within SPA views | calendar, link, event |
+
+---
+
+## 32. Dynamic Survey Engine
+
+> **File:** `08e_SurveyEngine.gs` | **Version:** 4.23.0
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Dynamic Schema** | Fully dynamic survey schema (Option B) | `buildSurveyForm()` | dynamic, schema, form |
+| **Form URL Deprecation** | Static form URL replaced by dynamic engine | Config cleanup | deprecation, URL, cleanup |
+| **Survey Processing** | Process submissions against dynamic schema | `processSurveySubmission()` | process, submit, response |
+
+---
+
+## 33. Share Phone
+
+> **Version:** 4.23.4
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Phone Opt-In** | Stewards choose whether to share their phone number | Column toggle in Member Directory | opt-in, phone, privacy |
+| **Member Visibility** | Members only see phone numbers of stewards who opted in | Filtered in SPA data service | visibility, filter, directory |
+| **Self-Toggle** | Stewards can toggle phone sharing from the SPA | Within steward_view.html | toggle, self-service, SPA |
+| **Default No** | New members default to phone not shared | Seed logic in DataManagers | default, new, seed |
+
+---
+
+## 34. FailsafeService
+
+> **File:** `28_FailsafeService.gs` | **Version:** 4.24.0
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Security Layer** | Additional security and reliability failsafe | `FailsafeService.validateAccess()` | security, failsafe, validate |
+| **File Validation** | Secure file access with validation | `FailsafeService.getFiles()` | files, validate, access |
+
+---
+
+## 35. Migrations
+
+> **File:** `29_Migrations.gs` | **Version:** 4.24.0
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Schema Migrations** | Run schema migrations for version upgrades | `runMigrations()` | migration, schema, upgrade |
+| **Migration Status** | Check current migration status | `getMigrationStatus()` | status, version, check |
+
+---
+
+## 36. Org Chart
+
+> **File:** `org_chart.html` | **Version:** 4.22.6
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Org Chart View** | Organizational chart visualization in the SPA | `org_chart.html` | org, chart, hierarchy |
+| **Sync Script** | Sync organizational data from external source | `scripts/sync-org-chart.js` | sync, org, script |
+
+---
+
 ## Version History
 
 | Version | Features Added |
 |---------|----------------|
+| **4.24.4** | Auth session token sweep, test suite fixes (2059 tests / 36 suites), feature parity sync |
+| **4.24.0** | FlashPolls removed, manual community draw, Q_COLS API, FailsafeService, Migrations |
+| **4.23.4** | Share Phone column, steward self-toggle, default No seeding |
+| **4.23.0** | Dynamic Survey Engine (Option B), form URL deprecation cleanup |
+| **4.22.9** | Timeline service — inline edit, meetingMinutesId, load more, dynamic year filter, calendar links |
+| **4.22.6** | Q&A Forum — steward-only answers, resolve, notifications, unanswered bell badge, org chart |
 | **4.13.0** | Notification bell with unread badge, EventBus auto-notifications, WorkloadService SPA module |
 | **4.12.2** | SPA web dashboard — SSO + magic link auth, steward/member views, deep-link routing |
 | **4.12.0** | Notifications system — sheet, API, dual-role page, steward compose |
@@ -857,4 +958,4 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ---
 
-*Strategic Command Center v4.13.0 - A personal project providing comprehensive tools for representatives*
+*Strategic Command Center v4.24.4 - A personal project providing comprehensive tools for representatives*

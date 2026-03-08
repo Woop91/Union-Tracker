@@ -113,62 +113,86 @@ function CREATE_DASHBOARD() {
       }
     }
 
+    var currentStep_ = '';
+    try {
+    currentStep_ = 'createConfigSheet';
     createConfigSheet(ss);
     ss.toast('Created Config sheet', '🏗️ Progress', 2);
 
+    currentStep_ = 'createMemberDirectory';
     createMemberDirectory(ss);
     ss.toast('Created Member Directory', '🏗️ Progress', 2);
 
+    currentStep_ = 'createGrievanceLog';
     createGrievanceLog(ss);
     ss.toast('Created Grievance Log', '🏗️ Progress', 2);
 
+    currentStep_ = 'setupActionTypeColumn';
     setupActionTypeColumn();
     ss.toast('Setup Action Type dropdown', '🏗️ Progress', 2);
 
+    currentStep_ = 'getOrCreateChecklistSheet';
     getOrCreateChecklistSheet();
     ss.toast('Created Case Checklist sheet', '🏗️ Progress', 2);
 
+    currentStep_ = 'setupHiddenSheets';
     ss.toast('Setting up hidden sheets...', '🏗️ Progress', 3);
     setupHiddenSheets(ss);
 
+    currentStep_ = 'createSurveyQuestionsSheet';
     createSurveyQuestionsSheet(ss);
     ss.toast('Created Survey Questions', '🏗️ Progress', 2);
 
+    currentStep_ = 'createSatisfactionSheet';
     createSatisfactionSheet(ss);
     ss.toast('Created Member Satisfaction', '🏗️ Progress', 2);
 
+    currentStep_ = 'createFeedbackSheet';
     createFeedbackSheet(ss);
     ss.toast('Created Feedback & Development', '🏗️ Progress', 2);
 
+    currentStep_ = 'createFunctionChecklistSheet_';
     createFunctionChecklistSheet_();
     ss.toast('Created Function Checklist', '🏗️ Progress', 2);
 
+    currentStep_ = 'createGettingStartedSheet';
     createGettingStartedSheet(ss);
     ss.toast('Created Getting Started', '🏗️ Progress', 2);
 
+    currentStep_ = 'createFAQSheet';
     createFAQSheet(ss);
     ss.toast('Created FAQ', '🏗️ Progress', 2);
 
+    currentStep_ = 'createConfigGuideSheet';
     createConfigGuideSheet(ss);
     ss.toast('Created Config Guide', '🏗️ Progress', 2);
 
+    currentStep_ = 'createFeaturesReferenceSheet';
     createFeaturesReferenceSheet(ss);
     ss.toast('Created Features Reference', '🏗️ Progress', 2);
 
+    currentStep_ = 'createVolunteerHoursSheet';
     createVolunteerHoursSheet(ss);
     ss.toast('Created Volunteer Hours tracking', '🏗️ Progress', 2);
 
+    currentStep_ = 'createMeetingAttendanceSheet';
     createMeetingAttendanceSheet(ss);
     ss.toast('Created Meeting Attendance tracking', '🏗️ Progress', 2);
 
+    currentStep_ = 'createMeetingCheckInLogSheet';
     createMeetingCheckInLogSheet(ss);
     ss.toast('Created Meeting Check-In Log', '🏗️ Progress', 2);
 
+    currentStep_ = 'saveFormUrlsToConfig_silent';
     saveFormUrlsToConfig_silent(ss);
     ss.toast('Saved form URLs to Config', '🏗️ Progress', 2);
 
+    currentStep_ = 'setupDataValidations';
     ss.toast('Setting up validations...', '🏗️ Progress', 3);
     setupDataValidations();
+    } catch (stepErr) {
+      throw new Error('[' + currentStep_ + '] ' + stepErr.message);
+    }
 
     // Initialize Resources sheet and Resource Config sheet (v4.22.x)
     // Both auto-create on first access but wired here so they're ready on setup.
@@ -333,7 +357,18 @@ function _ensureStewardTasksSheet(ss) {
     sheet.hideSheet();
   } else {
     // Migrate existing 10-col sheets: add headers + backfill 'steward' in col 10-11
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var stLastCol = sheet.getLastColumn();
+    if (stLastCol < 1) {
+      // Sheet exists but is empty — recreate headers
+      sheet.getRange(1, 1, 1, 12).setValues([[
+        'ID', 'Steward Email', 'Title', 'Description', 'Member Email',
+        'Priority', 'Status', 'Due Date', 'Created', 'Completed',
+        'Assignee Type', 'Assigned By'
+      ]]);
+      sheet.hideSheet();
+      return sheet;
+    }
+    var headers = sheet.getRange(1, 1, 1, stLastCol).getValues()[0];
     if (headers.length < 12 || String(headers[10]).trim() !== 'Assignee Type') {
       sheet.getRange(1, 11).setValue('Assignee Type');
       sheet.getRange(1, 12).setValue('Assigned By');

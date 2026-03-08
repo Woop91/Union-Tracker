@@ -72,7 +72,6 @@ beforeEach(function () {
     [CONFIG_COLS.ORG_NAME]: 'Test Organization',
     [CONFIG_COLS.CALENDAR_ID]: 'cal@test.com',
     [CONFIG_COLS.DRIVE_FOLDER_ID]: 'folder-123',
-    [CONFIG_COLS.SATISFACTION_FORM_URL]: 'https://forms.example.com/survey',
     [CONFIG_COLS.ORG_WEBSITE]: 'https://example.com'
   });
   installMockSpreadsheet(configSheet);
@@ -102,9 +101,9 @@ describe('ConfigReader.getConfig', function () {
     expect(cfg.driveFolderId).toBe('folder-123');
   });
 
-  test('returns satisfactionFormUrl and orgWebsite from Config tab', function () {
+  test('returns orgWebsite from Config tab', function () {
     var cfg = ConfigReader.getConfig(true);
-    expect(cfg.satisfactionFormUrl).toBe('https://forms.example.com/survey');
+    // satisfactionFormUrl removed v4.22.7 — survey is native webapp
     expect(cfg.orgWebsite).toBe('https://example.com');
   });
 

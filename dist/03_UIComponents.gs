@@ -135,7 +135,7 @@ function createDashboardMenu() {
       .addItem('📄 Backfill Minutes → Drive Docs', 'BACKFILL_MINUTES_DRIVE_DOCS'))
 
     .addSubMenu(ui.createMenu('📁 Google Drive')
-      .addItem('🏗️ Setup Dashboard Folder Structure', 'SETUP_DRIVE_FOLDERS')
+      .addItem('🏗️ Setup / Repair Drive Folder Structure', 'SETUP_DRIVE_FOLDERS')
       .addSeparator()
       .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
       .addItem('📁 View Grievance Files', 'showGrievanceFiles')

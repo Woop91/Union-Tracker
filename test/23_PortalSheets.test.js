@@ -50,14 +50,7 @@ describe('PORTAL_MEMBER_DIR_COLS', () => {
   });
 });
 
-describe('PORTAL_POLL_COLS', () => {
-  test('has expected fields', () => {
-    expect(PORTAL_POLL_COLS.ID).toBe(0);
-    expect(PORTAL_POLL_COLS.QUESTION).toBe(1);
-    expect(PORTAL_POLL_COLS.OPTIONS).toBe(2);
-    expect(PORTAL_POLL_COLS.ACTIVE).toBe(3);
-  });
-});
+// PORTAL_POLL_COLS removed v4.24.0 — FlashPolls replaced by unified wq* poll system
 
 describe('PORTAL_GRIEVANCE_COLS', () => {
   test('has all 12 columns', () => {
@@ -87,13 +80,12 @@ describe('PORTAL_MEGA_SURVEY_COLS', () => {
 // ============================================================================
 
 describe('PORTAL_SHEET_NAMES_', () => {
-  test('has all 8 sheet names', () => {
-    expect(Object.keys(PORTAL_SHEET_NAMES_).length).toBe(8);
+  test('has all 6 sheet names', () => {
+    expect(Object.keys(PORTAL_SHEET_NAMES_).length).toBe(6);
     expect(PORTAL_SHEET_NAMES_).toHaveProperty('MEMBER_DIR');
     expect(PORTAL_SHEET_NAMES_).toHaveProperty('EVENTS');
     expect(PORTAL_SHEET_NAMES_).toHaveProperty('MINUTES');
-    expect(PORTAL_SHEET_NAMES_).toHaveProperty('POLLS');
-    expect(PORTAL_SHEET_NAMES_).toHaveProperty('POLL_RESPONSES');
+    // POLLS / POLL_RESPONSES removed v4.24.0
     expect(PORTAL_SHEET_NAMES_).toHaveProperty('GRIEVANCES');
     expect(PORTAL_SHEET_NAMES_).toHaveProperty('STEWARD_LOG');
     expect(PORTAL_SHEET_NAMES_).toHaveProperty('MEGA_SURVEY');
@@ -169,19 +161,7 @@ describe('getOrCreateMinutesSheet', () => {
   });
 });
 
-describe('getOrCreatePollsSheet', () => {
-  test('creates FlashPolls sheet', () => {
-    getOrCreatePollsSheet();
-    expect(mockSs.insertSheet).toHaveBeenCalled();
-  });
-});
-
-describe('getOrCreatePollResponsesSheet', () => {
-  test('creates hidden PollResponses sheet', () => {
-    getOrCreatePollResponsesSheet();
-    expect(mockSs.insertSheet).toHaveBeenCalled();
-  });
-});
+// getOrCreatePollsSheet / getOrCreatePollResponsesSheet removed v4.24.0
 
 describe('getOrCreatePortalGrievanceSheet', () => {
   test('creates hidden PortalGrievances sheet', () => {

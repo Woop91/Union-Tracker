@@ -86,12 +86,12 @@ describe('MEMBER_COLS ↔ MEMBER_COLUMNS (1-indexed vs 0-indexed)', () => {
     expect(MEMBER_COLUMNS.MEMBER_ID).toBe(0);
   });
 
-  test('MEMBER_COLS.PIN_HASH is 33', () => {
-    expect(MEMBER_COLS.PIN_HASH).toBe(33);
+  test('MEMBER_COLS.PIN_HASH is 34', () => {
+    expect(MEMBER_COLS.PIN_HASH).toBe(34);
   });
 
-  test('MEMBER_COLUMNS.PIN_HASH is 32', () => {
-    expect(MEMBER_COLUMNS.PIN_HASH).toBe(32);
+  test('MEMBER_COLUMNS.PIN_HASH is 33', () => {
+    expect(MEMBER_COLUMNS.PIN_HASH).toBe(33);
   });
 });
 

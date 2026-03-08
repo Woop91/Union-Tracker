@@ -1536,69 +1536,36 @@ function getInteractiveAnalyticsData() {
     }
   }
 
-  // Get Survey Results from Member Satisfaction sheet
+  // Get Survey Results from Member Satisfaction sheet (v4.23.0: dynamic col map)
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (satSheet && satSheet.getLastRow() > 1) {
     try {
-      var satLastRow = satSheet.getLastRow();
+      var satLastRow   = satSheet.getLastRow();
       var numResponses = satLastRow - 1;
       data.surveyResults.totalResponses = numResponses;
 
-      // Calculate response rate (responses / total members)
       if (data.memberStats.total > 0) {
         data.surveyResults.responseRate = Math.round((numResponses / data.memberStats.total) * 100);
       }
 
       if (numResponses > 0) {
-        // Get satisfaction scores (Q6-Q9: columns G-J, indices 6-9)
-        var satScores = satSheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numResponses, 4).getValues();
-        var totalSat = 0;
-        var validSatCount = 0;
-        satScores.forEach(function(row) {
-          for (var i = 0; i < 4; i++) {
-            var val = parseFloat(row[i]);
-            if (!isNaN(val) && val > 0) {
-              totalSat += val;
-              validSatCount++;
+        // Use getSatisfactionSummary() for section averages — already dynamic
+        var summary = getSatisfactionSummary();
+        if (summary && summary.sections) {
+          var overallSection = summary.sections['OVERALL_SAT'];
+          if (overallSection && overallSection.avg !== null) {
+            data.surveyResults.avgSatisfaction = overallSection.avg.toFixed(1);
+          }
+          var sectionOrder = ['OVERALL_SAT','STEWARD_3A','CHAPTER','LEADERSHIP','CONTRACT','COMMUNICATION','MEMBER_VOICE','VALUE_ACTION'];
+          sectionOrder.forEach(function(key) {
+            var sec = summary.sections[key];
+            if (sec) {
+              data.surveyResults.bySection.push({ name: sec.name, avg: sec.avg !== null ? parseFloat(sec.avg) : 0 });
             }
-          }
-        });
-        data.surveyResults.avgSatisfaction = validSatCount > 0 ? (totalSat / validSatCount).toFixed(1) : 0;
-
-        // Get section averages
-        var sections = [
-          { name: 'Overall Satisfaction', startCol: SATISFACTION_COLS.Q6_SATISFIED_REP, numCols: 4 },
-          { name: 'Steward Ratings', startCol: SATISFACTION_COLS.Q10_TIMELY_RESPONSE, numCols: 7 },
-          { name: 'Chapter Effectiveness', startCol: SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES, numCols: 5 },
-          { name: 'Local Leadership', startCol: SATISFACTION_COLS.Q26_DECISIONS_CLEAR, numCols: 6 },
-          { name: 'Contract Enforcement', startCol: SATISFACTION_COLS.Q32_ENFORCES_CONTRACT, numCols: 4 },
-          { name: 'Communication', startCol: SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE, numCols: 5 },
-          { name: 'Member Voice', startCol: SATISFACTION_COLS.Q46_VOICE_MATTERS, numCols: 5 },
-          { name: 'Value & Action', startCol: SATISFACTION_COLS.Q51_GOOD_VALUE, numCols: 5 }
-        ];
-
-        sections.forEach(function(section) {
-          try {
-            var sectionData = satSheet.getRange(2, section.startCol, numResponses, section.numCols).getValues();
-            var sectionTotal = 0;
-            var sectionValidCount = 0;
-            sectionData.forEach(function(row) {
-              for (var i = 0; i < section.numCols; i++) {
-                var val = parseFloat(row[i]);
-                if (!isNaN(val) && val > 0) {
-                  sectionTotal += val;
-                  sectionValidCount++;
-                }
-              }
-            });
-            var sectionAvg = sectionValidCount > 0 ? (sectionTotal / sectionValidCount).toFixed(1) : 0;
-            data.surveyResults.bySection.push({ name: section.name, avg: parseFloat(sectionAvg) });
-          } catch (_e) {
-            data.surveyResults.bySection.push({ name: section.name, avg: 0 });
-          }
-        });
+          });
+        }
       }
-    } catch (e) {
+    } catch(e) {
       Logger.log('Error reading satisfaction data: ' + e.message);
     }
   }
@@ -1624,10 +1591,10 @@ function getInteractiveResourceLinks() {
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
       // Get URLs from Config sheet row 3 (data row; rows 1-2 are headers)
-      var row = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      // satisfactionForm removed v4.22.7 — survey is native webapp
+      var row = configSheet.getRange(3, 1, 1, CONFIG_COLS.ORG_WEBSITE).getValues()[0];
       links.grievanceForm = row[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
       links.contactForm = row[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
-      links.satisfactionForm = row[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
       links.orgWebsite = row[CONFIG_COLS.ORG_WEBSITE - 1] || '';
     } catch (e) {
       Logger.log('Error getting resource links: ' + e.message);

@@ -2113,7 +2113,8 @@ function seedNotificationsData() {
       fmt(threeDaysAgo),
       fmt(inOneMonth),
       '',
-      'Active'
+      'Active',
+      'Dismissible'
     ],
     [
       'NOTIF-' + String(nextId++).padStart(3, '0'),
@@ -2127,7 +2128,8 @@ function seedNotificationsData() {
       today,
       fmt(inOneWeek),
       '',
-      'Active'
+      'Active',
+      'Timed'
     ],
     [
       'NOTIF-' + String(nextId++).padStart(3, '0'),
@@ -2141,7 +2143,8 @@ function seedNotificationsData() {
       today,
       fmt(inOneMonth),
       '',
-      'Active'
+      'Active',
+      'Dismissible'
     ],
     [
       'NOTIF-' + String(nextId++).padStart(3, '0'),
@@ -2155,7 +2158,8 @@ function seedNotificationsData() {
       today,
       fmt(inTwoWeeks),
       '',
-      'Active'
+      'Active',
+      'Dismissible'
     ]
   ];
 

@@ -48,6 +48,7 @@ var DataService = (function () {
     memberSupervisor: ['supervisor'],
     memberJobTitle:  ['job title', 'title', 'position'],
     memberAdminFolderUrl: ['member admin folder url', 'member admin folder', 'contact log folder url'],  // 'contact log folder url' retained as fallback alias for backward compat
+    memberSharePhone:    ['share phone', 'share phone number', 'phone visible', 'public phone', 'share contact'],
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -396,6 +397,7 @@ var DataService = (function () {
       zip:          HEADERS.memberZip,
       workLocation: HEADERS.memberWorkLocation,
       officeDays:   HEADERS.memberOfficeDays,
+      sharePhone:   HEADERS.memberSharePhone,   // steward opt-in: phone visible to members
     };
 
     for (var i = 1; i < data.length; i++) {
@@ -794,11 +796,11 @@ var DataService = (function () {
       return {
         calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
         driveFolderUrl: getOrCreateSheetFolder_(),
-        surveyFormUrl: config.satisfactionFormUrl || '',
+        // surveyFormUrl removed v4.22.7 — survey is native webapp
         orgWebsite: config.orgWebsite || '',
       };
     } catch (_e) {
-      return { calendarUrl: '', driveFolderUrl: '', surveyFormUrl: '', orgWebsite: '' };
+      return { calendarUrl: '', driveFolderUrl: '', orgWebsite: '' };
     }
   }
 
@@ -1230,6 +1232,14 @@ var DataService = (function () {
       supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
       memberAdminFolderUrl: String(_getVal(row, colMap, HEADERS.memberAdminFolderUrl, '')).trim(),
+      sharePhone: (function() {
+        var raw = _getVal(row, colMap, HEADERS.memberSharePhone, null);
+        // Column absent → treat as false (opt-in required)
+        if (raw === null || raw === '') return false;
+        if (typeof raw === 'boolean') return raw;
+        var s = String(raw).trim().toLowerCase();
+        return s === 'yes' || s === 'true' || s === '1';
+      })(),
     };
   }
 
@@ -1832,7 +1842,7 @@ var DataService = (function () {
   // PUBLIC: Steward Directory (v4.12.0)
   // ═══════════════════════════════════════
 
-  function getStewardDirectory() {
+  function getStewardDirectory(callerIsSteward) {
     var cached = _getCachedSheetData(MEMBER_SHEET);
     if (!cached) return [];
     var data = cached.data;
@@ -1841,12 +1851,14 @@ var DataService = (function () {
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
       if (!rec.isSteward) continue;
+      // Phone: stewards always see it; members only see it if the steward opted in
+      var phoneToReturn = (callerIsSteward || rec.sharePhone) ? rec.phone : null;
       stewards.push({
         name: rec.name,
         email: rec.email,
         workLocation: rec.workLocation,
         officeDays: rec.officeDays,
-        phone: rec.phone,
+        phone: phoneToReturn,
         unit: rec.unit,
       });
     }
@@ -2171,6 +2183,19 @@ var DataService = (function () {
       }
     } catch (_e) { /* non-fatal */ }
 
+    var qaUnansweredCount = 0;
+    try {
+      if (typeof QAForum !== 'undefined') {
+        var qaResult = QAForum.getQuestions(email, 1, 999, 'recent');
+        if (qaResult && qaResult.questions) {
+          for (var q = 0; q < qaResult.questions.length; q++) {
+            var qq = qaResult.questions[q];
+            if (qq.answerCount === 0 && qq.status !== 'resolved' && qq.status !== 'deleted') qaUnansweredCount++;
+          }
+        }
+      }
+    } catch (_e) { /* non-fatal */ }
+
     return {
       cases: cases,
       kpis: kpis,
@@ -2178,6 +2203,7 @@ var DataService = (function () {
       taskCount: taskCount,
       overdueTaskCount: overdueTaskCount,
       notificationCount: notifCount,
+      qaUnansweredCount: qaUnansweredCount,
     };
   }
 
@@ -2231,107 +2257,10 @@ var DataService = (function () {
   }
 
   // ═══════════════════════════════════════
-  // PUBLIC: Polls (v4.16.0)
+  // NOTE v4.24.0: Legacy FlashPolls functions (getActivePolls, submitPollVote, addPoll)
+  // removed here. All poll functionality is now in 24_WeeklyQuestions.gs via wq* wrappers.
+  // FlashPolls/PollResponses sheets also removed from 23_PortalSheets.gs.
   // ═══════════════════════════════════════
-
-  /**
-   * Returns active polls with vote status for the user.
-   * @param {string} email
-   * @returns {Object[]}
-   */
-  function getActivePolls(email) {
-    try {
-    email = email ? String(email).trim().toLowerCase() : '';
-
-    var pollSheet = (typeof getOrCreatePollsSheet === 'function') ? getOrCreatePollsSheet() : null;
-    if (!pollSheet || pollSheet.getLastRow() <= 1) return [];
-
-    var respSheet = (typeof getOrCreatePollResponsesSheet === 'function') ? getOrCreatePollResponsesSheet() : null;
-
-    // Build response index
-    var myVotes = {};
-    var voteCounts = {};
-    if (respSheet && respSheet.getLastRow() > 1) {
-      var respData = respSheet.getDataRange().getValues();
-      for (var r = 1; r < respData.length; r++) {
-        var pollId = String(respData[r][PORTAL_POLL_RESPONSE_COLS.POLL_ID]);
-        var voter = String(respData[r][PORTAL_POLL_RESPONSE_COLS.EMAIL]).trim().toLowerCase();
-        var resp = String(respData[r][PORTAL_POLL_RESPONSE_COLS.RESPONSE]);
-
-        if (!voteCounts[pollId]) voteCounts[pollId] = {};
-        voteCounts[pollId][resp] = (voteCounts[pollId][resp] || 0) + 1;
-
-        if (voter === email) myVotes[pollId] = resp;
-      }
-    }
-
-    var pollData = pollSheet.getDataRange().getValues();
-    var polls = [];
-    for (var i = 1; i < pollData.length; i++) {
-      var active = String(pollData[i][PORTAL_POLL_COLS.ACTIVE]).trim().toLowerCase();
-      if (active !== 'true' && active !== 'yes') continue;
-
-      var id = String(pollData[i][PORTAL_POLL_COLS.ID]);
-      var optionsRaw = String(pollData[i][PORTAL_POLL_COLS.OPTIONS] || '');
-      var options = optionsRaw.split(',').map(function(o) { return o.trim(); }).filter(function(o) { return o; });
-
-      var results = {};
-      var totalVotes = 0;
-      options.forEach(function(o) {
-        var c = (voteCounts[id] && voteCounts[id][o]) || 0;
-        results[o] = c;
-        totalVotes += c;
-      });
-
-      polls.push({
-        id: id,
-        question: String(pollData[i][PORTAL_POLL_COLS.QUESTION] || ''),
-        options: options,
-        hasVoted: myVotes.hasOwnProperty(id),
-        myVote: myVotes[id] || null,
-        results: results,
-        totalVotes: totalVotes,
-        unit: String(pollData[i][PORTAL_POLL_COLS.UNIT] || ''),
-      });
-    }
-    return polls;
-    } catch (e) {
-      Logger.log('getActivePolls error: ' + e.message + '\n' + (e.stack || ''));
-      return [];
-    }
-  }
-
-  /**
-   * Submits a poll vote, guarding against double-voting.
-   * @param {string} email
-   * @param {string} pollId
-   * @param {string} response
-   * @returns {Object}
-   */
-  function submitPollVote(email, pollId, response) {
-    if (!email || !pollId || !response) return { success: false, message: 'Missing fields.' };
-    email = String(email).trim().toLowerCase();
-
-    var respSheet = (typeof getOrCreatePollResponsesSheet === 'function') ? getOrCreatePollResponsesSheet() : null;
-    if (!respSheet) return { success: false, message: 'Poll system unavailable.' };
-
-    // Check for existing vote
-    if (respSheet.getLastRow() > 1) {
-      var data = respSheet.getDataRange().getValues();
-      for (var i = 1; i < data.length; i++) {
-        if (String(data[i][PORTAL_POLL_RESPONSE_COLS.POLL_ID]) === pollId &&
-            String(data[i][PORTAL_POLL_RESPONSE_COLS.EMAIL]).trim().toLowerCase() === email) {
-          return { success: false, message: 'Already voted on this poll.' };
-        }
-      }
-    }
-
-    respSheet.appendRow([pollId, email, response, new Date()]);
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('POLL_VOTE', { email: email, pollId: pollId });
-    }
-    return { success: true, message: 'Vote recorded.' };
-  }
 
   // ═══════════════════════════════════════
   // PUBLIC: Meeting Minutes (v4.16.0)
@@ -2469,27 +2398,7 @@ var DataService = (function () {
     return { success: true, message: 'Minutes added.' + (driveDocUrl ? ' Google Doc saved.' : ''), id: id, driveDocUrl: driveDocUrl };
   }
 
-  /**
-   * Creates a new poll (steward-only).
-   * @param {string} stewardEmail
-   * @param {string} question
-   * @param {string} options - comma-separated
-   * @param {string} unit - target unit or empty for all
-   * @returns {Object}
-   */
-  function addPoll(stewardEmail, question, options, unit) {
-    if (!stewardEmail || !question || !options) return { success: false, message: 'Missing fields.' };
-    var sheet = (typeof getOrCreatePollsSheet === 'function') ? getOrCreatePollsSheet() : null;
-    if (!sheet) return { success: false, message: 'Polls sheet unavailable.' };
-
-    var id = 'POLL_' + Date.now().toString(36);
-    sheet.appendRow([id, question.substring(0, 500), options.substring(0, 500), 'true', (unit || '').substring(0, 100), String(stewardEmail).trim().toLowerCase(), new Date()]);
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('POLL_CREATED', { steward: stewardEmail, question: question.substring(0, 100) });
-    }
-    return { success: true, message: 'Poll created.', id: id };
-  }
+  // addPoll removed v4.24.0 — was FlashPolls-based. Use wqSetStewardQuestion() instead.
 
   // ═══════════════════════════════════════
   // Steward Performance (v4.18.0)
@@ -2773,51 +2682,50 @@ var DataService = (function () {
    * Returns satisfaction survey trend data (aggregated averages).
    * @returns {Object} { overallSat, stewardRating, stewardAccess, chapter, leadership, contract, representation, communication, memberVoice, valueAction }
    */
+  /**
+   * Returns satisfaction trends for the Insights page.
+   * v4.23.1: Fully rewritten — uses getSatisfactionSummary() (dynamic col map,
+   * section-key grouping). Returns the shape steward_view.html expects:
+   *   { overall, responseCount, categories: [{ name, avg }] }
+   *
+   * Replaces the old positional SATISFACTION_COLS reads, which broke when the
+   * v4.23.0 dynamic schema removed fixed column positions.
+   */
   function getSatisfactionTrends() {
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      if (!ss) return {};
-      var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
-      if (!sheet || sheet.getLastRow() <= 1) return {};
+      var summary = getSatisfactionSummary();
+      if (!summary || !summary.sections) return { overall: 0, responseCount: 0, categories: [] };
 
-      var data = sheet.getDataRange().getValues();
-      // Read from summary area if available (pre-computed by sheet formulas)
-      if (data.length > 1 && data[1][SATISFACTION_COLS.AVG_OVERALL_SAT - 1]) {
-        return {
-          overallSat: Number(data[1][SATISFACTION_COLS.AVG_OVERALL_SAT - 1]) || 0,
-          stewardRating: Number(data[1][SATISFACTION_COLS.AVG_STEWARD_RATING - 1]) || 0,
-          stewardAccess: Number(data[1][SATISFACTION_COLS.AVG_STEWARD_ACCESS - 1]) || 0,
-          chapter: Number(data[1][SATISFACTION_COLS.AVG_CHAPTER - 1]) || 0,
-          leadership: Number(data[1][SATISFACTION_COLS.AVG_LEADERSHIP - 1]) || 0,
-          contract: Number(data[1][SATISFACTION_COLS.AVG_CONTRACT - 1]) || 0,
-          representation: Number(data[1][SATISFACTION_COLS.AVG_REPRESENTATION - 1]) || 0,
-          communication: Number(data[1][SATISFACTION_COLS.AVG_COMMUNICATION - 1]) || 0,
-          memberVoice: Number(data[1][SATISFACTION_COLS.AVG_MEMBER_VOICE - 1]) || 0,
-          valueAction: Number(data[1][SATISFACTION_COLS.AVG_VALUE_ACTION - 1]) || 0,
-        };
+      var secs = summary.sections;
+
+      // Overall = OVERALL_SAT section average
+      var overall = 0;
+      if (secs['OVERALL_SAT'] && secs['OVERALL_SAT'].avg !== null) {
+        overall = secs['OVERALL_SAT'].avg;
       }
 
-      // Fallback: compute from individual responses (Q6-Q16 = satisfaction questions)
-      var sums = { sat: 0, steward: 0, access: 0 };
-      var count = 0;
-      for (var i = 1; i < data.length; i++) {
-        var sat = Number(data[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
-        if (!sat) continue;
-        count++;
-        sums.sat += sat;
-        sums.steward += Number(data[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
-        sums.access += Number(data[i][SATISFACTION_COLS.Q18_KNOW_CONTACT - 1]) || 0;
-      }
-      if (count === 0) return {};
+      // Categories in display order — skip sections with no data
+      var ORDER = [
+        'OVERALL_SAT', 'STEWARD_3A', 'STEWARD_3B', 'CHAPTER',
+        'LEADERSHIP', 'CONTRACT', 'REPRESENTATION',
+        'COMMUNICATION', 'MEMBER_VOICE', 'VALUE_ACTION', 'SCHEDULING'
+      ];
+      var categories = [];
+      ORDER.forEach(function(key) {
+        var s = secs[key];
+        if (s && s.avg !== null && s.count > 0) {
+          categories.push({ name: s.name, avg: s.avg });
+        }
+      });
+
       return {
-        overallSat: Math.round((sums.sat / count) * 10) / 10,
-        stewardRating: Math.round((sums.steward / count) * 10) / 10,
-        stewardAccess: Math.round((sums.access / count) * 10) / 10,
-        responseCount: count,
+        overall:       Math.round(overall * 10) / 10,
+        responseCount: summary.responseCount || 0,
+        categories:    categories
       };
     } catch (_e) {
       Logger.log('getSatisfactionTrends error: ' + _e.message);
-      return {};
+      return { overall: 0, responseCount: 0, categories: [] };
     }
   }
 
@@ -2843,7 +2751,7 @@ var DataService = (function () {
         new Date(),
         email,
         String(feedbackData.category || 'General').substring(0, 100),
-        String(feedbackData.type || 'Suggestion').substring(0, 50),
+        // TYPE column removed v4.24.1 — Category covers same ground
         String(feedbackData.priority || 'Medium').substring(0, 20),
         String(feedbackData.title).substring(0, 200),
         String(feedbackData.description || '').substring(0, 2000),
@@ -2913,14 +2821,12 @@ var DataService = (function () {
     createMemberTask: createMemberTask,
     getMemberTasks: getMemberTasks,
     completeMemberTask: completeMemberTask,
+    stewardCompleteMemberTask: stewardCompleteMemberTask,
     getStewardAssignedMemberTasks: getStewardAssignedMemberTasks,
-    // v4.17.0 - Feedback, Polls, Minutes
+    // v4.17.0 - Feedback, Minutes (Polls removed v4.24.0 — use wq* wrappers)
     getMyFeedback: getMyFeedback,
-    getActivePolls: getActivePolls,
-    submitPollVote: submitPollVote,
     getMeetingMinutes: getMeetingMinutes,
     addMeetingMinutes: addMeetingMinutes,
-    addPoll: addPoll,
     // v4.18.0 - Performance, Checklists, Meetings, Satisfaction, Feedback
     getStewardPerformance: getStewardPerformance,
     getAllStewardPerformance: getAllStewardPerformance,
@@ -2948,23 +2854,40 @@ var DataService = (function () {
  * @returns {string} The authenticated caller's email, or empty string if unavailable.
  * @private
  */
-function _resolveCallerEmail() {
+/**
+ * Resolves the caller's verified email.
+ * Priority: (1) Session.getActiveUser() — works for Google SSO
+ *           (2) sessionToken parameter — works for magic link / session token auth
+ *
+ * In "Execute as: Me" deployments, getActiveUser() returns empty for non-SSO
+ * users. Pass the client's SESSION_TOKEN to cover that case.
+ *
+ * @param {string=} sessionToken - Optional client-supplied session token (from PAGE_DATA.sessionToken)
+ * @returns {string} verified email or empty string
+ * @private
+ */
+function _resolveCallerEmail(sessionToken) {
   try {
     var email = Session.getActiveUser().getEmail();
-    return email ? email.toLowerCase().trim() : '';
-  } catch (_e) {
-    return '';
+    if (email) return email.toLowerCase().trim();
+  } catch (_e) { /* SSO not available */ }
+  // Fallback: verify session token server-side — never trust plain email from client
+  if (sessionToken && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
+    var tokenEmail = Auth.resolveEmailFromToken(sessionToken);
+    if (tokenEmail) return tokenEmail.toLowerCase().trim();
   }
+  return '';
 }
 
 /**
  * Resolves the caller's email and verifies steward role.
  * Use for all steward-only operations.
+ * @param {string=} sessionToken - Optional session token for non-SSO auth
  * @returns {string|null} Steward's email if authorized, null otherwise.
  * @private
  */
-function _requireStewardAuth() {
-  var auth = checkWebAppAuthorization('steward');
+function _requireStewardAuth(sessionToken) {
+  var auth = checkWebAppAuthorization('steward', sessionToken);
   if (!auth.isAuthorized) return null;
   return (auth.email || '').toLowerCase().trim();
 }
@@ -2973,20 +2896,20 @@ function _requireStewardAuth() {
 // AUTHENTICATED DATA SERVICE WRAPPERS
 // ═══════════════════════════════════════
 // Security model (CR-AUTH-3):
-//   - Steward ops: _requireStewardAuth() verifies steward role, uses server email
-//   - Member self-service: _resolveCallerEmail() provides server-verified identity
+//   - Steward ops: _requireStewardAuth(sessionToken) verifies steward role, uses server email
+//   - Member self-service: _resolveCallerEmail(sessionToken) provides server-verified identity
 //   - Public reads: no auth required (aggregate/non-PII data only)
 
-function dataGetStewardCases() { var s = _requireStewardAuth(); return s ? DataService.getStewardCases(s) : []; }
-function dataGetStewardKPIs() { var s = _requireStewardAuth(); return s ? DataService.getStewardKPIs(s) : {}; }
-function dataGetMemberGrievances() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievances(e) : []; }
-function dataGetMemberGrievanceHistory() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievanceHistory(e) : { success: false, message: 'Not authenticated.' }; }
-function dataGetStewardContact() { var e = _resolveCallerEmail(); return e ? DataService.getStewardContact(e) : null; }
+function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardCases(s) : []; }
+function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardKPIs(s) : {}; }
+function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberGrievances(e) : []; }
+function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberGrievanceHistory(e) : { success: false, message: 'Not authenticated.' }; }
+function dataGetStewardContact(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getStewardContact(e) : null; }
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 // Steward: view any member's full profile; Member: view own profile only
 function dataGetFullProfile(email) {
-  var caller = _resolveCallerEmail();
+  var caller = _resolveCallerEmail(sessionToken);
   if (!caller) return { success: false, message: 'Not authenticated.' };
   var isSteward = checkWebAppAuthorization('steward').isAuthorized;
   // Members may only fetch their own profile
@@ -2995,8 +2918,8 @@ function dataGetFullProfile(email) {
 }
 // Member self-service: update own safe fields (address, workLocation, officeDays only)
 // Stewards can also update member profiles; both paths use updateMemberProfile's field allowlist
-function dataUpdateProfile(ignoredEmail, updates) {
-  var e = _resolveCallerEmail();
+function dataUpdateProfile(sessionToken, updates) {
+  var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
   var isSteward = checkWebAppAuthorization('steward').isAuthorized;
   // Members can only update their own record; stewards can pass a target email via updates._targetEmail
@@ -3004,27 +2927,27 @@ function dataUpdateProfile(ignoredEmail, updates) {
   if (updates && updates._targetEmail) delete updates._targetEmail; // strip internal routing field
   return DataService.updateMemberProfile(targetEmail, updates);
 }
-function dataGetAssignedSteward() { var e = _resolveCallerEmail(); return e ? DataService.getAssignedStewardInfo(e) : null; }
-function dataGetAvailableStewards() { var e = _resolveCallerEmail(); return e ? DataService.getAvailableStewards(e) : []; }
-function dataAssignSteward(memberEmail, stewardEmail) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.assignStewardToMember(memberEmail, stewardEmail); }
-function dataStartGrievanceDraft(ignoredEmail, data) { var e = _resolveCallerEmail(); return e ? DataService.startGrievanceDraft(e, data) : { success: false, message: 'Not authenticated.' }; }
-function dataCreateGrievanceDrive() { var e = _resolveCallerEmail(); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
-function dataGetSurveyStatus() { var e = _resolveCallerEmail(); return e ? DataService.getMemberSurveyStatus(e) : null; }
-function dataGetAllMembers() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllMembers(); }
-function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
-function dataSendBroadcast(ignoredEmail, filter, msg, subject) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg, subject); }
-function dataGetSurveyResults() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getSurveyResults(); }
+function dataGetAssignedSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getAssignedStewardInfo(e) : null; }
+function dataGetAvailableStewards(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getAvailableStewards(e) : []; }
+function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.assignStewardToMember(memberEmail, stewardEmail); }
+function dataStartGrievanceDraft(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.startGrievanceDraft(e, data) : { success: false, message: 'Not authenticated.' }; }
+function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
+function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberSurveyStatus(e) : null; }
+function dataGetAllMembers(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getAllMembers(); }
+function dataGetStewardSurveyTracking(sessionToken, scope) { var s = _requireStewardAuth(sessionToken); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
+function dataSendBroadcast(sessionToken, filter, msg, subject) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg, subject); }
+function dataGetSurveyResults(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getSurveyResults(); }
 // v4.21.0 — Native survey engine wrappers
-function dataGetSurveyQuestions() { var e = _resolveCallerEmail(); return e ? getSurveyQuestions() : []; }
-function dataSubmitSurveyResponse(ignoredEmail, responses) { var e = _resolveCallerEmail(); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
+function dataGetSurveyQuestions(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? getSurveyQuestions() : []; }
+function dataSubmitSurveyResponse(sessionToken, responses) { var e = _resolveCallerEmail(sessionToken); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
 // dataGetPendingSurveyMembers, dataGetSatisfactionSummary, dataOpenNewSurveyPeriod are in 08e_SurveyEngine.gs
-function dataLogMemberContact(ignoredStewardEmail, memberEmail, type, notes, duration) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.logMemberContact(s, memberEmail, type, notes, duration); }
-function dataGetMemberContactHistory(ignoredStewardEmail, memberEmail) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getMemberContactHistory(s, memberEmail); }
-function dataGetStewardContactLog() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardContactLog(s); }
+function dataLogMemberContact(sessionToken, memberEmail, type, notes, duration) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.logMemberContact(s, memberEmail, type, notes, duration); }
+function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getMemberContactHistory(s, memberEmail); }
+function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getStewardContactLog(s); }
 
 // Send a direct email notification to a single member (steward-only)
-function dataSendDirectMessage(ignoredEmail, memberEmail, subject, body) {
-  var s = _requireStewardAuth();
+function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
+  var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, message: 'Steward access required.' };
   if (!memberEmail || !subject || !body) return { success: false, message: 'Missing required fields.' };
   try {
@@ -3061,8 +2984,8 @@ function dataSendDirectMessage(ignoredEmail, memberEmail, subject, body) {
 }
 
 // Returns the Drive folder URL for a member's active (non-resolved) grievance (steward-only)
-function dataGetMemberCaseFolderUrl(ignoredEmail, memberEmail) {
-  var s = _requireStewardAuth();
+function dataGetMemberCaseFolderUrl(sessionToken, memberEmail) {
+  var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, url: null, message: 'Steward access required.' };
   if (!memberEmail) return { success: false, url: null, message: 'Member email required.' };
   try {
@@ -3080,49 +3003,60 @@ function dataGetMemberCaseFolderUrl(ignoredEmail, memberEmail) {
     return { success: false, url: null, message: 'Error fetching case folder.' };
   }
 }
-function dataCreateTask(ignoredStewardEmail, title, desc, memberEmail, priority, dueDate, assignToEmail) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assignToEmail || ''); }
-function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, desc, memberEmail, priority, dueDate) {
-  var s = _requireStewardAuth();
+function dataCreateTask(sessionToken, title, desc, memberEmail, priority, dueDate, assignToEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assignToEmail || ''); }
+function dataCreateTaskForSteward(sessionToken, assigneeEmail, title, desc, memberEmail, priority, dueDate) {
+  var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, message: 'Steward access required.' };
   if (!DataService.isChiefSteward(s)) return { success: false, message: 'Not authorized.' };
   return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assigneeEmail);
 }
-function dataGetTasks(ignoredStewardEmail, statusFilter) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getTasks(s, statusFilter); }
-function dataCompleteTask(ignoredStewardEmail, taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
-function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
-function dataGetStewardDirectory() { var e = _resolveCallerEmail(); if (!e) return []; try { return DataService.getStewardDirectory(); } catch (err) { Logger.log('dataGetStewardDirectory error: ' + err.message + '\n' + (err.stack || '')); return []; } }
-function dataGetGrievanceStats() { var s = _requireStewardAuth(); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
-function dataGetGrievanceHotSpots() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getGrievanceHotSpots(); }
-function dataGetMembershipStats() { var e = _resolveCallerEmail(); return e ? DataService.getMembershipStats() : null; }
-function dataGetUpcomingEvents(limit) { var e = _resolveCallerEmail(); return e ? DataService.getUpcomingEvents(limit) : []; }
+function dataGetTasks(sessionToken, statusFilter) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getTasks(s, statusFilter); }
+function dataCompleteTask(sessionToken, taskId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
+function dataGetStewardMemberStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
+function dataGetStewardDirectory(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return [];
+  try {
+    var callerRec = DataService.findUserByEmail(e);
+    var callerIsSteward = callerRec && (callerRec.isSteward === true);
+    return DataService.getStewardDirectory(callerIsSteward);
+  } catch (err) {
+    Logger.log('dataGetStewardDirectory error: ' + err.message + '\n' + (err.stack || ''));
+    return [];
+  }
+}
+function dataGetGrievanceStats(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
+function dataGetGrievanceHotSpots(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getGrievanceHotSpots(); }
+function dataGetMembershipStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMembershipStats() : null; }
+function dataGetUpcomingEvents(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getUpcomingEvents(limit) : []; }
 // dataGetSurveyQuestions and dataSubmitSurveyResponse are defined in the v4.21.0 block above (single canonical definition)
-function dataIsChiefSteward() { var e = _resolveCallerEmail(); return e ? DataService.isChiefSteward(e) : false; }
+function dataIsChiefSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.isChiefSteward(e) : false; }
 // dataGetAgencyGrievanceStats — alias removed; frontend uses dataGetGrievanceStats directly
 
 // v4.17.0 — member task assignment wrappers (CR-AUTH-3: server-side identity)
-function dataCreateMemberTask(ignoredStewardEmail, memberEmail, title, desc, priority, dueDate) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createMemberTask(s, memberEmail, title, desc, priority, dueDate); }
-function dataGetMemberTasks(ignoredEmail, statusFilter) { var e = _resolveCallerEmail(); return e ? DataService.getMemberTasks(e, statusFilter) : []; }
-function dataCompleteMemberTask(ignoredEmail, taskId) { var e = _resolveCallerEmail(); return e ? DataService.completeMemberTask(e, taskId) : { success: false, message: 'Not authenticated.' }; }
-function dataGetStewardAssignedMemberTasks() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardAssignedMemberTasks(s); }
+function dataCreateMemberTask(sessionToken, memberEmail, title, desc, priority, dueDate) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createMemberTask(s, memberEmail, title, desc, priority, dueDate); }
+function dataGetMemberTasks(sessionToken, statusFilter) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberTasks(e, statusFilter) : []; }
+function dataCompleteMemberTask(sessionToken, taskId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.completeMemberTask(e, taskId) : { success: false, message: 'Not authenticated.' }; }
+function dataGetStewardAssignedMemberTasks(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getStewardAssignedMemberTasks(s); }
 // BUG-TASKS-03: steward completing a member task on the member's behalf
-function dataStaffCompleteMemberTask(taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.stewardCompleteMemberTask(s, taskId); }
+function dataStaffCompleteMemberTask(sessionToken, taskId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.stewardCompleteMemberTask(s, taskId); }
 
 // v4.16.0 — unwired sheet wrappers (CR-AUTH-3: server-side identity + role checks)
-function dataUpdateTask(ignoredEmail, taskId, updates) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.updateTask(s, taskId, updates); }
-function dataGetAllStewardPerformance() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllStewardPerformance(); }
-function dataGetCaseChecklist(caseId) { var e = _resolveCallerEmail(); return e ? DataService.getCaseChecklist(caseId) : []; }
-function dataToggleChecklistItem(checklistId, completed) { var e = _resolveCallerEmail(); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }
-function dataGetMemberMeetings() { var e = _resolveCallerEmail(); return e ? DataService.getMemberMeetings(e) : []; }
-function dataGetSatisfactionTrends() { var s = _requireStewardAuth(); if (!s) return { categories: [] }; return DataService.getSatisfactionTrends(); }
-function dataSubmitFeedback(ignoredEmail, data) { var e = _resolveCallerEmail(); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
-function dataGetMyFeedback() { var e = _resolveCallerEmail(); return e ? DataService.getMyFeedback(e) : []; }
+function dataUpdateTask(sessionToken, taskId, updates) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.updateTask(s, taskId, updates); }
+function dataGetAllStewardPerformance(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getAllStewardPerformance(); }
+function dataGetCaseChecklist(sessionToken, caseId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getCaseChecklist(caseId) : []; }
+function dataToggleChecklistItem(sessionToken, checklistId, completed) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }
+function dataGetMemberMeetings(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberMeetings(e) : []; }
+function dataGetSatisfactionTrends(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { categories: [] }; return DataService.getSatisfactionTrends(); }
+function dataSubmitFeedback(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
+function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMyFeedback(e) : []; }
 // v4.23.0: Portal Polls system deprecated — replaced by unified wq* poll system (24_WeeklyQuestions.gs)
 // These stubs kept so any stale clients that call them get a graceful empty response
 function dataGetActivePolls() { return []; }
 function dataSubmitPollVote() { return { success: false, message: 'Polls system updated — please refresh.' }; }
 function dataAddPoll() { return { success: false, message: 'Polls system updated — please refresh.' }; }
-function dataGetMeetingMinutes(limit) { var e = _resolveCallerEmail(); return e ? DataService.getMeetingMinutes(limit) : []; }
-function dataAddMeetingMinutes(ignoredStewardEmail, data) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data); }
+function dataGetMeetingMinutes(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMeetingMinutes(limit) : []; }
+function dataAddMeetingMinutes(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data); }
 
 /**
  * BACKFILL: Generates Drive docs for any existing MeetingMinutes rows
@@ -3260,8 +3194,8 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
 
 // Batch data fetch — single round-trip for SPA init (CR-AUTH-3: server-side identity + role)
 // Role is re-verified server-side from the Member Directory; client-supplied role is ignored.
-function dataGetBatchData(ignoredEmail, ignoredRole) {
-  var e = _resolveCallerEmail();
+function dataGetBatchData(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
   if (!e) return {};
   // Re-derive role from directory — never trust the client-supplied value
   var serverRole = DataService.getUserRole(e) || 'member';
@@ -3271,8 +3205,8 @@ function dataGetBatchData(ignoredEmail, ignoredRole) {
 }
 
 // Broadcast filter options (CR-AUTH-3: steward auth required)
-function dataGetBroadcastFilterOptions() {
-  var s = _requireStewardAuth();
+function dataGetBroadcastFilterOptions(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
   if (!s) return { locations: [], officeDays: [], hasDuesPayingColumn: false, broadcastScopeAll: false, totalMembers: 0 };
   try {
     var members = DataService.getAllMembers();
@@ -3324,8 +3258,8 @@ function dataGetBroadcastFilterOptions() {
  *   resourceDownloads    — not currently tracked; returns 0
  *   membershipTrends     — monthly total/new member counts from Member Directory HIRE_DATE (last 6 mo)
  */
-function dataGetEngagementStats() {
-  var _caller = _resolveCallerEmail();
+function dataGetEngagementStats(sessionToken) {
+  var _caller = _resolveCallerEmail(sessionToken);
   if (!_caller) return null;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -3442,7 +3376,6 @@ function dataGetEngagementStats() {
           var key = (d.getMonth() + 1) + '/' + (d.getFullYear() - 2000);
           monthMap[key] = { month: key, total: 0, new: 0 };
         }
-        var firstKey = Object.keys(monthMap)[0];
         var firstDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         for (var ri = 0; ri < mData2.length; ri++) {
           var hire = mData2[ri][hireIdx];
@@ -3491,7 +3424,7 @@ function dataGetEngagementStats() {
  *   trendDirection    — 'increasing' | 'decreasing' | 'stable' based on avg last 4 wks vs prior 4 wks
  */
 function dataGetWorkloadSummaryStats() {
-  var _caller = _resolveCallerEmail();
+  var _caller = _resolveCallerEmail(sessionToken);
   if (!_caller) return null;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -3600,7 +3533,7 @@ function dataGetWorkloadSummaryStats() {
  */
 function dataGetWelcomeData() {
   // CR-AUTH-3: Use server-side identity instead of client-supplied email
-  var email = _resolveCallerEmail();
+  var email = _resolveCallerEmail(sessionToken);
   if (!email) return { isFirstVisit: false, userName: '', role: 'member', quickActions: [] };
 
   var userRecord = DataService.findUserByEmail(email);
@@ -3650,9 +3583,9 @@ function dataGetWelcomeData() {
  * @param {string} email - User email
  * @returns {Object} { success: boolean }
  */
-function dataMarkWelcomeDismissed() {
+function dataMarkWelcomeDismissed(sessionToken) {
   // CR-AUTH-3: Use server-side identity instead of client-supplied email
-  var email = _resolveCallerEmail();
+  var email = _resolveCallerEmail(sessionToken);
   if (!email) return { success: false };
   var emailHash = _welcomeEmailHash(email);
   var propKey = 'WELCOME_DISMISSED_' + emailHash;

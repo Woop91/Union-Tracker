@@ -1,4 +1,6 @@
-# 📋 Phase 2 Development Plan — DDS Dashboard Web App
+> **Note:** This plan is from v4.12 (February 2026). Most features listed here have been implemented as of v4.24.4. See [FEATURES.md](FEATURES.md) for the current feature set.
+
+# Phase 2 Development Plan -- DDS Dashboard Web App
 # Last updated: 2026-02-24
 
 ---

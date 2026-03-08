@@ -530,7 +530,7 @@ describe('QAForum.submitAnswer', () => {
     var ss = createMockSpreadsheet([forumSheet, answerSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
-    QAForum.submitAnswer('steward@test.com', 'Steward', 'QA_1', 'Answer text', false);
+    QAForum.submitAnswer('steward@test.com', 'Steward', 'QA_1', 'Answer text', true);
 
     // Should call getRange for answer count (row 2, col 9) and updated (row 2, col 11)
     expect(forumSheet.getRange).toHaveBeenCalledWith(2, 9);
@@ -550,7 +550,7 @@ describe('QAForum.submitAnswer', () => {
     var mockLock = { waitLock: jest.fn(), releaseLock: jest.fn() };
     LockService.getScriptLock.mockReturnValue(mockLock);
 
-    QAForum.submitAnswer('u@test.com', 'U', 'QA_1', 'Answer text');
+    QAForum.submitAnswer('u@test.com', 'U', 'QA_1', 'Answer text', true);
 
     expect(mockLock.waitLock).toHaveBeenCalledWith(10000);
     expect(mockLock.releaseLock).toHaveBeenCalled();
@@ -564,7 +564,7 @@ describe('QAForum.submitAnswer', () => {
     var ss = createMockSpreadsheet([forumSheet, answerSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
-    var result = QAForum.submitAnswer('s@test.com', 'S', 'QA_1', 'Answer');
+    var result = QAForum.submitAnswer('s@test.com', 'S', 'QA_1', 'Answer', true);
     expect(result.success).toBe(true);
     expect(result.answerId).toMatch(/^ANS_/);
   });
@@ -927,16 +927,16 @@ describe('Global wrappers', () => {
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
     var spy = jest.spyOn(QAForum, 'getQuestions');
-    qaGetQuestions('user@test.com', 1, 10, 'recent');
-    // Wrapper resolves email via _resolveCallerEmail() — passes resolved email, not param
+    qaGetQuestions('test-session-token', 'user@test.com', 1, 10, 'recent');
+    // Wrapper resolves email via _resolveCallerEmail(sessionToken) — passes resolved email
     expect(spy).toHaveBeenCalledWith('test@example.com', 1, 10, 'recent');
     spy.mockRestore();
   });
 
   test('qaSubmitQuestion delegates to QAForum.submitQuestion', () => {
     var spy = jest.spyOn(QAForum, 'submitQuestion').mockReturnValue({ success: true, questionId: 'QA_test' });
-    var result = qaSubmitQuestion('user@test.com', 'Name', 'Question?', false);
-    // Wrapper resolves email via _resolveCallerEmail() — passes resolved email, not param
+    var result = qaSubmitQuestion('test-session-token', 'user@test.com', 'Name', 'Question?', false);
+    // Wrapper resolves email via _resolveCallerEmail(sessionToken) — passes resolved email
     expect(spy).toHaveBeenCalledWith('test@example.com', 'Name', 'Question?', false);
     expect(result.success).toBe(true);
     spy.mockRestore();

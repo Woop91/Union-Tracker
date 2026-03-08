@@ -1,6 +1,6 @@
 # Comfort View Dashboard Guide
 
-**Version:** 4.13.0 | **Last Updated:** 2026-02-25
+**Version:** 4.24.4 | **Last Updated:** 2026-03-07
 
 ## Quick Setup (Do This First!)
 
@@ -475,4 +475,4 @@ View → Comfort View → Comfort View Panel
 
 ---
 
-**Version:** 4.13.0 | **Last Updated:** 2026-02-25
+**Version:** 4.24.4 | **Last Updated:** 2026-03-07

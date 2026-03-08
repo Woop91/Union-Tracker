@@ -1062,7 +1062,14 @@ function setupActionTypeColumn() {
   ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   // Check if Action Type header exists
-  var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
+  var lastCol = grievanceSheet.getLastColumn();
+  if (lastCol < 1) {
+    // Sheet has no data columns yet — write grievance headers first
+    var gHeaders = getGrievanceHeaders();
+    grievanceSheet.getRange(1, 1, 1, gHeaders.length).setValues([gHeaders]);
+    lastCol = gHeaders.length;
+  }
+  var headers = grievanceSheet.getRange(1, 1, 1, lastCol).getValues()[0];
   var actionTypeCol = headers.indexOf('Action Type') + 1;
 
   if (actionTypeCol === 0) {

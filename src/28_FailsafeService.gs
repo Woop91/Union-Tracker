@@ -396,7 +396,6 @@ var FailsafeService = (function () {
   function _pruneOldBackups(folder, sheetNames) {
     sheetNames.forEach(function(sheetName) {
       var prefix = sheetName.replace(/[^a-zA-Z0-9_-]/g, '');
-      var files = folder.getFilesByName; // iterator
       // Collect all files matching this sheet prefix
       var allFiles = [];
       var iter = folder.getFiles();
@@ -411,7 +410,7 @@ var FailsafeService = (function () {
       allFiles.sort(function(a, b) { return b.name < a.name ? -1 : b.name > a.name ? 1 : 0; });
       // Delete everything beyond MAX_BACKUP_FILES
       for (var i = MAX_BACKUP_FILES; i < allFiles.length; i++) {
-        try { allFiles[i].file.setTrashed(true); } catch (e) { /* ignore */ }
+        try { allFiles[i].file.setTrashed(true); } catch (_e) { /* ignore */ }
       }
     });
   }

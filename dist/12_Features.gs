@@ -1062,7 +1062,14 @@ function setupActionTypeColumn() {
   ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   // Check if Action Type header exists
-  var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
+  var lastCol = grievanceSheet.getLastColumn();
+  if (lastCol < 1) {
+    // Sheet has no data columns yet — write grievance headers first
+    var gHeaders = getGrievanceHeaders();
+    grievanceSheet.getRange(1, 1, 1, gHeaders.length).setValues([gHeaders]);
+    lastCol = gHeaders.length;
+  }
+  var headers = grievanceSheet.getRange(1, 1, 1, lastCol).getValues()[0];
   var actionTypeCol = headers.indexOf('Action Type') + 1;
 
   if (actionTypeCol === 0) {
@@ -2941,6 +2948,7 @@ function refreshLookerMembers_() {
  * @returns {number} Number of rows exported
  */
 function refreshLookerSatisfaction_() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sourceSheet = ss.getSheetByName(SHEETS.SATISFACTION || '📊 Member Satisfaction');
   const targetSheet = ss.getSheetByName(LOOKER_CONFIG.SHEETS.SATISFACTION);
@@ -3447,6 +3455,7 @@ function refreshLookerAnonMembers_() {
  * @returns {number} Number of rows exported
  */
 function refreshLookerAnonSatisfaction_() {
+  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sourceSheet = ss.getSheetByName(SHEETS.SATISFACTION || '📊 Member Satisfaction');
   const targetSheet = ss.getSheetByName(LOOKER_CONFIG.SHEETS_ANON.SATISFACTION);

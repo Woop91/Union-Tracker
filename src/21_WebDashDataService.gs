@@ -2821,6 +2821,7 @@ var DataService = (function () {
     createMemberTask: createMemberTask,
     getMemberTasks: getMemberTasks,
     completeMemberTask: completeMemberTask,
+    stewardCompleteMemberTask: stewardCompleteMemberTask,
     getStewardAssignedMemberTasks: getStewardAssignedMemberTasks,
     // v4.17.0 - Feedback, Minutes (Polls removed v4.24.0 — use wq* wrappers)
     getMyFeedback: getMyFeedback,
@@ -3012,7 +3013,7 @@ function dataCreateTaskForSteward(sessionToken, assigneeEmail, title, desc, memb
 function dataGetTasks(sessionToken, statusFilter) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getTasks(s, statusFilter); }
 function dataCompleteTask(sessionToken, taskId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
 function dataGetStewardMemberStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
-function dataGetStewardDirectory() {
+function dataGetStewardDirectory(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return [];
   try {
@@ -3204,7 +3205,7 @@ function dataGetBatchData(sessionToken) {
 }
 
 // Broadcast filter options (CR-AUTH-3: steward auth required)
-function dataGetBroadcastFilterOptions() {
+function dataGetBroadcastFilterOptions(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { locations: [], officeDays: [], hasDuesPayingColumn: false, broadcastScopeAll: false, totalMembers: 0 };
   try {
@@ -3257,7 +3258,7 @@ function dataGetBroadcastFilterOptions() {
  *   resourceDownloads    — not currently tracked; returns 0
  *   membershipTrends     — monthly total/new member counts from Member Directory HIRE_DATE (last 6 mo)
  */
-function dataGetEngagementStats() {
+function dataGetEngagementStats(sessionToken) {
   var _caller = _resolveCallerEmail(sessionToken);
   if (!_caller) return null;
   try {
@@ -3375,7 +3376,6 @@ function dataGetEngagementStats() {
           var key = (d.getMonth() + 1) + '/' + (d.getFullYear() - 2000);
           monthMap[key] = { month: key, total: 0, new: 0 };
         }
-        var firstKey = Object.keys(monthMap)[0];
         var firstDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         for (var ri = 0; ri < mData2.length; ri++) {
           var hire = mData2[ri][hireIdx];
@@ -3583,7 +3583,7 @@ function dataGetWelcomeData() {
  * @param {string} email - User email
  * @returns {Object} { success: boolean }
  */
-function dataMarkWelcomeDismissed() {
+function dataMarkWelcomeDismissed(sessionToken) {
   // CR-AUTH-3: Use server-side identity instead of client-supplied email
   var email = _resolveCallerEmail(sessionToken);
   if (!email) return { success: false };

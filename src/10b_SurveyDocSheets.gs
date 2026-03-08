@@ -498,30 +498,26 @@ function populateRoadmapItems(sheet) {
   var now = new Date();
   var timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
 
-  // Roadmap items requiring external APIs - start at row 5
+  // Roadmap items requiring external APIs
+  // Schema (10 cols): Timestamp, Submitted By, Category, Priority, Title, Description, Status, Assigned To, Resolution, Notes
   var roadmapItems = [
-    // Row 2
-    [timestamp, 'System', 'Integration', 'Feature Request', 'Medium',
+    [timestamp, 'System', 'Integration', 'Medium',
      'Constant Contact / CRM Sync',
      'Read-only engagement metrics sync from Constant Contact v3 API. Pulls email open rates and last activity dates into Member Directory (OPEN_RATE, RECENT_CONTACT_DATE columns). Requires Constant Contact API key and OAuth setup. See Admin > Data Sync > CC menu.',
      'Resolved', '', '', 'External API: Constant Contact v3 API'],
-    // Row 3
-    [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
+    [timestamp, 'System', 'Integration', 'Low',
      'OCR Form Transcription (Cloud Vision)',
      'Use Google Cloud Vision API to read photos of handwritten grievance forms and auto-populate the Grievance Log. UI placeholder exists at showOCRDialog(). Requires Cloud Vision API enablement and billing.',
      'New', '', '', 'External API: Google Cloud Vision API'],
-    // Row 4
-    [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
+    [timestamp, 'System', 'Integration', 'Low',
      'Typeform/SurveyMonkey Survey Sync',
      'Pull real-time member satisfaction scores from external survey platforms (Typeform or SurveyMonkey) instead of using Google Forms. Would enhance the Unit Health Report with live third-party data.',
      'New', '', '', 'External API: Typeform API or SurveyMonkey API'],
-    // Row 5 - bonus item
-    [timestamp, 'System', 'Reports', 'Feature Request', 'Low',
+    [timestamp, 'System', 'Reports', 'Low',
      'Advanced Precedent Search with AI',
      'Enhance Search Precedents to use AI/ML for semantic matching of grievance outcomes. Would allow natural language queries like "overtime disputes in warehouse" to find relevant past practice examples.',
      'New', '', '', 'Requires: Google Vertex AI or similar ML API'],
-    // Row 6 - Secure Export via Email (org email only)
-    [timestamp, 'System', 'Member Directory', 'Feature Request', 'High',
+    [timestamp, 'System', 'Other', 'High',
      'Secure Export via Email (org email only)',
      'Add an export feature that allows exporting a list of all selectable Member Directory items via email. ' +
      'Export emails MUST only be sent to addresses ending in @org email. ' +
@@ -530,8 +526,7 @@ function populateRoadmapItems(sheet) {
      'The export should support column selection so stewards can choose which fields to include. ' +
      'PII columns (Street Address, City, State) require explicit opt-in and are excluded by default.',
      'Planned', '', '', 'Requires: email domain validation, leadership alert system'],
-    // Row 7 - Lockdown Mode (Multi-Steward Authorization)
-    [timestamp, 'System', 'Dashboard', 'Feature Request', 'High',
+    [timestamp, 'System', 'Other', 'High',
      'Lockdown Mode (Multi-Steward Authorization)',
      'Add a "Lockdown" feature that can be triggered by the authorization of multiple stewards (configurable threshold, e.g., 2+). ' +
      'Lockdown is intended for events of possible security breaches and should: ' +

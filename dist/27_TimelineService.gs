@@ -316,10 +316,10 @@ var TimelineService = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function tlGetTimelineEvents(page, pageSize, year, category) { var e = _resolveCallerEmail(); if (!e) return []; return TimelineService.getTimelineEvents(page, pageSize, year, category); }
-function tlAddTimelineEvent(stewardEmail, data) { var e = _requireStewardAuth(); if (!e) return null; return TimelineService.addTimelineEvent(e, data); }
-function tlUpdateTimelineEvent(stewardEmail, eventId, data) { var e = _requireStewardAuth(); if (!e) return null; return TimelineService.updateTimelineEvent(e, eventId, data); }
-function tlDeleteTimelineEvent(stewardEmail, eventId) { var e = _requireStewardAuth(); if (!e) return null; return TimelineService.deleteTimelineEvent(e, eventId); }
-function tlImportCalendarEvents(stewardEmail, startDate, endDate) { var e = _requireStewardAuth(); if (!e) return null; return TimelineService.importCalendarEvents(e, startDate, endDate); }
-function tlAttachDriveFiles(stewardEmail, eventId, fileIds) { var e = _requireStewardAuth(); if (!e) return null; return TimelineService.attachDriveFiles(e, eventId, fileIds); }
+function tlGetTimelineEvents(sessionToken, page, pageSize, year, category) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return TimelineService.getTimelineEvents(page, pageSize, year, category); }
+function tlAddTimelineEvent(sessionToken, data) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.addTimelineEvent(e, data); }
+function tlUpdateTimelineEvent(sessionToken, eventId, data) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.updateTimelineEvent(e, eventId, data); }
+function tlDeleteTimelineEvent(sessionToken, eventId) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.deleteTimelineEvent(e, eventId); }
+function tlImportCalendarEvents(sessionToken, startDate, endDate) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.importCalendarEvents(e, startDate, endDate); }
+function tlAttachDriveFiles(sessionToken, eventId, fileIds) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.attachDriveFiles(e, eventId, fileIds); }
 function tlInitSheets() { return TimelineService.initTimelineSheet(); }
