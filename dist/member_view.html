@@ -288,7 +288,7 @@ function renderMemberHome(appContainer) {
     eventsSection.appendChild(eventsArea);
     container.appendChild(eventsSection);
 
-    DataCache.cachedCall('events', 'dataGetUpcomingEvents', [10], function(events) {
+    DataCache.cachedCall('events', 'dataGetUpcomingEvents', [SESSION_TOKEN, 10], function(events) {
       // Update KPI counter
       // Guard against _notConfigured / _calNotFound sentinels (v4.22.5)
       if (!events || !Array.isArray(events)) {
@@ -976,7 +976,7 @@ function _showStewardPicker(targetSection) {
             if (result && result.success) renderStewardContact(document.getElementById('app'));
           }).withFailureHandler(function() {
             selectBtn.textContent = 'Select'; selectBtn.disabled = false;
-          }).dataAssignSteward(SESSION_TOKEN, s.email);
+          }).dataAssignSteward(SESSION_TOKEN, CURRENT_USER.email, s.email);
         }
       }, 'Select');
       item.appendChild(selectBtn);
@@ -1148,7 +1148,7 @@ function _renderMemberDirectory(target) {
             e.stopPropagation();
             serverCall().withSuccessHandler(function(result) {
               if (result && result.success) renderStewardContact(document.getElementById('app'));
-            }).dataAssignSteward(SESSION_TOKEN, s.email);
+            }).dataAssignSteward(SESSION_TOKEN, CURRENT_USER.email, s.email);
           }
         }, 'Select as my ' + CONFIG.stewardLabel));
 
@@ -2996,7 +2996,7 @@ function renderEventsPage(appContainer) {
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load events.'));
-    }).dataGetUpcomingEvents(20);
+    }).dataGetUpcomingEvents(SESSION_TOKEN, 20);
   });
 }
 
@@ -3289,7 +3289,7 @@ function _renderMemberCaseChecklist(container, caseId) {
   }).withFailureHandler(function() {
     checklistContent.innerHTML = '';
     checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', padding: '8px 0' } }, 'Failed to load checklist.'));
-  }).dataGetCaseChecklist(caseId);
+  }).dataGetCaseChecklist(SESSION_TOKEN, caseId);
 }
 
 // ═══════════════════════════════════════
@@ -3764,7 +3764,7 @@ function renderMinutesPage(appContainer) {
     }).withFailureHandler(function() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load minutes.'));
-    }).dataGetMeetingMinutes(100);
+    }).dataGetMeetingMinutes(SESSION_TOKEN, 100);
   });
 }
 

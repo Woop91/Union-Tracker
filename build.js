@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
@@ -79,6 +80,60 @@ const HTML_FILES = [
   'error_view.html',
   'org_chart.html',
 ];
+
+/**
+ * Validates all source files for syntax errors BEFORE copying to dist.
+ * Catches: JS syntax errors in .gs files, broken <script> blocks in HTML.
+ * Aborts build on first error — no broken code reaches dist/.
+ */
+function validate(gsFiles, htmlFiles) {
+  console.log('Validating source files...\n');
+  let errors = 0;
+
+  // 1. Check .gs files
+  for (const file of gsFiles) {
+    const filePath = path.join(SRC_DIR, file);
+    if (!fs.existsSync(filePath)) continue;
+    const code = fs.readFileSync(filePath, 'utf8');
+    try {
+      new vm.Script(code, { filename: file });
+    } catch (e) {
+      const line = (e.stack || '').match(/:(\d+)/)?.[1] || '?';
+      console.error(`  ❌ SYNTAX ERROR in ${file} (line ${line}): ${e.message}`);
+      errors++;
+    }
+  }
+
+  // 2. Check <script> blocks in HTML files
+  for (const file of htmlFiles) {
+    const filePath = path.join(SRC_DIR, file);
+    if (!fs.existsSync(filePath)) continue;
+    const content = fs.readFileSync(filePath, 'utf8');
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    let match;
+    let blockIndex = 0;
+    while ((match = scriptRegex.exec(content)) !== null) {
+      const js = match[1];
+      if (js.trim().length < 10 || js.includes('<?')) continue; // skip empty/template blocks
+      try {
+        new vm.Script(js, { filename: `${file}:script[${blockIndex}]` });
+      } catch (e) {
+        const line = (e.stack || '').match(/:(\d+)/)?.[1] || '?';
+        console.error(`  ❌ SYNTAX ERROR in ${file} <script> block ${blockIndex} (line ${line}): ${e.message}`);
+        errors++;
+      }
+      blockIndex++;
+    }
+  }
+
+  if (errors > 0) {
+    console.error(`\n❌ Validation failed: ${errors} syntax error(s). Build aborted.`);
+    console.error('   Fix the errors above, then run the build again.\n');
+    process.exit(1);
+  }
+
+  console.log('  ✓ All files validated — no syntax errors.\n');
+}
 
 function build(fileList) {
   const startTime = Date.now();
@@ -174,6 +229,7 @@ if (shouldClean) {
   }
 
   // Auto-clean before build to prevent orphaned files from persisting
+  validate(fileList, HTML_FILES);
   clean();
   build(fileList);
 }

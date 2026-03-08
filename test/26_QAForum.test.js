@@ -927,7 +927,7 @@ describe('Global wrappers', () => {
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
     var spy = jest.spyOn(QAForum, 'getQuestions');
-    qaGetQuestions('test-session-token', 'user@test.com', 1, 10, 'recent');
+    qaGetQuestions('test-session-token', 1, 10, 'recent');
     // Wrapper resolves email via _resolveCallerEmail(sessionToken) — passes resolved email
     expect(spy).toHaveBeenCalledWith('test@example.com', 1, 10, 'recent');
     spy.mockRestore();
@@ -935,7 +935,7 @@ describe('Global wrappers', () => {
 
   test('qaSubmitQuestion delegates to QAForum.submitQuestion', () => {
     var spy = jest.spyOn(QAForum, 'submitQuestion').mockReturnValue({ success: true, questionId: 'QA_test' });
-    var result = qaSubmitQuestion('test-session-token', 'user@test.com', 'Name', 'Question?', false);
+    var result = qaSubmitQuestion('test-session-token', 'Name', 'Question?', false);
     // Wrapper resolves email via _resolveCallerEmail(sessionToken) — passes resolved email
     expect(spy).toHaveBeenCalledWith('test@example.com', 'Name', 'Question?', false);
     expect(result.success).toBe(true);

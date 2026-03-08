@@ -3423,7 +3423,7 @@ function dataGetEngagementStats(sessionToken) {
  *   submissionRate    — % of stewards (IS_STEWARD = 'Yes') who have submitted at least once
  *   trendDirection    — 'increasing' | 'decreasing' | 'stable' based on avg last 4 wks vs prior 4 wks
  */
-function dataGetWorkloadSummaryStats() {
+function dataGetWorkloadSummaryStats(sessionToken) {
   var _caller = _resolveCallerEmail(sessionToken);
   if (!_caller) return null;
   try {
@@ -3531,7 +3531,7 @@ function dataGetWorkloadSummaryStats() {
  * @param {string} email - User email
  * @returns {Object} { isFirstVisit, userName, role, quickActions }
  */
-function dataGetWelcomeData() {
+function dataGetWelcomeData(sessionToken) {
   // CR-AUTH-3: Use server-side identity instead of client-supplied email
   var email = _resolveCallerEmail(sessionToken);
   if (!email) return { isFirstVisit: false, userName: '', role: 'member', quickActions: [] };

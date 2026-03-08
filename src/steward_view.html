@@ -2598,7 +2598,7 @@ function _renderStewardMemberTasks(container) {
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                   renderStewardTasks(document.getElementById('app'));
                 } else { alert('Failed to complete task.'); }
-              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataStaffCompleteMemberTask(t.id);
+              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataStaffCompleteMemberTask(SESSION_TOKEN, t.id);
             }
           }, '\u2705 Complete for member'));
         })(task);
@@ -3236,7 +3236,7 @@ function _renderCaseChecklist(container, caseId) {
   }).withFailureHandler(function() {
     checklistContent.innerHTML = '';
     checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', padding: '8px 0' } }, 'Failed to load checklist.'));
-  }).dataGetCaseChecklist(caseId);
+  }).dataGetCaseChecklist(SESSION_TOKEN, caseId);
 }
 
 // ═══════════════════════════════════════
@@ -3356,7 +3356,7 @@ function _renderCreateStewardPoll(container) {
   }
 
   var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
-  formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, 'Create This Week's ' + (CONFIG.stewardLabel || 'Steward') + ' Poll'));
+  formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, "Create This Week's " + (CONFIG.stewardLabel || 'Steward') + ' Poll'));
   formCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Replaces any existing steward poll for this week. The community poll is drawn automatically from the member pool each Monday.'));
 
   var questionInput = el('textarea', { className: 'msg-textarea', placeholder: 'Poll question…', style: { minHeight: '70px', marginBottom: '10px' } });
@@ -3464,7 +3464,7 @@ function _renderCreateStewardPoll(container) {
           drawBtn.textContent = 'Draw Community Poll';
           drawStatus.textContent = 'Request failed.';
           drawStatus.style.color = 'var(--danger)';
-        }).wqManualDrawCommunityPoll();
+        }).wqManualDrawCommunityPoll(SESSION_TOKEN);
       }
     }, 'Draw Community Poll');
 
@@ -3642,7 +3642,7 @@ function _renderMinutesList(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load minutes.'));
-  }).dataGetMeetingMinutes(100);
+  }).dataGetMeetingMinutes(SESSION_TOKEN, 100);
 }
 
 function _renderAddMinutes(container, onSaveSuccess) {
@@ -3824,7 +3824,7 @@ function _renderMyFeedback(container) {
   }).withFailureHandler(function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load feedback.'));
-  }).dataGetMyFeedback(); // email resolved server-side (v4.24.1)
+  }).dataGetMyFeedback(SESSION_TOKEN); // email resolved server-side (v4.24.1)
 }
 
 // ═══════════════════════════════════════
