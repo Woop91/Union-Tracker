@@ -2,99 +2,69 @@
 
 ## ⛔ CRITICAL RULES — READ FIRST
 
-1. **No function may delete or overwrite manually entered data.** Manually entered = imported via import function OR typed into cells by user. System-generated = anything written by code functions (except import function output). Functions may only: append new data, write to system-generated fields, clear auto-generated content.
-2. **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values. Always read from Config tab or constants. The Config tab is the single source of truth.
+1. **No function may delete or overwrite manually entered data.** Manually entered = imported via import function OR typed into cells by user. Functions may only: append new data, write to system-generated fields, clear auto-generated content.
+2. **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values. Always read from Config tab or constants. Config tab = single source of truth.
 3. **Column constants are 1-indexed** (matching `getRange()`). For array access on `getValues()` data, subtract 1: `row[GRIEVANCE_COLS.STATUS - 1]`.
-4. **All HTML must use `escapeHtml()`** for dynamic values. Defined in `00_Security.gs`. No exceptions.
-5. **`dist/` contains individual `.gs` + `.html` files for clasp push.** Never edit dist/ directly. Edit `src/*.gs` and `src/*.html`, then copy to dist/. **Do NOT use the consolidated single-file build** (`ConsolidatedDashboard.gs`) — clasp must push individual files because GAS needs separate `.html` files for `HtmlService.createTemplateFromFile()` and `createHtmlOutputFromFile()`.
-6. **After any merge/work to Main:** remind user to run `clasp push` from the repo root. Agent cannot run clasp remotely.
+4. **All HTML must use `escapeHtml()`** for dynamic values. Defined in `00_Security.gs:130`. No exceptions. Do not redefine it.
+5. **`dist/` contains individual `.gs` + `.html` files for clasp push.** Never edit dist/ directly. Edit `src/`, then build. GAS needs separate `.html` files for `createTemplateFromFile()` / `createHtmlOutputFromFile()`. `--prod` flag strips `07_DevTools.gs`.
+6. **After any merge/work to Main:** remind user to run `clasp push`. Agent cannot run clasp remotely.
 
 ## Permissions
 
-Claude has **full, pre-authorized access** to read, edit, create, and delete any files in both the **DDS-Dashboard** and **Union-Tracker** repositories — local and GitHub remotes. Claude will not ask for permission for any operation within these two repos, including:
-- Editing, creating, or deleting source files
-- Git operations (commit, push, pull, branch, merge, etc.)
-- Running `clasp push` to deploy either repo to Google Apps Script
-- Running build, lint, test, and deploy scripts
+Claude has **full, pre-authorized access** to read, edit, create, delete any files in both **DDS-Dashboard** and **Union-Tracker** — local and GitHub remotes. This includes all file operations, git operations, clasp push, build/lint/test/deploy scripts. No permission needed.
 
-For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos, Claude **must ask the user for permission** before reading or modifying.
+For anything **outside** these two repos, ask user first.
 
 ## Repos & Sync
 
 - **DDS-Dashboard** (private): Primary repo. Branches: `Main` (production), `staging` (pre-deploy mirror).
 - **Union-Tracker** (public): Mirror of DDS. Branches: `Main`, `staging`.
-- DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
+- DDS Apps Script ID: `[REDACTED — SEE DDS-DASHBOARD REPO]`
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in UT** (public repo).
-
-### Default Working Directory
-DDS `Main` is always the default working branch. **All commits go to `Main` first.**
+- DDS and UT are **identical**. No file exclusions remain (standalone WT removed in v4.20.0, now integrated into SPA via `25_WorkloadService.gs`). `typeof` guards in `index.html`, `member_view.html`, `03_UIComponents.gs` kept as defensive coding. If drift is found, it's a bug.
 
 ### Branch Commit Order — MANDATORY
-**NEVER commit directly to `staging`.** The only permitted flow is:
+
+All commits go to `Main` first. **NEVER commit directly to `staging`.**
 
 ```
-1. git checkout Main
-2. git add / git commit          ← ALL commits land here first
-3. git push origin Main
-4. git checkout staging
-5. git merge Main --no-edit
-6. git push origin staging
+1. git checkout Main → commit → push origin Main
+2. git checkout staging → merge Main --no-edit → push origin staging
+3. Repeat for UT (redact DDS Script ID from AI_REFERENCE.md if re-copied)
 ```
 
-Repeat for UT (with DDS Script ID redacted from AI_REFERENCE.md if re-copied).
-
-Committing to `staging` first and cherry-picking to `Main` creates divergent histories with duplicate commit hashes. **This is a bug.** If it happens, fix it immediately: merge `origin/staging` into `Main`, push `Main`, then fast-forward `staging` from `Main`.
+Committing to `staging` first creates divergent histories. If it happens: merge `origin/staging` into `Main`, push `Main`, fast-forward `staging`.
 
 ### Sync Flow
 ```
 DDS Main → DDS staging
 DDS Main → UT Main → UT staging
 ```
-- Every commit to DDS Main must be synced to UT Main, then both stagings updated.
-- Before any push, fetch origin and rebase/merge remote changes to avoid rejected pushes.
-
-### Repo Differences
-DDS and UT are **identical**. No file exclusions remain (the standalone Workload Tracker portal was removed in v4.20.0 — the workload tracker is now fully integrated into the SPA in both repos).
-- `typeof` guards in `index.html`, `member_view.html`, and `03_UIComponents.gs` are kept as defensive coding.
-- If drift is found, it's a bug — fix it.
-
-### Fallback (GitHub unreachable)
-Work on local DDS repo. **Mandatory:** add a timestamped note in `AI_REFERENCE.md` explaining:
-- What was done and why
-- What still needs pushing to GitHub
-- What still needs syncing to UT Main
-- Enough context for a follow-on agent to pick up exactly where work stopped
+Every DDS Main commit syncs to UT Main, then both stagings. Fetch origin before any push.
 
 ### Version Tracking — MANDATORY
-- **Semver tagging on every meaningful commit.** Update `VERSION_INFO` in `src/01_Core.gs`, `package.json`, and `CHANGELOG.md` together.
-- **Tag the commit** (e.g., `git tag v4.18.2`). Push tags: `git push origin --tags`.
-- If version is not updated, the commit is incomplete.
+- Semver on every meaningful commit. Update `VERSION_INFO` in `src/01_Core.gs`, `package.json`, `CHANGELOG.md` together.
+- Tag the commit (e.g., `git tag v4.18.2`). Push tags: `git push origin --tags`.
+- No version bump = incomplete commit.
 
 ### Parity Enforcement
-- After every push: verify GitHub remote and local clone are identical (`git status`, `git log --oneline -3`).
-- If a merge conflict cannot be resolved immediately: add a `TODO-MERGE` entry in `AI_REFERENCE.md` with conflict description and timestamp. Resolve at the earliest possible point.
-- **DDS GitHub, DDS local, and Google Apps Script must reflect the same state after every operation.**
-- **UT Main must match DDS Main** (minus Workload Tracker exclusions) after every sync.
+- After every push: `git status` + `git log --oneline -3` to verify local = remote.
+- Unresolvable merge conflict → `TODO-MERGE` in `AI_REFERENCE.md` with timestamp. Resolve ASAP.
+- DDS GitHub, DDS local, and GAS must all match after every operation.
 
 ### No-Assumptions Policy
 - Never assume file contents, function behavior, config values, or repo state. **Read first, then act.**
-- If prior work (by this agent or a previous one) contains assumptions: re-examine, correct, and document in `AI_REFERENCE.md`.
-- Every repo-altering action must be logged: what changed, why, and resulting version.
+- Prior agent assumptions → re-examine, correct, document in `AI_REFERENCE.md`.
+- Every repo-altering action must be logged: what, why, resulting version.
 
-### Workload Tracker
-- The standalone portal (`18_WorkloadTracker.gs`, `WorkloadTracker.html`) was removed in v4.20.0.
-- The workload tracker is now fully integrated into the SPA via `25_WorkloadService.gs` + `member_view.html`.
-- Both DDS and UT are identical — no exclusions remain. `typeof` guards are kept as defensive coding.
-- **Keep all "steward workload" references** — those are grievance case counts, not the WT module.
-
-### Fallback
-If GitHub is unreachable, work on local repo. Add a note in `AI_REFERENCE.md`: what was done, what needs pushing. Resolve on reconnection.
+### Fallback (GitHub unreachable)
+Work locally. Add timestamped note in `AI_REFERENCE.md`: what was done, what needs pushing/syncing, enough context for a follow-on agent to continue.
 
 ## Commands
 
 ```bash
-npm run build          # Copy src/*.gs + src/*.html → dist/ (individual files)
+npm run build          # src/*.gs + src/*.html → dist/ (individual files)
 npm run build:prod     # Production build (excludes DevTools)
 npm run lint           # ESLint all src/*.gs
 npm run lint:fix       # ESLint with auto-fix
@@ -107,208 +77,111 @@ npm run deploy         # lint + test:unit + build:prod + clasp push
 
 ## Architecture
 
-### File Naming & Load Order
+### File Load Order
 
-Files are numbered to control Google Apps Script's execution order:
+Files numbered to control GAS execution order:
 
-| Prefix | Layer | Files |
-|--------|-------|-------|
-| `00_` | Foundation | `DataAccess.gs`, `Security.gs` |
-| `01_` | Core | `Core.gs` — constants, config, utility functions |
-| `02_` | Data | `DataManagers.gs` — CRUD operations |
-| `03_` | UI | `UIComponents.gs` — menus, dialogs |
+| Prefix | Layer | Purpose |
+|--------|-------|---------|
+| `00_` | Foundation | DataAccess, Security |
+| `01_` | Core | Constants, config, utilities |
+| `02_` | Data | CRUD operations |
+| `03_` | UI | Menus, dialogs |
 | `04a-e` | UI modules | Menus, accessibility, dashboards |
 | `05_` | Integrations | Drive, Calendar, Email, Web App |
-| `06_` | Maintenance | Admin tools, undo/redo, snapshots, audit |
-| `07_` | DevTools | Development-only utilities (excluded in prod) |
+| `06_` | Maintenance | Admin, undo/redo, snapshots, audit |
+| `07_` | DevTools | Dev-only (excluded in prod) |
 | `08a-d` | Sheet utils | Setup, search, forms, audit formulas |
 | `09_` | Dashboards | Dashboard rendering |
-| `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
-| `11_-17_` | Features | CommandHub, features, self-service, meetings, events, enhancements, correlation |
-| `19_-28_` | Web Dashboard | Auth, config reader, data service, app, portal sheets, weekly questions, workload service, QA forum, timeline, failsafe |
-
-### Build Pipeline
-
-`dist/` is a flat copy of `src/*.gs` + `src/*.html` — individual files, not consolidated. Clasp pushes individual files so GAS can resolve `createTemplateFromFile()` / `createHtmlOutputFromFile()`. The `--prod` flag strips `07_DevTools.gs`.
+| `10_-10d` | Business logic | Entry, sheet creation, forms, sync |
+| `11_-17_` | Features | CommandHub, self-service, meetings, events, etc. |
+| `19_-28_` | Web Dashboard | Auth, config, data service, app, portals, workload, QA, timeline, failsafe |
 
 ### Column Constants
 
 | Constant | Source | Notes |
 |----------|--------|-------|
-| `SHEETS` / `SHEET_NAMES` | `01_Core.gs` | `SHEET_NAMES = SHEETS` — identical alias |
-| `GRIEVANCE_COLS` | `buildColsFromMap_(GRIEVANCE_HEADER_MAP_)` | 1-indexed for `getRange()` |
-| `MEMBER_COLS` | `buildColsFromMap_(MEMBER_HEADER_MAP_)` | 1-indexed for `getRange()` |
-| `CONFIG_COLS` | `buildColsFromMap_(CONFIG_HEADER_MAP_)` | 1-indexed for `getRange()` |
+| `SHEETS` / `SHEET_NAMES` | `01_Core.gs` | Identical alias |
+| `GRIEVANCE_COLS` | `buildColsFromMap_(GRIEVANCE_HEADER_MAP_)` | 1-indexed |
+| `MEMBER_COLS` | `buildColsFromMap_(MEMBER_HEADER_MAP_)` | 1-indexed |
+| `CONFIG_COLS` | `buildColsFromMap_(CONFIG_HEADER_MAP_)` | 1-indexed |
 
-**Rule:** For `getRange()` calls, use `*_COLS` directly. For array access, subtract 1.
+## Error Handling — MANDATORY
 
-## Error Handling Patterns — MANDATORY
+Enforced by architecture tests A5–A8.
 
-These rules are enforced by architecture tests (A5–A8) and **must** be followed.
+1. **GAS entry points (`doGet`, `onOpen`, `onEdit`, triggers):** Always wrap in try/catch. Unhandled throw → generic Google error or silent failure. Catch must call `_serveFatalError()` (zero-dependency fallback).
 
-### 1. GAS Entry Points — Always Wrap in try/catch
-`doGet()`, `onOpen()`, `onEdit()`, and all trigger functions are called directly by GAS. An unhandled throw produces either a generic Google error page (web app) or a silent trigger failure.
+2. **No cascading errors in catch blocks.** Never call a function in catch that could re-throw. Wrap secondary calls in their own try/catch or use hardcoded fallbacks.
+   ```js
+   // GOOD: catch (err) { try { cfg = ConfigReader.getConfig(); } catch(_) { cfg = {orgName:'Dashboard'}; } }
+   // BAD:  catch (err) { return _serveError(ConfigReader.getConfig(), err.message); }
+   ```
 
-```javascript
-// GOOD
-function doGet(e) {
-  try {
-    return doGetWebDashboard(e);
-  } catch (err) {
-    return _serveFatalError(err.message); // zero-dependency fallback
-  }
-}
+3. **`getActiveSpreadsheet()` null-guard** in web app files (19_–28_). Always check before chaining: `var ss = SpreadsheetApp.getActiveSpreadsheet(); if (!ss) return null;`
 
-// BAD — unhandled throw → Google shows "Sorry, unable to open the file"
-function doGet(e) {
-  return doGetWebDashboard(e);
-}
-```
-
-### 2. Error Handlers Must Not Cascade
-Never call a function in a `catch` block that could throw the same error that was caught. Wrap secondary calls in their own try/catch or use hardcoded fallback values.
-
-```javascript
-// GOOD
-catch (err) {
-  var cfg;
-  try { cfg = ConfigReader.getConfig(); } catch (_) { cfg = { orgName: 'Dashboard' }; }
-  return _serveError(cfg, err.message);
-}
-
-// BAD — if ConfigReader threw, this re-throws in the catch
-catch (err) {
-  return _serveError(ConfigReader.getConfig(), err.message);
-}
-```
-
-### 3. `getActiveSpreadsheet()` — Always Null-Guard in Web App Files
-In files 19_–28_ (web app chain), always check the return value before calling methods on it. It returns null if the script binding breaks.
-
-```javascript
-// GOOD
-var ss = SpreadsheetApp.getActiveSpreadsheet();
-if (!ss) return null; // or throw with a clear message
-var sheet = ss.getSheetByName(name);
-
-// BAD — crashes with "Cannot call method of null"
-var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
-```
-
-### 4. `google.script.run` — Always Attach a Failure Handler
-Use `serverCall()` (defined in `index.html`) instead of bare `google.script.run` to get a default `.withFailureHandler()`. Without one, server errors cause infinite loading spinners.
-
-```javascript
-// GOOD — uses serverCall() which has a default failure handler
-serverCall()
-  .withSuccessHandler(function(data) { renderResults(data); })
-  .myServerFunction(args);
-
-// ACCEPTABLE — explicit failure handler
-google.script.run
-  .withSuccessHandler(onSuccess)
-  .withFailureHandler(onError)
-  .myServerFunction(args);
-
-// BAD — no failure handler, spinner forever on error
-google.script.run
-  .withSuccessHandler(onSuccess)
-  .myServerFunction(args);
-```
+4. **`google.script.run` must have a failure handler.** Use `serverCall()` (in `index.html`) or explicit `.withFailureHandler()`. Missing handler = infinite spinner on error.
 
 ## Security Patterns
 
-### HTML Output — MANDATORY
-
-```javascript
-// GOOD: use escapeHtml() for all dynamic values
-'<td>' + escapeHtml(String(userName)) + '</td>'
-'<script>window.open(' + JSON.stringify(url) + ', "_blank");</script>'
-
-// BAD — XSS via string concatenation
-'<td>' + memberName + '</td>'
-```
-
-`escapeHtml()` is in `src/00_Security.gs:130`. Do not redefine it.
-
-### Other Security Functions
-- `escapeForFormula(value)` — prevents formula injection
+- `escapeHtml(value)` — XSS prevention for HTML output (`00_Security.gs:130`)
+- `escapeForFormula(value)` — formula injection prevention
 - `secureLog(context, message, data)` — masks PII before logging
 - `validateRole(email, requiredRole)` — role-based access control
 
 ## Config Sheet Write Paths — CRITICAL
 
-Multiple code paths write to Config. When modifying any Config-writing code, check all paths:
-
-1. **Always use `CONFIG_COLS.*`**, never hardcoded column numbers.
-2. **Always use `addToConfigDropdown_()`** for adding values. Never `getRange(lastRow + 1, col).setValue()`.
-3. **Use `DROPDOWN_MAP` and `MULTI_SELECT_COLS`** (rebuilt by `syncColumnMaps()`). Do not use `JOB_METADATA_FIELDS` for writes.
-4. **Rows 1-2 are structure.** Row 1 = section headers, Row 2 = column headers. Data starts at row 3.
+1. Always use `CONFIG_COLS.*`, never hardcoded column numbers.
+2. Always use `addToConfigDropdown_()` to add values. Never `getRange(lastRow+1, col).setValue()`.
+3. Use `DROPDOWN_MAP` and `MULTI_SELECT_COLS` (rebuilt by `syncColumnMaps()`). Not `JOB_METADATA_FIELDS` for writes.
+4. Rows 1-2 are structure (section headers, column headers). Data starts row 3.
 
 ## Coding Conventions
 
-- `var` vs `const`/`let`: Match the style of the file you're editing.
-- `camelCase` for functions, `UPPER_CASE` for destructive admin functions, trailing `_` for private helpers.
-- Error handling: `{ success: true, ... }` / `errorResponse(message)` for return values. Try/catch with `alert()` for UI calls.
-- Audit: `logAuditEvent()` for security events, `logIntegrityEvent()` for data events.
+- `var` vs `const`/`let`: Match existing file style.
+- `camelCase` functions, `UPPER_CASE` destructive admin, trailing `_` private helpers.
+- Return values: `{ success: true, ... }` / `errorResponse(message)`. Try/catch with `alert()` for UI.
+- Audit: `logAuditEvent()` for security, `logIntegrityEvent()` for data.
 
 ## Testing
 
-- Jest 29 with custom GAS mocks in `test/`
-- `test/architecture.test.js` + `test/modules.test.js` verify structural invariants
-- `test/columns.test.js` validates column constant consistency
+- Jest 29, custom GAS mocks in `test/`
+- `architecture.test.js` + `modules.test.js` — structural invariants
+- `columns.test.js` — column constant consistency
 
 ## Git Conventions
 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
-- Pre-commit hook: `.husky/pre-commit` runs lint-staged + build verification
-- **Both repos: Single branch `Main` (capital M). No feature/dev/staging branches.**
-- Every commit must include version bump if code changed.
+- Pre-commit: `.husky/pre-commit` runs lint-staged + build verification
+- Both repos use capital `Main`. Branches: `Main` + `staging`.
+- Every code-change commit must include version bump.
 
 ## Code Review — STRICT
 
-Canonical review: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are **outdated — do not reference them**.
+Canonical: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are **outdated — do not reference**.
 
-Rules:
-1. **Never claim "FIXED" without proof.** Cite exact file, line number, and the corrected code. If you can't point to it, it's not fixed.
-2. **Search the entire codebase** for every vulnerability pattern found — not just the file where it was first spotted.
-3. **No inflated scores.** State findings plainly. If something is broken, say it's broken.
+1. Never claim "FIXED" without proof — cite exact file, line, corrected code.
+2. Search entire codebase for every vulnerability pattern — not just the first file.
+3. No inflated scores. Broken = say broken.
+
+## Standing Rules
+
+### Badge Refresh on Mutations
+Any frontend action writing to Grievance Log or Steward Tasks **must** call `_refreshNavBadges()` on success. Debounced at 600ms. Always guard: `if (typeof _refreshNavBadges === 'function') _refreshNavBadges();`
+
+### Auth on Every `data*` Wrapper
+Every `function data*` in `21_WebDashDataService.gs` must begin with auth. No exceptions.
+```js
+var e = _resolveCallerEmail(); if (!e) return <safe_empty>;   // any user
+var s = _requireStewardAuth(); if (!s) return <safe_empty>;   // steward-only
+```
+No auth check = open anonymous endpoint.
 
 ## Reference Documents
 
-- `AI_REFERENCE.md` — LLM context doc (never delete, only append)
-- `SYNC-LOG.md` — DDS↔UT sync history and exclusion registry
-- `CODE_REVIEW.md` — canonical security/code review
-- `COLUMN_ISSUES_LOG.md` — recurring column bugs and fixes (READ if working on column-related code)
-- `FEATURES.md` — feature documentation
+- `AI_REFERENCE.md` — LLM context (never delete, only append)
+- `SYNC-LOG.md` — DDS↔UT sync history
+- `CODE_REVIEW.md` — canonical security review
+- `COLUMN_ISSUES_LOG.md` — recurring column bugs (READ before column work)
+- `FEATURES.md` — feature docs
 - `DEVELOPER_GUIDE.md` — developer onboarding
-
-## Standing Rule — Badge Refresh on Case/Task Mutations
-
-Any frontend action that writes to the Grievance Log or Steward Tasks sheet **must** call `_refreshNavBadges()` on success. This keeps the nav badge counts (overdue cases, open/overdue tasks) accurate within the session without a full page reload.
-
-`_refreshNavBadges()` is debounced at 600ms — safe to call on every success handler; rapid mutations collapse into one server round-trip.
-
-**Checklist for any new mutation UI:**
-- Task created → call `_refreshNavBadges()`
-- Task completed → call `_refreshNavBadges()`
-- Case status changed (when frontend status-change UI is built) → call `_refreshNavBadges()`
-- Member task completed (member_view.html) → call `_refreshNavBadges()` (guarded by `typeof` check since function lives in steward_view.html)
-
-Always use the guard: `if (typeof _refreshNavBadges === 'function') _refreshNavBadges();`
-
-## Standing Rule — Auth on Every data* Wrapper
-
-Every `function data*` in `21_WebDashDataService.gs` MUST begin with an auth check. No exceptions.
-
-```js
-// Minimum (any authenticated user):
-var e = _resolveCallerEmail();
-if (!e) return <safe_empty>;   // [], {}, null, false
-
-// Steward-only:
-var s = _requireStewardAuth();
-if (!s) return <safe_empty>;
-```
-
-A wrapper with no auth check is an open endpoint — any user can call it anonymously via the GAS web app URL.
