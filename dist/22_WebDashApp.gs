@@ -303,6 +303,14 @@ function getOrgChartHtml() {
 }
 
 /**
+ * Client-callable: Returns the POMS Reference HTML for lazy-loading.
+ * @returns {string} Raw HTML content (CSS-scoped under .poms-root)
+ */
+function getPOMSReferenceHtml() {
+  return HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+}
+
+/**
  * Returns the published web app URL. Used by client-side logout
  * as a reload fallback when window.top.location.reload() is blocked.
  * @returns {string}

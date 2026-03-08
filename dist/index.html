@@ -516,6 +516,7 @@
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
+        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
@@ -538,6 +539,7 @@
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
+        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
@@ -574,6 +576,36 @@
       });
     }
 
+    /**
+     * POMS Reference — loads poms_reference.html lazily, same pattern as org chart.
+     */
+    function renderPOMSReference(appContainer, role) {
+      renderPageLayout(appContainer, role, 'poms', function(container) {
+        showLoading(container);
+        container.style.height = 'calc(100vh - 56px)';
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+        google.script.run
+          .withSuccessHandler(function(html) {
+            container.innerHTML = '';
+            var wrap = el('div');
+            wrap.style.height = '100%';
+            wrap.innerHTML = html;
+            container.appendChild(wrap);
+            wrap.querySelectorAll('script').forEach(function(old) {
+              var s = document.createElement('script');
+              s.textContent = old.textContent;
+              old.parentNode.replaceChild(s, old);
+            });
+          })
+          .withFailureHandler(function(err) {
+            container.innerHTML = '';
+            container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load POMS Reference.'));
+          })
+          .getPOMSReferenceHtml();
+      });
+    }
+
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
       AppState.activeTab = tabId; // track for badge refresh
@@ -590,6 +622,11 @@
           return;
         }
         renderOrgChart(app, role);
+        return;
+      }
+      // POMS Reference — shared across both roles
+      if (tabId === 'poms') {
+        renderPOMSReference(app, role);
         return;
       }
 
