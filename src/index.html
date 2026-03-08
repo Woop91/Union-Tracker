@@ -42,18 +42,23 @@
 
     // On auth page: try to restore session from localStorage
     if (CURRENT_VIEW === 'auth' && WEB_APP_URL) {
-      if (PAGE_DATA.error === 'loggedout') {
-        // User just signed out — clear any stored session token
-        localStorage.removeItem('dashboardSessionToken');
-      } else {
-        var storedToken = localStorage.getItem('dashboardSessionToken');
-        if (storedToken && !PAGE_DATA.tokenChecked) {
-          // Redirect to web app URL with stored session token so server can validate
-          window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
-        } else if (PAGE_DATA.tokenChecked && storedToken) {
-          // Server already rejected this token — clear it
+      try {
+        if (PAGE_DATA.error === 'loggedout') {
+          // User just signed out — clear any stored session token
           localStorage.removeItem('dashboardSessionToken');
+        } else {
+          var storedToken = localStorage.getItem('dashboardSessionToken');
+          if (storedToken && !PAGE_DATA.tokenChecked) {
+            // Redirect to web app URL with stored session token so server can validate
+            window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
+          } else if (PAGE_DATA.tokenChecked && storedToken) {
+            // Server already rejected this token — clear it
+            localStorage.removeItem('dashboardSessionToken');
+          }
         }
+      } catch (_lsErr) {
+        // localStorage may be blocked (e.g. Safari privacy) — continue without session restore
+        console.warn('Session restore skipped:', _lsErr.message);
       }
     }
 
@@ -278,7 +283,7 @@
                 if (CURRENT_VIEW === 'steward') initStewardView(app);
                 else initMemberView(app);
               })
-              .dataGetBatchData(CURRENT_USER.email, CURRENT_VIEW);
+              .dataGetBatchData(SESSION_TOKEN);
           } else {
             if (CURRENT_VIEW === 'steward') initStewardView(app);
             else initMemberView(app);
@@ -837,9 +842,22 @@
     // INIT
     // ═══════════════════════════════════════
     document.addEventListener('DOMContentLoaded', function() {
-      getLayoutMode();
-      _prevMode = LayoutState.mode;
-      initApp();
+      try {
+        getLayoutMode();
+        _prevMode = LayoutState.mode;
+        initApp();
+      } catch (bootErr) {
+        console.error('Bootstrap error:', bootErr);
+        var app = document.getElementById('app');
+        if (app) {
+          app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,sans-serif;background:#141414;color:#e0e0e0">'
+            + '<div style="max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center">'
+            + '<h1 style="font-size:20px;margin:0 0 12px">Something went wrong</h1>'
+            + '<p style="color:#888;font-size:14px;line-height:1.6;margin:0 0 20px">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
+            + '<a href="javascript:localStorage.removeItem(\'dashboardSessionToken\');location.reload()" style="display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px">Clear &amp; Reload</a>'
+            + '</div></div>';
+        }
+      }
     });
   </script>
 

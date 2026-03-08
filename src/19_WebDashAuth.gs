@@ -69,6 +69,7 @@ var Auth = (function () {
    * @returns {Object} { success: boolean, message: string }
    */
   function sendMagicLink(email, rememberMe) {
+    try {
     email = String(email).trim().toLowerCase();
 
     // Rate limiting — max 3 magic links per email per 15 minutes
@@ -134,6 +135,10 @@ var Auth = (function () {
         msg += 'Please try again or use Google Sign-In.';
       }
       return { success: false, message: msg };
+    }
+    } catch (outerErr) {
+      Logger.log('Auth.sendMagicLink OUTER ERROR: ' + outerErr.message + '\n' + (outerErr.stack || ''));
+      return { success: false, message: 'Failed to send email. Please try again.' };
     }
   }
 
