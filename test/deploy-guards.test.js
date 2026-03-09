@@ -392,7 +392,8 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 describe('G6: dist/ files are in sync with src/', () => {
 
   test('every src .gs file has identical copy in dist', () => {
-    const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs'));
+    const PROD_EXCLUDED = ['07_DevTools.gs']; // excluded by --prod build
+    const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
 
     for (const f of gsFiles) {
