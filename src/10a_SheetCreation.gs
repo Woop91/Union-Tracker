@@ -64,7 +64,7 @@ function createConfigSheet(ss) {
     '── NOTIFICATIONS ──', '', '',                      // R-T (3 cols)
     '── ORGANIZATION ──', '', '', '',                   // U-X (4 cols)
     '── INTEGRATION ──', '',                            // Y-Z (2 cols)
-    '── DEADLINES ──', '', '', '',                      // AA-AD (4 cols)
+    '── DEADLINES ──', '', '', '', '', '', '',              // AA-AG (7 cols)
     '── MULTI-SELECT OPTIONS ──',                        // AE (1 col)
     '── CONTRACT & LEGAL ──', '', '', '',               // AF-AI (4 cols)
     '── ORG IDENTITY ──', '', '',                       // AJ-AL (3 cols)
@@ -142,6 +142,9 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.STEP1_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_1_RESPONSE], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEP2_APPEAL_DAYS, [DEADLINE_DEFAULTS.STEP_2_APPEAL], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEP2_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_2_RESPONSE], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP3_APPEAL_DAYS, [DEADLINE_DEFAULTS.STEP_3_APPEAL], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP3_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_3_RESPONSE], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ARBITRATION_DEMAND_DAYS, [DEADLINE_DEFAULTS.ARBITRATION_DEMAND], isExistingSheet);
 
   // Best Times to Contact (AE)
   var bestTimes = ['Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'];
