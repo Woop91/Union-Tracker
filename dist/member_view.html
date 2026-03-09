@@ -1487,6 +1487,7 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { renderUnionStatsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardContact(document.getElementById('app')); } },
       { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('member', 'poms'); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { renderMemberResources(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },

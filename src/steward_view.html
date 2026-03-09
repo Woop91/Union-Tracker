@@ -558,7 +558,11 @@ function renderStewardMembers(appContainer) {
     serverCall().withSuccessHandler(function(members) {
       content.innerHTML = '';
       if (!members || members.length === 0) {
-        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'No members found.'));
+        // If members is exactly [] (not null/undefined), auth may have failed silently
+        var msg = (members && members.length === 0) 
+          ? 'No members found. If this is unexpected, your session may have expired — try refreshing the page.'
+          : 'Failed to load members. Please refresh and try again.';
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, msg));
         return;
       }
 
@@ -708,11 +712,20 @@ function renderFilteredMembers(container, members, query) {
     var badges = el('div', { className: 'member-list-badges' });
     if (m.hasOpenGrievance) badges.appendChild(el('div', { className: 'status-dot active', title: 'Has open grievance' }));
     item.appendChild(badges);
+    item.appendChild(el('span', { className: 'member-list-chevron' }, '\u25B6'));
     container.appendChild(item);
 
     // Click handler — toggle inline detail panel
     item.addEventListener('click', function() {
-      _toggleMemberDetail(container, item, m);
+      try {
+        var wasExpanded = item.classList.contains('expanded');
+        var siblings = container.querySelectorAll('.member-list-item.expanded');
+        for (var s = 0; s < siblings.length; s++) siblings[s].classList.remove('expanded');
+        if (!wasExpanded) item.classList.add('expanded');
+        _toggleMemberDetail(container, item, m);
+      } catch (err) {
+        console.error('Member click error:', err);
+      }
     });
 
     // If this member was previously expanded, re-expand
@@ -749,13 +762,11 @@ function renderFilteredMembers(container, members, query) {
 function _toggleMemberDetail(container, itemEl, member) {
   var email = (member.email || '').toLowerCase();
   var existing = container.querySelector('.member-detail-panel');
-  // Collapse if same member clicked
   if (existing && _expandedMemberEmail === email) {
     existing.remove();
     _expandedMemberEmail = null;
     return;
   }
-  // Remove any existing panel
   if (existing) existing.remove();
   _expandedMemberEmail = email;
   _showMemberDetail(container, itemEl, member);
@@ -2149,6 +2160,7 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'steward'); } },
       { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('steward', 'poms'); } },
       { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { renderManagePolls(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { renderStewardDirectoryPage(document.getElementById('app')); } },
@@ -3906,6 +3918,73 @@ function renderFailsafePage(appContainer) {
     triggerCard.appendChild(triggerBtns);
     triggerCard.appendChild(triggerStatus);
     content.appendChild(triggerCard);
+
+    // Card 4: Initialize Missing Sheets
+    var initCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px', borderLeft: '3px solid var(--warning)' } });
+    initCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, '🔧 Initialize Missing Sheets'));
+    initCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Creates any missing sheets that newer features depend on (Timeline, Q&A Forum, Tasks, Notifications, etc.). Non-destructive — existing sheets with data are never touched. Run this if tabs show errors.'));
+    var initStatus = el('div', { style: { fontSize: '12px', minHeight: '20px' } });
+    initCard.appendChild(initStatus);
+    initCard.appendChild(el('button', {
+      className: 'btn btn-primary',
+      onClick: function() {
+        initStatus.innerHTML = '<div style="color:var(--muted)">Creating missing sheets... this may take a moment.</div>';
+        serverCall().withSuccessHandler(function(r) {
+          if (!r || !r.success) { initStatus.innerHTML = '<div style="color:var(--danger)">' + ((r && r.message) || 'Failed.') + '</div>'; return; }
+          var html = '<div style="color:var(--success);font-weight:600;margin-bottom:8px">✅ ' + r.message + '</div>';
+          if (r.created.length > 0) {
+            html += '<div style="color:var(--text);font-size:11px;margin-bottom:4px">Initialized:</div>';
+            r.created.forEach(function(c) { html += '<div style="color:var(--muted);font-size:11px;padding:1px 0">• ' + c + '</div>'; });
+          }
+          if (r.failed.length > 0) {
+            html += '<div style="color:var(--danger);font-size:11px;margin-top:6px">Failed:</div>';
+            r.failed.forEach(function(f) { html += '<div style="color:var(--danger);font-size:11px;padding:1px 0">• ' + f + '</div>'; });
+          }
+          initStatus.innerHTML = html;
+        }).withFailureHandler(function(err) {
+          initStatus.innerHTML = '<div style="color:var(--danger)">Failed: ' + ((err && err.message) || err) + '</div>';
+        }).fsEnsureAllSheets(SESSION_TOKEN);
+      }
+    }, 'Initialize Missing Sheets'));
+    content.appendChild(initCard);
+
+    // Card 5: System Diagnostic
+    var diagCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    diagCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, '🔍 System Diagnostic'));
+    diagCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Check which sheets exist, auth status, and identify missing dependencies that cause "Something went wrong" errors.'));
+    var diagResult = el('div', { style: { fontSize: '12px', minHeight: '20px' } });
+    diagCard.appendChild(diagResult);
+    diagCard.appendChild(el('button', {
+      className: 'btn btn-primary',
+      onClick: function() {
+        diagResult.innerHTML = '<div style="color:var(--muted)">Running diagnostic...</div>';
+        serverCall().withSuccessHandler(function(r) {
+          if (!r || !r.success) { diagResult.innerHTML = '<div style="color:var(--danger)">' + ((r && r.message) || 'Diagnostic failed.') + '</div>'; return; }
+          var html = '<div style="margin-bottom:8px;color:var(--text);font-weight:600">Sheets: ' + r.totalSheets + ' total | Auth: ' + (r.authOk ? '✅' : '❌') + ' | Email: ' + r.email + '</div>';
+          if (r.missing.length === 0) {
+            html += '<div style="color:var(--success);font-weight:600">✅ All required sheets present!</div>';
+          } else {
+            html += '<div style="color:var(--warning);font-weight:600;margin-bottom:6px">⚠️ Missing ' + r.missing.length + ' sheet(s):</div>';
+            r.missing.forEach(function(m) {
+              html += '<div style="color:var(--muted);padding:2px 0;font-family:var(--fontBody)">' + m + '</div>';
+            });
+          }
+          // Show all results
+          html += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">';
+          r.results.forEach(function(item) {
+            html += '<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px">'
+              + '<span style="color:var(--text)">' + item.label + '</span>'
+              + '<span style="color:' + (item.exists ? 'var(--success)' : item.critical ? 'var(--danger)' : 'var(--warning)') + '">' + (item.exists ? '✅' : '❌') + '</span>'
+              + '</div>';
+          });
+          html += '</div>';
+          diagResult.innerHTML = html;
+        }).withFailureHandler(function(err) {
+          diagResult.innerHTML = '<div style="color:var(--danger)">Diagnostic failed: ' + ((err && err.message) || err) + '</div>';
+        }).fsDiagnostic(SESSION_TOKEN);
+      }
+    }, 'Run Diagnostic'));
+    content.appendChild(diagCard);
 
     container.appendChild(content);
   });

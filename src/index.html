@@ -180,11 +180,17 @@
     function serverCall() {
       var runner = google.script.run;
       runner = runner.withFailureHandler(function(err) {
-        console.error('Server call failed:', err);
-        // Dismiss any loading spinners so the user isn't stuck
+        var msg = (err && err.message) ? err.message : String(err || 'Unknown error');
+        console.error('Server call failed:', msg, err);
+        // Dismiss any loading spinners and show the ACTUAL error
         var spinners = document.querySelectorAll('.loading-spinner');
         spinners.forEach(function(s) {
-          s.innerHTML = '<div class="empty-state">Something went wrong. Please try again.</div>';
+          s.innerHTML = '<div class="empty-state" style="text-align:center;padding:20px;">'
+            + '<div style="font-size:24px;margin-bottom:8px;">⚠️</div>'
+            + '<div style="color:var(--text);font-weight:600;margin-bottom:6px;">Something went wrong</div>'
+            + '<div style="color:var(--muted);font-size:12px;max-width:400px;margin:0 auto 12px;word-break:break-word;">' + msg + '</div>'
+            + '<button onclick="location.reload()" style="padding:6px 16px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:12px;">Reload</button>'
+            + '</div>';
         });
       });
       return runner;
@@ -578,10 +584,12 @@
 
     /**
      * POMS Reference — loads poms_reference.html lazily, same pattern as org chart.
+     * Contains 78 POMS sections, 17 flowcharts, search, ratings, bookmarks, notes.
      */
     function renderPOMSReference(appContainer, role) {
       renderPageLayout(appContainer, role, 'poms', function(container) {
         showLoading(container);
+        // Set container to fill height for POMS app shell
         container.style.height = 'calc(100vh - 56px)';
         container.style.padding = '0';
         container.style.overflow = 'hidden';
@@ -592,6 +600,7 @@
             wrap.style.height = '100%';
             wrap.innerHTML = html;
             container.appendChild(wrap);
+            // Re-execute <script> tags from poms_reference.html
             wrap.querySelectorAll('script').forEach(function(old) {
               var s = document.createElement('script');
               s.textContent = old.textContent;
@@ -883,6 +892,16 @@
         getLayoutMode();
         _prevMode = LayoutState.mode;
         initApp();
+
+        // Fire-and-forget: ensure all required sheets exist.
+        // Runs AFTER initApp dispatches — never blocks initial render.
+        // Version-keyed server-side flag prevents work on most loads.
+        if (CURRENT_VIEW !== 'auth' && CURRENT_VIEW !== 'error') {
+          google.script.run
+            .withSuccessHandler(function() {})
+            .withFailureHandler(function() {})
+            .dataEnsureSheetsIfNeeded(SESSION_TOKEN);
+        }
       } catch (bootErr) {
         console.error('Bootstrap error:', bootErr);
         var app = document.getElementById('app');
