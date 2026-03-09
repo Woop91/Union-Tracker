@@ -1757,3 +1757,26 @@ admins reading the sheet see the intent clearly.
 
 New sheets have no data rows at creation time, so seeding is not needed there.
 Blank cells in the column are still treated as `false` by the backend as a belt-and-suspenders fallback.
+
+---
+
+## 2026-03-08 — Steward Dual-Role Toggle Fix
+
+### Issue
+Stewards could not switch to Member View. The "Switch to Member/Steward" toggle in the sidebar and mobile headers was gated behind `IS_DUAL_ROLE`, which was only `true` when `role === 'both'`. Since stewards are assigned `role = 'steward'` from the Member Directory sheet, the toggle never appeared for them.
+
+### Root Cause
+`src/22_WebDashApp.gs` line 180: `isDualRole: role === 'both'` — excluded regular stewards.
+
+### Fix
+Changed to `isDualRole: role === 'steward' || role === 'both'` — since all stewards are members, every steward is inherently dual-role.
+
+### Files Changed
+- `src/22_WebDashApp.gs` — one-line fix (isDualRole condition)
+
+### How It Works
+- **Sidebar (desktop/tablet)**: `index.html` ~line 469 — shows "Switch to [Member/Steward]" when `IS_DUAL_ROLE` is true
+- **Steward mobile header**: `steward_view.html` ~line 94 — always shows switch button (not gated)
+- **Member mobile header**: `member_view.html` ~line 69 — shows switch button when `IS_DUAL_ROLE` is true
+- Labels come from `CONFIG.memberLabel` / `CONFIG.stewardLabel` (dynamic, from Config tab)
+- Toggle calls `initStewardView(app)` or `initMemberView(app)` and updates `AppState.activeRole`
