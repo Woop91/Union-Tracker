@@ -79,6 +79,7 @@ const HTML_FILES = [
   'member_view.html',
   'error_view.html',
   'org_chart.html',
+  'poms_reference.html',
 ];
 
 /**
