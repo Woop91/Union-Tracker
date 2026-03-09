@@ -17,12 +17,23 @@ fi
 
 # Step 2: Build verification
 echo ""
-echo "[2/2] Verifying build..."
-npm run build > /dev/null
+echo "[2/3] Verifying build..."
+npm run build > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
   echo ""
   echo "Build failed. Run 'npm run build' to see details."
+  exit 1
+fi
+
+# Step 3: Deploy guards + SPA integrity (catches routing, auth, sheet, parity bugs)
+echo ""
+echo "[3/3] Running deploy guards..."
+npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail 2>&1 | tail -5
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Deploy guard tests failed. Run 'npm run test:guards' for details."
   exit 1
 fi
 
