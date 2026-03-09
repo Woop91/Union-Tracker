@@ -148,12 +148,26 @@ function renderStewardDashboard(appContainer) {
 
       // Fill in org-wide stats
       serverCall().withSuccessHandler(function(stats) {
-        if (!stats || !stats.available) return;
         var cards = kpiGrid.querySelectorAll('.kpi-value');
+        if (!stats || !stats.available) {
+          // Graceful fallback — show 0 instead of leaving "..." placeholder
+          if (cards[0]) cards[0].textContent = '0';
+          if (cards[1]) cards[1].textContent = '0';
+          if (cards[2]) cards[2].textContent = '0';
+          if (cards[3]) cards[3].textContent = '0';
+          return;
+        }
         if (cards[0]) cards[0].textContent = String(stats.total || 0);
         if (cards[1]) { cards[1].textContent = String(stats.overdueCount || 0); if (stats.overdueCount > 0) cards[1].style.color = 'var(--danger)'; }
         if (cards[2]) { cards[2].textContent = String(stats.dueSoonCount || 0); if (stats.dueSoonCount > 0) cards[2].style.color = 'var(--warning)'; }
         if (cards[3]) cards[3].textContent = String(stats.settledCount || stats.wonCount || 0);
+      }).withFailureHandler(function(err) {
+        console.error('Org KPI stats failed:', err && err.message);
+        var cards = kpiGrid.querySelectorAll('.kpi-value');
+        if (cards[0]) cards[0].textContent = '\u2014';
+        if (cards[1]) cards[1].textContent = '\u2014';
+        if (cards[2]) cards[2].textContent = '\u2014';
+        if (cards[3]) cards[3].textContent = '\u2014';
       }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
       var kpiItems = [
@@ -2152,26 +2166,46 @@ function renderStewardMore(appContainer) {
     content.appendChild(phoneCard);
     // ─────────────────────────────────────────────────────────────────────
     var menuItems = [
+      { group: 'Manage' },
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
+      { group: 'Reference' },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('steward', 'poms'); } },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
+      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
+      { group: 'Community' },
+      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'steward'); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { renderManagePolls(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderStewardMinutes(document.getElementById('app')); } },
+      { group: 'Comms' },
       { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { renderBroadcast(document.getElementById('app')); } },
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View and send notifications', action: function() { renderStewardNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'steward'); } },
-      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
-      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('steward', 'poms'); } },
-      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { renderManagePolls(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
+      { divider: true },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { renderStewardDirectoryPage(document.getElementById('app')); } },
-
-      { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderStewardMinutes(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { renderFailsafePage(document.getElementById('app')); } },
+      { icon: '\uD83E\uDDEA', label: 'Test Runner', desc: 'Run integration tests', action: function() { renderTestRunnerPage(document.getElementById('app')); } },
     ];
 
     menuItems.forEach(function(m) {
+      if (m.group) {
+        content.appendChild(el('div', {
+          style: {
+            fontSize: '10px', fontWeight: '700', textTransform: 'uppercase',
+            letterSpacing: '1.2px', color: 'var(--text-secondary, #888)',
+            padding: '12px 0 4px', marginTop: '4px'
+          }
+        }, m.group));
+        return;
+      }
+      if (m.divider) {
+        content.appendChild(el('div', { style: { height: '1px', background: 'var(--border)', margin: '8px 0' } }));
+        return;
+      }
       var item = el('div', { className: 'more-menu-item', onClick: m.action });
       item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
       var text = el('div', { style: { flex: '1' } });
@@ -3988,5 +4022,279 @@ function renderFailsafePage(appContainer) {
 
     container.appendChild(content);
   });
+}
+
+/* ======================================================================
+ * TEST RUNNER PAGE — Steward-only dashboard panel for GAS-native tests
+ * ====================================================================== */
+
+function renderTestRunnerPage(appContainer) {
+  var role = PAGE_DATA.isDualRole ? 'steward' : PAGE_DATA.view;
+  renderPageLayout(appContainer, role, 'testrunner', function(container) {
+    var content = el('div', { style: { maxWidth: '960px', margin: '0 auto', padding: '20px' } });
+
+    // Header
+    var hdr = el('div', { style: { marginBottom: '24px' } });
+    hdr.appendChild(el('h2', { style: { margin: '0 0 4px', fontSize: '22px', fontWeight: '700' } }, '🧪 Test Runner'));
+    hdr.appendChild(el('p', { style: { margin: 0, color: 'var(--text-secondary)', fontSize: '14px' } },
+      'GAS-native integration tests — verifies Config, Auth, Grievance logic, and Column Mapping in the live environment.'));
+    content.appendChild(hdr);
+
+    // Controls card
+    var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' } });
+
+    var runAllBtn = el('button', {
+      className: 'btn btn-primary',
+      style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
+      onClick: function() {
+        runAllBtn.disabled = true;
+        runAllBtn.textContent = 'Running...';
+        statusEl.textContent = '⏳ Running tests...';
+        statusEl.style.color = 'var(--text-secondary)';
+        resultsContainer.innerHTML = '';
+        google.script.run
+          .withSuccessHandler(function(resp) {
+            runAllBtn.disabled = false;
+            runAllBtn.textContent = '▶ Run All Tests';
+            if (resp && resp.success) {
+              _renderTestResults(resultsContainer, resp.results, statusEl);
+            } else {
+              statusEl.textContent = '❌ ' + ((resp && resp.error) || 'Failed');
+              statusEl.style.color = 'var(--danger)';
+            }
+          })
+          .withFailureHandler(function(err) {
+            runAllBtn.disabled = false;
+            runAllBtn.textContent = '▶ Run All Tests';
+            statusEl.textContent = '❌ Error: ' + ((err && err.message) || err);
+            statusEl.style.color = 'var(--danger)';
+          })
+          .dataRunTests(SESSION_TOKEN, null);
+      }
+    }, '▶ Run All Tests');
+    ctrlCard.appendChild(runAllBtn);
+
+    // Suite filter dropdown
+    var suiteSelect = el('select', {
+      style: { padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '14px' }
+    });
+    var suiteOptions = [
+      { value: '', label: 'All Suites' },
+      { value: 'config', label: 'Config' },
+      { value: 'colmap', label: 'Column Mapping' },
+      { value: 'auth', label: 'Auth & Roles' },
+      { value: 'grievance', label: 'Grievance Logic' },
+      { value: 'security', label: 'Security' },
+      { value: 'system', label: 'System' }
+    ];
+    suiteOptions.forEach(function(opt) {
+      var o = el('option', { value: opt.value }, opt.label);
+      suiteSelect.appendChild(o);
+    });
+    ctrlCard.appendChild(suiteSelect);
+
+    var runFilterBtn = el('button', {
+      className: 'btn',
+      style: { padding: '8px 16px', cursor: 'pointer' },
+      onClick: function() {
+        var suite = suiteSelect.value;
+        if (!suite) return;
+        runFilterBtn.disabled = true;
+        statusEl.textContent = '⏳ Running ' + suite + ' suite...';
+        resultsContainer.innerHTML = '';
+        google.script.run
+          .withSuccessHandler(function(resp) {
+            runFilterBtn.disabled = false;
+            if (resp && resp.success) {
+              _renderTestResults(resultsContainer, resp.results, statusEl);
+            } else {
+              statusEl.textContent = '❌ ' + ((resp && resp.error) || 'Failed');
+              statusEl.style.color = 'var(--danger)';
+            }
+          })
+          .withFailureHandler(function(err) {
+            runFilterBtn.disabled = false;
+            statusEl.textContent = '❌ Error: ' + ((err && err.message) || err);
+            statusEl.style.color = 'var(--danger)';
+          })
+          .dataRunTests(SESSION_TOKEN, suite);
+      }
+    }, 'Run Suite');
+    ctrlCard.appendChild(runFilterBtn);
+
+    // Trigger controls
+    var trigSep = el('span', { style: { borderLeft: '1px solid var(--border-color)', height: '24px', margin: '0 4px' } });
+    ctrlCard.appendChild(trigSep);
+
+    var setupTrigBtn = el('button', {
+      className: 'btn',
+      style: { padding: '8px 12px', fontSize: '13px', cursor: 'pointer' },
+      onClick: function() {
+        google.script.run
+          .withSuccessHandler(function(r) {
+            if (r && r.success) trigStatus.textContent = '🕐 Daily 6AM';
+            else trigStatus.textContent = '❌ Failed';
+          })
+          .withFailureHandler(function() { trigStatus.textContent = '❌ Failed'; })
+          .dataManageTestTrigger(SESSION_TOKEN, 'setup');
+      }
+    }, '🕐 Enable Daily');
+    ctrlCard.appendChild(setupTrigBtn);
+
+    var rmTrigBtn = el('button', {
+      className: 'btn',
+      style: { padding: '8px 12px', fontSize: '13px', cursor: 'pointer' },
+      onClick: function() {
+        google.script.run
+          .withSuccessHandler(function(r) {
+            if (r && r.success) trigStatus.textContent = 'No trigger';
+            else trigStatus.textContent = '❌ Failed';
+          })
+          .withFailureHandler(function() { trigStatus.textContent = '❌ Failed'; })
+          .dataManageTestTrigger(SESSION_TOKEN, 'remove');
+      }
+    }, 'Disable');
+    ctrlCard.appendChild(rmTrigBtn);
+
+    var trigStatus = el('span', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, '');
+    ctrlCard.appendChild(trigStatus);
+
+    content.appendChild(ctrlCard);
+
+    // Status line
+    var statusEl = el('div', { style: { marginBottom: '16px', fontSize: '15px', fontWeight: '600' } }, '');
+    content.appendChild(statusEl);
+
+    // Results container
+    var resultsContainer = el('div');
+    content.appendChild(resultsContainer);
+
+    container.appendChild(content);
+
+    // Load last results on page open
+    google.script.run
+      .withSuccessHandler(function(resp) {
+        if (resp && resp.success && resp.results) {
+          _renderTestResults(resultsContainer, resp.results, statusEl);
+        } else {
+          statusEl.textContent = 'No test results yet — click "Run All Tests" to start.';
+          statusEl.style.color = 'var(--text-secondary)';
+        }
+      })
+      .withFailureHandler(function() {
+        statusEl.textContent = 'Could not load results.';
+        statusEl.style.color = 'var(--text-secondary)';
+      })
+      .dataGetTestResults(SESSION_TOKEN);
+  });
+}
+
+/**
+ * Renders structured test results into the container.
+ */
+function _renderTestResults(container, results, statusEl) {
+  container.innerHTML = '';
+  if (!results) return;
+
+  // Summary bar
+  var pct = results.summary.total > 0
+    ? Math.round((results.summary.passed / results.summary.total) * 100) : 0;
+  var allPassed = results.summary.failed === 0;
+  var icon = allPassed ? '✅' : '❌';
+
+  statusEl.textContent = icon + ' ' + results.summary.passed + '/' + results.summary.total +
+    ' passed (' + pct + '%) — ' + results.duration + 'ms';
+  statusEl.style.color = allPassed ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)';
+
+  // Timestamp
+  if (results.timestamp) {
+    var ts = el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' } },
+      'Last run: ' + new Date(results.timestamp).toLocaleString());
+    container.appendChild(ts);
+  }
+
+  // Summary cards row
+  var summaryRow = el('div', { style: { display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' } });
+  var _card = function(label, val, color) {
+    var c = el('div', { style: {
+      padding: '12px 20px', borderRadius: '10px', background: 'var(--bg-secondary)',
+      border: '1px solid var(--border-color)', minWidth: '100px', textAlign: 'center'
+    }});
+    c.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700', color: color } }, String(val)));
+    c.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' } }, label));
+    return c;
+  };
+  summaryRow.appendChild(_card('Total', results.summary.total, 'var(--text-primary)'));
+  summaryRow.appendChild(_card('Passed', results.summary.passed, 'var(--success, #10B981)'));
+  summaryRow.appendChild(_card('Failed', results.summary.failed, results.summary.failed > 0 ? 'var(--danger, #EF4444)' : 'var(--text-secondary)'));
+  summaryRow.appendChild(_card('Duration', results.duration + 'ms', 'var(--text-secondary)'));
+  container.appendChild(summaryRow);
+
+  // Per-suite collapsible sections
+  for (var si = 0; si < results.suites.length; si++) {
+    var suite = results.suites[si];
+    var suiteAllPassed = suite.failed === 0;
+    var suiteCard = el('div', { className: 'card', style: { marginBottom: '12px', overflow: 'hidden' } });
+
+    // Suite header (clickable)
+    var suiteBody = el('div', { style: { display: 'none', padding: '0 16px 16px' } });
+    var suiteHdr = el('div', {
+      style: {
+        padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', userSelect: 'none'
+      },
+      onClick: (function(body) {
+        return function() {
+          body.style.display = body.style.display === 'none' ? 'block' : 'none';
+        };
+      })(suiteBody)
+    });
+    suiteHdr.appendChild(el('span', { style: { fontWeight: '600', fontSize: '15px' } },
+      (suiteAllPassed ? '✅' : '❌') + ' ' + suite.name.toUpperCase() +
+      ' (' + suite.passed + '/' + (suite.passed + suite.failed) + ')'));
+    suiteHdr.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } },
+      suite.duration + 'ms ▾'));
+    suiteCard.appendChild(suiteHdr);
+
+    // Auto-expand failed suites
+    if (!suiteAllPassed) {
+      suiteBody.style.display = 'block';
+    }
+
+    // Individual tests
+    for (var ti = 0; ti < suite.tests.length; ti++) {
+      var t = suite.tests[ti];
+      var tRow = el('div', {
+        style: {
+          padding: '6px 0', borderTop: '1px solid var(--border-color)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          fontSize: '13px'
+        }
+      });
+      // Clean test name: test_suite_description → description
+      var cleanName = t.name.replace(/^test_[a-z]+_/, '');
+      tRow.appendChild(el('span', null, (t.passed ? '✓' : '✗') + ' ' + cleanName));
+      tRow.appendChild(el('span', {
+        style: { color: t.passed ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)', whiteSpace: 'nowrap', marginLeft: '8px' }
+      }, t.passed ? t.duration + 'ms' : 'FAIL'));
+
+      if (!t.passed && t.error) {
+        var errEl = el('div', { style: {
+          fontSize: '12px', color: 'var(--danger, #EF4444)', background: 'var(--bg-tertiary, #1e1e1e)',
+          padding: '6px 10px', borderRadius: '6px', marginTop: '4px', fontFamily: 'monospace',
+          wordBreak: 'break-word'
+        } }, t.error);
+        var errWrap = el('div');
+        errWrap.appendChild(tRow);
+        errWrap.appendChild(errEl);
+        suiteBody.appendChild(errWrap);
+      } else {
+        suiteBody.appendChild(tRow);
+      }
+    }
+
+    suiteCard.appendChild(suiteBody);
+    container.appendChild(suiteCard);
+  }
 }
 </script>

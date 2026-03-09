@@ -539,6 +539,7 @@
         { divider: true },
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
+        { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
       ];
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
@@ -694,6 +695,7 @@
           case 'qaforum': renderQAForum(app, 'steward'); break;
           case 'timeline': renderTimelinePage(app); break;
           case 'failsafe': renderFailsafePage(app); break;
+          case 'testrunner': renderTestRunnerPage(app); break;
           default: renderStewardDashboard(app);
         }
       }

@@ -278,6 +278,13 @@ function createDashboardMenu() {
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }
 
+  adminMenu.addSeparator()
+    .addSubMenu(ui.createMenu('🧪 Test Runner')
+      .addItem('▶ Run All Tests', 'runTestsFromMenu')
+      .addSeparator()
+      .addItem('🕐 Enable Daily Trigger', 'setupTestTriggerFromMenu')
+      .addItem('🚫 Disable Trigger', 'removeTestTriggerFromMenu'));
+
   adminMenu.addToUi();
 }
 

@@ -686,16 +686,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.22.9';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.0';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
-    MINOR: parseInt(parts[1], 10) || 20,
-    PATCH: parseInt(parts[2], 10) || 14,
+    MINOR: parseInt(parts[1], 10) || 25,
+    PATCH: parseInt(parts[2], 10) || 0,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-05',
-    CODENAME: 'Backfill Progress Flush, MegaSurvey Col Test'
+    BUILD_DATE: '2026-03-09',
+    CODENAME: 'GAS-Native Test Runner'
   };
 })();
 
@@ -706,6 +706,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.25.0', date: '2026-03-09', codename: 'GAS-Native Test Runner', changes: 'New GAS-native integration test framework (30_TestRunner.gs). Runs inside the Apps Script runtime against real Sheets/Config/Auth — not mocked. 6 test suites (config, colmap, auth, grievance, security, system) with 48 tests covering: Config tab reads, ConfigReader shape, column mapping integrity (GRIEVANCE_COLS/MEMBER_COLS/CONFIG_COLS), Auth module existence, _resolveCallerEmail/_requireStewardAuth/_checkWebAppAuth, grievance status constants, deadline rules, escapeHtml/escapeForFormula XSS prevention, VERSION_INFO format. SPA dashboard panel (steward-only testrunner tab) with run-all, per-suite filter, pass/fail cards, expandable error details, auto-expand failed suites. Sheets menu item under 🛠️ Admin → 🧪 Test Runner. Daily trigger support (6 AM). Server endpoints: dataRunTests, dataGetTestResults, dataManageTestTrigger — all steward-auth gated. Results stored in ScriptProperties. All tests read-only — never write to sheets. Files: src/30_TestRunner.gs (new), steward_view.html (renderTestRunnerPage), index.html (sidebar + routing), 03_UIComponents.gs (menu). Tests: architecture.test.js + spa-integrity.test.js updated. 2404/2404 Jest tests pass.' },
   { version: '4.24.8', date: '2026-03-08', codename: 'POMS Smart Search Integration', changes: 'Added POMS Reference as a new shared tab (both steward and member roles). 78 POMS sections covering DI/DIB/SSI sequential evaluation, SGA, medical evaluation, med-voc grid rules, CE lifecycle, FTC procedures, CDR (8-step MIRS), child claims, DAA, listings 1.00-14.00, SSI eligibility/income/resources/deeming/work incentives. 17 interactive flowcharts. Features: keyword search with fuzzy scoring, star ratings on explanations and flowcharts, bookmarks, personal notes, quick lookups. Mobile-optimized with 44px touch targets. Files: src/poms_reference.html (CSS-scoped under .poms-root), getPOMSReferenceHtml() in 22_WebDashApp.gs, renderPOMSReference() in index.html. Tab icon: 📘. Lazy-loaded same pattern as org chart.' },
   { version: '4.24.7', date: '2026-03-07', codename: 'Auth Sweep Final — Role Derivation + Residual Fixes', changes: 'FINAL: Three remaining issues closed. (1) getWebAppNotifications: userRole param was still client-trusted — replaced with server-derived role from checkWebAppAuthorization(null,sessionToken).auth.role; treats both/admin as steward for notification targeting. userRole param kept on getWebAppNotificationCount for API compat but ignored server-side. (2) addWebAppResource + sendWebAppNotification: had secondary Session.getActiveUser() call inside function body for audit log (addedBy/stewardEmail) — replaced with auth.email already resolved at function top. (3) getWebAppNotifications: for-loop header (for var i=1) was accidentally stripped during earlier str_replace; restored. restoreFromSnapshot() confirmed sheets-side only (uses ss.toast, never called from client views) — no fix needed.' },
   { version: '4.24.6', date: '2026-03-07', codename: 'Survey Post-Review Fix Batch', changes: '12-issue fix batch from survey system code review. (1) getSatisfactionTrends() fully rewritten — delegates to getSatisfactionSummary(), returns {overall, responseCount, categories[{name,avg}]} matching frontend shape; Insights satisfaction section renders for first time ever. (2) dataGetSatisfactionSummary(sessionToken) — added param, switched _requireStewardAuth→_resolveCallerEmail; both member and steward views can read aggregate anonymous stats; both HTML callers updated to pass SESSION_TOKEN. (3) Survey Version: periodId+"-v"+count replaces bare question count. (4) getActiveSectionKeys() branch rules fully dynamic from questions array via _sectionBranchRules{}. (5) localStorage→window._surveyDraft in-memory store (GAS iframe blocks localStorage). (6) buildSatisfactionColsShim_() in 08c — all deprecated SATISFACTION_COLS key names mapped to dynamic positions; injected into 20 functions across 5 files. (7) Summary write-back guarded if (summaryStart>0). (8) AVG_* per-row reads replaced with inline q-id computations. (9) DevTools maxCol: satSheet.getLastColumn(). (10) 11_CommandHub AVG fallback collapsed. (11) 28 double-paren syntax errors in 21_WebDashDataService.gs — all functions now parse correctly. (12) 5 blocks of getRange+SATISFACTION_COLS col replaced with single full-row reads+slice; stewardRange/leadershipRange ternary guards added.' },

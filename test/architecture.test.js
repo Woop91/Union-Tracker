@@ -207,7 +207,7 @@ describe('A1: Build order integrity', () => {
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
     '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
-    '28_FailsafeService.gs', '29_Migrations.gs'
+    '28_FailsafeService.gs', '29_Migrations.gs', '30_TestRunner.gs'
   ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {
