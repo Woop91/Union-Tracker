@@ -518,3 +518,110 @@ function fsInitSheets(sessionToken) {
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.initFailsafeSheet();
 }
+
+/**
+ * Ensures ALL required hidden/optional sheets exist.
+ * Callable from the SPA (no Sheets UI needed).
+ * Equivalent to the sheet-creation portions of CREATE_DASHBOARD.
+ * Non-destructive: skips sheets that already exist, only creates missing ones.
+ */
+/**
+ * Ensures ALL required hidden/optional sheets exist.
+ * Callable from the SPA (steward auth required).
+ * Delegates to _ensureAllSheetsInternal() — single source of truth.
+ */
+function fsEnsureAllSheets(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+
+  var result = _ensureAllSheetsInternal();
+  return {
+    success: true,
+    created: result.created,
+    failed: result.failed,
+    message: 'Initialized ' + result.created.length + ' sheet group(s).' + (result.failed.length > 0 ? ' ' + result.failed.length + ' failed.' : '')
+  };
+}
+
+/**
+ * Diagnostic function — checks which sheets exist and which are missing.
+ * Helps identify why tabs fail with "Something went wrong" errors.
+ * Call from SPA Failsafe page to see system health.
+ */
+function fsDiagnostic(sessionToken) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: false, message: 'Spreadsheet binding broken.' };
+
+  var allSheetNames = ss.getSheets().map(function(s) { return s.getName(); });
+  var results = [];
+
+  // Check critical sheets
+  var required = {
+    'Member Directory': SHEETS.MEMBER_DIR,
+    'Grievance Log': SHEETS.GRIEVANCE_LOG,
+    'Config': SHEETS.CONFIG,
+  };
+  var optional = {
+    'Notifications': SHEETS.NOTIFICATIONS,
+    'Resources': SHEETS.RESOURCES,
+    'Resource Config': SHEETS.RESOURCE_CONFIG,
+    'Contact Log': SHEETS.CONTACT_LOG,
+    'Steward Tasks': SHEETS.STEWARD_TASKS,
+    'Timeline Events': SHEETS.TIMELINE_EVENTS,
+    'QA Forum': SHEETS.QA_FORUM,
+    'QA Answers': SHEETS.QA_ANSWERS,
+    'Feedback': SHEETS.FEEDBACK,
+    'Case Checklist': SHEETS.CASE_CHECKLIST,
+    'Weekly Questions': SHEETS.WEEKLY_QUESTIONS,
+    'Weekly Responses': SHEETS.WEEKLY_RESPONSES,
+    'Question Pool': SHEETS.QUESTION_POOL,
+    'Survey Tracking': SHEETS.SURVEY_TRACKING,
+    'Survey Vault': SHEETS.SURVEY_VAULT,
+    'Member Satisfaction': SHEETS.SATISFACTION,
+    'Survey Questions': SHEETS.SURVEY_QUESTIONS,
+    'Failsafe Config': SHEETS.FAILSAFE_CONFIG,
+    'Workload Vault': SHEETS.WORKLOAD_VAULT,
+    'Workload Reporting': SHEETS.WORKLOAD_REPORTING,
+    'Audit Log': SHEETS.AUDIT_LOG,
+    'Meeting Check-In Log': SHEETS.MEETING_CHECKIN_LOG,
+    'Steward Performance': SHEETS.STEWARD_PERFORMANCE_CALC,
+  };
+
+  for (var label in required) {
+    var sheetName = required[label];
+    results.push({
+      label: label,
+      sheet: sheetName,
+      exists: allSheetNames.indexOf(sheetName) !== -1,
+      critical: true
+    });
+  }
+  for (var label2 in optional) {
+    var sheetName2 = optional[label2];
+    results.push({
+      label: label2,
+      sheet: sheetName2,
+      exists: allSheetNames.indexOf(sheetName2) !== -1,
+      critical: false
+    });
+  }
+
+  // Also check auth
+  var authOk = false;
+  try {
+    var testAuth = checkWebAppAuthorization('steward', sessionToken);
+    authOk = testAuth && testAuth.isAuthorized;
+  } catch (_) {}
+
+  return {
+    success: true,
+    totalSheets: allSheetNames.length,
+    results: results,
+    authOk: authOk,
+    email: e,
+    missing: results.filter(function(r) { return !r.exists; }).map(function(r) { return r.label + ' (' + r.sheet + ')' + (r.critical ? ' ⚠️ CRITICAL' : ''); })
+  };
+}

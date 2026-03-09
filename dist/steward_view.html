@@ -148,26 +148,12 @@ function renderStewardDashboard(appContainer) {
 
       // Fill in org-wide stats
       serverCall().withSuccessHandler(function(stats) {
+        if (!stats || !stats.available) return;
         var cards = kpiGrid.querySelectorAll('.kpi-value');
-        if (!stats || !stats.available) {
-          // Graceful fallback — show 0 instead of leaving "..." placeholder
-          if (cards[0]) cards[0].textContent = '0';
-          if (cards[1]) cards[1].textContent = '0';
-          if (cards[2]) cards[2].textContent = '0';
-          if (cards[3]) cards[3].textContent = '0';
-          return;
-        }
         if (cards[0]) cards[0].textContent = String(stats.total || 0);
         if (cards[1]) { cards[1].textContent = String(stats.overdueCount || 0); if (stats.overdueCount > 0) cards[1].style.color = 'var(--danger)'; }
         if (cards[2]) { cards[2].textContent = String(stats.dueSoonCount || 0); if (stats.dueSoonCount > 0) cards[2].style.color = 'var(--warning)'; }
         if (cards[3]) cards[3].textContent = String(stats.settledCount || stats.wonCount || 0);
-      }).withFailureHandler(function(err) {
-        console.error('Org KPI stats failed:', err && err.message);
-        var cards = kpiGrid.querySelectorAll('.kpi-value');
-        if (cards[0]) cards[0].textContent = '\u2014';
-        if (cards[1]) cards[1].textContent = '\u2014';
-        if (cards[2]) cards[2].textContent = '\u2014';
-        if (cards[3]) cards[3].textContent = '\u2014';
       }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
       var kpiItems = [
@@ -2166,45 +2152,26 @@ function renderStewardMore(appContainer) {
     content.appendChild(phoneCard);
     // ─────────────────────────────────────────────────────────────────────
     var menuItems = [
-      { group: 'Manage' },
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
-      { group: 'Reference' },
-      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('steward', 'poms'); } },
-      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
-      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
-      { group: 'Community' },
-      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'steward'); } },
-      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { renderManagePolls(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderStewardMinutes(document.getElementById('app')); } },
-      { group: 'Comms' },
       { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { renderBroadcast(document.getElementById('app')); } },
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View and send notifications', action: function() { renderStewardNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
-      { divider: true },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'steward'); } },
+      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('steward', 'poms'); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { renderManagePolls(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { renderStewardDirectoryPage(document.getElementById('app')); } },
+
+      { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderStewardMinutes(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { renderFailsafePage(document.getElementById('app')); } },
     ];
 
     menuItems.forEach(function(m) {
-      if (m.group) {
-        content.appendChild(el('div', {
-          style: {
-            fontSize: '10px', fontWeight: '700', textTransform: 'uppercase',
-            letterSpacing: '1.2px', color: 'var(--text-secondary, #888)',
-            padding: '12px 0 4px', marginTop: '4px'
-          }
-        }, m.group));
-        return;
-      }
-      if (m.divider) {
-        content.appendChild(el('div', { style: { height: '1px', background: 'var(--border)', margin: '8px 0' } }));
-        return;
-      }
       var item = el('div', { className: 'more-menu-item', onClick: m.action });
       item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
       var text = el('div', { style: { flex: '1' } });

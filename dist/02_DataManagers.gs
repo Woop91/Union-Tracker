@@ -1927,7 +1927,7 @@ function getDaysUntilDeadline(deadline) {
   deadlineDate.setHours(0, 0, 0, 0);
 
   const diffTime = deadlineDate - today;
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
 // ============================================================================
