@@ -177,7 +177,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     view: role === 'steward' || role === 'both' ? 'steward' : 'member',
     config: _sanitizeConfig(config),
     user: safeUser,
-    isDualRole: role === 'both',
+    isDualRole: role === 'steward' || role === 'both',
     sessionToken: sessionToken || null,
     initialTab: initialTab || null,
     webAppUrl: ScriptApp.getService().getUrl(),
@@ -304,6 +304,7 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the POMS Reference HTML for lazy-loading.
+ * Loaded on-demand when the user navigates to the POMS Reference tab.
  * @returns {string} Raw HTML content (CSS-scoped under .poms-root)
  */
 function getPOMSReferenceHtml() {

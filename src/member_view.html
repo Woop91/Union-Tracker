@@ -1482,26 +1482,46 @@ function renderMemberMore(appContainer) {
     var content = el('div', { className: 'content' });
     var isDuesPaying = _isDuesPaying();
     var menuItems = [
+      { group: 'Manage' },
+      { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', action: function() { renderMemberTasks(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { renderUnionStatsPage(document.getElementById('app')); } },
+      { group: 'Reference' },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('member', 'poms'); } },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { renderMemberResources(document.getElementById('app')); } },
+      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
+      { group: 'Community' },
+      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'member'); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { renderPollsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app'), 'member'); } },
+      { icon: '\uD83D\uDCCB', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderMinutesPage(document.getElementById('app')); } },
+      { group: 'Comms' },
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Messages and alerts', action: function() { renderMemberNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { renderUnionStatsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardContact(document.getElementById('app')); } },
-      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
-      { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { renderMemberResources(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },
-      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { renderPollsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { renderSurveyFormPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', action: function() { renderMemberTasks(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCCB', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderMinutesPage(document.getElementById('app')); } },
       { icon: '\uD83E\uDD1D', label: 'My Meetings', desc: 'Your meeting attendance', action: function() { renderMeetingsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'member'); } },
-      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app'), 'member'); } },
+      { divider: true },
+      { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardContact(document.getElementById('app')); } },
+      { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { renderSurveyFormPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
     ];
 
     menuItems.forEach(function(m) {
+      if (m.group) {
+        content.appendChild(el('div', {
+          style: {
+            fontSize: '10px', fontWeight: '700', textTransform: 'uppercase',
+            letterSpacing: '1.2px', color: 'var(--text-secondary, #888)',
+            padding: '12px 0 4px', marginTop: '4px'
+          }
+        }, m.group));
+        return;
+      }
+      if (m.divider) {
+        content.appendChild(el('div', { style: { height: '1px', background: 'var(--border)', margin: '8px 0' } }));
+        return;
+      }
       var isLocked = m.locked && !isDuesPaying;
       var item = el('div', {
         className: 'more-menu-item',
@@ -2192,8 +2212,10 @@ function renderSurveyResultsPage(appContainer) {
 // ═══════════════════════════════════════
 
 function renderWorkloadTracker(appContainer) {
-  renderPageLayout(appContainer, 'member', 'workload', function(container) {
-    _memberHeader(container, 'Workload Tracker');
+  var role = AppState.activeRole || 'member';
+  var headerFn = role === 'steward' ? _stewardHeader : _memberHeader;
+  renderPageLayout(appContainer, role, 'workload', function(container) {
+    headerFn(container, 'Workload Tracker');
     var content = el('div', { className: 'content' });
 
     var activeSubTab = 'submit';

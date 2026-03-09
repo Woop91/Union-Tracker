@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED]`
+**DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -1585,6 +1585,49 @@ add role-aware filtering in `getStewardDirectory()` in `21_WebDashDataService.gs
 
 ---
 
+---
+
+## 📋 CHANGE LOG — v4.24.1 FlashPolls Verdict + seedWeeklyQuestions Schema Fix
+
+**Date:** 2026-03-07
+**Version:** v4.24.1
+**Agent:** Claude (claude.ai)
+
+### FlashPolls Sheets — Live Spreadsheet Verdict
+
+**Conclusion: Sheets almost certainly exist (empty, headers only). No PII present.**
+
+Evidence chain:
+1. `FlashPolls`/`PollResponses` were introduced in v4.12.2 (2026-02-25) and created by `initPortalSheets()`.
+2. `initPortalSheets()` is called from `CREATE_DASHBOARD()`, which must have been run to set up the system.
+3. `seedPollsData()` (the only function that would write rows) was added in v4.18.0 (2026-02-26) as part of the Phase 3 seeder — a **separate manual function**, not called by `CREATE_DASHBOARD`.
+4. There is zero evidence in CHANGELOG, AI_REFERENCE, git commit messages, or code comments that Phase 3 seeder was ever run on the live script.
+5. `submitPollVote()` (the live-vote function) was **never wired to any frontend** — the webapp always used `wq*` wrappers. No real votes could have been recorded.
+
+**Result:** `FlashPolls` and `PollResponses` contain only headers. Still delete them — orphaned infrastructure.
+
+### Bug Fixed: seedWeeklyQuestions — Wrong Column Schema
+
+The existing `seedWeeklyQuestions()` function had two schema bugs causing silent data corruption:
+
+| Sheet | Bug | Fix |
+|---|---|---|
+| `_Question_Pool` | Missing `Options` column (wrote 5 cols, schema needs 6) | Added `JSON.stringify(options)` as col 3 |
+| `_Weekly_Questions` | Missing `Options` column (wrote 7 cols, schema needs 8) | Added `JSON.stringify(options)` as col 3 |
+| `_Weekly_Responses` | WQ-002 responses were numeric strings (`'8'`, `'7'`) — not valid option values | Replaced with actual option strings from the question |
+
+**Root cause:** Seed was written before `24_WeeklyQuestions.gs` added the `Options` column to both sheets. Schema drift was never caught because seeding was never confirmed run on the live script.
+
+**Schema (current, from 24_WeeklyQuestions.gs Q_COLS/P_COLS constants):**
+- `_Weekly_Questions`: `ID | Text | Options(JSON) | Source | Submitted By | Week Start | Active | Created`
+- `_Question_Pool`: `ID | Text | Options(JSON) | Submitted By Hash | Status | Created`
+- `_Weekly_Responses`: `ID | Question ID | Email Hash | Response | Timestamp`
+
+### Pool Questions Added (12 seed candidates)
+All with properly structured `Options` arrays. Topics: scheduling, policy clarity, contract priorities, caseload, steward accessibility, grievance process, meeting times, union confidence, communication, respect, teamwork.
+
+---
+
 ## Steward Phone Permission — Opt-In for Member Visibility (2026-03-07)
 
 ### Files Modified
@@ -1757,3 +1800,649 @@ admins reading the sheet see the intent clearly.
 
 New sheets have no data rows at creation time, so seeding is not needed there.
 Blank cells in the column are still treated as `false` by the backend as a belt-and-suspenders fallback.
+
+---
+
+## 📋 CHANGE LOG — v4.24.2 Manual Community Poll Draw
+
+**Date:** 2026-03-07
+**Version:** v4.24.2
+**Agent:** Claude (claude.ai)
+
+### Feature: Steward Manual Community Poll Draw
+
+**Problem:** The community poll slot only fills via a Monday time trigger (`autoSelectCommunityPoll`). That trigger has never been installed on the live script, so the community poll track has never worked. No steward had any way to release it.
+
+**Solution:** New GAS wrapper + steward UI button.
+
+#### Backend — `24_WeeklyQuestions.gs`
+`wqManualDrawCommunityPoll()` — steward-only wrapper. Calls `WeeklyQuestions.selectRandomPoolQuestion()` directly, bypassing `autoSelectCommunityPoll`'s day-of-week guards. Logs to audit trail. Returns `{ success, message, questionId?, text? }`.
+
+#### Frontend — `steward_view.html` — `_renderCreateStewardPoll()`
+The static pool count info line replaced with a full **Community Poll Pool card**:
+- Pool count display
+- **"Draw Community Poll"** button — disabled (with tooltip) when pool is empty
+- Inline status: shows drawn question text on success, error message on failure
+- Button disabled during in-flight request (prevents double-draw)
+- Empty pool guard fires client-side before the server call
+
+#### Why not a toggle
+A toggle implies an on/off persistent state. The draw is a one-time action per period — toggling it "on" would be meaningless since there's nothing to turn off. A button is the correct affordance.
+
+#### Note
+`setupCommunityPollTrigger()` should still be run eventually to automate future draws. The manual draw button is a first-release tool and a fallback for periods where the trigger misses.
+
+---
+
+### v4.20.18a — Minutes CTA bug fixes (2026-03-07)
+
+#### `member_view.html` — `renderMinutesPage()`
+Three bugs fixed:
+
+| Bug | Root cause | Fix |
+|-----|-----------|-----|
+| CTA never showed | `!CONFIG.grievancesFolderId === false` — `!x === false` evaluates as `!!x` due to precedence; only true when folder IS set | Removed condition entirely; CTA always shown |
+| CTA click crashed | Called `renderMyCasesPage()` which does not exist | Corrected to `renderMyCases()` |
+| CTA disappeared after load | `showLoading(content)` clears `content.innerHTML`; CTA was appended to `content` before `showLoading` | CTA now appended to `container`; spinner lives in separate `content` div; success handler does `content.innerHTML = ''` safely |
+
+#### `03_UIComponents.gs`
+Menu item renamed: `Setup Dashboard Folder Structure` → `Setup / Repair Drive Folder Structure`
+Rationale: re-running this on an existing deployment sets Minutes/ to view-only sharing.
+
+#### `05_Integrations.gs` — `SETUP_DRIVE_FOLDERS()`
+Alert now explicitly confirms Minutes/ folder sharing status.
+
+---
+
+## 📋 CHANGE LOG — v4.24.3 Auto-Draw Skip When Manually Released
+
+**Date:** 2026-03-07
+**Version:** v4.24.3
+**Agent:** Claude (claude.ai)
+
+### Feature: Monday Trigger Skips If Community Poll Already Active
+
+**Problem:** `autoSelectCommunityPoll` (Monday time trigger) would overwrite a community poll that a steward had already manually released via the v4.24.2 draw button.
+
+**Fix:** Added a pre-draw check in `autoSelectCommunityPoll` only (not in `selectRandomPoolQuestion` — manual steward draw via button can still overwrite intentionally).
+
+**Logic:** Before calling `selectRandomPoolQuestion()`, the trigger now reads `_Weekly_Questions` and checks if any row has `SOURCE = 'community'`, `ACTIVE = TRUE`, and `WEEK_START = current period`. If found → log and return without drawing.
+
+**Column indices used** (mirrors Q_COLS inside the IIFE — kept in sync as named constants):
+- `COL_SOURCE = 3`, `COL_WEEK_START = 5`, `COL_ACTIVE = 6`
+
+**⚠️ Schema dependency:** If `24_WeeklyQuestions.gs` Q_COLS indices ever change, `autoSelectCommunityPoll`'s named constants must be updated to match.
+
+
+---
+
+## 📋 CHANGE LOG — v4.24.4 Eliminate Duplicated Q_COLS Indices
+
+**Date:** 2026-03-07
+**Version:** v4.24.4
+**Agent:** Claude (claude.ai)
+
+### Fix: Single Source of Truth for Q_COLS
+
+**Problem (v4.24.3):** `autoSelectCommunityPoll` used hardcoded `COL_SOURCE=3`, `COL_WEEK_START=5`, `COL_ACTIVE=6` constants copied from `Q_COLS` inside the IIFE. Schema drift risk — two places to update.
+
+**Fix:** Exposed `Q_COLS` through the `WeeklyQuestions` public API return object. `autoSelectCommunityPoll` now reads `WeeklyQuestions.Q_COLS.SOURCE`, `.WEEK_START`, `.ACTIVE` directly. One definition, one place.
+
+**Change in `24_WeeklyQuestions.gs`:**
+- Public return object: added `Q_COLS: Q_COLS`
+- `autoSelectCommunityPoll`: replaced `COL_*` locals with `var qc = WeeklyQuestions.Q_COLS`
+
+
+---
+
+## 📋 CHANGE LOG — v4.24.5 Remove Dead TYPE Column from Feedback
+
+**Date:** 2026-03-07
+**Version:** v4.24.5
+**Agent:** Claude (claude.ai)
+
+### Fix: Removed `Type` column from Feedback schema
+
+**Problem:** `FEEDBACK_HEADER_MAP_` had a `TYPE` key (column "Type") that was never surfaced in the submit form. The backend default `feedbackData.type || 'Suggestion'` silently wrote `'Suggestion'` to every row because the frontend never sent `type`. `Category` already covers the same semantic ground.
+
+**Files changed:**
+- `src/01_Core.gs` — Removed `{ key: 'TYPE', header: 'Type' }` from `FEEDBACK_HEADER_MAP_`
+- `src/21_WebDashDataService.gs` — Removed `type` slot from `submitFeedback` row array
+- `src/10b_SurveyDocSheets.gs` — Removed `setColumnWidth(FEEDBACK_COLS.TYPE)` and Type dropdown `setDataValidation` block
+- `src/steward_view.html` — Removed stale `CURRENT_USER.email` arg from `.dataGetMyFeedback()` call (email is resolved server-side; the arg was silently ignored)
+
+**Also documented (no code change):** Stewards see the same two-tab Feedback page as members — no management panel to update Status/Resolution. Flagged for future enhancement.
+
+---
+
+## v4.24.6 — Survey Post-Review Fix Batch (2026-03-07)
+
+Applied to remote base at v4.24.4. See commit log for full details.
+12 issues fixed — see CHANGELOG entry for v4.24.6 in 01_Core.gs.
+
+### Key Rules
+- `buildSatisfactionColsShim_()` maps all SATISFACTION_COLS key names to dynamic positions
+- `dataGetSatisfactionSummary(sessionToken)` is member+steward accessible (aggregate anon data)  
+- `window._surveyDraft` replaces localStorage for survey progress in GAS iframe context
+- 28 double-paren syntax errors in 21_WebDashDataService.gs all fixed
+- `initSurveyEngine()` has NOT been run on live sheet — do not run until owner reviews Questions sheet
+
+
+---
+
+## 📋 CHANGE LOG — v4.24.8 Critical Auth Fix: Missing sessionToken Parameters + Bootstrap Recovery
+
+**Date:** 2026-03-07
+**Version:** v4.24.8
+**Agent:** Claude Opus 4.6 (claude.ai)
+
+### Reported Symptoms
+1. **White screen** in normal browser (non-incognito)
+2. **"Email me a sign-in link"** → "Something went wrong / Failed to send email"
+3. **"Continue with Google"** → error about needing Google account (expected in incognito)
+
+### Root Cause
+The v4.23.1 auth sweep (session token migration) rewrote function bodies to call `_resolveCallerEmail(sessionToken)` or `_requireStewardAuth(sessionToken)` but **did not add `sessionToken` to 6 function parameter lists**. The client correctly passed `SESSION_TOKEN`, but the server functions declared `()` (no params), so `sessionToken` was `undefined` inside. This caused `ReferenceError` on every call for magic-link/session-token users (SSO users were unaffected because `_resolveCallerEmail` tries SSO first).
+
+### Bugs Fixed
+
+**Bug 1 — 6 wrapper functions missing `sessionToken` parameter** (21_WebDashDataService.gs):
+- `dataGetBroadcastFilterOptions()` → `dataGetBroadcastFilterOptions(sessionToken)`
+- `dataGetStewardDirectory()` → `dataGetStewardDirectory(sessionToken)`
+- `dataGetEngagementStats()` → `dataGetEngagementStats(sessionToken)`
+- `dataGetWorkloadSummaryStats()` → `dataGetWorkloadSummaryStats(sessionToken)`
+- `dataGetWelcomeData()` → `dataGetWelcomeData(sessionToken)`
+- `dataMarkWelcomeDismissed()` → `dataMarkWelcomeDismissed(sessionToken)`
+
+**Bug 2 — `dataGetBatchData` client-server parameter mismatch** (index.html + 21_WebDashDataService.gs):
+- Client called `.dataGetBatchData(CURRENT_USER.email, CURRENT_VIEW)` but server expected `(sessionToken)`
+- Fixed client to call `.dataGetBatchData(SESSION_TOKEN)`
+- Server derives email via `_resolveCallerEmail(sessionToken)` and role from Member Directory
+
+**Bug 3 — `sendMagicLink` no top-level try/catch** (19_WebDashAuth.gs):
+- Unhandled exceptions before the `MailApp.sendEmail()` try/catch caused `google.script.run` failure handler to fire with generic error
+- Added outer try/catch with `Logger.log` for server-side diagnostics
+
+**Bug 4 — Client bootstrap crash = white screen** (index.html):
+- `DOMContentLoaded` handler had no error recovery — any JS exception during init left a blank page
+- Added try/catch with fallback error UI including "Clear & Reload" button that clears stale localStorage tokens
+
+**Bug 5 — localStorage redirect could throw** (index.html):
+- `localStorage.getItem()` / `removeItem()` can throw in restricted contexts (Safari ITP, certain iframes)
+- Wrapped session-restore block in try/catch
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `src/21_WebDashDataService.gs` | Added `sessionToken` param to 6 global wrapper functions |
+| `src/index.html` | Fixed `dataGetBatchData` call, added bootstrap error recovery, guarded localStorage |
+| `src/19_WebDashAuth.gs` | Added outer try/catch to `sendMagicLink` |
+| `dist/*` | Rebuilt from src via `node build.js` |
+
+### Key Rules (reminder for future agents)
+- ALL `google.script.run` wrapper functions that call `_resolveCallerEmail(sessionToken)` or `_requireStewardAuth(sessionToken)` MUST declare `sessionToken` as a parameter
+- Client calls MUST pass `SESSION_TOKEN` (not email or view) as the first argument to any auth-wrapped server function
+- The `dist/` directory is the deployment source — always rebuild after editing `src/`
+- `dataGetBatchData` resolves both email AND role server-side — client only sends `SESSION_TOKEN`
+
+### Deployment Required
+After pushing, Wardis must:
+1. `clasp push` from local machine (rootDir: `./dist`)
+2. Update the active web app deployment to a new version in Apps Script editor
+
+
+---
+
+## 📋 CHANGE LOG — v4.24.9 White Screen Fix + MailApp Scope
+
+**Date:** 2026-03-07
+**Version:** v4.24.9
+**Agent:** Claude Opus 4.6 (claude.ai)
+
+### Root Cause — White Screen
+**steward_view.html line 3359** had an unescaped apostrophe in a single-quoted JS string:
+```javascript
+'Create This Week's '   // ← apostrophe in Week's terminates the string
+```
+This is a **fatal syntax error** that kills the ENTIRE `<script>` block in steward_view.html, making `initStewardView()` undefined. When the main script calls it → `ReferenceError` → page stays blank.
+
+**Fix:** Changed outer quotes to double quotes: `"Create This Week's "`
+
+### Root Cause — Magic Link "Failed to send email"
+**appsscript.json** had `gmail.send` scope (for `GmailApp`) but NOT `script.send_mail` (for `MailApp`). Auth module uses `MailApp.sendEmail()`, which requires the `script.send_mail` scope. These are different APIs with different OAuth scopes.
+
+**Fix:** Added `https://www.googleapis.com/auth/script.send_mail` to oauthScopes in both `appsscript.json` and `dist/appsscript.json`.
+
+### Root Cause — "Continue with Google" error in incognito
+Expected behavior. In incognito mode, users aren't logged into Google, so SSO can't resolve their identity. The error message correctly directs them to use the email link option instead.
+
+### Key Rules (for future agents)
+- **ALWAYS syntax-check HTML view files after editing** using: `node -e "const vm=require('vm'); const fs=require('fs'); new vm.Script(fs.readFileSync('file.html','utf8').replace(/<script>/,'').replace(/<\/script>/,''))"`
+- **Never use unescaped apostrophes in single-quoted JS strings** — use double quotes or `\\`
+- **MailApp needs `script.send_mail`**, GmailApp needs `gmail.send` — they are DIFFERENT scopes
+- A syntax error in ANY included HTML view file silently kills ALL functions in that file's `<script>` block
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `src/steward_view.html` | Fixed unescaped apostrophe in `Week's` string |
+| `appsscript.json` | Added `script.send_mail` OAuth scope |
+| `dist/appsscript.json` | Added `script.send_mail` OAuth scope |
+| `dist/*` | Rebuilt from src |
+
+### Deployment Note
+After `clasp push`, Google will prompt the script owner to **re-authorize** the script because a new OAuth scope was added. Accept the authorization prompt.
+
+
+---
+
+## 📋 CHANGE LOG — v4.25.0 Deploy Guards + 26 Client-Server Auth Mismatches Fixed
+
+**Date:** 2026-03-07
+**Version:** v4.25.0
+**Agent:** Claude Opus 4.6 (claude.ai)
+
+### Deploy Guard Tests (test/deploy-guards.test.js)
+New automated test suite (64 tests) that catches every class of bug from the v4.24.8/9 outage:
+
+| Guard | What It Catches | How |
+|-------|----------------|-----|
+| G1 | JS syntax errors in HTML view files | Parses every `<script>` block with `vm.Script` |
+| G2 | Missing `sessionToken` parameter on server wrappers | Scans function bodies for `sessionToken` refs vs param list |
+| G3 | OAuth scope gaps | Maps API calls (MailApp, GmailApp, etc.) to required scopes |
+| G4 | Client-server parameter count mismatches | Compares `google.script.run` call arg counts to server signatures |
+| G5 | Unescaped apostrophes in single-quoted JS strings | Regex scan for `'word's'` patterns |
+| G6 | Stale dist/ (not rebuilt after src changes) | Byte-compares src/ vs dist/ |
+| G7 | Syntax errors in .gs files | Parses all .gs with `vm.Script` |
+
+**Run:** `npm run test:guards` or automatically via `npm run deploy` / `npm test`
+
+### 26 Client-Server Parameter Mismatches Fixed
+
+**QA Forum (26_QAForum.gs) — removed redundant `email`/`stewardEmail` params:**
+The v4.23.1 auth sweep added `sessionToken` as first param but left the legacy `email` param in position 2. Client correctly stopped sending email, but server still expected it positionally → all QA args shifted by one → pagination, upvotes, moderation were broken.
+
+Affected: `qaGetQuestions`, `qaGetQuestionDetail`, `qaSubmitQuestion`, `qaSubmitAnswer`, `qaUpvoteQuestion`, `qaModerateQuestion`, `qaModerateAnswer`, `qaGetFlaggedContent`, `qaResolveQuestion`
+
+**Client calls missing SESSION_TOKEN (steward_view.html + member_view.html):**
+- `dataStaffCompleteMemberTask(t.id)` → `(SESSION_TOKEN, t.id)`
+- `dataGetCaseChecklist(caseId)` → `(SESSION_TOKEN, caseId)` (both views)
+- `wqManualDrawCommunityPoll()` → `(SESSION_TOKEN)`
+- `dataGetMeetingMinutes(100)` → `(SESSION_TOKEN, 100)` (both views)
+- `dataGetMyFeedback()` → `(SESSION_TOKEN)`
+- `dataGetUpcomingEvents(20)` → `(SESSION_TOKEN, 20)` (member_view)
+- `DataCache.cachedCall` for events: `[10]` → `[SESSION_TOKEN, 10]`
+
+**`dataAssignSteward` — missing member email (member_view.html):**
+Client sent `(SESSION_TOKEN, stewardEmail)` but server expects `(sessionToken, memberEmail, stewardEmail)`. Added `CURRENT_USER.email` as second arg.
+
+### Key Rules for Future Agents
+- **Run `npm run test:guards` before ANY deployment** — it catches parameter mismatches, syntax errors, scope gaps, and stale dist
+- **When adding `sessionToken` to a server function, update ALL client calls** — search all HTML view files
+- **When removing a parameter from a server function, update ALL client calls** — positional args shift
+- **Never deploy without rebuilding dist/** — `node build.js` then verify G6 passes
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `test/deploy-guards.test.js` | NEW — 64 automated deploy guard tests |
+| `src/26_QAForum.gs` | Removed redundant email/stewardEmail from 9 wrapper functions |
+| `src/steward_view.html` | Added SESSION_TOKEN to 5 client calls |
+| `src/member_view.html` | Added SESSION_TOKEN to 5 client calls + CURRENT_USER.email to dataAssignSteward |
+| `package.json` | Added `test:guards` script, wired into deploy + lint-staged |
+| `dist/*` | Rebuilt from src |
+
+
+---
+
+## 🏗️ FUTURE ARCHITECTURE — Extract JS from HTML View Files
+
+**Status:** Planned, not scheduled
+**Priority:** Medium — reduces risk class, improves DX
+**Effort:** Major refactor
+
+### Problem
+`steward_view.html` (~3,900 lines) and `member_view.html` (~4,400 lines) each contain a single `<script>` block with thousands of lines of JavaScript. ESLint cannot lint JavaScript embedded in HTML files (the standard `eslint-plugin-html` fails here because GAS template tags like `<?!= include('styles') ?>` produce parse errors). This means ~8,000 lines of client-side JS are invisible to the linter — the exact code where the v4.24.9 fatal syntax error lived.
+
+Current mitigation: `build.js` validates HTML `<script>` blocks with `vm.Script` at build time, and `test/deploy-guards.test.js` G1 does the same at test time. These catch syntax errors but not logic bugs, unused variables, or style issues that ESLint would flag.
+
+### Proposed Fix
+Extract the JavaScript from each HTML view file into separate `.gs` files (e.g., `steward_view_client.gs`, `member_view_client.gs`) that GAS can serve via `HtmlService.createHtmlOutputFromFile()` or inline via `<?!= include() ?>`. The HTML files would then contain only markup + a `<script src>` or `<?!= include('steward_view_client') ?>` tag.
+
+**Benefits:**
+- Full ESLint coverage on all client-side JS
+- Easier code navigation (IDE support, go-to-definition)
+- Smaller diffs on HTML-only or JS-only changes
+- Could enable future bundling/minification
+
+**Risks:**
+- GAS `include()` returns raw HTML — extracted .gs files would need to be `.html` files containing only `<script>` blocks (current pattern already works this way for `auth_view.html` and `error_view.html`)
+- Variable scoping: all view JS currently shares a single `<script>` scope — splitting requires careful attention to shared state (`AppState`, `CONFIG`, `CURRENT_USER`, etc.)
+- Testing: deploy-guards G4 (param matching) would need updated file paths
+
+**Recommendation:** Do this when a major feature requires significant edits to either view file, so the refactor cost is amortized against planned work.
+
+---
+
+### 2026-03-08 — POMS Smart Search Integration (v4.24.8)
+- **Action**: Added POMS Reference as shared tab in web app (both steward + member roles)
+- **New Files**:
+  - `src/poms_reference.html` — 78 POMS sections, 17 flowcharts, keyword search, star ratings, bookmarks, notes (78KB, CSS-scoped under `.poms-root`)
+  - `dist/poms_reference.html` — copy
+- **Modified Files**:
+  - `src/index.html` / `dist/index.html` — Added `{ id: 'poms', icon: '📘', label: 'POMS Ref.' }` to both steward and member tab arrays. Added `renderPOMSReference()` function (lazy-load pattern identical to org chart). Added `if (tabId === 'poms')` shared tab handler.
+  - `src/22_WebDashApp.gs` / `dist/22_WebDashApp.gs` — Added `getPOMSReferenceHtml()` server function (returns poms_reference.html content)
+  - `src/01_Core.gs` / `dist/01_Core.gs` — Version entry 4.24.8
+- **Architecture**: Same lazy-load pattern as org chart — `google.script.run.getPOMSReferenceHtml()` fetches HTML, injected into container, `<script>` tags re-executed. Container set to `height:calc(100vh-56px)` for full-page POMS app experience.
+- **CSS Scoping**: All POMS styles prefixed with `p-` or `poms-` to avoid SPA conflicts. No `:root` vars. No `body` selectors.
+- **Security**: No DDS Script ID in poms_reference.html (verified grep)
+- **Sync**: DDS Main → UT staging (commit 1945f90). DDS Script ID check clean.
+
+---
+
+## 2026-03-08 — Steward Dual-Role Toggle Fix
+
+### Issue
+Stewards could not switch to Member View. The "Switch to Member/Steward" toggle in the sidebar and mobile headers was gated behind `IS_DUAL_ROLE`, which was only `true` when `role === 'both'`. Since stewards are assigned `role = 'steward'` from the Member Directory sheet, the toggle never appeared for them.
+
+### Root Cause
+`src/22_WebDashApp.gs` line 180: `isDualRole: role === 'both'` — excluded regular stewards.
+
+### Fix
+Changed to `isDualRole: role === 'steward' || role === 'both'` — since all stewards are members, every steward is inherently dual-role.
+
+### Files Changed
+- `src/22_WebDashApp.gs` — one-line fix (isDualRole condition)
+
+### How It Works
+- **Sidebar (desktop/tablet)**: `index.html` ~line 469 — shows "Switch to [Member/Steward]" when `IS_DUAL_ROLE` is true
+- **Steward mobile header**: `steward_view.html` ~line 94 — always shows switch button (not gated)
+- **Member mobile header**: `member_view.html` ~line 69 — shows switch button when `IS_DUAL_ROLE` is true
+- Labels come from `CONFIG.memberLabel` / `CONFIG.stewardLabel` (dynamic, from Config tab)
+- Toggle calls `initStewardView(app)` or `initMemberView(app)` and updates `AppState.activeRole`
+
+---
+
+## 2026-03-08 — Member List Clickability UX Fix
+
+### Issue
+Members in the steward's Members tab appeared non-interactive — no hover state, no cursor indicator, no visual hint they could be clicked to expand details.
+
+### Root Cause
+CSS for `.member-list-item` had no `cursor: pointer`, no hover/active states, and no expand indicator. The click handlers existed in JS but the visual affordance was absent.
+
+### Fix
+1. **CSS** (`styles.html`): Added `cursor: pointer`, `border-radius: 8px`, hover background, active scale transform, chevron rotation animation, and panel slide-in animation
+2. **JS** (`steward_view.html`): Added `▶` chevron span to each member row. Click handler now toggles `.expanded` class for chevron rotation. Siblings get `.expanded` removed on new selection.
+
+### Files Changed
+- `src/styles.html` — `.member-list-item` hover/active states, `.member-list-chevron` rotation, `.member-detail-panel` animation
+- `src/steward_view.html` — chevron element + expanded class toggle in click handler
+
+### How Member Click Works
+1. Steward opens Members tab → `renderStewardMembers()` calls `dataGetAllMembers(SESSION_TOKEN)`
+2. Members render as `div.member-list-item` rows with avatar, name, location, badges, chevron
+3. Click → `_toggleMemberDetail()` → either collapses (if same member) or expands detail panel
+4. Detail panel shows: email, location, office days, dues status + action buttons (Full Profile, Log Contact, Send Notification, Case Folder)
+5. "Full Profile" button calls `dataGetFullProfile(email)` for additional fields (job title, supervisor, joined date, member admin folder link)
+
+---
+
+## 2026-03-08 — POMS Missing from Mobile More Menus + Members Tab Error Feedback
+
+### Issue 1: POMS Reference not visible in steward view (mobile)
+POMS was in sidebar tabs (`_getSidebarTabs`) and routing (`_handleTabNav`) but was **missing from both the steward and member More menus** on mobile. Mobile users couldn't access POMS at all.
+
+### Fix
+Added `{ icon: '📘', label: 'POMS Ref.', ... }` to:
+- `steward_view.html` → `renderStewardMore()` menu items (after Org Chart)
+- `member_view.html` → `renderMemberMore()` menu items (after Org Chart)
+Both route through `_handleTabNav(role, 'poms')` for consistent behavior.
+
+### Issue 2: Members tab — silent failure on auth
+`dataGetAllMembers(SESSION_TOKEN)` returns `[]` when `_requireStewardAuth` fails (expired/invalid session). The success handler treats this as "no members" with no indication of the real problem.
+
+### Fix
+Improved the empty-state message to suggest refreshing if no members are found unexpectedly.
+
+### Files Changed
+- `src/steward_view.html` — POMS in More menu + improved members empty-state message
+- `src/member_view.html` — POMS in More menu
+
+---
+
+## 2026-03-08 — Member Click Debug Tracing
+
+### Issue
+Steward Members tab loads and displays members, but clicking a member row does nothing — no panel expansion, no error visible.
+
+### Investigation
+Code review shows click handler (`addEventListener`), `_toggleMemberDetail`, and `_showMemberDetail` are all wired correctly. Panel creation and `insertBefore` DOM insertion logic is sound. CSS variables (`--raised`, `--accent`, etc.) are defined by ThemeEngine. No `overflow: hidden` or `pointer-events: none` blocking the content area.
+
+### Diagnosis Approach
+Added try-catch with visible error display to three functions:
+1. Click handler in `renderFilteredMembers` — catches and shows red error below clicked row
+2. `_toggleMemberDetail` — catches and logs to console
+3. `_showMemberDetail` — catches and shows red error panel below clicked row
+
+If clicks do nothing AND no red error appears → the click event isn't firing (CSS overlay / z-index issue)
+If red error appears → the error message will reveal the root cause
+If panel appears but is invisible → theme/CSS variable issue
+
+### Files Changed
+- `src/steward_view.html` — try-catch wrappers with visible error feedback
+
+---
+
+## 2026-03-08 — Error Visibility + System Diagnostic
+
+### Issue
+Multiple tabs (Timeline, potentially others) show "Something went wrong. Please try again." with no indication of what the actual error is. The default `serverCall()` failure handler logs to console but replaces spinners with a generic message, making debugging impossible without F12.
+
+### Root Cause (likely)
+Server-side functions are throwing exceptions — most likely because required hidden sheets don't exist in the user's spreadsheet. Many features (Timeline, Q&A Forum, Feedback, Tasks, etc.) depend on auto-created hidden sheets. If auto-creation fails or sheets were never initialized, the feature breaks.
+
+### Fixes
+1. **Improved serverCall() failure handler** (`index.html`): Now shows the actual error message in the UI with a ⚠️ icon and Reload button, instead of the opaque "Something went wrong."
+2. **System Diagnostic function** (`28_FailsafeService.gs`): New `fsDiagnostic(sessionToken)` function checks all 25+ required/optional sheets, auth status, and returns a health report.
+3. **Diagnostic UI** (`steward_view.html`): New "System Diagnostic" card on the Failsafe page with "Run Diagnostic" button. Shows ✅/❌ for every sheet, highlights missing ones.
+
+### How to Use
+Steward sidebar → Data Failsafe → Run Diagnostic → see which sheets are missing → missing sheets likely explain which tabs are broken.
+
+### Files Changed
+- `src/index.html` — serverCall() failure handler now shows actual error
+- `src/28_FailsafeService.gs` — new fsDiagnostic() server function
+- `src/steward_view.html` — diagnostic card in Failsafe page
+
+---
+
+## 2026-03-08 — Auto-Init Missing Sheets on SPA Load
+
+### Design
+Per user feedback: "why not just have createDashboard auto-create all the sheets?" — CREATE_DASHBOARD already calls all init functions, but it requires Sheets UI (menu bar + confirmation dialog). It can't run from the SPA. If CREATE_DASHBOARD was run on an older code version, newer sheets are missing.
+
+### Solution: Two-layer approach
+1. **Auto-init on first load** (`21_WebDashDataService.gs`): `dataGetBatchData()` now calls `_ensureAllSheetsInternal()` on the first SPA load per version. Uses Script Property key `sheetsInitialized_{VERSION}` — re-runs automatically after each code update. No auth requirement (runs server-side). Non-destructive.
+2. **Manual button** (`28_FailsafeService.gs` + `steward_view.html`): "Initialize Missing Sheets" button on Failsafe page calls `fsEnsureAllSheets()` with detailed success/failure feedback per sheet group.
+
+### What gets auto-created (17 groups)
+Hidden calculation sheets, Contact Log, Steward Tasks, QA Forum + Answers, Timeline Events, Failsafe Config, Weekly Questions + Responses + Pool, Portal sheets, Workload Tracker (4 sheets), Resources, Resource Config, Survey Questions, Member Satisfaction, Feedback, Case Checklist, Notifications, Audit Log.
+
+### Key design decisions
+- **Version-keyed flag**: `sheetsInitialized_{VERSION}` ensures re-run after code updates but not on every page load.
+- **No auth gate on internal function**: `_ensureAllSheetsInternal()` runs for any user (member or steward) because sheet creation is a system concern, not a role concern.
+- **try/catch per init**: Each sheet group is independent — one failure doesn't block others.
+- **typeof guards**: Every init call checks `typeof` first — if a module isn't loaded, it silently skips.
+
+### Files Changed
+- `src/21_WebDashDataService.gs` — auto-init in dataGetBatchData() + _ensureAllSheetsInternal()
+- `src/28_FailsafeService.gs` — fsEnsureAllSheets() with detailed tracking
+- `src/steward_view.html` — "Initialize Missing Sheets" button on Failsafe page
+
+---
+
+## 2026-03-08 — Code Review Fixes (latency, debug cleanup, DRY)
+
+### Issue 1: Auto-init on critical load path
+**Problem**: `_ensureAllSheetsInternal()` ran inside `dataGetBatchData()` — the initial data fetch. Added latency on first load per version.
+**Fix**: Moved to separate `dataEnsureSheetsIfNeeded()` endpoint. Client fires it as fire-and-forget from `DOMContentLoaded` AFTER `initApp()` dispatches. Never blocks initial render.
+
+### Issue 2: Debug scaffolding in production
+**Problem**: Commit 0be801c added try-catch wrappers with visible red DOM error boxes in member click handlers — diagnostic code not appropriate for release.
+**Fix**: Removed red error DOM insertion from click handler, `_toggleMemberDetail`, and `_showMemberDetail`. Click handler retains a minimal try-catch with console.error only. The other two functions are unwrapped entirely since their callers already catch.
+
+### Issue 3: DRY violation
+**Problem**: `fsEnsureAllSheets()` (28_FailsafeService.gs) and `_ensureAllSheetsInternal()` (21_WebDashDataService.gs) contained nearly identical 17-item init lists.
+**Fix**: `_ensureAllSheetsInternal()` is now the single source of truth — returns `{ created[], failed[] }`. `fsEnsureAllSheets()` delegates to it with a steward auth wrapper. Zero duplication.
+
+### Architecture after fixes
+```
+Client (index.html DOMContentLoaded)
+  ├── initApp() → dataGetBatchData() → fast, no init work
+  └── fire-and-forget → dataEnsureSheetsIfNeeded()
+                            └── checks version flag
+                            └── calls _ensureAllSheetsInternal() if needed
+
+Failsafe page button
+  └── fsEnsureAllSheets(token)
+        └── _requireStewardAuth()
+        └── _ensureAllSheetsInternal()   ← same function
+```
+
+### Files Changed
+- `src/21_WebDashDataService.gs` — dataGetBatchData cleaned, dataEnsureSheetsIfNeeded added, _ensureAllSheetsInternal returns results
+- `src/28_FailsafeService.gs` — fsEnsureAllSheets delegates to _ensureAllSheetsInternal
+- `src/index.html` — fire-and-forget call after initApp
+- `src/steward_view.html` — debug scaffolding removed from member click handlers
+
+## Tab Reorder & Group Headers (2026-03-09)
+
+### Changes Made
+- **Sidebar group headers**: Added `{ group: 'Label' }` support to `_getSidebarTabs()` in `src/index.html`. Renderer at ~line 459 now handles `tab.group` alongside `tab.divider`.
+- **CSS**: Added `.sidebar-group-label` style in `src/styles.html` (10px uppercase, letter-spacing 1.2px, `--text-secondary` color).
+- **Three named groups** introduced across both roles:
+  - **DDS**: POMS Ref., Workload Tracker
+  - **Resources**: Insights (steward) / Union Stats (member), Resources, Org. Chart, Q&A Forum
+  - **Activity**: Tasks / My Tasks, Events, Timeline
+- **Steward Workload Tracker**: Added `workload` tab to steward sidebar and steward switch case in `_handleTabNav()`. `renderWorkloadTracker()` in `src/member_view.html` made role-aware via `AppState.activeRole`, using `_stewardHeader` or `_memberHeader` dynamically.
+- **More menus**: Both `src/steward_view.html` and `src/member_view.html` `menuItems[]` reordered to match group structure. Group/divider rendering added to both `forEach` loops.
+
+### Files Changed
+1. `src/styles.html` — Added `.sidebar-group-label` CSS class
+2. `src/index.html` — `_getSidebarTabs()` reordered with group headers; sidebar renderer updated; steward switch added `workload` case
+3. `src/steward_view.html` — `menuItems[]` reordered with `{ group }` and `{ divider }` entries; renderer updated
+4. `src/member_view.html` — `menuItems[]` reordered with `{ group }` and `{ divider }` entries; renderer updated; `renderWorkloadTracker()` made role-aware
+
+### ⚠️ Union-Tracker Note
+- WorkloadTracker typeof guards still needed in UT for 3 files (pre-existing issue, not introduced here).
+- These changes must be synced DDS Main → UT staging per standard flow.
+
+## Tab Regroup v2 — Intent-Based Groups (2026-03-09)
+
+### Supersedes
+Previous DDS/Resources/Activity grouping replaced same day with intent-based groups.
+
+### New Group Structure (both roles)
+- **Ungrouped top**: Core daily work (Cases, Members/Directory, Contact Log)
+- **Manage**: Tasks, Workload Tracker, Insights/Union Stats — tracking & analysis
+- **Reference**: POMS Ref., Resources, Org. Chart — read-only lookup tools
+- **Community**: Q&A Forum, Polls, Feedback, Minutes — two-way engagement
+- **Comms**: Broadcast (steward only), Notifications, Events, Timeline — scheduling & messaging
+- **Ungrouped bottom**: Admin/settings (Survey Tracking, Failsafe for steward; Steward Dir, Profile, Survey Results for member)
+
+### Reasoning
+Groups map to workflow modes (track work → look up info → engage community → communicate → admin). Previous "DDS" label was confusing (whole app is DDS). Previous "Activity" group separated Tasks from Cases which breaks workflow proximity.
+
+### Files Changed (same 3 as v1)
+1. `src/index.html` — `_getSidebarTabs()` reordered
+2. `src/steward_view.html` — `menuItems[]` reordered
+3. `src/member_view.html` — `menuItems[]` reordered
+
+## Sheet Tab Order & Tab Colors Update (2026-03-09)
+
+### Changes
+- Added `SHEETS.MEETING_CHECKIN_LOG` to `reorderSheetsToStandard()` in `src/08a_SheetSetup.gs` (position: after Meeting Attendance, before Workload Reporting)
+- Added `SHEETS.MEETING_CHECKIN_LOG` to yellow (Activity tracking) color group in `applyTabColors_()` in `src/11_CommandHub.gs`
+
+### Final Sheet Tab Order (16 tabs)
+1-3: Member Directory, Grievance Log, Case Checklist (🟣 Purple — core data)
+4-5: Resources, Resource Config (🟢 Green — reference)
+6-8: Survey Questions, Member Satisfaction, Feedback (🔵 Blue — community)
+9-11: Meeting Attendance, Meeting Check-In Log, Workload Reporting (🟡 Yellow — activity)
+12-13: Getting Started, FAQ (🔴 Red — onboarding)
+14-16: Function Checklist, Config Guide, Config (🟠 Orange — admin)
+
+### Menu Structure Confirmed (already restructured in prior session)
+- **Union Hub**: Dashboards, Search, Members, Cases, Analytics, Quick Actions, Help
+- **Tools**: Outreach, Surveys & Polls, Calendar & Meetings, Drive, Workload, View & Display, Multi-Select, OCR, Web App
+- **Admin**: Diagnostics, Data Sync, Validation, Automation, Cache, Security, Maintenance, Styling, Setup, Demo Data
+
+## Sheet Tabs & Menus Restructure v3 (2026-03-09)
+
+### Supersedes
+All prior tab order/color/menu sections. This is the canonical layout.
+
+### Sheet Tab Order (4 color groups, 17 tabs)
+🟣 Purple — **Core Data** (daily): Member Directory, Grievance Log, Case Checklist, Workload Reporting
+🟢 Green — **Reference** (look-up): Resources, Getting Started, FAQ
+🔵 Blue — **Engagement** (community): Meeting Attendance, Meeting Check-In Log, Member Satisfaction, Feedback & Dev, Notifications
+🟠 Orange — **Config & Admin** (owner-editable): Survey Questions, Resource Config, Function Checklist, Config Guide, Config
+
+Reasoning: 4 groups simpler than 6. Workload Reporting promoted to Core (stewards check daily). Getting Started/FAQ moved to Reference (look-up, not prime position). Survey Questions/Resource Config moved to Admin (config sheets, not data sheets). Notifications added (Blue — engagement data).
+
+### Menu Structure
+**📊 Union Hub** (unchanged): Dashboards, Search, Members, Cases, Analytics, Quick Actions, Help
+- Removed: Workload duplicate, Calendar/Drive shortcuts (now in Tools)
+
+**🔧 Tools** (restructured):
+- Email & Notifications (merged Communication + Notifications)
+- Calendar & Meetings (removed setup items → Admin)
+- Google Drive (removed setup items → Admin)
+- Workload Tracker (single location, no duplicate)
+- Surveys & Polls (merged, removed triggers → Admin)
+- ── separator ──
+- Sheet Tools (merged View & Display + Multi-Select, OCR removed)
+- Themes (extracted from Admin for steward access)
+- ── separator ──
+- Get Mobile App URL (shortcut from Web App & Portal)
+
+**🛠️ Admin** (restructured — broke up 27-item Setup):
+- Diagnostics, Repair, Settings (top-level)
+- Data Sync, Validation, Automation, Cache, Security (unchanged)
+- ── separator ──
+- Initial Setup (one-time items: dashboard, calendar, drive, survey, polls, workload, hidden sheets)
+- Triggers (all trigger installations in one place)
+- Maintenance (refresh, backfill, restore, create sheets, cleanup)
+- Styling (config styling, tab colors, theme columns)
+- Web App & Portal (moved from Tools — admin work + OCR buried here)
+
+### Files Changed
+1. `src/08a_SheetSetup.gs` — `reorderSheetsToStandard()` — new 4-group order with Notifications
+2. `src/11_CommandHub.gs` — `applyTabColors_()` — 4 colors (dropped Yellow, Red)
+3. `src/03_UIComponents.gs` — `createDashboardMenu()` — full menu restructure
+
+---
+
+## 🔧 FIX LOG — 2026-03-09: Org KPI Cards Not Populating (Steward Cases Tab)
+
+### Problem
+When a steward has 0 assigned cases, the Cases tab falls back to org-wide KPIs. The "Org Overdue" and "Org Due <7d" cards stayed as "..." (placeholder) and never populated.
+
+### Root Causes Found
+1. **Missing failure handler** (`steward_view.html:150`): The `dataGetGrievanceStats` call had no `.withFailureHandler` for the KPI cards.
+2. **Silent early return** (`steward_view.html:151`): When `stats.available === false`, the success handler returned without updating cards.
+3. **Cases due today uncounted** (`21_WebDashDataService.gs`): `deadlineDays === 0` fell through both overdue (`< 0`) and dueSoon (`> 0`) checks.
+4. **No try/catch in `getGrievanceStats` loop**: One malformed row could crash the entire function.
+
+### Files Changed
+- `src/steward_view.html` — Added `.withFailureHandler`; handle `available:false` gracefully
+- `src/21_WebDashDataService.gs` — Changed `>0` to `>=0` in 3 dueSoon checks; try/catch in loop
+
+### Testing Added (2026-03-09)
+**24 new unit tests** in `test/21_WebDashDataService.test.js`:
+- Deadline boundary conditions (12 tests), KPI computation parity (4 tests), Error resilience (5 tests), Return shape contracts (3 tests).
+
+**2 new deploy guards** in `test/deploy-guards.test.js`:
+- G8: Failure handler ratchet (blocks new serverCall() without .withFailureHandler)
+- G9: KPI data contract (static scan for required return keys)

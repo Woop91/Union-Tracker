@@ -419,15 +419,26 @@ function getOrCreateSheet(ss, name) {
  * @returns {void}
  */
 function reorderSheetsToStandard(ss) {
-  // Dashboard and Satisfaction sheets are deprecated (v4.3.2/v4.3.8) - excluded from ordering
+  // 4 groups: Core Data (purple) → Reference (green) → Engagement (blue) → Config & Admin (orange)
   var desiredOrder = [
-    SHEETS.GETTING_STARTED,
-    SHEETS.FAQ,
+    // 🟣 Core Data — daily workflow
     SHEETS.MEMBER_DIR,
     SHEETS.GRIEVANCE_LOG,
+    SHEETS.CASE_CHECKLIST,
+    SHEETS.WORKLOAD_REPORTING,
+    // 🟢 Reference — look-up material
     SHEETS.RESOURCES,
-    SHEETS.RESOURCE_CONFIG,
+    SHEETS.GETTING_STARTED,
+    SHEETS.FAQ,
+    // 🔵 Engagement — community data
+    SHEETS.MEETING_ATTENDANCE,
+    SHEETS.MEETING_CHECKIN_LOG,
+    SHEETS.SATISFACTION,
     SHEETS.FEEDBACK,
+    SHEETS.NOTIFICATIONS,
+    // 🟠 Config & Admin — owner/admin editable
+    SHEETS.SURVEY_QUESTIONS,
+    SHEETS.RESOURCE_CONFIG,
     SHEETS.FUNCTION_CHECKLIST,
     SHEETS.CONFIG_GUIDE,
     SHEETS.CONFIG
@@ -446,8 +457,8 @@ function reorderSheetsToStandard(ss) {
     }
   }
 
-  var firstSheet = ss.getSheetByName(SHEETS.GETTING_STARTED) ||
-                   ss.getSheetByName(SHEETS.MEMBER_DIR) ||
+  var firstSheet = ss.getSheetByName(SHEETS.MEMBER_DIR) ||
+                   ss.getSheetByName(SHEETS.GETTING_STARTED) ||
                    ss.getSheets()[0];
   if (firstSheet) {
     ss.setActiveSheet(firstSheet);

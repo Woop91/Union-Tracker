@@ -836,14 +836,13 @@ function addRepoLinkToFAQ_(ss) {
  * @private
  */
 function applyTabColors_(ss) {
-  // Tab color definitions - Updated per user requirements
+  // 4 color groups — matches reorderSheetsToStandard() grouping
   var TAB_COLORS = {
-    RED: '#ea4335',         // Red - Getting Started, FAQ
-    PURPLE: '#7c3aed',      // Purple - Member Directory, Grievance Log
-    YELLOW: '#fbbc04',      // Yellow - Feedback and Development, Function Checklist
-    ORANGE: '#ff9800',      // Orange - Config, Config Guide
-    BLUE: '#1a73e8',        // Blue - Member Satisfaction
-    HIDDEN: '#9e9e9e'       // Gray - for hidden/calc sheets
+    PURPLE: '#7c3aed',      // Core Data — daily workflow
+    GREEN: '#16a34a',       // Reference — look-up material
+    BLUE: '#1a73e8',        // Engagement — community data
+    ORANGE: '#ff9800',      // Config & Admin — owner editable
+    HIDDEN: '#9e9e9e'       // Hidden/calc sheets
   };
 
   // Helper function to find sheet by name (tries exact match and variations)
@@ -877,32 +876,36 @@ function applyTabColors_(ss) {
     }
   }
 
-  // Red tabs - Getting Started, FAQ
-  applyColor(SHEETS.GETTING_STARTED, TAB_COLORS.RED);
-  applyColor(SHEETS.FAQ, TAB_COLORS.RED);
-
-  // Purple tabs - Member Directory, Grievance Log, Case Checklist
+  // 🟣 Purple — Core Data (daily workflow)
   applyColor(SHEETS.MEMBER_DIR, TAB_COLORS.PURPLE);
-  applyColor('Member Directory', TAB_COLORS.PURPLE);  // Fallback without constant
+  applyColor('Member Directory', TAB_COLORS.PURPLE);
   applyColor(SHEETS.GRIEVANCE_LOG, TAB_COLORS.PURPLE);
-  applyColor('Grievance Log', TAB_COLORS.PURPLE);  // Fallback without constant
+  applyColor('Grievance Log', TAB_COLORS.PURPLE);
   applyColor(SHEETS.CASE_CHECKLIST, TAB_COLORS.PURPLE);
-  applyColor('Case Checklist', TAB_COLORS.PURPLE);  // Fallback without constant
+  applyColor('Case Checklist', TAB_COLORS.PURPLE);
+  applyColor(SHEETS.WORKLOAD_REPORTING, TAB_COLORS.PURPLE);
 
-  // Yellow tabs - Feedback and Development, Function Checklist
-  applyColor(SHEETS.FEEDBACK, TAB_COLORS.YELLOW);
-  applyColor('Feedback & Development', TAB_COLORS.YELLOW);  // Without emoji
-  applyColor('Feedback and Development', TAB_COLORS.YELLOW);  // Alternate spelling
-  applyColor(SHEETS.FUNCTION_CHECKLIST, TAB_COLORS.YELLOW);
+  // 🟢 Green — Reference (look-up material)
+  applyColor(SHEETS.RESOURCES, TAB_COLORS.GREEN);
+  applyColor(SHEETS.GETTING_STARTED, TAB_COLORS.GREEN);
+  applyColor(SHEETS.FAQ, TAB_COLORS.GREEN);
 
-  // Orange tabs - Config, Config Guide
-  applyColor(SHEETS.CONFIG, TAB_COLORS.ORANGE);
-  applyColor('Config', TAB_COLORS.ORANGE);  // Fallback
-  applyColor(SHEETS.CONFIG_GUIDE, TAB_COLORS.ORANGE);
-
-  // Blue tabs - Member Satisfaction
+  // 🔵 Blue — Engagement (community data)
+  applyColor(SHEETS.MEETING_ATTENDANCE, TAB_COLORS.BLUE);
+  applyColor(SHEETS.MEETING_CHECKIN_LOG, TAB_COLORS.BLUE);
   applyColor(SHEETS.SATISFACTION, TAB_COLORS.BLUE);
-  applyColor('Member Satisfaction', TAB_COLORS.BLUE);  // Without emoji
+  applyColor('Member Satisfaction', TAB_COLORS.BLUE);
+  applyColor(SHEETS.FEEDBACK, TAB_COLORS.BLUE);
+  applyColor('Feedback & Development', TAB_COLORS.BLUE);
+  applyColor(SHEETS.NOTIFICATIONS, TAB_COLORS.BLUE);
+
+  // 🟠 Orange — Config & Admin (owner editable)
+  applyColor(SHEETS.SURVEY_QUESTIONS, TAB_COLORS.ORANGE);
+  applyColor(SHEETS.RESOURCE_CONFIG, TAB_COLORS.ORANGE);
+  applyColor(SHEETS.FUNCTION_CHECKLIST, TAB_COLORS.ORANGE);
+  applyColor(SHEETS.CONFIG_GUIDE, TAB_COLORS.ORANGE);
+  applyColor(SHEETS.CONFIG, TAB_COLORS.ORANGE);
+  applyColor('Config', TAB_COLORS.ORANGE);
 
   Logger.log('Tab colors applied successfully');
 }
