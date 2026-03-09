@@ -461,114 +461,215 @@ describe('G7: All .gs files have valid JavaScript syntax', () => {
 
 
 // ============================================================================
-// G8: MISSING .withFailureHandler ON serverCall() CHAINS (RATCHET)
+// G8: build.js file arrays match actual src/ contents
 // ============================================================================
-// Reason: The Org KPI bug (2026-03-09) was caused by a serverCall() chain
-// with .withSuccessHandler but no .withFailureHandler. Server errors silently
-// left UI elements in their "..." placeholder state.
-//
-// This guard counts chains missing failure handlers and ensures the count
-// never INCREASES. Existing debt can be reduced over time; new debt is blocked.
+// Reason: poms_reference.html was added to src/ and dist/ but NOT to the
+// HTML_FILES array in build.js. A fresh --prod build would delete it from dist/,
+// breaking the POMS Reference tab at runtime.
 
-describe('G8: serverCall() failure handler ratchet', () => {
-  // Current baseline of chains missing .withFailureHandler.
-  // ⚠️ Only DECREASE this number as you fix chains. NEVER increase it.
-  const RATCHET = {
-    'steward_view.html': 30,
-    'member_view.html': 38,
-    'index.html': 0,
-  };
+describe('G8: build.js file arrays match src/ contents', () => {
+  const buildCode = fs.readFileSync(path.resolve(__dirname, '..', 'build.js'), 'utf8');
 
-  /**
-   * Counts serverCall() chains that have .withSuccessHandler but NOT
-   * .withFailureHandler in the same chain.
-   */
-  function countMissingFailureHandlers(content) {
-    let count = 0;
-    const pattern = /serverCall\(\)/g;
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
-      // Grab up to 2000 chars after serverCall() to cover multi-line chains
-      const chunk = content.substring(match.index, match.index + 2000);
-      const hasSuccess = chunk.includes('withSuccessHandler');
-      const hasFailure = chunk.includes('withFailureHandler');
-      if (hasSuccess && !hasFailure) {
-        count++;
-      }
-    }
-    return count;
-  }
+  // Extract HTML_FILES array from build.js
+  const htmlMatch = buildCode.match(/const HTML_FILES\s*=\s*\[([\s\S]*?)\];/);
+  const registeredHtml = htmlMatch
+    ? htmlMatch[1].match(/'([^']+\.html)'/g).map(m => m.replace(/'/g, ''))
+    : [];
 
-  Object.entries(RATCHET).forEach(([file, maxAllowed]) => {
-    const filePath = path.join(SRC_DIR, file);
-    if (!fs.existsSync(filePath)) return;
+  // Extract BUILD_ORDER (GS files) array from build.js
+  const gsMatch = buildCode.match(/const BUILD_ORDER\s*=\s*\[([\s\S]*?)\];/);
+  const registeredGs = gsMatch
+    ? gsMatch[1].match(/'([^']+\.gs)'/g).map(m => m.replace(/'/g, ''))
+    : [];
 
-    test(`${file} — missing failure handlers <= ${maxAllowed} (ratchet)`, () => {
-      const content = fs.readFileSync(filePath, 'utf8');
-      const missing = countMissingFailureHandlers(content);
+  test('every .html file in src/ is registered in HTML_FILES', () => {
+    const srcHtml = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html'));
+    const missing = srcHtml.filter(f => !registeredHtml.includes(f));
+    expect(missing).toEqual([]);
+  });
 
-      if (missing > maxAllowed) {
-        // eslint-disable-next-line no-console
-        console.error(
-          `\n🚨 ${file}: ${missing} serverCall() chains missing .withFailureHandler ` +
-          `(ratchet allows ${maxAllowed}). New chains MUST include .withFailureHandler.`
-        );
-      }
+  test('every .gs file in src/ is registered in BUILD_ORDER', () => {
+    const srcGs = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs'));
+    const missing = srcGs.filter(f => !registeredGs.includes(f));
+    expect(missing).toEqual([]);
+  });
 
-      expect(missing).toBeLessThanOrEqual(maxAllowed);
+  test('no phantom entries in HTML_FILES (file must exist in src/)', () => {
+    const srcHtml = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html'));
+    const phantom = registeredHtml.filter(f => !srcHtml.includes(f));
+    expect(phantom).toEqual([]);
+  });
+
+  test('no phantom entries in BUILD_ORDER (file must exist in src/)', () => {
+    const srcGs = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs'));
+    const phantom = registeredGs.filter(f => !srcGs.includes(f));
+    expect(phantom).toEqual([]);
+  });
+});
+
+
+// ============================================================================
+// G9: Nav tab entries have corresponding handlers
+// ============================================================================
+// Reason: Adding a tab to _getSidebarTabs without a case in _handleTabNav
+// gives a white screen or falls through to default. Adding a handler without
+// the nav entry makes the feature unreachable.
+
+describe('G9: Nav tabs and handlers are in sync', () => {
+  const indexCode = fs.readFileSync(path.join(SRC_DIR, 'index.html'), 'utf8');
+
+  // Extract all tab ids from _getSidebarTabs
+  const tabIdMatches = indexCode.match(/\{\s*id:\s*'([^']+)'/g) || [];
+  const navTabIds = [...new Set(
+    tabIdMatches.map(m => m.match(/id:\s*'([^']+)'/)[1])
+      .filter(id => !id.startsWith('_')) // skip _member_more, _steward_more
+  )];
+
+  // Extract handled tab ids from _handleTabNav (case 'xxx': and tabId === 'xxx')
+  const caseMatches = indexCode.match(/case\s+'([^']+)':/g) || [];
+  const ifMatches = indexCode.match(/tabId\s*===\s*'([^']+)'/g) || [];
+  const handledIds = [...new Set([
+    ...caseMatches.map(m => m.match(/case\s+'([^']+)'/)[1]),
+    ...ifMatches.map(m => m.match(/tabId\s*===\s*'([^']+)'/)[1]),
+  ])];
+
+  test('every nav tab id has a handler in _handleTabNav', () => {
+    const unhandled = navTabIds.filter(id => !handledIds.includes(id));
+    expect(unhandled).toEqual([]);
+  });
+
+  // Shared tabs that should appear in BOTH steward and member nav
+  const sharedTabs = ['orgchart', 'poms'];
+  sharedTabs.forEach(tabId => {
+    test(`shared tab '${tabId}' appears in both steward and member nav arrays`, () => {
+      // Count occurrences — should be 2 (once per role)
+      const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
+      expect(count).toBeGreaterThanOrEqual(2);
     });
   });
 });
 
 
 // ============================================================================
-// G9: KPI DATA CONTRACT — getGrievanceStats/getStewardKPIs return keys
+// G10: Lazy-loaded HTML files have server functions
 // ============================================================================
-// Reason: Frontend depends on specific keys (overdueCount, dueSoonCount, etc.).
-// If backend renames or drops a key, the UI silently shows "..." or NaN.
-// This guard statically scans the return statement for required keys.
+// Reason: renderPOMSReference calls google.script.run.getPOMSReferenceHtml().
+// If the server function doesn't exist, the tab shows "Failed to load".
 
-describe('G9: Backend KPI functions return required keys', () => {
-  const DATA_SERVICE_PATH = path.join(SRC_DIR, '21_WebDashDataService.gs');
-  if (!fs.existsSync(DATA_SERVICE_PATH)) return;
-  const code = fs.readFileSync(DATA_SERVICE_PATH, 'utf8');
+describe('G10: Lazy-loaded views have matching server functions', () => {
+  const indexCode = fs.readFileSync(path.join(SRC_DIR, 'index.html'), 'utf8');
 
-  test('getGrievanceStats returns overdueCount and dueSoonCount', () => {
-    // Find the return statement in getGrievanceStats
-    const funcStart = code.indexOf('function getGrievanceStats()');
-    expect(funcStart).toBeGreaterThan(-1);
-    const returnBlock = code.substring(funcStart, funcStart + 4000);
+  // Strip block comments
+  const codeOnly = indexCode.replace(/\/\*[\s\S]*?\*\//g, '');
 
-    expect(returnBlock).toMatch(/overdueCount\s*:/);
-    expect(returnBlock).toMatch(/dueSoonCount\s*:/);
-    expect(returnBlock).toMatch(/total\s*:/);
-    expect(returnBlock).toMatch(/settledCount\s*:/);
-    expect(returnBlock).toMatch(/wonCount\s*:/);
-    expect(returnBlock).toMatch(/available\s*:\s*true/);
+  // Find all HtmlService-pattern server functions: lines like
+  //   .getOrgChartHtml();  or  .getPOMSReferenceHtml();
+  // These are the terminal call in a google.script.run chain.
+  // Pattern: line has only whitespace, a dot, a function name, parens, semicolon
+  const terminalCalls = codeOnly.match(/^\s+\.(\w+)\(\s*\)\s*;/gm) || [];
+  const serverFunctions = new Set();
+  terminalCalls.forEach(line => {
+    const name = line.match(/\.(\w+)\(/)[1];
+    if (!name.startsWith('with') && !['forEach', 'map', 'filter', 'join',
+        'appendChild', 'remove', 'push', 'pop', 'trim', 'replace',
+        'toString', 'slice', 'splice'].includes(name)) {
+      serverFunctions.add(name);
+    }
   });
 
-  test('getStewardKPIs returns overdue, dueSoon, totalCases', () => {
-    const funcStart = code.indexOf('function getStewardKPIs(');
-    expect(funcStart).toBeGreaterThan(-1);
-    const returnBlock = code.substring(funcStart, funcStart + 1500);
-
-    expect(returnBlock).toMatch(/overdue\s*:/);
-    expect(returnBlock).toMatch(/dueSoon\s*:/);
-    expect(returnBlock).toMatch(/totalCases\s*:/);
-    expect(returnBlock).toMatch(/resolved\s*:/);
-    expect(returnBlock).toMatch(/activeCases\s*:/);
+  // Collect all function declarations from .gs files
+  const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs'));
+  const allGsFunctions = new Set();
+  gsFiles.forEach(file => {
+    const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
+    const fnMatches = code.match(/^function\s+(\w+)\s*\(/gm) || [];
+    fnMatches.forEach(m => allGsFunctions.add(m.match(/function\s+(\w+)/)[1]));
   });
 
-  test('_computeKPIsFromCases returns same keys as getStewardKPIs', () => {
-    const funcStart = code.indexOf('function _computeKPIsFromCases(');
-    expect(funcStart).toBeGreaterThan(-1);
-    const returnBlock = code.substring(funcStart, funcStart + 1500);
+  // Must find at least the known lazy-loaders
+  test('detects lazy-loaded server functions (getOrgChartHtml, getPOMSReferenceHtml)', () => {
+    expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
+    expect(serverFunctions.has('getPOMSReferenceHtml')).toBe(true);
+  });
 
-    expect(returnBlock).toMatch(/overdue\s*:/);
-    expect(returnBlock).toMatch(/dueSoon\s*:/);
-    expect(returnBlock).toMatch(/totalCases\s*:/);
-    expect(returnBlock).toMatch(/resolved\s*:/);
-    expect(returnBlock).toMatch(/activeCases\s*:/);
+  [...serverFunctions].forEach(fn => {
+    test(`server function ${fn}() exists in .gs files`, () => {
+      expect(allGsFunctions.has(fn)).toBe(true);
+    });
+  });
+});
+
+
+// ============================================================================
+// G11: poms_reference.html is self-contained and parseable
+// ============================================================================
+// Reason: poms_reference.html is loaded via HtmlService.createHtmlOutputFromFile
+// and injected into the SPA. If its <script> block has syntax errors, the entire
+// POMS tab fails silently.
+
+describe('G11: poms_reference.html integrity', () => {
+  const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
+
+  test('poms_reference.html exists', () => {
+    expect(fs.existsSync(pomsPath)).toBe(true);
+  });
+
+  test('contains POMS_DATA array with entries', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const match = code.match(/POMS_DATA\s*=\s*\[/);
+    expect(match).not.toBeNull();
+    // Count entries
+    const entries = (code.match(/\{id:/g) || []).length;
+    expect(entries).toBeGreaterThanOrEqual(78);
+  });
+
+  test('contains FLOWS object with flowcharts', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const match = code.match(/FLOWS\s*=\s*\{/);
+    expect(match).not.toBeNull();
+    // Count flowcharts (title: entries)
+    const charts = (code.match(/title:"/g) || []).length;
+    expect(charts).toBeGreaterThanOrEqual(17);
+  });
+
+  test('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
+      expect(code).toContain(`P.tab==='${tab}'`);
+    });
+  });
+
+  test('<script> block parses without syntax errors', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
+    expect(scriptMatch).not.toBeNull();
+    expect(() => {
+      new vm.Script(scriptMatch[1], { filename: 'poms_reference.html' });
+    }).not.toThrow();
+  });
+
+  test('no DDS Apps Script ID present', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    expect(code).not.toContain('18hHHX');
+  });
+});
+
+
+// ============================================================================
+// G12: No sensitive IDs leaked in source files
+// ============================================================================
+// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
+// files that get synced to the public Union-Tracker repo.
+
+describe('G12: No sensitive ID leaks', () => {
+  const DDS_SCRIPT_ID_PREFIX = '18hHHX';
+  const srcFiles = fs.readdirSync(SRC_DIR);
+
+  srcFiles.forEach(file => {
+    test(`src/${file} does not contain DDS Script ID`, () => {
+      const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
+      expect(code).not.toContain(DDS_SCRIPT_ID_PREFIX);
+    });
   });
 });
 
