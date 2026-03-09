@@ -508,7 +508,7 @@ function pcol(sh){return{DI:'#2E75B6',SI:'#548235',CE:'#8B0000'}[sh]||'#333';}
 function prenderHdr(){
   var h=$('poms-hdr');h.innerHTML='';
   var row=pel('div','','');row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px';
-  row.innerHTML='<span style="font-size:20px">📘</span><div><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div>';
+  row.innerHTML='<span style="font-size:20px">📘</span><div style="flex:1"><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div><a href="https://github.com/Woop91/509D/raw/main/dds-resources/POMS_Flowcharts_Desk_Reference.pdf" target="_blank" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap;min-height:32px">📥 Print PDF</a>';
   h.appendChild(row);
   var wrap=pel('div','p-swrap');wrap.innerHTML='<span class="p-sicon">🔍</span>';
   var inp=document.createElement('input');inp.className='p-search';inp.placeholder='Section, topic, keyword...';inp.value=P.q;inp.type='search';
