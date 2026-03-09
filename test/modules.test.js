@@ -180,13 +180,23 @@ describe('CONFIG_COLS', () => {
     expect(CONFIG_COLS.STEP2_RESPONSE_DAYS).toBeDefined();
   });
 
+  test('has deadline config columns including Step III and Arbitration', () => {
+    expect(CONFIG_COLS.FILING_DEADLINE_DAYS).toBeDefined();
+    expect(CONFIG_COLS.STEP1_RESPONSE_DAYS).toBeDefined();
+    expect(CONFIG_COLS.STEP2_APPEAL_DAYS).toBeDefined();
+    expect(CONFIG_COLS.STEP2_RESPONSE_DAYS).toBeDefined();
+    expect(CONFIG_COLS.STEP3_APPEAL_DAYS).toBeDefined();
+    expect(CONFIG_COLS.STEP3_RESPONSE_DAYS).toBeDefined();
+    expect(CONFIG_COLS.ARBITRATION_DEMAND_DAYS).toBeDefined();
+  });
+
   test('has chief steward email column', () => {
-    expect(CONFIG_COLS.CHIEF_STEWARD_EMAIL).toBe(42);
+    expect(CONFIG_COLS.CHIEF_STEWARD_EMAIL).toBe(45);
   });
 
   test('has escalation config columns', () => {
-    expect(CONFIG_COLS.ESCALATION_STATUSES).toBe(45);
-    expect(CONFIG_COLS.ESCALATION_STEPS).toBe(46);
+    expect(CONFIG_COLS.ESCALATION_STATUSES).toBe(48);
+    expect(CONFIG_COLS.ESCALATION_STEPS).toBe(49);
   });
 
   test('has form URL columns', () => {
