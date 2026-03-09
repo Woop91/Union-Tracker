@@ -553,7 +553,7 @@ const QL=[
 
 var SHEETS=["All","DI","SI","CE"];
 var CATS=[];POMS_DATA.forEach(function(d){if(CATS.indexOf(d.c)===-1)CATS.push(d.c);});CATS.sort();
-var P={q:"",sh:"All",ca:"",sel:null,ratings:{},notes:{},bookmarks:[],_results:[],searchHistory:[],viewHistory:{}};
+var P={q:"",sh:"All",ca:"",tab:"search",sel:null,ratings:{},notes:{},bookmarks:[],_results:[],searchHistory:[],viewHistory:{}};
 var $=function(id){return document.getElementById(id);};
 
 // Storage
@@ -574,33 +574,56 @@ function psearch(){var r=POMS_DATA.slice();if(P.sh!=='All')r=r.filter(function(x
 function pel(tag,cls,html){var e=document.createElement(tag);if(cls)e.className=cls;if(html!==undefined)e.innerHTML=html;return e;}
 function pcol(sh){return{DI:'#2E75B6',SI:'#548235',CE:'#8B0000'}[sh]||'#333';}
 
+// Export CSV
+function pexportCSV(){
+  var rows=[["Section","Title","Category","Sheet","ExRating","FlowRating","Bookmarked","Notes"]];
+  POMS_DATA.forEach(function(d){var er=P.ratings['ex:'+d.id]||0;var fr=d.fl?(P.ratings['flow:'+d.fl]||0):"";
+    var bm=P.bookmarks.indexOf(d.id)>-1?"Yes":"";var n=P.notes[d.id]||"";
+    if(er||fr||bm||n)rows.push([d.s,d.t,d.c,d.sh,er||"",fr,bm,'"'+(n||"").replace(/"/g,'""')+'"']);});
+  var blob=new Blob([rows.map(function(r){return r.join(",");}).join("\n")],{type:"text/csv"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="POMS_Ratings_"+new Date().toISOString().slice(0,10)+".csv";a.click();}
+
 // Header
 function prenderHdr(){
   var h=$('poms-hdr');h.innerHTML='';
   var row=pel('div','','');row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px';
-  row.innerHTML='<span style="font-size:20px">📘</span><div style="flex:1"><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div><a href="https://github.com/Woop91/509D/raw/main/dds-resources/POMS_Flowcharts_Desk_Reference.pdf" target="_blank" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap;min-height:32px">📥 Print PDF</a>';
+  row.innerHTML='<span style="font-size:20px">📘</span><div style="flex:1"><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div><a href="https://github.com/Woop91/509D/raw/main/dds-resources/POMS_Flowcharts_Desk_Reference.pdf" target="_blank" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap;min-height:32px">📥 PDF</a>';
   h.appendChild(row);
-  var wrap=pel('div','p-swrap');wrap.innerHTML='<span class="p-sicon">🔍</span>';
-  var inp=document.createElement('input');inp.className='p-search';inp.placeholder='Section, topic, keyword...';inp.value=P.q;inp.type='search';
-  inp.addEventListener('input',function(e){P.q=e.target.value;prenderBody();
-    var cb=wrap.querySelector('.p-clear');if(cb)cb.classList.toggle('vis',!!P.q);
-    clearTimeout(window._pst);window._pst=setTimeout(function(){
-      if(P.q.trim().length>=2){var q=P.q.trim().toLowerCase();
-        var idx=-1;for(var i=0;i<P.searchHistory.length;i++){if(P.searchHistory[i].q===q){idx=i;break;}}
-        if(idx>-1){P.searchHistory[idx].n++;P.searchHistory[idx].d=Date.now();}
-        else{P.searchHistory.unshift({q:q,n:1,d:Date.now()});}
-        if(P.searchHistory.length>50)P.searchHistory.length=50;
-        psv('searches',P.searchHistory);}
-    },1500);});
-  wrap.appendChild(inp);
-  var clr=pel('button','p-clear'+(P.q?' vis':''),'✕');clr.onclick=function(){P.q='';inp.value='';prenderBody();clr.classList.remove('vis');};
-  wrap.appendChild(clr);h.appendChild(wrap);
-  var fRow=pel('div','p-pills');
-  SHEETS.forEach(function(s){var p=pel('button','p-pill'+(P.sh===s?' on':''),s);p.onclick=function(){P.sh=s;prenderBody();prenderHdr();};fRow.appendChild(p);});
-  var sel=document.createElement('select');sel.className='p-pill';sel.style.cssText='background:rgba(255,255,255,.06);padding:0 8px';
-  sel.innerHTML='<option value="" style="color:#333">All Categories</option>'+CATS.map(function(c){return '<option value="'+c+'" style="color:#333"'+(P.ca===c?' selected':'')+'>'+c+'</option>';}).join('');
-  sel.onchange=function(e){P.ca=e.target.value;prenderBody();};fRow.appendChild(sel);
-  h.appendChild(fRow);
+
+  // Tab pills
+  var tabRow=pel('div','p-pills');tabRow.style.marginBottom='8px';
+  var tabs=[['search','🔍 Search'],['bookmarks','♥ Saved ('+P.bookmarks.length+')'],['rated','⭐ Ratings'],['stats','📊 Stats']];
+  tabs.forEach(function(t){
+    var btn=pel('button','p-pill'+(P.tab===t[0]?' on':''),t[1]);
+    btn.onclick=function(){P.tab=t[0];prender();};
+    tabRow.appendChild(btn);});
+  h.appendChild(tabRow);
+
+  // Search controls only on search tab
+  if(P.tab==='search'){
+    var wrap=pel('div','p-swrap');wrap.innerHTML='<span class="p-sicon">🔍</span>';
+    var inp=document.createElement('input');inp.className='p-search';inp.placeholder='Section, topic, keyword...';inp.value=P.q;inp.type='search';
+    inp.addEventListener('input',function(e){P.q=e.target.value;prenderBody();
+      var cb=wrap.querySelector('.p-clear');if(cb)cb.classList.toggle('vis',!!P.q);
+      clearTimeout(window._pst);window._pst=setTimeout(function(){
+        if(P.q.trim().length>=2){var q=P.q.trim().toLowerCase();
+          var idx=-1;for(var i=0;i<P.searchHistory.length;i++){if(P.searchHistory[i].q===q){idx=i;break;}}
+          if(idx>-1){P.searchHistory[idx].n++;P.searchHistory[idx].d=Date.now();}
+          else{P.searchHistory.unshift({q:q,n:1,d:Date.now()});}
+          if(P.searchHistory.length>50)P.searchHistory.length=50;
+          psv('searches',P.searchHistory);}
+      },1500);});
+    wrap.appendChild(inp);
+    var clr=pel('button','p-clear'+(P.q?' vis':''),'✕');clr.onclick=function(){P.q='';inp.value='';prenderBody();clr.classList.remove('vis');};
+    wrap.appendChild(clr);h.appendChild(wrap);
+    var fRow=pel('div','p-pills');
+    SHEETS.forEach(function(s){var p=pel('button','p-pill'+(P.sh===s?' on':''),s);p.onclick=function(){P.sh=s;prenderBody();prenderHdr();};fRow.appendChild(p);});
+    var sel=document.createElement('select');sel.className='p-pill';sel.style.cssText='background:rgba(255,255,255,.06);padding:0 8px';
+    sel.innerHTML='<option value="" style="color:#333">All Categories</option>'+CATS.map(function(c){return '<option value="'+c+'" style="color:#333"'+(P.ca===c?' selected':'')+'>'+c+'</option>';}).join('');
+    sel.onchange=function(e){P.ca=e.target.value;prenderBody();};fRow.appendChild(sel);
+    h.appendChild(fRow);
+  }
 }
 
 // Card
@@ -626,7 +649,110 @@ function prenderCard(item){
 // Body
 function prenderBody(){
   var main=$('poms-body');main.innerHTML='';
-  var results=psearch();
+  var results;
+
+  // ═══ BOOKMARKS TAB ═══
+  if(P.tab==='bookmarks'){
+    results=POMS_DATA.filter(function(d){return P.bookmarks.indexOf(d.id)>-1;});
+    if(!results.length){main.innerHTML='<div class="p-empty"><div style="font-size:36px">♡</div><div style="font-size:13px;margin-top:8px">No bookmarks yet.<br>Tap ♥ on any section to save it.</div></div>';return;}
+    main.appendChild(pel('div','p-count',results.length+' bookmarked section'+(results.length!==1?'s':'')));
+    P._results=results;
+    results.forEach(function(item){main.appendChild(prenderCard(item));});
+    return;
+  }
+
+  // ═══ RATINGS TAB ═══
+  if(P.tab==='rated'){
+    results=POMS_DATA.filter(function(d){return P.ratings['ex:'+d.id]>0;}).sort(function(a,b){return(P.ratings['ex:'+b.id]||0)-(P.ratings['ex:'+a.id]||0);});
+    if(results.length){
+      var row=pel('div','');row.style.cssText='display:flex;gap:8px;margin-bottom:10px';
+      var expBtn=pel('button','','📥 Export CSV');expBtn.style.cssText='padding:10px 16px;border-radius:10px;border:1px solid #e94560;background:#fff;color:#e94560;font-size:12px;font-weight:600;flex:1;min-height:44px;cursor:pointer';
+      expBtn.onclick=pexportCSV;row.appendChild(expBtn);
+      var rstBtn=pel('button','','🗑 Reset All');rstBtn.style.cssText='padding:10px 16px;border-radius:10px;border:1px solid #ddd;background:#fff;color:#999;font-size:12px;flex:1;min-height:44px;cursor:pointer';
+      rstBtn.onclick=function(){if(confirm('Clear ALL ratings, notes, bookmarks?')){P.ratings={};P.notes={};P.bookmarks=[];psv('ratings',{});psv('notes',{});psv('bookmarks',[]);prender();}};
+      row.appendChild(rstBtn);main.appendChild(row);
+    }
+    if(!results.length){main.innerHTML='<div class="p-empty"><div style="font-size:36px">⭐</div><div style="font-size:13px;margin-top:8px">No ratings yet.<br>Rate explanations in any section.</div></div>';return;}
+    main.appendChild(pel('div','p-count',results.length+' rated section'+(results.length!==1?'s':'')));
+    P._results=results;
+    results.forEach(function(item){
+      var card=prenderCard(item);
+      var starSpan=card.querySelector('.p-stars');
+      if(starSpan)starSpan.innerHTML='<span style="color:#f39c12">'+'★'.repeat(P.ratings['ex:'+item.id])+'</span>'+'☆'.repeat(5-P.ratings['ex:'+item.id]);
+      main.appendChild(card);
+    });
+    return;
+  }
+
+  // ═══ STATS TAB ═══
+  if(P.tab==='stats'){
+    var topViewed=[];var vhKeys=Object.keys(P.viewHistory);
+    for(var i=0;i<vhKeys.length;i++)topViewed.push([vhKeys[i],P.viewHistory[vhKeys[i]]]);
+    topViewed.sort(function(a,b){return b[1]-a[1];});topViewed=topViewed.slice(0,10);
+    var topSearched=P.searchHistory.slice().sort(function(a,b){return b.n-a.n;}).slice(0,10);
+    var recentSearches=P.searchHistory.slice().sort(function(a,b){return b.d-a.d;}).slice(0,10);
+    var totalViews=0;for(var k in P.viewHistory)totalViews+=P.viewHistory[k];
+    var totalSearches=0;for(var j=0;j<P.searchHistory.length;j++)totalSearches+=P.searchHistory[j].n;
+
+    // Summary cards
+    var sumRow=pel('div','');sumRow.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px';
+    [{n:totalSearches,l:'Searches'},{n:totalViews,l:'Views'},{n:vhKeys.length,l:'Sections Seen'}].forEach(function(s){
+      var c=pel('div','');c.style.cssText='background:#fff;border-radius:10px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05)';
+      c.innerHTML='<div style="font-size:22px;font-weight:700;color:#1a1a2e">'+s.n+'</div><div style="font-size:10px;color:#888;margin-top:2px">'+s.l+'</div>';
+      sumRow.appendChild(c);});
+    main.appendChild(sumRow);
+
+    // Most viewed
+    if(topViewed.length){
+      main.appendChild(pel('div','p-ql-label','📊 Most Viewed Sections'));
+      topViewed.forEach(function(pair){
+        var item=null;for(var m=0;m<POMS_DATA.length;m++){if(POMS_DATA[m].id===pair[0]){item=POMS_DATA[m];break;}}
+        if(!item)return;
+        var r=pel('div','');r.style.cssText='display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 14px;margin-bottom:4px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04)';
+        r.innerHTML='<div style="font-size:18px;font-weight:700;color:#e94560;min-width:32px;text-align:center">'+pair[1]+'</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:#1a1a2e">'+item.s+'</div><div style="font-size:11px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+item.t+'</div></div>';
+        r.onclick=function(){popenDetail(item);};
+        main.appendChild(r);
+      });
+    }
+
+    // Most searched
+    if(topSearched.length){
+      var lbl=pel('div','p-ql-label','🔍 Most Searched');lbl.style.marginTop='16px';main.appendChild(lbl);
+      var scroll=pel('div','p-ql-scroll');
+      topSearched.forEach(function(h){
+        var chip=pel('button','p-ql-chip',h.q+' <span style="color:#e94560;font-weight:700;margin-left:4px">'+h.n+'</span>');
+        chip.onclick=function(){P.q=h.q;P.tab='search';prender();};
+        scroll.appendChild(chip);});
+      main.appendChild(scroll);
+    }
+
+    // Recent searches
+    if(recentSearches.length){
+      var lbl2=pel('div','p-ql-label','🕐 Recent Searches');lbl2.style.marginTop='16px';main.appendChild(lbl2);
+      recentSearches.forEach(function(h){
+        var r=pel('div','');r.style.cssText='display:flex;align-items:center;gap:10px;background:#fff;border-radius:8px;padding:8px 12px;margin-bottom:3px;cursor:pointer';
+        var ago=Math.round((Date.now()-h.d)/60000);
+        var ts=ago<60?ago+'m ago':ago<1440?Math.round(ago/60)+'h ago':Math.round(ago/1440)+'d ago';
+        r.innerHTML='<span style="font-size:14px;opacity:.3">🔍</span><span style="flex:1;font-size:13px;color:#1a1a2e">'+h.q+'</span><span style="font-size:10px;color:#aaa">'+ts+'</span>';
+        r.onclick=function(){P.q=h.q;P.tab='search';prender();};
+        main.appendChild(r);
+      });
+    }
+
+    // Clear history
+    if(totalSearches||totalViews){
+      var clrBtn=pel('button','','🗑 Clear History');
+      clrBtn.style.cssText='margin-top:16px;padding:12px;border-radius:10px;border:1px solid #ddd;background:#fff;color:#999;font-size:12px;width:100%;min-height:44px;cursor:pointer';
+      clrBtn.onclick=function(){if(confirm('Clear all search/view history?')){P.searchHistory=[];P.viewHistory={};psv('searches',[]);psv('views',{});prender();}};
+      main.appendChild(clrBtn);
+    }
+
+    if(!totalSearches&&!totalViews)main.innerHTML='<div class="p-empty"><div style="font-size:36px">📊</div><div style="font-size:13px;margin-top:8px">No usage data yet.<br>Search and view sections to see stats.</div></div>';
+    return;
+  }
+
+  // ═══ SEARCH TAB ═══
+  results=psearch();
   // Quick lookups
   if(!P.q&&!P.ca&&P.sh==='All'){
     var qlDiv=pel('div','p-ql');qlDiv.appendChild(pel('div','p-ql-label','Quick Lookups'));
