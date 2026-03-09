@@ -32,7 +32,7 @@ function createDashboardMenu() {
   var localNumber = getLocalNumberFromConfig_();
 
   // ============================================================================
-  // MENU 1: Union Hub - Primary Operations
+  // MENU 1: Union Hub — Daily Operations
   // ============================================================================
   ui.createMenu('📊 ' + localNumber + ' Union Hub')
     .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
@@ -84,118 +84,75 @@ function createDashboardMenu() {
 
     .addSeparator()
     .addItem('⚡ Quick Actions', 'showQuickActionsMenu')
-    .addItem('📅 Open Google Calendar', 'openGoogleCalendar')
-    .addItem('📁 Open Google Drive', 'openGoogleDrive')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
-    .addSeparator()
-    .addSubMenu(ui.createMenu('📊 Workload Tracker')
-      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
-      .addItem('💾 Create Backup', 'createWorkloadBackup')
-      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
-      .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
-      .addSeparator()
-      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
-      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem'))
     .addToUi();
 
   // ============================================================================
-  // MENU 2: Tools - Supporting Features
+  // MENU 2: Tools — Features Used While Working
   // ============================================================================
   ui.createMenu('🔧 Tools')
-    .addSubMenu(ui.createMenu('📧 Communication')
+    .addSubMenu(ui.createMenu('📧 Email & Notifications')
       .addItem('📧 Send Contact Form', 'sendContactInfoForm')
-      .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember'))
-
-    .addSubMenu(ui.createMenu('📋 Survey Engine')
-      .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
+      .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember')
       .addSeparator()
-      .addItem('📂 Open New Survey Period', 'menuOpenNewSurveyPeriod')
-      .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
-      .addSeparator()
-      .addItem('🔔 Send Survey Reminders Now', 'sendSurveyCompletionReminders')
-      .addSeparator()
-      .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
-      .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
-      .addItem('✅ Install ALL Survey Triggers', 'menuInstallSurveyTriggers'))
-
-    .addSubMenu(ui.createMenu('🗳️ Polls')
-      .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
-      .addItem('🔄 Draw Community Poll Now (manual)', 'autoSelectCommunityPoll')
-      .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets'))
+      .addItem('⚙️ Notification Settings', 'showNotificationSettings')
+      .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
 
     .addSubMenu(ui.createMenu('📅 Calendar & Meetings')
-      .addItem('🏗️ Setup Union Events Calendar', 'SETUP_CALENDAR')
-      .addSeparator()
       .addItem('📝 Setup New Meeting', 'showSetupMeetingDialog')
       .addItem('✅ Open Meeting Check-In', 'showMeetingCheckInDialog')
       .addSeparator()
       .addItem('🔗 Sync Deadlines', 'syncDeadlinesToCalendar')
       .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
       .addSeparator()
-      .addItem('📄 Backfill Minutes → Drive Docs', 'BACKFILL_MINUTES_DRIVE_DOCS'))
+      .addItem('📅 Open Google Calendar', 'openGoogleCalendar'))
 
     .addSubMenu(ui.createMenu('📁 Google Drive')
-      .addItem('🏗️ Setup / Repair Drive Folder Structure', 'SETUP_DRIVE_FOLDERS')
-      .addSeparator()
       .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
       .addItem('📁 View Grievance Files', 'showGrievanceFiles')
-      .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders'))
+      .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders')
+      .addSeparator()
+      .addItem('📁 Open Google Drive', 'openGoogleDrive'))
 
-    .addSubMenu(ui.createMenu('🔔 Notifications')
-      .addItem('⚙️ Notification Settings', 'showNotificationSettings')
-      .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
+      .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
+      .addSeparator()
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))
+
+    .addSubMenu(ui.createMenu('📋 Surveys & Polls')
+      .addItem('📂 Open New Survey Period', 'menuOpenNewSurveyPeriod')
+      .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
+      .addItem('🔔 Send Survey Reminders Now', 'sendSurveyCompletionReminders')
+      .addSeparator()
+      .addItem('🔄 Draw Community Poll Now', 'autoSelectCommunityPoll'))
 
     .addSeparator()
 
-    .addSubMenu(ui.createMenu('🎛️ View & Display')
+    .addSubMenu(ui.createMenu('🎛️ Sheet Tools')
       .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
       .addItem('📱 Toggle Pocket View', 'toggleMobileView')
       .addItem('📱 Pocket View (Active Sheet)', 'navToMobile')
       .addItem('🖥️ Restore All Columns', 'showAllColumns')
       .addSeparator()
+      .addItem('📝 Multi-Select Editor', 'openCellMultiSelectEditor')
+      .addItem('⚡ Enable Multi-Select Auto-Open', 'installMultiSelectTrigger')
+      .addItem('🚫 Disable Multi-Select Auto-Open', 'removeMultiSelectTrigger'))
+
+    .addSubMenu(ui.createMenu('🎨 Themes')
       .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
       .addItem('🎨 Theme Presets', 'showThemePresetPicker')
       .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
       .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
 
-    .addSubMenu(ui.createMenu('📝 Multi-Select')
-      .addItem('📝 Open Editor', 'openCellMultiSelectEditor')
-      .addItem('⚡ Enable Auto-Open', 'installMultiSelectTrigger')
-      .addItem('🚫 Disable Auto-Open', 'removeMultiSelectTrigger'))
-
-    .addSubMenu(ui.createMenu('📝 OCR Tools')
-      .addItem('📝 OCR Transcribe Form', 'showOCRDialog')
-      .addItem('🔧 OCR Setup', 'setupOCRApiKey'))
-
     .addSeparator()
-
-    .addSubMenu(ui.createMenu('🌐 Web App & Portal')
-      .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
-      .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
-      .addItem('📊 Build Public Portal', 'buildPublicPortal')
-      .addSeparator()
-      .addItem('🔑 Generate Member PIN', 'showGeneratePINDialog')
-      .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
-      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
-
-    .addSubMenu(ui.createMenu('📊 Workload Tracker')
-      .addItem('📊 Refresh Ledger', 'refreshWorkloadLedger')
-      .addItem('💾 Create Backup', 'createWorkloadBackup')
-      .addItem('🗄️ Archive Old Data', 'archiveWorkloadData')
-      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
-      .addSeparator()
-      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem')
-      .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'))
-
-    .addSubMenu(ui.createMenu('🔄 Maintenance')
-      .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
-      .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
-      .addItem('🔄 Refresh View', 'refreshMemberView'))
-
+    .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
     .addToUi();
 
   // ============================================================================
-  // MENU 3: Admin - System Administration
+  // MENU 3: Admin — Configuration & System Management
   // ============================================================================
   var adminMenu = ui.createMenu('🛠️ Admin')
     .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
@@ -251,34 +208,63 @@ function createDashboardMenu() {
 
     .addSeparator()
 
-    .addSubMenu(ui.createMenu('🎨 Styling')
-      .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
-      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
-      .addItem('🖌️ Setup Theme Columns', 'setupThemeColumns'))
-
-    .addSubMenu(ui.createMenu('🏗️ Setup')
+    .addSubMenu(ui.createMenu('🏗️ Initial Setup')
       .addItem('🚀 Initialize Dashboard', 'initializeDashboard')
       .addSeparator()
-      .addItem('📋 Initialize Survey Engine', 'initSurveyEngine')
-      .addItem('✅ Install ALL Survey Triggers', 'menuInstallSurveyTriggers')
-      .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
+      .addItem('🏗️ Setup Union Events Calendar', 'SETUP_CALENDAR')
+      .addItem('🏗️ Setup / Repair Drive Folder Structure', 'SETUP_DRIVE_FOLDERS')
+      .addSeparator()
+      .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
+      .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets')
+      .addItem('⚙️ Workload: Initialize Sheets', 'initWorkloadTrackerSheets')
+      .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
       .addSeparator()
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('🔒 Enforce Hidden Sheets (Mobile Fix)', 'enforceHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'))
+
+    .addSubMenu(ui.createMenu('⏱️ Triggers')
+      .addItem('✅ Install ALL Survey Triggers', 'menuInstallSurveyTriggers')
+      .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
+      .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
+      .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
       .addSeparator()
-      .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
-      .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
-      .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
+      .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem'))
+
+    .addSubMenu(ui.createMenu('🔄 Maintenance')
+      .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
+      .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
+      .addItem('🔄 Refresh View', 'refreshMemberView')
+      .addSeparator()
+      .addItem('📄 Backfill Minutes → Drive Docs', 'BACKFILL_MINUTES_DRIVE_DOCS')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
       .addSeparator()
-      .addItem('🗑️ Remove Deprecated Dashboard', 'removeDeprecatedDashboard'));
+      .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
+      .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
+      .addItem('🗑️ Remove Deprecated Dashboard', 'removeDeprecatedDashboard'))
+
+    .addSubMenu(ui.createMenu('🎨 Styling')
+      .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
+      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('🖌️ Setup Theme Columns', 'setupThemeColumns'))
+
+    .addSubMenu(ui.createMenu('🌐 Web App & Portal')
+      .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
+      .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
+      .addItem('📊 Build Public Portal', 'buildPublicPortal')
+      .addSeparator()
+      .addItem('🔑 Generate Member PIN', 'showGeneratePINDialog')
+      .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
+      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog')
+      .addSeparator()
+      .addItem('📝 OCR Transcribe Form', 'showOCRDialog')
+      .addItem('🔧 OCR Setup', 'setupOCRApiKey'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {

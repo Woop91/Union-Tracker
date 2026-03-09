@@ -180,11 +180,17 @@
     function serverCall() {
       var runner = google.script.run;
       runner = runner.withFailureHandler(function(err) {
-        console.error('Server call failed:', err);
-        // Dismiss any loading spinners so the user isn't stuck
+        var msg = (err && err.message) ? err.message : String(err || 'Unknown error');
+        console.error('Server call failed:', msg, err);
+        // Dismiss any loading spinners and show the ACTUAL error
         var spinners = document.querySelectorAll('.loading-spinner');
         spinners.forEach(function(s) {
-          s.innerHTML = '<div class="empty-state">Something went wrong. Please try again.</div>';
+          s.innerHTML = '<div class="empty-state" style="text-align:center;padding:20px;">'
+            + '<div style="font-size:24px;margin-bottom:8px;">⚠️</div>'
+            + '<div style="color:var(--text);font-weight:600;margin-bottom:6px;">Something went wrong</div>'
+            + '<div style="color:var(--muted);font-size:12px;max-width:400px;margin:0 auto 12px;word-break:break-word;">' + msg + '</div>'
+            + '<button onclick="location.reload()" style="padding:6px 16px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:12px;">Reload</button>'
+            + '</div>';
         });
       });
       return runner;
@@ -454,6 +460,10 @@
           sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
           return;
         }
+        if (tab.group) {
+          sidebar.appendChild(el('div', { className: 'sidebar-group-label' }, tab.group));
+          return;
+        }
         var item = el('div', {
           className: 'sidebar-item' + (tab.id === activeTab ? ' active' : ''),
           onClick: function() { _handleTabNav(role, tab.id); }
@@ -507,48 +517,55 @@
       if (role === 'steward') return [
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
         { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
-        { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
-        { id: 'tasks', icon: '\u2705', label: 'Tasks' },
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
-        { divider: true },
+        { group: 'Manage' },
+        { id: 'tasks', icon: '\u2705', label: 'Tasks' },
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
+        { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
+        { group: 'Reference' },
+        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
+        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
+        { group: 'Community' },
+        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
+        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
+        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
+        { group: 'Comms' },
         { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
-        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
-        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
-        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
-        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
-        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
-        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
-        { divider: true },
-        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
+        { divider: true },
+        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
       ];
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { id: 'contact', icon: '\uD83D\uDC65', label: 'Directory' },
-        { divider: true },
+        { group: 'Manage' },
+        { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
+        { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
+        { group: 'Reference' },
+        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
+        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
+        { group: 'Community' },
+        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
+        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
+        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
+        { group: 'Comms' },
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'meetings', icon: '\uD83D\uDCC5', label: 'My Meetings' },
-        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
-        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
-        { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
-        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
-        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
-        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
-        { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
-        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
-        { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
-        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
-        { divider: true },
-        { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
-        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
+        { divider: true },
+        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
+        { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
+        { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
       ];
     }
 
@@ -578,10 +595,12 @@
 
     /**
      * POMS Reference — loads poms_reference.html lazily, same pattern as org chart.
+     * Contains 78 POMS sections, 17 flowcharts, search, ratings, bookmarks, notes.
      */
     function renderPOMSReference(appContainer, role) {
       renderPageLayout(appContainer, role, 'poms', function(container) {
         showLoading(container);
+        // Set container to fill height for POMS app shell
         container.style.height = 'calc(100vh - 56px)';
         container.style.padding = '0';
         container.style.overflow = 'hidden';
@@ -592,6 +611,7 @@
             wrap.style.height = '100%';
             wrap.innerHTML = html;
             container.appendChild(wrap);
+            // Re-execute <script> tags from poms_reference.html
             wrap.querySelectorAll('script').forEach(function(old) {
               var s = document.createElement('script');
               s.textContent = old.textContent;
@@ -667,6 +687,7 @@
           case 'surveytrack': renderSurveyTracking(app); break;
           case 'contactlog': renderContactLog(app); break;
           case 'tasks': renderStewardTasks(app); break;
+          case 'workload': renderWorkloadTracker(app); break;
           case 'events': renderEventsPage(app); break;
           case 'minutes': renderStewardMinutes(app); break;
           case 'feedback': renderFeedbackPage(app, 'steward'); break;
@@ -883,6 +904,16 @@
         getLayoutMode();
         _prevMode = LayoutState.mode;
         initApp();
+
+        // Fire-and-forget: ensure all required sheets exist.
+        // Runs AFTER initApp dispatches — never blocks initial render.
+        // Version-keyed server-side flag prevents work on most loads.
+        if (CURRENT_VIEW !== 'auth' && CURRENT_VIEW !== 'error') {
+          google.script.run
+            .withSuccessHandler(function() {})
+            .withFailureHandler(function() {})
+            .dataEnsureSheetsIfNeeded(SESSION_TOKEN);
+        }
       } catch (bootErr) {
         console.error('Bootstrap error:', bootErr);
         var app = document.getElementById('app');

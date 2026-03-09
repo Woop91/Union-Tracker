@@ -97,6 +97,16 @@ input { font: inherit; }
   background: var(--border);
   margin: 8px 20px;
 }
+.sidebar-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-secondary, #888);
+  padding: 12px 24px 4px;
+  margin-top: 4px;
+  user-select: none;
+}
 
 .page-header {
   padding: 12px 20px 16px;
@@ -734,8 +744,35 @@ input { font: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.member-list-item:hover {
+  background: var(--accentBg, rgba(99,102,241,0.06));
+}
+.member-list-item:active {
+  transform: scale(0.99);
+  opacity: 0.85;
+}
+.member-list-chevron {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+.member-list-item.expanded .member-list-chevron {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+.member-detail-panel {
+  animation: panelSlide 0.2s ease;
+}
+@keyframes panelSlide {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 500px; }
 }
 .member-list-avatar {
   width: 36px; height: 36px;
