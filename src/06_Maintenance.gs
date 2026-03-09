@@ -3732,6 +3732,122 @@ function onEditWithAuditLogging(e) {
 }
 
 // ============================================================================
+// TRIGGER AUDIT & CLEANUP
+// ============================================================================
+
+/**
+ * Audits all installed triggers — logs handler names, types, and frequency.
+ * Run manually from Script Editor to diagnose quota exhaustion.
+ * READ-ONLY: does not delete anything.
+ * @returns {Object} { triggers: [...], totalCount, duplicates: [...] }
+ */
+function auditAllTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var seen = {};
+  var duplicates = [];
+  var report = [];
+
+  for (var i = 0; i < triggers.length; i++) {
+    var t = triggers[i];
+    var handler = t.getHandlerFunction();
+    var type = t.getEventType().toString();
+    var source = '';
+    try { source = t.getTriggerSource().toString(); } catch (_e) { source = 'unknown'; }
+
+    var entry = {
+      index: i,
+      handler: handler,
+      eventType: type,
+      source: source,
+      id: t.getUniqueId()
+    };
+    report.push(entry);
+
+    // Track duplicates (same handler name)
+    if (seen[handler]) {
+      duplicates.push({ handler: handler, count: seen[handler] + 1 });
+    }
+    seen[handler] = (seen[handler] || 0) + 1;
+  }
+
+  var result = {
+    totalCount: triggers.length,
+    triggers: report,
+    duplicates: duplicates.length > 0 ? duplicates : 'none'
+  };
+
+  Logger.log('=== TRIGGER AUDIT ===');
+  Logger.log('Total triggers: ' + result.totalCount);
+  for (var j = 0; j < report.length; j++) {
+    var r = report[j];
+    Logger.log('  [' + j + '] ' + r.handler + ' (' + r.eventType + ', ' + r.source + ')');
+  }
+  if (duplicates.length > 0) {
+    Logger.log('⚠️ DUPLICATES FOUND:');
+    for (var d = 0; d < duplicates.length; d++) {
+      Logger.log('  ' + duplicates[d].handler + ' × ' + duplicates[d].count);
+    }
+  }
+  Logger.log('=== END AUDIT ===');
+
+  return result;
+}
+
+/**
+ * Removes ALL duplicate triggers (keeps one per handler function).
+ * Also removes triggers for known heavy/optional handlers.
+ * Run from Script Editor after reviewing auditAllTriggers() output.
+ * @param {boolean} [dryRun=true] - If true, logs what would be removed without deleting
+ * @returns {Object} { removed: [...], kept: [...] }
+ */
+function cleanupDuplicateTriggers(dryRun) {
+  if (dryRun === undefined) dryRun = true; // Safe default
+
+  var triggers = ScriptApp.getProjectTriggers();
+  var seen = {};
+  var removed = [];
+  var kept = [];
+
+  for (var i = 0; i < triggers.length; i++) {
+    var t = triggers[i];
+    var handler = t.getHandlerFunction();
+
+    if (seen[handler]) {
+      // Duplicate — remove
+      if (!dryRun) {
+        ScriptApp.deleteTrigger(t);
+      }
+      removed.push(handler + ' (trigger #' + i + ')');
+    } else {
+      seen[handler] = true;
+      kept.push(handler);
+    }
+  }
+
+  var action = dryRun ? 'WOULD REMOVE (dry run)' : 'REMOVED';
+  Logger.log('=== TRIGGER CLEANUP — ' + action + ' ===');
+  Logger.log('Kept: ' + kept.length + ' | Removed: ' + removed.length);
+  for (var r = 0; r < removed.length; r++) {
+    Logger.log('  ❌ ' + removed[r]);
+  }
+  Logger.log('=== END CLEANUP ===');
+
+  return { removed: removed, kept: kept, dryRun: dryRun };
+}
+
+/**
+ * SPA endpoint: Get trigger audit report (steward-only).
+ * @param {string} sessionToken
+ * @returns {Object}
+ */
+function dataAuditTriggers(sessionToken) {
+  var s = typeof _requireStewardAuth === 'function' ? _requireStewardAuth(sessionToken) : null;
+  if (!s) return { success: false, error: 'Steward access required' };
+
+  return { success: true, audit: auditAllTriggers() };
+}
+
+// ============================================================================
 // MENU ADDITIONS
 // ============================================================================
 
@@ -3753,5 +3869,6 @@ function addDataIntegrityMenuItems() {
     .addItem('📦 Archive Closed Grievances', 'showArchiveDialog')
     .addSeparator()
     .addItem('📜 View Audit Log', 'showAuditLogViewer')
+    .addItem('🔧 Audit Triggers (check logs)', 'auditAllTriggers')
     .addToUi();
 }

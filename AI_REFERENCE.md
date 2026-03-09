@@ -2446,3 +2446,20 @@ When a steward has 0 assigned cases, the Cases tab falls back to org-wide KPIs. 
 **2 new deploy guards** in `test/deploy-guards.test.js`:
 - G8: Failure handler ratchet (blocks new serverCall() without .withFailureHandler)
 - G9: KPI data contract (static scan for required return keys)
+
+## v4.25.4 — Stability: TestRunner Timeout Guard + Trigger Audit (2026-03-09)
+
+### Problem diagnosed
+- Web app unstable: test runner exceeding GAS 6-min execution limit, cascading into quota exhaustion.
+- Root cause: 82 tests with no timeout guard + 3.15 MB code parsed per execution + 558 KB HTML payload.
+
+### Changes made
+1. **TestRunner timeout guard** (src/30_TestRunner.gs): Global timeout at 5 min (MAX_RUNTIME_MS), per-test slow detection at 30s. Remaining tests skip gracefully.
+2. **Trigger audit utility** (src/06_Maintenance.gs): auditAllTriggers() (read-only), cleanupDuplicateTriggers(dryRun), dataAuditTriggers() SPA endpoint. Menu item added.
+3. **VERSION** bumped to 4.25.4.
+
+### Files modified
+1. `src/30_TestRunner.gs` — timeout guard
+2. `src/06_Maintenance.gs` — trigger audit functions + menu item
+3. `src/01_Core.gs` — version bump
+4. `AI_REFERENCE.md` — this entry
