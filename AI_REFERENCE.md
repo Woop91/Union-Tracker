@@ -2421,3 +2421,20 @@ Reasoning: 4 groups simpler than 6. Workload Reporting promoted to Core (steward
 1. `src/08a_SheetSetup.gs` — `reorderSheetsToStandard()` — new 4-group order with Notifications
 2. `src/11_CommandHub.gs` — `applyTabColors_()` — 4 colors (dropped Yellow, Red)
 3. `src/03_UIComponents.gs` — `createDashboardMenu()` — full menu restructure
+
+---
+
+## 🔧 FIX LOG — 2026-03-09: Org KPI Cards Not Populating (Steward Cases Tab)
+
+### Problem
+When a steward has 0 assigned cases, the Cases tab falls back to org-wide KPIs. The "Org Overdue" and "Org Due <7d" cards stayed as "..." (placeholder) and never populated.
+
+### Root Causes Found
+1. **Missing failure handler** (`steward_view.html:150`): The `dataGetGrievanceStats` call had no `.withFailureHandler` for the KPI cards.
+2. **Silent early return** (`steward_view.html:151`): When `stats.available === false`, the success handler returned without updating cards.
+3. **Cases due today uncounted** (`21_WebDashDataService.gs`): `deadlineDays === 0` fell through both overdue (`< 0`) and dueSoon (`> 0`) checks.
+4. **No try/catch in `getGrievanceStats` loop**: One malformed row could crash the entire function.
+
+### Files Changed
+- `src/steward_view.html` — Added `.withFailureHandler`; handle `available:false` gracefully
+- `src/21_WebDashDataService.gs` — Changed `>0` to `>=0` in 3 dueSoon checks; try/catch in loop

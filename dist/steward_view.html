@@ -148,12 +148,26 @@ function renderStewardDashboard(appContainer) {
 
       // Fill in org-wide stats
       serverCall().withSuccessHandler(function(stats) {
-        if (!stats || !stats.available) return;
         var cards = kpiGrid.querySelectorAll('.kpi-value');
+        if (!stats || !stats.available) {
+          // Graceful fallback — show 0 instead of leaving "..." placeholder
+          if (cards[0]) cards[0].textContent = '0';
+          if (cards[1]) cards[1].textContent = '0';
+          if (cards[2]) cards[2].textContent = '0';
+          if (cards[3]) cards[3].textContent = '0';
+          return;
+        }
         if (cards[0]) cards[0].textContent = String(stats.total || 0);
         if (cards[1]) { cards[1].textContent = String(stats.overdueCount || 0); if (stats.overdueCount > 0) cards[1].style.color = 'var(--danger)'; }
         if (cards[2]) { cards[2].textContent = String(stats.dueSoonCount || 0); if (stats.dueSoonCount > 0) cards[2].style.color = 'var(--warning)'; }
         if (cards[3]) cards[3].textContent = String(stats.settledCount || stats.wonCount || 0);
+      }).withFailureHandler(function(err) {
+        console.error('Org KPI stats failed:', err && err.message);
+        var cards = kpiGrid.querySelectorAll('.kpi-value');
+        if (cards[0]) cards[0].textContent = '\u2014';
+        if (cards[1]) cards[1].textContent = '\u2014';
+        if (cards[2]) cards[2].textContent = '\u2014';
+        if (cards[3]) cards[3].textContent = '\u2014';
       }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
       var kpiItems = [

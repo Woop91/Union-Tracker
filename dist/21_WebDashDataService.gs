@@ -189,7 +189,7 @@ var DataService = (function () {
         overdue++;
       } else {
         active++;
-        if (c.deadlineDays !== null && c.deadlineDays <= 7 && c.deadlineDays > 0) {
+        if (c.deadlineDays !== null && c.deadlineDays <= 7 && c.deadlineDays >= 0) {
           dueSoon++;
         }
       }
@@ -1888,6 +1888,7 @@ var DataService = (function () {
     var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0;
     var overdueCount = 0, dueSoonCount = 0;
     for (var i = 1; i < data.length; i++) {
+      try {
       var rec = _buildGrievanceRecord(data[i], colMap);
       var s = rec.status || 'unknown';
       byStatus[s] = (byStatus[s] || 0) + 1;
@@ -1905,7 +1906,7 @@ var DataService = (function () {
       // Deadline-based counts for org KPI cards
       if (s === 'overdue') {
         overdueCount++;
-      } else if (rec.deadlineDays !== null && rec.deadlineDays > 0 && rec.deadlineDays <= 7 &&
+      } else if (rec.deadlineDays !== null && rec.deadlineDays >= 0 && rec.deadlineDays <= 7 &&
                  s !== 'resolved' && s !== 'withdrawn' && s !== 'closed' && s !== 'won' && s !== 'denied' && s !== 'settled') {
         dueSoonCount++;
       }
@@ -1920,6 +1921,9 @@ var DataService = (function () {
         var dc = new Date(rec.closedTimestamp);
         var rKey = dc.getFullYear() + '-' + ('0' + (dc.getMonth() + 1)).slice(-2);
         monthlyResolved[rKey] = (monthlyResolved[rKey] || 0) + 1;
+      }
+      } catch (rowErr) {
+        Logger.log('getGrievanceStats: skipped row ' + i + ' — ' + rowErr.message);
       }
     }
     // Merge month keys from both maps, sort, take last 12
@@ -2219,7 +2223,7 @@ var DataService = (function () {
       else if (status === 'overdue') overdue++;
       else {
         active++;
-        if (cases[i].deadlineDays !== null && cases[i].deadlineDays <= 7 && cases[i].deadlineDays > 0) dueSoon++;
+        if (cases[i].deadlineDays !== null && cases[i].deadlineDays <= 7 && cases[i].deadlineDays >= 0) dueSoon++;
       }
     }
     return { totalCases: total, activeCases: active, overdue: overdue, dueSoon: dueSoon, resolved: resolved };
@@ -3202,6 +3206,85 @@ function dataGetBatchData(sessionToken) {
   // Normalize 'both' → steward view (steward functions are a superset)
   if (serverRole === 'both' || serverRole === 'admin') serverRole = 'steward';
   return DataService.getBatchData(e, serverRole);
+}
+
+/**
+ * Lightweight check + auto-init of missing sheets.
+ * Called fire-and-forget from client AFTER view renders — never blocks initial load.
+ * Version-keyed Script Property prevents re-running on every page load.
+ */
+function dataEnsureSheetsIfNeeded(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { skipped: true };
+  var initKey = 'sheetsInitialized_' + (typeof VERSION !== 'undefined' ? VERSION : 'unknown');
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty(initKey)) return { skipped: true, reason: 'already initialized' };
+  try {
+    _ensureAllSheetsInternal();
+    props.setProperty(initKey, new Date().toISOString());
+    return { initialized: true };
+  } catch (err) {
+    Logger.log('Auto-init sheets warning: ' + err.message);
+    return { initialized: false, error: err.message };
+  }
+}
+
+/**
+ * Canonical sheet initialization — single source of truth.
+ * Non-destructive: all init functions skip if sheet already exists.
+ * Returns { created: string[], failed: string[] } for tracking.
+ * @private
+ */
+function _ensureAllSheetsInternal() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { created: [], failed: ['Spreadsheet binding broken'] };
+
+  var created = [];
+  var failed = [];
+
+  var inits = [
+    ['Hidden sheets',     function() { if (typeof setupHiddenSheets === 'function') setupHiddenSheets(ss); }],
+    ['Contact Log',       function() { if (typeof _ensureContactLogSheet === 'function') _ensureContactLogSheet(ss); }],
+    ['Steward Tasks',     function() { if (typeof _ensureStewardTasksSheet === 'function') _ensureStewardTasksSheet(ss); }],
+    ['QA Forum',          function() { if (typeof QAForum !== 'undefined' && QAForum.initQAForumSheets) QAForum.initQAForumSheets(); }],
+    ['Timeline',          function() { if (typeof TimelineService !== 'undefined' && TimelineService.initTimelineSheet) TimelineService.initTimelineSheet(); }],
+    ['Failsafe Config',   function() { if (typeof FailsafeService !== 'undefined' && FailsafeService.initFailsafeSheet) FailsafeService.initFailsafeSheet(); }],
+    ['Weekly Questions',  function() { if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) WeeklyQuestions.initWeeklyQuestionSheets(); }],
+    ['Portal sheets',     function() { if (typeof initPortalSheets === 'function') initPortalSheets(); }],
+    ['Workload Tracker',  function() { if (typeof initWorkloadTrackerSheets === 'function') initWorkloadTrackerSheets(); }],
+    ['Resources',         function() { if (typeof createResourcesSheet === 'function') createResourcesSheet(ss); }],
+    ['Resource Config',   function() { if (typeof createResourceConfigSheet === 'function') createResourceConfigSheet(ss); }],
+    ['Survey Questions',  function() { if (typeof createSurveyQuestionsSheet === 'function') createSurveyQuestionsSheet(ss); }],
+    ['Satisfaction',      function() { if (typeof createSatisfactionSheet === 'function') createSatisfactionSheet(ss); }],
+    ['Feedback',          function() { if (typeof createFeedbackSheet === 'function') createFeedbackSheet(ss); }],
+    ['Case Checklist',    function() { if (typeof getOrCreateChecklistSheet === 'function') getOrCreateChecklistSheet(); }],
+    ['Notifications',     function() {
+      if (!ss.getSheetByName(SHEETS.NOTIFICATIONS)) {
+        var s = ss.insertSheet(SHEETS.NOTIFICATIONS);
+        s.getRange(1, 1, 1, 10).setValues([['ID', 'Type', 'Subject', 'Body', 'Sender', 'Recipients', 'Created', 'Status', 'Priority', 'Metadata']]);
+        s.hideSheet();
+      }
+    }],
+    ['Audit Log',         function() {
+      if (!ss.getSheetByName(SHEETS.AUDIT_LOG)) {
+        var s = ss.insertSheet(SHEETS.AUDIT_LOG);
+        s.getRange(1, 1, 1, 6).setValues([['Timestamp', 'User', 'Action', 'Target', 'Details', 'IP']]);
+        s.hideSheet();
+      }
+    }],
+  ];
+
+  inits.forEach(function(pair) {
+    try {
+      pair[1]();
+      created.push(pair[0]);
+    } catch (err) {
+      failed.push(pair[0] + ': ' + err.message);
+      Logger.log('Auto-init ' + pair[0] + ' failed: ' + err.message);
+    }
+  });
+
+  return { created: created, failed: failed };
 }
 
 // Broadcast filter options (CR-AUTH-3: steward auth required)
