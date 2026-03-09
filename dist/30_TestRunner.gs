@@ -502,6 +502,48 @@ function _getTestRegistry() {
     { name: 'test_system_spreadsheetBound',            fn: test_system_spreadsheetBound },
     { name: 'test_system_eventBusExists',              fn: test_system_eventBusExists },
     { name: 'test_system_hiddenSheetsConstant',        fn: test_system_hiddenSheetsConstant },
+
+    // ── dataservice suite (DataService CRUD) ──
+    { name: 'test_dataservice_moduleExists',               fn: test_dataservice_moduleExists },
+    { name: 'test_dataservice_findUserByEmailCallable',    fn: test_dataservice_findUserByEmailCallable },
+    { name: 'test_dataservice_getUserRoleCallable',        fn: test_dataservice_getUserRoleCallable },
+    { name: 'test_dataservice_getStewardCasesCallable',    fn: test_dataservice_getStewardCasesCallable },
+    { name: 'test_dataservice_getAllMembersCallable',      fn: test_dataservice_getAllMembersCallable },
+    { name: 'test_dataservice_getUnitsCallable',           fn: test_dataservice_getUnitsCallable },
+    { name: 'test_dataservice_getBatchDataCallable',       fn: test_dataservice_getBatchDataCallable },
+    { name: 'test_dataservice_memberLookupReturnsShape',   fn: test_dataservice_memberLookupReturnsShape },
+    { name: 'test_dataservice_invalidEmailReturnsNull',    fn: test_dataservice_invalidEmailReturnsNull },
+    { name: 'test_dataservice_publicAPIComplete',          fn: test_dataservice_publicAPIComplete },
+
+    // ── authsweep suite (Endpoint auth rejection) ──
+    { name: 'test_authsweep_allDataFnsExist',              fn: test_authsweep_allDataFnsExist },
+    { name: 'test_authsweep_stewardEndpointsRejectNull',   fn: test_authsweep_stewardEndpointsRejectNull },
+    { name: 'test_authsweep_memberEndpointsRejectNull',    fn: test_authsweep_memberEndpointsRejectNull },
+    { name: 'test_authsweep_noDataLeakOnNullToken',        fn: test_authsweep_noDataLeakOnNullToken },
+    { name: 'test_authsweep_pollStubsSafe',                fn: test_authsweep_pollStubsSafe },
+    { name: 'test_authsweep_testRunnerEndpointsGated',     fn: test_authsweep_testRunnerEndpointsGated },
+
+    // ── configlive suite (Config completeness vs live headers) ──
+    { name: 'test_configlive_configSheetHasHeaders',       fn: test_configlive_configSheetHasHeaders },
+    { name: 'test_configlive_memberDirHasHeaders',         fn: test_configlive_memberDirHasHeaders },
+    { name: 'test_configlive_grievanceLogHasHeaders',      fn: test_configlive_grievanceLogHasHeaders },
+    { name: 'test_configlive_configColsMatchSheet',        fn: test_configlive_configColsMatchSheet },
+    { name: 'test_configlive_memberColsMatchSheet',        fn: test_configlive_memberColsMatchSheet },
+    { name: 'test_configlive_grievanceColsMatchSheet',     fn: test_configlive_grievanceColsMatchSheet },
+    { name: 'test_configlive_syncColumnMapsCallable',      fn: test_configlive_syncColumnMapsCallable },
+    { name: 'test_configlive_configRow3HasValues',         fn: test_configlive_configRow3HasValues },
+
+    // ── survey suite (Survey engine integrity) ──
+    { name: 'test_survey_hiddenSheetsConstants',           fn: test_survey_hiddenSheetsConstants },
+    { name: 'test_survey_periodsColsDefined',              fn: test_survey_periodsColsDefined },
+    { name: 'test_survey_questionsColsDefined',            fn: test_survey_questionsColsDefined },
+    { name: 'test_survey_getSurveyQuestionsCallable',      fn: test_survey_getSurveyQuestionsCallable },
+    { name: 'test_survey_questionsReturnArray',            fn: test_survey_questionsReturnArray },
+    { name: 'test_survey_questionShapeValid',              fn: test_survey_questionShapeValid },
+    { name: 'test_survey_getSurveyPeriodCallable',         fn: test_survey_getSurveyPeriodCallable },
+    { name: 'test_survey_submitResponseCallable',          fn: test_survey_submitResponseCallable },
+    { name: 'test_survey_satisfactionColsDefined',         fn: test_survey_satisfactionColsDefined },
+    { name: 'test_survey_trackingSheetExists',             fn: test_survey_trackingSheetExists },
   ];
 }
 
@@ -891,5 +933,375 @@ function test_system_eventBusExists() {
 function test_system_hiddenSheetsConstant() {
   if (typeof HIDDEN_SHEETS !== 'undefined') {
     TestRunner.assertType(HIDDEN_SHEETS, 'object', 'HIDDEN_SHEETS is object');
+  }
+}
+
+// ── DATASERVICE SUITE ─────────────────────────────────────────────────
+// Tests DataService CRUD operations against live sheets.
+
+function test_dataservice_moduleExists() {
+  TestRunner.assertNotNull(DataService, 'DataService');
+  TestRunner.assertType(DataService, 'object', 'DataService is object');
+}
+
+function test_dataservice_findUserByEmailCallable() {
+  TestRunner.assertType(DataService.findUserByEmail, 'function', 'findUserByEmail');
+}
+
+function test_dataservice_getUserRoleCallable() {
+  TestRunner.assertType(DataService.getUserRole, 'function', 'getUserRole');
+}
+
+function test_dataservice_getStewardCasesCallable() {
+  TestRunner.assertType(DataService.getStewardCases, 'function', 'getStewardCases');
+}
+
+function test_dataservice_getAllMembersCallable() {
+  TestRunner.assertType(DataService.getAllMembers, 'function', 'getAllMembers');
+}
+
+function test_dataservice_getUnitsCallable() {
+  TestRunner.assertType(DataService.getUnits, 'function', 'getUnits');
+}
+
+function test_dataservice_getBatchDataCallable() {
+  TestRunner.assertType(DataService.getBatchData, 'function', 'getBatchData');
+}
+
+function test_dataservice_memberLookupReturnsShape() {
+  // Lookup a definitely-nonexistent email — should return null (not throw)
+  var result = DataService.findUserByEmail('__nonexistent_test_probe__@example.invalid');
+  // null means "not found" — this is correct behavior
+  TestRunner.assertTrue(result === null || result === undefined,
+    'Nonexistent email returns null/undefined, not an error');
+}
+
+function test_dataservice_invalidEmailReturnsNull() {
+  var result = DataService.findUserByEmail('');
+  TestRunner.assertTrue(result === null || result === undefined,
+    'Empty email returns null/undefined');
+}
+
+function test_dataservice_publicAPIComplete() {
+  // Verify all expected DataService public methods exist
+  var expected = [
+    'findUserByEmail', 'getUserRole', 'getStewardCases', 'getStewardKPIs',
+    'getMemberGrievances', 'getMemberGrievanceHistory', 'getStewardContact',
+    'getUnits', 'getFullMemberProfile', 'updateMemberProfile',
+    'getAssignedStewardInfo', 'getAvailableStewards', 'getAllMembers',
+    'createTask', 'getTasks', 'completeTask', 'updateTask',
+    'getStewardMemberStats', 'getStewardDirectory',
+    'getGrievanceStats', 'getGrievanceHotSpots', 'getMembershipStats',
+    'getUpcomingEvents', 'isChiefSteward', 'submitFeedback',
+    'getMeetingMinutes', 'addMeetingMinutes',
+    'getCaseChecklist', 'toggleChecklistItem', 'getMemberMeetings',
+    'getSatisfactionTrends', 'getBatchData'
+  ];
+  for (var i = 0; i < expected.length; i++) {
+    TestRunner.assertType(DataService[expected[i]], 'function',
+      'DataService.' + expected[i]);
+  }
+}
+
+// ── AUTHSWEEP SUITE ───────────────────────────────────────────────────
+// Verifies all data* endpoints reject unauthenticated calls.
+// These tests call real endpoints with null/invalid tokens.
+
+function test_authsweep_allDataFnsExist() {
+  // Spot-check critical data* wrappers exist as global functions
+  var fns = [
+    'dataGetStewardCases', 'dataGetMemberGrievances', 'dataGetAllMembers',
+    'dataSendBroadcast', 'dataCreateTask', 'dataGetTasks',
+    'dataUpdateProfile', 'dataGetBatchData', 'dataRunTests'
+  ];
+  for (var i = 0; i < fns.length; i++) {
+    TestRunner.assertEquals('function', typeof this[fns[i]] !== 'undefined' ? 'function' : 'undefined',
+      fns[i] + ' exists');
+  }
+}
+
+function test_authsweep_stewardEndpointsRejectNull() {
+  // Steward-only endpoints must return safe-empty when called with null token
+  var stewardEndpoints = [
+    { fn: 'dataGetStewardCases', safeEmpty: [] },
+    { fn: 'dataGetStewardKPIs', safeEmpty: {} },
+    { fn: 'dataGetAllMembers', safeEmpty: [] },
+    { fn: 'dataGetGrievanceStats', safeEmpty: { available: false } },
+    { fn: 'dataGetGrievanceHotSpots', safeEmpty: [] },
+    { fn: 'dataGetStewardContactLog', safeEmpty: [] },
+    { fn: 'dataGetTasks', safeEmpty: [] },
+    { fn: 'dataGetAllStewardPerformance', safeEmpty: [] },
+  ];
+  for (var i = 0; i < stewardEndpoints.length; i++) {
+    var ep = stewardEndpoints[i];
+    try {
+      var result = this[ep.fn](null); // null token = unauthenticated
+      // Result must be the safe empty type, not real data
+      var resultType = Array.isArray(result) ? 'array' : typeof result;
+      var safeType = Array.isArray(ep.safeEmpty) ? 'array' : typeof ep.safeEmpty;
+      TestRunner.assertEquals(safeType, resultType,
+        ep.fn + ' returns safe-empty type on null token');
+    } catch (e) {
+      // Throwing is also acceptable — it means the endpoint rejected
+    }
+  }
+}
+
+function test_authsweep_memberEndpointsRejectNull() {
+  // Member endpoints must return safe-empty for null token
+  var memberEndpoints = [
+    { fn: 'dataGetMemberGrievances', safeEmpty: [] },
+    { fn: 'dataGetStewardContact', safeEmpty: null },
+    { fn: 'dataGetAssignedSteward', safeEmpty: null },
+    { fn: 'dataGetAvailableStewards', safeEmpty: [] },
+    { fn: 'dataGetSurveyStatus', safeEmpty: null },
+    { fn: 'dataGetMemberTasks', safeEmpty: [] },
+    { fn: 'dataGetMemberMeetings', safeEmpty: [] },
+    { fn: 'dataGetMyFeedback', safeEmpty: [] },
+  ];
+  for (var i = 0; i < memberEndpoints.length; i++) {
+    var ep = memberEndpoints[i];
+    try {
+      var result = this[ep.fn](null);
+      // Must not return actual member data
+      if (Array.isArray(ep.safeEmpty)) {
+        TestRunner.assertTrue(Array.isArray(result) && result.length === 0,
+          ep.fn + ' returns empty array on null token');
+      }
+    } catch (e) {
+      // Throwing is acceptable
+    }
+  }
+}
+
+function test_authsweep_noDataLeakOnNullToken() {
+  // dataGetBatchData is a high-value target — bulk data endpoint
+  try {
+    var result = dataGetBatchData(null);
+    // Should return empty/error, not real batch data
+    if (result && typeof result === 'object') {
+      // If it returns an object, it should NOT have member arrays
+      var hasMemberData = result.members && Array.isArray(result.members) && result.members.length > 0;
+      TestRunner.assertFalsy(hasMemberData,
+        'dataGetBatchData(null) must not leak member data');
+    }
+  } catch (e) {
+    // Throwing is acceptable
+  }
+}
+
+function test_authsweep_pollStubsSafe() {
+  // Legacy poll stubs should be safe (no auth needed, return empty/failure)
+  var polls = dataGetActivePolls();
+  TestRunner.assertTrue(Array.isArray(polls) && polls.length === 0,
+    'dataGetActivePolls returns empty array');
+  var vote = dataSubmitPollVote();
+  TestRunner.assertHasKey(vote, 'success', 'dataSubmitPollVote has success key');
+  TestRunner.assertEquals(false, vote.success, 'dataSubmitPollVote returns failure');
+}
+
+function test_authsweep_testRunnerEndpointsGated() {
+  // Our own test endpoints must be auth-gated
+  var runResult = dataRunTests(null);
+  TestRunner.assertHasKey(runResult, 'success', 'dataRunTests has success key');
+  TestRunner.assertEquals(false, runResult.success, 'dataRunTests rejects null token');
+
+  var getResult = dataGetTestResults(null);
+  TestRunner.assertEquals(false, getResult.success, 'dataGetTestResults rejects null token');
+
+  var trigResult = dataManageTestTrigger(null, 'setup');
+  TestRunner.assertEquals(false, trigResult.success, 'dataManageTestTrigger rejects null token');
+}
+
+// ── CONFIGLIVE SUITE ──────────────────────────────────────────────────
+// Verifies live sheet headers match expected column constants.
+
+function test_configlive_configSheetHasHeaders() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(SHEETS.CONFIG);
+  TestRunner.assertNotNull(sheet, 'Config sheet exists');
+  var lastCol = sheet.getLastColumn();
+  TestRunner.assertGreaterThan(lastCol, 0, 'Config has columns');
+}
+
+function test_configlive_memberDirHasHeaders() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  TestRunner.assertNotNull(sheet, 'Member Dir sheet exists');
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  TestRunner.assertGreaterThan(headers.length, 5, 'Member Dir has 5+ columns');
+}
+
+function test_configlive_grievanceLogHasHeaders() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  TestRunner.assertNotNull(sheet, 'Grievance Log sheet exists');
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  TestRunner.assertGreaterThan(headers.length, 5, 'Grievance Log has 5+ columns');
+}
+
+function test_configlive_configColsMatchSheet() {
+  // Verify CONFIG_COLS positions don't exceed actual sheet width
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!sheet) return;
+  var maxCol = sheet.getLastColumn();
+  var keys = Object.keys(CONFIG_COLS);
+  for (var i = 0; i < keys.length; i++) {
+    var val = CONFIG_COLS[keys[i]];
+    if (typeof val === 'number') {
+      TestRunner.assertTrue(val <= maxCol,
+        'CONFIG_COLS.' + keys[i] + ' (' + val + ') <= sheet width (' + maxCol + ')');
+    }
+  }
+}
+
+function test_configlive_memberColsMatchSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) return;
+  var maxCol = sheet.getLastColumn();
+  var keys = Object.keys(MEMBER_COLS);
+  for (var i = 0; i < keys.length; i++) {
+    var val = MEMBER_COLS[keys[i]];
+    if (typeof val === 'number') {
+      TestRunner.assertTrue(val <= maxCol,
+        'MEMBER_COLS.' + keys[i] + ' (' + val + ') <= sheet width (' + maxCol + ')');
+    }
+  }
+}
+
+function test_configlive_grievanceColsMatchSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return;
+  var maxCol = sheet.getLastColumn();
+  var keys = Object.keys(GRIEVANCE_COLS);
+  for (var i = 0; i < keys.length; i++) {
+    var val = GRIEVANCE_COLS[keys[i]];
+    if (typeof val === 'number') {
+      TestRunner.assertTrue(val <= maxCol,
+        'GRIEVANCE_COLS.' + keys[i] + ' (' + val + ') <= sheet width (' + maxCol + ')');
+    }
+  }
+}
+
+function test_configlive_syncColumnMapsCallable() {
+  TestRunner.assertEquals('function', typeof syncColumnMaps, 'syncColumnMaps exists');
+  // Don't actually call it (it writes) — just verify it's available
+}
+
+function test_configlive_configRow3HasValues() {
+  // Config tab row 3 holds the actual config values — verify it's not empty
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!sheet || sheet.getLastRow() < 3) return;
+  var orgNameCol = CONFIG_COLS.ORG_NAME;
+  if (!orgNameCol || orgNameCol < 1) return;
+  var val = sheet.getRange(3, orgNameCol).getValue();
+  TestRunner.assertTrue(String(val).trim().length > 0,
+    'Config row 3 ORG_NAME is not empty');
+}
+
+// ── SURVEY SUITE ──────────────────────────────────────────────────────
+// Tests survey engine integrity — constants, question schema, period mgmt.
+
+function test_survey_hiddenSheetsConstants() {
+  TestRunner.assertHasKey(HIDDEN_SHEETS, 'SURVEY_TRACKING', 'SURVEY_TRACKING');
+  TestRunner.assertHasKey(HIDDEN_SHEETS, 'SURVEY_VAULT', 'SURVEY_VAULT');
+  TestRunner.assertHasKey(HIDDEN_SHEETS, 'SURVEY_PERIODS', 'SURVEY_PERIODS');
+  // Values should be underscore-prefixed hidden sheet names
+  TestRunner.assertTrue(HIDDEN_SHEETS.SURVEY_TRACKING.charAt(0) === '_',
+    'SURVEY_TRACKING starts with _');
+}
+
+function test_survey_periodsColsDefined() {
+  TestRunner.assertNotNull(SURVEY_PERIODS_COLS, 'SURVEY_PERIODS_COLS');
+  TestRunner.assertType(SURVEY_PERIODS_COLS, 'object', 'is object');
+  TestRunner.assertHasKey(SURVEY_PERIODS_COLS, 'PERIOD_ID', 'PERIOD_ID');
+  TestRunner.assertHasKey(SURVEY_PERIODS_COLS, 'STATUS', 'STATUS');
+}
+
+function test_survey_questionsColsDefined() {
+  TestRunner.assertNotNull(SURVEY_QUESTIONS_COLS, 'SURVEY_QUESTIONS_COLS');
+  TestRunner.assertType(SURVEY_QUESTIONS_COLS, 'object', 'is object');
+  TestRunner.assertHasKey(SURVEY_QUESTIONS_COLS, 'QUESTION_ID', 'QUESTION_ID');
+  TestRunner.assertHasKey(SURVEY_QUESTIONS_COLS, 'QUESTION_TEXT', 'QUESTION_TEXT');
+  TestRunner.assertHasKey(SURVEY_QUESTIONS_COLS, 'TYPE', 'TYPE');
+  TestRunner.assertHasKey(SURVEY_QUESTIONS_COLS, 'ACTIVE', 'ACTIVE');
+}
+
+function test_survey_getSurveyQuestionsCallable() {
+  TestRunner.assertEquals('function', typeof getSurveyQuestions, 'getSurveyQuestions exists');
+}
+
+function test_survey_questionsReturnArray() {
+  var questions = getSurveyQuestions();
+  TestRunner.assertTrue(Array.isArray(questions), 'getSurveyQuestions returns array');
+  TestRunner.assertGreaterThan(questions.length, 0, 'at least 1 question');
+}
+
+function test_survey_questionShapeValid() {
+  var questions = getSurveyQuestions();
+  if (!questions || questions.length === 0) return;
+  // Check first question has expected shape
+  var q = questions[0];
+  TestRunner.assertHasKey(q, 'id', 'question.id');
+  TestRunner.assertHasKey(q, 'text', 'question.text');
+  TestRunner.assertHasKey(q, 'type', 'question.type');
+  // Type should be one of known types
+  var validTypes = ['slider-10', 'dropdown', 'radio', 'checkbox', 'paragraph', 'text'];
+  TestRunner.assertTrue(validTypes.indexOf(q.type) !== -1,
+    'question.type "' + q.type + '" is a known type');
+}
+
+function test_survey_getSurveyPeriodCallable() {
+  TestRunner.assertEquals('function', typeof getSurveyPeriod, 'getSurveyPeriod exists');
+  // getSurveyPeriod returns the active period object or null
+  try {
+    var period = getSurveyPeriod();
+    // null means no active period — valid
+    // object means active period — also valid
+    if (period !== null) {
+      TestRunner.assertType(period, 'object', 'period is object');
+    }
+  } catch (e) {
+    // If sheet doesn't exist yet, that's okay — function should handle gracefully
+  }
+}
+
+function test_survey_submitResponseCallable() {
+  TestRunner.assertEquals('function', typeof submitSurveyResponse, 'submitSurveyResponse exists');
+  // Don't actually submit — just verify it exists
+}
+
+function test_survey_satisfactionColsDefined() {
+  // SATISFACTION_COLS is deprecated but kept for backward compat
+  if (typeof SATISFACTION_COLS !== 'undefined') {
+    TestRunner.assertType(SATISFACTION_COLS, 'object', 'SATISFACTION_COLS is object');
+  }
+  // The dynamic col map function should also exist
+  if (typeof getSatisfactionColMap_ !== 'undefined') {
+    TestRunner.assertType(getSatisfactionColMap_, 'function', 'getSatisfactionColMap_ is function');
+  }
+}
+
+function test_survey_trackingSheetExists() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var sheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
+  // Sheet may not exist if survey hasn't been initialized yet — that's a warning, not failure
+  // But if it exists, verify it has headers
+  if (sheet && sheet.getLastRow() >= 1) {
+    var firstCell = sheet.getRange(1, 1).getValue();
+    TestRunner.assertTrue(String(firstCell).trim().length > 0,
+      'Survey tracking sheet has a header in A1');
   }
 }

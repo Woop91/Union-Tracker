@@ -4085,7 +4085,11 @@ function renderTestRunnerPage(appContainer) {
       { value: 'auth', label: 'Auth & Roles' },
       { value: 'grievance', label: 'Grievance Logic' },
       { value: 'security', label: 'Security' },
-      { value: 'system', label: 'System' }
+      { value: 'system', label: 'System' },
+      { value: 'dataservice', label: 'DataService CRUD' },
+      { value: 'authsweep', label: 'Auth Sweep' },
+      { value: 'configlive', label: 'Config Completeness' },
+      { value: 'survey', label: 'Survey Engine' }
     ];
     suiteOptions.forEach(function(opt) {
       var o = el('option', { value: opt.value }, opt.label);
