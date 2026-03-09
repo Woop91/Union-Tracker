@@ -461,6 +461,119 @@ describe('G7: All .gs files have valid JavaScript syntax', () => {
 
 
 // ============================================================================
+// G8: MISSING .withFailureHandler ON serverCall() CHAINS (RATCHET)
+// ============================================================================
+// Reason: The Org KPI bug (2026-03-09) was caused by a serverCall() chain
+// with .withSuccessHandler but no .withFailureHandler. Server errors silently
+// left UI elements in their "..." placeholder state.
+//
+// This guard counts chains missing failure handlers and ensures the count
+// never INCREASES. Existing debt can be reduced over time; new debt is blocked.
+
+describe('G8: serverCall() failure handler ratchet', () => {
+  // Current baseline of chains missing .withFailureHandler.
+  // ⚠️ Only DECREASE this number as you fix chains. NEVER increase it.
+  const RATCHET = {
+    'steward_view.html': 30,
+    'member_view.html': 38,
+    'index.html': 0,
+  };
+
+  /**
+   * Counts serverCall() chains that have .withSuccessHandler but NOT
+   * .withFailureHandler in the same chain.
+   */
+  function countMissingFailureHandlers(content) {
+    let count = 0;
+    const pattern = /serverCall\(\)/g;
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+      // Grab up to 2000 chars after serverCall() to cover multi-line chains
+      const chunk = content.substring(match.index, match.index + 2000);
+      const hasSuccess = chunk.includes('withSuccessHandler');
+      const hasFailure = chunk.includes('withFailureHandler');
+      if (hasSuccess && !hasFailure) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  Object.entries(RATCHET).forEach(([file, maxAllowed]) => {
+    const filePath = path.join(SRC_DIR, file);
+    if (!fs.existsSync(filePath)) return;
+
+    test(`${file} — missing failure handlers <= ${maxAllowed} (ratchet)`, () => {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const missing = countMissingFailureHandlers(content);
+
+      if (missing > maxAllowed) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `\n🚨 ${file}: ${missing} serverCall() chains missing .withFailureHandler ` +
+          `(ratchet allows ${maxAllowed}). New chains MUST include .withFailureHandler.`
+        );
+      }
+
+      expect(missing).toBeLessThanOrEqual(maxAllowed);
+    });
+  });
+});
+
+
+// ============================================================================
+// G9: KPI DATA CONTRACT — getGrievanceStats/getStewardKPIs return keys
+// ============================================================================
+// Reason: Frontend depends on specific keys (overdueCount, dueSoonCount, etc.).
+// If backend renames or drops a key, the UI silently shows "..." or NaN.
+// This guard statically scans the return statement for required keys.
+
+describe('G9: Backend KPI functions return required keys', () => {
+  const DATA_SERVICE_PATH = path.join(SRC_DIR, '21_WebDashDataService.gs');
+  if (!fs.existsSync(DATA_SERVICE_PATH)) return;
+  const code = fs.readFileSync(DATA_SERVICE_PATH, 'utf8');
+
+  test('getGrievanceStats returns overdueCount and dueSoonCount', () => {
+    // Find the return statement in getGrievanceStats
+    const funcStart = code.indexOf('function getGrievanceStats()');
+    expect(funcStart).toBeGreaterThan(-1);
+    const returnBlock = code.substring(funcStart, funcStart + 4000);
+
+    expect(returnBlock).toMatch(/overdueCount\s*:/);
+    expect(returnBlock).toMatch(/dueSoonCount\s*:/);
+    expect(returnBlock).toMatch(/total\s*:/);
+    expect(returnBlock).toMatch(/settledCount\s*:/);
+    expect(returnBlock).toMatch(/wonCount\s*:/);
+    expect(returnBlock).toMatch(/available\s*:\s*true/);
+  });
+
+  test('getStewardKPIs returns overdue, dueSoon, totalCases', () => {
+    const funcStart = code.indexOf('function getStewardKPIs(');
+    expect(funcStart).toBeGreaterThan(-1);
+    const returnBlock = code.substring(funcStart, funcStart + 1500);
+
+    expect(returnBlock).toMatch(/overdue\s*:/);
+    expect(returnBlock).toMatch(/dueSoon\s*:/);
+    expect(returnBlock).toMatch(/totalCases\s*:/);
+    expect(returnBlock).toMatch(/resolved\s*:/);
+    expect(returnBlock).toMatch(/activeCases\s*:/);
+  });
+
+  test('_computeKPIsFromCases returns same keys as getStewardKPIs', () => {
+    const funcStart = code.indexOf('function _computeKPIsFromCases(');
+    expect(funcStart).toBeGreaterThan(-1);
+    const returnBlock = code.substring(funcStart, funcStart + 1500);
+
+    expect(returnBlock).toMatch(/overdue\s*:/);
+    expect(returnBlock).toMatch(/dueSoon\s*:/);
+    expect(returnBlock).toMatch(/totalCases\s*:/);
+    expect(returnBlock).toMatch(/resolved\s*:/);
+    expect(returnBlock).toMatch(/activeCases\s*:/);
+  });
+});
+
+
+// ============================================================================
 // HELPERS
 // ============================================================================
 

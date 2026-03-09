@@ -2438,3 +2438,11 @@ When a steward has 0 assigned cases, the Cases tab falls back to org-wide KPIs. 
 ### Files Changed
 - `src/steward_view.html` — Added `.withFailureHandler`; handle `available:false` gracefully
 - `src/21_WebDashDataService.gs` — Changed `>0` to `>=0` in 3 dueSoon checks; try/catch in loop
+
+### Testing Added (2026-03-09)
+**24 new unit tests** in `test/21_WebDashDataService.test.js`:
+- Deadline boundary conditions (12 tests), KPI computation parity (4 tests), Error resilience (5 tests), Return shape contracts (3 tests).
+
+**2 new deploy guards** in `test/deploy-guards.test.js`:
+- G8: Failure handler ratchet (blocks new serverCall() without .withFailureHandler)
+- G9: KPI data contract (static scan for required return keys)
