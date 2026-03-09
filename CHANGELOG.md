@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.25.2] - 2026-03-09
+
+### Added
+- Email notifications on scheduled test failures (daily trigger only)
+- New Config column: `Test Runner Notify Email` — set to any email to receive failure alerts
+- Styled HTML email body (dark theme) with plain-text fallback
+- MailApp quota guard (skips if remaining < 5)
+
+### Changed
+- `runScheduledTests()` now checks results and calls `_sendTestFailureEmail()` on failure
+- Manual runs (menu/SPA) still use toast only — no email spam
+
 ## [4.25.1] - 2026-03-09
 
 ### Added

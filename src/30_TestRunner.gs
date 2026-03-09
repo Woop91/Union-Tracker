@@ -346,10 +346,142 @@ var TestRunner = (function () {
 
 /**
  * Global function called by the daily trigger.
+ * Runs all tests, emails on failure if TEST_NOTIFY_EMAIL is set in Config tab.
  * Must be a top-level function (GAS trigger requirement).
  */
 function runScheduledTests() {
-  TestRunner.runAll();
+  var results = TestRunner.runAll();
+
+  if (results.summary.failed > 0) {
+    _sendTestFailureEmail(results);
+  }
+}
+
+/**
+ * Reads the test notification email address from Config tab.
+ * @returns {string|null} Email address or null if not set
+ * @private
+ */
+function _getTestNotifyEmail() {
+  try {
+    if (!CONFIG_COLS.TEST_NOTIFY_EMAIL || CONFIG_COLS.TEST_NOTIFY_EMAIL < 1) return null;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (!sheet || sheet.getLastRow() < 3) return null;
+    var val = String(sheet.getRange(3, CONFIG_COLS.TEST_NOTIFY_EMAIL).getValue() || '').trim();
+    // Basic email validation
+    return (val && val.indexOf('@') > 0) ? val : null;
+  } catch (e) {
+    Logger.log('TestRunner: Failed to read notify email — ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Sends a failure notification email with test results summary.
+ * Only sends if TEST_NOTIFY_EMAIL is configured in Config tab.
+ * @param {Object} results - TestRunner results object
+ * @private
+ */
+function _sendTestFailureEmail(results) {
+  var email = _getTestNotifyEmail();
+  if (!email) {
+    Logger.log('TestRunner: No TEST_NOTIFY_EMAIL configured — skipping failure notification.');
+    return;
+  }
+
+  try {
+    // Check daily quota — don't burn emails if quota is low
+    var remaining = MailApp.getRemainingDailyQuota();
+    if (remaining < 5) {
+      Logger.log('TestRunner: MailApp quota too low (' + remaining + ') — skipping email.');
+      return;
+    }
+
+    // Build org name for subject
+    var orgName = 'Dashboard';
+    try {
+      var config = ConfigReader.getConfig();
+      orgName = config.orgName || orgName;
+    } catch (_e) { /* fallback */ }
+
+    // Build failure details
+    var failedTests = [];
+    for (var si = 0; si < results.suites.length; si++) {
+      var suite = results.suites[si];
+      for (var ti = 0; ti < suite.tests.length; ti++) {
+        var t = suite.tests[ti];
+        if (!t.passed) {
+          failedTests.push({
+            suite: suite.name,
+            test: t.name.replace(/^test_[a-z]+_/, ''),
+            error: t.error || 'Unknown error'
+          });
+        }
+      }
+    }
+
+    var subject = '❌ ' + orgName + ' — ' + results.summary.failed + ' test(s) failed';
+
+    // Plain-text body
+    var body = orgName + ' Test Runner — Scheduled Run\n'
+      + '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+      + 'Result: ' + results.summary.passed + ' passed, '
+      + results.summary.failed + ' failed ('
+      + results.summary.total + ' total)\n'
+      + 'Duration: ' + results.duration + 'ms\n'
+      + 'Time: ' + results.timestamp + '\n\n'
+      + 'Failed Tests:\n'
+      + '─────────────\n';
+
+    for (var f = 0; f < failedTests.length; f++) {
+      var ft = failedTests[f];
+      body += '\n[' + ft.suite.toUpperCase() + '] ' + ft.test + '\n'
+        + '  → ' + ft.error + '\n';
+    }
+
+    body += '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+      + 'View full results in the Test Runner tab of your dashboard.\n';
+
+    // HTML body for nicer email rendering
+    var html = '<div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:600px;margin:0 auto">'
+      + '<div style="background:#1e1e1e;color:#e0e0e0;padding:20px 24px;border-radius:12px">'
+      + '<h2 style="margin:0 0 12px;font-size:18px;color:#EF4444">❌ Test Failure Report</h2>'
+      + '<div style="background:#2a2a2a;padding:12px 16px;border-radius:8px;margin-bottom:16px">'
+      + '<span style="color:#10B981;font-weight:700">' + results.summary.passed + ' passed</span>'
+      + ' &nbsp;|&nbsp; '
+      + '<span style="color:#EF4444;font-weight:700">' + results.summary.failed + ' failed</span>'
+      + ' &nbsp;|&nbsp; '
+      + '<span style="color:#888">' + results.duration + 'ms</span>'
+      + '</div>';
+
+    for (var h = 0; h < failedTests.length; h++) {
+      var hf = failedTests[h];
+      html += '<div style="margin-bottom:10px;padding:10px 14px;background:#2a2a2a;border-left:3px solid #EF4444;border-radius:6px">'
+        + '<div style="font-weight:600;font-size:13px;color:#ccc">'
+        + '<span style="color:#888;text-transform:uppercase;font-size:11px">' + hf.suite + '</span>'
+        + ' — ' + hf.test + '</div>'
+        + '<div style="font-size:12px;color:#EF4444;margin-top:4px;font-family:monospace;word-break:break-word">'
+        + hf.error.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        + '</div></div>';
+    }
+
+    html += '<div style="font-size:12px;color:#666;margin-top:16px;border-top:1px solid #333;padding-top:12px">'
+      + results.timestamp + ' — ' + orgName + ' Test Runner'
+      + '</div></div></div>';
+
+    MailApp.sendEmail({
+      to: email,
+      subject: subject,
+      body: body,
+      htmlBody: html
+    });
+
+    Logger.log('TestRunner: Failure email sent to ' + email);
+  } catch (e) {
+    Logger.log('TestRunner: Failed to send notification email — ' + e.message);
+  }
 }
 
 /**
