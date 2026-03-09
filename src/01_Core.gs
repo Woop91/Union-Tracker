@@ -686,16 +686,16 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.1';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.2';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 25,
-    PATCH: parseInt(parts[2], 10) || 1,
+    PATCH: parseInt(parts[2], 10) || 2,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-09',
-    CODENAME: 'Test Runner Expansion'
+    CODENAME: 'Test Failure Notifications'
   };
 })();
 
@@ -706,6 +706,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.25.2', date: '2026-03-09', codename: 'Test Failure Notifications', changes: 'Email notifications on scheduled test failures. New Config column: TEST_NOTIFY_EMAIL (Config tab header "Test Runner Notify Email"). When daily trigger runs and tests fail, an email is sent to the configured address with: pass/fail summary, failed test names grouped by suite, error messages, duration, timestamp. Email has both plain-text and styled HTML body (dark theme matching dashboard). Quota guard: skips email if MailApp remaining quota < 5. No email sent on success (failure-only). Manual runs still use toast only. Functions: _getTestNotifyEmail() reads from Config via CONFIG_COLS.TEST_NOTIFY_EMAIL, _sendTestFailureEmail(results) builds and sends the email. New CONFIG_HEADER_MAP_ entry: TEST_NOTIFY_EMAIL after BROADCAST_SCOPE_ALL.' },
   { version: '4.25.1', date: '2026-03-09', codename: 'Test Runner Expansion', changes: '4 new GAS-native test suites added to 30_TestRunner.gs. (1) dataservice suite (10 tests): DataService module existence, all public API methods callable, findUserByEmail shape validation, invalid email returns null, complete public API coverage check. (2) authsweep suite (6 tests): all data* functions exist, steward endpoints reject null token, member endpoints reject null token, dataGetBatchData no data leak on null, poll stubs return safe values, test runner endpoints auth-gated. (3) configlive suite (8 tests): live sheet header existence, CONFIG_COLS/MEMBER_COLS/GRIEVANCE_COLS don\'t exceed actual sheet width, syncColumnMaps callable, Config row 3 has values. (4) survey suite (10 tests): HIDDEN_SHEETS survey constants, SURVEY_PERIODS_COLS/SURVEY_QUESTIONS_COLS defined, getSurveyQuestions returns valid array with correct question shape (id/text/type), getSurveyPeriod callable, submitSurveyResponse exists, SATISFACTION_COLS backward compat, tracking sheet existence. Total: 10 suites, 82 tests. SPA dropdown updated with 4 new filter options.' },
   { version: '4.25.0', date: '2026-03-09', codename: 'GAS-Native Test Runner', changes: 'New GAS-native integration test framework (30_TestRunner.gs). Runs inside the Apps Script runtime against real Sheets/Config/Auth — not mocked. 6 test suites (config, colmap, auth, grievance, security, system) with 48 tests covering: Config tab reads, ConfigReader shape, column mapping integrity (GRIEVANCE_COLS/MEMBER_COLS/CONFIG_COLS), Auth module existence, _resolveCallerEmail/_requireStewardAuth/_checkWebAppAuth, grievance status constants, deadline rules, escapeHtml/escapeForFormula XSS prevention, VERSION_INFO format. SPA dashboard panel (steward-only testrunner tab) with run-all, per-suite filter, pass/fail cards, expandable error details, auto-expand failed suites. Sheets menu item under 🛠️ Admin → 🧪 Test Runner. Daily trigger support (6 AM). Server endpoints: dataRunTests, dataGetTestResults, dataManageTestTrigger — all steward-auth gated. Results stored in ScriptProperties. All tests read-only — never write to sheets. Files: src/30_TestRunner.gs (new), steward_view.html (renderTestRunnerPage), index.html (sidebar + routing), 03_UIComponents.gs (menu). Tests: architecture.test.js + spa-integrity.test.js updated. 2404/2404 Jest tests pass.' },
   { version: '4.24.8', date: '2026-03-08', codename: 'POMS Smart Search Integration', changes: 'Added POMS Reference as a new shared tab (both steward and member roles). 78 POMS sections covering DI/DIB/SSI sequential evaluation, SGA, medical evaluation, med-voc grid rules, CE lifecycle, FTC procedures, CDR (8-step MIRS), child claims, DAA, listings 1.00-14.00, SSI eligibility/income/resources/deeming/work incentives. 17 interactive flowcharts. Features: keyword search with fuzzy scoring, star ratings on explanations and flowcharts, bookmarks, personal notes, quick lookups. Mobile-optimized with 44px touch targets. Files: src/poms_reference.html (CSS-scoped under .poms-root), getPOMSReferenceHtml() in 22_WebDashApp.gs, renderPOMSReference() in index.html. Tab icon: 📘. Lazy-loaded same pattern as org chart.' },
@@ -1534,7 +1535,9 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'INSIGHTS_CACHE_TTL_MIN',   header: 'Insights Cache TTL (Minutes)' },
   // Broadcast: allow any steward to send to ALL members (not just their assigned ones)
   // Set to 'yes' to enable the All Members scope option in the Broadcast tab
-  { key: 'BROADCAST_SCOPE_ALL',      header: 'Broadcast: Allow All Members Scope' }
+  { key: 'BROADCAST_SCOPE_ALL',      header: 'Broadcast: Allow All Members Scope' },
+  // Test runner (v4.25.2) — email address for failure notifications from scheduled test runs
+  { key: 'TEST_NOTIFY_EMAIL',        header: 'Test Runner Notify Email' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
