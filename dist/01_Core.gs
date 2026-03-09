@@ -502,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.25.3",
+  VERSION: "4.25.4",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -686,7 +686,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.3';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.4';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
@@ -706,6 +706,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.25.4', date: '2026-03-09', codename: 'Stability: Timeout Guard + Trigger Audit', changes: 'Fixed webapp instability caused by GAS-native test runner exceeding 6-minute execution limit. TestRunner.runAll() now has global timeout (MAX_RUNTIME_MS=300000, 5 min) and per-test slow detection (PER_TEST_MAX_MS=30000, 30s). Remaining tests counted as skipped when timeout hit, status set to timeout. New trigger audit utilities in 06_Maintenance.gs: auditAllTriggers() (read-only, logs all installed triggers with duplicate detection), cleanupDuplicateTriggers(dryRun) (removes duplicate triggers, safe dryRun default), dataAuditTriggers(sessionToken) SPA endpoint. Audit Triggers menu item added to Data Integrity menu. Documented: 3.15 MB total .gs code, 558 KB HTML payload (all views inlined via include()), 20+ installable trigger sources across codebase.' },
   { version: '4.25.3', date: '2026-03-09', codename: 'Deadline Config Completeness', changes: 'Added 3 missing deadline Config columns: STEP3_APPEAL_DAYS (header "Step III Appeal Days", default 10), STEP3_RESPONSE_DAYS (header "Step III Response Days", default 21), ARBITRATION_DEMAND_DAYS (header "Arbitration Demand Days", default 30). CONFIG_HEADER_MAP_ expanded (3 entries after STEP2_RESPONSE_DAYS). DEADLINES section header widened from 4 to 7 cols in createConfigSheet. seedConfigDefault_ calls added for all 3. getDeadlineRules() now reads Step III and Arbitration values from Config instead of hardcoded DEADLINE_DEFAULTS; still falls back to defaults if empty/NaN. COMMAND_CONFIG.VERSION fixed from stale "4.24.4" to match actual version.' },
   { version: '4.25.2', date: '2026-03-09', codename: 'Test Failure Notifications', changes: 'Email notifications on scheduled test failures. New Config column: TEST_NOTIFY_EMAIL (Config tab header "Test Runner Notify Email"). When daily trigger runs and tests fail, an email is sent to the configured address with: pass/fail summary, failed test names grouped by suite, error messages, duration, timestamp. Email has both plain-text and styled HTML body (dark theme matching dashboard). Quota guard: skips email if MailApp remaining quota < 5. No email sent on success (failure-only). Manual runs still use toast only. Functions: _getTestNotifyEmail() reads from Config via CONFIG_COLS.TEST_NOTIFY_EMAIL, _sendTestFailureEmail(results) builds and sends the email. New CONFIG_HEADER_MAP_ entry: TEST_NOTIFY_EMAIL after BROADCAST_SCOPE_ALL.' },
   { version: '4.25.1', date: '2026-03-09', codename: 'Test Runner Expansion', changes: '4 new GAS-native test suites added to 30_TestRunner.gs. (1) dataservice suite (10 tests): DataService module existence, all public API methods callable, findUserByEmail shape validation, invalid email returns null, complete public API coverage check. (2) authsweep suite (6 tests): all data* functions exist, steward endpoints reject null token, member endpoints reject null token, dataGetBatchData no data leak on null, poll stubs return safe values, test runner endpoints auth-gated. (3) configlive suite (8 tests): live sheet header existence, CONFIG_COLS/MEMBER_COLS/GRIEVANCE_COLS don\'t exceed actual sheet width, syncColumnMaps callable, Config row 3 has values. (4) survey suite (10 tests): HIDDEN_SHEETS survey constants, SURVEY_PERIODS_COLS/SURVEY_QUESTIONS_COLS defined, getSurveyQuestions returns valid array with correct question shape (id/text/type), getSurveyPeriod callable, submitSurveyResponse exists, SATISFACTION_COLS backward compat, tracking sheet existence. Total: 10 suites, 82 tests. SPA dropdown updated with 4 new filter options.' },

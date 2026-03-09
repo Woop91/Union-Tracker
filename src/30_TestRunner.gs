@@ -171,8 +171,14 @@ var TestRunner = (function () {
    * @param {string} [filterSuite] - Optional suite name to run only that suite
    * @returns {Object} Full results object
    */
+  // Safety margin: bail at 5 min to stay under GAS 6-min execution limit.
+  // Individual test timeout: 30s per test to catch hung sheet reads.
+  var MAX_RUNTIME_MS  = 5 * 60 * 1000;  // 300 000 ms
+  var PER_TEST_MAX_MS = 30 * 1000;       // 30 000 ms
+
   function runAll(filterSuite) {
     var startTime = new Date().getTime();
+    var timedOut = false;
 
     // Update status to "running"
     _setStatus('running');
@@ -192,6 +198,19 @@ var TestRunner = (function () {
     }
 
     for (var si = 0; si < suiteNames.length; si++) {
+      // ── Global timeout check before each suite ──
+      if (new Date().getTime() - startTime > MAX_RUNTIME_MS) {
+        timedOut = true;
+        Logger.log('TestRunner: Global timeout reached (' + MAX_RUNTIME_MS + 'ms) — skipping remaining suites.');
+        // Count remaining tests as skipped
+        for (var ri = si; ri < suiteNames.length; ri++) {
+          var remaining = suites[suiteNames[ri]];
+          results.summary.skipped += remaining.length;
+          results.summary.total += remaining.length;
+        }
+        break;
+      }
+
       var suiteName = suiteNames[si];
       var tests = suites[suiteName];
       var suiteResult = {
@@ -199,12 +218,26 @@ var TestRunner = (function () {
         tests: [],
         passed: 0,
         failed: 0,
+        skipped: 0,
         duration: 0
       };
 
       var suiteStart = new Date().getTime();
 
       for (var ti = 0; ti < tests.length; ti++) {
+        // ── Per-test timeout check ──
+        var elapsed = new Date().getTime() - startTime;
+        if (elapsed > MAX_RUNTIME_MS) {
+          // Skip remaining tests in this suite
+          var leftInSuite = tests.length - ti;
+          suiteResult.skipped += leftInSuite;
+          results.summary.skipped += leftInSuite;
+          results.summary.total += leftInSuite;
+          timedOut = true;
+          Logger.log('TestRunner: Timeout mid-suite "' + suiteName + '" — skipping ' + leftInSuite + ' remaining tests.');
+          break;
+        }
+
         var test = tests[ti];
         var testStart = new Date().getTime();
         var testResult = { name: test.name, passed: false, error: null, duration: 0 };
@@ -219,6 +252,13 @@ var TestRunner = (function () {
         }
 
         testResult.duration = new Date().getTime() - testStart;
+
+        // Flag tests that ran too long (informational — they still completed)
+        if (testResult.duration > PER_TEST_MAX_MS) {
+          Logger.log('TestRunner: SLOW test "' + test.name + '" took ' + testResult.duration + 'ms (limit: ' + PER_TEST_MAX_MS + 'ms)');
+          testResult.slow = true;
+        }
+
         suiteResult.tests.push(testResult);
         results.summary.total++;
         if (testResult.passed) results.summary.passed++;
@@ -230,10 +270,11 @@ var TestRunner = (function () {
     }
 
     results.duration = new Date().getTime() - startTime;
+    results.timedOut = timedOut;
 
     // Store results
     _storeResults(results);
-    _setStatus('complete');
+    _setStatus(timedOut ? 'timeout' : 'complete');
 
     return results;
   }

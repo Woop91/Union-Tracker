@@ -2430,19 +2430,248 @@ Reasoning: 4 groups simpler than 6. Workload Reporting promoted to Core (steward
 When a steward has 0 assigned cases, the Cases tab falls back to org-wide KPIs. The "Org Overdue" and "Org Due <7d" cards stayed as "..." (placeholder) and never populated.
 
 ### Root Causes Found
-1. **Missing failure handler** (`steward_view.html:150`): The `dataGetGrievanceStats` call had no `.withFailureHandler` for the KPI cards.
-2. **Silent early return** (`steward_view.html:151`): When `stats.available === false`, the success handler returned without updating cards.
-3. **Cases due today uncounted** (`21_WebDashDataService.gs`): `deadlineDays === 0` fell through both overdue (`< 0`) and dueSoon (`> 0`) checks.
-4. **No try/catch in `getGrievanceStats` loop**: One malformed row could crash the entire function.
+1. **Missing failure handler** (`steward_view.html:150`): The `dataGetGrievanceStats` call had no `.withFailureHandler` for the KPI cards. Server errors caused the generic handler to target `.loading-spinner` elements only — KPI `.kpi-value` elements were untouched.
+2. **Silent early return** (`steward_view.html:151`): When `stats.available === false`, the success handler returned without updating cards. Cards stayed "...".
+3. **Cases due today uncounted** (`21_WebDashDataService.gs`): `deadlineDays === 0` fell through both overdue (`< 0`) and dueSoon (`> 0`) checks. Three locations affected: `getGrievanceStats`, `getStewardKPIs`, `_computeKPIsFromCases`.
+4. **No try/catch in `getGrievanceStats` loop** (`21_WebDashDataService.gs:1890`): One malformed row could crash the entire function.
 
 ### Files Changed
-- `src/steward_view.html` — Added `.withFailureHandler`; handle `available:false` gracefully
-- `src/21_WebDashDataService.gs` — Changed `>0` to `>=0` in 3 dueSoon checks; try/catch in loop
+- `src/steward_view.html` — Added `.withFailureHandler` to org KPI `dataGetGrievanceStats` call; handle `available:false` by showing "0" instead of "..."
+- `src/21_WebDashDataService.gs` — Changed `deadlineDays > 0` to `deadlineDays >= 0` in 3 locations; wrapped `getGrievanceStats` loop in try/catch
+
+### How Org KPI Fallback Works
+- `renderStewardDashboard()` checks `(kpis.totalCases || 0) === 0`
+- If true → renders "Org Cases / Org Overdue / Org Due <7d / Org Resolved" with "..." placeholder
+- Async call to `dataGetGrievanceStats(SESSION_TOKEN)` fills in real values
+- `getGrievanceStats()` iterates ALL grievance rows (not steward-filtered) and counts overdue/dueSoon
+- Overdue: `_buildGrievanceRecord` auto-derives from `deadlineDays < 0` on non-terminal cases
+- DueSoon: `deadlineDays >= 0 && deadlineDays <= 7` on non-terminal cases
+- Deadline column matched by aliases: `['deadline', 'next deadline', 'due date']`
+
+### ⚠️ IMPORTANT: Deadline Column Must Match
+If the Grievance Log's deadline column header doesn't match one of `['deadline', 'next deadline', 'due date']`, all deadline-based counts will be 0 (not an error, just 0). The column name is case-insensitive.
 
 ### Testing Added (2026-03-09)
 **24 new unit tests** in `test/21_WebDashDataService.test.js`:
-- Deadline boundary conditions (12 tests), KPI computation parity (4 tests), Error resilience (5 tests), Return shape contracts (3 tests).
+- **Deadline boundary conditions** (12 tests): Covers `deadlineDays` values of -30, -1, 0, 1, 7, 8, null. Tests overdue auto-detection, terminal status protection, and mixed scenarios.
+- **KPI computation parity** (4 tests): Verifies `getStewardKPIs` and `getBatchData.kpis` (via `_computeKPIsFromCases`) produce identical counts for the same data.
+- **Error resilience** (5 tests): Malformed rows (short rows, null dates, invalid date strings, empty sheet, missing sheet) — none should crash `getGrievanceStats`.
+- **Return shape contracts** (3 tests): Ensures `getGrievanceStats` and `getStewardKPIs` always return the keys the frontend depends on.
 
 **2 new deploy guards** in `test/deploy-guards.test.js`:
-- G8: Failure handler ratchet (blocks new serverCall() without .withFailureHandler)
-- G9: KPI data contract (static scan for required return keys)
+- **G8 — Failure handler ratchet**: Counts `serverCall()` chains with `.withSuccessHandler` but no `.withFailureHandler`. Current baseline: steward_view=30, member_view=38, index=0. Count must never INCREASE; decrease as debt is addressed.
+- **G9 — KPI data contract**: Statically scans `getGrievanceStats`, `getStewardKPIs`, and `_computeKPIsFromCases` return statements for required keys (overdueCount, dueSoonCount, total, etc.). Catches silent key renames/deletions.
+---
+
+## 2026-03-09 — SPA Integrity Test Suite (G8–G14)
+
+### Why
+Every bug from the 2026-03-08/09 session would have been caught by automated tests:
+- POMS missing from mobile → G9 (More menu parity)
+- Stewards can't switch to member view → G10 (isDualRole gate)
+- Tabs showing "Something went wrong" → G11 (sheet init completeness) + G13 (error visibility)
+- Members not clickable → G14 (CSS affordance)
+- Dead tabs without routing → G8 (route handler completeness)
+
+### Tests Added (test/spa-integrity.test.js)
+
+| Guard | What it catches | How |
+|-------|----------------|-----|
+| G8 | Sidebar tab with no route handler | Extracts all tab IDs from `_getSidebarTabs`, checks each has a `case` or shared `if` in `_handleTabNav` |
+| G9 | Feature only on desktop, missing on mobile | Extracts sidebar tab IDs, subtracts bottom-nav tabs, checks remainder appears in More menu |
+| G10 | Steward toggle gate regression | Asserts `isDualRole` condition includes `role === 'steward'`, not just `role === 'both'` |
+| G11 | New sheet added to SHEETS constant but not to auto-init | Maps 17 feature sheet constants to init functions, checks each is covered in `_ensureAllSheetsInternal` |
+| G12 | Client calls non-existent server function | Scans HTML for `.funcName()` on serverCall chains, checks each name exists as a `function` in .gs files |
+| G13 | serverCall hides actual errors | Asserts failure handler references `err.message` or `err`, not just a generic string |
+| G14 | Clickable elements without visual affordance | Checks `.member-list-item` has `cursor: pointer`, `:hover` state, and `addEventListener('click')` |
+
+### Integration
+- `npm run test:guards` now runs both `deploy-guards.test.js` and `spa-integrity.test.js`
+- Pre-commit hook (`.husky/pre-commit`) runs guards as step 3 — blocks commits that break routing, auth, or sheet init
+- `npm run deploy` pipeline: lint → guards → unit tests → build → clasp push
+
+### Files Changed
+- `test/spa-integrity.test.js` — new file, 12 tests
+- `package.json` — test:guards script updated
+- `.husky/pre-commit` — step 3 added for guards
+
+---
+
+## v4.25.0 — GAS-Native Test Runner (2026-03-09)
+
+### What Changed
+- **New file**: `src/30_TestRunner.gs` — GAS-native integration test framework
+- **Modified**: `build.js` — added `30_TestRunner.gs` to BUILD_ORDER
+- **Modified**: `src/index.html` — added `testrunner` tab to steward sidebar + routing
+- **Modified**: `src/steward_view.html` — added `renderTestRunnerPage()` function + More menu entry
+- **Modified**: `src/03_UIComponents.gs` — added 🧪 Test Runner submenu under Admin
+- **Modified**: `src/01_Core.gs` — version bump to 4.25.0 + VERSION_HISTORY entry
+- **Modified**: `package.json` — version bump to 4.25.0
+- **Modified**: `CHANGELOG.md` — v4.25.0 entry
+- **Modified**: `test/architecture.test.js` — added `30_TestRunner.gs` to BUILD_ORDER
+- **Modified**: `test/spa-integrity.test.js` — added `renderTestRunnerPage` to renderMap
+
+### How It Works
+- **TestRunner IIFE module** in `30_TestRunner.gs` with assert helpers (assertEquals, assertTrue, assertNotNull, assertType, assertContains, assertThrows, assertGreaterThan, assertHasKey, assertDeepEquals, assertFalsy)
+- **Test discovery** via `_getTestRegistry()` — explicit registry pattern (GAS doesn't support `Object.keys(this)`)
+- **Naming convention**: `test_SUITE_description` — suite extracted from second segment
+- **6 suites / 48 tests**:
+  - `config` (10): SHEETS constant, sheet existence, ConfigReader shape, CONFIG_COLS, DEFAULT_CONFIG, DEADLINE_DEFAULTS
+  - `colmap` (9): GRIEVANCE_COLS/MEMBER_COLS/CONFIG_COLS defined, required keys present, all positive, no duplicates
+  - `auth` (8): Auth module, resolveUser, DataService, findUserByEmail, _resolveCallerEmail, _requireStewardAuth, checkWebAppAuthorization, session token functions
+  - `grievance` (10): GRIEVANCE_STATUS, all statuses, closed statuses subset, priority coverage, deadline rules, step list, isValidGrievanceId, outcomes
+  - `security` (6): escapeHtml, escapeForFormula, XSS blocking, null/number handling
+  - `system` (5): VERSION_INFO, semver format, spreadsheet binding, EventBus, HIDDEN_SHEETS
+- **All tests are READ-ONLY** — never write to sheets
+- **Results stored** in ScriptProperties as JSON (key: `TEST_RUNNER_RESULTS`)
+- **SPA panel**: steward-only tab with summary cards, per-suite collapsibles, auto-expand failures, monospace error display
+- **Triggers**: manual menu item (`runTestsFromMenu`), daily 6AM (`runScheduledTests`)
+- **Server endpoints**: `dataRunTests(sessionToken, filterSuite)`, `dataGetTestResults(sessionToken)`, `dataManageTestTrigger(sessionToken, action)` — all require `_requireStewardAuth`
+
+### Key Design Decisions
+1. **GAS-native over Jest mocks**: Tests run inside real GAS runtime hitting real Sheets/Config — catches integration bugs that mocked tests miss (column drift, Config tab misreads, permission issues)
+2. **Registry pattern over discovery**: GAS V8 can't enumerate global functions reliably — explicit `_getTestRegistry()` is safer
+3. **Read-only tests**: Zero risk of corrupting production data
+4. **Steward-only access**: Test results could reveal system internals — gated behind `_requireStewardAuth`
+5. **ScriptProperties storage**: Lightweight, persists across sessions, no additional sheet tab needed
+6. **Auth on all endpoints**: Follows CLAUDE.md rule — every `data*` function begins with auth check
+
+---
+
+## v4.25.1 — Test Runner Expansion (2026-03-09)
+
+### What Changed
+- **Modified**: `src/30_TestRunner.gs` — added 4 new test suites (34 tests → 82 total)
+- **Modified**: `src/steward_view.html` — added 4 new suite filter options to SPA dropdown
+- **Modified**: `src/01_Core.gs` — version bump to 4.25.1 + VERSION_HISTORY entry
+- **Modified**: `package.json`, `CHANGELOG.md` — version bump
+
+### New Test Suites
+
+**dataservice (10 tests):**
+- DataService module exists as IIFE with expected public API
+- `findUserByEmail` — callable, returns null for nonexistent/empty email (not throws)
+- `getUserRole`, `getStewardCases`, `getAllMembers`, `getUnits`, `getBatchData` — all callable
+- Public API completeness: 33 expected methods verified
+
+**authsweep (6 tests):**
+- 8 steward endpoints reject null token (return safe-empty `[]`, `{}`, etc.)
+- 8 member endpoints reject null token (return `[]` or `null`)
+- `dataGetBatchData(null)` does not leak member data
+- Legacy poll stubs (`dataGetActivePolls`, `dataSubmitPollVote`) return safe values
+- Test runner's own 3 endpoints (`dataRunTests`, `dataGetTestResults`, `dataManageTestTrigger`) reject null
+
+**configlive (8 tests):**
+- Config, Member Dir, Grievance Log sheets exist and have headers
+- CONFIG_COLS, MEMBER_COLS, GRIEVANCE_COLS — no position exceeds actual sheet width (catches col drift)
+- `syncColumnMaps` function exists
+- Config row 3 ORG_NAME cell is not empty
+
+**survey (10 tests):**
+- `HIDDEN_SHEETS.SURVEY_TRACKING/VAULT/PERIODS` defined with `_` prefix
+- `SURVEY_PERIODS_COLS` has PERIOD_ID and STATUS
+- `SURVEY_QUESTIONS_COLS` has QUESTION_ID, QUESTION_TEXT, TYPE, ACTIVE
+- `getSurveyQuestions()` returns array with valid question shape (`id`, `text`, `type` in known set)
+- `getSurveyPeriod()` callable, returns null or object
+- `submitSurveyResponse` and `SATISFACTION_COLS` exist (backward compat)
+- Survey tracking sheet has header if it exists
+
+### Design Rationale
+- **Auth sweep tests real endpoints with null tokens** — catches any function that forgot `_resolveCallerEmail`/`_requireStewardAuth` at the top. Accepts either safe-empty return OR throw (both are valid rejection).
+- **Config completeness checks sheet width vs constant values** — catches the common bug where a column is added to the header map but not to the actual sheet (or vice versa).
+- **Survey tests read-only** — calls `getSurveyQuestions()` and `getSurveyPeriod()` but never `submitSurveyResponse()` or `openNewSurveyPeriod()`.
+
+---
+
+## v4.25.2 — Test Failure Notifications (2026-03-09)
+
+### What Changed
+- **Modified**: `src/01_Core.gs` — added `TEST_NOTIFY_EMAIL` to `CONFIG_HEADER_MAP_`, version bump
+- **Modified**: `src/30_TestRunner.gs` — `runScheduledTests()` now emails on failure, added `_getTestNotifyEmail()` and `_sendTestFailureEmail(results)`
+- **Modified**: `package.json`, `CHANGELOG.md` — version bump
+
+### How It Works
+1. **Config tab setup**: Add a header `Test Runner Notify Email` in the Config tab (auto-discovered by `syncColumnMaps`). Put an email address in row 3.
+2. **Daily trigger fires** → `runScheduledTests()` → `TestRunner.runAll()` → if failures > 0 → `_sendTestFailureEmail(results)`
+3. **Email content**: Subject line shows org name + failure count. Body lists each failed test grouped by suite with error messages. Both plain-text and styled HTML (dark theme).
+4. **Quota guard**: Skips email if `MailApp.getRemainingDailyQuota() < 5` to avoid burning quota.
+5. **No email on success**: Failure-only. Manual runs use toast only — no email.
+
+### Config Column
+- Key: `CONFIG_COLS.TEST_NOTIFY_EMAIL`
+- Header: `Test Runner Notify Email`
+- Position: After `Broadcast: Allow All Members Scope` (last column in CONFIG_HEADER_MAP_)
+- Value: Any valid email address. Leave blank to disable notifications.
+
+### Design Rationale
+- **Failure-only**: Daily success emails are noise. If you want proof tests ran, check the SPA panel.
+- **Config tab over hardcoded**: Follows "everything dynamic" rule. Admins can change the email without code changes.
+- **Quota guard**: MassAbility DDS uses MailApp for other notifications too — don't compete for the 100/day limit.
+- **HTML + plain-text**: HTML renders in Gmail/Outlook; plain-text is the fallback for text-only clients.
+
+## v4.25.3 — Deadline Config Completeness (2026-03-09)
+
+### Changes
+- **3 new Config columns added** to CONFIG_HEADER_MAP_ (01_Core.gs):
+  - `STEP3_APPEAL_DAYS` → header: "Step III Appeal Days" (default: 10)
+  - `STEP3_RESPONSE_DAYS` → header: "Step III Response Days" (default: 21)
+  - `ARBITRATION_DEMAND_DAYS` → header: "Arbitration Demand Days" (default: 30)
+- **getDeadlineRules()** (01_Core.gs): Now reads Step III and Arbitration values from Config instead of hardcoded DEADLINE_DEFAULTS. Falls back to defaults if empty/NaN.
+- **createConfigSheet** (10a_SheetCreation.gs): DEADLINES section header expanded from 4→7 cols. 3 new seedConfigDefault_ calls added.
+- **COMMAND_CONFIG.VERSION** fixed from stale "4.24.4" to match actual version "4.25.3".
+
+### Bug found
+- COMMAND_CONFIG.VERSION was stuck at "4.24.4" while VERSION_INFO showed 4.25.2. Fixed to 4.25.3.
+
+### Test updates
+- modules.test.js: CHIEF_STEWARD_EMAIL position 42→45, ESCALATION_STATUSES 45→48, ESCALATION_STEPS 46→49 (shifted +3).
+- New test: "has deadline config columns including Step III and Arbitration" (7 assertions).
+- Total: 2405 tests pass.
+
+### Files modified
+1. `src/01_Core.gs` — CONFIG_HEADER_MAP_, VERSION_INFO, VERSION_HISTORY, COMMAND_CONFIG.VERSION, getDeadlineRules()
+2. `src/10a_SheetCreation.gs` — sectionHeaders, seedConfigDefault_ calls
+3. `test/modules.test.js` — position updates, new test
+4. `AI_REFERENCE.md` — this entry
+
+## v4.25.4 — Stability: TestRunner Timeout Guard + Trigger Audit (2026-03-09)
+
+### Problem diagnosed
+- **Web app unstable**: Slow load → test timeouts → HTTP errors → complete failure to load.
+- **Root cause**: 82 GAS-native tests run without any timeout guard. Combined with 3.15 MB of .gs code (71,414 lines) that GAS must parse on every execution, plus 558 KB HTML payload evaluated server-side via `<?!= include() ?>`, the 6-minute GAS execution limit was exceeded.
+- **Cascading failure**: Timed-out test runs + 20+ installed triggers (daily security digest, hourly enforceHiddenSheets, daily dashboard refresh, backup triggers, etc.) exhausted the daily execution quota. Once quota is depleted, `doGet()` itself fails → app won't load at all until quota resets (24 hours).
+
+### Changes made
+
+#### 1. TestRunner timeout guard (src/30_TestRunner.gs)
+- **Global timeout**: `MAX_RUNTIME_MS = 300000` (5 min) — bails before hitting GAS 6-min limit.
+- **Per-test slow detection**: `PER_TEST_MAX_MS = 30000` (30s) — flags slow tests in results.
+- **Graceful skip**: When timeout is hit, remaining tests are counted as `skipped` (not failed). Status set to `'timeout'` instead of `'complete'`.
+- **New fields in results**: `results.timedOut` (boolean), `suiteResult.skipped` (count), `testResult.slow` (boolean flag on slow tests).
+
+#### 2. Trigger audit utility (src/06_Maintenance.gs)
+- **`auditAllTriggers()`**: READ-ONLY. Logs all installed triggers with handler names, event types, sources. Detects duplicates (same handler installed multiple times). Added to 🛡️ Data Integrity menu.
+- **`cleanupDuplicateTriggers(dryRun)`**: Removes duplicate triggers (keeps one per handler). Safe default: `dryRun=true`.
+- **`dataAuditTriggers(sessionToken)`**: SPA endpoint for steward-only access.
+
+### Key metrics (for future reference)
+| Metric | Value |
+|--------|-------|
+| .gs file count | 42 |
+| .gs total size | 3,153,281 bytes (3.15 MB) |
+| .gs total lines | 71,414 |
+| HTML payload (all views inlined) | 558 KB |
+| Test count | 82 |
+| Installable trigger sources | 20+ locations across codebase |
+
+### Known issue: HTML payload bloat
+`index.html` inlines ALL views via `<?!= include() ?>` regardless of user role:
+- `steward_view.html` = 225 KB (sent to members too)
+- `member_view.html` = 241 KB (sent to stewards too)
+- `styles.html` = 38 KB
+This 558 KB total is near HtmlService limits. **P1 fix needed**: lazy-load only the relevant view.
+
+### Files modified
+1. `src/30_TestRunner.gs` — timeout guard in `runAll()`, new constants `MAX_RUNTIME_MS`, `PER_TEST_MAX_MS`
+2. `src/06_Maintenance.gs` — `auditAllTriggers()`, `cleanupDuplicateTriggers()`, `dataAuditTriggers()`, menu item
+3. `AI_REFERENCE.md` — this entry
