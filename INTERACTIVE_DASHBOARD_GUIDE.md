@@ -47,13 +47,13 @@ A comprehensive dashboard for stewards and leadership with **12 tabs**:
 **Menu:** `Union Hub > Member Dashboard`
 **Web App URL:** `?mode=member`
 
-A PII-safe dashboard for sharing with members - **10 tabs** with anonymized data:
+A PII-safe dashboard for sharing with members - **9 tabs** with anonymized data:
 
 | Feature | Description |
 |---------|-------------|
 | **Same Dark Theme** | Identical professional dark gradient interface |
-| **10 Tabs** | Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Meeting Notes, Compare |
-| **No My Cases or Help** | My Cases and Help tabs are steward-only (requires PII) |
+| **9 Tabs** | Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction, Resources, Meeting Notes, Compare |
+| **No My Cases, Directory, or Help** | My Cases and Help are steward-only (requires PII). Directory removed in v4.24.5 — members access steward contacts via the Steward Directory utility link instead. |
 | **Anonymized Data** | Member names replaced with "Member 1", "Member 2", etc. |
 | **Aggregate Stats** | Individual data rolled up to percentages and totals |
 | **PII Masking** | Phone numbers and SSNs automatically scrubbed |
@@ -609,6 +609,6 @@ Potential additions (from Future Features sheet):
 ---
 
 **Version:** 4.24.4
-**Last Updated:** 2026-03-07
+**Last Updated:** 2026-02-25
 
-*A personal project providing data-driven insights for representatives*
+*A personal project providing data-driven insights for representatives* 📊

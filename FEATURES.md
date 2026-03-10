@@ -1,9 +1,9 @@
 # Strategic Command Center - Complete Features Reference
 
-**Version:** 4.24.4 | **Codename:** Q&A Forum, Timeline, Dynamic Survey & Auth Sweep
+**Version:** 4.24.4 | **Codename:** Auth Sweep Complete
 **Last Updated:** March 2026
 
-> **New in v4.24.4:** Q&A Forum with steward-only answers, Timeline activity feed with inline editing, Dynamic Survey Engine (Option B), Share Phone steward opt-in, FailsafeService security layer, schema migrations, org chart, auth session token sweep across all services
+> **New in v4.24.4:** Auth sweep complete across all web dashboard APIs, FlashPolls removed, Q_COLS API exposed, QAForum wrapper fixes
 
 This document provides a comprehensive, searchable reference of all features in the Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -101,7 +101,7 @@ This document provides a comprehensive, searchable reference of all features in 
 |---------|-------------|-----------|----------|
 | **New Case/Grievance** | Opens pre-filled grievance form. Calculates deadlines automatically based on Article 23A. | Strategic Ops > Cases > New Case/Grievance | create, file, new |
 | **Edit Selected Grievance** | Modify details of the currently selected grievance row. | Strategic Ops > Cases > Edit Selected | edit, modify, update |
-| **Advance Grievance Step** | Move grievance to next step (Step I → Step II → Step III → Arbitration). | Strategic Ops > Cases > Advance Step | step, advance, escalate |
+| **Advance Grievance Step** | Move grievance to next step (Step I -> Step II -> Step III -> Arbitration). | Strategic Ops > Cases > Advance Step | step, advance, escalate |
 | **View Active Grievances** | Filter to show only open/pending grievances. | Union Hub > Grievances > View Active | active, open, pending |
 | **Bulk Status Update** | Update status for multiple selected grievances at once. | Union Hub > Grievances > Bulk Update | bulk, batch, multiple |
 
@@ -205,6 +205,8 @@ This document provides a comprehensive, searchable reference of all features in 
 
 ## 8. Notifications & Alerts
 
+> **Notification overhaul** in v4.22.0, manage hardening in v4.22.1, cleanup pass in v4.22.2.
+
 | Feature | Description | Menu Path | Keywords |
 |---------|-------------|-----------|----------|
 | **Email Notifications** | Send email alerts for deadlines and status changes. | Union Hub > Notifications | email, alert, notify |
@@ -237,7 +239,7 @@ This document provides a comprehensive, searchable reference of all features in 
 | **Rising Stars** | Top-performing stewards by score and win rate. | Strategic Ops > Strategic Intelligence > Rising Stars | top performers, stewards, win rate |
 | **Management Hostility Report** | Analyzes denial rates across grievance steps. | Strategic Ops > Strategic Intelligence > Hostility Report | denial, management, hostility |
 | **Bargaining Cheat Sheet** | Strategic data for contract negotiations (common violations, leverage points). | Strategic Ops > Strategic Intelligence > Bargaining | bargaining, contract, negotiation |
-| **Unit Density Treemap** | Visual heat map of grievance activity by unit (green → yellow → red). | Strategic Ops > Analytics > Treemap | treemap, density, heatmap |
+| **Unit Density Treemap** | Visual heat map of grievance activity by unit (green -> yellow -> red). | Strategic Ops > Analytics > Treemap | treemap, density, heatmap |
 | **Sentiment Trend Analysis** | Organization morale tracking over time from survey data. | Strategic Ops > Analytics > Sentiment Trends | sentiment, morale, trends |
 | **Unit Health Report** | Comprehensive health check for specific units. | Field Portal > Analytics > Unit Health | health, unit, report |
 
@@ -498,7 +500,7 @@ Creates hidden sheets for internal Looker reports with full member data.
 |------------|--------|---------------|
 | `_Looker_Members` | Member Directory | Full member data with names, contact info, grievance stats |
 | `_Looker_Grievances` | Grievance Log | Full grievance data with member names, dates, outcomes |
-| `_Looker_Satisfaction` | Member Satisfaction | Anonymous survey responses with section averages (no email, no member ID — verification via vault hashes only) |
+| `_Looker_Satisfaction` | Member Satisfaction | Anonymous survey responses with section averages (no email, no member ID -- verification via vault hashes only) |
 
 ### PII-Free Integration (Anonymized)
 
@@ -525,10 +527,10 @@ Creates anonymized sheets for external stakeholders, public dashboards, or compl
 | Feature | Description |
 |---------|-------------|
 | **Anonymous Hashes** | Non-reversible hash generation for IDs (e.g., `A7F3K2M9`) |
-| **Bucketed Values** | Days since contact → "Within Week", "1-3 Months", etc. |
-| **Categorized Roles** | Specific job titles → "Nursing", "Technical/Support", etc. |
+| **Bucketed Values** | Days since contact -> "Within Week", "1-3 Months", etc. |
+| **Categorized Roles** | Specific job titles -> "Nursing", "Technical/Support", etc. |
 | **Engagement Levels** | Calculated from aggregated factors, not individual data |
-| **Score Buckets** | 1-10 ratings → "Low (1-4)", "Medium (5-7)", "High (8-10)" |
+| **Score Buckets** | 1-10 ratings -> "Low (1-4)", "Medium (5-7)", "High (8-10)" |
 
 ### Use Cases
 
@@ -652,7 +654,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 | Feature | Description | Menu Path | Keywords |
 |---------|-------------|-----------|----------|
-| **Sync CC Engagement** | Fetches all CC contacts, matches by email to Member Directory, pulls per-contact activity summaries (open rate, last activity date), writes to `OPEN_RATE` and `RECENT_CONTACT_DATE` columns. Progress toasts during sync. | Admin > Data Sync > Sync CC Engagement → Members | `syncConstantContactEngagement()`, open rate, email, engagement, sync |
+| **Sync CC Engagement** | Fetches all CC contacts, matches by email to Member Directory, pulls per-contact activity summaries (open rate, last activity date), writes to `OPEN_RATE` and `RECENT_CONTACT_DATE` columns. Progress toasts during sync. | Admin > Data Sync > Sync CC Engagement -> Members | `syncConstantContactEngagement()`, open rate, email, engagement, sync |
 | **Automatic Token Refresh** | Access tokens (2-hour lifetime) are automatically refreshed using the stored refresh token. No user action needed after initial authorization. | Automatic | `getConstantContactToken_()`, refresh, token, auto |
 | **Rate Limiting** | Respects CC API limits (4 requests/second, 10,000/day). Pauses between batches of API calls. | Automatic | rate limit, throttle, pause |
 | **Pagination** | Handles CC accounts with large contact lists (500+ contacts) via cursor-based pagination. | Automatic | pagination, cursor, large list |
@@ -661,8 +663,8 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 | Source (Constant Contact) | Calculation | Target (Member Directory) |
 |--------------------------|-------------|--------------------------|
-| `activity_summary.em_sends` + `em_opens` | `(opens / sends) × 100` | **OPEN_RATE** (column T) — Email open rate % |
-| `activity_summary.em_sends_date`, `em_opens_date`, `em_clicks_date` | Most recent date | **RECENT_CONTACT_DATE** (column Y) — Last email activity |
+| `activity_summary.em_sends` + `em_opens` | `(opens / sends) x 100` | **OPEN_RATE** (column T) -- Email open rate % |
+| `activity_summary.em_sends_date`, `em_opens_date`, `em_clicks_date` | Most recent date | **RECENT_CONTACT_DATE** (column Y) -- Last email activity |
 
 ### Technical Details
 
@@ -673,7 +675,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 | **Token Storage** | Script Properties (encrypted at rest by Google) |
 | **Lookback Period** | 365 days of campaign activity |
 | **Matching Key** | Email address (case-insensitive) |
-| **Direction** | Read-only — never writes to Constant Contact |
+| **Direction** | Read-only -- never writes to Constant Contact |
 
 ### Requirements
 
@@ -686,9 +688,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ## 25. Workload Tracker
 
-> **Files:** `25_WorkloadService.gs` (SPA module) | **Version:** 4.10.0 / 4.13.0
->
-> **Note:** Union-Tracker uses the SPA workload module exclusively (`25_WorkloadService.gs`).
+> **File:** `25_WorkloadService.gs` (SPA module) | **Version:** 4.10.0 / 4.13.0
 
 ### SPA Workload Module (v4.13.0)
 
@@ -763,6 +763,8 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 ## 27. Notifications System
 
 > **File:** `08a_SheetSetup.gs`, SPA routes | **Version:** 4.12.0
+>
+> Notification overhaul (v4.22.0), manage hardening (v4.22.1), cleanup pass (v4.22.2).
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
@@ -790,7 +792,9 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ## 28. SPA Web Dashboard
 
-> **Files:** `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs` | **Version:** 4.12.2
+> **Files:** `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`, `25_WorkloadService.gs`, `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`, `29_Migrations.gs` | **Version:** 4.25.5
+>
+> 11 SPA modules (19-29). Routes include Q&A Forum, Timeline, FailsafeService, and Migrations.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
@@ -800,8 +804,18 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 | **Member View** | Member-facing dashboard in SPA format | `member_view.html` | member, dashboard, SPA |
 | **Deep-Link Routing** | `?page=X` pre-selects tabs via `PAGE_DATA.initialTab` | `doGetWebDashboard(e)` | deep-link, routing, tabs |
 | **Config Reader** | Column-based Config tab reader with `CONFIG_COLS` | `getConfigValue(key)` | config, settings, reader |
-| **Weekly Questions** | Weekly check-in questions with response tracking | `getWeeklyQuestions()`, `submitWeeklyResponse()` | weekly, questions, check-in |
+| **Weekly Questions** | Weekly check-in questions with response tracking. FlashPolls removed in v4.24.0, replaced with manual community draw. | `getWeeklyQuestions()`, `submitWeeklyResponse()` | weekly, questions, check-in |
 | **Portal Sheets** | Hidden sheet management for SPA data | `getPortalSheetData()` | sheets, data, hidden |
+| **Q&A Forum** | Steward-member Q&A with resolve/reopen and notifications | `QAForum.*` | Q&A, forum, questions |
+| **Timeline** | Activity feed with inline edit, pagination, and calendar links | `TimelineService.*` | timeline, activity, feed |
+| **FailsafeService** | Retry logic and graceful degradation for critical operations | `FailsafeService.*` | failsafe, retry, reliability |
+| **Migrations** | One-time data migration runner for schema changes | `Migrations.*` | migration, schema, upgrade |
+
+### Member SPA Sidebar Tabs (v4.25.4)
+
+Home, My Cases, My Tasks, Workload Tracker, Union Stats, POMS Ref., Resources, Org. Chart, Q&A Forum, Polls, Feedback, Minutes, Notifications, Events, My Meetings, Timeline, Steward Directory, Profile, Survey Results.
+
+> **No Directory tab.** Members do not have a general Directory. Steward contacts are accessed via the "Steward Directory" utility link (renders `renderStewardContact()`).
 
 ### SPA Hidden Sheets
 
@@ -828,31 +842,35 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ## 30. Q&A Forum
 
-> **File:** `26_QAForum.gs` | **Version:** 4.22.6
+> **File:** `26_QAForum.gs` | **Version:** 4.22.6+
+
+Features for steward-member Q&A communication within the SPA web dashboard.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **Post Question** | Members post questions (optionally anonymous) | `postQuestion(data, sessionToken)` | question, ask, anonymous |
-| **Steward-Only Answers** | Only stewards can answer questions | `postAnswer(data, sessionToken)` | answer, steward, reply |
-| **Resolve / Reopen** | Stewards mark questions as resolved or reopen them | `resolveQuestion(id, sessionToken)` | resolve, close, reopen |
-| **Unanswered Badge** | Unanswered count appears on notification bell | Within SPA views | badge, count, bell |
-| **Show-Resolved Toggle** | Filter resolved questions in or out | Within SPA views | filter, toggle, resolved |
-| **Anonymous Notifications** | Stewards alerted to new anonymous questions | Via EventBus | anonymous, alert, notification |
+| **Steward-Only Answers** | Only stewards can respond to member questions | `QAForum.submitAnswer()` | steward, answer, restrict |
+| **Question Resolve/Reopen** | Stewards can mark questions as resolved or reopen them | `QAForum.resolveQuestion()`, `QAForum.reopenQuestion()` | resolve, reopen, status |
+| **Unanswered Count Badge** | Notification bell badge shows count of unanswered questions | Within SPA views | badge, unanswered, count |
+| **Anonymous Question Notifications** | Notifications sent when new anonymous questions are posted | Via EventBus | anonymous, notification, alert |
+| **Show-Resolved Toggle** | Filter toggle to show or hide resolved questions | Within SPA views | filter, resolved, toggle |
 
 ---
 
 ## 31. Timeline Service
 
-> **File:** `27_TimelineService.gs` | **Version:** 4.22.9
+> **File:** `27_TimelineService.gs` | **Version:** 4.22.9+
+
+Activity feed and timeline features within the SPA web dashboard.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **Activity Feed** | Chronological feed of organizational events | `getTimelineEntries(params, sessionToken)` | feed, activity, events |
-| **Inline Editing** | Edit timeline entries directly in the feed | `editTimelineEntry(data, sessionToken)` | edit, inline, update |
-| **Meeting Minutes Link** | Entries can link to meetingMinutesId | Within timeline data | minutes, link, meeting |
-| **Load More Pagination** | Scroll through history with progressive loading | Within SPA views | pagination, load, scroll |
-| **Dynamic Year Filter** | Filter entries by year | Within SPA views | year, filter, date |
-| **Calendar Icon Links** | Quick link to related calendar events | Within SPA views | calendar, link, event |
+| **Inline Editing** | Edit timeline entries directly in the activity feed | `TimelineService.updateEntry()` | edit, inline, update |
+| **Meeting Minutes Linking** | Link timeline entries to meeting minutes via meetingMinutesId | `TimelineService.linkMinutes()` | minutes, link, meeting |
+| **Load More Pagination** | Paginated timeline loading for performance | `TimelineService.getEntries()` | pagination, load more, performance |
+| **Dynamic Year Filter** | Filter timeline entries by year with auto-populated year options | Within SPA views | year, filter, dynamic |
+| **Calendar Icon Links** | Calendar icons link to related events from timeline entries | Within SPA views | calendar, link, icon |
+| **Drive File Verification** | Verify existence of linked Drive files in timeline entries | `TimelineService.verifyDriveFile()` | drive, verify, file |
+| **Theme-Aware Category Badges** | Category badges that adapt to the current theme (light/dark) | Within SPA views | theme, badge, category |
 
 ---
 
@@ -860,57 +878,74 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 > **File:** `08e_SurveyEngine.gs` | **Version:** 4.23.0
 
+Fully dynamic survey schema driven by configuration rather than hardcoded values.
+
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **Dynamic Schema** | Fully dynamic survey schema (Option B) | `buildSurveyForm()` | dynamic, schema, form |
-| **Form URL Deprecation** | Static form URL replaced by dynamic engine | Config cleanup | deprecation, URL, cleanup |
-| **Survey Processing** | Process submissions against dynamic schema | `processSurveySubmission()` | process, submit, response |
+| **Option B Dynamic Configuration** | Survey schema driven entirely by config, not hardcoded | `SurveyEngine.getSchema()` | dynamic, config, schema |
+| **Form URL Deprecation Cleanup** | Legacy form URL references removed in favor of dynamic schema | Config cleanup | deprecation, cleanup, form URL |
+| **Dynamic Question Rendering** | Survey questions rendered from config-defined schema | Within SPA views | questions, render, dynamic |
 
 ---
 
 ## 33. Share Phone
 
-> **Version:** 4.23.4
+> **Version:** 4.23.4+
+
+Steward phone sharing opt-in feature for the member directory and web dashboard.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **Phone Opt-In** | Stewards choose whether to share their phone number | Column toggle in Member Directory | opt-in, phone, privacy |
-| **Member Visibility** | Members only see phone numbers of stewards who opted in | Filtered in SPA data service | visibility, filter, directory |
-| **Self-Toggle** | Stewards can toggle phone sharing from the SPA | Within steward_view.html | toggle, self-service, SPA |
-| **Default No** | New members default to phone not shared | Seed logic in DataManagers | default, new, seed |
+| **Phone Opt-In Permission** | Stewards can opt in to share their phone number with members | Config column | opt-in, phone, permission |
+| **Member Visibility Control** | Members only see steward phone numbers for stewards who opted in | Within SPA views | visibility, control, member |
+| **Steward Self-Toggle** | Stewards can toggle their own Share Phone setting in the web dashboard | Within `steward_view.html` | toggle, self-service, steward |
+| **Default No Seeding** | New members are seeded with Share Phone set to 'No' by default | Via seeding logic | default, no, seed |
+| **Config Column** | SHARE_PHONE column added to Member Directory | Column constant | column, config, directory |
 
 ---
 
 ## 34. FailsafeService
 
-> **File:** `28_FailsafeService.gs` | **Version:** 4.24.0
+> **File:** `28_FailsafeService.gs` | **Version:** 4.22.8+
+
+Critical operation wrapper providing retry logic and graceful degradation for unreliable operations.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **Security Layer** | Additional security and reliability failsafe | `FailsafeService.validateAccess()` | security, failsafe, validate |
-| **File Validation** | Secure file access with validation | `FailsafeService.getFiles()` | files, validate, access |
+| **Retry Logic** | Automatic retry for operations that fail due to transient errors | `FailsafeService.execute()` | retry, transient, error |
+| **Graceful Degradation** | Falls back to safe defaults when operations persistently fail | `FailsafeService.executeWithFallback()` | fallback, degradation, safe |
+| **Security-Scoped File Access** | File access operations scoped to authorized folders only | `FailsafeService.getFiles()` | security, scope, files |
+| **Session Token Auth Fix** | Session token authentication fix for magic link users | Auth integration | session, token, magic link |
 
 ---
 
 ## 35. Migrations
 
-> **File:** `29_Migrations.gs` | **Version:** 4.24.0
+> **File:** `29_Migrations.gs` | **Version:** 4.20.26+
+
+One-time data migration service for schema changes and column auto-migration.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **Schema Migrations** | Run schema migrations for version upgrades | `runMigrations()` | migration, schema, upgrade |
-| **Migration Status** | Check current migration status | `getMigrationStatus()` | status, version, check |
+| **Migration Runner** | Executes one-time migrations for schema changes | `Migrations.run()` | runner, schema, one-time |
+| **Member Directory Column Migration** | Auto-adds missing headers to Member Directory | `_addMissingMemberHeaders_()` | member, headers, auto-add |
+| **Grievance Log Column Migration** | Auto-adds missing headers to Grievance Log | `_addMissingGrievanceHeaders_()` | grievance, headers, auto-add |
+| **Contact Log Folder URL Migration** | Migrates Contact Log Folder URL to Member Admin Folder URL | Migration script | contact log, folder URL, rename |
+| **DriveDocUrl Header Migration** | Auto-migrates DriveDocUrl header for meeting minutes | Migration script | drive, doc URL, minutes |
 
 ---
 
 ## 36. Org Chart
 
-> **File:** `org_chart.html` | **Version:** 4.22.6
+> **Files:** `org_chart.html`, `scripts/sync-org-chart.js` | **Version:** 4.22.6
+
+Organization chart visualization for the MADDS org chart.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **Org Chart View** | Organizational chart visualization in the SPA | `org_chart.html` | org, chart, hierarchy |
-| **Sync Script** | Sync organizational data from external source | `scripts/sync-org-chart.js` | sync, org, script |
+| **MADDS Org Chart** | Default org chart view showing organizational structure | `org_chart.html` | org chart, structure, MADDS |
+| **Automated Sync Script** | Node.js script for automated org chart data updates | `scripts/sync-org-chart.js` | sync, script, automated |
+| **Dedicated Template** | Standalone HTML template for org chart rendering | `org_chart.html` | template, HTML, standalone |
 
 ---
 
@@ -918,18 +953,24 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 | Version | Features Added |
 |---------|----------------|
-| **4.24.4** | Auth session token sweep, test suite fixes (2059 tests / 36 suites), feature parity sync |
-| **4.24.0** | FlashPolls removed, manual community draw, Q_COLS API, FailsafeService, Migrations |
+| **4.24.4** | Auth sweep complete across all web dashboard APIs, QAForum wrapper fixes, Q_COLS API exposed |
+| **4.24.0** | FlashPolls removed, replaced with manual community draw |
 | **4.23.4** | Share Phone column, steward self-toggle, default No seeding |
 | **4.23.0** | Dynamic Survey Engine (Option B), form URL deprecation cleanup |
-| **4.22.9** | Timeline service — inline edit, meetingMinutesId, load more, dynamic year filter, calendar links |
-| **4.22.6** | Q&A Forum — steward-only answers, resolve, notifications, unanswered bell badge, org chart |
+| **4.22.9** | Timeline Service -- inline edit, meetingMinutesId, load more, dynamic year filter, calendar links |
+| **4.22.8** | FailsafeService -- security & reliability fixes, session token auth for magic link users |
+| **4.22.6** | Q&A Forum -- steward-only answers, resolve, notifications, unanswered bell badge; Org Chart |
+| **4.22.2** | Notification cleanup pass |
+| **4.22.1** | Notification manage hardening |
+| **4.22.0** | Notification overhaul |
+| **4.20.26** | Migrations service -- column auto-migration for Member Directory, Grievance Log, minutes |
+| **4.20.18** | Minutes schema fix, pagination, auto-share, folder warning |
 | **4.13.0** | Notification bell with unread badge, EventBus auto-notifications, WorkloadService SPA module |
-| **4.12.2** | SPA web dashboard — SSO + magic link auth, steward/member views, deep-link routing |
-| **4.12.0** | Notifications system — sheet, API, dual-role page, steward compose |
+| **4.12.2** | SPA web dashboard -- SSO + magic link auth, steward/member views, deep-link routing |
+| **4.12.0** | Notifications system -- sheet, API, dual-role page, steward compose |
 | **4.11.0** | Resources hub, meeting check-in route, design refresh (DM Sans + Fraunces) |
-| **4.10.0** | Workload Tracker — 8 categories, privacy controls, reciprocity, email reminders |
-| **4.9.0** | Constant Contact v3 API integration — read-only email engagement metrics sync (OPEN_RATE, RECENT_CONTACT_DATE) |
+| **4.10.0** | Workload Tracker -- 8 categories, privacy controls, reciprocity, email reminders |
+| **4.9.0** | Constant Contact v3 API integration -- read-only email engagement metrics sync (OPEN_RATE, RECENT_CONTACT_DATE) |
 | **4.8.2** | State field added to member contact update (self-service portal, contact form, profile) |
 | **4.6.0** | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override |
 | **4.5.1** | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
@@ -944,6 +985,17 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 | **4.2.0** | Modal SPA architecture, Web App entry point |
 | **4.0.3** | Material Design, Google Charts, Safety Valve PII |
 | **4.0.0** | Strategic Command Center, PDF engine, mobile view |
+
+---
+
+## Build & Test Summary
+
+| Metric | Value |
+|--------|-------|
+| **Source files** | 42 .gs files + 7 .html files |
+| **Test suites** | 36 suites |
+| **Tests** | 2059 tests, 0 failures |
+| **Build mode** | copy-files, `--prod` excludes `07_DevTools.gs` |
 
 ---
 

@@ -1,7 +1,7 @@
 # AI REFERENCE DOCUMENT — DDS-Dashboard
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
-# Last updated: 2026-03-07
+# Last updated: 2026-03-09 (v4.25.5)
 # Consolidation note: On 2026-02-25, duplicate sections were replaced with
 # pointers to their canonical source files. No information was removed.
 
