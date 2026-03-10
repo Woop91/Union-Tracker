@@ -4120,7 +4120,11 @@ function renderTestRunnerPage(appContainer) {
           .withFailureHandler(function(err) {
             runAllBtn.disabled = false;
             runAllBtn.textContent = '▶ Run All Tests';
-            statusEl.textContent = '❌ Error: ' + ((err && err.message) || err);
+            var msg = (err && err.message) || String(err);
+            if (msg.indexOf('execution time') !== -1 || msg.indexOf('Exceeded') !== -1) {
+              msg = 'GAS 6-minute limit exceeded. Try running individual suites using the filter dropdown.';
+            }
+            statusEl.textContent = '❌ Error: ' + msg;
             statusEl.style.color = 'var(--danger)';
           })
           .dataRunTests(SESSION_TOKEN, null);
@@ -4261,8 +4265,20 @@ function _renderTestResults(container, results, statusEl) {
   var icon = allPassed ? '✅' : '❌';
 
   statusEl.textContent = icon + ' ' + results.summary.passed + '/' + results.summary.total +
-    ' passed (' + pct + '%) — ' + results.duration + 'ms';
+    ' passed (' + pct + '%) — ' + results.duration + 'ms' +
+    (results.summary.skipped ? ' (' + results.summary.skipped + ' skipped)' : '');
   statusEl.style.color = allPassed ? 'var(--success, #10B981)' : 'var(--danger, #EF4444)';
+
+  // Timeout warning banner
+  if (results.timedOut) {
+    var warnBanner = el('div', { style: {
+      background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)',
+      borderRadius: '10px', padding: '12px 16px', marginBottom: '16px',
+      fontSize: '13px', color: '#f59e0b'
+    }}, '⚠️ Test run hit the 3.5-minute safety timeout (GAS 6-min limit). ' +
+       results.summary.skipped + ' test(s) were skipped. Use the suite filter to run specific suites individually.');
+    container.appendChild(warnBanner);
+  }
 
   // Timestamp
   if (results.timestamp) {
@@ -4285,6 +4301,9 @@ function _renderTestResults(container, results, statusEl) {
   summaryRow.appendChild(_card('Total', results.summary.total, 'var(--text-primary)'));
   summaryRow.appendChild(_card('Passed', results.summary.passed, 'var(--success, #10B981)'));
   summaryRow.appendChild(_card('Failed', results.summary.failed, results.summary.failed > 0 ? 'var(--danger, #EF4444)' : 'var(--text-secondary)'));
+  if (results.summary.skipped > 0) {
+    summaryRow.appendChild(_card('Skipped', results.summary.skipped, '#f59e0b'));
+  }
   summaryRow.appendChild(_card('Duration', results.duration + 'ms', 'var(--text-secondary)'));
   container.appendChild(summaryRow);
 
@@ -4309,7 +4328,8 @@ function _renderTestResults(container, results, statusEl) {
     });
     suiteHdr.appendChild(el('span', { style: { fontWeight: '600', fontSize: '15px' } },
       (suiteAllPassed ? '✅' : '❌') + ' ' + suite.name.toUpperCase() +
-      ' (' + suite.passed + '/' + (suite.passed + suite.failed) + ')'));
+      ' (' + suite.passed + '/' + (suite.passed + suite.failed + (suite.skipped || 0)) + ')' +
+      (suite.skipped ? ' ⏭ ' + suite.skipped + ' skipped' : '')));
     suiteHdr.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } },
       suite.duration + 'ms ▾'));
     suiteCard.appendChild(suiteHdr);

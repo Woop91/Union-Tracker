@@ -502,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.25.5",
+  VERSION: "4.25.6",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -686,7 +686,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.5';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.6';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
@@ -706,6 +706,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.25.6', date: '2026-03-09', codename: 'Test Runner Timeout Fix', changes: 'Fixed GAS 6-minute execution timeout crash when running all 82 tests. Root cause: 5-min soft guard too tight + 16 redundant SpreadsheetApp.getActiveSpreadsheet() network calls + authsweep endpoints each doing sheet reads via getUserRole_(). Fixes: (1) timeout lowered 5min→3.5min for 2.5min safety margin, (2) _getCachedSS() replaces 12 individual SpreadsheetApp calls in test functions, (3) cache reset at start of runAll(), (4) SPA UI now shows timeout warning banner, skipped test count card, suite skipped counts, and failure handler detects execution time errors with helpful guidance to use suite filter.' },
   { version: '4.25.5', date: '2026-03-09', codename: 'Member View: Remove Directory Tab', changes: 'Removed "Directory" tab (id: contact) from member SPA sidebar in index.html. Members should not have a general Directory — steward contacts are accessed via the separate Steward Directory utility link (id: stewarddirectory). Removed case contact routing entry and contact color mapping from TAB_COLORS. Deep-links to #contact for members now fall through to Home. Updated README.md (expanded member tab listing), FEATURES.md (added Member SPA Sidebar Tabs section, bumped SPA version), INTERACTIVE_DASHBOARD_GUIDE.md (member tab count 10→9, removed Directory from tab list), CHANGELOG.md, AI_REFERENCE.md.' },
   { version: '4.25.4', date: '2026-03-09', codename: 'Stability: Timeout Guard + Trigger Audit', changes: 'Fixed webapp instability caused by GAS-native test runner exceeding 6-minute execution limit. TestRunner.runAll() now has global timeout (MAX_RUNTIME_MS=300000, 5 min) and per-test slow detection (PER_TEST_MAX_MS=30000, 30s). Remaining tests counted as skipped when timeout hit, status set to timeout. New trigger audit utilities in 06_Maintenance.gs: auditAllTriggers() (read-only, logs all installed triggers with duplicate detection), cleanupDuplicateTriggers(dryRun) (removes duplicate triggers, safe dryRun default), dataAuditTriggers(sessionToken) SPA endpoint. Audit Triggers menu item added to Data Integrity menu. Documented: 3.15 MB total .gs code, 558 KB HTML payload (all views inlined via include()), 20+ installable trigger sources across codebase.' },
   { version: '4.25.3', date: '2026-03-09', codename: 'Deadline Config Completeness', changes: 'Added 3 missing deadline Config columns: STEP3_APPEAL_DAYS (header "Step III Appeal Days", default 10), STEP3_RESPONSE_DAYS (header "Step III Response Days", default 21), ARBITRATION_DEMAND_DAYS (header "Arbitration Demand Days", default 30). CONFIG_HEADER_MAP_ expanded (3 entries after STEP2_RESPONSE_DAYS). DEADLINES section header widened from 4 to 7 cols in createConfigSheet. seedConfigDefault_ calls added for all 3. getDeadlineRules() now reads Step III and Arbitration values from Config instead of hardcoded DEADLINE_DEFAULTS; still falls back to defaults if empty/NaN. COMMAND_CONFIG.VERSION fixed from stale "4.24.4" to match actual version.' },

@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.25.6] - 2026-03-09
+
+### Fixed
+- Test runner GAS 6-minute execution timeout crash when running all 82 tests
+- Timeout guard lowered from 5min to 3.5min (2.5min safety margin vs 1min before)
+- Cached spreadsheet reference (`_getCachedSS()`) eliminates 12 redundant `SpreadsheetApp.getActiveSpreadsheet()` network round-trips in test functions
+
+### Added
+- Timeout warning banner in SPA test runner UI with guidance to use suite filter
+- Skipped test count summary card
+- Suite headers now show skipped count
+- Failure handler detects "execution time" errors and shows helpful message instead of raw GAS error
+
 ## [4.25.5] - 2026-03-09
 
 ### Removed

@@ -2825,11 +2825,145 @@ Replaced single-view survey results with 5-tab dashboard: Overview, Heatmap, Sec
 - Removed the "Directory" tab (`id: 'contact'`) from the member sidebar in `src/index.html`
 - Removed the corresponding `case 'contact'` switch entry in the member routing logic
 - Removed the `contact` color mapping from `TAB_COLORS`
-- Any existing deep-links to `#contact` for members now fall through to default (Home)
+- Any existing deep-links to `#contact` for members will now fall through to the default (Home)
 
 ### What was NOT removed
-- **Steward Directory** (`id: 'stewarddirectory'`) — remains as utility link for finding/selecting a steward
-- **`renderStewardContact()`** function — still used by Steward Directory link
+- **Steward Directory** (`id: 'stewarddirectory'`) — remains in member sidebar as a utility link for finding/selecting a steward. Labeled dynamically as `CONFIG.stewardLabel + ' Directory'`, not "Directory".
+- **"Find a Steward" button** on Home tab (`member_view.html` line ~246) — contextual action when no steward is assigned, not a standalone tab.
+- **`renderStewardContact()`** function in `member_view.html` — still used by Steward Directory link.
+
+### Reasoning
+Members should not have a general "Directory" tab. The Steward Directory (which shows steward contacts for member selection) is a separate, role-appropriate utility.
 
 ### Files modified
 1. `src/index.html` — 3 edits: sidebar tab removed, switch case removed, color mapping removed
+
+---
+
+## 🔧 FIX LOG — 2026-03-09 (Session 2): Org Overdue / Org Due <7d Still Zero
+
+### Problem
+"Org Overdue" and "Org Due <7d" KPI cards still showed "..." or 0 after previous fix session. The async `dataGetGrievanceStats` call was running and returning `available: true`, but `overdueCount` and `dueSoonCount` were always 0.
+
+### Root Cause
+`HEADERS.grievanceDeadline` aliases (`['deadline', 'next deadline', 'due date']`) **do not match any actual column header** in the Grievance Log sheet. The sheet uses `Next Action Due`, `Filing Deadline`, and `Days to Deadline` — none of which were in the alias list.
+
+Result: `_getVal(row, colMap, HEADERS.grievanceDeadline, null)` returned `null` on every row → `deadlineDays` was always `null` → overdue auto-detection never fired → status stayed as whatever the sheet Status column said (e.g. "Step I", "Open") → `getGrievanceStats` `overdueCount` stayed 0.
+
+### Fix Applied (src/21_WebDashDataService.gs)
+
+**Change 1 — Line 60: Expand `grievanceDeadline` aliases**
+```
+// OLD:
+grievanceDeadline: ['deadline', 'next deadline', 'due date'],
+// NEW:
+grievanceDeadline: ['deadline', 'next deadline', 'due date', 'next action due', 'filing deadline'],
+```
+`Next Action Due` is a Date column — existing date parsing logic handles it correctly.
+
+**Change 2 — After deadline date block in `_buildGrievanceRecord`:**
+Added `Days to Deadline` numeric fallback. If no date column matched, reads the computed `Days to Deadline` column:
+- If value is the text `"Overdue"` → `deadlineDays = -1`
+- If value is numeric (e.g. `-5`, `3`) → `deadlineDays = Math.ceil(value)`
+
+This two-layer approach ensures coverage whether a case has `Next Action Due` populated or only the computed `Days to Deadline` column.
+
+### Priority Order for Deadline Resolution
+1. `Next Action Due` date → compute `deadlineDays` from today
+2. `Filing Deadline` date (fallback) → compute `deadlineDays` from today
+3. `Days to Deadline` number/text → use directly
+
+### ⚠️ Reminder
+Column header matching is case-insensitive via `_buildColumnMap`. `'next action due'` matches `Next Action Due` in the sheet.
+
+---
+
+## 🔬 AUDIT LOG — 2026-03-09: Full Field-to-Column Match Audit
+
+### Purpose
+Verified every `HEADERS` alias in `21_WebDashDataService.gs` against actual column headers in `MEMBER_HEADER_MAP_` and `GRIEVANCE_HEADER_MAP_` (both in `01_Core.gs`).
+
+### Method
+Extracted all aliases → compared against normalized actual headers → identified misses → traced each miss through `_buildUserRecord` and frontend rendering to determine functional impact.
+
+### Results
+
+#### Member Aliases
+| Alias Key | Status | Notes |
+|---|---|---|
+| memberEmail | ✅ Match | `Email` |
+| memberName | ✅ Safe | No "Name" column — falls back to First+Last concat |
+| memberFirstName | ✅ Match | `First Name` |
+| memberLastName | ✅ Match | `Last Name` |
+| memberRole | ✅ Safe | No "Role" column — `Is Steward` fallback covers steward detection |
+| memberUnit | ✅ Match | `Unit` |
+| memberPhone | ✅ Match | `Phone` |
+| memberJoined | ⚠️ Fixed | Added `hire date` alias → now maps to `Hire Date` column |
+| memberDuesStatus | ✅ Match | `Dues Status` |
+| memberDuesPaying | 🔴 Fixed | No "Dues Paying" column — was returning null → gate bypassed |
+| memberId | ✅ Match | `Member ID` |
+| memberWorkLocation | ✅ Match | `Work Location` |
+| memberOfficeDays | ✅ Match | `Office Days` |
+| memberAssignedSteward | ✅ Match | `Assigned Steward` |
+| memberIsSteward | ✅ Match | `Is Steward` |
+| memberStreet/City/State/Zip | ✅ Match | all exact |
+| memberHasOpenGrievance | ✅ Match | `Has Open Grievance?` |
+| memberSupervisor | ✅ Match | `Supervisor` |
+| memberJobTitle | ✅ Match | `Job Title` |
+| memberAdminFolderUrl | ✅ Match | `Member Admin Folder URL` |
+| memberSharePhone | ✅ Match | `Share Phone` |
+
+#### Grievance Aliases
+| Alias Key | Status | Notes |
+|---|---|---|
+| grievanceId | ✅ Match | `Grievance ID` |
+| grievanceMemberEmail | ✅ Match | `Member Email` |
+| grievanceMemberFirstName/LastName | ✅ Match | |
+| grievanceStatus | ✅ Match | `Status` |
+| grievanceStep | ✅ Match | `Current Step` |
+| grievanceDeadline | ✅ Fixed (prev session) | Now maps to `Next Action Due` |
+| grievanceFiled | ✅ Match | `Date Filed` |
+| grievanceSteward | ✅ Match | `Assigned Steward` |
+| grievanceUnit | ✅ Match | `Work Location` |
+| grievancePriority | ⚪ No column | Not displayed in grievance cards — no action |
+| grievanceNotes | ⚪ No column | Not displayed in grievance cards — no action |
+| grievanceIssueCategory | ✅ Match | `Issue Category` |
+| grievanceResolution | ✅ Match | `Resolution` |
+| grievanceDateClosed | ✅ Match | `Date Closed` |
+
+### Fixes Applied (this session)
+
+**Fix 1 — `memberDuesPaying` gate bypass (HIGH)**
+No `Dues Paying` column exists → `duesPaying` was always `null` → treated as paying → all members bypassed dues gate for Org Chart, Survey, Polls, Union Stats, POMS, Resources.
+
+Added fallback derivation from `Dues Status` column (which exists):
+- `'current'`, `'active'`, `'paid'`, or any unrecognized → `true` (paying)
+- `'past due'`, `'inactive'`, `'delinquent'`, `'lapsed'`, `'non-paying'`, `'no'` → `false` (not paying)
+- Column absent entirely → `null` (benefit of the doubt, treated as paying)
+
+File: `src/21_WebDashDataService.gs`, `_buildUserRecord()`, duesPaying block
+
+**Fix 2 — `memberJoined` shows "—" (LOW)**
+Added `'hire date'` as alias for `memberJoined` → now maps to `Hire Date` column in sheet.
+File: `src/21_WebDashDataService.gs`, line 35
+
+### Columns With No Alias (intentional — not read by DataService)
+These exist in the sheet but are read directly by non-DataService code (GS functions, formulas) and not needed in the webapp frontend: `Contact Steward`, `Contact Notes`, `Cubicle`, `Days to Deadline` (member sheet), `Employee ID`, `Grievance Status` (member sheet), `Interest: *`, `Last Virtual/In-Person Mtg`, `Manager`, `Open Rate %`, `PIN Hash`, `Preferred Communication`, `Recent Contact Date`, `Start Grievance`, `Volunteer Hours`, `⚡ Actions`. Grievance sheet: all step date columns, reminder columns, acknowledgment columns, drive folder columns — read by GS backend only.
+## ⏱️ Test Runner Timeout Fix (2026-03-09, v4.25.6)
+
+### Root cause
+GAS has a hard 6-minute execution limit. The test runner had a 5-minute soft guard that checked BETWEEN tests, but:
+1. 82 tests × ~4s each = ~5.5 min cumulative
+2. 16 calls to `SpreadsheetApp.getActiveSpreadsheet()` (each a network round-trip)
+3. `authsweep` suite calls 16+ real endpoint functions, each doing `checkWebAppAuthorization()` → `getUserRole_()` → sheet read
+4. A single slow test at minute 5:01 would push past 6:00 before the next guard check fired
+
+### Fixes applied
+1. **Timeout lowered: 5min → 3.5min** — gives 2.5min safety margin instead of 1min
+2. **Cached spreadsheet reference** — `_getCachedSS()` replaces 12 individual `SpreadsheetApp.getActiveSpreadsheet()` calls in test functions. Infrastructure functions (menu handlers, email sender) still use direct calls since they run in separate execution contexts.
+3. **Cache reset** — `_testSS_ = null` at start of `runAll()` prevents stale references between runs
+4. **SPA timeout handling** — timeout warning banner with guidance to use suite filter, skipped count card, suite headers show skipped count, failure handler detects "execution time" error and shows helpful message
+
+### Files modified
+1. `src/30_TestRunner.gs` — timeout constant, SS cache, cache reset in runAll
+2. `src/steward_view.html` — timeout banner, skipped card, suite skipped count, failure message
