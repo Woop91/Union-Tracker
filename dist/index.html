@@ -167,7 +167,7 @@
       // Per-tab accent colors for color-coded themes
       var TAB_COLORS = {
         cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366', contact: '#06d6a0',
+        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
         poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
         polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
@@ -682,7 +682,6 @@
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
-        { id: 'contact', icon: '\uD83D\uDC65', label: 'Directory' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
@@ -793,7 +792,6 @@
         switch(tabId) {
           case 'home': renderMemberHome(app); break;
           case 'cases': renderMyCases(app); break;
-          case 'contact': renderStewardContact(app); break;
           case 'profile': renderUpdateProfile(app); break;
           case 'resources': renderMemberResources(app); break;
           case 'workload': renderWorkloadTracker(app); break;

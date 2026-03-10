@@ -2816,3 +2816,20 @@ Replaced single-view survey results with 5-tab dashboard: Overview, Heatmap, Sec
 
 ### Files modified
 1. `src/member_view.html` — 4 new view functions (~320 lines), TABS array expanded, renderView switch expanded
+
+---
+
+## 🚫 Directory Tab Removed from Member View (2026-03-09)
+
+### What changed
+- Removed the "Directory" tab (`id: 'contact'`) from the member sidebar in `src/index.html`
+- Removed the corresponding `case 'contact'` switch entry in the member routing logic
+- Removed the `contact` color mapping from `TAB_COLORS`
+- Any existing deep-links to `#contact` for members now fall through to default (Home)
+
+### What was NOT removed
+- **Steward Directory** (`id: 'stewarddirectory'`) — remains as utility link for finding/selecting a steward
+- **`renderStewardContact()`** function — still used by Steward Directory link
+
+### Files modified
+1. `src/index.html` — 3 edits: sidebar tab removed, switch case removed, color mapping removed
