@@ -32,7 +32,7 @@ var DataService = (function () {
     memberRole:      ['role', 'member role', 'type', 'member type', 'membership type'],
     memberUnit:      ['unit', 'workplace unit', 'department'],
     memberPhone:     ['phone', 'phone number', 'cell', 'mobile'],
-    memberJoined:    ['joined', 'join date', 'member since', 'date joined'],
+    memberJoined:    ['joined', 'join date', 'member since', 'date joined', 'hire date'],
     memberDuesStatus:['dues status', 'dues', 'status'],
     memberDuesPaying:['dues paying', 'is dues paying', 'dues paid', 'paying dues'],
     memberId:        ['member id', 'id', 'member number'],
@@ -57,7 +57,7 @@ var DataService = (function () {
     grievanceMemberLastName:  ['last name', 'last'],
     grievanceStatus: ['status', 'grievance status', 'case status'],
     grievanceStep:   ['step', 'current step', 'grievance step'],
-    grievanceDeadline: ['deadline', 'next deadline', 'due date'],
+    grievanceDeadline: ['deadline', 'next deadline', 'due date', 'next action due', 'filing deadline'],
     grievanceFiled:  ['filed', 'filed date', 'date filed', 'created'],
     grievanceSteward:['assigned steward', 'steward', 'steward email', 'assigned to'],
     grievanceUnit:   ['unit', 'workplace unit', 'work location', 'location'],
@@ -1213,11 +1213,22 @@ var DataService = (function () {
       joined: _getVal(row, colMap, HEADERS.memberJoined, ''),
       duesStatus: String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim(),
       duesPaying: (function() {
+        // First: check explicit Dues Paying column (if it exists)
         var raw = _getVal(row, colMap, HEADERS.memberDuesPaying, null);
-        if (raw === null || raw === '') return null; // column absent — unknown
-        if (typeof raw === 'boolean') return raw;
-        var s = String(raw).trim().toLowerCase();
-        return s === 'true' || s === 'yes' || s === '1';
+        if (raw !== null && raw !== '') {
+          if (typeof raw === 'boolean') return raw;
+          var s = String(raw).trim().toLowerCase();
+          return s === 'true' || s === 'yes' || s === '1';
+        }
+        // Fallback: derive from Dues Status column ('Current' → paying; 'Past Due'/'Inactive' → not paying)
+        var duesStatus = String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim().toLowerCase();
+        if (duesStatus === '') return null; // column absent — unknown
+        var NON_PAYING = ['past due', 'inactive', 'delinquent', 'lapsed', 'non-paying', 'no'];
+        for (var ni = 0; ni < NON_PAYING.length; ni++) {
+          if (duesStatus === NON_PAYING[ni]) return false;
+        }
+        // 'current', 'active', 'paid', 'yes', or any unrecognized value → treat as paying
+        return true;
       })(),
       memberId: String(_getVal(row, colMap, HEADERS.memberId, '')).trim(),
       workLocation: String(_getVal(row, colMap, HEADERS.memberWorkLocation, '')).trim(),
@@ -1295,6 +1306,22 @@ var DataService = (function () {
         diff = parsed.getTime() - now.getTime();
         deadlineDays = Math.ceil(diff / (24 * 60 * 60 * 1000));
         deadlineFormatted = _formatDate(parsed);
+      }
+    }
+
+    // Fallback: if no date column resolved deadlineDays, read 'Days to Deadline'
+    // which is a computed numeric column (or the text "Overdue") in the Grievance Log.
+    if (deadlineDays === null) {
+      var dtdRaw = _getVal(row, colMap, ['days to deadline'], null);
+      if (dtdRaw !== null && dtdRaw !== '') {
+        var dtdStr = String(dtdRaw).trim().toLowerCase();
+        if (dtdStr === 'overdue') {
+          deadlineDays = -1;
+          deadlineFormatted = 'Overdue';
+        } else {
+          var dtdNum = parseFloat(dtdStr);
+          if (!isNaN(dtdNum)) deadlineDays = Math.ceil(dtdNum);
+        }
       }
     }
 
