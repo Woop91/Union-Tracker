@@ -171,14 +171,19 @@ var TestRunner = (function () {
    * @param {string} [filterSuite] - Optional suite name to run only that suite
    * @returns {Object} Full results object
    */
-  // Safety margin: bail at 5 min to stay under GAS 6-min execution limit.
-  // Individual test timeout: 30s per test to catch hung sheet reads.
-  var MAX_RUNTIME_MS  = 5 * 60 * 1000;  // 300 000 ms
-  var PER_TEST_MAX_MS = 30 * 1000;       // 30 000 ms
+  // Safety margin: bail at 3.5 min to stay under GAS 6-min execution limit.
+  // Previous 5-min guard was too tight — a single slow Sheets API call at 4:59
+  // could push past 6:00 before the next between-test check fires.
+  // Individual test timeout: 30s per test to catch hung sheet reads (informational only).
+  var MAX_RUNTIME_MS  = 3.5 * 60 * 1000;  // 210 000 ms
+  var PER_TEST_MAX_MS = 30 * 1000;         // 30 000 ms
 
   function runAll(filterSuite) {
     var startTime = new Date().getTime();
     var timedOut = false;
+
+    // Reset shared spreadsheet cache for fresh run
+    _testSS_ = null;
 
     // Update status to "running"
     _setStatus('running');
@@ -728,6 +733,15 @@ function _getTestRegistry() {
  * All tests are READ-ONLY — never write to sheets.
  * ======================================================================== */
 
+// ── Shared spreadsheet cache ──────────────────────────────────────────
+// SpreadsheetApp.getActiveSpreadsheet() is a network round-trip every call.
+// Tests called it 16+ times individually — caching saves ~10-15 seconds.
+var _testSS_ = null;
+function _getCachedSS() {
+  if (!_testSS_) _testSS_ = SpreadsheetApp.getActiveSpreadsheet();
+  return _testSS_;
+}
+
 // ── CONFIG SUITE ──────────────────────────────────────────────────────
 
 function test_config_sheetsConstantDefined() {
@@ -739,21 +753,21 @@ function test_config_sheetsConstantDefined() {
 }
 
 function test_config_configSheetExists() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return; // web context — skip gracefully
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
   TestRunner.assertNotNull(sheet, 'Config sheet "' + SHEETS.CONFIG + '" exists');
 }
 
 function test_config_memberDirSheetExists() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   TestRunner.assertNotNull(sheet, 'Member Dir sheet "' + SHEETS.MEMBER_DIR + '" exists');
 }
 
 function test_config_grievanceLogSheetExists() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   TestRunner.assertNotNull(sheet, 'Grievance Log sheet "' + SHEETS.GRIEVANCE_LOG + '" exists');
@@ -1084,7 +1098,7 @@ function test_system_versionFormatSemver() {
 }
 
 function test_system_spreadsheetBound() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   // In web app context this may be null — that's okay for web-triggered tests
   // but if it exists, verify it's an actual spreadsheet
   if (ss) {
@@ -1290,7 +1304,7 @@ function test_authsweep_testRunnerEndpointsGated() {
 // Verifies live sheet headers match expected column constants.
 
 function test_configlive_configSheetHasHeaders() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
   TestRunner.assertNotNull(sheet, 'Config sheet exists');
@@ -1299,7 +1313,7 @@ function test_configlive_configSheetHasHeaders() {
 }
 
 function test_configlive_memberDirHasHeaders() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   TestRunner.assertNotNull(sheet, 'Member Dir sheet exists');
@@ -1308,7 +1322,7 @@ function test_configlive_memberDirHasHeaders() {
 }
 
 function test_configlive_grievanceLogHasHeaders() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   TestRunner.assertNotNull(sheet, 'Grievance Log sheet exists');
@@ -1318,7 +1332,7 @@ function test_configlive_grievanceLogHasHeaders() {
 
 function test_configlive_configColsMatchSheet() {
   // Verify CONFIG_COLS positions don't exceed actual sheet width
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!sheet) return;
@@ -1334,7 +1348,7 @@ function test_configlive_configColsMatchSheet() {
 }
 
 function test_configlive_memberColsMatchSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!sheet) return;
@@ -1350,7 +1364,7 @@ function test_configlive_memberColsMatchSheet() {
 }
 
 function test_configlive_grievanceColsMatchSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) return;
@@ -1372,7 +1386,7 @@ function test_configlive_syncColumnMapsCallable() {
 
 function test_configlive_configRow3HasValues() {
   // Config tab row 3 holds the actual config values — verify it's not empty
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!sheet || sheet.getLastRow() < 3) return;
@@ -1467,7 +1481,7 @@ function test_survey_satisfactionColsDefined() {
 }
 
 function test_survey_trackingSheetExists() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = _getCachedSS();
   if (!ss) return;
   var sheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
   // Sheet may not exist if survey hasn't been initialized yet — that's a warning, not failure
