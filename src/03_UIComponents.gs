@@ -231,6 +231,7 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
+      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
       .addSeparator()
       .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem'))
 

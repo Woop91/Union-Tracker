@@ -2967,3 +2967,31 @@ GAS has a hard 6-minute execution limit. The test runner had a 5-minute soft gua
 ### Files modified
 1. `src/30_TestRunner.gs` — timeout constant, SS cache, cache reset in runAll
 2. `src/steward_view.html` — timeout banner, skipped card, suite skipped count, failure message
+
+## 🐛 onOpen Deferred Trigger Bug Fix (2026-03-10, v4.25.7)
+
+### Root Cause
+Two compounding bugs in `onOpen()` (`10_Main.gs`) caused `onOpenDeferred_()` to never run on sheet open:
+
+**Bug 1 — ScriptApp not allowed in simple triggers:**
+`ScriptApp.getProjectTriggers()` requires authorization that GAS simple triggers do not have. The call threw silently, fell into the catch block, and attempted to call `onOpenDeferred_()` inline — but that function also calls `ScriptApp.getProjectTriggers()` internally (to self-clean), which failed for the same reason.
+
+**Bug 2 — finally block race condition:**
+Even if Bug 1 didn't exist, the `finally { cleanUpOnOpenTrigger_() }` block ran synchronously immediately after trigger creation — deleting the 1-second deferred trigger before it could fire. GAS timer triggers need to be allowed to tick; `finally` does not wait.
+
+**Practical impact:** `syncColumnMaps()`, `enforceHiddenSheets()`, tab colors, and the "Dashboard loaded" toast never executed on sheet open.
+
+### Fixes Applied
+1. **`onOpen()` simplified** — now only does cache clear + `createDashboardMenu()`. No ScriptApp calls, no finally block. Correct GAS simple trigger pattern.
+2. **`setupOpenDeferredTrigger()`** added to `08e_SurveyEngine.gs` — installs `onOpenDeferred_` as an installable `onOpen` trigger via `ScriptApp.newTrigger().forSpreadsheet().onOpen().create()`. Safe to re-run (removes existing first).
+3. **`menuInstallSurveyTriggers()`** updated — now also calls `setupOpenDeferredTrigger()` so "Install ALL" covers this fix.
+4. **Menu item added** — Admin → ⏱️ Triggers → 🔓 Install onOpen Deferred Trigger
+
+### ⚠️ Action Required After Deploy
+Run **Admin → ⏱️ Triggers → ✅ Install ALL Survey Triggers** (or 🔓 Install onOpen Deferred Trigger alone) ONCE per Google account that uses the sheet. Installable triggers are per-user.
+
+### Files Modified
+1. `src/10_Main.gs` — `onOpen()` stripped to menu-only
+2. `src/08e_SurveyEngine.gs` — `setupOpenDeferredTrigger()` added, `menuInstallSurveyTriggers()` updated
+3. `src/03_UIComponents.gs` — new menu item in Triggers submenu
+4. `dist/` — all three files mirrored

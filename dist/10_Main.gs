@@ -33,42 +33,21 @@
  * Sets up the custom menu, applies tab colors, and initializes the dashboard
  */
 function onOpen() {
+  // FIX v4.25.7: onOpen is a GAS simple trigger — ScriptApp.getProjectTriggers()
+  // requires authorization not available in simple triggers and throws silently.
+  // The prior approach also had a race condition: the finally block called
+  // cleanUpOnOpenTrigger_() synchronously, deleting the deferred trigger before
+  // the 1000ms elapsed, so onOpenDeferred_() never ran.
+  //
+  // Fix: onOpen does ONLY menu creation. onOpenDeferred_ is installed once as a
+  // standalone installable trigger via Admin → Triggers → Install All Survey Triggers
+  // (menuInstallSurveyTriggers), which is the correct GAS pattern.
   try {
     // Clear memoized caches so fresh config values are picked up
     if (typeof _systemNameCache_ !== 'undefined') _systemNameCache_ = null;
-
-    // Only menu creation runs synchronously — keep onOpen fast
     createDashboardMenu();
-
-    // F41: Defer heavy init to a 1-second timed trigger so the UI isn't blocked
-    // REL-01: Pre-check for existing onOpenDeferred_ triggers before creating a new one.
-    // Prevents trigger accumulation if cleanup fails (GAS limit: 20 triggers per user).
-    try {
-      var existingTriggers = ScriptApp.getProjectTriggers();
-      var hasDeferred = false;
-      for (var t = 0; t < existingTriggers.length; t++) {
-        if (existingTriggers[t].getHandlerFunction() === 'onOpenDeferred_') {
-          hasDeferred = true;
-          break;
-        }
-      }
-      if (!hasDeferred) {
-        ScriptApp.newTrigger('onOpenDeferred_')
-          .timeBased()
-          .after(1000)
-          .create();
-      }
-    } catch (trigErr) {
-      // Installable trigger unavailable (e.g., simple trigger context) — run inline
-      console.log('Deferred trigger failed, running inline: ' + trigErr.message);
-      onOpenDeferred_();
-    }
-
   } catch (error) {
     console.error('Error in onOpen:', error);
-  } finally {
-    // Clean up the one-shot trigger so it does not accumulate
-    cleanUpOnOpenTrigger_();
   }
 }
 

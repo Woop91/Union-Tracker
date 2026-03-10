@@ -805,20 +805,44 @@ function menuShowSurveyPeriodStatus() {
 function menuInstallSurveyTriggers() {
   setupQuarterlyTrigger();
   setupWeeklyReminderTrigger();
+  setupOpenDeferredTrigger();
 
   var msg = [
-    '✅ Both survey triggers installed:',
+    '✅ All triggers installed:',
     '',
     '1. Quarterly auto-open — fires on the 1st of each month at 6 AM;',
     '   auto-opens a new period on Jan 1, Apr 1, Jul 1, Oct 1.',
     '',
     '2. Weekly member reminders — fires every Tuesday at 9 AM;',
     '   emails members who have not yet completed the active survey period.',
+    '',
+    '3. onOpen deferred init — fires on spreadsheet open (installable trigger);',
+    '   runs syncColumnMaps, enforceHiddenSheets, tab colors, and toast.',
   ].join('\n');
 
   try {
-    SpreadsheetApp.getUi().alert('Survey Triggers Installed', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('Triggers Installed', msg, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (_uiErr) {
     Logger.log(msg);
   }
+}
+
+/**
+ * Installs onOpenDeferred_ as an installable onOpen trigger.
+ * FIX v4.25.7: onOpen (simple trigger) cannot call ScriptApp — this installable
+ * trigger replaces the broken spawn-from-onOpen approach.
+ * Safe to re-run — removes existing before creating new.
+ */
+function setupOpenDeferredTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onOpenDeferred_') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('onOpenDeferred_')
+    .forSpreadsheet(SpreadsheetApp.getActive())
+    .onOpen()
+    .create();
+  Logger.log('setupOpenDeferredTrigger: onOpenDeferred_ installed as installable onOpen trigger.');
 }

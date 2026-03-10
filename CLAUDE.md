@@ -113,6 +113,45 @@ Enforced by architecture tests A5–A8.
 1. **GAS entry points (`doGet`, `onOpen`, `onEdit`, triggers):** Always wrap in try/catch. Unhandled throw → generic Google error or silent failure. Catch must call `_serveFatalError()` (zero-dependency fallback).
 
 2. **No cascading errors in catch blocks.** Never call a function in catch that could re-throw. Wrap secondary calls in their own try/catch or use hardcoded fallbacks.
+
+## GAS Simple Trigger Constraints — MANDATORY
+
+`onOpen`, `onEdit`, `onChange`, `onFormSubmit` are **simple triggers**. They run with restricted authorization. Violating these rules causes **silent failure** — no error shown, no stack trace.
+
+### ⛔ NEVER call in a simple trigger:
+| Forbidden | Why |
+|---|---|
+| `ScriptApp.getProjectTriggers()` | Requires auth not granted to simple triggers |
+| `ScriptApp.newTrigger()` | Same |
+| `ScriptApp.deleteTrigger()` | Same |
+| `MailApp.sendEmail()` | Requires auth |
+| `GmailApp.*` | Requires auth |
+| Any OAuth service | Requires auth |
+
+### ✅ Simple triggers may ONLY:
+- Call `SpreadsheetApp.getUi()` to build menus
+- Call `SpreadsheetApp.getActiveSpreadsheet()` for read-only sheet access
+- Call pure utility functions that do not touch ScriptApp or external services
+
+### ✅ Pattern: deferred init via installable trigger
+If `onOpen` needs to do anything beyond menu creation, install a **separate installable onOpen trigger** once via a setup function:
+```js
+// Run once from menu after deploy — NOT from onOpen itself
+function setupOpenDeferredTrigger() {
+  // Remove existing to avoid duplicates
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'onOpenDeferred_') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onOpenDeferred_')
+    .forSpreadsheet(SpreadsheetApp.getActive())
+    .onOpen()
+    .create();
+}
+```
+
+### ✅ Race condition rule: never use `finally` with async-like patterns
+`finally` in GAS runs **synchronously and immediately** — it does not wait for time-based triggers. Never create a trigger and then clean it up in `finally`; the trigger will be deleted before it fires.
+
    ```js
    // GOOD: catch (err) { try { cfg = ConfigReader.getConfig(); } catch(_) { cfg = {orgName:'Dashboard'}; } }
    // BAD:  catch (err) { return _serveError(ConfigReader.getConfig(), err.message); }
