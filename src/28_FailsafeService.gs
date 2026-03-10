@@ -32,7 +32,8 @@ var FailsafeService = (function () {
         'Email', 'Digest Enabled', 'Digest Frequency', 'Last Digest Sent',
         'Include Grievances', 'Include Workload', 'Include Tasks'
       ]]);
-      sheet.hideSheet();
+      // GAS-02: Use very-hidden so users cannot unhide PII-containing system sheets via menu
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(sheet); else sheet.hideSheet();
     }
     return sheet;
   }

@@ -997,7 +997,9 @@ function _renderMemberDirectory(target) {
   target.appendChild(labelRow);
   showLoading(target);
 
-  serverCall().withSuccessHandler(function(stewards) {
+  // PERF-06: Cache steward directory via DataCache (120s TTL) — avoids redundant
+  // server calls on tab switches since the directory rarely changes mid-session.
+  DataCache.cachedCall('stewardDirectory', 'dataGetStewardDirectory', [SESSION_TOKEN], function(stewards) {
     // Remove spinner but keep label
     while (target.children.length > 1) target.removeChild(target.lastChild);
 
@@ -1009,7 +1011,9 @@ function _renderMemberDirectory(target) {
     // Search input
     var searchInput = el('input', {
       className: 'search-input',
-      placeholder: 'Search by name or location…',
+      placeholder: 'Search by name or location\u2026',
+      'aria-label': 'Search steward directory by name or location',
+      role: 'searchbox',
       style: { marginBottom: '8px' },
     });
     target.appendChild(searchInput);
@@ -1052,7 +1056,12 @@ function _renderMemberDirectory(target) {
     if (topLocs.length > 1) renderPills();
     else pillBar.style.display = 'none';
 
-    searchInput.addEventListener('input', function() { renderList(searchInput.value.toLowerCase()); });
+    // PERF-03: Debounce search input to prevent full DOM re-render per keystroke
+    var _searchTimer = null;
+    searchInput.addEventListener('input', function() {
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(function() { renderList(searchInput.value.toLowerCase()); }, 200);
+    });
 
     function renderList(query) {
       listArea.innerHTML = '';
@@ -1112,7 +1121,7 @@ function _renderMemberDirectory(target) {
         if (s.officeDays) {
           var odRow = el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' } });
           var inOffice = inOfficeToday(s);
-          odRow.innerHTML = '📅 In-office: ' + s.officeDays + (inOffice ? ' <span style="color:var(--success);font-weight:600">● In today</span>' : '');
+          odRow.innerHTML = '\uD83D\uDCC5 In-office: ' + safeText(s.officeDays) + (inOffice ? ' <span style="color:var(--success);font-weight:600">\u25CF In today</span>' : '');
           details.appendChild(odRow);
         }
         if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px', textDecoration: 'none' } }, '✉️ ' + s.email));
@@ -1162,10 +1171,10 @@ function _renderMemberDirectory(target) {
     }
 
     renderList('');
-  }).withFailureHandler(function() {
+  }, function() {
     while (target.children.length > 1) target.removeChild(target.lastChild);
     target.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '13px', padding: '10px 0' } }, 'Failed to load directory.'));
-  }).dataGetStewardDirectory(SESSION_TOKEN);
+  }, 120000);
 }
 
 // ═══════════════════════════════════════

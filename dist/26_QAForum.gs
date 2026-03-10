@@ -32,7 +32,8 @@ var QAForum = (function () {
         'ID', 'Author Email', 'Author Name', 'Is Anonymous', 'Question Text',
         'Status', 'Upvote Count', 'Upvoters', 'Answer Count', 'Created', 'Updated'
       ]]);
-      forumSheet.hideSheet();
+      // GAS-02: Use very-hidden so users cannot unhide PII-containing system sheets via menu
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(forumSheet); else forumSheet.hideSheet();
     }
 
     // _QA_Answers: ID | Question ID | Author Email | Author Name | Is Steward | Answer Text | Status | Created
@@ -43,7 +44,8 @@ var QAForum = (function () {
         'ID', 'Question ID', 'Author Email', 'Author Name', 'Is Steward',
         'Answer Text', 'Status', 'Created'
       ]]);
-      answerSheet.hideSheet();
+      // GAS-02: Use very-hidden so users cannot unhide PII-containing system sheets via menu
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(answerSheet); else answerSheet.hideSheet();
     }
   }
 
@@ -175,7 +177,7 @@ var QAForum = (function () {
         isAnonymous ? true : false, text,
         'active', 0, '', 0, now, now
       ]);
-      logAuditEvent('QA_QUESTION_SUBMITTED', 'Question ' + id + ' by ' + (isAnonymous ? 'anonymous' : email));
+      logAuditEvent('QA_QUESTION_SUBMITTED', 'Question ' + id + ' by ' + (isAnonymous ? 'anonymous' : maskEmail(email)));
 
       // Notify all stewards of the new unanswered question
       var preview = text.substring(0, 120) + (text.length > 120 ? '...' : '');
@@ -309,7 +311,7 @@ var QAForum = (function () {
         var newStatus = action === 'delete' ? 'deleted' : action === 'flag' ? 'flagged' : 'active';
         sheet.getRange(i + 1, 6).setValue(newStatus);
         sheet.getRange(i + 1, 11).setValue(new Date());
-        logAuditEvent('QA_QUESTION_MODERATED', 'Question ' + questionId + ' ' + action + 'd by ' + stewardEmail);
+        logAuditEvent('QA_QUESTION_MODERATED', 'Question ' + questionId + ' ' + action + 'd by ' + maskEmail(stewardEmail));
         return { success: true };
       }
     }
@@ -329,7 +331,7 @@ var QAForum = (function () {
       if (data[i][0] === answerId) {
         var newStatus = action === 'delete' ? 'deleted' : action === 'flag' ? 'flagged' : 'active';
         sheet.getRange(i + 1, 7).setValue(newStatus);
-        logAuditEvent('QA_ANSWER_MODERATED', 'Answer ' + answerId + ' ' + action + 'd by ' + stewardEmail);
+        logAuditEvent('QA_ANSWER_MODERATED', 'Answer ' + answerId + ' ' + action + 'd by ' + maskEmail(stewardEmail));
         return { success: true };
       }
     }
@@ -404,7 +406,7 @@ var QAForum = (function () {
         if (current === 'deleted') return { success: false, message: 'Question not found.' };
         sheet.getRange(i + 1, 6).setValue('resolved');
         sheet.getRange(i + 1, 11).setValue(new Date());
-        logAuditEvent('QA_QUESTION_RESOLVED', 'Question ' + questionId + ' resolved by ' + email);
+        logAuditEvent('QA_QUESTION_RESOLVED', 'Question ' + questionId + ' resolved by ' + maskEmail(email));
         return { success: true };
       }
     }

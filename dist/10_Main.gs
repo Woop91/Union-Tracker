@@ -41,11 +41,23 @@ function onOpen() {
     createDashboardMenu();
 
     // F41: Defer heavy init to a 1-second timed trigger so the UI isn't blocked
+    // REL-01: Pre-check for existing onOpenDeferred_ triggers before creating a new one.
+    // Prevents trigger accumulation if cleanup fails (GAS limit: 20 triggers per user).
     try {
-      ScriptApp.newTrigger('onOpenDeferred_')
-        .timeBased()
-        .after(1000)
-        .create();
+      var existingTriggers = ScriptApp.getProjectTriggers();
+      var hasDeferred = false;
+      for (var t = 0; t < existingTriggers.length; t++) {
+        if (existingTriggers[t].getHandlerFunction() === 'onOpenDeferred_') {
+          hasDeferred = true;
+          break;
+        }
+      }
+      if (!hasDeferred) {
+        ScriptApp.newTrigger('onOpenDeferred_')
+          .timeBased()
+          .after(1000)
+          .create();
+      }
     } catch (trigErr) {
       // Installable trigger unavailable (e.g., simple trigger context) — run inline
       console.log('Deferred trigger failed, running inline: ' + trigErr.message);
@@ -53,7 +65,7 @@ function onOpen() {
     }
 
   } catch (error) {
-    console.error('Error in onOpenDeferred_:', error);
+    console.error('Error in onOpen:', error);
   } finally {
     // Clean up the one-shot trigger so it does not accumulate
     cleanUpOnOpenTrigger_();
@@ -100,33 +112,42 @@ function onOpenDeferred_() {
     return;
   }
 
+  // REL-04: Wrap entire deferred init in try/catch so trigger failures are logged
+  // and don't silently disappear (GAS only logs trigger errors to Stackdriver).
   try {
-    syncColumnMaps();
-  } catch (syncError) {
-    console.log('Column sync skipped: ' + syncError.message);
-  }
-
-  try {
-    ensureAllSheetColumns_();
-  } catch (colError) {
-    console.log('Column check skipped: ' + colError.message);
-  }
-
-  try {
-    if (typeof applyTabColors_ === 'function') {
-      applyTabColors_(ss);
+    try {
+      syncColumnMaps();
+    } catch (syncError) {
+      console.log('Column sync skipped: ' + syncError.message);
     }
-  } catch (tabError) {
-    console.log('Tab colors not applied: ' + tabError.message);
-  }
 
-  try {
-    enforceHiddenSheets();
-  } catch (hideError) {
-    console.log('Hidden sheet enforcement skipped: ' + hideError.message);
-  }
+    try {
+      ensureAllSheetColumns_();
+    } catch (colError) {
+      console.log('Column check skipped: ' + colError.message);
+    }
 
-  ss.toast('Dashboard loaded successfully', '🏛️ Union Dashboard', 3);
+    try {
+      if (typeof applyTabColors_ === 'function') {
+        applyTabColors_(ss);
+      }
+    } catch (tabError) {
+      console.log('Tab colors not applied: ' + tabError.message);
+    }
+
+    try {
+      enforceHiddenSheets();
+    } catch (hideError) {
+      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+    }
+
+    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
+  } catch (deferredErr) {
+    Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('DEFERRED_INIT_FAILED', 'onOpenDeferred_ error: ' + deferredErr.message);
+    }
+  }
 }
 
 /**

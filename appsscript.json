@@ -1,5 +1,5 @@
 {
-  "_scopeReview": "REVIEW: Audit oauthScopes periodically. Remove any scopes no longer needed. Last reviewed: 2026-02-25.",
+  "_scopeReview": "REVIEW: Audit oauthScopes periodically. Remove any scopes no longer needed. Last reviewed: 2026-03-09. All scopes verified in use.",
   "timeZone": "America/New_York",
   "dependencies": {},
   "exceptionLogging": "STACKDRIVER",
