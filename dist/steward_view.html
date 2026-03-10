@@ -493,11 +493,50 @@ function renderBottomNav(container, role, activeTab) {
     { id: 'more', icon: '\u2630', label: 'More' },
   ];
 
-  tabs.forEach(function(tab) {
+  var navTheme = AppState.navTheme || 'default';
+  var activeColor = NavThemes.getTabColor(activeTab);
+  var hasBlobIndicator = (navTheme === 'blobLava' || navTheme === 'cyberpunk');
+
+  // Set per-tab color CSS custom properties on the nav
+  nav.style.setProperty('--blob-color', activeColor);
+  nav.style.setProperty('--blob-glow', activeColor + '44');
+  nav.style.setProperty('--blob-color-dim', activeColor + '18');
+  nav.style.setProperty('--blob-color-border', activeColor + '33');
+
+  // Add blob indicator element for blobLava and cyberpunk themes
+  var blobEl = null;
+  if (hasBlobIndicator) {
+    blobEl = el('div', { className: 'nav-blob-indicator' });
+    nav.appendChild(blobEl);
+  }
+
+  var activeIndex = -1;
+  tabs.forEach(function(tab, idx) {
+    if (tab.id === activeTab) activeIndex = idx;
+
     var item = el('div', {
       className: 'nav-item' + (tab.id === activeTab ? ' active' : ''),
       onClick: function() { _handleTabNav(role, tab.id === 'more_steward' ? '_steward_more' : tab.id === 'more' ? '_member_more' : tab.id); }
     });
+
+    // For shatter theme, set per-item color
+    if (navTheme === 'shatter') {
+      var tabColor = NavThemes.getTabColor(tab.id);
+      item.style.setProperty('--blob-color', tabColor);
+      item.style.setProperty('--blob-glow', tabColor + '55');
+      if (tab.id !== activeTab) {
+        item.style.borderColor = tabColor + '33';
+      }
+    }
+
+    // For liquid pour, set per-item color
+    if (navTheme === 'liquidPour') {
+      var lpColor = NavThemes.getTabColor(tab.id);
+      item.style.setProperty('--blob-color', lpColor);
+      item.style.setProperty('--blob-glow', lpColor + '44');
+      item.style.setProperty('--blob-color-dim', lpColor + '18');
+      item.style.setProperty('--blob-color-border', lpColor + '33');
+    }
 
     // Icon wrapper — allows badge positioning
     var iconWrap = el('div', { style: { position: 'relative', display: 'inline-block' } });
@@ -550,12 +589,27 @@ function renderBottomNav(container, role, activeTab) {
 
     item.appendChild(iconWrap);
     var label = el('span', { className: 'nav-label' }, tab.label);
-    if (tab.id === activeTab) label.style.color = 'var(--accent)';
+    if (tab.id === activeTab && navTheme === 'default') label.style.color = 'var(--accent)';
     item.appendChild(label);
     nav.appendChild(item);
   });
 
   container.appendChild(nav);
+
+  // Position blob indicator after DOM render
+  if (hasBlobIndicator && blobEl && activeIndex >= 0) {
+    requestAnimationFrame(function() {
+      var navItems = nav.querySelectorAll('.nav-item');
+      if (navItems[activeIndex]) {
+        var navRect = nav.getBoundingClientRect();
+        var itemRect = navItems[activeIndex].getBoundingClientRect();
+        var left = itemRect.left - navRect.left;
+        var width = itemRect.width;
+        blobEl.style.left = (left + 4) + 'px';
+        blobEl.style.width = (width - 8) + 'px';
+      }
+    });
+  }
 }
 
 // ═══════════════════════════════════════

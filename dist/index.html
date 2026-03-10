@@ -161,6 +161,87 @@
     })();
 
     // ═══════════════════════════════════════
+    // NAV THEME ENGINE — 5 nav visual styles
+    // ═══════════════════════════════════════
+    var NavThemes = (function() {
+      // Per-tab accent colors for color-coded themes
+      var TAB_COLORS = {
+        cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
+        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
+        more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
+        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+        polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
+        events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
+        testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
+        stewarddirectory: '#8b5cf6', mytasks: '#f59e0b', unionstats: '#3b82f6', meetings: '#06d6a0',
+      };
+
+      var themes = {
+        'default': {
+          tid: 'default', label: 'Default', emoji: '⚡',
+          desc: 'Standard nav — auto follows dark/light mode',
+          type: 'default',
+        },
+        'blobLava': {
+          tid: 'blobLava', label: 'Blob Lava', emoji: '🌋',
+          desc: 'Morphing lava blob tracks your active tab',
+          type: 'default',
+        },
+        'cyberpunk': {
+          tid: 'cyberpunk', label: 'Cyberpunk', emoji: '🔲',
+          desc: 'Grid lines, scanlines, hard neon glow',
+          type: 'extra',
+        },
+        'shatter': {
+          tid: 'shatter', label: 'Shatter', emoji: '💎',
+          desc: 'Color shards — tap to activate',
+          type: 'extra',
+        },
+        'liquidPour': {
+          tid: 'liquidPour', label: 'Liquid Pour', emoji: '🧪',
+          desc: 'Floating bubble nav with color fill',
+          type: 'extra',
+        },
+      };
+
+      function getTabColor(tabId) {
+        return TAB_COLORS[tabId] || '#8b5cf6';
+      }
+
+      function getTabGradient(tabId) {
+        var c = getTabColor(tabId);
+        // Shift hue slightly for gradient endpoint
+        return 'linear-gradient(135deg, ' + c + ', ' + c + 'cc)';
+      }
+
+      function setNavTheme(themeId) {
+        if (!themes[themeId]) themeId = 'default';
+        AppState.navTheme = themeId;
+        try { localStorage.setItem('dds_navTheme', themeId); } catch(e) {}
+        // Apply nav theme class to body
+        document.body.className = document.body.className
+          .replace(/\bnav-theme-\S+/g, '')
+          .trim() + ' nav-theme-' + themeId;
+      }
+
+      function getAll() { return themes; }
+      function getCurrent() { return themes[AppState.navTheme] || themes['default']; }
+
+      // Apply on load
+      function init() { setNavTheme(AppState.navTheme); }
+
+      return {
+        themes: themes,
+        getTabColor: getTabColor,
+        getTabGradient: getTabGradient,
+        setNavTheme: setNavTheme,
+        getAll: getAll,
+        getCurrent: getCurrent,
+        init: init,
+      };
+    })();
+
+    // ═══════════════════════════════════════
     // SAFE SERVER CALL — default failure handler for google.script.run
     // ═══════════════════════════════════════
     /**
@@ -253,6 +334,7 @@
       role: CURRENT_USER ? CURRENT_USER.role : null,
       activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
       isDark: true,
+      navTheme: (function() { try { return localStorage.getItem('dds_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
       user: CURRENT_USER,
       cases: [],
       kpis: null,
@@ -267,6 +349,7 @@
     // ═══════════════════════════════════════
     function initApp() {
       var app = document.getElementById('app');
+      NavThemes.init();
 
       switch (CURRENT_VIEW) {
         case 'auth':
@@ -471,6 +554,12 @@
           el('span', { className: 'sidebar-item-icon' }, tab.icon),
           el('span', null, tab.label)
         ]);
+        // Set per-tab accent color for themed nav styles
+        if (tab.id === activeTab && AppState.navTheme !== 'default') {
+          var tabColor = NavThemes.getTabColor(tab.id);
+          item.style.setProperty('--blob-color', tabColor);
+          item.style.setProperty('--blob-glow', tabColor + '44');
+        }
         sidebar.appendChild(item);
       });
 
@@ -504,6 +593,55 @@
         el('span', { className: 'sidebar-item-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'),
         el('span', null, AppState.isDark ? 'Light Mode' : 'Dark Mode')
       ]));
+      // Nav Theme Picker — expandable in sidebar
+      (function() {
+        var currentTheme = NavThemes.getCurrent();
+        var pickerWrap = el('div');
+        var pickerToggle = el('div', {
+          className: 'sidebar-item',
+          onClick: function() {
+            var panel = pickerWrap.querySelector('.nav-theme-picker');
+            if (panel) {
+              panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+            }
+          }
+        }, [
+          el('span', { className: 'sidebar-item-icon' }, '\uD83C\uDFA8'),
+          el('span', null, 'Nav Style: ' + currentTheme.emoji)
+        ]);
+        pickerWrap.appendChild(pickerToggle);
+
+        var pickerPanel = el('div', { className: 'nav-theme-picker', style: { display: 'none', padding: '4px 12px 8px' } });
+        var allThemes = NavThemes.getAll();
+        for (var tid in allThemes) {
+          if (!allThemes.hasOwnProperty(tid)) continue;
+          var th = allThemes[tid];
+          (function(themeObj) {
+            var isActive = AppState.navTheme === themeObj.tid;
+            var item = el('div', {
+              className: 'nav-theme-picker-item' + (isActive ? ' active' : ''),
+              onClick: function() {
+                NavThemes.setNavTheme(themeObj.tid);
+                _handleTabNav(role, activeTab);
+              }
+            });
+            item.appendChild(el('span', { className: 'ntp-emoji' }, themeObj.emoji));
+            var info = el('div');
+            info.appendChild(el('div', { className: 'ntp-label' }, themeObj.label));
+            info.appendChild(el('div', { className: 'ntp-desc' }, themeObj.desc));
+            item.appendChild(info);
+            item.appendChild(el('span', {
+              className: 'ntp-badge ' + themeObj.type,
+            }, themeObj.type === 'default' ? 'DEFAULT' : 'EXTRA'));
+            if (isActive) {
+              item.appendChild(el('span', { className: 'ntp-check' }, '\u2713'));
+            }
+            pickerPanel.appendChild(item);
+          })(th);
+        }
+        pickerWrap.appendChild(pickerPanel);
+        sidebar.appendChild(pickerWrap);
+      })();
       sidebar.appendChild(el('div', {
         className: 'sidebar-item',
         onClick: handleLogout
@@ -544,7 +682,6 @@
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
-        { id: 'contact', icon: '\uD83D\uDC65', label: 'Directory' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
@@ -655,7 +792,6 @@
         switch(tabId) {
           case 'home': renderMemberHome(app); break;
           case 'cases': renderMyCases(app); break;
-          case 'contact': renderStewardContact(app); break;
           case 'profile': renderUpdateProfile(app); break;
           case 'resources': renderMemberResources(app); break;
           case 'workload': renderWorkloadTracker(app); break;

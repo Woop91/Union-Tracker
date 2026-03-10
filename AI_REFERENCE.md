@@ -2675,3 +2675,161 @@ This 558 KB total is near HtmlService limits. **P1 fix needed**: lazy-load only 
 1. `src/30_TestRunner.gs` — timeout guard in `runAll()`, new constants `MAX_RUNTIME_MS`, `PER_TEST_MAX_MS`
 2. `src/06_Maintenance.gs` — `auditAllTriggers()`, `cleanupDuplicateTriggers()`, `dataAuditTriggers()`, menu item
 3. `AI_REFERENCE.md` — this entry
+
+---
+
+## Nav Theme System — Phase 1 Implementation (March 2026)
+
+### What was added
+5 switchable navigation visual themes, stored per-user in localStorage.
+
+### Theme definitions
+| Theme ID | Label | Type | Visual |
+|----------|-------|------|--------|
+| `default` | Default | default | Standard nav — follows dark/light mode |
+| `blobLava` | Blob Lava | default | Morphing lava-lamp blob tracks active tab |
+| `cyberpunk` | Cyberpunk | extra | Grid lines, scanlines, hard neon glow per tab |
+| `shatter` | Shatter | extra | Colored shard blocks per tab, flash-on-select |
+| `liquidPour` | Liquid Pour | extra | Floating bubble-style nav items with per-tab color |
+
+### Architecture
+1. **NavThemes engine** (`index.html`): Singleton object providing theme registry, per-tab color mapping, localStorage persistence (`dds_navTheme` key), body class management (`nav-theme-{id}`).
+2. **Per-tab accent colors** (`NavThemes.TAB_COLORS`): Every sidebar/bottom tab ID mapped to a distinct color — used by blob indicator, shatter blocks, and liquid bubbles.
+3. **CSS themes** (`styles.html`): 5 theme rulesets scoped via `.nav-theme-{id}` body class. Includes CSS animations: `blobMorph`, `blobPulse`, `cpGridMove`, `cpScanline`, `cpFlicker`, `shatterGlow`, `bubbleFloat1/2`, `bubblePop`.
+4. **Blob indicator** (`steward_view.html` `renderBottomNav`): For blobLava and cyberpunk themes, a `.nav-blob-indicator` div is added to `.bottom-nav` and positioned via `requestAnimationFrame` to sit behind the active tab. CSS vars `--blob-color`, `--blob-glow` drive coloring.
+5. **Theme picker** (`index.html` `renderSidebarItems`): Expandable panel in sidebar under "Nav Style" item. Shows all 5 themes with emoji, label, description, DEFAULT/EXTRA badge, and checkmark for active.
+
+### How it works — dynamic, never hardcoded
+- Tab colors come from `NavThemes.TAB_COLORS` map — adding new tabs auto-inherits default color
+- Theme preference persisted in localStorage, read on init
+- Body class controls all visual styling — zero inline style overrides for themes
+- Sidebar active items get `--blob-color` CSS var set dynamically per tab
+
+### Files modified
+1. `src/index.html` — AppState.navTheme, NavThemes engine, NavThemes.init() in initApp(), sidebar theme picker, sidebar active item color vars
+2. `src/styles.html` — 5 theme CSS rulesets (~200 lines), theme picker UI styles
+3. `src/steward_view.html` — renderBottomNav rewritten with blob indicator, per-tab colors, theme-aware rendering
+
+### IMPORTANT rules preserved
+- Everything dynamic, nothing hardcoded
+- Column identification by header name (not affected)
+- No deletion/overwriting of manually entered data (not affected)
+- Config tab remains single source of truth (not affected)
+
+---
+
+## Chapter-Based Survey UI — Phase 2 Implementation (March 2026)
+
+### What was added
+Enhanced survey wizard with chapter intro screens, animated progress, mini celebrations between sections, and confetti on completion.
+
+### Architecture — 3-phase section flow
+Each survey section now cycles through three phases:
+1. **Intro phase**: Full-screen chapter card with emoji, section title, tagline, question count, estimated time, and "Start/Continue" button
+2. **Questions phase**: Original multi-type question rendering (slider-10, radio, checkbox, dropdown, paragraph) — preserved intact with all branching logic
+3. **Celebration phase**: Mini celebration screen with confetti, completion stats (answered/progress/time), and "Next Section" button
+
+### Visual enhancements
+- **Animated progress bar**: CSS glow animation (`surveyGlowBar`), shimmer effect, smooth width transition
+- **Step dots**: Active dot expands, completed dots fill with accent color, pending dots are dimmed
+- **Confetti**: 30-particle CSS animation on section completion and final submission
+- **Section visuals**: Each section gets an emoji, color, and tagline from `_sectionVisuals` map
+- **Celebration stats**: Animated count-up cards showing answered count, % progress, elapsed time
+- **Thank you screen**: Animated spinning checkmark, pulse rings, stat cards, confetti explosion
+
+### CSS animations added (styles.html)
+`surveySlideUp`, `surveyPopIn`, `surveyBounce`, `surveyFloat`, `surveyGlowBar`, `surveyShimmer`, `surveyCelebSpin`, `surveyPulseRing`, `surveyConfetti`, `surveyCountUp`, `surveyEmojiWiggle`
+
+### Integration preserved
+- All server calls untouched: `dataGetSurveyQuestions`, `dataGetSurveyStatus`, `dataSubmitSurveyResponse`
+- Branch logic (`_sectionBranchRules`, `getActiveSectionKeys`) fully preserved
+- Draft saving (`window._surveyDraft`) fully preserved
+- All question types (slider-10, radio, radio-branch, checkbox, dropdown, paragraph) untouched
+- Validation per section untouched
+- Dues-paying gate untouched
+- Error handling and retry logic untouched
+
+### Files modified
+1. `src/member_view.html` — `_renderSurveyWizard` enhanced with phase system, chapter intros, celebrations, confetti helper, animated thank-you
+2. `src/styles.html` — ~150 lines of survey animation CSS
+
+---
+
+## Survey Results 5-View Dashboard — Phase 3 Implementation (March 2026)
+
+### What was added
+Replaced single-view survey results with 5-tab dashboard: Overview, Heatmap, Sections, Balance (Radar), and Detail.
+
+### View descriptions
+| Tab | ID | What it shows |
+|-----|----|---------------|
+| 📖 Overview | story | Hero score, scrollable ranked section strip, strongest/weakest insight cards, all-sections list with mini bars |
+| 🔥 Heatmap | heatmap | Color-intensity cells per section (opacity scales with score), legend |
+| 📈 Sections | sections | Conic progress ring for overall, expandable cards per section with score bars |
+| 🎯 Balance | radar | SVG radar/spider chart with data polygon, axis lines, grid rings, emoji labels, ranked list below |
+| 🔍 Detail | detail | Filterable section list with chapter pills, per-section cards with score bars |
+
+### Architecture
+- Tab bar using existing `.sub-tab` CSS classes for consistency
+- All 5 views render inside a shared `viewContainer` div, swapped on tab click
+- Data source: `dataGetSatisfactionSummary(SESSION_TOKEN)` — unchanged
+- Section data dynamically normalized into `sectionList` array with emoji/color per section
+- `scoreColor()` function maps 1-10 scale to 5 color tiers
+- SVG radar chart rendered via `document.createElementNS` for full browser compat
+- All animations use survey CSS from Phase 2 (`surveySlideUp`, etc.)
+
+### Server integration
+- No server-side changes — uses existing `dataGetSatisfactionSummary` endpoint
+- Response threshold check (10 minimum) preserved
+- Privacy badge preserved
+- Error handling preserved
+- Future: when `dataGetSurveyHistory` endpoint is added, Heatmap and Sections views can show cross-round data
+
+### Files modified
+1. `src/member_view.html` — `renderSurveyResultsPage` rewritten (~220 lines, replaces ~80 lines)
+
+---
+
+## Survey Results 4 Extra Views — Phase 4 Implementation (March 2026)
+
+### What was added
+4 additional tabs in the survey results dashboard: Alerts, Participation/Turnout, Compare, and Meeting View.
+
+### View descriptions
+| Tab | ID | What it shows |
+|-----|----|---------------|
+| 🚨 Alerts | alerts | Auto-flagged issues: critical (below 5.0), warning (below 6.5), gap detection, low response warning. Summary badges at top, color-coded cards per alert. |
+| 👥 Turnout | participation | Response count hero, conic progress ring for participation rate (uses AppState.memberCount), per-section response counts, "Boost Participation" tips card. |
+| 📊 Compare | compare | Side-by-side section comparison with dropdown pickers. Shows dual score cards, difference analysis (modest/significant/major gap), visual bar comparison. |
+| 📋 Meeting | meeting | Projector-ready: large hero score (56px font), ranked section bars with rank badges, key takeaways list, auto-generated discussion points based on scores. |
+
+### Architecture
+- All 4 views use the same `dataGetSatisfactionSummary` data — no new server endpoints
+- Alerts auto-generate from score thresholds (configurable: `lowThreshold = 5.0`, `warnThreshold = 6.5`)
+- Participation uses `AppState.memberCount` for rate calculation (gracefully hides if unavailable)
+- Compare uses native `<select>` dropdowns for section picker
+- Meeting view uses larger fonts/spacing optimized for screen projection
+- All animations reuse Phase 2 survey CSS (`surveySlideUp`, `surveyCountUp`, etc.)
+
+### Total tab count in Survey Results: 9
+📖 Overview, 🔥 Heatmap, 📈 Sections, 🎯 Balance, 🔍 Detail, 🚨 Alerts, 👥 Turnout, 📊 Compare, 📋 Meeting
+
+### Files modified
+1. `src/member_view.html` — 4 new view functions (~320 lines), TABS array expanded, renderView switch expanded
+
+---
+
+## 🚫 Directory Tab Removed from Member View (2026-03-09)
+
+### What changed
+- Removed the "Directory" tab (`id: 'contact'`) from the member sidebar in `src/index.html`
+- Removed the corresponding `case 'contact'` switch entry in the member routing logic
+- Removed the `contact` color mapping from `TAB_COLORS`
+- Any existing deep-links to `#contact` for members now fall through to default (Home)
+
+### What was NOT removed
+- **Steward Directory** (`id: 'stewarddirectory'`) — remains as utility link for finding/selecting a steward
+- **`renderStewardContact()`** function — still used by Steward Directory link
+
+### Files modified
+1. `src/index.html` — 3 edits: sidebar tab removed, switch case removed, color mapping removed
