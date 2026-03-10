@@ -71,8 +71,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Woop91/Union-Tracker.git
-   cd Union-Tracker
+   git clone https://github.com/Woop91/DDS-Dashboard.git
+   cd DDS-Dashboard
    ```
 
 2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
@@ -83,7 +83,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Click the **+** button next to "Files" to create a new script file
    - Name it to match the source file (without the `.gs` extension)
    - Paste the contents from the corresponding `src/` file
-   - Repeat for all 42 `.gs` files and 7 `.html` files
+   - Repeat for all 41 `.gs` files and 7 `.html` files
 
 5. **Run the initial setup:**
    - Select `CREATE_DASHBOARD` from the function dropdown
@@ -97,8 +97,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone and install:**
 
    ```bash
-   git clone https://github.com/Woop91/Union-Tracker.git
-   cd Union-Tracker
+   git clone https://github.com/Woop91/DDS-Dashboard.git
+   cd DDS-Dashboard
    npm install
    ```
 
@@ -188,7 +188,7 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 
 ### Dashboards & Analytics
 - **Steward Dashboard**: Internal view with 11 tabs -- Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes
-- **Member Dashboard**: PII-safe view for sharing with members
+- **Member Dashboard**: PII-safe view with Home, My Cases, My Tasks, Union Stats, Steward Directory, Resources, Q&A Forum, Polls, Feedback, Minutes, Notifications, Events, Meetings, Timeline, Profile, and Survey Results. No general Directory tab -- members find stewards via the Steward Directory utility.
 - **Executive Dashboard**: High-level metrics with Chart.js visualizations
 - **Interactive Dashboard**: Customizable metrics and chart types
 - Hot spot detection, sentiment analysis, and workload balancing
@@ -199,11 +199,12 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - Deadline sync to Google Calendar
 - Automated meeting event creation
 
-### Notifications & Alerts
+### Notifications & Alerts (v4.12.0, overhauled v4.22.0+)
 - Daily overdue alerts (8 AM trigger)
 - Escalation notifications for Step II/III/Arbitration
 - Scheduled meeting document emails
 - Email snapshots and dashboard links
+- Notification overhaul (v4.22.0) with manage hardening (v4.22.1) and cleanup pass (v4.22.2)
 
 ### Accessibility (Comfort View)
 - ADHD-friendly themes with soft colors
@@ -216,7 +217,7 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - XSS prevention with HTML escaping
 - PII masking for public dashboards (phone numbers, SSNs auto-redacted)
 - Zero-knowledge survey vault: email and member ID stored as SHA-256 hashes only (non-reversible)
-- Survey responses are cryptographically anonymous — no one can link answers to members
+- Survey responses are cryptographically anonymous -- no one can link answers to members
 - Security event alerting with threat detection at web app, edit trigger, and self-service entry points
 - Formula injection protection
 - Input sanitization and validation
@@ -243,7 +244,7 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - Plain-language insight strings for non-statistician users
 
 ### Auto-Discovery Columns (v4.9.0)
-- Dynamic column resolution — zero manual updates on sheet restructure
+- Dynamic column resolution -- zero manual updates on sheet restructure
 - All column references use dynamic `CONFIG_COLS` and `MEMBER_COLS` constants
 - Multi-select dropdown editor for Grievance Log with checkbox UI
 
@@ -255,7 +256,7 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - Employment tracking with Full-time/Part-time and overtime hours
 - Email reminder system with configurable frequency
 - 24-month rolling data archive and CSV backup to Google Drive
-- SPA-integrated SSO workload module (`25_WorkloadService.gs`) embedded in member_view
+- SPA-integrated SSO module (`25_WorkloadService.gs`)
 
 ### Resources Hub (v4.11.0)
 - Educational content hub with search, category pills, and expandable cards (`?page=resources`)
@@ -275,48 +276,66 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - Full single-page application with Google SSO + magic link authentication
 - Role-based views: `steward_view.html` and `member_view.html`
 - Deep-link routing: `?page=X` pre-selects tabs via `PAGE_DATA.initialTab`
-- 11 SPA modules: Auth, ConfigReader, DataService, WebDashApp, PortalSheets, WeeklyQuestions, WorkloadService, QAForum, TimelineService, FailsafeService, Migrations
+- 8 SPA modules: Auth, ConfigReader, DataService, WebDashApp, PortalSheets, WeeklyQuestions, QAForum, TimelineService, FailsafeService, Migrations
 - Hidden sheets: `_Weekly_Questions`, `_Contact_Log`, `_Steward_Tasks`
-- Auto-configures auth on first run — no manual ScriptProperties setup
+- Auto-configures auth on first run -- no manual ScriptProperties setup
 
 ### Notification Bell & EventBus Alerts (v4.13.0)
 - Notification bell badge with unread count in SPA header
-- Steward notification management — compose/inbox/manage tabs
+- Steward notification management -- compose/inbox/manage tabs
 - EventBus auto-notifications for grievance deadlines and status changes
 - Member notification view with dismiss functionality
 
+### Org Chart (v4.22.6)
+- MADDS org chart as default view
+- `scripts/sync-org-chart.js` script for syncing org chart data
+- Dedicated `org_chart.html` template
+
 ### Q&A Forum (v4.22.6+)
-- Steward-member Q&A communication through the web dashboard
-- Steward-only answers, question resolve/reopen functionality
-- Unanswered count on notification bell badge
-- Anonymous question notifications and show-resolved toggle
+- Steward-only answers to member questions
+- Question resolve/reopen workflow
+- Unanswered count displayed on notification bell badge
+- Anonymous question notifications
+- Show-resolved toggle for filtering
+
+### Polls (v4.22.6+, updated v4.24.0)
+- FlashPolls system removed in v4.24.0
+- Replaced with manual community draw
+- Q_COLS API for column management
 
 ### Timeline Service (v4.22.9+)
-- Chronological activity feed in the web dashboard
-- Inline editing, meeting minutes linking, load more pagination
-- Dynamic year filter, calendar icon links, theme-aware category badges
+- Inline edit for timeline entries
+- meetingMinutesId linking to meeting documents
+- Load more pagination for large timelines
+- Dynamic year filter
+- Calendar icon links for event integration
+- Drive file verification
+- Theme-aware category badges
 
 ### Dynamic Survey Engine (v4.23.0)
-- Fully dynamic survey schema driven by configuration
-- Replaced hardcoded survey form URL with dynamic config
+- Fully dynamic survey schema (Option B)
+- Form URL deprecation cleanup
+- Configurable survey fields via `_Survey_Config` sheet
 
 ### Share Phone (v4.23.4+)
-- Steward phone opt-in permission for member visibility
-- Self-toggle in web dashboard, default 'No' seeding
+- Steward phone opt-in permission
+- Member visibility control for phone numbers
+- Steward self-toggle in web dashboard
+- Default 'No' seeding for privacy
 
 ### FailsafeService (v4.22.8+)
-- Critical operation wrapper with retry logic and graceful degradation
-- Session token auth for magic link and session users
+- Security and reliability fixes for critical operations
+- Safe execution wrappers for error-prone operations
 
-### Org Chart (v4.22.6)
-- MADDS organizational chart as default view
-- Automated sync via `scripts/sync-org-chart.js`
+### Migrations Service (v4.20.26+)
+- One-time data migrations with tracking
+- Column auto-migration for Member Directory and Grievance Log
 
 ### Looker Studio Integration
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
 - **PII-Free**: Anonymized `_Looker_Anon_*` sheets for external stakeholders
 - Non-reversible hashes, bucketed values, and engagement levels
-- Survey data uses zero-knowledge vault — `_Looker_Satisfaction` contains no member IDs or emails
+- Survey data uses zero-knowledge vault -- `_Looker_Satisfaction` contains no member IDs or emails
 
 ### Constant Contact Integration
 - **Read-only** engagement metrics sync from Constant Contact v3 API
@@ -324,7 +343,7 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - OAuth2 authorization with automatic token refresh
 - Case-insensitive email matching between CC contacts and members
 - Rate limiting and pagination for large contact lists
-- Setup, authorize, sync, status, and disconnect — all from the Admin menu
+- Setup, authorize, sync, status, and disconnect -- all from the Admin menu
 
 ---
 
@@ -447,6 +466,9 @@ These sheets power the auto-updating columns. You don't need to edit them.
 | `_Steward_Tasks` | Steward task management (10 cols) |
 | `_Resources` | Educational resources and documents |
 | `_Notifications` | System and steward notifications (12 cols) |
+| `_QA_Forum` | Q&A Forum questions and answers |
+| `_Timeline` | Timeline events and entries |
+| `_Survey_Config` | Dynamic survey configuration |
 
 ---
 
@@ -455,8 +477,8 @@ These sheets power the auto-updating columns. You don't need to edit them.
 ### Setup
 
 ```bash
-git clone https://github.com/Woop91/Union-Tracker.git
-cd Union-Tracker
+git clone https://github.com/Woop91/DDS-Dashboard.git
+cd DDS-Dashboard
 npm install
 ```
 
@@ -467,11 +489,15 @@ npm run build          # Copy individual .gs + .html files to dist/
 npm run build --prod   # Production build (excludes DevTools)
 npm run lint           # ESLint code quality checks
 npm run lint:fix       # Auto-fix ESLint issues
-npm run test:unit      # Run 2059 Jest unit tests (36 suites)
+npm run test:unit      # Run 2059 Jest unit tests across 36 suites
 npm test               # Full pipeline: lint + build + test
 npm run clean          # Clean dist directory
 npm run deploy         # Deploy to Google Apps Script (requires clasp)
 ```
+
+### Scripts
+
+- `scripts/sync-org-chart.js` -- Syncs org chart data for the MADDS org chart view
 
 ### Making Changes
 
@@ -512,7 +538,7 @@ The codebase uses a 42-file modular architecture (+ 7 HTML templates) with numbe
 | 26-29 | Extended Services | `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`, `29_Migrations.gs` |
 | -- | HTML | `index.html`, `styles.html`, `auth_view.html`, `steward_view.html`, `member_view.html`, `error_view.html`, `org_chart.html` |
 
-> **Note:** No prefix 18 exists in this repo (the standalone WorkloadTracker was removed). Workload functionality is embedded in the SPA via `25_WorkloadService.gs`.
+NOTE: No prefix 18 exists in this repo (it was the standalone WorkloadTracker, now removed).
 
 ### Design Principles
 
@@ -571,19 +597,20 @@ A: Use Google Sheets' built-in version history (File > Version history) or make 
 
 | Document | Description |
 |----------|-------------|
-| [FEATURES.md](FEATURES.md) | Complete searchable feature reference (23 categories) |
-| [USER_TUTORIALS.md](USER_TUTORIALS.md) | Step-by-step tutorials for common tasks |
-| [STEWARD_GUIDE.md](STEWARD_GUIDE.md) | Guide for stewards using the system |
+| [README.md](README.md) | This file -- project overview and quick start |
 | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Architecture, code patterns, and debugging |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute to the project |
-| [CHANGELOG.md](CHANGELOG.md) | Detailed version history |
-| [INTERACTIVE_DASHBOARD_GUIDE.md](INTERACTIVE_DASHBOARD_GUIDE.md) | Dashboard customization guide |
+| [QUICK_DEPLOY.md](QUICK_DEPLOY.md) | Fast deployment instructions |
+| [SECURITY_REVIEW.md](SECURITY_REVIEW.md) | Security analysis and findings |
+| [STEWARD_GUIDE.md](STEWARD_GUIDE.md) | Guide for stewards using the system |
+| [USER_TUTORIALS.md](USER_TUTORIALS.md) | Step-by-step tutorials for common tasks |
+| [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) | Demo data seeding and cleanup |
 | [COMFORT_VIEW_GUIDE.md](COMFORT_VIEW_GUIDE.md) | Accessibility and visual comfort features |
 | [GRIEVANCE_WORKFLOW_GUIDE.md](GRIEVANCE_WORKFLOW_GUIDE.md) | Grievance filing workflow |
-| [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) | Demo data seeding and cleanup |
-| [QUICK_DEPLOY.md](QUICK_DEPLOY.md) | Fast deployment instructions |
-| [AIR.md](AIR.md) | Full architecture and implementation reference |
-| [SECURITY_REVIEW.md](SECURITY_REVIEW.md) | Security analysis and findings |
+| [INTERACTIVE_DASHBOARD_GUIDE.md](INTERACTIVE_DASHBOARD_GUIDE.md) | Dashboard customization guide |
+| [WELCOME_EMAIL.md](WELCOME_EMAIL.md) | Welcome email template and setup |
+| [CHANGELOG.md](CHANGELOG.md) | Detailed version history (being created) |
+| [FEATURES.md](FEATURES.md) | Complete searchable feature reference (being created) |
 
 ### Setup Guides
 
@@ -591,7 +618,6 @@ A: Use Google Sheets' built-in version history (File > Version history) or make 
 |-------|-------------|
 | [Heatmap Setup](setup-instructions/01_HEATMAP_SETUP.md) | Color gradient configuration |
 | [OCR Setup](setup-instructions/02_OCR_SETUP.md) | Google Cloud Vision API for OCR |
-| [CLASP Deployment](setup-instructions/03_CLASP_SETUP.md) | Complete CLASP deployment guide |
 | [Drive URL Setup](setup-instructions/04_RESOURCE_DRIVE_URL_LINK_SETUP.md) | Shared documents folder linking |
 | [Dropbox Setup](setup-instructions/05_RESOURCE_DROPBOX_SETUP.md) | Resource dropbox folder setup |
 | [PDF Generation](setup-instructions/06_PDF_GENERATION_SETUP.md) | PDF template and email setup |
@@ -615,7 +641,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| **4.24.4** | 2026-03-07 | Auth sweep complete, Q_COLS API, FlashPolls removed, QAForum wrapper fixes |
+| **4.24.4** | 2026-03-07 | Auth sweep complete, Q_COLS API, FlashPolls removed, QAForum double-paren fix |
 | **4.23.0** | 2026-03 | Dynamic survey engine (Option B), Share Phone feature, steward directory parity |
 | **4.22.0** | 2026-03 | Notification overhaul, Q&A Forum, Timeline, org chart, FailsafeService, events hardening |
 | **4.20.18** | 2026-03 | Minutes tab fixes, per-member admin folders, column auto-migration |
@@ -624,8 +650,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 | **4.12.0** | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
 | **4.11.0** | 2026-02-24 | Resources hub, meeting check-in route, design refresh |
 | **4.10.0** | 2026-02-23 | Workload Tracker module, 8 workload categories, privacy controls, email reminders, 5 new hidden sheets |
-| **4.9.1** | 2026-02-23 | Security vulnerability fix pass — 22 findings fixed, XSS hardening, formula injection protection |
-| **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 2059 tests across 36 suites |
+| **4.9.1** | 2026-02-23 | Security vulnerability fix pass -- 22 findings fixed, XSS hardening, formula injection protection |
+| **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 1300+ tests across 21 suites |
 | **4.8.2** | 2026-02-16 | State field added to member contact surfaces |
 | **4.8.1** | 2026-02-15 | 5 new contact form fields, unified name-based Member ID system |
 | **4.8.0** | 2026-02-15 | Security event alerting, zero-knowledge survey vault, event bus architecture |

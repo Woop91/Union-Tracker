@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.25.5] - 2026-03-09
+
+### Removed
+- "Directory" tab (`id: contact`) from member SPA sidebar — members should not have a general directory
+- `case 'contact'` routing entry and `contact` color mapping in `index.html`
+
+### Changed
+- Deep-links to `#contact` for members now fall through to Home (default)
+- Updated README.md, FEATURES.md member tab listing, INTERACTIVE_DASHBOARD_GUIDE.md tab count (10→9)
+
+### Note
+- Steward Directory utility link (`id: stewarddirectory`) retained — used for finding/selecting an assigned steward
+
+## [4.25.4] - 2026-03-09
+
+### Added
+- Config columns: Step III Appeal Days, Step III Response Days, Arbitration Demand Days
+- getDeadlineRules() now reads Step III + Arbitration from Config (was hardcoded)
+- New test: deadline config column completeness (7 assertions)
+
+### Fixed
+- COMMAND_CONFIG.VERSION stuck at "4.24.4" — corrected to "4.25.3"
+- Test positions for CHIEF_STEWARD_EMAIL (+3), ESCALATION_STATUSES (+3), ESCALATION_STEPS (+3)
+
 ## [4.25.2] - 2026-03-09
 
 ### Added
