@@ -89,12 +89,24 @@ global.PropertiesService = {
 };
 
 // --- CacheService ---
+// TEST-03: TTL enforcement — expired entries return null, matching real GAS behavior
 let _cache = {};
+let _cacheTTLs = {};
 global.CacheService = {
   getScriptCache: jest.fn(() => ({
-    get: jest.fn(key => _cache[key] || null),
-    put: jest.fn((key, val, ttl) => { _cache[key] = val; }),
-    remove: jest.fn(key => { delete _cache[key]; })
+    get: jest.fn(key => {
+      if (_cacheTTLs[key] && Date.now() > _cacheTTLs[key]) {
+        delete _cache[key];
+        delete _cacheTTLs[key];
+        return null;
+      }
+      return _cache[key] || null;
+    }),
+    put: jest.fn((key, val, ttl) => {
+      _cache[key] = val;
+      if (ttl) _cacheTTLs[key] = Date.now() + (ttl * 1000);
+    }),
+    remove: jest.fn(key => { delete _cache[key]; delete _cacheTTLs[key]; })
   }))
 };
 
@@ -103,6 +115,7 @@ afterEach(() => {
   for (const key of Object.keys(_scriptProperties)) delete _scriptProperties[key];
   for (const key of Object.keys(_userProperties)) delete _userProperties[key];
   for (const key of Object.keys(_cache)) delete _cache[key];
+  for (const key of Object.keys(_cacheTTLs)) delete _cacheTTLs[key];
 });
 
 // --- Mock Sheet / Range / Spreadsheet ---
@@ -145,7 +158,26 @@ function createMockSheet(name, data) {
   return {
     getName: jest.fn(() => name),
     getDataRange: jest.fn(() => createMockRange(data || [['header']])),
-    getRange: jest.fn(() => createMockRange()),
+    // TEST-03: Bounds-checked getRange — validates row/col >= 1 like real GAS
+    getRange: jest.fn(function(row, col, numRows, numCols) {
+      if (typeof row === 'number' && row < 1) throw new Error('Those values are not valid for the row property (minimum 1).');
+      if (typeof col === 'number' && col < 1) throw new Error('Those values are not valid for the column property (minimum 1).');
+      // Return data slice when data is available and row/col are specified
+      if (data && typeof row === 'number' && typeof col === 'number') {
+        var nr = numRows || 1;
+        var nc = numCols || 1;
+        var sliced = [];
+        for (var r = row - 1; r < row - 1 + nr; r++) {
+          var rowData = [];
+          for (var c = col - 1; c < col - 1 + nc; c++) {
+            rowData.push(data[r] && data[r][c] !== undefined ? data[r][c] : '');
+          }
+          sliced.push(rowData);
+        }
+        return createMockRange(sliced.length > 0 ? sliced : [['']]);
+      }
+      return createMockRange();
+    }),
     getLastRow: jest.fn(() => (data ? data.length : 1)),
     getLastColumn: jest.fn(() => (data && data[0] ? data[0].length : 1)),
     getMaxColumns: jest.fn(() => (data && data[0] ? data[0].length : 10)),
@@ -248,12 +280,18 @@ global.DriveApp = {
     getId: jest.fn(() => 'folder-id'),
     getUrl: jest.fn(() => 'https://drive.google.com/folder-id'),
     setDescription: jest.fn(),
+    setSharing: jest.fn(),
     getFoldersByName: jest.fn(() => ({ hasNext: jest.fn(() => false) })),
-    createFolder: jest.fn()
+    createFolder: jest.fn(),
+    getFiles: jest.fn(() => ({ hasNext: jest.fn(() => false) })),
+    createFile: jest.fn()
   })),
   getFoldersByName: jest.fn(() => ({ hasNext: jest.fn(() => false) })),
   getRootFolder: jest.fn(() => ({ getId: jest.fn(() => 'root') })),
-  getFileById: jest.fn(() => ({ getName: jest.fn(() => 'TestFile.pdf') }))
+  getFileById: jest.fn(() => ({ getName: jest.fn(() => 'TestFile.pdf') })),
+  // SEC-07: Access and Permission enums for folder sharing control
+  Access: { ANYONE: 'ANYONE', ANYONE_WITH_LINK: 'ANYONE_WITH_LINK', DOMAIN: 'DOMAIN', DOMAIN_WITH_LINK: 'DOMAIN_WITH_LINK', PRIVATE: 'PRIVATE' },
+  Permission: { VIEW: 'VIEW', EDIT: 'EDIT', COMMENT: 'COMMENT', NONE: 'NONE' }
 };
 
 // --- MimeType ---

@@ -39,6 +39,30 @@ var FailsafeService = (function () {
   }
 
   // ═══════════════════════════════════════
+  // Cached Sheet Read Helper
+  // ═══════════════════════════════════════
+
+  // PERF-01: Cache sheet reads to avoid redundant getDataRange() calls across requests
+  function _getCachedSheetData(sheetName, maxAgeSec) {
+    maxAgeSec = maxAgeSec || 120;
+    try {
+      var cache = CacheService.getScriptCache();
+      var cacheKey = 'fs_sheet_' + sheetName;
+      var cached = cache.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (_e) { /* fall through to fresh read */ }
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() <= 1) return null;
+    var data = sheet.getDataRange().getValues();
+    try {
+      cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
+    } catch (_e) { /* CacheService 100KB limit — fail silently */ }
+    return data;
+  }
+
+  // ═══════════════════════════════════════
   // Digest Configuration
   // ═══════════════════════════════════════
 
@@ -51,7 +75,7 @@ var FailsafeService = (function () {
       return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
     }
 
-    var data = sheet.getDataRange().getValues();
+    var data = _getCachedSheetData(SHEETS.FAILSAFE_CONFIG, 120) || sheet.getDataRange().getValues();
     var eml = email.toLowerCase().trim();
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][0]).toLowerCase().trim() === eml) {
@@ -419,7 +443,15 @@ var FailsafeService = (function () {
   function _getOrCreateBackupFolder() {
     var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
     if (folders.hasNext()) return folders.next();
-    return DriveApp.createFolder(BACKUP_FOLDER_NAME);
+    // SEC-07: Restrict sharing so only the script owner can access PII-containing backups
+    var folder = DriveApp.createFolder(BACKUP_FOLDER_NAME);
+    try {
+      folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+      folder.setDescription('Automated backups — contains member PII. Do not share.');
+    } catch (_e) {
+      Logger.log('Could not restrict backup folder sharing: ' + _e.message);
+    }
+    return folder;
   }
 
   function _toCsv(data) {

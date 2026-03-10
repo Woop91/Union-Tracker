@@ -676,6 +676,60 @@ describe('G12: No sensitive ID leaks', () => {
 
 
 // ============================================================================
+// G13: MODULE LOAD ORDER SAFETY
+// ============================================================================
+// Reason: GAS V8 loads files alphabetically. IIFE modules (var X = (function(){})())
+// must not reference other IIFE modules at init time (top-level execution outside
+// function bodies) if those modules are defined in later-loading files.
+// References inside function bodies are safe — by the time any function is called,
+// all files have loaded.
+
+describe('G13: Module load order is safe', () => {
+
+  test('no duplicate IIFE module names across .gs files', () => {
+    const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs')).sort();
+    const iifeNames = {};
+    const duplicates = [];
+
+    gsFiles.forEach(file => {
+      const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
+      const iifeMatch = code.match(/^var\s+(\w+)\s*=\s*\(function/m);
+      if (iifeMatch) {
+        const name = iifeMatch[1];
+        if (iifeNames[name]) {
+          duplicates.push(`"${name}" defined in both ${iifeNames[name]} and ${file}`);
+        }
+        iifeNames[name] = file;
+      }
+    });
+
+    expect(duplicates).toEqual([]);
+  });
+
+  test('no duplicate top-level function names across .gs files', () => {
+    const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs')).sort();
+    const funcMap = {};
+    const duplicates = [];
+
+    gsFiles.forEach(file => {
+      const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
+      const regex = /^function\s+(\w+)\s*\(/gm;
+      let match;
+      while ((match = regex.exec(code)) !== null) {
+        const name = match[1];
+        if (funcMap[name]) {
+          duplicates.push(`"${name}" declared in both ${funcMap[name]} and ${file}`);
+        }
+        funcMap[name] = file;
+      }
+    });
+
+    expect(duplicates).toEqual([]);
+  });
+});
+
+
+// ============================================================================
 // HELPERS
 // ============================================================================
 

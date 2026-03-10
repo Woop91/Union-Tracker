@@ -11,6 +11,7 @@
  * MADDS is the only org chart across all repos and branches.
  *
  * Usage:  npm run sync-org-chart
+ *         npm run sync-org-chart -- --dry-run   (fetch + transform + verify only, no push)
  *
  * REQUIRES: .env at repo root containing:
  *   GITHUB_509D_TOKEN=ghp_...   (PAT with repo scope)
@@ -58,6 +59,9 @@ const TARGETS = [
   },
 ];
 const COMMIT_MSG = 'sync: update org_chart.html from 509d/MADDS.html';
+
+// BUILD-04: --dry-run flag — fetch, transform, verify, but skip clone/commit/push
+const DRY_RUN = process.argv.includes('--dry-run');
 
 function loadEnv() {
   const envFile = path.join(__dirname, '..', '.env');
@@ -234,6 +238,17 @@ async function main() {
     process.exit(1);
   }
   console.log('[sync-org-chart] Verified OK (' + OUTPUT_CONTENT.split('\n').length + ' lines)');
+
+  if (DRY_RUN) {
+    console.log('\n[sync-org-chart] --dry-run: Would update the following targets:');
+    for (const target of TARGETS) {
+      for (const branch of target.branches) {
+        console.log('  ' + target.owner + '/' + target.repo + '@' + branch + ': ' + target.files.join(', '));
+      }
+    }
+    console.log('\n[sync-org-chart] Dry run complete — no changes pushed.\n');
+    return;
+  }
 
   for (const target of TARGETS) {
     processTarget(target);

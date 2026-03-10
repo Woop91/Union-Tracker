@@ -50,6 +50,31 @@ var QAForum = (function () {
   }
 
   // ═══════════════════════════════════════
+  // Cached Sheet Read Helper
+  // ═══════════════════════════════════════
+
+  // PERF-01: Cache full-sheet reads via CacheService to reduce redundant getDataRange() calls.
+  // TTL defaults to 60s — acceptable staleness for read-heavy Q&A list loads.
+  function _getCachedSheetData(sheetName, maxAgeSec) {
+    maxAgeSec = maxAgeSec || 60;
+    try {
+      var cache = CacheService.getScriptCache();
+      var cacheKey = 'qa_sheet_' + sheetName;
+      var cached = cache.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (_e) { /* cache miss or parse error — fall through to fresh read */ }
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() <= 1) return null;
+    var data = sheet.getDataRange().getValues();
+    try {
+      cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
+    } catch (_e) { /* CacheService has 100KB per-key limit — fail silently */ }
+    return data;
+  }
+
+  // ═══════════════════════════════════════
   // Questions
   // ═══════════════════════════════════════
 
@@ -67,7 +92,7 @@ var QAForum = (function () {
     }
     if (!sheet || sheet.getLastRow() <= 1) return { questions: [], total: 0, page: page, pageSize: pageSize };
 
-    var data = sheet.getDataRange().getValues();
+    var data = _getCachedSheetData(SHEETS.QA_FORUM, 60) || sheet.getDataRange().getValues();
     var questions = [];
     for (var i = 1; i < data.length; i++) {
       var status = String(data[i][5] || 'active').toLowerCase().trim();
@@ -107,7 +132,7 @@ var QAForum = (function () {
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
     if (!sheet || sheet.getLastRow() <= 1) return null;
 
-    var data = sheet.getDataRange().getValues();
+    var data = _getCachedSheetData(SHEETS.QA_FORUM, 60) || sheet.getDataRange().getValues();
     var question = null;
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] === questionId) {
@@ -133,7 +158,7 @@ var QAForum = (function () {
     var ansSheet = ss.getSheetByName(SHEETS.QA_ANSWERS);
     var answers = [];
     if (ansSheet && ansSheet.getLastRow() > 1) {
-      var ansData = ansSheet.getDataRange().getValues();
+      var ansData = _getCachedSheetData(SHEETS.QA_ANSWERS, 60) || ansSheet.getDataRange().getValues();
       for (var j = 1; j < ansData.length; j++) {
         if (ansData[j][1] === questionId && String(ansData[j][6] || 'active').toLowerCase().trim() !== 'deleted') {
           answers.push({
