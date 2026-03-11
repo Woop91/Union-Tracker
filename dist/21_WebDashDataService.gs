@@ -15,6 +15,9 @@
  *   - No member PII is exposed to other members
  */
 
+// Tab name used inside per-member contact spreadsheets (NOT the hidden _Contact_Log sheet)
+var CONTACT_SHEET_TAB_ = 'Contact Log';
+
 var DataService = (function () {
 
   // Sheet names — read from SHEETS constants if available, fallback to defaults
@@ -565,14 +568,14 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
-      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName('Grievance Log');
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet) return { success: false, message: 'Grievance sheet not found.' };
 
       // Resolve member identity dynamically from directory
       var memberId = '';
       var memberFirstName = '';
       var memberLastName = '';
-      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR) || ss.getSheetByName('Member Directory');
+      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberDir && memberDir.getLastRow() > 1) {
         var mData = memberDir.getDataRange().getValues();
         var mColMap = _buildColumnMap(mData[0]);
@@ -639,14 +642,14 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
-      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName('Grievance Log');
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'No grievances found.' };
 
       var emailLower = String(email).toLowerCase().trim();
 
       // ── Resolve memberId dynamically from Member Directory ────────────────
       var memberId = '';
-      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR) || ss.getSheetByName('Member Directory');
+      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberDir && memberDir.getLastRow() > 1) {
         var mData   = memberDir.getDataRange().getValues();
         var mColMap = _buildColumnMap(mData[0]);
@@ -1431,7 +1434,7 @@ var DataService = (function () {
       DriveApp.getRootFolder().removeFile(ssFile); // move out of My Drive root
 
       var sheet = ss.getActiveSheet();
-      sheet.setName('Contact Log');
+      sheet.setName(CONTACT_SHEET_TAB_);
       var headers = ['Date', 'Steward', 'Contact Type', 'Notes', 'Duration'];
       sheet.getRange(1, 1, 1, headers.length).setValues([headers])
            .setFontWeight('bold')
@@ -1522,7 +1525,7 @@ var DataService = (function () {
         var folderName = masterFolder.getName();
         var contactSS = getOrCreateMemberContactSheet_(masterFolder, folderName);
         if (contactSS) {
-          var logSheet = contactSS.getSheetByName('Contact Log') || contactSS.getActiveSheet();
+          var logSheet = contactSS.getSheetByName(CONTACT_SHEET_TAB_) || contactSS.getActiveSheet();
           logSheet.appendRow([new Date(), sName, contactType, (notes || '').substring(0, 500), duration || '']);
         }
       }
@@ -1681,9 +1684,11 @@ var DataService = (function () {
     var sheet = _ensureStewardTasks();
     // Migrate headers if needed
     var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 12)).getValues()[0];
+    var assigneeTypeCol = 11;  // position in 12-col Steward Tasks schema
+    var assignedByCol   = 12;
     if (!headers[10] || String(headers[10]).trim() !== 'Assignee Type') {
-      sheet.getRange(1, 11).setValue('Assignee Type');
-      sheet.getRange(1, 12).setValue('Assigned By');
+      sheet.getRange(1, assigneeTypeCol).setValue('Assignee Type');
+      sheet.getRange(1, assignedByCol).setValue('Assigned By');
     }
     var id = 'MT_' + Date.now().toString(36);
     sheet.appendRow([
@@ -2997,7 +3002,7 @@ function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
         var folderName = memberFolder.getName();
         var contactSS  = DataService.getOrCreateMemberContactSheetPublic(memberFolder, folderName);
         if (contactSS) {
-          var logSheet = contactSS.getSheetByName('Contact Log') || contactSS.getActiveSheet();
+          var logSheet = contactSS.getSheetByName(CONTACT_SHEET_TAB_) || contactSS.getActiveSheet();
           var noteText = 'Subject: ' + subject + (body ? ' | ' + String(body).substring(0, 300) : '');
           logSheet.appendRow([new Date(), sName, 'Email', noteText, '']);
         }
@@ -3082,7 +3087,8 @@ function dataGetSatisfactionTrends(sessionToken) { var s = _requireStewardAuth(s
 function dataSubmitFeedback(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMyFeedback(e) : []; }
 // v4.23.0: Portal Polls system deprecated — replaced by unified wq* poll system (24_WeeklyQuestions.gs)
-// These stubs kept so any stale clients that call them get a graceful empty response
+// These stubs kept so any stale clients that call them get a graceful empty response.
+// ⚠️ AUTH REQUIRED: If reimplementing, MUST add _resolveCallerEmail / _requireStewardAuth gates.
 function dataGetActivePolls() { return []; }
 function dataSubmitPollVote() { return { success: false, message: 'Polls system updated — please refresh.' }; }
 function dataAddPoll() { return { success: false, message: 'Polls system updated — please refresh.' }; }

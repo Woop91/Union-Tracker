@@ -8,6 +8,7 @@
 4. **All HTML must use `escapeHtml()`** for dynamic values. Defined in `00_Security.gs:130`. No exceptions. Do not redefine it.
 5. **`dist/` contains individual `.gs` + `.html` files for clasp push.** Never edit dist/ directly. Edit `src/`, then build. GAS needs separate `.html` files for `createTemplateFromFile()` / `createHtmlOutputFromFile()`. `--prod` flag strips `07_DevTools.gs`.
 6. **After any merge/work to Main:** remind user to run `clasp push`. Agent cannot run clasp remotely.
+7. **⚠️ Adding a scope to `appsscript.json` REQUIRES re-authorization of the deployed web app.** GAS does NOT auto-authorize new scopes in existing deployments. After `clasp push`, the admin must: Apps Script editor → Deploy → Manage Deployments → create a new version → authorize all scopes. Failure to do this causes the new scope's services to throw auth errors silently (they reach the catch block and return `{success:false}`). After any scope change, run the `emailsend` test suite via the TestRunner tab to verify. The CI `scope-change-guard` job will also flag this on every push to Main.
 
 ## Permissions
 

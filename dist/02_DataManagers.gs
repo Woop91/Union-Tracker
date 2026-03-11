@@ -1632,7 +1632,7 @@ function startNewGrievance(grievanceData) {
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
 
       if (!grievanceSheet) {
         throw new Error('Grievance Tracker sheet not found');
@@ -1728,7 +1728,7 @@ function handleGrievanceDialogSubmit(formData) {
     // Set the Action Type on the new row
     try {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
-      const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+      const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
       if (grievanceSheet && GRIEVANCE_COLS.ACTION_TYPE) {
         ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
         // Find the row with this grievance ID
@@ -1960,7 +1960,7 @@ function advanceGrievanceStep(grievanceId, options) {
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
     const data = sheet.getDataRange().getValues();
 
     // Find the grievance row
@@ -2105,7 +2105,7 @@ function getStepColumnSet(step) {
  */
 function recalcAllGrievancesBatched() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   const data = sheet.getDataRange().getValues();
 
   let updatedCount = 0;
@@ -2186,7 +2186,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   const data = sheet.getDataRange().getValues();
   const numRows = data.length - 1;
@@ -2247,7 +2247,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
  */
 function getGrievanceById(grievanceId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 
@@ -2270,7 +2270,7 @@ function getGrievanceById(grievanceId) {
  */
 function getOpenGrievances() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 
@@ -2363,7 +2363,7 @@ function getUpcomingDeadlines(daysAhead) {
  */
 function getGrievanceStats() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
 
   if (!sheet || sheet.getLastRow() < 2) {
     return {
@@ -2469,7 +2469,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
   }
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
     ensureMinimumColumns(sheet, getGrievanceHeaders().length);
     const data = sheet.getDataRange().getValues();
 
@@ -2558,7 +2558,7 @@ function showNewGrievanceDialog() {
  */
 function showEditGrievanceDialog() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.GRIEVANCE_TRACKER) {
+  if (sheet.getName() !== SHEETS.GRIEVANCE_TRACKER) {
     showAlert('Please select a grievance in the Grievance Tracker sheet', 'Wrong Sheet');
     return;
   }
@@ -2584,7 +2584,7 @@ function showEditGrievanceDialog() {
  */
 function showBulkStatusUpdate() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.GRIEVANCE_TRACKER) {
+  if (sheet.getName() !== SHEETS.GRIEVANCE_TRACKER) {
     showAlert('Please use this from the Grievance Tracker sheet', 'Wrong Sheet');
     return;
   }

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Pre-push hook
+# Runs before any git push to catch OAuth scope changes that require
+# web app re-authorization (v4.25.8 bug class prevention).
+
+echo "Running pre-push checks..."
+echo ""
+
+echo "[1/1] Checking for OAuth scope changes..."
+node scripts/check-scope-change.js
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Push blocked. See above for required action."
+  echo "Use 'git push --no-verify' to bypass if you have already re-authorized."
+  exit 1
+fi
+
+echo ""
+echo "Pre-push checks passed."

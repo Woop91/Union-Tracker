@@ -117,7 +117,7 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('📊 Workload Tracker')
       .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
       .addItem('💾 Create Backup', 'createWorkloadBackup')
-      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData')
       .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
       .addSeparator()
       .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))

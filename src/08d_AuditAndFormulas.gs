@@ -1113,7 +1113,7 @@ function refreshAllHiddenFormulas() {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcMembersSheet(sheet) {
-  const memberSheetName = SHEET_NAMES.MEMBER_DIRECTORY;
+  const memberSheetName = SHEETS.MEMBER_DIRECTORY;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
@@ -1166,7 +1166,7 @@ function setupCalcMembersSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcGrievancesSheet(sheet) {
-  const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
+  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
@@ -1243,7 +1243,7 @@ function setupCalcGrievancesSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcDeadlinesSheet(sheet) {
-  const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
+  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var gIdCol = getColumnLetter(GRIEVANCE_COLS.GRIEVANCE_ID);
@@ -1328,8 +1328,8 @@ function setupCalcDeadlinesSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcStatsSheet(sheet) {
-  const memberSheetName = SHEET_NAMES.MEMBER_DIRECTORY;
-  const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
+  const memberSheetName = SHEETS.MEMBER_DIRECTORY;
+  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
@@ -1415,8 +1415,8 @@ function setupCalcStatsSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcSyncSheet(sheet) {
-  const memberSheetName = SHEET_NAMES.MEMBER_DIRECTORY;
-  const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
+  const memberSheetName = SHEETS.MEMBER_DIRECTORY;
+  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
@@ -1481,9 +1481,9 @@ function setupCalcFormulasSheet(sheet) {
   // Department list formula
   sheet.getRange('A4').setValue('DEPARTMENT_LIST');
   sheet.getRange('B4').setFormula(
-    `=SORT(UNIQUE(FILTER('${SHEET_NAMES.MEMBER_DIRECTORY}'!E:E,` +
-    `'${SHEET_NAMES.MEMBER_DIRECTORY}'!E:E<>"Department",` +
-    `'${SHEET_NAMES.MEMBER_DIRECTORY}'!E:E<>"")))`
+    `=SORT(UNIQUE(FILTER('${SHEETS.MEMBER_DIRECTORY}'!E:E,` +
+    `'${SHEETS.MEMBER_DIRECTORY}'!E:E<>"Department",` +
+    `'${SHEETS.MEMBER_DIRECTORY}'!E:E<>"")))`
   );
 
   // Status list formula
@@ -1982,7 +1982,7 @@ function computeAuditRowHash_(previousHash, timestamp, eventType, user, details,
  */
 function verifyAuditLogIntegrity() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_NAMES.AUDIT_LOG || SHEETS.AUDIT_LOG);
+  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG || SHEETS.AUDIT_LOG);
   if (!sheet || sheet.getLastRow() < 2) {
     return { valid: true, totalRows: 0, invalidRows: [] };
   }

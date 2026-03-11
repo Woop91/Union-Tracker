@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
+**DDS Apps Script ID:** `[REDACTED — SEE DDS-DASHBOARD REPO]`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -2995,3 +2995,202 @@ Run **Admin → ⏱️ Triggers → ✅ Install ALL Survey Triggers** (or 🔓 I
 2. `src/08e_SurveyEngine.gs` — `setupOpenDeferredTrigger()` added, `menuInstallSurveyTriggers()` updated
 3. `src/03_UIComponents.gs` — new menu item in Triggers submenu
 4. `dist/` — all three files mirrored
+
+---
+
+## 🐛 BUG FIX LOG ENTRY — 2026-03-10 (v4.25.8)
+
+### Email Magic Link Login Broken
+
+**Symptom:** "Email me a sign-in link" button showed error screen; no email received.
+
+**Root Cause:** Authorization gap in `MailApp` scope.
+- `MailApp.sendEmail()` requires `script.send_mail` OAuth scope
+- That scope was added to `appsscript.json` in v4.24.9 (2026-03-08)
+- GAS rule: adding a scope to the manifest does NOT auto-authorize deployed web apps
+- The deployed web app still ran with old scopes (missing `script.send_mail`)
+- `MailApp.sendEmail()` threw an auth exception → inner catch → `{success: false}` → error UI
+
+**Fix applied in `src/19_WebDashAuth.gs`:**
+- **Primary sender switched to `GmailApp.sendEmail()`** — uses `gmail.send` scope, which was authorized in the deployment long before `script.send_mail` was added
+- **MailApp kept as fallback** — if GmailApp fails, MailApp is tried (works once deployment is re-authorized)
+- **Added step-by-step `Logger.log` statements** (STEP 0–5) so Stackdriver shows exactly where failures occur
+- **`testAuthEmailSend(testEmail)` global function added** — run from Apps Script editor to test both GmailApp and MailApp independently
+
+**Re-authorization note (for admin):**
+To fully authorize `script.send_mail` in the deployed web app:
+1. Open Apps Script editor → Deploy → Manage deployments
+2. Create a new deployment version
+3. Authorize all scopes when prompted
+This makes MailApp work too (both primary and fallback paths will succeed).
+
+**Diagnostic tool:**
+```javascript
+// Run from Apps Script editor:
+testAuthEmailSend()               // sends to script owner
+testAuthEmailSend('your@email')  // sends to specific address
+```
+Check Stackdriver logs for pass/fail per sender.
+
+**Key design rule reinforced:** When adding new OAuth scopes to `appsscript.json`, always create a new web app deployment and re-authorize. The deployed web app does NOT inherit new scopes automatically.
+
+---
+
+## 🧪 TEST SUITE ENTRY — 2026-03-10 (v4.25.9)
+
+### `emailsend` Suite Added to TestRunner
+
+**Why:** The v4.25.8 bug (MailApp scope not authorized) would have been caught immediately by runtime tests.
+No tests existed to verify email services were accessible before the bug was reported in production.
+
+**What was added:**
+
+| File | Change |
+|------|--------|
+| `src/30_TestRunner.gs` | 10 new tests in `emailsend` suite |
+| `src/steward_view.html` | "Email & Auth Scopes" suite added to filter dropdown |
+| `.github/workflows/build.yml` | `scope-change-guard` CI job added |
+| `CLAUDE.md` | Rule 7: OAuth scope re-auth requirement documented |
+
+**Tests in `emailsend` suite:**
+
+| Test | What it catches |
+|------|----------------|
+| `test_emailsend_gmailAppAccessible` | GmailApp quota call — fails if `gmail.send` scope not authorized in deployment |
+| `test_emailsend_mailAppAccessible` | MailApp quota call — soft-fail if `script.send_mail` scope not authorized |
+| `test_emailsend_webAppUrlResolvable` | ScriptApp.getService().getUrl() null → broken sign-in links |
+| `test_emailsend_scriptPropertiesWritable` | PropertiesService R/W — fails = token storage broken, all auth fails |
+| `test_emailsend_cacheServiceWritable` | CacheService R/W — fails = rate limiting & sheet cache broken |
+| `test_emailsend_authModuleExists` | Auth IIFE missing from dist → all magic link auth silently broken |
+| `test_emailsend_globalWrappersExist` | google.script.run target functions missing → client-side failure |
+| `test_emailsend_rateLimitKeyFormat` | Rate limit key malformed → rate limiting bypassed silently |
+| `test_emailsend_tokenPrefixNotConflicting` | Token type bleeding (session vs magic link) |
+| `test_emailsend_sendMagicLinkBadEmailReturnsSafe` | Enumeration defense + full code path smoke test (no email sent) |
+
+**`scope-change-guard` CI job:**
+- Runs on every push to `Main`
+- Diffs `appsscript.json` against previous commit
+- If scopes were ADDED: **fails the build** with re-authorization instructions in GitHub Actions summary
+- If scopes were REMOVED: warns but passes
+- Uses `python3` to parse JSON (no external deps)
+
+**Key rule encoded in CLAUDE.md (Rule 7):**
+> Adding a scope to `appsscript.json` REQUIRES re-authorization of the deployed web app.
+> GAS does NOT auto-authorize new scopes in existing deployments.
+
+---
+
+## Comprehensive Code Audit — 2026-03-10
+
+### Audit Summary
+- **Scope**: Full codebase audit of 93,305 lines across 43 source files
+- **Version**: v4.25.7
+- **Result**: 1 critical bug, 4 high-severity, 5 medium-severity findings
+
+### Critical Bug Found
+- `03_UIComponents.gs:120` — Menu item calls `wtArchiveOldData_` but function is `wtArchiveOldData` (no underscore)
+
+### Key Metrics
+- 1,380 global functions, 109 frontend→backend calls (100% wired)
+- 41 test suites, 2,446 tests passing
+- 58/60 data functions have auth gates (2 are safe stubs)
+- 0 eval() calls, 0 script ID leaks, 0 npm vulnerabilities
+- 202 potentially unused functions (~14.6% dead code)
+- 12 source files have no dedicated test coverage
+- 7 hardcoded sheet name strings violate dynamic config rules
+- package.json version (4.25.2) mismatches COMMAND_CONFIG.VERSION (4.25.7)
+
+### Hardcoded Values Found
+- `06_Maintenance.gs:3365` — `'_Archive_Grievances'`
+- `21_WebDashDataService.gs:568,575,642,649` — Fallback sheet name strings
+- `21_WebDashDataService.gs:1525,3000` — `'Contact Log'`
+- `08a_SheetSetup.gs:373-374`, `21_WebDashDataService.gs:1685-1686` — Column indices 11, 12
+- `10b_SurveyDocSheets.gs:1992,2007` — `system@massability.org`
+
+### See
+- `COMPREHENSIVE_CODE_AUDIT.md` for the full report with all findings, evidence, and recommendations.
+
+---
+
+## 🔍 COMPREHENSIVE AUDIT LOG — 2026-03-10
+
+**Audit version:** v4.25.7 | **Audit type:** Full codebase review
+**Full report:** `COMPREHENSIVE_AUDIT_2026-03-10.md`
+
+### Key Findings Summary
+- ✅ 117/117 HTML→GS server function wires verified
+- ✅ 60/60 data endpoints authenticated
+- ✅ 0 duplicate function names
+- ✅ src/dist parity perfect
+- ✅ DDS Script ID absent from source
+- ⚠️ 142 orphaned/dead functions identified
+- ⚠️ 32 getSheetByName calls without null guard
+- ⚠️ 5 data-write functions without lock protection
+- ⚠️ 7 hardcoded values violating dynamic-config rule
+- ⚠️ 14 source files without test coverage (14,853 lines)
+- ⚠️ 965 KB total HTML payload
+- ⚠️ 30+ @deprecated functions still shipping
+
+### Hardcoded Values Found
+1. `06_Maintenance.gs:3365` — `'_Archive_Grievances'` (needs SHEETS constant)
+2. `21_WebDashDataService.gs:568,575,642,649` — fallback sheet name strings
+3. `21_WebDashDataService.gs:1525,3000` — `'Contact Log'` hardcoded
+4. `10b_SurveyDocSheets.gs:1992,2007` — `'system@massability.org'`
+
+### Data Functions Missing Lock Protection
+1. `syncMemberGrievanceData()` — 02_DataManagers.gs:338
+2. `updateMemberDataBatch()` — 02_DataManagers.gs:951
+3. `addWebAppResource()` — 05_Integrations.gs:4011
+4. `updateWebAppResource()` — 05_Integrations.gs:4076
+5. `deleteWebAppResource()` — 05_Integrations.gs:4118
+
+### Files Without Test Coverage
+04a_UIMenus, 04b_AccessibilityFeatures, 04c_InteractiveDashboard, 04d_ExecutiveDashboard, 08a_SheetSetup, 08b_SearchAndCharts, 08c_FormsAndNotifications, 08d_AuditAndFormulas, 08e_SurveyEngine, 10a_SheetCreation, 10b_SurveyDocSheets, 10c_FormHandlers, 29_Migrations, 30_TestRunner
+
+### Fixes Applied — 2026-03-11
+
+| ID | Fix | File(s) |
+|----|-----|---------|
+| C-1 | Menu wiring `wtArchiveOldData_` → `wtArchiveOldData` | `03_UIComponents.gs:120` |
+| C-2a | `'_Archive_Grievances'` → `HIDDEN_SHEETS.ARCHIVE_GRIEVANCES` | `06_Maintenance.gs:3211,3365` |
+| C-2b | Added `ARCHIVE_GRIEVANCES` to HIDDEN_SHEETS constant | `01_Core.gs:914` |
+| C-2c | Removed redundant `'Grievance Log'` / `'Member Directory'` fallbacks | `21_WebDashDataService.gs:568,575,642,649` |
+| C-2d | `'Contact Log'` → `CONTACT_SHEET_TAB_` global constant | `21_WebDashDataService.gs:19,1435,1526,3001` |
+| C-3 | Hardcoded column indices 11/12 → named variables | `08a_SheetSetup.gs:373-374`, `21_WebDashDataService.gs:1685-1686` |
+| H-1 | `system@massability.org` → `getConfigValue_(CONFIG_COLS.MAIN_CONTACT_EMAIL)` | `10b_SurveyDocSheets.gs:1992,2007` |
+| H-2 | Added ⚠️ AUTH REQUIRED comment on poll stubs | `21_WebDashDataService.gs:3089-3093` |
+| M-5 | Synced `package.json` version to `4.25.7` (matches `COMMAND_CONFIG.VERSION`) | `package.json:3` |
+
+### Try/Catch Analysis Result
+All 13 "unmatched" try blocks are valid `try {} finally {}` patterns (no catch needed). Used for lock cleanup. No bug — no fix required.
+
+### Additional Fixes — 2026-03-11 (Batch 2)
+
+| ID | Fix | File(s) |
+|----|-----|---------|
+| M-2 | **REAL BUG**: `safeText()` was called 11x but never defined — added HTML escape function | `index.html` |
+| M-3 | Deprecated `SHEET_NAMES` alias, migrated 40 references across 6 files to `SHEETS.*` | `01_Core.gs`, `02_DataManagers.gs`, `05_Integrations.gs`, `06_Maintenance.gs`, `08b_SearchAndCharts.gs`, `08d_AuditAndFormulas.gs`, `10_Main.gs` |
+| M-4 | Added `LockService` guards to 6 unlocked write functions | `09_Dashboards.gs` (3), `16_DashboardEnhancements.gs` (3) |
+| EventBus | Wired `registerEventBusSubscribers()` into `onOpenDeferred_()` | `10_Main.gs` |
+
+### Test Coverage — 2026-03-11
+
+Added 12 new test files covering all previously untested source files:
+
+| Test File | Source File | Tests | Focus |
+|-----------|-------------|-------|-------|
+| `08c_FormsAndNotifications.test.js` | `08c_FormsAndNotifications.gs` | 46 | Form handlers, quarter calc, date parsing, survey columns |
+| `08d_AuditAndFormulas.test.js` | `08d_AuditAndFormulas.gs` | 45 | HMAC hashing, vault integrity, hidden sheet constants |
+| `10a_SheetCreation.test.js` | `10a_SheetCreation.gs` | 27 | Config/member/grievance columns, header maps |
+| `08a_SheetSetup.test.js` | `08a_SheetSetup.gs` | 22 | Contact log creation, sheet constants |
+| `04c_InteractiveDashboard.test.js` | `04c_InteractiveDashboard.gs` | 13 | Data retrieval, dropdown values |
+| `04d_ExecutiveDashboard.test.js` | `04d_ExecutiveDashboard.gs` | 22 | Function existence, stats retrieval |
+| `04a_UIMenus.test.js` | `04a_UIMenus.gs` | 14 | Visual control panel, multi-select HTML |
+| `10c_FormHandlers.test.js` | `10c_FormHandlers.gs` | 19 | Folder name sanitization, function existence |
+| `08e_SurveyEngine.test.js` | `08e_SurveyEngine.gs` | 23 | Survey period constants, function existence |
+| `04b_AccessibilityFeatures.test.js` | `04b_AccessibilityFeatures.gs` | 25 | CSV parsing, common styles, quick capture |
+| `10b_SurveyDocSheets.test.js` | `10b_SurveyDocSheets.gs` | 17 | Dynamic email verification, sheet constants |
+| `08b_SearchAndCharts.test.js` | `08b_SearchAndCharts.gs` | 23 | padRight, SHEET_NAMES migration verification |
+| `29_Migrations.test.js` | `29_Migrations.gs` | 1 | Function existence |
+
+Total: 54 test suites, 2,744 tests passing (previously 41 suites, 2,446 tests).

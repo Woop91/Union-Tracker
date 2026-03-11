@@ -886,8 +886,10 @@ var SHEETS = {
   FAILSAFE_CONFIG:    '_Failsafe_Config'      // hidden — digest/backup preferences
 };
 
-// SHEET_NAMES alias for backward compatibility
-// Some code references SHEET_NAMES instead of SHEETS
+/**
+ * @deprecated v4.25.7 — Use SHEETS directly. This alias exists only for backward
+ * compatibility and will be removed in a future major version.
+ */
 var SHEET_NAMES = SHEETS;
 
 /**
@@ -910,7 +912,8 @@ var HIDDEN_SHEETS = {
   CHECKLIST_CALC: '_Checklist_Calc',
   SURVEY_TRACKING: '_Survey_Tracking',
   SURVEY_VAULT: '_Survey_Vault',
-  SURVEY_PERIODS: '_Survey_Periods'
+  SURVEY_PERIODS: '_Survey_Periods',
+  ARCHIVE_GRIEVANCES: '_Archive_Grievances'
 };
 
 // ============================================================================

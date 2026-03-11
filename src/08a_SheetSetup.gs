@@ -370,11 +370,14 @@ function _ensureStewardTasksSheet(ss) {
     }
     var headers = sheet.getRange(1, 1, 1, stLastCol).getValues()[0];
     if (headers.length < 12 || String(headers[10]).trim() !== 'Assignee Type') {
-      sheet.getRange(1, 11).setValue('Assignee Type');
-      sheet.getRange(1, 12).setValue('Assigned By');
+      // Columns 11,12 are positions of Assignee Type / Assigned By in the 12-col schema above
+      var assigneeTypeCol = 11;
+      var assignedByCol   = 12;
+      sheet.getRange(1, assigneeTypeCol).setValue('Assignee Type');
+      sheet.getRange(1, assignedByCol).setValue('Assigned By');
       var lastRow = sheet.getLastRow();
       if (lastRow > 1) {
-        var fillRange = sheet.getRange(2, 11, lastRow - 1, 1);
+        var fillRange = sheet.getRange(2, assigneeTypeCol, lastRow - 1, 1);
         var fillValues = [];
         for (var i = 0; i < lastRow - 1; i++) fillValues.push(['steward']);
         fillRange.setValues(fillValues);

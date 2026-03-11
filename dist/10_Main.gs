@@ -120,6 +120,17 @@ function onOpenDeferred_() {
       console.log('Hidden sheet enforcement skipped: ' + hideError.message);
     }
 
+    // Initialize EventBus subscribers so the bus is ready for event routing.
+    // Note: onEdit() currently calls handlers directly. To fully migrate to
+    // EventBus routing, replace direct calls in onEdit() with emitEditEvent(e).
+    try {
+      if (typeof registerEventBusSubscribers === 'function') {
+        registerEventBusSubscribers();
+      }
+    } catch (busError) {
+      console.log('EventBus registration skipped: ' + busError.message);
+    }
+
     ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
   } catch (deferredErr) {
     Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
@@ -1737,7 +1748,7 @@ function getVersionInfo() {
 function updateGrievance(grievanceId, updates) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
     const data = sheet.getDataRange().getValues();
 
     let rowIndex = -1;
@@ -1991,7 +2002,7 @@ function showNewMemberDialog() {
 function addNewMember(memberData) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+    const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
     if (!sheet) {
       return errorResponse('Member Directory sheet not found');
@@ -2050,7 +2061,7 @@ function addNewMember(memberData) {
  */
 function startGrievanceForMember() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.MEMBER_DIRECTORY) {
+  if (sheet.getName() !== SHEETS.MEMBER_DIRECTORY) {
     showAlert('Please select a member in the Member Directory', 'Wrong Sheet');
     return;
   }
@@ -2166,7 +2177,7 @@ Jane,Smith,EMP002,HR,Manager,jane@example.com,555-5678"></textarea>
  */
 function importMembersFromText(text) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2312,7 +2323,7 @@ function exportMemberDirectory(format) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2461,7 +2472,7 @@ function showFindMemberDialog() {
  */
 function searchMembersForDialog(term) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2502,7 +2513,7 @@ function searchMembersForDialog(term) {
  */
 function navigateToMemberRow(row) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (sheet) {
     sheet.activate();

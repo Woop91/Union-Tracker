@@ -1,6 +1,6 @@
 {
   "name": "union-steward-dashboard",
-  "version": "4.25.2",
+  "version": "4.25.7",
   "description": "Modular Union Steward Dashboard for Google Sheets",
   "main": "build.js",
   "scripts": {
@@ -16,9 +16,11 @@
     "clean": "node build.js --clean",
     "test:guards": "jest test/deploy-guards.test.js test/spa-integrity.test.js --verbose --no-coverage",
     "deploy": "npm run lint && npm run test:guards && npm run test:unit && npm run build:prod && clasp push",
+    "deploy:dev": "npm run lint && npm run build && clasp push --force",
     "open": "clasp open",
     "prepare": "husky",
-    "sync-org-chart": "node scripts/sync-org-chart.js"
+    "sync-org-chart": "node scripts/sync-org-chart.js",
+    "check:scopes": "node scripts/check-scope-change.js"
   },
   "keywords": [
     "google-apps-script",

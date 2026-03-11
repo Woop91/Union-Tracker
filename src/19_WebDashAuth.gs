@@ -4,7 +4,12 @@
  *
  * Two auth paths:
  *   1. Google SSO — Session.getActiveUser().getEmail()
- *   2. Magic Link — email-based token sent via MailApp
+ *   2. Magic Link — email-based token sent via GmailApp (primary) / MailApp (fallback)
+ *
+ * SCOPE NOTE: Uses GmailApp.sendEmail() (gmail.send scope) as primary sender.
+ * MailApp.sendEmail() (script.send_mail scope) is kept as fallback.
+ * If both fail, the deployed web app may need re-authorization — run
+ * testAuthEmailSend() from the Apps Script editor to diagnose.
  *
  * Token storage: ScriptProperties (server-side)
  * Client persistence: localStorage token (acts as "cookie")
@@ -82,17 +87,28 @@ var Auth = (function () {
     cache.put(rateKey, String(count + 1), 900);
 
     // Validate email exists in directory
+    Logger.log('Auth.sendMagicLink STEP 0: looking up ' + email + ' in Member Directory');
     var userRecord = DataService.findUserByEmail(email);
     if (!userRecord) {
+      Logger.log('Auth.sendMagicLink: email not found in directory — returning generic message');
       // Don't reveal whether email exists — security best practice
       // Simulate processing time to prevent timing-based enumeration
       Utilities.sleep(500 + Math.floor(Math.random() * 500));
       return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
     }
 
+    Logger.log('Auth.sendMagicLink STEP 1: user found, building token for ' + email);
     var config = ConfigReader.getConfig();
+
+    Logger.log('Auth.sendMagicLink STEP 2: config loaded, orgName=' + config.orgName);
     var token = _generateMagicToken(email);
+
+    Logger.log('Auth.sendMagicLink STEP 3: token generated, fetching web app URL');
     var webAppUrl = ScriptApp.getService().getUrl();
+    if (!webAppUrl) {
+      Logger.log('Auth.sendMagicLink ERROR: ScriptApp.getService().getUrl() returned null — is this script deployed as a web app?');
+      return { success: false, message: 'Web app URL could not be resolved. Please contact your administrator.' };
+    }
 
     var linkParams = '?token=' + encodeURIComponent(token);
     if (rememberMe) {
@@ -104,32 +120,56 @@ var Auth = (function () {
     var subject = 'Sign in to ' + config.orgName + ' Dashboard';
     var htmlBody = _buildEmailHtml(config, signInUrl, email);
 
-    // Check remaining email quota before attempting to send
-    try {
-      var remaining = MailApp.getRemainingDailyQuota();
-      if (remaining <= 0) {
-        Logger.log('Auth: Daily email quota exhausted');
-        return { success: false, message: 'Email quota reached for today. Please use Google Sign-In or try again tomorrow.' };
-      }
-    } catch (_quotaErr) {
-      // If quota check fails, proceed with send attempt anyway
-    }
+    Logger.log('Auth.sendMagicLink STEP 4: attempting email send to ' + email);
+
+    // PRIMARY: GmailApp (uses gmail.send scope — authorized in web app deployment)
+    // FALLBACK: MailApp (uses script.send_mail scope — requires separate re-auth)
+    // Reason: gmail.send was in appsscript.json long before script.send_mail was added
+    // (v4.24.9). If the deployment wasn't re-authorized after v4.24.9, MailApp throws.
+    // GmailApp uses the pre-existing gmail.send scope and avoids that auth gap.
+    var sendError = null;
 
     try {
+      GmailApp.sendEmail(email, subject, '', {
+        htmlBody: htmlBody,
+        name: config.orgName + ' Dashboard',
+        noReply: false,
+      });
+      Logger.log('Auth.sendMagicLink STEP 5: GmailApp send succeeded');
+      return { success: true, message: 'Sign-in link sent to ' + email };
+    } catch (gmailErr) {
+      Logger.log('Auth.sendMagicLink GmailApp FAILED: ' + gmailErr.message + ' — trying MailApp fallback');
+      sendError = gmailErr;
+    }
+
+    // Fallback: MailApp (works if script.send_mail scope is authorized in deployment)
+    try {
+      // Quota guard — MailApp has a daily limit
+      var remaining = 0;
+      try { remaining = MailApp.getRemainingDailyQuota(); } catch (_q) { remaining = 1; }
+      if (remaining <= 0) {
+        Logger.log('Auth.sendMagicLink: MailApp quota exhausted');
+        return { success: false, message: 'Email quota reached for today. Please use Google Sign-In or try again tomorrow.' };
+      }
+
       MailApp.sendEmail({
         to: email,
         subject: subject,
         htmlBody: htmlBody,
         noReply: true,
       });
-
+      Logger.log('Auth.sendMagicLink STEP 5: MailApp fallback send succeeded');
       return { success: true, message: 'Sign-in link sent to ' + email };
-    } catch (err) {
-      Logger.log('Auth: Failed to send magic link to ' + email + ': ' + err.message);
-      var msg = 'Failed to send email. ';
-      if (err.message && err.message.indexOf('quota') >= 0) {
+    } catch (mailErr) {
+      Logger.log('Auth.sendMagicLink BOTH senders FAILED. GmailApp: ' + sendError.message + ' | MailApp: ' + mailErr.message);
+
+      var msg = 'Failed to send sign-in link. ';
+      var combinedMsg = (sendError.message || '') + ' ' + (mailErr.message || '');
+      if (combinedMsg.indexOf('quota') >= 0) {
         msg += 'Email quota exhausted. Please use Google Sign-In.';
-      } else if (err.message && err.message.indexOf('invalid') >= 0) {
+      } else if (combinedMsg.indexOf('authorization') >= 0 || combinedMsg.indexOf('Permission') >= 0 || combinedMsg.indexOf('auth') >= 0) {
+        msg += 'Email authorization error — the web app may need to be re-deployed. Please use Google Sign-In.';
+      } else if (combinedMsg.indexOf('invalid') >= 0) {
         msg += 'The email address may be invalid. Please check and try again.';
       } else {
         msg += 'Please try again or use Google Sign-In.';
@@ -373,6 +413,46 @@ function authLogout(sessionToken) {
  */
 function authCleanupExpiredTokens() {
   return Auth.cleanupExpiredTokens();
+}
+
+/**
+ * DIAGNOSTIC: Test email sending for the magic link flow.
+ * Run this from the Apps Script editor to verify GmailApp and MailApp work.
+ * Reports which sender succeeded, which failed, and why.
+ * Does NOT store a token — the email is sent but the link will not work.
+ *
+ * Usage: Open Apps Script editor → Select function → Run testAuthEmailSend
+ * @param {string} [testEmail] - Override destination (default: script owner)
+ */
+function testAuthEmailSend(testEmail) {
+  var to = testEmail || Session.getEffectiveUser().getEmail();
+  var subject = '[DDS-Dashboard] Magic Link Email Test';
+  var htmlBody = '<p>This is a test of the magic link email system.</p>'
+    + '<p>If you received this, email sending is working correctly.</p>'
+    + '<p>Sent at: ' + new Date().toISOString() + '</p>';
+
+  var results = { to: to, gmail: null, mailapp: null };
+
+  try {
+    GmailApp.sendEmail(to, subject + ' (GmailApp)', '', { htmlBody: htmlBody, name: 'DDS-Dashboard Test' });
+    results.gmail = 'SUCCESS';
+    Logger.log('testAuthEmailSend: GmailApp → SUCCESS');
+  } catch (e) {
+    results.gmail = 'FAILED: ' + e.message;
+    Logger.log('testAuthEmailSend: GmailApp → FAILED: ' + e.message);
+  }
+
+  try {
+    MailApp.sendEmail({ to: to, subject: subject + ' (MailApp)', htmlBody: htmlBody, noReply: true });
+    results.mailapp = 'SUCCESS';
+    Logger.log('testAuthEmailSend: MailApp → SUCCESS');
+  } catch (e) {
+    results.mailapp = 'FAILED: ' + e.message;
+    Logger.log('testAuthEmailSend: MailApp → FAILED: ' + e.message);
+  }
+
+  Logger.log('testAuthEmailSend results: ' + JSON.stringify(results));
+  return results;
 }
 
 /**

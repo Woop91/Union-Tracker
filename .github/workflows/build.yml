@@ -154,3 +154,77 @@ jobs:
 
           DEPRECATED_COUNT=$(grep -r "DEPRECATED" src/*.gs | wc -l || echo "0")
           echo "- **DEPRECATED markers**: $DEPRECATED_COUNT" >> $GITHUB_STEP_SUMMARY
+
+  scope-change-guard:
+    name: OAuth Scope Change Detection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/Main' || github.ref == 'refs/heads/master')
+
+    steps:
+      - name: Checkout current commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Detect appsscript.json scope changes
+        run: |
+          echo "## OAuth Scope Change Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          CHANGED=$(git diff HEAD~1 HEAD --name-only | grep "appsscript.json" || true)
+
+          if [ -z "$CHANGED" ]; then
+            echo "✅ **appsscript.json was not modified** — no re-authorization required." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "⚠️ **appsscript.json WAS MODIFIED in this commit.**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          OLD_SCOPES=$(git show HEAD~1:appsscript.json | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for s in data.get('oauthScopes', []):
+            print(s)
+          " 2>/dev/null || echo "(none)")
+
+          NEW_SCOPES=$(cat appsscript.json | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for s in data.get('oauthScopes', []):
+            print(s)
+          " 2>/dev/null || echo "(none)")
+
+          ADDED=$(comm -13 <(echo "$OLD_SCOPES" | sort) <(echo "$NEW_SCOPES" | sort))
+          REMOVED=$(comm -23 <(echo "$OLD_SCOPES" | sort) <(echo "$NEW_SCOPES" | sort))
+
+          if [ -n "$ADDED" ]; then
+            echo "### 🔴 Scopes ADDED (require re-authorization of deployed web app):" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$ADDED" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ⚡ ACTION REQUIRED:" >> $GITHUB_STEP_SUMMARY
+            echo "1. After deploying (\`clasp push\`), go to **Apps Script editor → Deploy → Manage Deployments**" >> $GITHUB_STEP_SUMMARY
+            echo "2. Create a **new deployment version**" >> $GITHUB_STEP_SUMMARY
+            echo "3. Click through the authorization prompt and **authorize all scopes**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Why:** GAS web app deployments cache authorized scopes at deploy time." >> $GITHUB_STEP_SUMMARY
+            echo "Adding a scope to appsscript.json does NOT auto-authorize the live deployment." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Test after re-auth:** Run the \`emailsend\` suite in the TestRunner tab." >> $GITHUB_STEP_SUMMARY
+            echo ""
+            echo "ERROR: OAuth scopes added — re-authorization of deployed web app required."
+            exit 1
+          fi
+
+          if [ -n "$REMOVED" ]; then
+            echo "### 🟡 Scopes REMOVED (no re-authorization needed):" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$REMOVED" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -z "$ADDED" ] && [ -z "$REMOVED" ]; then
+            echo "✅ appsscript.json changed but **oauthScopes list was not modified**." >> $GITHUB_STEP_SUMMARY
+          fi

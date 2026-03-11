@@ -824,7 +824,7 @@ function batchCreateAllMissingFolders() {
  */
 function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEET_NAMES.GRIEVANCE_TRACKER
+  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEETS.GRIEVANCE_TRACKER
   const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   // H-05: Null check after getSheetByName
@@ -848,7 +848,7 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
  */
 function openGrievanceFolder() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEET_NAMES.GRIEVANCE_TRACKER
+  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEETS.GRIEVANCE_TRACKER
   if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
     showAlert('Please select a grievance in the Grievance Tracker', 'Wrong Sheet');
     return;
