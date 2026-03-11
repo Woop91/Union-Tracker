@@ -222,10 +222,9 @@ describe('emitEditEvent', () => {
 
   test('emits sheet:edit:KEY for known sheet names', () => {
     const handler = jest.fn();
-    // SHEETS.GRIEVANCE_TRACKER has same value as SHEETS.GRIEVANCE_LOG ('Grievance Log')
-    // but comes later in SHEETS, so it overwrites GRIEVANCE_LOG in the reverse sheetKeyMap.
-    // The emitted event is therefore 'sheet:edit:GRIEVANCE_TRACKER'.
-    EventBus.on('sheet:edit:GRIEVANCE_TRACKER', handler);
+    // GRIEVANCE_TRACKER alias removed in v4.25.9 (FIX-CORE-02).
+    // emitEditEvent maps 'Grievance Log' -> GRIEVANCE_LOG key.
+    EventBus.on('sheet:edit:GRIEVANCE_LOG', handler);
 
     const mockRange = {
       getSheet: () => ({ getName: () => SHEETS.GRIEVANCE_LOG })
