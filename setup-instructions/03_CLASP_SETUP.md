@@ -27,7 +27,7 @@ This guide assumes you have **zero command-line experience**. Every step is expl
 Before starting, make sure you have:
 
 - A **Google account** (the one you want the dashboard attached to)
-- This repository cloned to your computer (you should already have the `DDS-Dashboard` folder)
+- This repository cloned to your computer (you should already have the `Union-Tracker` folder)
 - An internet connection
 
 ---
@@ -80,13 +80,13 @@ The terminal is where you type commands. Here's how to open it on each operating
 Once your terminal is open, you need to navigate to the repository folder. Type:
 
 ```bash
-cd path/to/DDS-Dashboard
+cd path/to/Union-Tracker
 ```
 
 Replace `path/to/` with the actual location. For example:
 
-- **macOS/Linux:** `cd ~/Documents/DDS-Dashboard`
-- **Windows:** `cd C:\Users\YourName\Documents\DDS-Dashboard`
+- **macOS/Linux:** `cd ~/Documents/Union-Tracker`
+- **Windows:** `cd C:\Users\YourName\Documents\Union-Tracker`
 
 > **Tip:** You can type `cd ` (with a space after it) and then drag the folder from your file explorer into the terminal window. It will paste the full path for you.
 
@@ -186,7 +186,7 @@ cp .clasp.json.example .clasp.json
 
 7. Save the file.
 
-> **Important:** The `rootDir` is set to `./dist` because the build process consolidates all 27 source files into `dist/ConsolidatedDashboard.gs`. Clasp pushes whatever is in `rootDir`.
+> **Important:** The `rootDir` is set to `./dist` because the build process copies individual `.gs` and `.html` source files into `dist/`. Clasp pushes whatever is in `rootDir`.
 
 ---
 
@@ -200,7 +200,7 @@ Now you're ready to send your code to Google. There are two approaches:
 npm run build && npx clasp push
 ```
 
-This runs the build script to consolidate all 27 source files into `dist/ConsolidatedDashboard.gs`, then pushes it to your Apps Script project.
+This runs the build script to copy individual `.gs` and `.html` files into `dist/`, then pushes them to your Apps Script project.
 
 ### Full Deploy (lint + test + build + push)
 
@@ -263,7 +263,7 @@ Make your changes in the `src/` directory files using any text editor or IDE.
 npm test
 ```
 
-This runs linting, builds the consolidated file, and runs 950+ unit tests.
+This runs linting, builds the multi-file output, and runs 1300+ unit tests.
 
 ### Push changes to Google
 
@@ -307,7 +307,7 @@ npx clasp logs
 | `npx clasp status` | Show which files will be pushed |
 | `npx clasp versions` | List deployed versions |
 | `npx clasp deploy` | Create a versioned deployment |
-| `npm run build` | Build the consolidated file from source |
+| `npm run build` | Copy source files to dist/ for deployment |
 | `npm run deploy` | Full pipeline: lint + test + build + push |
 | `npm test` | Run linting, build, and all unit tests |
 
@@ -345,7 +345,7 @@ This is normal. Type `y` and press Enter to proceed with the push.
 
 ### Files look different after pull
 
-Remember that `clasp push` sends the consolidated `dist/ConsolidatedDashboard.gs` file (one big file), not the individual 27 source files. If you pull, you'll get that consolidated version back. Always make edits in `src/` and use `npm run build` to regenerate `dist/`.
+Remember that `clasp push` sends the individual files from `dist/` (`.gs` + `.html`). If you pull, you'll get those files back. Always make edits in `src/` and use `npm run build` to regenerate `dist/`.
 
 ---
 
@@ -355,7 +355,7 @@ The complete setup from scratch in six commands:
 
 ```bash
 # 1. Navigate to the project
-cd path/to/DDS-Dashboard
+cd path/to/Union-Tracker
 
 # 2. Install dependencies (includes clasp)
 npm install
@@ -366,7 +366,7 @@ npx clasp login
 # 4. Create a new Sheet + Apps Script project
 npx clasp create --type sheets --title "Union Steward Dashboard"
 
-# 5. Build the consolidated source file
+# 5. Build the source files
 npm run build
 
 # 6. Push to Google

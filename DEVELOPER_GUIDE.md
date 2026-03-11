@@ -63,8 +63,9 @@ The codebase follows a layered architecture with 42 modules organized by numbere
         ▼                     ▼                      ▼
 ┌───────────────┐   ┌────────────────┐   ┌────────────────────┐
 │  UI Layer     │   │  Data Layer    │   │  Services/Features  │
-│  03/04a-e     │   │  02/08a-d/10*  │   │  05/06/09/11-14    │
-└───────────────┘   └────────────────┘   └────────────────────┘
+│  03/04a-e     │   │  02/08a-e/10*  │   │  05/06/09/11-14    │
+└───────────────┘   └────────────────┘   │  15-17/19-25/26-29 │
+        │                     │          └────────────────────┘
         │                     │                      │
         └─────────────────────┼──────────────────────┘
                               ▼
@@ -107,7 +108,12 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 | `08b_SearchAndCharts.gs` | Search functions, chart generation | `desktopSearch`, `buildChart` |
 | `08c_FormsAndNotifications.gs` | Form handling, notifications, deadline alerts | `sendDeadlineAlerts`, `processFormSubmission` |
 | `08d_AuditAndFormulas.gs` | Audit log, formula sync, hidden calc sheets | `logAuditEntry`, `setupCalcFormulasSheet` |
-| `08e_SurveyEngine.gs` | Dynamic survey schema engine (Option B) | `buildSurveyForm`, `processSurveySubmission` |
+
+### Sheet Utilities
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `08e_SurveyEngine.gs` | Dynamic survey schema engine | `buildSurveyFromConfig`, `processSurveyResponse` |
 
 ### UI Modules
 
