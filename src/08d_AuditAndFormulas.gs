@@ -1166,7 +1166,7 @@ function setupCalcMembersSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcGrievancesSheet(sheet) {
-  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
+  const grievanceSheetName = SHEETS.GRIEVANCE_LOG;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
@@ -1243,7 +1243,7 @@ function setupCalcGrievancesSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcDeadlinesSheet(sheet) {
-  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
+  const grievanceSheetName = SHEETS.GRIEVANCE_LOG;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var gIdCol = getColumnLetter(GRIEVANCE_COLS.GRIEVANCE_ID);
@@ -1329,7 +1329,7 @@ function setupCalcDeadlinesSheet(sheet) {
  */
 function setupCalcStatsSheet(sheet) {
   const memberSheetName = SHEETS.MEMBER_DIRECTORY;
-  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
+  const grievanceSheetName = SHEETS.GRIEVANCE_LOG;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
@@ -1416,7 +1416,7 @@ function setupCalcStatsSheet(sheet) {
  */
 function setupCalcSyncSheet(sheet) {
   const memberSheetName = SHEETS.MEMBER_DIRECTORY;
-  const grievanceSheetName = SHEETS.GRIEVANCE_TRACKER;
+  const grievanceSheetName = SHEETS.GRIEVANCE_LOG;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);

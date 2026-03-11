@@ -482,3 +482,127 @@ describe('G14: Member list items have click affordance', () => {
     expect(stewardCode).toMatch(/_toggleMemberDetail\(container,\s*item,\s*m\)/);
   });
 });
+
+
+// ============================================================================
+// G15: BOTTOM NAV TAB IDs HAVE ROUTE HANDLERS
+// ============================================================================
+// Bug (2026-03-11): renderBottomNav member tabs had id:'contact' but
+// _handleTabNav only handled case 'stewarddirectory'. Unknown IDs fell through
+// to default (renderMemberHome), silently sending the user back to home on
+// every Contact tab click. G8 only checked sidebar tabs — not bottom nav tabs.
+// This guard catches the same class of mismatch for bottom nav specifically.
+
+describe('G15: Bottom nav tab IDs have route handlers', () => {
+  const stewardCode = read('steward_view.html');
+  const indexCode   = read('index.html');
+
+  // Extract tab IDs from renderBottomNav (both steward and member arrays)
+  function extractBottomNavIds(code) {
+    const funcStart = code.indexOf('function renderBottomNav');
+    if (funcStart === -1) return [];
+    let depth = 0, started = false, block = '';
+    for (let i = funcStart; i < code.length; i++) {
+      if (code[i] === '{') { depth++; started = true; }
+      if (code[i] === '}') depth--;
+      if (started) block += code[i];
+      if (started && depth === 0) break;
+    }
+    return [...block.matchAll(/id:\s*'([^']+)'/g)].map(m => m[1]);
+  }
+
+  // Extract all handled tab IDs from _handleTabNav
+  function extractHandledIds(code) {
+    const handled = new Set();
+    // Shared if-checks (e.g. if (tabId === 'orgchart'))
+    for (const m of code.matchAll(/if\s*\(tabId\s*===\s*'([^']+)'\)/g)) handled.add(m[1]);
+    // Switch case labels
+    for (const m of code.matchAll(/case\s*'([^']+)':/g)) handled.add(m[1]);
+    // Special internal IDs: More menus trigger by their internal name
+    handled.add('_member_more');
+    handled.add('_steward_more');
+    // 'more' and 'more_steward' are translated inside renderBottomNav onClick
+    // before _handleTabNav is called — they are not routed directly
+    handled.add('more');
+    handled.add('more_steward');
+    return handled;
+  }
+
+  const bottomNavIds = extractBottomNavIds(stewardCode);
+  const handledIds   = extractHandledIds(indexCode);
+
+  test('all bottom nav tab IDs have route handlers in _handleTabNav', () => {
+    // 'more' / 'more_steward' are UI-only sentinels — translated to
+    // '_member_more' / '_steward_more' before _handleTabNav is called.
+    // Everything else must have an explicit handler.
+    const sentinels = new Set(['more', 'more_steward']);
+    const unhandled = bottomNavIds.filter(id => !sentinels.has(id) && !handledIds.has(id));
+    if (unhandled.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn('Bottom nav tab IDs with no route handler:', unhandled);
+    }
+    expect(unhandled).toEqual([]);
+  });
+
+  test('no duplicate tab IDs in bottom nav', () => {
+    const seen = new Set();
+    const dupes = [];
+    for (const id of bottomNavIds) {
+      if (seen.has(id) && !['cases'].includes(id)) dupes.push(id); // 'cases' appears once per role array — OK
+      seen.add(id);
+    }
+    expect(dupes).toEqual([]);
+  });
+});
+
+
+// ============================================================================
+// G16: renderPageLayout ALWAYS RENDERS BOTH SIDEBAR AND BOTTOM NAV
+// ============================================================================
+// Bug (2026-03-11): renderPageLayout used an if/else branch driven by
+// isSidebarLayout() (JS viewport detection). If JS picked the wrong branch,
+// ZERO nav was rendered into the DOM — user had no navigation at all.
+// Fix: always add both sidebar-nav and bottom-nav; CSS controls visibility.
+// This guard prevents a revert to the conditional pattern.
+
+describe('G16: renderPageLayout always renders both sidebar and bottom nav', () => {
+  const indexCode = read('index.html');
+
+  // Extract renderPageLayout function body
+  function extractRenderPageLayout(code) {
+    const funcStart = code.indexOf('function renderPageLayout(');
+    if (funcStart === -1) return '';
+    let depth = 0, started = false, block = '';
+    for (let i = funcStart; i < code.length; i++) {
+      if (code[i] === '{') { depth++; started = true; }
+      if (code[i] === '}') depth--;
+      if (started) block += code[i];
+      if (started && depth === 0) break;
+    }
+    return block;
+  }
+
+  const body = extractRenderPageLayout(indexCode);
+
+  test('renderPageLayout calls renderSidebarItems unconditionally', () => {
+    expect(body).toContain('renderSidebarItems(');
+    // Must NOT be inside an if (isSidebarLayout()) conditional
+    // Simple check: renderSidebarItems must appear without a preceding isSidebarLayout guard
+    const guardedPattern = /if\s*\(\s*isSidebarLayout\(\)\s*\)[\s\S]*?renderSidebarItems/;
+    expect(guardedPattern.test(body)).toBe(false);
+  });
+
+  test('renderPageLayout calls renderBottomNav unconditionally', () => {
+    expect(body).toContain('renderBottomNav(');
+    // Must NOT be inside an else block tied to isSidebarLayout
+    const guardedPattern = /else\s*\{[\s\S]*?renderBottomNav/;
+    expect(guardedPattern.test(body)).toBe(false);
+  });
+
+  test('renderPageLayout does not use if/else to choose between navs', () => {
+    // The old bug: if (isSidebarLayout()) { sidebar only } else { bottomNav only }
+    // This pattern should no longer exist
+    const branchPattern = /if\s*\(\s*isSidebarLayout\(\)\s*\)\s*\{[\s\S]*?\}\s*else\s*\{/;
+    expect(branchPattern.test(body)).toBe(false);
+  });
+});

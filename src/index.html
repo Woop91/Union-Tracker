@@ -518,22 +518,24 @@
      */
     function renderPageLayout(container, role, activeTab, contentFn) {
       container.innerHTML = '';
-      getLayoutMode();
+      getLayoutMode(); // keep LayoutState current for other callers (e.g. isSidebarLayout in headers)
 
-      if (isSidebarLayout()) {
-        var layout = el('div', { className: 'page-layout' });
-        var sidebar = el('nav', { className: 'sidebar-nav' });
-        renderSidebarItems(sidebar, role, activeTab);
-        layout.appendChild(sidebar);
+      // Always render both sidebar and bottom nav — CSS media queries control which is visible.
+      // Previously a JS conditional chose one or the other; if isSidebarLayout() was wrong,
+      // NO nav rendered at all. CSS-driven visibility is always accurate regardless of
+      // viewport detection timing or GAS iframe context.
+      var layout = el('div', { className: 'page-layout' });
+      var sidebar = el('nav', { className: 'sidebar-nav' });
+      renderSidebarItems(sidebar, role, activeTab);
+      layout.appendChild(sidebar);
 
-        var content = el('div', { className: 'page-layout-content' });
-        contentFn(content);
-        layout.appendChild(content);
-        container.appendChild(layout);
-      } else {
-        contentFn(container);
-        renderBottomNav(container, role, activeTab);
-      }
+      var content = el('div', { className: 'page-layout-content' });
+      contentFn(content);
+      layout.appendChild(content);
+      container.appendChild(layout);
+
+      // Bottom nav always added to DOM; CSS hides it at tablet+ (min-width: 640px)
+      renderBottomNav(container, role, activeTab);
     }
 
     function renderSidebarItems(sidebar, role, activeTab) {

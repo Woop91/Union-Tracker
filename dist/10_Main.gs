@@ -835,12 +835,17 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
   // their OWN source dates already entered - those will recalculate from their own source.
   // We only cascade when downstream source dates are empty.
 
+  // FIX-MAIN-01: v4.25.8 — Read deadline days from getDeadlineRules() (Config sheet)
+  // instead of hardcoding. Uses addBusinessDays() for consistency with all other deadline
+  // calculations. Previously used raw * 86400000 ms math (calendar days, not business days).
+  var rules = getDeadlineRules();
+
   var deadlineChain = [
-    { calcCol: GRIEVANCE_COLS.FILING_DEADLINE, sourceCol: GRIEVANCE_COLS.INCIDENT_DATE, days: 21 },
-    { calcCol: GRIEVANCE_COLS.STEP1_DUE, sourceCol: GRIEVANCE_COLS.DATE_FILED, days: 30 },
-    { calcCol: GRIEVANCE_COLS.STEP2_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP1_RCVD, days: 10 },
-    { calcCol: GRIEVANCE_COLS.STEP2_DUE, sourceCol: GRIEVANCE_COLS.STEP2_APPEAL_FILED, days: 30 },
-    { calcCol: GRIEVANCE_COLS.STEP3_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP2_RCVD, days: 30 }
+    { calcCol: GRIEVANCE_COLS.FILING_DEADLINE,  sourceCol: GRIEVANCE_COLS.INCIDENT_DATE,       days: rules.FILING_DAYS },
+    { calcCol: GRIEVANCE_COLS.STEP1_DUE,        sourceCol: GRIEVANCE_COLS.DATE_FILED,           days: rules.STEP_1.DAYS_FOR_RESPONSE },
+    { calcCol: GRIEVANCE_COLS.STEP2_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP1_RCVD,          days: rules.STEP_2.DAYS_TO_APPEAL },
+    { calcCol: GRIEVANCE_COLS.STEP2_DUE,        sourceCol: GRIEVANCE_COLS.STEP2_APPEAL_FILED,  days: rules.STEP_2.DAYS_FOR_RESPONSE },
+    { calcCol: GRIEVANCE_COLS.STEP3_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP2_RCVD,          days: rules.STEP_3.DAYS_TO_APPEAL }
   ];
 
   // Find position of overridden column in the chain
@@ -864,7 +869,7 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
     // If the downstream step has its own source date, it will be calculated from that
     // source by syncGrievanceFormulasToLog — skip it.
     if (sourceValue instanceof Date) {
-      previousDate = new Date(sourceValue.getTime() + downstream.days * 86400000);
+      previousDate = addBusinessDays(sourceValue, downstream.days);
       continue;
     }
 
@@ -876,7 +881,7 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
       if (previousDate instanceof Date) continue;
     }
 
-    var newDeadline = new Date(previousDate.getTime() + downstream.days * 86400000);
+    var newDeadline = addBusinessDays(previousDate, downstream.days);
     sheet.getRange(row, downstream.calcCol).setValue(newDeadline);
     previousDate = newDeadline;
   }
@@ -1748,7 +1753,7 @@ function getVersionInfo() {
 function updateGrievance(grievanceId, updates) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
+    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
     const data = sheet.getDataRange().getValues();
 
     let rowIndex = -1;

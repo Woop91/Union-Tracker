@@ -46,8 +46,8 @@ function DIAGNOSE_SETUP() {
     DASHBOARD: true,           // @deprecated v4.3.2 - modal dashboards now
     REPORTS: true,             // Backward-compat alias for DASHBOARD
     TEST_RESULTS: true,        // Created on-demand by test framework only
-    GRIEVANCE_TRACKER: true,   // Backward-compat alias for GRIEVANCE_LOG
     MEMBER_DIRECTORY: true     // Backward-compat alias for MEMBER_DIR
+    // GRIEVANCE_TRACKER removed v4.25.9 - alias deleted, all callers use GRIEVANCE_LOG
   };
 
   var checkedValues = {};
@@ -98,7 +98,7 @@ function DIAGNOSE_SETUP() {
 
   // Check 4: Grievance Tracker structure
   results.checks.push('Verifying Grievance Tracker structure...');
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (grievanceSheet) {
     var gHeaders = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
     var requiredGHeaders = [
@@ -1766,8 +1766,8 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEETS.GRIEVANCE_TRACKER
-  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
+  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEETS.GRIEVANCE_LOG
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!sheet) {
     return errorResponse('Grievance Log/Tracker not found');
