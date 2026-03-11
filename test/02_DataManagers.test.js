@@ -477,7 +477,7 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
   });
 
   test('returns zeroed stats when sheet has only header row', () => {
-    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, [
+    const sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [
       ['Grievance ID', 'Member ID', 'First Name', 'Last Name', 'Status']
     ]);
     sheet.getLastRow.mockReturnValue(1);
@@ -514,7 +514,7 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
       makeRow(GRIEVANCE_STATUS.CLOSED, 'Other')
     ];
 
-    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    const sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     sheet.getLastRow.mockReturnValue(data.length);
     sheet.getDataRange.mockReturnValue({
       getValues: jest.fn(() => data),
@@ -553,7 +553,7 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
       makeRow(GRIEVANCE_STATUS.OPEN, 'Safety')
     ];
 
-    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    const sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     sheet.getLastRow.mockReturnValue(data.length);
     sheet.getDataRange.mockReturnValue({
       getValues: jest.fn(() => data),
@@ -789,7 +789,7 @@ describe('startNewGrievance', () => {
 
     const data = [headerRow, existingRow];
 
-    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    const sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     sheet.getDataRange.mockReturnValue({
       getValues: jest.fn(() => data),
       getRow: jest.fn(() => 1),
@@ -925,7 +925,7 @@ describe('resolveGrievance', () => {
       getSheet: jest.fn()
     };
 
-    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    const sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     sheet.getDataRange.mockReturnValue({
       getValues: jest.fn(() => data),
       getRow: jest.fn(() => 1),
@@ -1037,7 +1037,7 @@ describe('advanceGrievanceStep', () => {
       getSheet: jest.fn()
     };
 
-    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    const sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     sheet.getDataRange.mockReturnValue({
       getValues: jest.fn(() => data),
       getRow: jest.fn(() => 1),
