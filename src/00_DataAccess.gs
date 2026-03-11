@@ -87,9 +87,10 @@ var TIME_CONSTANTS = {
  */
 function withScriptLock_(fn, timeoutMs) {
   var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(timeoutMs || 10000);
-  } catch (_e) {
+  // GAS-01: Standardize on tryLock() to match 02_DataManagers.gs pattern.
+  // tryLock returns false immediately if lock unavailable (non-blocking);
+  // the timeout is the max wait, not a guaranteed sleep.
+  if (!lock.tryLock(timeoutMs || 10000)) {
     throw new Error('Could not acquire lock. Another operation is in progress. Please try again.');
   }
   try {

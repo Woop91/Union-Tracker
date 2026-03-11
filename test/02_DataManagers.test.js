@@ -207,6 +207,52 @@ describe('getDaysUntilDeadline', () => {
     const result = getDaysUntilDeadline(tomorrow);
     expect(result).toBe(1);
   });
+
+  // TEST-04: DST transition edge cases — verifies Math.round fix (was Math.ceil)
+  // Spring forward: clocks jump 2:00→3:00 AM, so a "day" is only 23 hours
+  // Fall back: clocks jump 2:00→1:00 AM, so a "day" is 25 hours
+  test('handles spring-forward DST transition (23-hour day)', () => {
+    // Simulate: deadline is 7 days after a spring-forward date
+    // On the spring-forward day, 7 calendar days = 7*24 - 1 = 167 hours
+    const now = new Date(2026, 2, 8, 10, 0, 0, 0); // Mar 8 2026 (day before spring forward)
+    const deadline = new Date(2026, 2, 15, 10, 0, 0, 0); // Mar 15 2026
+    jest.spyOn(Date, 'now').mockReturnValue(now.getTime());
+    // Override "new Date()" to return our mocked "now"
+    const origDate = global.Date;
+    const mockDate = function (...args) {
+      if (args.length === 0) return new origDate(now.getTime());
+      return new origDate(...args);
+    };
+    mockDate.now = () => now.getTime();
+    mockDate.prototype = origDate.prototype;
+    global.Date = mockDate;
+    try {
+      const result = getDaysUntilDeadline(deadline);
+      expect(result).toBe(7);
+    } finally {
+      global.Date = origDate;
+    }
+  });
+
+  test('handles fall-back DST transition (25-hour day)', () => {
+    // Nov 1 2026 is the fall-back date
+    const now = new Date(2026, 10, 1, 10, 0, 0, 0); // Nov 1 2026
+    const deadline = new Date(2026, 10, 8, 10, 0, 0, 0); // Nov 8 2026
+    const origDate = global.Date;
+    const mockDate = function (...args) {
+      if (args.length === 0) return new origDate(now.getTime());
+      return new origDate(...args);
+    };
+    mockDate.now = () => now.getTime();
+    mockDate.prototype = origDate.prototype;
+    global.Date = mockDate;
+    try {
+      const result = getDaysUntilDeadline(deadline);
+      expect(result).toBe(7);
+    } finally {
+      global.Date = origDate;
+    }
+  });
 });
 
 // ============================================================================

@@ -33,30 +33,21 @@
  * Sets up the custom menu, applies tab colors, and initializes the dashboard
  */
 function onOpen() {
+  // FIX v4.25.7: onOpen is a GAS simple trigger — ScriptApp.getProjectTriggers()
+  // requires authorization not available in simple triggers and throws silently.
+  // The prior approach also had a race condition: the finally block called
+  // cleanUpOnOpenTrigger_() synchronously, deleting the deferred trigger before
+  // the 1000ms elapsed, so onOpenDeferred_() never ran.
+  //
+  // Fix: onOpen does ONLY menu creation. onOpenDeferred_ is installed once as a
+  // standalone installable trigger via Admin → Triggers → Install All Survey Triggers
+  // (menuInstallSurveyTriggers), which is the correct GAS pattern.
   try {
     // Clear memoized caches so fresh config values are picked up
     if (typeof _systemNameCache_ !== 'undefined') _systemNameCache_ = null;
-
-    // Only menu creation runs synchronously — keep onOpen fast
     createDashboardMenu();
-
-    // F41: Defer heavy init to a 1-second timed trigger so the UI isn't blocked
-    try {
-      ScriptApp.newTrigger('onOpenDeferred_')
-        .timeBased()
-        .after(1000)
-        .create();
-    } catch (trigErr) {
-      // Installable trigger unavailable (e.g., simple trigger context) — run inline
-      console.log('Deferred trigger failed, running inline: ' + trigErr.message);
-      onOpenDeferred_();
-    }
-
   } catch (error) {
-    console.error('Error in onOpenDeferred_:', error);
-  } finally {
-    // Clean up the one-shot trigger so it does not accumulate
-    cleanUpOnOpenTrigger_();
+    console.error('Error in onOpen:', error);
   }
 }
 
@@ -100,33 +91,53 @@ function onOpenDeferred_() {
     return;
   }
 
+  // REL-04: Wrap entire deferred init in try/catch so trigger failures are logged
+  // and don't silently disappear (GAS only logs trigger errors to Stackdriver).
   try {
-    syncColumnMaps();
-  } catch (syncError) {
-    console.log('Column sync skipped: ' + syncError.message);
-  }
-
-  try {
-    ensureAllSheetColumns_();
-  } catch (colError) {
-    console.log('Column check skipped: ' + colError.message);
-  }
-
-  try {
-    if (typeof applyTabColors_ === 'function') {
-      applyTabColors_(ss);
+    try {
+      syncColumnMaps();
+    } catch (syncError) {
+      console.log('Column sync skipped: ' + syncError.message);
     }
-  } catch (tabError) {
-    console.log('Tab colors not applied: ' + tabError.message);
-  }
 
-  try {
-    enforceHiddenSheets();
-  } catch (hideError) {
-    console.log('Hidden sheet enforcement skipped: ' + hideError.message);
-  }
+    try {
+      ensureAllSheetColumns_();
+    } catch (colError) {
+      console.log('Column check skipped: ' + colError.message);
+    }
 
-  ss.toast('Dashboard loaded successfully', '🏛️ Union Dashboard', 3);
+    try {
+      if (typeof applyTabColors_ === 'function') {
+        applyTabColors_(ss);
+      }
+    } catch (tabError) {
+      console.log('Tab colors not applied: ' + tabError.message);
+    }
+
+    try {
+      enforceHiddenSheets();
+    } catch (hideError) {
+      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+    }
+
+    // Initialize EventBus subscribers so the bus is ready for event routing.
+    // Note: onEdit() currently calls handlers directly. To fully migrate to
+    // EventBus routing, replace direct calls in onEdit() with emitEditEvent(e).
+    try {
+      if (typeof registerEventBusSubscribers === 'function') {
+        registerEventBusSubscribers();
+      }
+    } catch (busError) {
+      console.log('EventBus registration skipped: ' + busError.message);
+    }
+
+    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
+  } catch (deferredErr) {
+    Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('DEFERRED_INIT_FAILED', 'onOpenDeferred_ error: ' + deferredErr.message);
+    }
+  }
 }
 
 /**
@@ -1737,7 +1748,7 @@ function getVersionInfo() {
 function updateGrievance(grievanceId, updates) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
     const data = sheet.getDataRange().getValues();
 
     let rowIndex = -1;
@@ -1991,7 +2002,7 @@ function showNewMemberDialog() {
 function addNewMember(memberData) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+    const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
     if (!sheet) {
       return errorResponse('Member Directory sheet not found');
@@ -2050,7 +2061,7 @@ function addNewMember(memberData) {
  */
 function startGrievanceForMember() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.MEMBER_DIRECTORY) {
+  if (sheet.getName() !== SHEETS.MEMBER_DIRECTORY) {
     showAlert('Please select a member in the Member Directory', 'Wrong Sheet');
     return;
   }
@@ -2166,7 +2177,7 @@ Jane,Smith,EMP002,HR,Manager,jane@example.com,555-5678"></textarea>
  */
 function importMembersFromText(text) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2312,7 +2323,7 @@ function exportMemberDirectory(format) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2461,7 +2472,7 @@ function showFindMemberDialog() {
  */
 function searchMembersForDialog(term) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2502,7 +2513,7 @@ function searchMembersForDialog(term) {
  */
 function navigateToMemberRow(row) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (sheet) {
     sheet.activate();

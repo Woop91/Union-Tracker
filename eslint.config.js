@@ -125,7 +125,8 @@ module.exports = [
       'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', vars: 'local' }],
       'no-redeclare': ['error', { builtinGlobals: false }],
       'no-empty': 'off',
-      'eqeqeq': 'warn',
+      // CODE-05: Upgraded from 'warn' — loose equality (==) causes subtle type coercion bugs
+      'eqeqeq': ['error', 'smart'],
       'semi': 'off',
       'quotes': 'off',
       'indent': 'off',

@@ -250,7 +250,7 @@ function advancedSearch(filters) {
 
   // Search members if included
   if (filters.includeMembers) {
-    var memberSheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
     if (memberSheet) {
       var data = memberSheet.getDataRange().getValues();
 
@@ -293,7 +293,7 @@ function advancedSearch(filters) {
 
   // Search grievances if included
   if (filters.includeGrievances) {
-    var grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
     if (grievanceSheet) {
       var gData = grievanceSheet.getDataRange().getValues();
 
@@ -347,7 +347,7 @@ function getDepartmentList() {
 
   if (!formulaSheet) {
     var memberSheet = SpreadsheetApp.getActiveSpreadsheet()
-      .getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+      .getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
     if (!memberSheet || memberSheet.getLastRow() <= 1) return [];
 
@@ -372,7 +372,7 @@ function getDepartmentList() {
  */
 function getMemberList() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
 
   if (!sheet) return [];
 

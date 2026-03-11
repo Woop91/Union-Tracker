@@ -302,11 +302,12 @@ function checkWebAppAuthorization(requiredRole, sessionToken) {
     result.email = email;
 
     // Check if access control is enabled
-    // v4.5.2: Even when access control is disabled, ALWAYS enforce role checks
-    // for privileged roles (steward/admin) to protect PII access.
-    if (!ACCESS_CONTROL.ENABLED && requiredRole !== 'steward' && requiredRole !== 'admin') {
-      result.isAuthorized = true;
-      result.role = 'user';
+    // v4.25.5 SEC-01: Fail-secure — when access control is disabled, DENY by default.
+    // Previously this auto-authorized non-privileged users, exposing member data
+    // if an admin disabled AC to troubleshoot. Now disabled = locked down.
+    if (!ACCESS_CONTROL.ENABLED) {
+      Logger.log('ACCESS_CONTROL is disabled — denying access (fail-secure). Re-enable to restore normal operation.');
+      result.message = 'Access control is currently disabled. Contact your administrator to re-enable it.';
       return result;
     }
 

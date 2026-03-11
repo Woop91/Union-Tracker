@@ -39,7 +39,8 @@ function getFormUrlFromConfig(formType) {
     }
   }
 
-  // Fall back to hardcoded default
+  // REL-02: Log a warning when falling back to default URL so admins know config is missing
+  Logger.log('getFormUrlFromConfig: Config sheet missing or invalid for "' + formType + '" — using hardcoded default URL');
   return defaultUrl;
 }
 

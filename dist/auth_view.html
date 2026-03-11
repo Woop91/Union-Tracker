@@ -117,14 +117,16 @@ function showAuthEmail(container) {
   wrapper.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left' } }, 'Sign in with email'));
   wrapper.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px', marginBottom: '24px', lineHeight: '1.5' } }, "We'll send a secure link. No password needed."));
 
-  // Email input
-  var inputLabel = el('label', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'Email address');
+  // Email input — ACC-02: Associate <label> with <input> via for/id for screen readers
+  var inputLabel = el('label', { htmlFor: 'auth-email-input', style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'Email address');
   wrapper.appendChild(inputLabel);
 
   var emailInput = el('input', {
+    id: 'auth-email-input',
     className: 'auth-input',
     type: 'email',
     placeholder: 'you@example.com',
+    autocomplete: 'email',
   });
   wrapper.appendChild(emailInput);
 

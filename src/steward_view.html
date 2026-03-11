@@ -4011,26 +4011,26 @@ function renderFailsafePage(appContainer) {
     var initCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px', borderLeft: '3px solid var(--warning)' } });
     initCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, '🔧 Initialize Missing Sheets'));
     initCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Creates any missing sheets that newer features depend on (Timeline, Q&A Forum, Tasks, Notifications, etc.). Non-destructive — existing sheets with data are never touched. Run this if tabs show errors.'));
-    var initStatus = el('div', { style: { fontSize: '12px', minHeight: '20px' } });
+    var initStatus = el('div', { style: { fontSize: '12px', minHeight: '20px' }, 'aria-live': 'polite', role: 'status' });
     initCard.appendChild(initStatus);
     initCard.appendChild(el('button', {
       className: 'btn btn-primary',
       onClick: function() {
         initStatus.innerHTML = '<div style="color:var(--muted)">Creating missing sheets... this may take a moment.</div>';
         serverCall().withSuccessHandler(function(r) {
-          if (!r || !r.success) { initStatus.innerHTML = '<div style="color:var(--danger)">' + ((r && r.message) || 'Failed.') + '</div>'; return; }
-          var html = '<div style="color:var(--success);font-weight:600;margin-bottom:8px">✅ ' + r.message + '</div>';
+          if (!r || !r.success) { initStatus.innerHTML = '<div style="color:var(--danger)">' + safeText((r && r.message) || 'Failed.') + '</div>'; return; }
+          var html = '<div style="color:var(--success);font-weight:600;margin-bottom:8px">\u2705 ' + safeText(r.message) + '</div>';
           if (r.created.length > 0) {
             html += '<div style="color:var(--text);font-size:11px;margin-bottom:4px">Initialized:</div>';
-            r.created.forEach(function(c) { html += '<div style="color:var(--muted);font-size:11px;padding:1px 0">• ' + c + '</div>'; });
+            r.created.forEach(function(c) { html += '<div style="color:var(--muted);font-size:11px;padding:1px 0">\u2022 ' + safeText(c) + '</div>'; });
           }
           if (r.failed.length > 0) {
             html += '<div style="color:var(--danger);font-size:11px;margin-top:6px">Failed:</div>';
-            r.failed.forEach(function(f) { html += '<div style="color:var(--danger);font-size:11px;padding:1px 0">• ' + f + '</div>'; });
+            r.failed.forEach(function(f) { html += '<div style="color:var(--danger);font-size:11px;padding:1px 0">\u2022 ' + safeText(f) + '</div>'; });
           }
           initStatus.innerHTML = html;
         }).withFailureHandler(function(err) {
-          initStatus.innerHTML = '<div style="color:var(--danger)">Failed: ' + ((err && err.message) || err) + '</div>';
+          initStatus.innerHTML = '<div style="color:var(--danger)">Failed: ' + safeText((err && err.message) || err) + '</div>';
         }).fsEnsureAllSheets(SESSION_TOKEN);
       }
     }, 'Initialize Missing Sheets'));
@@ -4040,35 +4040,35 @@ function renderFailsafePage(appContainer) {
     var diagCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
     diagCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, '🔍 System Diagnostic'));
     diagCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Check which sheets exist, auth status, and identify missing dependencies that cause "Something went wrong" errors.'));
-    var diagResult = el('div', { style: { fontSize: '12px', minHeight: '20px' } });
+    var diagResult = el('div', { style: { fontSize: '12px', minHeight: '20px' }, 'aria-live': 'polite', role: 'status' });
     diagCard.appendChild(diagResult);
     diagCard.appendChild(el('button', {
       className: 'btn btn-primary',
       onClick: function() {
         diagResult.innerHTML = '<div style="color:var(--muted)">Running diagnostic...</div>';
         serverCall().withSuccessHandler(function(r) {
-          if (!r || !r.success) { diagResult.innerHTML = '<div style="color:var(--danger)">' + ((r && r.message) || 'Diagnostic failed.') + '</div>'; return; }
-          var html = '<div style="margin-bottom:8px;color:var(--text);font-weight:600">Sheets: ' + r.totalSheets + ' total | Auth: ' + (r.authOk ? '✅' : '❌') + ' | Email: ' + r.email + '</div>';
+          if (!r || !r.success) { diagResult.innerHTML = '<div style="color:var(--danger)">' + safeText((r && r.message) || 'Diagnostic failed.') + '</div>'; return; }
+          var html = '<div style="margin-bottom:8px;color:var(--text);font-weight:600">Sheets: ' + r.totalSheets + ' total | Auth: ' + (r.authOk ? '\u2705' : '\u274C') + ' | Email: ' + safeText(r.email) + '</div>';
           if (r.missing.length === 0) {
-            html += '<div style="color:var(--success);font-weight:600">✅ All required sheets present!</div>';
+            html += '<div style="color:var(--success);font-weight:600">\u2705 All required sheets present!</div>';
           } else {
-            html += '<div style="color:var(--warning);font-weight:600;margin-bottom:6px">⚠️ Missing ' + r.missing.length + ' sheet(s):</div>';
+            html += '<div style="color:var(--warning);font-weight:600;margin-bottom:6px">\u26A0\uFE0F Missing ' + r.missing.length + ' sheet(s):</div>';
             r.missing.forEach(function(m) {
-              html += '<div style="color:var(--muted);padding:2px 0;font-family:var(--fontBody)">' + m + '</div>';
+              html += '<div style="color:var(--muted);padding:2px 0;font-family:var(--fontBody)">' + safeText(m) + '</div>';
             });
           }
           // Show all results
           html += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">';
           r.results.forEach(function(item) {
             html += '<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px">'
-              + '<span style="color:var(--text)">' + item.label + '</span>'
-              + '<span style="color:' + (item.exists ? 'var(--success)' : item.critical ? 'var(--danger)' : 'var(--warning)') + '">' + (item.exists ? '✅' : '❌') + '</span>'
+              + '<span style="color:var(--text)">' + safeText(item.label) + '</span>'
+              + '<span style="color:' + (item.exists ? 'var(--success)' : item.critical ? 'var(--danger)' : 'var(--warning)') + '">' + (item.exists ? '\u2705' : '\u274C') + '</span>'
               + '</div>';
           });
           html += '</div>';
           diagResult.innerHTML = html;
         }).withFailureHandler(function(err) {
-          diagResult.innerHTML = '<div style="color:var(--danger)">Diagnostic failed: ' + ((err && err.message) || err) + '</div>';
+          diagResult.innerHTML = '<div style="color:var(--danger)">Diagnostic failed: ' + safeText((err && err.message) || err) + '</div>';
         }).fsDiagnostic(SESSION_TOKEN);
       }
     }, 'Run Diagnostic'));
@@ -4147,7 +4147,8 @@ function renderTestRunnerPage(appContainer) {
       { value: 'dataservice', label: 'DataService CRUD' },
       { value: 'authsweep', label: 'Auth Sweep' },
       { value: 'configlive', label: 'Config Completeness' },
-      { value: 'survey', label: 'Survey Engine' }
+      { value: 'survey', label: 'Survey Engine' },
+      { value: 'emailsend', label: 'Email & Auth Scopes' }
     ];
     suiteOptions.forEach(function(opt) {
       var o = el('option', { value: opt.value }, opt.label);

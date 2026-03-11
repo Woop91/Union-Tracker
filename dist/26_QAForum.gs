@@ -32,7 +32,8 @@ var QAForum = (function () {
         'ID', 'Author Email', 'Author Name', 'Is Anonymous', 'Question Text',
         'Status', 'Upvote Count', 'Upvoters', 'Answer Count', 'Created', 'Updated'
       ]]);
-      forumSheet.hideSheet();
+      // GAS-02: Use very-hidden so users cannot unhide PII-containing system sheets via menu
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(forumSheet); else forumSheet.hideSheet();
     }
 
     // _QA_Answers: ID | Question ID | Author Email | Author Name | Is Steward | Answer Text | Status | Created
@@ -43,8 +44,34 @@ var QAForum = (function () {
         'ID', 'Question ID', 'Author Email', 'Author Name', 'Is Steward',
         'Answer Text', 'Status', 'Created'
       ]]);
-      answerSheet.hideSheet();
+      // GAS-02: Use very-hidden so users cannot unhide PII-containing system sheets via menu
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(answerSheet); else answerSheet.hideSheet();
     }
+  }
+
+  // ═══════════════════════════════════════
+  // Cached Sheet Read Helper
+  // ═══════════════════════════════════════
+
+  // PERF-01: Cache full-sheet reads via CacheService to reduce redundant getDataRange() calls.
+  // TTL defaults to 60s — acceptable staleness for read-heavy Q&A list loads.
+  function _getCachedSheetData(sheetName, maxAgeSec) {
+    maxAgeSec = maxAgeSec || 60;
+    try {
+      var cache = CacheService.getScriptCache();
+      var cacheKey = 'qa_sheet_' + sheetName;
+      var cached = cache.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (_e) { /* cache miss or parse error — fall through to fresh read */ }
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() <= 1) return null;
+    var data = sheet.getDataRange().getValues();
+    try {
+      cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
+    } catch (_e) { /* CacheService has 100KB per-key limit — fail silently */ }
+    return data;
   }
 
   // ═══════════════════════════════════════
@@ -65,7 +92,7 @@ var QAForum = (function () {
     }
     if (!sheet || sheet.getLastRow() <= 1) return { questions: [], total: 0, page: page, pageSize: pageSize };
 
-    var data = sheet.getDataRange().getValues();
+    var data = _getCachedSheetData(SHEETS.QA_FORUM, 60) || sheet.getDataRange().getValues();
     var questions = [];
     for (var i = 1; i < data.length; i++) {
       var status = String(data[i][5] || 'active').toLowerCase().trim();
@@ -105,7 +132,7 @@ var QAForum = (function () {
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
     if (!sheet || sheet.getLastRow() <= 1) return null;
 
-    var data = sheet.getDataRange().getValues();
+    var data = _getCachedSheetData(SHEETS.QA_FORUM, 60) || sheet.getDataRange().getValues();
     var question = null;
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] === questionId) {
@@ -131,7 +158,7 @@ var QAForum = (function () {
     var ansSheet = ss.getSheetByName(SHEETS.QA_ANSWERS);
     var answers = [];
     if (ansSheet && ansSheet.getLastRow() > 1) {
-      var ansData = ansSheet.getDataRange().getValues();
+      var ansData = _getCachedSheetData(SHEETS.QA_ANSWERS, 60) || ansSheet.getDataRange().getValues();
       for (var j = 1; j < ansData.length; j++) {
         if (ansData[j][1] === questionId && String(ansData[j][6] || 'active').toLowerCase().trim() !== 'deleted') {
           answers.push({
@@ -175,7 +202,7 @@ var QAForum = (function () {
         isAnonymous ? true : false, text,
         'active', 0, '', 0, now, now
       ]);
-      logAuditEvent('QA_QUESTION_SUBMITTED', 'Question ' + id + ' by ' + (isAnonymous ? 'anonymous' : email));
+      logAuditEvent('QA_QUESTION_SUBMITTED', 'Question ' + id + ' by ' + (isAnonymous ? 'anonymous' : maskEmail(email)));
 
       // Notify all stewards of the new unanswered question
       var preview = text.substring(0, 120) + (text.length > 120 ? '...' : '');
@@ -309,7 +336,7 @@ var QAForum = (function () {
         var newStatus = action === 'delete' ? 'deleted' : action === 'flag' ? 'flagged' : 'active';
         sheet.getRange(i + 1, 6).setValue(newStatus);
         sheet.getRange(i + 1, 11).setValue(new Date());
-        logAuditEvent('QA_QUESTION_MODERATED', 'Question ' + questionId + ' ' + action + 'd by ' + stewardEmail);
+        logAuditEvent('QA_QUESTION_MODERATED', 'Question ' + questionId + ' ' + action + 'd by ' + maskEmail(stewardEmail));
         return { success: true };
       }
     }
@@ -329,7 +356,7 @@ var QAForum = (function () {
       if (data[i][0] === answerId) {
         var newStatus = action === 'delete' ? 'deleted' : action === 'flag' ? 'flagged' : 'active';
         sheet.getRange(i + 1, 7).setValue(newStatus);
-        logAuditEvent('QA_ANSWER_MODERATED', 'Answer ' + answerId + ' ' + action + 'd by ' + stewardEmail);
+        logAuditEvent('QA_ANSWER_MODERATED', 'Answer ' + answerId + ' ' + action + 'd by ' + maskEmail(stewardEmail));
         return { success: true };
       }
     }
@@ -404,7 +431,7 @@ var QAForum = (function () {
         if (current === 'deleted') return { success: false, message: 'Question not found.' };
         sheet.getRange(i + 1, 6).setValue('resolved');
         sheet.getRange(i + 1, 11).setValue(new Date());
-        logAuditEvent('QA_QUESTION_RESOLVED', 'Question ' + questionId + ' resolved by ' + email);
+        logAuditEvent('QA_QUESTION_RESOLVED', 'Question ' + questionId + ' resolved by ' + maskEmail(email));
         return { success: true };
       }
     }

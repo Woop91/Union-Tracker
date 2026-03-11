@@ -1981,6 +1981,10 @@ function createNotificationsSheet(ss) {
   nextMonth.setDate(nextMonth.getDate() + 30);
   var nextMonthStr = Utilities.formatDate(nextMonth, tz, 'yyyy-MM-dd');
 
+  var systemEmail = (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined')
+    ? (getConfigValue_(CONFIG_COLS.MAIN_CONTACT_EMAIL) || 'system@noreply.local')
+    : 'system@noreply.local';
+
   var starterRows = [
     [
       'NOTIF-001',
@@ -1989,7 +1993,7 @@ function createNotificationsSheet(ss) {
       'Welcome to the Union Dashboard',
       'Your union dashboard is now live! Here you can check in to meetings, learn about your rights, and track grievance progress. Contact your steward if you have any questions.',
       'Normal',
-      'system@massability.org',
+      systemEmail,
       'System',
       today,
       nextMonthStr,
@@ -2004,7 +2008,7 @@ function createNotificationsSheet(ss) {
       'Monthly General Meeting — Check In Available',
       'The Monthly General Membership Meeting is scheduled. Use the Check In page to mark your attendance. Virtual join link is available in the Events tab.',
       'Normal',
-      'system@massability.org',
+      systemEmail,
       'System',
       today,
       nextWeekStr,

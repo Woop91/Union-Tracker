@@ -56,7 +56,12 @@ function addMember(memberData) {
   rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
   rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
   rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
-  sheet.getRange(newRow, 1, 1, totalCols).setValues([rowData]);
+  // REL-03: Wrap sheet write in try/catch with contextual error message
+  try {
+    sheet.getRange(newRow, 1, 1, totalCols).setValues([rowData]);
+  } catch (writeErr) {
+    throw new Error('addMember: sheet write failed at row ' + newRow + ': ' + writeErr.message);
+  }
 
   return memberId;
 
@@ -97,9 +102,11 @@ function updateMember(memberId, updateData) {
       throw new Error('Member not found: ' + memberId);
     }
 
-  // Read current row, modify requested fields, write back in single setValues call (F1: batch write)
-  var totalCols = sheet.getLastColumn();
-  var currentRow = sheet.getRange(memberRow, 1, 1, totalCols).getValues()[0];
+  // PERF-02: Use the already-loaded data array directly instead of re-reading the row.
+  // The previous code called sheet.getRange(memberRow,...).getValues() which is a redundant
+  // Sheets API call — we already have the full row from the getDataRange() read above.
+  var currentRow = data[memberRow - 1].slice(); // copy to avoid mutating cached array
+  var totalCols = currentRow.length;
 
   // F11-12: Use !== undefined instead of truthiness to allow clearing fields with empty strings
   if (updateData.firstName !== undefined) currentRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(updateData.firstName);
@@ -110,7 +117,12 @@ function updateMember(memberId, updateData) {
   if (updateData.workLocation !== undefined) currentRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(updateData.workLocation);
   if (updateData.unit !== undefined) currentRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(updateData.unit);
 
-  sheet.getRange(memberRow, 1, 1, totalCols).setValues([currentRow]);
+  // REL-03: Wrap sheet write in try/catch with contextual error message
+  try {
+    sheet.getRange(memberRow, 1, 1, totalCols).setValues([currentRow]);
+  } catch (writeErr) {
+    throw new Error('updateMember: sheet write failed for ' + memberId + ' at row ' + memberRow + ': ' + writeErr.message);
+  }
 
   } finally {
     lock.releaseLock();
@@ -1620,7 +1632,7 @@ function startNewGrievance(grievanceData) {
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
 
       if (!grievanceSheet) {
         throw new Error('Grievance Tracker sheet not found');
@@ -1716,7 +1728,7 @@ function handleGrievanceDialogSubmit(formData) {
     // Set the Action Type on the new row
     try {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
-      const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+      const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
       if (grievanceSheet && GRIEVANCE_COLS.ACTION_TYPE) {
         ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
         // Find the row with this grievance ID
@@ -1948,7 +1960,7 @@ function advanceGrievanceStep(grievanceId, options) {
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
     const data = sheet.getDataRange().getValues();
 
     // Find the grievance row
@@ -2093,7 +2105,7 @@ function getStepColumnSet(step) {
  */
 function recalcAllGrievancesBatched() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   const data = sheet.getDataRange().getValues();
 
   let updatedCount = 0;
@@ -2174,7 +2186,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   const data = sheet.getDataRange().getValues();
   const numRows = data.length - 1;
@@ -2235,7 +2247,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
  */
 function getGrievanceById(grievanceId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 
@@ -2258,7 +2270,7 @@ function getGrievanceById(grievanceId) {
  */
 function getOpenGrievances() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 
@@ -2351,7 +2363,7 @@ function getUpcomingDeadlines(daysAhead) {
  */
 function getGrievanceStats() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
 
   if (!sheet || sheet.getLastRow() < 2) {
     return {
@@ -2457,7 +2469,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
   }
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
     ensureMinimumColumns(sheet, getGrievanceHeaders().length);
     const data = sheet.getDataRange().getValues();
 
@@ -2546,7 +2558,7 @@ function showNewGrievanceDialog() {
  */
 function showEditGrievanceDialog() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.GRIEVANCE_TRACKER) {
+  if (sheet.getName() !== SHEETS.GRIEVANCE_TRACKER) {
     showAlert('Please select a grievance in the Grievance Tracker sheet', 'Wrong Sheet');
     return;
   }
@@ -2572,7 +2584,7 @@ function showEditGrievanceDialog() {
  */
 function showBulkStatusUpdate() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.GRIEVANCE_TRACKER) {
+  if (sheet.getName() !== SHEETS.GRIEVANCE_TRACKER) {
     showAlert('Please use this from the Grievance Tracker sheet', 'Wrong Sheet');
     return;
   }

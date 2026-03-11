@@ -69,25 +69,7 @@ var COMMAND_CENTER_CONFIG = {
   }
 };
 
-// ============================================================================
-// COMMAND CENTER MENU (DEPRECATED - v4.4.0)
-// ============================================================================
-
-/**
- * @deprecated v4.4.0 - Menu consolidated into createDashboardMenu() in UIService.gs
- * The Field Portal menu has been merged into:
- * - 📊 Union Hub (primary operations)
- * - 🔧 Tools (supporting features)
- * - 🛠️ Admin (system administration)
- *
- * This function is kept for backward compatibility but is no longer called.
- * All menu items have been reorganized into the new consolidated structure.
- */
-function createCommandCenterMenu() {
-  // v4.4.0: This function is deprecated - menu consolidated into UIService.gs
-  // Keeping the function stub to prevent errors if called from legacy code
-  console.log('createCommandCenterMenu() is deprecated in v4.4.0 - menus consolidated');
-}
+// CODE-01: createCommandCenterMenu() removed — deprecated since v4.4.0, zero callers.
 
 // ============================================================================
 // NAVIGATION SHORTCUTS (v4.0)

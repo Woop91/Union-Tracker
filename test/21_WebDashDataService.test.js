@@ -420,7 +420,9 @@ describe('dataGetEngagementStats', () => {
     expect(typeof dataGetEngagementStats).toBe('function');
   });
 
-  test('returns null when no stats are seeded', () => {
+  test('returns null when no member data exists', () => {
+    // Override with empty spreadsheet — no member directory means totalMembers=0 → null
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(createMockSpreadsheet([]));
     PropertiesService.getScriptProperties().deleteAllProperties();
     const result = dataGetEngagementStats('test-session-token');
     expect(result).toBeNull();

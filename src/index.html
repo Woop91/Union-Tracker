@@ -242,6 +242,25 @@
     })();
 
     // ═══════════════════════════════════════
+    // SAFE TEXT — HTML escape for dynamic data in innerHTML
+    // ═══════════════════════════════════════
+    /**
+     * Escapes HTML special characters to prevent XSS when inserting
+     * dynamic data into innerHTML. Used by member_view and steward_view.
+     * @param {*} str - Value to escape (coerced to string)
+     * @returns {string} HTML-safe string
+     */
+    function safeText(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ═══════════════════════════════════════
     // SAFE SERVER CALL — default failure handler for google.script.run
     // ═══════════════════════════════════════
     /**

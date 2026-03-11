@@ -15,6 +15,9 @@
  *   - No member PII is exposed to other members
  */
 
+// Tab name used inside per-member contact spreadsheets (NOT the hidden _Contact_Log sheet)
+var CONTACT_SHEET_TAB_ = 'Contact Log';
+
 var DataService = (function () {
 
   // Sheet names — read from SHEETS constants if available, fallback to defaults
@@ -32,7 +35,7 @@ var DataService = (function () {
     memberRole:      ['role', 'member role', 'type', 'member type', 'membership type'],
     memberUnit:      ['unit', 'workplace unit', 'department'],
     memberPhone:     ['phone', 'phone number', 'cell', 'mobile'],
-    memberJoined:    ['joined', 'join date', 'member since', 'date joined'],
+    memberJoined:    ['joined', 'join date', 'member since', 'date joined', 'hire date'],
     memberDuesStatus:['dues status', 'dues', 'status'],
     memberDuesPaying:['dues paying', 'is dues paying', 'dues paid', 'paying dues'],
     memberId:        ['member id', 'id', 'member number'],
@@ -57,7 +60,7 @@ var DataService = (function () {
     grievanceMemberLastName:  ['last name', 'last'],
     grievanceStatus: ['status', 'grievance status', 'case status'],
     grievanceStep:   ['step', 'current step', 'grievance step'],
-    grievanceDeadline: ['deadline', 'next deadline', 'due date'],
+    grievanceDeadline: ['deadline', 'next deadline', 'due date', 'next action due', 'filing deadline'],
     grievanceFiled:  ['filed', 'filed date', 'date filed', 'created'],
     grievanceSteward:['assigned steward', 'steward', 'steward email', 'assigned to'],
     grievanceUnit:   ['unit', 'workplace unit', 'work location', 'location'],
@@ -565,14 +568,14 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
-      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName('Grievance Log');
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet) return { success: false, message: 'Grievance sheet not found.' };
 
       // Resolve member identity dynamically from directory
       var memberId = '';
       var memberFirstName = '';
       var memberLastName = '';
-      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR) || ss.getSheetByName('Member Directory');
+      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberDir && memberDir.getLastRow() > 1) {
         var mData = memberDir.getDataRange().getValues();
         var mColMap = _buildColumnMap(mData[0]);
@@ -639,14 +642,14 @@ var DataService = (function () {
     try {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
-      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName('Grievance Log');
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'No grievances found.' };
 
       var emailLower = String(email).toLowerCase().trim();
 
       // ── Resolve memberId dynamically from Member Directory ────────────────
       var memberId = '';
-      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR) || ss.getSheetByName('Member Directory');
+      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberDir && memberDir.getLastRow() > 1) {
         var mData   = memberDir.getDataRange().getValues();
         var mColMap = _buildColumnMap(mData[0]);
@@ -1213,11 +1216,22 @@ var DataService = (function () {
       joined: _getVal(row, colMap, HEADERS.memberJoined, ''),
       duesStatus: String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim(),
       duesPaying: (function() {
+        // First: check explicit Dues Paying column (if it exists)
         var raw = _getVal(row, colMap, HEADERS.memberDuesPaying, null);
-        if (raw === null || raw === '') return null; // column absent — unknown
-        if (typeof raw === 'boolean') return raw;
-        var s = String(raw).trim().toLowerCase();
-        return s === 'true' || s === 'yes' || s === '1';
+        if (raw !== null && raw !== '') {
+          if (typeof raw === 'boolean') return raw;
+          var s = String(raw).trim().toLowerCase();
+          return s === 'true' || s === 'yes' || s === '1';
+        }
+        // Fallback: derive from Dues Status column ('Current' → paying; 'Past Due'/'Inactive' → not paying)
+        var duesStatus = String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim().toLowerCase();
+        if (duesStatus === '') return null; // column absent — unknown
+        var NON_PAYING = ['past due', 'inactive', 'delinquent', 'lapsed', 'non-paying', 'no'];
+        for (var ni = 0; ni < NON_PAYING.length; ni++) {
+          if (duesStatus === NON_PAYING[ni]) return false;
+        }
+        // 'current', 'active', 'paid', 'yes', or any unrecognized value → treat as paying
+        return true;
       })(),
       memberId: String(_getVal(row, colMap, HEADERS.memberId, '')).trim(),
       workLocation: String(_getVal(row, colMap, HEADERS.memberWorkLocation, '')).trim(),
@@ -1295,6 +1309,22 @@ var DataService = (function () {
         diff = parsed.getTime() - now.getTime();
         deadlineDays = Math.ceil(diff / (24 * 60 * 60 * 1000));
         deadlineFormatted = _formatDate(parsed);
+      }
+    }
+
+    // Fallback: if no date column resolved deadlineDays, read 'Days to Deadline'
+    // which is a computed numeric column (or the text "Overdue") in the Grievance Log.
+    if (deadlineDays === null) {
+      var dtdRaw = _getVal(row, colMap, ['days to deadline'], null);
+      if (dtdRaw !== null && dtdRaw !== '') {
+        var dtdStr = String(dtdRaw).trim().toLowerCase();
+        if (dtdStr === 'overdue') {
+          deadlineDays = -1;
+          deadlineFormatted = 'Overdue';
+        } else {
+          var dtdNum = parseFloat(dtdStr);
+          if (!isNaN(dtdNum)) deadlineDays = Math.ceil(dtdNum);
+        }
       }
     }
 
@@ -1404,7 +1434,7 @@ var DataService = (function () {
       DriveApp.getRootFolder().removeFile(ssFile); // move out of My Drive root
 
       var sheet = ss.getActiveSheet();
-      sheet.setName('Contact Log');
+      sheet.setName(CONTACT_SHEET_TAB_);
       var headers = ['Date', 'Steward', 'Contact Type', 'Notes', 'Duration'];
       sheet.getRange(1, 1, 1, headers.length).setValues([headers])
            .setFontWeight('bold')
@@ -1495,7 +1525,7 @@ var DataService = (function () {
         var folderName = masterFolder.getName();
         var contactSS = getOrCreateMemberContactSheet_(masterFolder, folderName);
         if (contactSS) {
-          var logSheet = contactSS.getSheetByName('Contact Log') || contactSS.getActiveSheet();
+          var logSheet = contactSS.getSheetByName(CONTACT_SHEET_TAB_) || contactSS.getActiveSheet();
           logSheet.appendRow([new Date(), sName, contactType, (notes || '').substring(0, 500), duration || '']);
         }
       }
@@ -1654,9 +1684,11 @@ var DataService = (function () {
     var sheet = _ensureStewardTasks();
     // Migrate headers if needed
     var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 12)).getValues()[0];
+    var assigneeTypeCol = 11;  // position in 12-col Steward Tasks schema
+    var assignedByCol   = 12;
     if (!headers[10] || String(headers[10]).trim() !== 'Assignee Type') {
-      sheet.getRange(1, 11).setValue('Assignee Type');
-      sheet.getRange(1, 12).setValue('Assigned By');
+      sheet.getRange(1, assigneeTypeCol).setValue('Assignee Type');
+      sheet.getRange(1, assignedByCol).setValue('Assigned By');
     }
     var id = 'MT_' + Date.now().toString(36);
     sheet.appendRow([
@@ -2970,7 +3002,7 @@ function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
         var folderName = memberFolder.getName();
         var contactSS  = DataService.getOrCreateMemberContactSheetPublic(memberFolder, folderName);
         if (contactSS) {
-          var logSheet = contactSS.getSheetByName('Contact Log') || contactSS.getActiveSheet();
+          var logSheet = contactSS.getSheetByName(CONTACT_SHEET_TAB_) || contactSS.getActiveSheet();
           var noteText = 'Subject: ' + subject + (body ? ' | ' + String(body).substring(0, 300) : '');
           logSheet.appendRow([new Date(), sName, 'Email', noteText, '']);
         }
@@ -3055,7 +3087,8 @@ function dataGetSatisfactionTrends(sessionToken) { var s = _requireStewardAuth(s
 function dataSubmitFeedback(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMyFeedback(e) : []; }
 // v4.23.0: Portal Polls system deprecated — replaced by unified wq* poll system (24_WeeklyQuestions.gs)
-// These stubs kept so any stale clients that call them get a graceful empty response
+// These stubs kept so any stale clients that call them get a graceful empty response.
+// ⚠️ AUTH REQUIRED: If reimplementing, MUST add _resolveCallerEmail / _requireStewardAuth gates.
 function dataGetActivePolls() { return []; }
 function dataSubmitPollVote() { return { success: false, message: 'Polls system updated — please refresh.' }; }
 function dataAddPoll() { return { success: false, message: 'Polls system updated — please refresh.' }; }

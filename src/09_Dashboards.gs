@@ -1430,6 +1430,9 @@ function getSatisfactionAnalyticsData() {
  * Calculates section averages and dashboard metrics
  */
 function syncSatisfactionValues() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return; // another sync in progress
+  try {
   var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
@@ -1464,6 +1467,7 @@ function syncSatisfactionValues() {
   writeSatisfactionDashboard_(sheet, responseData, sectionAverages);
 
   Logger.log('Member Satisfaction values synced for ' + responseData.length + ' responses');
+  } finally { lock.releaseLock(); }
 }
 
 /**
@@ -2471,6 +2475,9 @@ function getAutoSyncOptions() {
  * Called during CREATE_DASHBOARD and on data changes
  */
 function syncDashboardValues() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return; // another sync in progress
+  try {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var dashSheet = ss.getSheetByName(SHEETS.DASHBOARD);
 
@@ -2500,6 +2507,7 @@ function syncDashboardValues() {
   writeDashboardValues_(dashSheet, metrics);
 
   Logger.log('Dashboard values synced');
+  } finally { lock.releaseLock(); }
 }
 
 /**
@@ -3287,6 +3295,9 @@ function applyDashboardGradients_(sheet) {
  * Sync computed values to Feedback sheet metrics
  */
 function syncFeedbackValues() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return; // another sync in progress
+  try {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
 
@@ -3356,6 +3367,7 @@ function syncFeedbackValues() {
   sheet.getRange(3, 13, metricsData.length, 3).setValues(metricsData);
 
   Logger.log('Feedback values synced');
+  } finally { lock.releaseLock(); }
 }
 
 

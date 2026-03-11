@@ -413,6 +413,7 @@ function pushNotification(userEmail, notification) {
  * @returns {Object} Saved view with ID
  */
 function saveSharedView(view) {
+  return withScriptLock_(function() {
   var props = PropertiesService.getScriptProperties();
   var views = JSON.parse(props.getProperty('shared_views') || '[]');
   var userEmail = Session.getActiveUser().getEmail();
@@ -444,6 +445,7 @@ function saveSharedView(view) {
 
   EventBus.emit('collaboration:viewCreated', { viewId: sharedView.id });
   return { success: true, view: sharedView };
+  });
 }
 
 /**
@@ -549,6 +551,7 @@ function deleteSharedView(viewId) {
  * @returns {Object} Saved preset with ID
  */
 function saveChartPreset(preset) {
+  return withScriptLock_(function() {
   var props = PropertiesService.getUserProperties();
   var presets = JSON.parse(props.getProperty('chart_presets') || '[]');
 
@@ -569,6 +572,7 @@ function saveChartPreset(preset) {
 
   EventBus.emit('preset:saved', { presetId: chartPreset.id, name: chartPreset.name });
   return { success: true, preset: chartPreset };
+  });
 }
 
 /**
@@ -786,6 +790,7 @@ function getAvailableFilterOptions(isPII) {
  * @returns {Object} Saved filter preset with ID
  */
 function saveFilterPreset(name, filters) {
+  return withScriptLock_(function() {
   var props = PropertiesService.getUserProperties();
   var presets = JSON.parse(props.getProperty('filter_presets') || '[]');
 
@@ -801,6 +806,7 @@ function saveFilterPreset(name, filters) {
 
   EventBus.emit('filter:presetSaved', { presetId: preset.id, name: name });
   return { success: true, preset: preset };
+  });
 }
 
 /**

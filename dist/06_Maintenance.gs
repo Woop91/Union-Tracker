@@ -77,7 +77,7 @@ function DIAGNOSE_SETUP() {
 
   // Check 3: Member Directory structure
   results.checks.push('Verifying Member Directory structure...');
-  var memberSheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
   if (memberSheet) {
     var headers = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
     var requiredHeaders = [
@@ -98,7 +98,7 @@ function DIAGNOSE_SETUP() {
 
   // Check 4: Grievance Tracker structure
   results.checks.push('Verifying Grievance Tracker structure...');
-  var grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
   if (grievanceSheet) {
     var gHeaders = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
     var requiredGHeaders = [
@@ -1505,13 +1505,13 @@ function showUndoRedoPanel() {
 function logAuditEvent(eventType, details) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let auditSheet = ss.getSheetByName(SHEET_NAMES.AUDIT_LOG);
+    let auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
 
     // Create audit sheet if it doesn't exist — use the canonical 10-col schema
     // H-43: Standardize to the 10-col AUDIT_LOG_HEADER_MAP_ schema used by
     // 08d_AuditAndFormulas.gs, plus an Integrity Hash column (col 11).
     if (!auditSheet) {
-      auditSheet = ss.insertSheet(SHEET_NAMES.AUDIT_LOG);
+      auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
       var headerRow = (typeof getHeadersFromMap_ === 'function' && typeof AUDIT_LOG_HEADER_MAP_ !== 'undefined')
         ? getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_)
         : ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column', 'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type'];
@@ -1630,7 +1630,7 @@ function logAuditEvent(eventType, details) {
  */
 function getRecentAuditLogs(count) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const auditSheet = ss.getSheetByName(SHEET_NAMES.AUDIT_LOG);
+  const auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
 
   if (!auditSheet) return [];
 
@@ -1766,8 +1766,8 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEET_NAMES.GRIEVANCE_TRACKER
-  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEETS.GRIEVANCE_TRACKER
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
 
   if (!sheet) {
     return errorResponse('Grievance Log/Tracker not found');
@@ -3208,7 +3208,7 @@ function archiveClosedGrievances(daysOld) {
   }
 
   // Get or create archive sheet
-  var archiveSheetName = '_Archive_Grievances';
+  var archiveSheetName = HIDDEN_SHEETS.ARCHIVE_GRIEVANCES;
   var archiveSheet = ss.getSheetByName(archiveSheetName);
 
   if (!archiveSheet) {
@@ -3362,7 +3362,7 @@ function showArchiveDialog() {
 function restoreFromArchive(grievanceIds) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  var archiveSheet = ss.getSheetByName('_Archive_Grievances');
+  var archiveSheet = ss.getSheetByName(HIDDEN_SHEETS.ARCHIVE_GRIEVANCES);
 
   if (!archiveSheet || !grievanceSheet) {
     return { restored: 0, error: 'Required sheets not found' };

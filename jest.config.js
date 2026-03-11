@@ -9,13 +9,13 @@ module.exports = {
     '!src/07_DevTools.gs'
   ],
   coverageReporters: ['text', 'text-summary', 'html', 'lcov'],
-  // Coverage thresholds set to realistic baselines — goal is to increase over time
+  // TEST-01: Coverage thresholds raised from 50/40 — incrementally moving toward 80% target
   coverageThreshold: {
     global: {
-      lines: 50,
-      branches: 40,
-      functions: 50,
-      statements: 50
+      lines: 70,
+      branches: 60,
+      functions: 70,
+      statements: 70
     }
   },
   watchPathIgnorePatterns: ['dist/', 'coverage/', 'node_modules/']

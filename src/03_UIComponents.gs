@@ -117,7 +117,7 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('📊 Workload Tracker')
       .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
       .addItem('💾 Create Backup', 'createWorkloadBackup')
-      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData')
       .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
       .addSeparator()
       .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))
@@ -231,6 +231,7 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
+      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
       .addSeparator()
       .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem'))
 
