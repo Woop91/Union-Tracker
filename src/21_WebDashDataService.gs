@@ -2944,11 +2944,13 @@ function dataGetStewardContact(sessionToken) { var e = _resolveCallerEmail(sessi
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 // Steward: view any member's full profile; Member: view own profile only
-function dataGetFullProfile(email) {
+// FIX-WDS-01: v4.25.8 — Parameter was named 'email' but body referenced undefined 'sessionToken'.
+// Renamed first param to sessionToken; email is now second param (optional, steward override).
+function dataGetFullProfile(sessionToken, email) {
   var caller = _resolveCallerEmail(sessionToken);
   if (!caller) return { success: false, message: 'Not authenticated.' };
-  var isSteward = checkWebAppAuthorization('steward').isAuthorized;
-  // Members may only fetch their own profile
+  var isSteward = checkWebAppAuthorization('steward', sessionToken).isAuthorized;
+  // Members may only fetch their own profile; stewards can fetch any member's
   var targetEmail = (isSteward && email) ? email : caller;
   return DataService.getFullMemberProfile(targetEmail);
 }

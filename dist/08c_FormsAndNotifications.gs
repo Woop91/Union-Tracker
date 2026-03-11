@@ -761,6 +761,71 @@ function setupSatisfactionFormTrigger() {
   }
 }
 
+/**
+ * Audits and optionally removes the deprecated onSatisfactionFormSubmit trigger.
+ *
+ * Background: setupSatisfactionFormTrigger() could be called at any time,
+ * creating a form-submit trigger pointing at onSatisfactionFormSubmit().
+ * That handler was deprecated in v4.21.0 and is now a no-op.  If the trigger
+ * still exists it fires on every survey submission, wastes execution quota,
+ * and logs a misleading deprecation warning.
+ *
+ * FIX-FORMS-01 (v4.25.9): Added to detect and remove the stale trigger.
+ * Run once manually from the Admin menu or Dev Tools panel.
+ *
+ * @param {boolean} [autoDelete=false] If true, removes trigger without prompting.
+ * @returns {boolean} true if a trigger was found and deleted, false otherwise.
+ */
+function auditAndRemoveSatisfactionTrigger(autoDelete) {
+  var triggers = ScriptApp.getProjectTriggers();
+  var found = null;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onSatisfactionFormSubmit') {
+      found = triggers[i];
+      break;
+    }
+  }
+
+  if (!found) {
+    if (!autoDelete) {
+      SpreadsheetApp.getUi().alert(
+        'Trigger Audit — Clean',
+        'No stale satisfaction form trigger found. Nothing to remove.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    }
+    console.log('auditAndRemoveSatisfactionTrigger: no stale trigger found.');
+    return false;
+  }
+
+  if (!autoDelete) {
+    var ui = SpreadsheetApp.getUi();
+    var resp = ui.alert(
+      'Stale Trigger Found',
+      'A deprecated satisfaction survey trigger (onSatisfactionFormSubmit) is still active.\n\n' +
+      'This trigger fires on every survey submission but does nothing (deprecated v4.21.0).\n' +
+      'Removing it saves execution quota.\n\n' +
+      'Remove this trigger now?',
+      ui.ButtonSet.YES_NO
+    );
+    if (resp !== ui.Button.YES) {
+      console.log('auditAndRemoveSatisfactionTrigger: user declined removal.');
+      return false;
+    }
+  }
+
+  ScriptApp.deleteTrigger(found);
+  console.log('auditAndRemoveSatisfactionTrigger: stale trigger removed successfully.');
+  if (!autoDelete) {
+    SpreadsheetApp.getUi().alert(
+      'Trigger Removed',
+      'The stale satisfaction form trigger has been deleted.\n\n' +
+      'Survey submissions now use the in-app submitSurveyResponse() path only.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  }
+  return true;
+}
 
 
 /**

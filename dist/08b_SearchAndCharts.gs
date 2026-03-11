@@ -293,7 +293,7 @@ function advancedSearch(filters) {
 
   // Search grievances if included
   if (filters.includeGrievances) {
-    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_TRACKER);
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
     if (grievanceSheet) {
       var gData = grievanceSheet.getDataRange().getValues();
 

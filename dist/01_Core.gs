@@ -856,7 +856,8 @@ var SHEETS = {
   FAQ: '❓ FAQ',
   CONFIG_GUIDE: '📖 Config Guide',
   // Aliases for backward compatibility (some code uses these alternate names)
-  GRIEVANCE_TRACKER: 'Grievance Log',
+  // NOTE: GRIEVANCE_TRACKER alias removed in v4.25.9 (FIX-CORE-02) — all 22
+  //   callers migrated to canonical SHEETS.GRIEVANCE_LOG. Sheet is unchanged.
   MEMBER_DIRECTORY: 'Member Directory',
   REPORTS: '💼 Dashboard',
   // Workload Tracker sheets (18_WorkloadTracker.gs)
@@ -2590,16 +2591,34 @@ var GRIEVANCE_OUTCOMES = {
 /**
  * Default deadline rules for grievance step calculations (fallback values).
  * Actual values are loaded from Config sheet at runtime via getDeadlineRules().
+ *
+ * SOURCE: SEIU Local 509 Unit 8 CBA (2024–2026), Article 23 / MA DOC Grievance
+ * Policy 270.03 for Bargaining Units 8 & 10 (July 2025 edition).
+ *
+ * CONTRACT SUMMARY FOR UNIT 8 (only 2 steps + arbitration):
+ *   Filing:        21 calendar days from incident
+ *   Step I resp:   30 calendar days (21 if meeting held)
+ *   Step II appeal: 10 BUSINESS days from Step I decision  ← note: business days
+ *   Step II resp:  30 calendar days (21 if conference held)
+ *   Arbitration:   30 calendar days from Step II
+ *   NOTE: Unit 8 CBA has NO Step III — goes Step I → Step II → Arbitration.
+ *         STEP_3_* fields below are retained for configurability but are not
+ *         required by this CBA.  If your local contract differs, override via
+ *         the Config sheet.
+ *
+ * FIX-CORE-01 (v4.25.9): Corrected STEP_1_RESPONSE (7→30), STEP_2_APPEAL
+ *   (7→10), STEP_2_RESPONSE (14→30) to match verified contract language.
+ *   Old hardcoded values were wrong; Config sheet must be re-seeded.
  * @const {Object}
  */
 var DEADLINE_DEFAULTS = {
-  FILING_DAYS: 21,
-  STEP_1_RESPONSE: 7,
-  STEP_2_APPEAL: 7,
-  STEP_2_RESPONSE: 14,
-  STEP_3_APPEAL: 10,
-  STEP_3_RESPONSE: 21,
-  ARBITRATION_DEMAND: 30,
+  FILING_DAYS: 21,          // Art. 23: 21 calendar days to file
+  STEP_1_RESPONSE: 30,      // Art. 23: 30 calendar days for Step I response (21 if meeting)
+  STEP_2_APPEAL: 10,        // Art. 23: 10 BUSINESS days to appeal to Step II
+  STEP_2_RESPONSE: 30,      // Art. 23: 30 calendar days for Step II response (21 if conference)
+  STEP_3_APPEAL: 10,        // Not in Unit 8 CBA — retained for configurable deployments
+  STEP_3_RESPONSE: 21,      // Not in Unit 8 CBA — retained for configurable deployments
+  ARBITRATION_DEMAND: 30,   // Art. 23: 30 calendar days from Step II to demand arbitration
   WARNING_THRESHOLD: 5,
   CRITICAL_THRESHOLD: 2,
   REMINDER_FIRST: 7,

@@ -801,7 +801,8 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       } catch (_e) { /* Can't get owner */ }
     }
 
-    if (recipients.length === 0 || MailApp.getRemainingDailyQuota() < 1) return;
+    // FIX-SEC-01 (cont): Quota check removed — safeSendEmail_() handles this internally.
+    if (recipients.length === 0) return;
 
     // Mask PII in details before including in email
     var safeDetails = {};
@@ -848,7 +849,9 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       'Action Required: Please review this event immediately.' +
       footer;
 
-    MailApp.sendEmail({
+    // FIX-SEC-01: v4.25.8 — Use safeSendEmail_() for quota guard + format validation.
+    // Removes redundant getRemainingDailyQuota() check above (handled by safeSendEmail_).
+    safeSendEmail_({
       to: recipients.join(','),
       subject: subjectPrefix + ' SECURITY ALERT: ' + eventType,
       body: body
