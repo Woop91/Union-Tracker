@@ -1335,6 +1335,23 @@ function renderUpdateProfile(appContainer) {
         return;
       }
 
+      // Read-only info section
+      var infoFields = [
+        { label: 'Email', value: profile.email || CURRENT_USER.email || '' },
+        { label: 'Employee Number', value: profile.memberId || profile.employeeNumber || '' },
+        { label: 'Hire Date', value: profile.joined || profile.hireDate || '' },
+      ];
+      var infoSection = el('div', { className: 'card card-glass', style: { padding: '14px 16px', marginBottom: '14px' } });
+      infoSection.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, 'Account Info'));
+      infoFields.forEach(function(f) {
+        if (!f.value) return;
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0' } });
+        row.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, f.label));
+        row.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text)', fontWeight: '500' } }, f.value));
+        infoSection.appendChild(row);
+      });
+      content.appendChild(infoSection);
+
       var fields = [
         { key: 'street', label: 'Street Address', value: profile.street },
         { key: 'city', label: 'City', value: profile.city },

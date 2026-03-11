@@ -368,6 +368,7 @@ var DataService = (function () {
       supervisor: user.supervisor,
       jobTitle: user.jobTitle,
       joined: user.joined,
+      memberId: user.memberId || '',
       memberAdminFolderUrl: user.memberAdminFolderUrl || '',
     };
   }

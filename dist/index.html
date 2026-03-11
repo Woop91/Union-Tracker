@@ -376,20 +376,22 @@
           break;
         case 'steward':
         case 'member':
-          // Pre-fetch batch data in a single round-trip, then init the view.
-          // Falls back to per-view init if batch fails.
+          // Render view shell immediately, pre-fetch batch data in parallel.
+          // The view renders with loading state; batch data arrives and populates content.
           if (CURRENT_USER && CURRENT_USER.email) {
+            // Start view init immediately (renders nav + loading skeleton)
+            if (CURRENT_VIEW === 'steward') initStewardView(app);
+            else initMemberView(app);
+            // Fetch batch data in parallel — views use it if available
             google.script.run
               .withSuccessHandler(function(batch) {
                 AppState.batchData = batch || {};
-                if (CURRENT_VIEW === 'steward') initStewardView(app);
-                else initMemberView(app);
+                // Signal that batch data arrived (views can listen)
+                if (typeof AppState.onBatchReady === 'function') AppState.onBatchReady();
               })
               .withFailureHandler(function() {
-                // Batch unavailable — views will make individual calls
                 AppState.batchData = null;
-                if (CURRENT_VIEW === 'steward') initStewardView(app);
-                else initMemberView(app);
+                if (typeof AppState.onBatchReady === 'function') AppState.onBatchReady();
               })
               .dataGetBatchData(SESSION_TOKEN);
           } else {
@@ -688,7 +690,6 @@
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
-        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
         { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
         { group: 'Comms' },
         { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
@@ -699,6 +700,7 @@
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
         { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
@@ -714,7 +716,6 @@
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
-        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
         { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
         { group: 'Comms' },
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
@@ -722,9 +723,9 @@
         { id: 'meetings', icon: '\uD83D\uDCC5', label: 'My Meetings' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
         { divider: true },
-        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
     }
 
@@ -1077,10 +1078,12 @@
         console.error('Bootstrap error:', bootErr);
         var app = document.getElementById('app');
         if (app) {
+          var errDetail = bootErr && bootErr.message ? bootErr.message : String(bootErr);
           app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,sans-serif;background:#141414;color:#e0e0e0">'
             + '<div style="max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center">'
             + '<h1 style="font-size:20px;margin:0 0 12px">Something went wrong</h1>'
             + '<p style="color:#888;font-size:14px;line-height:1.6;margin:0 0 20px">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
+            + '<p style="color:#555;font-size:11px;line-height:1.4;margin:0 0 20px;font-family:monospace;word-break:break-all">' + errDetail + '</p>'
             + '<a href="javascript:localStorage.removeItem(\'dashboardSessionToken\');location.reload()" style="display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px">Clear &amp; Reload</a>'
             + '</div></div>';
         }

@@ -911,7 +911,7 @@ function _showMemberDetail(container, itemEl, member) {
           actionArea.innerHTML = '';
           actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to load profile.'));
         })
-        .dataGetFullProfile(member.email);
+        .dataGetFullProfile(SESSION_TOKEN, member.email);
     }
   }, 'Full Profile');
 
@@ -2101,13 +2101,16 @@ function renderSurveyTracking(appContainer) {
         var pendHeader = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', margin: '12px 0 6px' } }, 'Pending (' + pending + ')');
         dataWrap.appendChild(pendHeader);
         (pendingData.members || []).forEach(function(m) {
-          var item = el('div', { className: 'member-list-item' });
+          var item = el('div', { className: 'member-list-item', style: { cursor: 'pointer' } });
           item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
           var info = el('div', { className: 'member-list-info' });
           info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.memberId));
           if (m.workLocation) info.appendChild(el('div', { className: 'member-list-meta' }, m.workLocation + (m.assignedSteward ? ' \u2014 ' + m.assignedSteward : '')));
           item.appendChild(info);
           item.appendChild(el('span', { style: { fontSize: '14px', color: 'var(--muted)' } }, '\u23F3'));
+          if (m.email && typeof _showMemberDetail === 'function') {
+            item.onclick = (function(member) { return function() { _showMemberDetail(member); }; })(m);
+          }
           dataWrap.appendChild(item);
         });
       }
@@ -2851,21 +2854,21 @@ function renderInsightsPage(appContainer) {
     var cacheAge = cache ? (Date.now() - (cache.ts || 0)) : Infinity;
 
     if (cache && cacheAge < CACHE_TTL) {
-      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat);
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
       return;
     }
     if (cache) {
       // Stale: render stale immediately, refresh in background
-      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat);
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
     } else {
       showLoading(content);
     }
 
-    var statsData = null, hotSpotsData = null, perfData = null, satData = null;
+    var statsData = null, hotSpotsData = null, perfData = null, satData = null, memberStatsData = null;
     function tryRender() {
-      if (statsData === null || hotSpotsData === null || perfData === null || satData === null) return;
-      AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData };
-      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData);
+      if (statsData === null || hotSpotsData === null || perfData === null || satData === null || memberStatsData === null) return;
+      AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData, memberStats: memberStatsData };
+      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData);
     }
 
     serverCall().withSuccessHandler(function(stats) {
@@ -2899,10 +2902,18 @@ function renderInsightsPage(appContainer) {
       satData = (cache && cache.sat) || { categories: [] };
       tryRender();
     }).dataGetSatisfactionTrends(SESSION_TOKEN);
+
+    serverCall().withSuccessHandler(function(ms) {
+      memberStatsData = ms || { available: false };
+      tryRender();
+    }).withFailureHandler(function() {
+      memberStatsData = (cache && cache.memberStats) || { available: false };
+      tryRender();
+    }).dataGetMembershipStats(SESSION_TOKEN);
   });
 }
 
-function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData) {
+function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData) {
   content.innerHTML = '';
   if (!statsData || !statsData.available) {
     content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));
@@ -2910,17 +2921,60 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
     _renderQuickInsights(content, statsData, hotSpotsData);
     _renderFiledVsResolved(content, statsData);
   }
+  if (memberStatsData && memberStatsData.available) _renderMembershipInsights(content, memberStatsData);
   if (perfData && perfData.length > 0) _renderPerformanceSection(content, perfData);
   if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(content, satData);
 }
 
+function _renderMembershipInsights(container, ms) {
+  var section = el('div', { style: { marginBottom: '16px' } });
+  section.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
+    color: 'var(--text)', marginBottom: '12px',
+  }}, 'Membership Overview'));
+
+  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '12px' } });
+  grid.appendChild(_insightCard('TOTAL MEMBERS', 'var(--info)', _fmtNum(ms.total), ''));
+
+  // Dues breakdown
+  var duesEntries = [];
+  if (ms.byDues) Object.keys(ms.byDues).forEach(function(k) { duesEntries.push({ label: k, count: ms.byDues[k] }); });
+  duesEntries.sort(function(a, b) { return b.count - a.count; });
+  var duesSub = duesEntries.slice(0, 3).map(function(e) { return e.label + ': ' + e.count; }).join(', ');
+  grid.appendChild(_insightCard('DUES STATUS', 'var(--success)', duesEntries.length > 0 ? duesEntries[0].label : 'N/A', duesSub));
+
+  // Location breakdown
+  var locEntries = [];
+  if (ms.byLocation) Object.keys(ms.byLocation).forEach(function(k) { locEntries.push({ label: k, count: ms.byLocation[k] }); });
+  locEntries.sort(function(a, b) { return b.count - a.count; });
+  var locSub = locEntries.slice(0, 3).map(function(e) { return e.label + ': ' + e.count; }).join(', ');
+  grid.appendChild(_insightCard('TOP LOCATION', 'var(--accent)', locEntries.length > 0 ? locEntries[0].label : 'N/A', locSub));
+
+  // Unit breakdown
+  var unitEntries = [];
+  if (ms.byUnit) Object.keys(ms.byUnit).forEach(function(k) { unitEntries.push({ label: k, count: ms.byUnit[k] }); });
+  unitEntries.sort(function(a, b) { return b.count - a.count; });
+  var unitSub = unitEntries.slice(0, 3).map(function(e) { return e.label + ': ' + e.count; }).join(', ');
+  grid.appendChild(_insightCard('TOP UNIT', 'var(--warning)', unitEntries.length > 0 ? unitEntries[0].label : 'N/A', unitSub));
+
+  section.appendChild(grid);
+  container.appendChild(section);
+}
+
 function _fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
-function _insightCard(title, color, mainText, subText) {
+function _insightCard(title, color, mainText, subText, onClick) {
   var card = el('div', { className: 'card card-glass', style: {
     padding: '16px 18px', borderLeft: '3px solid ' + color,
     background: color + '08',
+    cursor: onClick ? 'pointer' : 'default',
+    transition: 'transform 0.15s ease',
   }});
+  if (onClick) {
+    card.onclick = onClick;
+    card.onmouseenter = function() { card.style.transform = 'translateY(-2px)'; };
+    card.onmouseleave = function() { card.style.transform = ''; };
+  }
   card.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '11px', fontWeight: '600',
     color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
@@ -2950,7 +3004,9 @@ function _renderQuickInsights(container, stats, hotSpots) {
   if (stats.deniedCount) parts.push(_fmtNum(stats.deniedCount) + ' denied');
   if (stats.settledCount) parts.push(_fmtNum(stats.settledCount) + ' settled');
   if (parts.length) statusSub += ' \u00B7 ' + parts.join(', ');
-  grid.appendChild(_insightCard('GRIEVANCE STATUS', 'var(--info)', _fmtNum(activeCount) + ' Active', statusSub));
+  grid.appendChild(_insightCard('GRIEVANCE STATUS', 'var(--info)', _fmtNum(activeCount) + ' Active', statusSub, function() {
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+  }));
 
   // Box 2: Hot Spots
   var hsCount = hotSpots ? hotSpots.length : 0;
@@ -2958,7 +3014,9 @@ function _renderQuickInsights(container, stats, hotSpots) {
   var hsSub = hsCount > 0
     ? hotSpots.slice(0, 3).map(function(h) { return h.location + ' (' + h.count + ')'; }).join(', ')
     : 'No concentration areas detected';
-  grid.appendChild(_insightCard('HOT SPOTS', hsColor, hsCount > 0 ? hsCount + ' Location' + (hsCount > 1 ? 's' : '') : 'All Clear', hsSub));
+  grid.appendChild(_insightCard('HOT SPOTS', hsColor, hsCount > 0 ? hsCount + ' Location' + (hsCount > 1 ? 's' : '') : 'All Clear', hsSub, function() {
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+  }));
 
   // Box 3: Step Distribution
   var stepEntries = [];
@@ -2968,7 +3026,9 @@ function _renderQuickInsights(container, stats, hotSpots) {
   }
   var stepsWithCases = stepEntries.filter(function(e) { return e.count > 0; }).length;
   var stepSub = stepEntries.slice(0, 3).map(function(e) { return e.step + ': ' + e.count; }).join(', ');
-  grid.appendChild(_insightCard('STEP DISTRIBUTION', 'var(--accent)', stepsWithCases + ' Step' + (stepsWithCases !== 1 ? 's' : ''), stepSub));
+  grid.appendChild(_insightCard('STEP DISTRIBUTION', 'var(--accent)', stepsWithCases + ' Step' + (stepsWithCases !== 1 ? 's' : ''), stepSub, function() {
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+  }));
 
   // Box 4: Top Issue Category
   var catEntries = [];
@@ -2976,8 +3036,12 @@ function _renderQuickInsights(container, stats, hotSpots) {
     Object.keys(stats.byCategory).forEach(function(k) { catEntries.push({ cat: k, count: stats.byCategory[k] }); });
     catEntries.sort(function(a, b) { return b.count - a.count; });
   }
-  var topCat = catEntries.length > 0 ? catEntries[0] : { cat: 'N/A', count: 0 };
-  grid.appendChild(_insightCard('TOP ISSUE CATEGORY', 'var(--warning)', topCat.cat, topCat.count + ' cases'));
+  // Skip "Uncategorized" when picking top category
+  var filteredCats = catEntries.filter(function(e) { return e.cat.toLowerCase() !== 'uncategorized'; });
+  var topCat = filteredCats.length > 0 ? filteredCats[0] : (catEntries.length > 0 ? catEntries[0] : { cat: 'N/A', count: 0 });
+  grid.appendChild(_insightCard('TOP ISSUE CATEGORY', 'var(--warning)', topCat.cat, topCat.count + ' cases', function() {
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+  }));
 
   container.appendChild(grid);
 }
@@ -3023,6 +3087,12 @@ function _renderPerformanceSection(container, perfData) {
     count++;
   });
   var avgWin = totalClosed > 0 ? Math.round((totalWon / totalClosed) * 100) : 0;
+  // Fallback: average individual winRate values if no won/closed counts available
+  if (avgWin === 0 && count > 0) {
+    var sumRate = 0, rateCount = 0;
+    perfData.forEach(function(p) { if (p.winRate > 0) { sumRate += p.winRate; rateCount++; } });
+    if (rateCount > 0) avgWin = Math.round(sumRate / rateCount);
+  }
   var avgDays = totalDaysCount > 0 ? Math.round(totalDaysWeighted / totalDaysCount) : 0;
 
   var statsRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' } });
@@ -4097,39 +4167,61 @@ function renderTestRunnerPage(appContainer) {
     // Controls card
     var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' } });
 
+    // Run All sequentially — runs each suite one at a time to avoid GAS 6-min limit
+    var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend'];
     var runAllBtn = el('button', {
       className: 'btn btn-primary',
       style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
       onClick: function() {
         runAllBtn.disabled = true;
-        runAllBtn.textContent = 'Running...';
-        statusEl.textContent = '⏳ Running tests...';
-        statusEl.style.color = 'var(--text-secondary)';
+        runFilterBtn.disabled = true;
         resultsContainer.innerHTML = '';
-        google.script.run
-          .withSuccessHandler(function(resp) {
+        var mergedResults = {
+          timestamp: new Date().toISOString(),
+          duration: 0,
+          suites: [],
+          summary: { total: 0, passed: 0, failed: 0, skipped: 0 },
+          timedOut: false
+        };
+        var idx = 0;
+        function runNextSuite() {
+          if (idx >= _allSuiteIds.length) {
             runAllBtn.disabled = false;
-            runAllBtn.textContent = '▶ Run All Tests';
-            if (resp && resp.success) {
-              _renderTestResults(resultsContainer, resp.results, statusEl);
-            } else {
-              statusEl.textContent = '❌ ' + ((resp && resp.error) || 'Failed');
-              statusEl.style.color = 'var(--danger)';
-            }
-          })
-          .withFailureHandler(function(err) {
-            runAllBtn.disabled = false;
-            runAllBtn.textContent = '▶ Run All Tests';
-            var msg = (err && err.message) || String(err);
-            if (msg.indexOf('execution time') !== -1 || msg.indexOf('Exceeded') !== -1) {
-              msg = 'GAS 6-minute limit exceeded. Try running individual suites using the filter dropdown.';
-            }
-            statusEl.textContent = '❌ Error: ' + msg;
-            statusEl.style.color = 'var(--danger)';
-          })
-          .dataRunTests(SESSION_TOKEN, null);
+            runFilterBtn.disabled = false;
+            runAllBtn.textContent = '\u25B6 Run All Tests';
+            _renderTestResults(resultsContainer, mergedResults, statusEl);
+            return;
+          }
+          var sid = _allSuiteIds[idx];
+          statusEl.textContent = '\u23F3 Running suite ' + (idx + 1) + '/' + _allSuiteIds.length + ' (' + sid + ')...';
+          statusEl.style.color = 'var(--text-secondary)';
+          google.script.run
+            .withSuccessHandler(function(resp) {
+              if (resp && resp.success && resp.results) {
+                var r = resp.results;
+                mergedResults.duration += r.duration || 0;
+                mergedResults.summary.total += r.summary.total;
+                mergedResults.summary.passed += r.summary.passed;
+                mergedResults.summary.failed += r.summary.failed;
+                mergedResults.summary.skipped += r.summary.skipped;
+                if (r.timedOut) mergedResults.timedOut = true;
+                for (var s = 0; s < (r.suites || []).length; s++) mergedResults.suites.push(r.suites[s]);
+              }
+              idx++;
+              runNextSuite();
+            })
+            .withFailureHandler(function(err) {
+              mergedResults.suites.push({ name: sid, tests: [], passed: 0, failed: 1, skipped: 0, duration: 0, error: (err && err.message) || String(err) });
+              mergedResults.summary.total++;
+              mergedResults.summary.failed++;
+              idx++;
+              runNextSuite();
+            })
+            .dataRunTests(SESSION_TOKEN, sid);
+        }
+        runNextSuite();
       }
-    }, '▶ Run All Tests');
+    }, '\u25B6 Run All Tests');
     ctrlCard.appendChild(runAllBtn);
 
     // Suite filter dropdown

@@ -502,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.25.7",
+  VERSION: "4.25.10",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -686,7 +686,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.7';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.10';
   var parts = ver.split('.');
   return {
     MAJOR: parseInt(parts[0], 10) || 4,
@@ -694,8 +694,8 @@ var VERSION_INFO = (function() {
     PATCH: parseInt(parts[2], 10) || 3,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-09',
-    CODENAME: 'Deadline Config Completeness'
+    BUILD_DATE: '2026-03-11',
+    CODENAME: 'Web App Diagnostics & Parallel Render'
   };
 })();
 
@@ -706,6 +706,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.25.10', date: '2026-03-11', codename: 'Web App Diagnostics & Parallel Render', changes: 'Parallel view rendering in index.html (steward + member views load concurrently). Nav tab reorder: Feedback moved to Admin section, stewarddirectory removed from member sidebar. diagnoseWebApp() 14-step diagnostic function in 22_WebDashApp.gs for debugging app loading issues. memberId added to profile data in 21_WebDashDataService.gs. Workload sheet diagnostics in 28_FailsafeService.gs. Enhanced error reporting: null-guard on fatalErr.stack, actual error message shown in bootstrap screen instead of generic failure.' },
   { version: '4.25.7', date: '2026-03-10', codename: 'onOpen Simple Trigger Fix', changes: 'Fixed critical bug: onOpen() called ScriptApp.getProjectTriggers() (not permitted in simple triggers — throws silently) and finally block deleted the deferred trigger before 1000ms elapsed. Result: onOpenDeferred_ never ran on sheet open. Fix: onOpen now only does cache clear + createDashboardMenu(). setupOpenDeferredTrigger() installs onOpenDeferred_ as an installable onOpen trigger. menuInstallSurveyTriggers() updated to include this. New menu item in Admin > Triggers.' },
   { version: '4.25.6', date: '2026-03-09', codename: 'Test Runner Timeout Fix', changes: 'Fixed GAS 6-minute execution timeout crash when running all 82 tests. Root cause: 5-min soft guard too tight + 16 redundant SpreadsheetApp.getActiveSpreadsheet() network calls + authsweep endpoints each doing sheet reads via getUserRole_(). Fixes: (1) timeout lowered 5min→3.5min for 2.5min safety margin, (2) _getCachedSS() replaces 12 individual SpreadsheetApp calls in test functions, (3) cache reset at start of runAll(), (4) SPA UI now shows timeout warning banner, skipped test count card, suite skipped counts, and failure handler detects execution time errors with helpful guidance to use suite filter.' },
   { version: '4.25.5', date: '2026-03-09', codename: 'Member View: Remove Directory Tab', changes: 'Removed "Directory" tab (id: contact) from member SPA sidebar in index.html. Members should not have a general Directory — steward contacts are accessed via the separate Steward Directory utility link (id: stewarddirectory). Removed case contact routing entry and contact color mapping from TAB_COLORS. Deep-links to #contact for members now fall through to Home. Updated README.md (expanded member tab listing), FEATURES.md (added Member SPA Sidebar Tabs section, bumped SPA version), INTERACTIVE_DASHBOARD_GUIDE.md (member tab count 10→9, removed Directory from tab list), CHANGELOG.md, AI_REFERENCE.md.' },
