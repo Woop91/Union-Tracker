@@ -28,7 +28,14 @@ function doGet(e) {
   try {
     return doGetWebDashboard(e);
   } catch (fatalErr) {
-    Logger.log('doGet FATAL: ' + fatalErr.message + '\n' + fatalErr.stack);
+    Logger.log('doGet FATAL: ' + fatalErr.message + '\n' + (fatalErr.stack || ''));
+    // Log additional context for debugging
+    try {
+      Logger.log('doGet FATAL context: ConfigReader=' + (typeof ConfigReader) +
+        ', Auth=' + (typeof Auth) +
+        ', DataService=' + (typeof DataService) +
+        ', SHEETS=' + (typeof SHEETS));
+    } catch (_) { /* best-effort */ }
     return _serveFatalError(fatalErr.message);
   }
 }
@@ -318,4 +325,147 @@ function getPOMSReferenceHtml() {
  */
 function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
+}
+
+/**
+ * DIAGNOSTIC: Run from Apps Script editor to test the full doGet loading chain.
+ * Reports each step's success/failure with timing info.
+ * Usage: Open Apps Script editor → Select diagnoseWebApp → Run → View Logs.
+ */
+function diagnoseWebApp() {
+  var results = [];
+  var start = Date.now();
+
+  function step(name, fn) {
+    var t0 = Date.now();
+    try {
+      var val = fn();
+      results.push({ step: name, ok: true, ms: Date.now() - t0, detail: val });
+      Logger.log('✓ ' + name + ' (' + (Date.now() - t0) + 'ms)');
+      return val;
+    } catch (err) {
+      results.push({ step: name, ok: false, ms: Date.now() - t0, error: err.message });
+      Logger.log('✗ ' + name + ' (' + (Date.now() - t0) + 'ms): ' + err.message);
+      return null;
+    }
+  }
+
+  // 1. Spreadsheet binding
+  var ss = step('SpreadsheetApp.getActiveSpreadsheet()', function() {
+    var s = SpreadsheetApp.getActiveSpreadsheet();
+    if (!s) throw new Error('null — script is not bound to a spreadsheet');
+    return s;
+  });
+
+  // 2. Config sheet exists
+  step('Config sheet lookup', function() {
+    if (!ss) throw new Error('skipped — no spreadsheet');
+    var sheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (!sheet) throw new Error('Config sheet "' + SHEETS.CONFIG + '" not found');
+    return 'found (' + sheet.getLastRow() + ' rows)';
+  });
+
+  // 3. ConfigReader
+  var config = step('ConfigReader.getConfig()', function() {
+    var c = ConfigReader.getConfig(true);
+    return 'orgName=' + c.orgName;
+  });
+
+  // 4. Member Directory sheet
+  step('Member Directory sheet', function() {
+    if (!ss) throw new Error('skipped');
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet) throw new Error('Sheet "' + SHEETS.MEMBER_DIR + '" not found');
+    return 'found (' + sheet.getLastRow() + ' rows)';
+  });
+
+  // 5. Grievance Log sheet
+  step('Grievance Log sheet', function() {
+    if (!ss) throw new Error('skipped');
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!sheet) throw new Error('Sheet "' + SHEETS.GRIEVANCE_LOG + '" not found');
+    return 'found (' + sheet.getLastRow() + ' rows)';
+  });
+
+  // 6. Auth module
+  step('Auth module available', function() {
+    if (typeof Auth === 'undefined') throw new Error('Auth is undefined');
+    if (typeof Auth.resolveUser !== 'function') throw new Error('Auth.resolveUser missing');
+    return 'OK';
+  });
+
+  // 7. DataService module
+  step('DataService module available', function() {
+    if (typeof DataService === 'undefined') throw new Error('DataService is undefined');
+    if (typeof DataService.findUserByEmail !== 'function') throw new Error('findUserByEmail missing');
+    if (typeof DataService.getBatchData !== 'function') throw new Error('getBatchData missing');
+    return 'OK';
+  });
+
+  // 8. SSO identity
+  step('Session.getActiveUser()', function() {
+    var email = Session.getActiveUser().getEmail();
+    return email || '(empty — expected when run from editor, works in web app)';
+  });
+
+  // 9. ScriptApp URL
+  step('ScriptApp.getService().getUrl()', function() {
+    var url = ScriptApp.getService().getUrl();
+    if (!url) throw new Error('null — web app may not be deployed');
+    return url;
+  });
+
+  // 10. HTML template evaluation (auth view — lightest)
+  step('Template: auth view', function() {
+    var template = HtmlService.createTemplateFromFile('index');
+    template.view = 'auth';
+    template.pageData = JSON.stringify({ view: 'auth', config: _sanitizeConfig(config || { orgName: 'Test', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' }), error: null, webAppUrl: '', tokenChecked: false });
+    var output = template.evaluate();
+    var size = output.getContent().length;
+    return 'OK (' + Math.round(size / 1024) + ' KB)';
+  });
+
+  // 11. HTML template evaluation (dashboard view — heaviest)
+  step('Template: dashboard view (steward+member)', function() {
+    var template = HtmlService.createTemplateFromFile('index');
+    template.view = 'steward';
+    template.pageData = JSON.stringify({ view: 'steward', config: _sanitizeConfig(config || { orgName: 'Test', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' }), user: { email: 'test@test.com', name: 'Test', firstName: 'Test', lastName: 'User', role: 'steward', unit: 'Test', joined: '', duesStatus: 'Active', duesPaying: null, phone: '', workLocation: '', officeDays: '', assignedSteward: '', hasOpenGrievance: false, sharePhone: false }, isDualRole: true, sessionToken: null, initialTab: null, webAppUrl: '' });
+    var output = template.evaluate();
+    var size = output.getContent().length;
+    if (size > 500000) {
+      throw new Error('HTML output is ' + Math.round(size / 1024) + ' KB — may exceed GAS limit (500 KB). Consider lazy-loading views.');
+    }
+    return 'OK (' + Math.round(size / 1024) + ' KB)';
+  });
+
+  // 12. ScriptProperties accessible
+  step('PropertiesService.getScriptProperties()', function() {
+    var props = PropertiesService.getScriptProperties();
+    if (!props) throw new Error('null');
+    var keys = props.getKeys();
+    return 'OK (' + keys.length + ' keys)';
+  });
+
+  // 13. CacheService accessible
+  step('CacheService.getScriptCache()', function() {
+    var cache = CacheService.getScriptCache();
+    if (!cache) throw new Error('null');
+    return 'OK';
+  });
+
+  Logger.log('\n=== DIAGNOSIS COMPLETE (' + (Date.now() - start) + 'ms total) ===');
+  var failed = results.filter(function(r) { return !r.ok; });
+  if (failed.length === 0) {
+    Logger.log('All steps passed. If the web app still fails to load:');
+    Logger.log('  1. Check that you created a NEW deployment version after clasp push');
+    Logger.log('  2. Clear browser cache and try incognito window');
+    Logger.log('  3. Check Apps Script editor Executions log for doGet errors');
+    Logger.log('  4. If HTML output > 450 KB, the page may be too large for GAS');
+  } else {
+    Logger.log(failed.length + ' step(s) failed:');
+    for (var i = 0; i < failed.length; i++) {
+      Logger.log('  ✗ ' + failed[i].step + ': ' + failed[i].error);
+    }
+  }
+  return results;
 }

@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.25.10] - 2026-03-11
+
+### Added
+- `diagnoseWebApp()` — 14-step diagnostic function in `22_WebDashApp.gs` for debugging app loading issues (checks deployment, permissions, doGet, view rendering, config, auth)
+- `memberId` included in profile data (`21_WebDashDataService.gs`)
+- Workload sheet diagnostics in `28_FailsafeService.gs`
+
+### Changed
+- **Parallel view rendering** in `index.html` — steward and member views now load concurrently for faster startup
+- Nav tab reorder: Feedback moved to Admin section; `stewarddirectory` removed from member sidebar
+- Enhanced error reporting: null-guard on `fatalErr.stack`, actual error message displayed in bootstrap screen instead of generic failure
+
 ## [4.25.7] - 2026-03-10
 
 ### Fixed
