@@ -110,7 +110,7 @@ var Auth = (function () {
     try {
       config = ConfigReader.getConfig();
     } catch (cfgErr) {
-      Logger.log('Auth.sendMagicLink: ConfigReader.getConfig() failed (' + cfgErr.message + ') — using defaults');
+      Logger.log('Auth.sendMagicLink: ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
       config = {
         orgName: 'Dashboard',
         logoInitials: '',
