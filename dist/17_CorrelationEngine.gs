@@ -418,7 +418,7 @@ function correlateCategoryVsResolutionTime_(data) {
       if (cases[i].daysOpen && cases[i].daysOpen > 0) {
         resolvedDays.push(cases[i].daysOpen);
       }
-      if (cases[i].status === 'Won' || cases[i].status === 'won') {
+      if (cases[i].status === GRIEVANCE_STATUS.WON || cases[i].status === 'won') {
         winCount++;
       }
     }

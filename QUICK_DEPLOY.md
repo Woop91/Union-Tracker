@@ -1,6 +1,6 @@
 # Quick Deploy - Union Steward Dashboard
 
-**Version:** 4.24.4 | **Architecture:** 48-File Modular
+**Version:** 4.24.4 | **Architecture:** 48-File Production
 
 Deploy the Union Steward Dashboard to a Google Sheet using the source files in `src/`.
 
@@ -17,6 +17,7 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 - Steward Dashboard, Member Dashboard, and Executive Dashboard
 - Meeting management with auto-generated Google Docs
 - Mobile-optimized quick actions and web app portal
+- Standalone workload tracker portal with PIN authentication
 - Comfort View accessibility features
 
 ---
@@ -26,8 +27,8 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 ### Step 1: Get the Files
 
 ```bash
-git clone https://github.com/Woop91/Union-Tracker.git
-cd Union-Tracker/src
+git clone https://github.com/Woop91/DDS-Dashboard.git
+cd DDS-Dashboard/src
 ```
 
 ### Step 2: Create a New Google Sheet
@@ -160,7 +161,7 @@ Your dashboard is fully operational.
 If you prefer automated deployment:
 
 ```bash
-cd Union-Tracker
+cd DDS-Dashboard
 npm install
 clasp login
 clasp create --type sheets --title "Union Dashboard"
@@ -210,5 +211,5 @@ See [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) for the full production transition 
 
 ---
 
-**Version:** 4.24.4 (48-File Modular Architecture)
+**Version:** 4.24.4 (48-File Production Architecture)
 **Last Updated:** 2026-03-07

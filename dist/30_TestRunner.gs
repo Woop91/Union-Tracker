@@ -9,13 +9,29 @@
  *   - Results stored in ScriptProperties for SPA dashboard panel
  *   - Manual trigger (Sheets menu) + timed trigger (daily)
  *
- * Test suites:
+ * Test suites (core — defined in this file):
  *   config_   — Config tab reads, CONFIG_COLS, ConfigReader shape
  *   colmap_   — Column mapping (GRIEVANCE_COLS, MEMBER_COLS) integrity
  *   auth_     — Auth resolution, role checks, steward auth
  *   grievance_ — Deadline rules, status constants, ID validation
  *   security_ — escapeHtml, escapeForFormula, XSS prevention
  *   system_   — Sheet existence, version info, build integrity
+ *   dataservice_ — DataService CRUD operations
+ *   authsweep_ — Endpoint auth rejection
+ *   configlive_ — Live sheet headers vs column constants
+ *   survey_   — Survey engine integrity
+ *   emailsend_ — Email delivery & scope authorization
+ *
+ * Web app suites (defined in 31_WebAppTests.gs):
+ *   webapp_   — doGet routing, templates, URL resolution
+ *   configrd_ — ConfigReader module completeness
+ *   portal_   — PortalSheets column constants, 0-indexed validation
+ *   weeklyq_  — WeeklyQuestions module API
+ *   workload_ — WorkloadService module, categories
+ *   qaforum_  — QAForum module, question retrieval
+ *   timeline_ — TimelineService module, events, categories
+ *   failsafe_ — FailsafeService module, digest config
+ *   endpoints_ — All data, wq, qa, tl, fs wrapper existence & auth
  *
  * IMPORTANT: All tests are READ-ONLY. They never write to sheets.
  * Tests interact with real GAS services (SpreadsheetApp, CacheService, etc.)
@@ -331,6 +347,46 @@ var TestRunner = (function () {
     }
   }
 
+  /**
+   * Extracts a unified error summary from stored results.
+   * Returns all failures grouped by suite with test name + error message.
+   * Useful for SPA "show all errors" panel.
+   * @returns {Object} { totalErrors, failures: [{suite, test, error}], timestamp, duration }
+   */
+  function getErrorSummary() {
+    var results = getResults();
+    if (!results) return { totalErrors: 0, failures: [], timestamp: null, duration: 0 };
+
+    var failures = [];
+    for (var si = 0; si < results.suites.length; si++) {
+      var suite = results.suites[si];
+      for (var ti = 0; ti < suite.tests.length; ti++) {
+        var t = suite.tests[ti];
+        if (!t.passed) {
+          failures.push({
+            suite: suite.name,
+            test: t.name.replace(/^test_[a-z]+_/, ''),
+            fullName: t.name,
+            error: t.error || 'Unknown error',
+            duration: t.duration || 0,
+            slow: t.slow || false
+          });
+        }
+      }
+    }
+
+    return {
+      totalErrors: failures.length,
+      totalPassed: results.summary.passed,
+      totalSkipped: results.summary.skipped,
+      totalTests: results.summary.total,
+      failures: failures,
+      timestamp: results.timestamp,
+      duration: results.duration,
+      timedOut: results.timedOut || false
+    };
+  }
+
   // ── Trigger management ──────────────────────────────────────────────
 
   /**
@@ -379,6 +435,7 @@ var TestRunner = (function () {
     runAll: runAll,
     getResults: getResults,
     getStatus: getStatus,
+    getErrorSummary: getErrorSummary,
 
     // Triggers
     setupDailyTrigger: setupDailyTrigger,
@@ -398,8 +455,17 @@ var TestRunner = (function () {
 function runScheduledTests() {
   var results = TestRunner.runAll();
 
+  // Log unified error summary for Apps Script console visibility
   if (results.summary.failed > 0) {
+    var summary = TestRunner.getErrorSummary();
+    Logger.log('TestRunner: ' + summary.totalErrors + ' FAILURE(S) in ' + summary.totalTests + ' tests (' + results.duration + 'ms)');
+    for (var i = 0; i < summary.failures.length; i++) {
+      var f = summary.failures[i];
+      Logger.log('  [' + f.suite.toUpperCase() + '] ' + f.test + ' — ' + f.error);
+    }
     _sendTestFailureEmail(results);
+  } else {
+    Logger.log('TestRunner: All ' + results.summary.passed + ' tests passed (' + results.duration + 'ms)');
   }
 }
 
@@ -538,6 +604,21 @@ function runTestsFromMenu() {
   ss.toast('Running tests...', 'Test Runner', 30);
   var results = TestRunner.runAll();
   var msg = results.summary.passed + ' passed, ' + results.summary.failed + ' failed (' + results.duration + 'ms)';
+
+  if (results.summary.failed > 0) {
+    var summary = TestRunner.getErrorSummary();
+    // Log all errors to the Apps Script console for easy review
+    Logger.log('=== TEST ERROR SUMMARY ===');
+    Logger.log(summary.totalErrors + ' failure(s) across ' + summary.totalTests + ' total tests');
+    for (var i = 0; i < summary.failures.length; i++) {
+      var f = summary.failures[i];
+      Logger.log('[' + f.suite.toUpperCase() + '] ' + f.test + ': ' + f.error);
+    }
+    Logger.log('=== END ERROR SUMMARY ===');
+    // Toast shows count; full details in View > Logs
+    msg += ' — see View > Logs for details';
+  }
+
   ss.toast(msg, results.summary.failed > 0 ? '❌ Tests Failed' : '✅ Tests Passed', 10);
 }
 
@@ -594,6 +675,23 @@ function dataGetTestResults(sessionToken) {
   var results = TestRunner.getResults();
   var status = TestRunner.getStatus();
   return { success: true, results: results, status: status };
+}
+
+/**
+ * SPA endpoint: Get unified error summary from last test run (steward-only).
+ * Returns all failures in a flat list for the "show all errors" panel.
+ * @param {string} [sessionToken]
+ * @returns {Object} { success, ...errorSummary }
+ */
+function dataGetTestErrorSummary(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { success: false, error: 'Not authenticated' };
+
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, error: 'Steward access required' };
+
+  var summary = TestRunner.getErrorSummary();
+  return { success: true, summary: summary };
 }
 
 /**
@@ -734,6 +832,102 @@ function _getTestRegistry() {
     { name: 'test_emailsend_rateLimitKeyFormat',           fn: test_emailsend_rateLimitKeyFormat },
     { name: 'test_emailsend_tokenPrefixNotConflicting',    fn: test_emailsend_tokenPrefixNotConflicting },
     { name: 'test_emailsend_sendMagicLinkBadEmailReturnsSafe', fn: test_emailsend_sendMagicLinkBadEmailReturnsSafe },
+
+    // ── webapp suite (doGet routing, templates, URL resolution) ──
+    { name: 'test_webapp_doGetExists',                     fn: test_webapp_doGetExists },
+    { name: 'test_webapp_doGetWebDashboardExists',         fn: test_webapp_doGetWebDashboardExists },
+    { name: 'test_webapp_includeHelperExists',             fn: test_webapp_includeHelperExists },
+    { name: 'test_webapp_getWebAppUrlExists',              fn: test_webapp_getWebAppUrlExists },
+    { name: 'test_webapp_getWebAppUrlReturnsString',       fn: test_webapp_getWebAppUrlReturnsString },
+    { name: 'test_webapp_orgChartHtmlExists',              fn: test_webapp_orgChartHtmlExists },
+    { name: 'test_webapp_pomsReferenceHtmlExists',         fn: test_webapp_pomsReferenceHtmlExists },
+    { name: 'test_webapp_diagnoseWebAppExists',            fn: test_webapp_diagnoseWebAppExists },
+    { name: 'test_webapp_diagnoseWebAppRunsClean',         fn: test_webapp_diagnoseWebAppRunsClean },
+    { name: 'test_webapp_serveFatalErrorExists',           fn: test_webapp_serveFatalErrorExists },
+    { name: 'test_webapp_sanitizeConfigExists',            fn: test_webapp_sanitizeConfigExists },
+    { name: 'test_webapp_sanitizeConfigStripsInternal',    fn: test_webapp_sanitizeConfigStripsInternal },
+
+    // ── configrd suite (ConfigReader module completeness) ──
+    { name: 'test_configrd_moduleExists',                  fn: test_configrd_moduleExists },
+    { name: 'test_configrd_getConfigCallable',             fn: test_configrd_getConfigCallable },
+    { name: 'test_configrd_validateConfigCallable',        fn: test_configrd_validateConfigCallable },
+    { name: 'test_configrd_refreshConfigCallable',         fn: test_configrd_refreshConfigCallable },
+    { name: 'test_configrd_getConfigJSONCallable',         fn: test_configrd_getConfigJSONCallable },
+    { name: 'test_configrd_configHasRequiredFields',       fn: test_configrd_configHasRequiredFields },
+    { name: 'test_configrd_configHasDriveFields',          fn: test_configrd_configHasDriveFields },
+    { name: 'test_configrd_configHasAuthFields',           fn: test_configrd_configHasAuthFields },
+    { name: 'test_configrd_validateConfigReturnsShape',    fn: test_configrd_validateConfigReturnsShape },
+    { name: 'test_configrd_getConfigJSONReturnsString',    fn: test_configrd_getConfigJSONReturnsString },
+
+    // ── portal suite (PortalSheets column constants, 0-indexed validation) ──
+    { name: 'test_portal_memberDirColsDefined',            fn: test_portal_memberDirColsDefined },
+    { name: 'test_portal_eventColsDefined',                fn: test_portal_eventColsDefined },
+    { name: 'test_portal_minutesColsDefined',              fn: test_portal_minutesColsDefined },
+    { name: 'test_portal_grievanceColsDefined',            fn: test_portal_grievanceColsDefined },
+    { name: 'test_portal_stewardLogColsDefined',           fn: test_portal_stewardLogColsDefined },
+    { name: 'test_portal_megaSurveyColsDefined',           fn: test_portal_megaSurveyColsDefined },
+    { name: 'test_portal_allCols0Indexed',                 fn: test_portal_allCols0Indexed },
+    { name: 'test_portal_noDuplicateIndices',              fn: test_portal_noDuplicateIndices },
+    { name: 'test_portal_setupFunctionsExist',             fn: test_portal_setupFunctionsExist },
+
+    // ── weeklyq suite (WeeklyQuestions module API) ──
+    { name: 'test_weeklyq_moduleExists',                   fn: test_weeklyq_moduleExists },
+    { name: 'test_weeklyq_publicAPIComplete',              fn: test_weeklyq_publicAPIComplete },
+    { name: 'test_weeklyq_qColsExposed',                  fn: test_weeklyq_qColsExposed },
+    { name: 'test_weeklyq_globalWrappersExist',            fn: test_weeklyq_globalWrappersExist },
+    { name: 'test_weeklyq_getPoolCountCallable',           fn: test_weeklyq_getPoolCountCallable },
+    { name: 'test_weeklyq_getPollFrequencyCallable',       fn: test_weeklyq_getPollFrequencyCallable },
+    { name: 'test_weeklyq_wrappersRejectNullToken',        fn: test_weeklyq_wrappersRejectNullToken },
+    { name: 'test_weeklyq_autoSelectExists',               fn: test_weeklyq_autoSelectExists },
+
+    // ── workload suite (WorkloadService module, categories) ──
+    { name: 'test_workload_moduleExists',                  fn: test_workload_moduleExists },
+    { name: 'test_workload_publicAPIComplete',             fn: test_workload_publicAPIComplete },
+    { name: 'test_workload_subCategoriesExposed',          fn: test_workload_subCategoriesExposed },
+    { name: 'test_workload_categoryLabelsExposed',         fn: test_workload_categoryLabelsExposed },
+    { name: 'test_workload_getSubCategoriesCallable',      fn: test_workload_getSubCategoriesCallable },
+    { name: 'test_workload_globalWrappersExist',           fn: test_workload_globalWrappersExist },
+    { name: 'test_workload_triggerHandlersExist',          fn: test_workload_triggerHandlersExist },
+    { name: 'test_workload_wrappersRejectNullToken',       fn: test_workload_wrappersRejectNullToken },
+
+    // ── qaforum suite (QAForum module, question retrieval) ──
+    { name: 'test_qaforum_moduleExists',                   fn: test_qaforum_moduleExists },
+    { name: 'test_qaforum_publicAPIComplete',              fn: test_qaforum_publicAPIComplete },
+    { name: 'test_qaforum_globalWrappersExist',            fn: test_qaforum_globalWrappersExist },
+    { name: 'test_qaforum_getQuestionsReturnsArray',       fn: test_qaforum_getQuestionsReturnsArray },
+    { name: 'test_qaforum_wrappersRejectNullToken',        fn: test_qaforum_wrappersRejectNullToken },
+    { name: 'test_qaforum_paginationDefaults',             fn: test_qaforum_paginationDefaults },
+
+    // ── timeline suite (TimelineService module, events, categories) ──
+    { name: 'test_timeline_moduleExists',                  fn: test_timeline_moduleExists },
+    { name: 'test_timeline_publicAPIComplete',             fn: test_timeline_publicAPIComplete },
+    { name: 'test_timeline_globalWrappersExist',           fn: test_timeline_globalWrappersExist },
+    { name: 'test_timeline_getEventsReturnsArray',         fn: test_timeline_getEventsReturnsArray },
+    { name: 'test_timeline_wrappersRejectNullToken',       fn: test_timeline_wrappersRejectNullToken },
+    { name: 'test_timeline_categoriesValidated',           fn: test_timeline_categoriesValidated },
+
+    // ── failsafe suite (FailsafeService module, digest config) ──
+    { name: 'test_failsafe_moduleExists',                  fn: test_failsafe_moduleExists },
+    { name: 'test_failsafe_publicAPIComplete',             fn: test_failsafe_publicAPIComplete },
+    { name: 'test_failsafe_globalWrappersExist',           fn: test_failsafe_globalWrappersExist },
+    { name: 'test_failsafe_diagnosticExists',              fn: test_failsafe_diagnosticExists },
+    { name: 'test_failsafe_digestConfigReturnsShape',      fn: test_failsafe_digestConfigReturnsShape },
+    { name: 'test_failsafe_wrappersRejectNullToken',       fn: test_failsafe_wrappersRejectNullToken },
+    { name: 'test_failsafe_ensureAllSheetsExists',         fn: test_failsafe_ensureAllSheetsExists },
+
+    // ── endpoints suite (Comprehensive data* wrapper existence & auth) ──
+    { name: 'test_endpoints_coreGrievanceFnsExist',        fn: test_endpoints_coreGrievanceFnsExist },
+    { name: 'test_endpoints_taskFnsExist',                 fn: test_endpoints_taskFnsExist },
+    { name: 'test_endpoints_surveyFeedbackFnsExist',       fn: test_endpoints_surveyFeedbackFnsExist },
+    { name: 'test_endpoints_contactNotificationFnsExist',  fn: test_endpoints_contactNotificationFnsExist },
+    { name: 'test_endpoints_adminStatsFnsExist',           fn: test_endpoints_adminStatsFnsExist },
+    { name: 'test_endpoints_batchDiagnosticFnsExist',      fn: test_endpoints_batchDiagnosticFnsExist },
+    { name: 'test_endpoints_meetingFnsExist',              fn: test_endpoints_meetingFnsExist },
+    { name: 'test_endpoints_checklistFnsExist',            fn: test_endpoints_checklistFnsExist },
+    { name: 'test_endpoints_legacyStubsSafe',              fn: test_endpoints_legacyStubsSafe },
+    { name: 'test_endpoints_allWriteEndpointsRejectNull',  fn: test_endpoints_allWriteEndpointsRejectNull },
+    { name: 'test_endpoints_notificationCountExists',      fn: test_endpoints_notificationCountExists },
+    { name: 'test_endpoints_grievanceDraftFnsExist',       fn: test_endpoints_grievanceDraftFnsExist },
   ];
 }
 
@@ -1121,7 +1315,7 @@ function test_system_spreadsheetBound() {
 }
 
 function test_system_eventBusExists() {
-  TestRunner.assertEquals('function', typeof EventBus !== 'undefined' ? 'object' : 'undefined',
+  TestRunner.assertEquals('object', typeof EventBus !== 'undefined' ? 'object' : 'undefined',
     'EventBus type check — if this fails, 15_EventBus.gs may not be loaded');
   if (typeof EventBus !== 'undefined') {
     TestRunner.assertType(EventBus.emit, 'function', 'EventBus.emit');
@@ -1442,13 +1636,15 @@ function test_survey_getSurveyQuestionsCallable() {
 }
 
 function test_survey_questionsReturnArray() {
-  var questions = getSurveyQuestions();
+  var result = getSurveyQuestions();
+  var questions = result && result.questions ? result.questions : result;
   TestRunner.assertTrue(Array.isArray(questions), 'getSurveyQuestions returns array');
   TestRunner.assertGreaterThan(questions.length, 0, 'at least 1 question');
 }
 
 function test_survey_questionShapeValid() {
-  var questions = getSurveyQuestions();
+  var result = getSurveyQuestions();
+  var questions = result && result.questions ? result.questions : result;
   if (!questions || questions.length === 0) return;
   // Check first question has expected shape
   var q = questions[0];

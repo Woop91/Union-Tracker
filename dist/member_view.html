@@ -32,9 +32,12 @@ function initMemberView(container) {
   }
 
   // Fallback: load individually (batch unavailable)
-  serverCall().withSuccessHandler(function(r) {
-    AppState.notificationCount = (r && r.count) || 0;
-  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(SESSION_TOKEN, 'member');
+  // C4/S2: Single badge count call replaces serial notification call
+  serverCall().withSuccessHandler(function(counts) {
+    AppState.notificationCount = (counts && counts.notificationCount) || 0;
+  }).withFailureHandler(function() {
+    AppState.notificationCount = 0;
+  }).dataGetBadgeCounts(SESSION_TOKEN);
 
   serverCall()
     .withSuccessHandler(function(grievances) {
@@ -1338,8 +1341,10 @@ function renderUpdateProfile(appContainer) {
       // Read-only info section
       var infoFields = [
         { label: 'Email', value: profile.email || CURRENT_USER.email || '' },
+        { label: 'Employee ID', value: profile.employeeId || '' },
         { label: 'Employee Number', value: profile.memberId || profile.employeeNumber || '' },
-        { label: 'Hire Date', value: profile.joined || profile.hireDate || '' },
+        { label: 'Hire Date', value: profile.hireDate || profile.joined || '' },
+        { label: 'Email Open Rate', value: profile.openRate ? (String(profile.openRate).indexOf('%') !== -1 ? profile.openRate : profile.openRate + '%') : '' },
       ];
       var infoSection = el('div', { className: 'card card-glass', style: { padding: '14px 16px', marginBottom: '14px' } });
       infoSection.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, 'Account Info'));
@@ -4877,7 +4882,7 @@ function renderQAForum(appContainer, role) {
           if (!text) { statusMsg.textContent = 'Write your question first.'; statusMsg.style.color = 'var(--danger)'; return; }
           statusMsg.textContent = 'Posting...'; statusMsg.style.color = 'var(--muted)';
           serverCall().withSuccessHandler(function(r) {
-            if (r && r.success) { activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
+            if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
             else { statusMsg.textContent = r ? r.message : 'Error posting.'; statusMsg.style.color = 'var(--danger)'; }
           }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitQuestion(SESSION_TOKEN, CURRENT_USER.name || '', text, anonCheck.checked);
         }

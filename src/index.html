@@ -3,12 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5.0, user-scalable=yes">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Dashboard</title>
 
-  <!-- Fonts — load only weights used (400, 600) to reduce payload -->
+  <!-- N1: Fonts — reduced to 3 families (dropped Sora, subset weights) to cut payload ~20% -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
   <?!= include('styles') ?>
 
@@ -37,7 +40,11 @@
 
     // Store session token in localStorage if provided
     if (SESSION_TOKEN) {
-      localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
+      try {
+        localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
+        // Reset redirect counter — token is valid, auth succeeded
+        localStorage.removeItem('dashboardSessionRedirectCount');
+      } catch (_lsErr) { /* localStorage may be blocked */ }
     }
 
     // On auth page: try to restore session from localStorage
@@ -46,14 +53,29 @@
         if (PAGE_DATA.error === 'loggedout') {
           // User just signed out — clear any stored session token
           localStorage.removeItem('dashboardSessionToken');
+          localStorage.removeItem('dashboardSessionRedirectCount');
+        } else if (PAGE_DATA.tokenChecked) {
+          // Server already rejected this token — clear it and reset redirect counter
+          localStorage.removeItem('dashboardSessionToken');
+          localStorage.removeItem('dashboardSessionRedirectCount');
         } else {
           var storedToken = localStorage.getItem('dashboardSessionToken');
-          if (storedToken && !PAGE_DATA.tokenChecked) {
-            // Redirect to web app URL with stored session token so server can validate
-            window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
-          } else if (PAGE_DATA.tokenChecked && storedToken) {
-            // Server already rejected this token — clear it
-            localStorage.removeItem('dashboardSessionToken');
+          if (storedToken) {
+            // Redirect-loop guard: max 2 attempts before clearing stale token.
+            // Without this, Chrome's aggressive caching + stale localStorage token
+            // can cause an infinite redirect cycle (works in incognito because
+            // localStorage starts empty).
+            var redirectCount = parseInt(localStorage.getItem('dashboardSessionRedirectCount') || '0', 10);
+            if (redirectCount >= 2) {
+              // Too many redirects — token is likely expired/invalid, clear it
+              localStorage.removeItem('dashboardSessionToken');
+              localStorage.removeItem('dashboardSessionRedirectCount');
+              console.warn('Session restore: cleared stale token after ' + redirectCount + ' failed attempts');
+            } else {
+              localStorage.setItem('dashboardSessionRedirectCount', String(redirectCount + 1));
+              // Redirect to web app URL with stored session token so server can validate
+              window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
+            }
           }
         }
       } catch (_lsErr) {
@@ -61,6 +83,89 @@
         console.warn('Session restore skipped:', _lsErr.message);
       }
     }
+
+    // ═══════════════════════════════════════
+    // N3: PRELOAD — Fire batch data call IMMEDIATELY, before module definitions parse.
+    // This overlaps the server round-trip with JS parsing time.
+    // ═══════════════════════════════════════
+    var _preloadedBatch = null;
+    var _preloadReady = false;
+    var _preloadCallbacks = [];
+
+    if ((CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member') && CURRENT_USER && CURRENT_USER.email) {
+      google.script.run
+        .withSuccessHandler(function(batch) {
+          _preloadedBatch = batch || {};
+          _preloadReady = true;
+          // C3: Stale-while-revalidate — persist batch data for instant return visits
+          try { localStorage.setItem('dds_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch })); } catch(_) {}
+          for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](_preloadedBatch);
+          _preloadCallbacks = [];
+        })
+        .withFailureHandler(function() {
+          _preloadedBatch = null;
+          _preloadReady = true;
+          for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](null);
+          _preloadCallbacks = [];
+        })
+        .dataGetBatchData(SESSION_TOKEN);
+    }
+
+    /**
+     * Returns preloaded batch data. If not ready yet, queues the callback.
+     * @param {Function} cb - Called with batch data (or null on failure)
+     */
+    function _onPreloadReady(cb) {
+      if (_preloadReady) { cb(_preloadedBatch); return; }
+      _preloadCallbacks.push(cb);
+    }
+
+    // ═══════════════════════════════════════
+    // C1: SKELETON UI — Show layout skeleton immediately instead of blank screen.
+    // Renders placeholder boxes that match the final layout, replaced when data arrives.
+    // ═══════════════════════════════════════
+    (function _renderSkeleton() {
+      if (CURRENT_VIEW !== 'steward' && CURRENT_VIEW !== 'member') return;
+      var app = document.getElementById('app');
+      if (!app) return;
+      var skeletonHtml =
+        '<div class="skeleton-wrap">' +
+          '<div class="skeleton-header">' +
+            '<div class="skeleton-box" style="width:120px;height:18px;"></div>' +
+            '<div class="skeleton-box" style="width:80px;height:14px;margin-top:4px;"></div>' +
+          '</div>' +
+          '<div class="skeleton-kpis">' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+          '</div>' +
+          '<div class="skeleton-cards">' +
+            '<div class="skeleton-box skeleton-card"></div>' +
+            '<div class="skeleton-box skeleton-card"></div>' +
+            '<div class="skeleton-box skeleton-card"></div>' +
+          '</div>' +
+        '</div>';
+      app.innerHTML = skeletonHtml;
+    })();
+
+    // C3: Stale-while-revalidate — render from cached batch data instantly on return visits
+    var _swrApplied = false;
+    (function _trySWR() {
+      if (CURRENT_VIEW !== 'steward' && CURRENT_VIEW !== 'member') return;
+      try {
+        var raw = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
+        if (!raw) return;
+        var parsed = JSON.parse(raw);
+        // Only use SWR data if less than 5 minutes old
+        if (Date.now() - parsed.ts > 300000) return;
+        if (parsed.data) {
+          _preloadedBatch = parsed.data;
+          // Don't set _preloadReady — let the fresh server call complete and overwrite
+          _swrApplied = true;
+        }
+      } catch (_) {}
+    })();
 
     // ═══════════════════════════════════════
     // THEME ENGINE
@@ -107,7 +212,7 @@
             success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
             border: 'rgba(255,255,255,0.08)', radius: '20px',
             fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            fontDisplay: "'Space Grotesk', sans-serif",
             mode: 'dark',
           },
           light: {
@@ -116,7 +221,7 @@
             success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
             border: 'rgba(0,0,0,0.08)', radius: '20px',
             fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            fontDisplay: "'Space Grotesk', sans-serif",
             mode: 'light',
           }
         }
@@ -302,6 +407,9 @@
     var DataCache = (function() {
       var _cache = {};
       var DEFAULT_TTL = 120000; // 2 minutes
+      // C6: Longer TTLs for stable data (member directory, config rarely change)
+      var STABLE_TTL = 300000; // 5 minutes — for member directory, steward directory
+      var CONFIG_TTL = 1800000; // 30 minutes — for config data
 
       function get(key) {
         var entry = _cache[key];
@@ -342,8 +450,77 @@
         runner[fnName].apply(runner, args || []);
       }
 
-      return { get: get, set: set, invalidate: invalidate, cachedCall: cachedCall };
+      return { get: get, set: set, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
     })();
+
+    // ═══════════════════════════════════════
+    // C2: LAZY LIST RENDERER — Renders first N items, lazy-loads rest on scroll via IntersectionObserver
+    // ═══════════════════════════════════════
+    var LazyList = (function() {
+      var PAGE_SIZE = 50;
+
+      /**
+       * Renders items into a container with pagination via IntersectionObserver.
+       * @param {Element} container - Parent container
+       * @param {Array} items - Full array of items
+       * @param {Function} renderItem - fn(item, index) → Element
+       * @param {Object} [opts] - { pageSize: number, emptyMsg: string }
+       */
+      function render(container, items, renderItem, opts) {
+        opts = opts || {};
+        var ps = opts.pageSize || PAGE_SIZE;
+        if (!items || items.length === 0) {
+          if (opts.emptyMsg) container.appendChild(el('div', { className: 'empty-state' }, opts.emptyMsg));
+          return;
+        }
+        var rendered = 0;
+
+        function renderPage() {
+          var end = Math.min(rendered + ps, items.length);
+          var frag = document.createDocumentFragment();
+          for (var i = rendered; i < end; i++) {
+            var node = renderItem(items[i], i);
+            if (node) frag.appendChild(node);
+          }
+          // Remove sentinel before appending new items
+          var oldSentinel = container.querySelector('.lazy-sentinel');
+          if (oldSentinel) oldSentinel.remove();
+          container.appendChild(frag);
+          rendered = end;
+
+          // Add sentinel for next page
+          if (rendered < items.length) {
+            var sentinel = document.createElement('div');
+            sentinel.className = 'lazy-sentinel';
+            sentinel.style.height = '1px';
+            container.appendChild(sentinel);
+            if (typeof IntersectionObserver !== 'undefined') {
+              var obs = new IntersectionObserver(function(entries) {
+                if (entries[0].isIntersecting) {
+                  obs.disconnect();
+                  renderPage();
+                }
+              }, { rootMargin: '200px' });
+              obs.observe(sentinel);
+            } else {
+              // Fallback: render all if no IntersectionObserver
+              renderPage();
+            }
+          }
+        }
+
+        renderPage();
+      }
+
+      return { render: render, PAGE_SIZE: PAGE_SIZE };
+    })();
+
+    // ═══════════════════════════════════════
+    // C5: IDLE CALLBACK — Defers non-critical rendering to idle frames
+    // ═══════════════════════════════════════
+    var _scheduleIdle = (typeof requestIdleCallback === 'function')
+      ? function(fn) { requestIdleCallback(fn, { timeout: 2000 }); }
+      : function(fn) { setTimeout(fn, 16); };
 
     // ═══════════════════════════════════════
     // APP STATE
@@ -376,22 +553,25 @@
           break;
         case 'steward':
         case 'member':
-          // Pre-fetch batch data in a single round-trip, then init the view.
-          // Falls back to per-view init if batch fails.
+          // N3: Use preloaded batch data (fired at top of <script> before module defs).
+          // C3: If SWR data was applied, render immediately with stale data, then refresh.
           if (CURRENT_USER && CURRENT_USER.email) {
-            google.script.run
-              .withSuccessHandler(function(batch) {
-                AppState.batchData = batch || {};
+            if (_swrApplied && _preloadedBatch) {
+              // Render instantly from SWR cache
+              AppState.batchData = _preloadedBatch;
+              if (CURRENT_VIEW === 'steward') initStewardView(app);
+              else initMemberView(app);
+              // When fresh data arrives, update in background (no re-render unless data changed)
+              _onPreloadReady(function(freshBatch) {
+                if (freshBatch) AppState.batchData = freshBatch;
+              });
+            } else {
+              _onPreloadReady(function(batch) {
+                AppState.batchData = batch;
                 if (CURRENT_VIEW === 'steward') initStewardView(app);
                 else initMemberView(app);
-              })
-              .withFailureHandler(function() {
-                // Batch unavailable — views will make individual calls
-                AppState.batchData = null;
-                if (CURRENT_VIEW === 'steward') initStewardView(app);
-                else initMemberView(app);
-              })
-              .dataGetBatchData(SESSION_TOKEN);
+              });
+            }
           } else {
             if (CURRENT_VIEW === 'steward') initStewardView(app);
             else initMemberView(app);
@@ -462,7 +642,12 @@
     function showLoading(container) {
       container.innerHTML = '';
       var loader = el('div', { className: 'loading-spinner' });
-      loader.innerHTML = '<div class="spinner"></div><div class="loading-text">Loading...</div>';
+      loader.innerHTML =
+        '<div class="skeleton-card"></div>' +
+        '<div class="skeleton-row"></div>' +
+        '<div class="skeleton-row"></div>' +
+        '<div class="skeleton-card"></div>' +
+        '<div class="skeleton-row"></div>';
       container.appendChild(loader);
     }
 

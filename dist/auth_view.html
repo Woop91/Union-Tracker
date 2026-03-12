@@ -5,23 +5,10 @@
  * States: choose → email → sending → sent → error
  */
 function renderAuth(container) {
-  // Apply auth theme (always dark)
-  var hue = CONFIG.accentHue || 250;
-  document.documentElement.style.setProperty('--bg', '#0a0a18');
-  document.documentElement.style.setProperty('--surface', 'rgba(255,255,255,0.04)');
-  document.documentElement.style.setProperty('--raised', 'rgba(255,255,255,0.06)');
-  document.documentElement.style.setProperty('--text', '#eeedf5');
-  document.documentElement.style.setProperty('--muted', '#6b6b80');
-  document.documentElement.style.setProperty('--accent', 'hsl(' + hue + ', 70%, 68%)');
-  document.documentElement.style.setProperty('--accentBg', 'hsla(' + hue + ', 70%, 68%, 0.1)');
-  document.documentElement.style.setProperty('--accentBorder', 'hsla(' + hue + ', 70%, 68%, 0.25)');
-  document.documentElement.style.setProperty('--border', 'rgba(255,255,255,0.08)');
-  document.documentElement.style.setProperty('--success', '#34d399');
-  document.documentElement.style.setProperty('--danger', '#f87171');
-  document.documentElement.style.setProperty('--fontBody', "'Plus Jakarta Sans', sans-serif");
-  document.documentElement.style.setProperty('--fontDisplay', "'Sora', sans-serif");
-  document.body.style.background = '#0a0a18';
-  document.body.style.color = '#eeedf5';
+  // Apply member dark theme via ThemeEngine (single source of truth for colors)
+  if (typeof ThemeEngine !== 'undefined') {
+    ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
+  }
 
   showAuthChoose(container);
 }
@@ -193,14 +180,26 @@ function showAuthSending(container, email, rememberMe) {
   // Actually send the magic link
   google.script.run
     .withSuccessHandler(function(result) {
-      if (result.success) {
+      if (result && result.success) {
         showAuthSent(container, email, rememberMe);
+      } else if (result) {
+        showAuthError(container, result.message || 'An unknown error occurred.', email);
       } else {
-        showAuthError(container, result.message, email);
+        // result is null/undefined — server returned nothing
+        showAuthError(container, 'No response from server. The web app may need to be re-deployed. Please contact your administrator.', email);
       }
     })
     .withFailureHandler(function(err) {
-      showAuthError(container, err.message || 'Failed to send email. Please try again.', email);
+      // withFailureHandler fires when google.script.run CANNOT reach the server
+      // or the server function throws an unhandled exception.
+      // Common causes: stale cached page, third-party cookie blocking, auth scope issues.
+      var msg = (err && err.message) ? err.message : '';
+      if (!msg || msg === 'Error' || msg === 'ScriptError') {
+        msg = 'Unable to connect to the server. ';
+        msg += 'This is often caused by a stale browser cache. ';
+        msg += 'Please clear your browser cache or try in an incognito/private window.';
+      }
+      showAuthError(container, msg, email);
     })
     .authSendMagicLink(email, rememberMe);
 }

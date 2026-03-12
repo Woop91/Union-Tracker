@@ -4,14 +4,10 @@
  * Shows when auth fails, user not found, or something breaks
  */
 function renderError(container, error) {
-  // Apply dark theme
-  document.documentElement.style.setProperty('--bg', '#0a0a18');
-  document.documentElement.style.setProperty('--text', '#eeedf5');
-  document.documentElement.style.setProperty('--muted', '#6b6b80');
-  document.documentElement.style.setProperty('--accent', 'hsl(' + (CONFIG.accentHue || 250) + ', 70%, 68%)');
-  document.documentElement.style.setProperty('--fontBody', "'Plus Jakarta Sans', sans-serif");
-  document.documentElement.style.setProperty('--fontDisplay', "'Sora', sans-serif");
-  document.body.style.background = '#0a0a18';
+  // Apply member dark theme via ThemeEngine (single source of truth for colors)
+  if (typeof ThemeEngine !== 'undefined') {
+    ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
+  }
 
   container.innerHTML = '';
   var wrapper = el('div', { className: 'error-container fade-in' });

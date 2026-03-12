@@ -501,9 +501,49 @@ function getPendingSurveyMembers() {
     var pendingMembers = [];
     var completedCount = 0;
 
+    // Build email → member record map for enrichment (cubicle, officeDays, hireDate)
+    var memberMap = {};
+    try {
+      var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+      if (memberSheet && memberSheet.getLastRow() > 1) {
+        var mData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
+        var mHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
+        var mColMap = {};
+        for (var h = 0; h < mHeaders.length; h++) {
+          var hName = String(mHeaders[h]).trim().toLowerCase();
+          if (hName) mColMap[hName] = h;
+        }
+        var mEmailCol = mColMap['email'] !== undefined ? mColMap['email'] : -1;
+        var mCubicleCol = mColMap['cubicle'] !== undefined ? mColMap['cubicle'] : -1;
+        var mOfficeDaysCol = mColMap['office days'] !== undefined ? mColMap['office days'] : -1;
+        var mHireDateCol = mColMap['hire date'] !== undefined ? mColMap['hire date'] : -1;
+        if (mEmailCol !== -1) {
+          for (var mi = 0; mi < mData.length; mi++) {
+            var mEmail = String(mData[mi][mEmailCol]).trim().toLowerCase();
+            if (mEmail) {
+              memberMap[mEmail] = {
+                cubicle: mCubicleCol !== -1 ? String(mData[mi][mCubicleCol] || '').trim() : '',
+                officeDays: mOfficeDaysCol !== -1 ? String(mData[mi][mOfficeDaysCol] || '').trim() : '',
+                hireDate: mHireDateCol !== -1 ? (mData[mi][mHireDateCol] instanceof Date ? mData[mi][mHireDateCol].toLocaleDateString() : String(mData[mi][mHireDateCol] || '').trim()) : '',
+              };
+            }
+          }
+        }
+      }
+    } catch(enrichErr) {
+      Logger.log('getPendingSurveyMembers enrichment error: ' + enrichErr.message);
+    }
+
     for (var i = 0; i < data.length; i++) {
-      var status = String(data[i][C.CURRENT_STATUS - 1] || '').trim();
-      if (status === 'Completed') {
+      var status = String(data[i][C.CURRENT_STATUS - 1] || '').trim().toLowerCase();
+      var email = String(data[i][C.EMAIL - 1] || '').trim().toLowerCase();
+      var enriched = memberMap[email] || {};
+      var totalMissed = parseInt(data[i][C.TOTAL_MISSED - 1], 10) || 0;
+      var totalCompleted = parseInt(data[i][C.TOTAL_COMPLETED - 1], 10) || 0;
+      var totalSurveys = totalMissed + totalCompleted;
+      var participationRate = totalSurveys > 0 ? Math.round((totalCompleted / totalSurveys) * 100) : null;
+
+      if (status === 'completed') {
         completedCount++;
       } else {
         pendingMembers.push({
@@ -511,7 +551,13 @@ function getPendingSurveyMembers() {
           name:            String(data[i][C.MEMBER_NAME      - 1] || ''),
           email:           String(data[i][C.EMAIL            - 1] || ''),
           workLocation:    String(data[i][C.WORK_LOCATION    - 1] || ''),
-          assignedSteward: String(data[i][C.ASSIGNED_STEWARD - 1] || '')
+          assignedSteward: String(data[i][C.ASSIGNED_STEWARD - 1] || ''),
+          cubicle:         enriched.cubicle || '',
+          officeDays:      enriched.officeDays || '',
+          hireDate:        enriched.hireDate || '',
+          participationRate: participationRate,
+          totalCompleted:  totalCompleted,
+          totalMissed:     totalMissed,
         });
       }
     }

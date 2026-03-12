@@ -28,7 +28,31 @@ loadSources([
  */
 function buildMockConfigSheet(valueMap) {
   var mockSheet = createMockSheet('Config');
-  mockSheet.getRange = jest.fn(function (row, col) {
+  // Determine max column from the value map for getLastColumn
+  var maxCol = 0;
+  for (var k in valueMap) {
+    if (valueMap.hasOwnProperty(k)) {
+      var c = Number(k);
+      if (c > maxCol) maxCol = c;
+    }
+  }
+  maxCol = Math.max(maxCol, 20); // Ensure a reasonable default
+  mockSheet.getLastColumn = jest.fn(function () { return maxCol; });
+  mockSheet.getRange = jest.fn(function (row, col, numRows, numCols) {
+    // S4: Support single-row read pattern getRange(3, 1, 1, lastCol).getValues()
+    if (row === 3 && col === 1 && numRows === 1 && numCols) {
+      var rowData = [];
+      for (var i = 1; i <= numCols; i++) {
+        rowData.push(valueMap[i] !== undefined ? valueMap[i] : '');
+      }
+      return {
+        getValue: jest.fn(function () { return rowData[0] || ''; }),
+        getValues: jest.fn(function () { return [rowData]; }),
+        setValue: jest.fn(),
+        setValues: jest.fn()
+      };
+    }
+    // Legacy single-cell pattern getRange(3, col).getValue()
     return {
       getValue: jest.fn(function () {
         if (row === 3 && valueMap[col] !== undefined) return valueMap[col];
@@ -110,15 +134,14 @@ describe('ConfigReader.getConfig', function () {
   test('returns cached value on second call without forceRefresh', function () {
     // First call reads from sheet
     var first = ConfigReader.getConfig(true);
-    // Simulate that cache.put stored the value; make cache.get return it
-    var cachedJson = JSON.stringify(first);
-    mockCache.get = jest.fn(function () { return cachedJson; });
-
-    // Second call should use the cache, not the sheet
+    // S3: In-execution memo means second call returns memo without hitting CacheService.
+    // This is the expected performance optimization behavior.
     var second = ConfigReader.getConfig();
     expect(second).toEqual(first);
-    // Cache was consulted
-    expect(mockCache.get).toHaveBeenCalled();
+    // The memo short-circuits — CacheService may not be consulted within same execution.
+    // Validate that refreshConfig clears the memo and re-reads:
+    var refreshed = ConfigReader.refreshConfig();
+    expect(refreshed.orgName).toBe('Test Organization');
   });
 
   test('forceRefresh=true bypasses cache', function () {
@@ -174,8 +197,8 @@ describe('ConfigReader.getConfig', function () {
     installMockSpreadsheet(configSheet);
 
     var cfg = ConfigReader.getConfig(true);
-    // Verify getRange was called with row 3 and the CONFIG_COLS constant
-    expect(configSheet.getRange).toHaveBeenCalledWith(3, CONFIG_COLS.ORG_NAME);
+    // S4: Now reads entire row 3 in one call: getRange(3, 1, 1, lastCol)
+    expect(configSheet.getRange).toHaveBeenCalledWith(3, 1, 1, expect.any(Number));
     expect(cfg.orgName).toBe('Column Test Org');
   });
 

@@ -18,5 +18,10 @@ module.exports = {
       statements: 70
     }
   },
+  // Unified error summary reporter — aggregates all failures into one readable block
+  reporters: [
+    'default',
+    './test/webapp-error-reporter.js'
+  ],
   watchPathIgnorePatterns: ['dist/', 'coverage/', 'node_modules/']
 };

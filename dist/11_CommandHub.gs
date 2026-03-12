@@ -3051,7 +3051,7 @@ function getStewardWorkload() {
 
     if (steward && workload[steward]) {
       workload[steward].totalCases++;
-      if (status === 'Open' || (status && status.indexOf('Pending') >= 0)) {
+      if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) {
         workload[steward].openCases++;
       }
     }

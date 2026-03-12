@@ -793,7 +793,7 @@ function createStewardLeaderboardChart_(sheet) {
       if (stewardName) {
         caseCounts[stewardName] = (caseCounts[stewardName] || 0) + 1;
         var gStatus = gData[g][GRIEVANCE_COLS.STATUS - 1] || '';
-        if (gStatus === 'Won' || gStatus === 'Settled') {
+        if (gStatus === GRIEVANCE_STATUS.WON || gStatus === GRIEVANCE_STATUS.SETTLED) {
           winCounts[stewardName] = (winCounts[stewardName] || 0) + 1;
         }
       }

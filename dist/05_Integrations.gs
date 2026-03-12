@@ -2837,7 +2837,7 @@ function getWebAppGrievanceList() {
     var result = data.map(function(row) {
       var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
       // Skip blank rows - must have a valid grievance ID starting with G
-      if (!grievanceId || (typeof grievanceId === 'string' && !grievanceId.toString().match(/^G/i))) return null;
+      if (!isGrievanceId_(grievanceId)) return null;
 
       var filed = row[GRIEVANCE_COLS.DATE_FILED - 1];
       var incident = row[GRIEVANCE_COLS.INCIDENT_DATE - 1];
@@ -2903,7 +2903,7 @@ function getWebAppMemberList() {
     var result = data.map(function(row) {
       var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
       // Skip blank rows - must have a valid member ID starting with M
-      if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return null;
+      if (!isMemberId_(memberId)) return null;
 
       return {
         id: memberId,
@@ -3023,7 +3023,7 @@ function getWebAppDashboardStats() {
     var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
     var validMembers = memberIds.filter(function(row) {
       var id = row[0] || '';
-      return id && id.toString().match(/^M/i);
+      return isMemberId_(id);
     }).length;
     stats.totalMembers = validMembers;
   } else {

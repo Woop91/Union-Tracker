@@ -335,9 +335,9 @@ function getVisualControlPanelHtml() {
  * Helper functions for navigation
  * Note: Dashboards are now modal-based for better UX
  */
+/** @deprecated Use showStewardDashboard() directly. Kept for menu backward compat. */
 function showExecutiveDashboard() {
-  // Redirects to Interactive Dashboard modal (was: sheet navigation)
-  showInteractiveDashboardTab();
+  showStewardDashboard();
 }
 
 function showStewardDirectory() {

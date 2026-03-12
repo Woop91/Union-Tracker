@@ -338,9 +338,11 @@ function registerEventBusSubscribers() {
   }, { priority: 10, id: 'member_audit' });
 
   // --- Auto-sync (debounced via onEditAutoSync) ---
+  // M-48: Mark _grievanceEditHandled so onEditAutoSync skips redundant formula sync
+  // (handleGrievanceEdit at priority 100 already computed deadline values for this row)
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
     if (typeof onEditAutoSync === 'function') {
-      try { onEditAutoSync(e); } catch (_err) { /* skip */ }
+      try { e._grievanceEditHandled = true; onEditAutoSync(e); } catch (_err) { /* skip */ }
     }
   }, { priority: 20, id: 'grievance_auto_sync' });
 

@@ -10,6 +10,16 @@
 6. **After any merge/work to Main:** remind user to run `clasp push`. Agent cannot run clasp remotely.
 7. **⚠️ Adding a scope to `appsscript.json` REQUIRES re-authorization of the deployed web app.** GAS does NOT auto-authorize new scopes in existing deployments. After `clasp push`, the admin must: Apps Script editor → Deploy → Manage Deployments → create a new version → authorize all scopes. Failure to do this causes the new scope's services to throw auth errors silently (they reach the catch block and return `{success:false}`). After any scope change, run the `emailsend` test suite via the TestRunner tab to verify. The CI `scope-change-guard` job will also flag this on every push to Main.
 
+## Tech Stack & Version
+
+- **Current version:** 4.25.10 (check `package.json` and `src/01_Core.gs:VERSION_INFO` for latest)
+- **Runtime:** Google Apps Script V8 (ES2020), timezone `America/New_York`
+- **Build:** Node.js >=18, ESLint v9 (flat config), Jest 29, Husky 9
+- **Deployment:** Google CLASP (`@google/clasp`), GitHub Actions CI
+- **Source:** 42 `.gs` files + 8 `.html` files (~94K lines)
+- **Tests:** 59 Jest test files + GAS-native TestRunner (6 suites, 48+ tests)
+- **OAuth Scopes:** 10 (spreadsheets, drive, docs, gmail, calendar, external requests, userinfo, scriptapp, container.ui, send_mail)
+
 ## Permissions
 
 Claude has **full, pre-authorized access** to read, edit, create, delete any files in both **DDS-Dashboard** and **Union-Tracker** — local and GitHub remotes. This includes all file operations, git operations, clasp push, build/lint/test/deploy scripts. No permission needed.
@@ -71,9 +81,15 @@ npm run lint           # ESLint all src/*.gs
 npm run lint:fix       # ESLint with auto-fix
 npm run test           # lint + build + jest (full pipeline)
 npm run test:unit      # Jest only
+npm run test:guards    # Deploy guards + SPA integrity checks only
 npm run coverage       # Jest with coverage report
 npm run ci             # clean + lint + build + test:unit
-npm run deploy         # lint + test:unit + build:prod + clasp push
+npm run deploy         # lint + test:guards + test:unit + build:prod + clasp push
+npm run deploy:dev     # lint + build + clasp push --force (dev shortcut)
+npm run watch          # Watch mode (rebuild on src/ changes)
+npm run clean          # Remove dist/ directory
+npm run sync-org-chart # Sync org chart from Google Drive
+npm run check:scopes   # Check for OAuth scope changes in appsscript.json
 ```
 
 ## Architecture
@@ -92,11 +108,13 @@ Files numbered to control GAS execution order:
 | `05_` | Integrations | Drive, Calendar, Email, Web App |
 | `06_` | Maintenance | Admin, undo/redo, snapshots, audit |
 | `07_` | DevTools | Dev-only (excluded in prod) |
-| `08a-d` | Sheet utils | Setup, search, forms, audit formulas |
+| `08a-e` | Sheet utils | Setup, search, forms, audit formulas, survey engine |
 | `09_` | Dashboards | Dashboard rendering |
-| `10_-10d` | Business logic | Entry, sheet creation, forms, sync |
-| `11_-17_` | Features | CommandHub, self-service, meetings, events, etc. |
+| `10_-10d` | Business logic | Entry, sheet creation, survey docs, forms, sync |
+| `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation engine |
 | `19_-28_` | Web Dashboard | Auth, config, data service, app, portals, workload, QA, timeline, failsafe |
+| `29_` | Migrations | Column schema auto-migration |
+| `30_` | TestRunner | GAS-native test runner framework (in-spreadsheet tests) |
 
 ### Column Constants
 
@@ -106,6 +124,27 @@ Files numbered to control GAS execution order:
 | `GRIEVANCE_COLS` | `buildColsFromMap_(GRIEVANCE_HEADER_MAP_)` | 1-indexed |
 | `MEMBER_COLS` | `buildColsFromMap_(MEMBER_HEADER_MAP_)` | 1-indexed |
 | `CONFIG_COLS` | `buildColsFromMap_(CONFIG_HEADER_MAP_)` | 1-indexed |
+
+### HTML Files (SPA & Views)
+
+| File | Purpose |
+|------|---------|
+| `index.html` | SPA entry point — unified steward dashboard |
+| `steward_view.html` | Steward command center |
+| `member_view.html` | Member self-service dashboard |
+| `auth_view.html` | Login/authentication page |
+| `error_view.html` | Error display fallback |
+| `styles.html` | Shared CSS (included via `createTemplateFromFile()`) |
+| `org_chart.html` | Organizational chart view |
+| `poms_reference.html` | POMS reference documentation |
+
+### Build System (`build.js`)
+
+- Validates `.gs` syntax and `<script>` blocks in HTML before copying
+- Copies individual files from `src/` → `dist/` (not consolidated)
+- `--prod` excludes `07_DevTools.gs`; warns if prod build exceeds 52 files (limit 60)
+- Auto-cleans `dist/` before build to prevent orphaned files
+- Also copies `appsscript.json` and `AI_REFERENCE.md` to `dist/`
 
 ## Error Handling — MANDATORY
 
@@ -185,14 +224,43 @@ function setupOpenDeferredTrigger() {
 
 ## Testing
 
-- Jest 29, custom GAS mocks in `test/`
-- `architecture.test.js` + `modules.test.js` — structural invariants
-- `columns.test.js` — column constant consistency
+### Jest (local, CI)
+- Jest 29, custom GAS mocks in `test/gas-mock.js` + `test/load-source.js`
+- 59 test files covering all source modules
+- Coverage thresholds: 70% lines, 60% branches, 70% functions, 70% statements
+- Key structural tests:
+  - `architecture.test.js` — entry point error handling, auth checks (A1–A8)
+  - `modules.test.js` — module structure invariants
+  - `columns.test.js` — column constant consistency
+  - `deploy-guards.test.js` — deployment safety checks
+  - `spa-integrity.test.js` — SPA HTML/JS integrity
+  - `simple-trigger-lint.test.js` — simple trigger restriction enforcement
+  - `auth-denial.test.js` — auth denial path coverage
+
+### GAS-Native TestRunner (in-spreadsheet)
+- `30_TestRunner.gs` — 6 suites, 48+ tests run inside Google Apps Script
+- Accessible via the TestRunner tab in the SPA dashboard
+- Supports daily trigger (6 AM scheduled runs) via `setupOpenDeferredTrigger()`
+
+## CI/CD
+
+### GitHub Actions (`.github/workflows/build.yml`)
+Three jobs run on every push/PR:
+1. **lint-and-build** — ESLint, build, `npm audit`, Jest, coverage upload, size report (warns >3MB, limit ~6MB)
+2. **code-quality** — file/function counts, duplicate function detection (fails on dupes), TODO/FIXME tracking
+3. **scope-change-guard** — runs on push to `Main` only; **fails if OAuth scopes are added** (requires re-auth)
+
+### Husky Git Hooks
+| Hook | Runs | Purpose |
+|------|------|---------|
+| `pre-commit` | `lint-staged` + `npm run build` + deploy guards | Lint staged `.gs` files, verify build, run deploy/SPA integrity tests |
+| `commit-msg` | `commitlint` | Enforce conventional commit format |
+| `pre-push` | `check-scope-change.js` | Block push if OAuth scopes changed |
 
 ## Git Conventions
 
-- Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
-- Pre-commit: `.husky/pre-commit` runs lint-staged + build verification
+- Conventional Commits enforced by commitlint: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+- Pre-commit: `.husky/pre-commit` runs lint-staged + build verification + deploy guards
 - Both repos use capital `Main`. Branches: `Main` + `staging`.
 - Every code-change commit must include version bump.
 

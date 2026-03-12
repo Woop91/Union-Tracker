@@ -1,7 +1,7 @@
 # SYNC-LOG.md — DDS-Dashboard → Union-Tracker
 
 ## Purpose
-Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
+Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `Main`.
 
 ---
 
@@ -12,10 +12,10 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 - **Manually entered data**: Anything imported by users via the import function, or typed directly into cells by a user. **Must never be deleted or overwritten by any function.**
 
 ### Sync Rules
-- Source: DDS `Main` → Target: UT `staging`
-- User manages: UT `staging` → UT `dev` → UT `main`
+- Source: DDS `Main` → Target: UT `Main`
+- **Single branch policy: Both repos use `Main` only.**
 - **Excluded from UT:**
-  - DDS Apps Script ID (`[REDACTED — DDS private]`)
+  - DDS Apps Script ID (`[REDACTED — SEE DDS-DASHBOARD REPO]`)
   - Workload Tracker-exclusive files (see registry below)
   - Any credentials, tokens, or secrets (UT is public)
 
@@ -49,7 +49,7 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 | Date | Agent | DDS Commit | UT Commit | Files Synced | Exclusions Applied | Notes |
 |------|-------|------------|-----------|-------------|-------------------|-------|
 | 2026-02-25 | Claude (claude.ai) | — | — | SYNC-LOG.md, AI-REFERENCE.md | N/A | Initial setup files |
-| 2026-02-28 | Claude (claude-code) | `d1e51fb` | `b119401` | 102 files (40 .gs, 8 .html, tests, build) | 18_WorkloadTracker.gs, WorkloadTracker.html excluded; typeof guards on 03_UIComponents.gs, index.html, member_view.html; build.js BUILD_ORDER updated; architecture.test.js updated | Full sync: Batches 1-10 code review fixes (auth, XSS, formula injection, perf, dead code) |
+| 2026-02-28 | Claude (claude-code) | `d1e51fb` | `b119401` | 102 files (40 .gs, 8 .html, tests, build) | 18_WorkloadTracker.gs, WorkloadTracker.html excluded; typeof guards applied | Full sync: Batches 1-10 code review fixes |
 | 2026-03-02 | Claude (claude-code) | `efffbfd` | `d675259` | 22 files (10 src + 11 dist + CHANGELOG.md + package.json) | 18_WorkloadTracker.gs, WorkloadTracker.html excluded; typeof guards preserved in index.html, member_view.html | v4.19.0 sync: QA bug fixes & resilience (Issues 1-12), sign-out fix, security hardening (rate limiting, token cleanup, timing-attack prevention) |
 | 2026-03-07 | Claude (claude-code) | `ca5520e` | `609edc9` | 42 .gs + 7 .html (full parity) | None — 18_WorkloadTracker.gs deleted from both repos | v4.24.4 full sync: Q&A Forum, Timeline, dynamic surveys, auth sweep, FlashPolls removal, FailsafeService, Migrations, Share Phone, org chart. All source files identical across repos. |
 

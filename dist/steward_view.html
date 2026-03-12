@@ -32,24 +32,23 @@ function initStewardView(container) {
   }
 
   // Fallback: load individually (batch unavailable)
-  serverCall().withSuccessHandler(function(r) {
-    AppState.notificationCount = (r && r.count) || 0;
-  }).withFailureHandler(function(e) { console.error(e.message); }).getWebAppNotificationCount(SESSION_TOKEN, 'steward');
+  // C4/S2: Single badge count call replaces 3 serial calls
+  serverCall().withSuccessHandler(function(counts) {
+    AppState.notificationCount = (counts && counts.notificationCount) || 0;
+    AppState.taskCount = (counts && counts.taskCount) || 0;
+    AppState.overdueTaskCount = (counts && counts.overdueTaskCount) || 0;
+    AppState.qaUnansweredCount = (counts && counts.qaUnansweredCount) || 0;
+  }).withFailureHandler(function() {
+    AppState.notificationCount = 0;
+    AppState.taskCount = 0;
+    AppState.overdueTaskCount = 0;
+    AppState.qaUnansweredCount = 0;
+  }).dataGetBadgeCounts(SESSION_TOKEN);
 
-  // Fire member and task count fetches in parallel — non-blocking.
-  // AppState is updated when they arrive; badges render on next nav redraw.
+  // Member count still needed for display
   serverCall().withSuccessHandler(function(members) {
     AppState.memberCount = (members || []).length;
   }).withFailureHandler(function() { AppState.memberCount = 0; }).dataGetAllMembers(SESSION_TOKEN);
-
-  serverCall().withSuccessHandler(function(tasks) {
-    var open = (tasks || []).filter(function(t) { return t.status !== 'completed'; });
-    AppState.taskCount = open.length;
-    AppState.overdueTaskCount = open.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
-  }).withFailureHandler(function() {
-    AppState.taskCount = 0;
-    AppState.overdueTaskCount = 0;
-  }).dataGetTasks(SESSION_TOKEN, null);
 
   serverCall()
     .withSuccessHandler(function(cases) {
@@ -2008,21 +2007,193 @@ function renderSurveyTracking(appContainer) {
     var periodBar = el('div', { style: { marginBottom: '14px' } });
     content.appendChild(periodBar);
 
+    // Scope filter tabs
+    var scopeWrap = el('div', { style: { marginBottom: '14px' } });
+    content.appendChild(scopeWrap);
+
     // KPI summary area
     var kpiWrap = el('div', { style: { marginBottom: '14px' } });
     content.appendChild(kpiWrap);
+
+    // Stats area
+    var statsWrap = el('div', { style: { marginBottom: '14px' } });
+    content.appendChild(statsWrap);
 
     // Tracking list area
     var dataWrap = el('div');
     content.appendChild(dataWrap);
 
-    // Load period + pending members + satisfaction summary in parallel
-    showLoading(dataWrap);
+    var activeScope = 'assigned';
 
+    function loadSurveyData(scope) {
+      activeScope = scope;
+      showLoading(dataWrap);
+      kpiWrap.innerHTML = '';
+      statsWrap.innerHTML = '';
+
+      // Load steward-specific survey tracking with richer data
+      serverCall().withSuccessHandler(function(trackingData) {
+        dataWrap.innerHTML = '';
+
+        var total = trackingData.total || 0;
+        var completed = trackingData.completed || 0;
+        var pending = total - completed;
+        var rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+        var members = trackingData.members || [];
+        var stewardInfo = trackingData.stewardInfo || {};
+
+        // ── Overall progress bar ───────────────────────────────────────
+        if (total > 0) {
+          var progCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '10px' } });
+          var progHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
+          progHeader.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, 'Response Rate'));
+          progHeader.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '700', color: rate >= 80 ? 'var(--success)' : rate >= 50 ? 'var(--warning)' : 'var(--danger)' } }, rate + '%'));
+          progCard.appendChild(progHeader);
+
+          // Overall progress bar
+          var barBg = el('div', { style: { height: '10px', background: 'rgba(255,255,255,0.06)', borderRadius: '5px', overflow: 'hidden', marginBottom: '8px' } });
+          var barColor = rate >= 80 ? 'var(--success)' : rate >= 50 ? 'var(--warning)' : 'var(--danger)';
+          barBg.appendChild(el('div', { style: { height: '100%', width: rate + '%', background: barColor, borderRadius: '5px', transition: 'width 0.6s ease' } }));
+          progCard.appendChild(barBg);
+
+          progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', textAlign: 'center' } }, completed + ' completed of ' + total + ' members'));
+          dataWrap.appendChild(progCard);
+        }
+
+        // ── Participation statistics ─────────────────────────────────────
+        statsWrap.innerHTML = '';
+        if (members.length > 0) {
+          var newMembers = 0;
+          var decliningMembers = 0;
+          var consistentMembers = 0;
+          var firstTimers = 0;
+          var now = new Date();
+          members.forEach(function(m) {
+            if (m.hireDate) {
+              var hd = new Date(m.hireDate);
+              if (!isNaN(hd.getTime()) && (now - hd) < 180 * 24 * 60 * 60 * 1000) newMembers++;
+            }
+            if (m.participationRate !== null) {
+              if (m.participationRate < 30 && m.totalMissed > 1) decliningMembers++;
+              else if (m.participationRate >= 70) consistentMembers++;
+            }
+            if (m.totalCompleted === 0 && m.totalMissed === 0) firstTimers++;
+          });
+
+          var sGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' } });
+          var statItems = [
+            { label: 'New Members', value: newMembers, color: 'var(--info)', icon: '\uD83C\uDD95' },
+            { label: 'First Survey', value: firstTimers, color: 'var(--accent)', icon: '\u2728' },
+            { label: 'Consistent', value: consistentMembers, color: 'var(--success)', icon: '\u2705' },
+            { label: 'Declining', value: decliningMembers, color: 'var(--danger)', icon: '\u26A0\uFE0F' },
+          ];
+          statItems.forEach(function(s) {
+            var card = el('div', { className: 'card', style: { padding: '10px 8px', textAlign: 'center', background: 'var(--surface)' } });
+            card.appendChild(el('div', { style: { fontSize: '16px', marginBottom: '2px' } }, s.icon));
+            card.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: s.color } }, String(s.value)));
+            card.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', marginTop: '2px' } }, s.label));
+            sGrid.appendChild(card);
+          });
+          statsWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Participation Statistics'));
+          statsWrap.appendChild(sGrid);
+        }
+
+        // ── Satisfaction section averages ────────────────────────────────
+        serverCall().withSuccessHandler(function(summary) {
+          kpiWrap.innerHTML = '';
+          if (!summary || !summary.sections) return;
+          var sections = summary.sections;
+          var topSections = ['OVERALL_SAT','STEWARD_3A','CHAPTER','LEADERSHIP','CONTRACT'];
+          var hasAny = topSections.some(function(k) { return sections[k] && sections[k].avg !== null; });
+          if (!hasAny || summary.responseCount < 5) return;
+
+          kpiWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Section Averages (1\u201310)'));
+          var kpiRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+          topSections.forEach(function(key) {
+            var s = sections[key];
+            if (!s || s.avg === null) return;
+            var color = s.avg < 4 ? 'var(--danger)' : s.avg < 6 ? 'var(--warning)' : 'var(--success)';
+            var kpi = el('div', { className: 'card', style: { flex: '1', minWidth: '80px', padding: '10px 8px', textAlign: 'center', background: 'var(--surface)' } });
+            kpi.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: color } }, s.avg.toFixed(1)));
+            kpi.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', marginTop: '2px', lineHeight: '1.3' } }, s.name));
+            kpiRow.appendChild(kpi);
+          });
+          kpiWrap.appendChild(kpiRow);
+        }).withFailureHandler(function() {}).dataGetSatisfactionSummary(SESSION_TOKEN);
+
+        // ── No data ───────────────────────────────────────────────────────
+        if (!total) {
+          dataWrap.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No survey tracking data. Open a period and populate tracking.'));
+          return;
+        }
+
+        // ── Nearby members (same location/office days/cubicle proximity) ─
+        var pendingMembers = members.filter(function(m) { return !m.completed; });
+        var completedMembers = members.filter(function(m) { return m.completed; });
+
+        // Calculate proximity scores for pending members
+        if (stewardInfo.workLocation && pendingMembers.length > 0) {
+          pendingMembers.forEach(function(m) {
+            var score = 0;
+            if (m.workLocation && m.workLocation.toLowerCase() === stewardInfo.workLocation.toLowerCase()) score += 3;
+            if (m.officeDays && stewardInfo.officeDays) {
+              var mDays = m.officeDays.toLowerCase().split(/[,;\s]+/);
+              var sDays = stewardInfo.officeDays.toLowerCase().split(/[,;\s]+/);
+              var overlap = mDays.filter(function(d) { return sDays.indexOf(d) !== -1; }).length;
+              score += overlap;
+            }
+            if (m.cubicle && stewardInfo.cubicle) {
+              // Basic cubicle proximity: same floor/section prefix
+              var mPrefix = m.cubicle.replace(/[0-9]+$/, '');
+              var sPrefix = stewardInfo.cubicle.replace(/[0-9]+$/, '');
+              if (mPrefix && sPrefix && mPrefix.toLowerCase() === sPrefix.toLowerCase()) score += 2;
+            }
+            m._proximityScore = score;
+          });
+        }
+
+        // Nearby = same location + high proximity score
+        var nearbyMembers = pendingMembers.filter(function(m) { return (m._proximityScore || 0) >= 3; });
+        nearbyMembers.sort(function(a, b) { return (b._proximityScore || 0) - (a._proximityScore || 0); });
+        var otherPending = pendingMembers.filter(function(m) { return (m._proximityScore || 0) < 3; });
+
+        // ── Render nearby members section ───────────────────────────────
+        if (nearbyMembers.length > 0) {
+          dataWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', margin: '12px 0 6px' } }, '\uD83D\uDCCD Nearby \u2014 Pending (' + nearbyMembers.length + ')'));
+          dataWrap.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } }, 'Members at your location with overlapping office days'));
+          nearbyMembers.forEach(function(m) { _renderSurveyMemberItem(dataWrap, m, true); });
+        }
+
+        // ── Render other pending members ────────────────────────────────
+        if (otherPending.length > 0) {
+          dataWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', margin: '12px 0 6px' } }, 'Other Pending (' + otherPending.length + ')'));
+          otherPending.forEach(function(m) { _renderSurveyMemberItem(dataWrap, m, false); });
+        }
+
+        // ── Completed list (collapsed by default) ───────────────────────
+        if (completedMembers.length > 0) {
+          var compToggle = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--success)', margin: '16px 0 6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' } });
+          compToggle.appendChild(el('span', { style: { transition: 'transform 0.2s' } }, '\u25B6'));
+          compToggle.appendChild(el('span', {}, 'Completed (' + completedMembers.length + ')'));
+          var compList = el('div', { style: { display: 'none' } });
+          compToggle.onclick = function() {
+            var isOpen = compList.style.display !== 'none';
+            compList.style.display = isOpen ? 'none' : 'block';
+            compToggle.firstChild.textContent = isOpen ? '\u25B6' : '\u25BC';
+          };
+          dataWrap.appendChild(compToggle);
+          completedMembers.forEach(function(m) { _renderSurveyMemberItem(compList, m, false); });
+          dataWrap.appendChild(compList);
+        }
+
+      }).withFailureHandler(function() {
+        dataWrap.innerHTML = '';
+        dataWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load survey data.'));
+      }).dataGetStewardSurveyTracking(SESSION_TOKEN, scope);
+    }
+
+    // ── Period status bar ──────────────────────────────────────────────
     serverCall().withSuccessHandler(function(pendingData) {
-      dataWrap.innerHTML = '';
-
-      // ── Period status bar ──────────────────────────────────────────────
       periodBar.innerHTML = '';
       var period = pendingData.periodId
         ? { id: pendingData.periodId, name: pendingData.periodName, status: 'Active' }
@@ -2044,82 +2215,75 @@ function renderSurveyTracking(appContainer) {
         } }, 'Open New Period'));
         periodBar.appendChild(closedBar);
       }
+    }).withFailureHandler(function() {}).dataGetPendingSurveyMembers(SESSION_TOKEN);
 
-      // ── Completion chart ───────────────────────────────────────────────
-      var total     = pendingData.total     || 0;
-      var completed = pendingData.completed || 0;
-      var pending   = pendingData.pending   || 0;
-      var rate      = pendingData.rate      || 0;
-
-      if (total > 0) {
-        var progCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '10px' } });
-        var progHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
-        progHeader.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, 'Response Rate'));
-        progHeader.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '700', color: rate >= 80 ? 'var(--success)' : rate >= 50 ? 'var(--warning)' : 'var(--danger)' } }, rate + '%'));
-        progCard.appendChild(progHeader);
-
-        if (typeof ChartHelper !== 'undefined') {
-          var cColor = rate >= 80 ? '#4ade80' : rate >= 50 ? '#facc15' : '#ef4444';
-          ChartHelper.createDoughnutChart(progCard, 'survey-track-chart',
-            ['Completed', 'Pending'], [completed, pending], [cColor, 'rgba(255,255,255,0.08)']);
+    // ── Scope filter tabs ──────────────────────────────────────────────
+    var scopeRow = el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } });
+    var scopes = [
+      { id: 'assigned', label: 'My Members' },
+      { id: 'location', label: 'My Location' },
+      { id: 'all', label: 'All Members' },
+    ];
+    var scopeBtns = {};
+    scopes.forEach(function(s) {
+      var btn = el('button', {
+        className: 'filter-tab' + (s.id === activeScope ? ' active' : ''),
+        onClick: function() {
+          Object.keys(scopeBtns).forEach(function(k) { scopeBtns[k].className = 'filter-tab' + (k === s.id ? ' active' : ''); });
+          loadSurveyData(s.id);
         }
-        progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px', textAlign: 'center' } }, completed + ' completed of ' + total + ' members'));
-        dataWrap.appendChild(progCard);
-      }
+      }, s.label);
+      scopeBtns[s.id] = btn;
+      scopeRow.appendChild(btn);
+    });
+    scopeWrap.appendChild(scopeRow);
 
-      // ── Satisfaction section averages ──────────────────────────────────
-      serverCall().withSuccessHandler(function(summary) {
-        kpiWrap.innerHTML = '';
-        if (!summary || !summary.sections) return;
-        var sections = summary.sections;
-        var topSections = ['OVERALL_SAT','STEWARD_3A','CHAPTER','LEADERSHIP','CONTRACT'];
-        var hasAny = topSections.some(function(k) { return sections[k] && sections[k].avg !== null; });
-        if (!hasAny || summary.responseCount < 5) return;
-
-        kpiWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Section Averages (1–10)'));
-        var kpiRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-        topSections.forEach(function(key) {
-          var s = sections[key];
-          if (!s || s.avg === null) return;
-          var color = s.avg < 4 ? 'var(--danger)' : s.avg < 6 ? 'var(--warning)' : 'var(--success)';
-          var kpi = el('div', { className: 'card', style: { flex: '1', minWidth: '80px', padding: '10px 8px', textAlign: 'center', background: 'var(--surface)' } });
-          kpi.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: color } }, s.avg.toFixed(1)));
-          kpi.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', marginTop: '2px', lineHeight: '1.3' } }, s.name));
-          kpiRow.appendChild(kpi);
-        });
-        kpiWrap.appendChild(kpiRow);
-      }).withFailureHandler(function() {}).dataGetSatisfactionSummary(SESSION_TOKEN);
-
-      // ── Pending member list ────────────────────────────────────────────
-      if (!total) {
-        dataWrap.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No survey tracking data. Open a period and populate tracking.'));
-        return;
-      }
-
-      // Pending list
-      if (pending > 0) {
-        var pendHeader = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', margin: '12px 0 6px' } }, 'Pending (' + pending + ')');
-        dataWrap.appendChild(pendHeader);
-        (pendingData.members || []).forEach(function(m) {
-          var item = el('div', { className: 'member-list-item', style: { cursor: 'pointer' } });
-          item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
-          var info = el('div', { className: 'member-list-info' });
-          info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.memberId));
-          if (m.workLocation) info.appendChild(el('div', { className: 'member-list-meta' }, m.workLocation + (m.assignedSteward ? ' \u2014 ' + m.assignedSteward : '')));
-          item.appendChild(info);
-          item.appendChild(el('span', { style: { fontSize: '14px', color: 'var(--muted)' } }, '\u23F3'));
-          if (m.email && typeof _showMemberDetail === 'function') {
-            item.onclick = (function(member, el) { return function() { _showMemberDetail(dataWrap, el, member); }; })(m, item);
-          }
-          dataWrap.appendChild(item);
-        });
-      }
-
-    }).withFailureHandler(function() {
-      dataWrap.innerHTML = '';
-      dataWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load survey data.'));
-    }).dataGetPendingSurveyMembers(SESSION_TOKEN);
+    // Initial load
+    loadSurveyData('assigned');
   });
+}
+
+// Helper: render a survey member item with progress bar and details
+function _renderSurveyMemberItem(parentEl, m, showProximity) {
+  var item = el('div', { className: 'member-list-item', style: { cursor: 'pointer', flexDirection: 'column', alignItems: 'stretch', gap: '6px' } });
+
+  var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } });
+  topRow.appendChild(el('div', { className: 'member-list-avatar', style: { background: m.completed ? 'var(--success)' : 'var(--surface)' } }, (m.name || 'M').charAt(0).toUpperCase()));
+
+  var info = el('div', { style: { flex: '1', minWidth: '0' } });
+  info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
+
+  // Meta line: location, office days, cubicle
+  var metaParts = [];
+  if (m.workLocation) metaParts.push(m.workLocation);
+  if (m.officeDays) metaParts.push(m.officeDays);
+  if (showProximity && m.cubicle) metaParts.push('Cube ' + m.cubicle);
+  if (metaParts.length > 0) {
+    info.appendChild(el('div', { className: 'member-list-meta' }, metaParts.join(' \u00B7 ')));
+  }
+  topRow.appendChild(info);
+
+  // Status icon
+  topRow.appendChild(el('span', { style: { fontSize: '14px', color: m.completed ? 'var(--success)' : 'var(--muted)', flexShrink: '0' } }, m.completed ? '\u2705' : '\u23F3'));
+  item.appendChild(topRow);
+
+  // Participation rate bar
+  if (m.participationRate !== null) {
+    var partRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '42px' } });
+    var pRate = m.participationRate;
+    var pColor = pRate >= 70 ? 'var(--success)' : pRate >= 40 ? 'var(--warning)' : 'var(--danger)';
+    partRow.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', minWidth: '60px' } }, 'History: ' + pRate + '%'));
+    var partBg = el('div', { style: { flex: '1', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' } });
+    partBg.appendChild(el('div', { style: { height: '100%', width: pRate + '%', background: pColor, borderRadius: '2px', transition: 'width 0.4s ease' } }));
+    partRow.appendChild(partBg);
+    partRow.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', minWidth: '40px', textAlign: 'right' } }, m.totalCompleted + '/' + (m.totalCompleted + m.totalMissed)));
+    item.appendChild(partRow);
+  }
+
+  if (m.email && typeof _showMemberDetail === 'function') {
+    item.onclick = (function(member, itemEl) { return function() { _showMemberDetail(parentEl, itemEl, member); }; })(m, item);
+  }
+  parentEl.appendChild(item);
 }
 
 // ═══════════════════════════════════════
@@ -2817,18 +2981,18 @@ function _renderNewTaskForm(container, onCreated) {
         if (!memEmail) { statusMsg.textContent = 'Enter member email.'; statusMsg.style.color = 'var(--danger)'; return; }
         serverCall().withSuccessHandler(function(r) {
           if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = r ? r.message : 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-        }).dataCreateMemberTask(SESSION_TOKEN, memEmail, title, descInput.value.trim(), priSelect.value, dueInput.value || '');
+        }).withFailureHandler(function(e) { statusMsg.textContent = 'Network error creating task.'; statusMsg.style.color = 'var(--danger)'; console.error(e.message); }).dataCreateMemberTask(SESSION_TOKEN, memEmail, title, descInput.value.trim(), priSelect.value, dueInput.value || '');
       } else {
         // Create steward task
         var assignee = assignSelect ? assignSelect.value : '';
         if (assignee) {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-          }).dataCreateTaskForSteward(SESSION_TOKEN, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+          }).withFailureHandler(function(e) { statusMsg.textContent = 'Network error creating task.'; statusMsg.style.color = 'var(--danger)'; console.error(e.message); }).dataCreateTaskForSteward(SESSION_TOKEN, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         } else {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-          }).dataCreateTask(SESSION_TOKEN, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+          }).withFailureHandler(function(e) { statusMsg.textContent = 'Network error creating task.'; statusMsg.style.color = 'var(--danger)'; console.error(e.message); }).dataCreateTask(SESSION_TOKEN, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
         }
       }
     }
@@ -2915,18 +3079,40 @@ function renderInsightsPage(appContainer) {
 
 function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData) {
   content.innerHTML = '';
-  if (!statsData || !statsData.available) {
-    content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));
-  } else {
-    _renderQuickInsights(content, statsData, hotSpotsData);
-    _renderFiledVsResolved(content, statsData);
+  // Detail panel for drill-down views
+  var detailPanel = el('div', { style: { display: 'none', marginBottom: '16px' } });
+  content.appendChild(detailPanel);
+
+  var mainContent = el('div');
+  content.appendChild(mainContent);
+
+  function showDetail(title, renderFn) {
+    detailPanel.innerHTML = '';
+    detailPanel.style.display = 'block';
+    mainContent.style.display = 'none';
+
+    var backBtn = el('button', { className: 'btn btn-sm', style: { marginBottom: '12px', fontSize: '12px' }, onClick: function() {
+      detailPanel.style.display = 'none';
+      mainContent.style.display = 'block';
+    }}, '\u2190 Back to Insights');
+    detailPanel.appendChild(backBtn);
+    detailPanel.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)', marginBottom: '12px' } }, title));
+
+    renderFn(detailPanel);
   }
-  if (memberStatsData && memberStatsData.available) _renderMembershipInsights(content, memberStatsData);
-  if (perfData && perfData.length > 0) _renderPerformanceSection(content, perfData);
-  if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(content, satData);
+
+  if (!statsData || !statsData.available) {
+    mainContent.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));
+  } else {
+    _renderQuickInsights(mainContent, statsData, hotSpotsData, showDetail);
+    _renderFiledVsResolved(mainContent, statsData);
+  }
+  if (memberStatsData && memberStatsData.available) _renderMembershipInsights(mainContent, memberStatsData, showDetail);
+  if (perfData && perfData.length > 0) _renderPerformanceSection(mainContent, perfData, showDetail);
+  if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(mainContent, satData, showDetail);
 }
 
-function _renderMembershipInsights(container, ms) {
+function _renderMembershipInsights(container, ms, showDetail) {
   var section = el('div', { style: { marginBottom: '16px' } });
   section.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
@@ -2934,28 +3120,42 @@ function _renderMembershipInsights(container, ms) {
   }}, 'Membership Overview'));
 
   var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '12px' } });
-  grid.appendChild(_insightCard('TOTAL MEMBERS', 'var(--info)', _fmtNum(ms.total), ''));
+  grid.appendChild(_insightCard('TOTAL MEMBERS', 'var(--info)', _fmtNum(ms.total), '', function() {
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'members');
+  }));
 
   // Dues breakdown
   var duesEntries = [];
   if (ms.byDues) Object.keys(ms.byDues).forEach(function(k) { duesEntries.push({ label: k, count: ms.byDues[k] }); });
   duesEntries.sort(function(a, b) { return b.count - a.count; });
   var duesSub = duesEntries.slice(0, 3).map(function(e) { return e.label + ': ' + e.count; }).join(', ');
-  grid.appendChild(_insightCard('DUES STATUS', 'var(--success)', duesEntries.length > 0 ? duesEntries[0].label : 'N/A', duesSub));
+  grid.appendChild(_insightCard('DUES STATUS', 'var(--success)', duesEntries.length > 0 ? duesEntries[0].label : 'N/A', duesSub, function() {
+    if (showDetail) showDetail('Dues Status Breakdown', function(panel) {
+      _renderInsightDetailList(panel, duesEntries, 'var(--success)');
+    });
+  }));
 
   // Location breakdown
   var locEntries = [];
   if (ms.byLocation) Object.keys(ms.byLocation).forEach(function(k) { locEntries.push({ label: k, count: ms.byLocation[k] }); });
   locEntries.sort(function(a, b) { return b.count - a.count; });
   var locSub = locEntries.slice(0, 3).map(function(e) { return e.label + ': ' + e.count; }).join(', ');
-  grid.appendChild(_insightCard('TOP LOCATION', 'var(--accent)', locEntries.length > 0 ? locEntries[0].label : 'N/A', locSub));
+  grid.appendChild(_insightCard('TOP LOCATION', 'var(--accent)', locEntries.length > 0 ? locEntries[0].label : 'N/A', locSub, function() {
+    if (showDetail) showDetail('Members by Location', function(panel) {
+      _renderInsightDetailList(panel, locEntries, 'var(--accent)');
+    });
+  }));
 
   // Unit breakdown
   var unitEntries = [];
   if (ms.byUnit) Object.keys(ms.byUnit).forEach(function(k) { unitEntries.push({ label: k, count: ms.byUnit[k] }); });
   unitEntries.sort(function(a, b) { return b.count - a.count; });
   var unitSub = unitEntries.slice(0, 3).map(function(e) { return e.label + ': ' + e.count; }).join(', ');
-  grid.appendChild(_insightCard('TOP UNIT', 'var(--warning)', unitEntries.length > 0 ? unitEntries[0].label : 'N/A', unitSub));
+  grid.appendChild(_insightCard('TOP UNIT', 'var(--warning)', unitEntries.length > 0 ? unitEntries[0].label : 'N/A', unitSub, function() {
+    if (showDetail) showDetail('Members by Unit', function(panel) {
+      _renderInsightDetailList(panel, unitEntries, 'var(--warning)');
+    });
+  }));
 
   section.appendChild(grid);
   container.appendChild(section);
@@ -2990,7 +3190,7 @@ function _insightCard(title, color, mainText, subText, onClick) {
   return card;
 }
 
-function _renderQuickInsights(container, stats, hotSpots) {
+function _renderQuickInsights(container, stats, hotSpots, showDetail) {
   var grid = el('div', { style: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: '10px', marginBottom: '16px',
@@ -3005,7 +3205,20 @@ function _renderQuickInsights(container, stats, hotSpots) {
   if (stats.settledCount) parts.push(_fmtNum(stats.settledCount) + ' settled');
   if (parts.length) statusSub += ' \u00B7 ' + parts.join(', ');
   grid.appendChild(_insightCard('GRIEVANCE STATUS', 'var(--info)', _fmtNum(activeCount) + ' Active', statusSub, function() {
-    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+    if (showDetail) showDetail('Grievance Status Details', function(panel) {
+      var items = [{ label: 'Active / Open', count: activeCount }];
+      if (stats.wonCount) items.push({ label: 'Won', count: stats.wonCount });
+      if (stats.deniedCount) items.push({ label: 'Denied', count: stats.deniedCount });
+      if (stats.settledCount) items.push({ label: 'Settled', count: stats.settledCount });
+      if (stats.withdrawnCount) items.push({ label: 'Withdrawn', count: stats.withdrawnCount });
+      _renderInsightDetailList(panel, items, 'var(--info)');
+      // Add link to cases
+      var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
+        if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+      }}, 'View All Cases \u2192');
+      panel.appendChild(navBtn);
+    });
+    else if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
   }));
 
   // Box 2: Hot Spots
@@ -3015,7 +3228,11 @@ function _renderQuickInsights(container, stats, hotSpots) {
     ? hotSpots.slice(0, 3).map(function(h) { return h.location + ' (' + h.count + ')'; }).join(', ')
     : 'No concentration areas detected';
   grid.appendChild(_insightCard('HOT SPOTS', hsColor, hsCount > 0 ? hsCount + ' Location' + (hsCount > 1 ? 's' : '') : 'All Clear', hsSub, function() {
-    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+    if (showDetail && hotSpots && hotSpots.length > 0) showDetail('Grievance Hot Spots', function(panel) {
+      var hsItems = hotSpots.map(function(h) { return { label: h.location, count: h.count }; });
+      _renderInsightDetailList(panel, hsItems, 'var(--danger)');
+    });
+    else if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
   }));
 
   // Box 3: Step Distribution
@@ -3027,7 +3244,11 @@ function _renderQuickInsights(container, stats, hotSpots) {
   var stepsWithCases = stepEntries.filter(function(e) { return e.count > 0; }).length;
   var stepSub = stepEntries.slice(0, 3).map(function(e) { return e.step + ': ' + e.count; }).join(', ');
   grid.appendChild(_insightCard('STEP DISTRIBUTION', 'var(--accent)', stepsWithCases + ' Step' + (stepsWithCases !== 1 ? 's' : ''), stepSub, function() {
-    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+    if (showDetail) showDetail('Grievance Step Distribution', function(panel) {
+      var sItems = stepEntries.map(function(e) { return { label: e.step, count: e.count }; });
+      _renderInsightDetailList(panel, sItems, 'var(--accent)');
+    });
+    else if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
   }));
 
   // Box 4: Top Issue Category
@@ -3036,11 +3257,14 @@ function _renderQuickInsights(container, stats, hotSpots) {
     Object.keys(stats.byCategory).forEach(function(k) { catEntries.push({ cat: k, count: stats.byCategory[k] }); });
     catEntries.sort(function(a, b) { return b.count - a.count; });
   }
-  // Skip "Uncategorized" when picking top category
   var filteredCats = catEntries.filter(function(e) { return e.cat.toLowerCase() !== 'uncategorized'; });
   var topCat = filteredCats.length > 0 ? filteredCats[0] : (catEntries.length > 0 ? catEntries[0] : { cat: 'N/A', count: 0 });
   grid.appendChild(_insightCard('TOP ISSUE CATEGORY', 'var(--warning)', topCat.cat, topCat.count + ' cases', function() {
-    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
+    if (showDetail) showDetail('Issue Categories', function(panel) {
+      var cItems = catEntries.map(function(e) { return { label: e.cat, count: e.count }; });
+      _renderInsightDetailList(panel, cItems, 'var(--warning)');
+    });
+    else if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'cases');
   }));
 
   container.appendChild(grid);
@@ -3071,7 +3295,29 @@ function _renderFiledVsResolved(container, stats) {
 // PERFORMANCE SECTION — Insights Page (v4.16.0)
 // ═══════════════════════════════════════
 
-function _renderPerformanceSection(container, perfData) {
+// Helper: renders a detailed breakdown list for drill-down views
+function _renderInsightDetailList(panel, items, color) {
+  if (!items || items.length === 0) {
+    panel.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No data available.'));
+    return;
+  }
+  var maxCount = Math.max.apply(null, items.map(function(i) { return i.count || 0; }));
+  items.forEach(function(item) {
+    var row = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '12px' } });
+    var labelEl = el('div', { style: { flex: '1', minWidth: '0' } });
+    labelEl.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, item.label));
+    // Progress bar
+    var pct = maxCount > 0 ? Math.round(((item.count || 0) / maxCount) * 100) : 0;
+    var barBg = el('div', { style: { height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' } });
+    barBg.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: color, borderRadius: '2px', transition: 'width 0.4s ease' } }));
+    labelEl.appendChild(barBg);
+    row.appendChild(labelEl);
+    row.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', color: color, minWidth: '40px', textAlign: 'right' } }, _fmtNum(item.count || 0)));
+    panel.appendChild(row);
+  });
+}
+
+function _renderPerformanceSection(container, perfData, showDetail) {
   var section = el('div', { style: { marginBottom: '16px' } });
   section.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
@@ -3096,8 +3342,21 @@ function _renderPerformanceSection(container, perfData) {
   var avgDays = totalDaysCount > 0 ? Math.round(totalDaysWeighted / totalDaysCount) : 0;
 
   var statsRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' } });
-  statsRow.appendChild(_insightCard('AVG WIN RATE', 'var(--success)', avgWin + '%', count + ' ' + CONFIG.stewardLabel.toLowerCase() + 's'));
-  statsRow.appendChild(_insightCard('AVG RESOLUTION', 'var(--info)', avgDays + 'd', 'Days to close'));
+  statsRow.appendChild(_insightCard('AVG WIN RATE', 'var(--success)', avgWin + '%', count + ' ' + CONFIG.stewardLabel.toLowerCase() + 's', function() {
+    if (showDetail) showDetail(CONFIG.stewardLabel + ' Win Rates', function(panel) {
+      var items = perfData.map(function(p) { return { label: p.steward, count: p.winRate || 0 }; });
+      items.sort(function(a, b) { return b.count - a.count; });
+      items.forEach(function(item) { item.label = item.label + ' (' + item.count + '%)'; });
+      _renderInsightDetailList(panel, items, 'var(--success)');
+    });
+  }));
+  statsRow.appendChild(_insightCard('AVG RESOLUTION', 'var(--info)', avgDays + 'd', 'Days to close', function() {
+    if (showDetail) showDetail('Resolution Time by ' + CONFIG.stewardLabel, function(panel) {
+      var items = perfData.filter(function(p) { return p.avgDays > 0; }).map(function(p) { return { label: p.steward + ' (' + p.avgDays + ' days)', count: p.avgDays }; });
+      items.sort(function(a, b) { return a.count - b.count; }); // fastest first
+      _renderInsightDetailList(panel, items, 'var(--info)');
+    });
+  }));
   statsRow.appendChild(_insightCard('TEAM SIZE', 'var(--accent)', String(count), 'Active ' + CONFIG.stewardLabel.toLowerCase() + 's'));
   section.appendChild(statsRow);
 
@@ -3128,20 +3387,37 @@ function _renderPerformanceSection(container, perfData) {
 // SATISFACTION SECTION — Insights Page (v4.16.0)
 // ═══════════════════════════════════════
 
-function _renderSatisfactionSection(container, trends) {
+function _renderSatisfactionSection(container, trends, showDetail) {
   var section = el('div', { style: { marginBottom: '16px' } });
   section.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
     color: 'var(--text)', marginBottom: '12px',
   }}, 'Member Satisfaction Trends'));
 
-  // Overall score card
-  var overallCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' } });
+  // Overall score card — clickable for category drill-down
   var scoreColor = trends.overall >= 7 ? 'var(--success)' : trends.overall >= 5 ? 'var(--warning)' : 'var(--danger)';
+  var overallCard = el('div', { className: 'card card-glass', style: {
+    padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px',
+    cursor: showDetail ? 'pointer' : 'default', transition: 'transform 0.15s ease',
+  }});
+  if (showDetail) {
+    overallCard.onmouseenter = function() { overallCard.style.transform = 'translateY(-2px)'; };
+    overallCard.onmouseleave = function() { overallCard.style.transform = ''; };
+    overallCard.onclick = function() {
+      showDetail('Satisfaction Category Breakdown', function(panel) {
+        if (trends.categories && trends.categories.length > 0) {
+          var items = trends.categories.map(function(c) { return { label: c.name + ' (avg: ' + c.avg + ')', count: Math.round(c.avg * 10) }; });
+          _renderInsightDetailList(panel, items, scoreColor);
+        }
+        panel.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '12px' } }, trends.responseCount + ' total responses'));
+      });
+    };
+  }
   overallCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '32px', fontWeight: '700', color: scoreColor } }, String(trends.overall)));
   var overallInfo = el('div');
   overallInfo.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '600' } }, 'Overall Score'));
   overallInfo.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, trends.responseCount + ' responses'));
+  if (showDetail) overallInfo.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--accent)', marginTop: '4px' } }, 'Tap for details \u2192'));
   overallCard.appendChild(overallInfo);
   section.appendChild(overallCard);
 
@@ -4161,14 +4437,14 @@ function renderTestRunnerPage(appContainer) {
     var hdr = el('div', { style: { marginBottom: '24px' } });
     hdr.appendChild(el('h2', { style: { margin: '0 0 4px', fontSize: '22px', fontWeight: '700' } }, '🧪 Test Runner'));
     hdr.appendChild(el('p', { style: { margin: 0, color: 'var(--text-secondary)', fontSize: '14px' } },
-      'GAS-native integration tests — verifies Config, Auth, Grievance logic, and Column Mapping in the live environment.'));
+      'GAS-native integration tests — verifies Config, Auth, Grievance logic, Column Mapping, and all Web App modules in the live environment.'));
     content.appendChild(hdr);
 
     // Controls card
     var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' } });
 
     // Run All sequentially — runs each suite one at a time to avoid GAS 6-min limit
-    var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend'];
+    var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'webapp', 'configrd', 'portal', 'weeklyq', 'workload', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
     var runAllBtn = el('button', {
       className: 'btn btn-primary',
       style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
@@ -4240,7 +4516,16 @@ function renderTestRunnerPage(appContainer) {
       { value: 'authsweep', label: 'Auth Sweep' },
       { value: 'configlive', label: 'Config Completeness' },
       { value: 'survey', label: 'Survey Engine' },
-      { value: 'emailsend', label: 'Email & Auth Scopes' }
+      { value: 'emailsend', label: 'Email & Auth Scopes' },
+      { value: 'webapp', label: 'Web App Routing' },
+      { value: 'configrd', label: 'ConfigReader' },
+      { value: 'portal', label: 'Portal Sheets' },
+      { value: 'weeklyq', label: 'Weekly Questions' },
+      { value: 'workload', label: 'Workload Service' },
+      { value: 'qaforum', label: 'QA Forum' },
+      { value: 'timeline', label: 'Timeline Service' },
+      { value: 'failsafe', label: 'Failsafe Service' },
+      { value: 'endpoints', label: 'Endpoint Coverage' }
     ];
     suiteOptions.forEach(function(opt) {
       var o = el('option', { value: opt.value }, opt.label);

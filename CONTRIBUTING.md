@@ -30,8 +30,8 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Woop91/Union-Tracker.git
-   cd Union-Tracker
+   git clone https://github.com/Woop91/DDS-Dashboard.git
+   cd DDS-Dashboard
    ```
 
 2. **Install dependencies**
@@ -84,25 +84,19 @@ Please be respectful and constructive in all interactions. We're all working tow
 │   ├── 14_MeetingCheckIn.gs        # Meeting check-in system
 │   ├── 15_EventBus.gs              # Pub/sub event system
 │   ├── 16_DashboardEnhancements.gs # Date ranges, chart export, drill-down
-│   ├── 17_CorrelationEngine.gs     # Cross-dimensional correlation analysis
+│   ├── 17_CorrelationEngine.gs     # Cross-dimensional correlation
 │   ├── 19_WebDashAuth.gs           # Google SSO + magic link auth
 │   ├── 20_WebDashConfigReader.gs   # Column-based Config tab reader
 │   ├── 21_WebDashDataService.gs    # Unified data service for SPA
 │   ├── 22_WebDashApp.gs            # SPA entry point and routing
 │   ├── 23_PortalSheets.gs          # Hidden sheet management for SPA
-│   ├── 24_WeeklyQuestions.gs        # Weekly check-in questions
+│   ├── 24_WeeklyQuestions.gs       # Weekly check-in questions
 │   ├── 25_WorkloadService.gs       # SPA-integrated workload
-│   ├── 26_QAForum.gs               # Q&A Forum with steward-only answers
-│   ├── 27_TimelineService.gs       # Timeline activity feed
-│   ├── 28_FailsafeService.gs       # Security and reliability failsafe
-│   ├── 29_Migrations.gs            # Schema migration runner
-│   ├── index.html                   # SPA entry point
-│   ├── styles.html                  # SPA shared styles
-│   ├── auth_view.html               # SSO/magic link auth view
-│   ├── steward_view.html            # Steward dashboard SPA view
-│   ├── member_view.html             # Member dashboard SPA view
-│   ├── error_view.html              # Error/access denied page
-│   └── org_chart.html               # Organizational chart view
+│   ├── 26_QAForum.gs               # Q&A Forum for steward-member Q&A
+│   ├── 27_TimelineService.gs       # Timeline/activity feed service
+│   ├── 28_FailsafeService.gs       # Critical operation failsafe wrapper
+│   ├── 29_Migrations.gs            # One-time data migration runner
+│   └── (7 .html files)             # SPA templates
 ├── test/                   # Jest unit tests
 │   ├── gas-mock.js         # GAS environment mocks
 │   ├── load-source.js      # Source file loader
@@ -135,20 +129,14 @@ Please be respectful and constructive in all interactions. We're all working tow
 | 12_ | Feature extensions (Dynamic Engine, Looker) |
 | 13_ | Member self-service (PIN auth) |
 | 14_ | Meeting check-in system |
-| 15_ | Event bus (pub/sub) |
-| 16_ | Dashboard enhancements |
-| 17_ | Correlation engine |
-| 19_ | Web dashboard authentication |
-| 20_ | Web dashboard config reader |
-| 21_ | Web dashboard data service |
-| 22_ | Web dashboard app / routing |
-| 23_ | Portal sheets management |
-| 24_ | Weekly questions |
-| 25_ | Workload service |
+| 15_ | Event bus (pub/sub system) |
+| 16_ | Dashboard enhancements (date ranges, chart export) |
+| 17_ | Correlation engine (statistical analysis) |
+| 19-25_ | SPA web dashboard modules (auth, config, data, app, sheets, questions, workload) |
 | 26_ | Q&A Forum |
 | 27_ | Timeline service |
-| 28_ | Failsafe service |
-| 29_ | Migrations |
+| 28_ | FailsafeService (critical operation wrapper) |
+| 29_ | Migrations (one-time data migrations) |
 
 ## Coding Standards
 
@@ -252,19 +240,23 @@ npm test
 
 ### Test Structure
 
-Tests use Jest v29.7.0 with custom GAS environment mocking:
+Tests use Jest v29.7.0 with custom GAS environment mocking (2059 tests across 36 suites):
 
 ```
 test/
-├── gas-mock.js           # Mocks for SpreadsheetApp, Session, Utilities, etc.
-├── load-source.js        # Preprocessor to load .gs files in Node.js
-├── 00_Security.test.js   # Security function tests
-├── 00_DataAccess.test.js # Data access and time constant tests
-├── 01_Core.test.js       # Column constants, version, headers
-├── 05_Integrations.test.js # Config and integration tests
-├── 10_Main.test.js       # Row construction, CSV escaping
-├── 13_MemberSelfService.test.js # PIN generation/hashing
-└── modules.test.js       # Cross-module tests
+├── gas-mock.js             # Mocks for SpreadsheetApp, Session, Utilities, etc.
+├── load-source.js          # Preprocessor to load .gs files in Node.js
+├── modules.test.js         # Cross-module tests
+├── architecture.test.js    # Architecture validation tests
+├── columns.test.js         # Column constant tests
+├── expansion.test.js       # Expansion/integration tests
+├── 00_Security.test.js     # Security function tests
+├── 00_DataAccess.test.js   # Data access and time constant tests
+├── 01_Core.test.js         # Column constants, version, headers
+├── ...                     # (one test file per source module)
+├── 26_QAForum.test.js      # Q&A Forum tests
+├── 27_TimelineService.test.js # Timeline service tests
+└── 28_FailsafeService.test.js # FailsafeService tests
 ```
 
 ### Writing Tests

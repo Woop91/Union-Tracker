@@ -36,7 +36,7 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 ### High-Level Structure
 
 ```
-Union-Tracker/
+DDS-Dashboard/
 ├── src/                    # 42 source files (.gs) + 7 HTML
 ├── test/                   # Jest unit tests (2059 tests across 36 suites)
 ├── dist/                   # Build output (auto-generated)
@@ -66,7 +66,6 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 │  03/04a-e     │   │  02/08a-e/10*  │   │  05/06/09/11-14    │
 └───────────────┘   └────────────────┘   │  15-17/19-25/26-29 │
         │                     │          └────────────────────┘
-        │                     │                      │
         └─────────────────────┼──────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -177,10 +176,10 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `26_QAForum.gs` | Q&A Forum with steward-only answers and resolve | `getQAForumData`, `postQuestion`, `postAnswer`, `resolveQuestion` |
-| `27_TimelineService.gs` | Timeline activity feed with inline edit | `getTimelineEntries`, `addTimelineEntry`, `editTimelineEntry` |
-| `28_FailsafeService.gs` | Security and reliability failsafe layer | `FailsafeService.getFiles`, `FailsafeService.validateAccess` |
-| `29_Migrations.gs` | Schema migration runner | `runMigrations`, `getMigrationStatus` |
+| `26_QAForum.gs` | Q&A Forum for steward-member communication (IIFE: QAForum) | `getForumQuestions`, `postForumAnswer`, `resolveForumQuestion` |
+| `27_TimelineService.gs` | Timeline/activity feed service (IIFE: TimelineService) | `getTimelineEntries`, `addTimelineEntry`, `editTimelineEntry` |
+| `28_FailsafeService.gs` | Critical operation failsafe wrapper (IIFE: FailsafeService) | `withFailsafe`, `getFailsafeStatus` |
+| `29_Migrations.gs` | One-time data migration runner (IIFE: Migrations) | `runPendingMigrations`, `registerMigration` |
 
 ### HTML Templates
 
@@ -188,11 +187,11 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 |------|---------|
 | `index.html` | SPA entry point |
 | `styles.html` | SPA shared styles |
-| `auth_view.html` | SSO/magic link authentication view |
+| `auth_view.html` | Authentication view template |
 | `steward_view.html` | Steward dashboard SPA view |
 | `member_view.html` | Member dashboard SPA view |
-| `error_view.html` | Error/access denied page |
-| `org_chart.html` | Organizational chart view |
+| `error_view.html` | Error page template |
+| `org_chart.html` | Organization chart view |
 
 ### Development Module (Remove in Production)
 
@@ -240,9 +239,9 @@ if (!authResult.isAuthorized) {
 
 The `00_Security.gs` module includes a security event alerting system that detects and notifies on suspicious activity. Hooks are integrated at key entry points:
 
-- **`05_Integrations.gs`** — web app access monitoring
-- **`10_Main.gs`** — edit trigger threat detection
-- **`13_MemberSelfService.gs`** — failed authentication attempt tracking
+- **`05_Integrations.gs`** -- web app access monitoring
+- **`10_Main.gs`** -- edit trigger threat detection
+- **`13_MemberSelfService.gs`** -- failed authentication attempt tracking
 
 ### Member ID Generation
 
@@ -273,6 +272,14 @@ var formula = buildSafeQuery(sheetName, 'SELECT A, B WHERE C > 0', 1);
 // Escape sheet names for formula use
 var safeSheet = safeSheetNameForFormula(userProvidedName);
 ```
+
+### Session Token Authentication (v4.22.9+)
+
+All web dashboard API calls now pass a session token for authentication. The auth sweep (v4.22.9 through v4.24.7) ensures that every DataService wrapper function validates the caller's session before returning data.
+
+### FailsafeService (v4.22.8+)
+
+The `28_FailsafeService.gs` module wraps critical operations (file access, sheet reads) with retry logic and graceful degradation, preventing cascading failures.
 
 ---
 
@@ -355,58 +362,61 @@ npm run deploy
 ### Build Process
 
 1. **Lint** (optional): ESLint checks all `.gs` files
-2. **Concatenate**: Files combined in `BUILD_ORDER` sequence
+2. **Copy**: Individual `.gs` + `.html` files copied to `dist/`
 3. **Embed HTML**: HTML templates converted to functions
 4. **Output**: Individual `.gs` + `.html` files copied to `dist/`
 
+Note: The `--prod` flag excludes `07_DevTools.gs` from the build output.
+
 ### Build Order
 
-Files must be concatenated in dependency order (42 files):
+Files must be copied in dependency order (42 files):
 
 ```javascript
 const BUILD_ORDER = [
-  '00_Security.gs',               // Security utilities, XSS prevention, access control
-  '00_DataAccess.gs',             // Data Access Layer, time constants
-  '01_Core.gs',                   // Error handling + Constants (SHEETS, MEMBER_COLS, etc.)
-  '02_DataManagers.gs',           // Member + Grievance CRUD managers
-  '03_UIComponents.gs',           // Menu, Theme, Mobile, QuickActions, Search
-  '04a_UIMenus.gs',               // Menu creation, visual control panel, dialogs
-  '04b_AccessibilityFeatures.gs', // Comfort view, focus mode, import/export
-  '04c_InteractiveDashboard.gs',  // Interactive dashboard, mobile views
-  '04d_ExecutiveDashboard.gs',    // Executive dashboard, steward dashboard, alerts
-  '04e_PublicDashboard.gs',       // Public member dashboard, unified data endpoints
-  '05_Integrations.gs',           // Drive, Calendar, WebApp integration
-  '06_Maintenance.gs',            // Diagnostics, Cache, Undo/Redo
-  '07_DevTools.gs',               // Dev tools + Test framework (remove before prod)
-  '08a_SheetSetup.gs',            // Main setup, utility functions, data validation
-  '08b_SearchAndCharts.gs',       // Search functions, chart generation
-  '08c_FormsAndNotifications.gs', // Form handling, notifications, deadline alerts
-  '08d_AuditAndFormulas.gs',      // Audit log, formula sync, hidden calc sheets
-  '08e_SurveyEngine.gs',          // Dynamic survey schema engine (Option B)
-  '09_Dashboards.gs',             // Satisfaction, Sync, Public dashboards
-  '10a_SheetCreation.gs',         // Config, Member Directory, Grievance Log creation
-  '10b_SurveyDocSheets.gs',       // Satisfaction, Feedback, FAQ, Getting Started sheets
-  '10c_FormHandlers.gs',          // Menu handlers, form submissions, flagged reviews
-  '10d_SyncAndMaintenance.gs',    // Formatting, testing, Drive, Calendar, sync
-  '10_Main.gs',                   // Main entry point, onOpen, onEdit, triggers
-  '11_CommandHub.gs',             // Command center + Secure member dashboard
-  '12_Features.gs',               // Checklist, Dynamic Engine, Looker Studio
-  '13_MemberSelfService.gs',      // Member self-service portal with PIN auth
-  '14_MeetingCheckIn.gs',         // Meeting check-in system with email + PIN auth
-  '15_EventBus.gs',               // Pub/sub event system
-  '16_DashboardEnhancements.gs',  // Date ranges, chart export, drill-down
-  '17_CorrelationEngine.gs',      // Cross-dimensional correlation analysis
-  '19_WebDashAuth.gs',            // Google SSO + magic link auth
-  '20_WebDashConfigReader.gs',    // Column-based Config tab reader
-  '21_WebDashDataService.gs',     // Unified data service for SPA
-  '22_WebDashApp.gs',             // SPA entry point and routing
-  '23_PortalSheets.gs',           // Hidden sheet management for SPA
-  '24_WeeklyQuestions.gs',        // Weekly check-in questions
-  '25_WorkloadService.gs',        // SPA-integrated workload (IIFE: WorkloadService)
-  '26_QAForum.gs',                // Q&A Forum with steward-only answers
-  '27_TimelineService.gs',        // Timeline activity feed with inline edit
-  '28_FailsafeService.gs',        // Security and reliability failsafe layer
-  '29_Migrations.gs'              // Schema migration runner
+  '00_Security.gs',
+  '00_DataAccess.gs',
+  '01_Core.gs',
+  '02_DataManagers.gs',
+  '03_UIComponents.gs',
+  '04a_UIMenus.gs',
+  '04b_AccessibilityFeatures.gs',
+  '04c_InteractiveDashboard.gs',
+  '04d_ExecutiveDashboard.gs',
+  '04e_PublicDashboard.gs',
+  '05_Integrations.gs',
+  '06_Maintenance.gs',
+  '07_DevTools.gs',
+  '08a_SheetSetup.gs',
+  '08b_SearchAndCharts.gs',
+  '08c_FormsAndNotifications.gs',
+  '08d_AuditAndFormulas.gs',
+  '08e_SurveyEngine.gs',
+  '09_Dashboards.gs',
+  '10a_SheetCreation.gs',
+  '10b_SurveyDocSheets.gs',
+  '10c_FormHandlers.gs',
+  '10d_SyncAndMaintenance.gs',
+  '10_Main.gs',
+  '11_CommandHub.gs',
+  '12_Features.gs',
+  '13_MemberSelfService.gs',
+  '14_MeetingCheckIn.gs',
+  '15_EventBus.gs',
+  '16_DashboardEnhancements.gs',
+  '17_CorrelationEngine.gs',
+  // Web-dashboard SPA modules
+  '19_WebDashAuth.gs',
+  '20_WebDashConfigReader.gs',
+  '21_WebDashDataService.gs',
+  '22_WebDashApp.gs',
+  '23_PortalSheets.gs',
+  '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs',
+  '26_QAForum.gs',
+  '27_TimelineService.gs',
+  '28_FailsafeService.gs',
+  '29_Migrations.gs',
 ];
 ```
 
@@ -432,44 +442,44 @@ npm test
 
 ```
 test/
-├── gas-mock.js                    # GAS global mocks (SpreadsheetApp, Logger, etc.)
-├── load-source.js                 # Loads .gs source files into Node.js global scope
-├── modules.test.js                # Cross-module integration tests
-├── architecture.test.js           # Architecture validation tests
-├── columns.test.js                # Column constant tests
-├── expansion.test.js              # Expansion and growth tests
-├── 00_DataAccess.test.js          # Data Access Layer tests
-├── 00_Security.test.js            # Security module tests
-├── 01_Core.test.js                # Core constants and error handling tests
-├── 02_DataManagers.test.js        # Member and grievance data manager tests
-├── 03_UIComponents.test.js        # UI component tests
-├── 04_UIService.test.js           # UI service tests
-├── 04e_PublicDashboard.test.js    # Public dashboard tests
-├── 05_Integrations.test.js        # Integrations tests
-├── 06_Maintenance.test.js         # Maintenance and diagnostics tests
-├── 07_DevTools.test.js            # Dev tools tests
-├── 08_SheetUtils.test.js          # Sheet utility tests
-├── 09_Dashboards.test.js          # Dashboard tests
-├── 10_Code.test.js                # Code and sheet creation tests
-├── 10_Main.test.js                # Main entry point tests
-├── 10d_SyncAndMaintenance.test.js # Sync and maintenance tests
-├── 11_CommandHub.test.js          # Command hub tests
-├── 12_Features.test.js            # Features and checklist tests
-├── 13_MemberSelfService.test.js   # Member self-service portal tests
-├── 14_MeetingCheckIn.test.js      # Meeting check-in system tests
-├── 15_EventBus.test.js            # EventBus pub/sub tests
-├── 16_DashboardEnhancements.test.js # Dashboard enhancements tests
-├── 17_CorrelationEngine.test.js   # Correlation engine tests
-├── 19_WebDashAuth.test.js         # Web dashboard auth tests
-├── 20_WebDashConfigReader.test.js # Config reader tests
-├── 21_WebDashDataService.test.js  # Web data service tests
-├── 22_WebDashApp.test.js          # Web dashboard app tests
-├── 23_PortalSheets.test.js        # Portal sheets tests
-├── 24_WeeklyQuestions.test.js     # Weekly questions tests
-├── 25_WorkloadService.test.js     # Workload service tests
-├── 26_QAForum.test.js             # Q&A Forum tests
-├── 27_TimelineService.test.js     # Timeline service tests
-└── 28_FailsafeService.test.js     # Failsafe service tests
+├── gas-mock.js
+├── load-source.js
+├── modules.test.js
+├── architecture.test.js
+├── columns.test.js
+├── expansion.test.js
+├── 00_DataAccess.test.js
+├── 00_Security.test.js
+├── 01_Core.test.js
+├── 02_DataManagers.test.js
+├── 03_UIComponents.test.js
+├── 04_UIService.test.js
+├── 04e_PublicDashboard.test.js
+├── 05_Integrations.test.js
+├── 06_Maintenance.test.js
+├── 07_DevTools.test.js
+├── 08_SheetUtils.test.js
+├── 09_Dashboards.test.js
+├── 10_Code.test.js
+├── 10_Main.test.js
+├── 10d_SyncAndMaintenance.test.js
+├── 11_CommandHub.test.js
+├── 12_Features.test.js
+├── 13_MemberSelfService.test.js
+├── 14_MeetingCheckIn.test.js
+├── 15_EventBus.test.js
+├── 16_DashboardEnhancements.test.js
+├── 17_CorrelationEngine.test.js
+├── 19_WebDashAuth.test.js
+├── 20_WebDashConfigReader.test.js
+├── 21_WebDashDataService.test.js
+├── 22_WebDashApp.test.js
+├── 23_PortalSheets.test.js
+├── 24_WeeklyQuestions.test.js
+├── 25_WorkloadService.test.js
+├── 26_QAForum.test.js
+├── 27_TimelineService.test.js
+└── 28_FailsafeService.test.js
 ```
 
 #### Writing Tests

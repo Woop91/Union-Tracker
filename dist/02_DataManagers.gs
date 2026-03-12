@@ -25,14 +25,9 @@
  * @returns {string} The generated Member ID
  */
 function addMember(memberData) {
-  var lock = LockService.getScriptLock();
-  try {
-    if (!lock.tryLock(10000)) {
-      throw new Error('Could not acquire lock for addMember — another operation in progress');
-    }
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  return withScriptLock_(function() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
       throw new Error('Member Directory sheet not found');
@@ -45,29 +40,26 @@ function addMember(memberData) {
     var lastRow = sheet.getLastRow();
     var newRow = lastRow + 1;
 
-  // Build row array and write with single setValues call (F1: batch write)
-  var totalCols = sheet.getLastColumn() || Object.keys(MEMBER_COLS).length;
-  var rowData = new Array(totalCols).fill('');
-  rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
-  rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
-  rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
-  rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
-  rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
-  rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
-  rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
-  rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
-  // REL-03: Wrap sheet write in try/catch with contextual error message
-  try {
-    sheet.getRange(newRow, 1, 1, totalCols).setValues([rowData]);
-  } catch (writeErr) {
-    throw new Error('addMember: sheet write failed at row ' + newRow + ': ' + writeErr.message);
-  }
+    // Build row array and write with single setValues call (F1: batch write)
+    var totalCols = sheet.getLastColumn() || Object.keys(MEMBER_COLS).length;
+    var rowData = new Array(totalCols).fill('');
+    rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+    // REL-03: Wrap sheet write in try/catch with contextual error message
+    try {
+      sheet.getRange(newRow, 1, 1, totalCols).setValues([rowData]);
+    } catch (writeErr) {
+      throw new Error('addMember: sheet write failed at row ' + newRow + ': ' + writeErr.message);
+    }
 
-  return memberId;
-
-  } finally {
-    lock.releaseLock();
-  }
+    return memberId;
+  });
 }
 
 /**
@@ -76,14 +68,9 @@ function addMember(memberData) {
  * @param {Object} updateData - Fields to update
  */
 function updateMember(memberId, updateData) {
-  var lock = LockService.getScriptLock();
-  try {
-    if (!lock.tryLock(10000)) {
-      throw new Error('Could not acquire lock for updateMember — another operation in progress');
-    }
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  return withScriptLock_(function() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
       throw new Error('Member Directory sheet not found');
@@ -102,31 +89,26 @@ function updateMember(memberId, updateData) {
       throw new Error('Member not found: ' + memberId);
     }
 
-  // PERF-02: Use the already-loaded data array directly instead of re-reading the row.
-  // The previous code called sheet.getRange(memberRow,...).getValues() which is a redundant
-  // Sheets API call — we already have the full row from the getDataRange() read above.
-  var currentRow = data[memberRow - 1].slice(); // copy to avoid mutating cached array
-  var totalCols = currentRow.length;
+    // PERF-02: Use the already-loaded data array directly instead of re-reading the row.
+    var currentRow = data[memberRow - 1].slice(); // copy to avoid mutating cached array
+    var totalCols = currentRow.length;
 
-  // F11-12: Use !== undefined instead of truthiness to allow clearing fields with empty strings
-  if (updateData.firstName !== undefined) currentRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(updateData.firstName);
-  if (updateData.lastName !== undefined) currentRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(updateData.lastName);
-  if (updateData.email !== undefined) currentRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(updateData.email);
-  if (updateData.phone !== undefined) currentRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(updateData.phone);
-  if (updateData.jobTitle !== undefined) currentRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(updateData.jobTitle);
-  if (updateData.workLocation !== undefined) currentRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(updateData.workLocation);
-  if (updateData.unit !== undefined) currentRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(updateData.unit);
+    // F11-12: Use !== undefined instead of truthiness to allow clearing fields with empty strings
+    if (updateData.firstName !== undefined) currentRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(updateData.firstName);
+    if (updateData.lastName !== undefined) currentRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(updateData.lastName);
+    if (updateData.email !== undefined) currentRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(updateData.email);
+    if (updateData.phone !== undefined) currentRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(updateData.phone);
+    if (updateData.jobTitle !== undefined) currentRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(updateData.jobTitle);
+    if (updateData.workLocation !== undefined) currentRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(updateData.workLocation);
+    if (updateData.unit !== undefined) currentRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(updateData.unit);
 
-  // REL-03: Wrap sheet write in try/catch with contextual error message
-  try {
-    sheet.getRange(memberRow, 1, 1, totalCols).setValues([currentRow]);
-  } catch (writeErr) {
-    throw new Error('updateMember: sheet write failed for ' + memberId + ' at row ' + memberRow + ': ' + writeErr.message);
-  }
-
-  } finally {
-    lock.releaseLock();
-  }
+    // REL-03: Wrap sheet write in try/catch with contextual error message
+    try {
+      sheet.getRange(memberRow, 1, 1, totalCols).setValues([currentRow]);
+    } catch (writeErr) {
+      throw new Error('updateMember: sheet write failed for ' + memberId + ' at row ' + memberRow + ': ' + writeErr.message);
+    }
+  });
 }
 
 /**
@@ -1625,14 +1607,10 @@ function showExportMembersDialog() {
  * @return {Object} Result with grievance ID or error
  */
 function startNewGrievance(grievanceData) {
-  var lock = LockService.getScriptLock();
   try {
-    if (!lock.tryLock(10000)) {
-      return errorResponse('Could not acquire lock — another operation in progress', 'createGrievance');
-    }
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    return withScriptLock_(function() {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
       if (!grievanceSheet) {
         throw new Error('Grievance Tracker sheet not found');
@@ -1694,13 +1672,11 @@ function startNewGrievance(grievanceData) {
         grievanceId: grievanceId,
         message: `Grievance ${grievanceId} created successfully`
       };
-
-    } catch (error) {
-      console.error('Error creating grievance:', error);
-      return errorResponse(error.message, 'createGrievance');
-    } finally {
-      lock.releaseLock();
-    }
+    });
+  } catch (error) {
+    console.error('Error creating grievance:', error);
+    return errorResponse(error.message, 'createGrievance');
+  }
 }
 
 /**
@@ -1953,12 +1929,8 @@ function getDaysUntilDeadline(deadline) {
  * @return {Object} Result object
  */
 function advanceGrievanceStep(grievanceId, options) {
-  var lock = LockService.getScriptLock();
   try {
-    if (!lock.tryLock(10000)) {
-      return errorResponse('Could not acquire lock — another operation in progress', 'advanceGrievanceStep');
-    }
-
+    return withScriptLock_(function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
     const data = sheet.getDataRange().getValues();
@@ -2044,12 +2016,10 @@ function advanceGrievanceStep(grievanceId, options) {
       newStep: nextStep,
       message: `Grievance advanced to Step ${nextStep}`
     };
-
+    });
   } catch (error) {
     console.error('Error advancing grievance:', error);
     return errorResponse(error.message, 'advanceGrievanceStep');
-  } finally {
-    lock.releaseLock();
   }
 }
 
@@ -2179,60 +2149,57 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
   }
 
-  var lock = LockService.getScriptLock();
   try {
-    if (!lock.tryLock(10000)) {
-      return errorResponse('Could not acquire lock — another operation in progress', 'bulkUpdateGrievanceStatus');
-    }
+    return withScriptLock_(function() {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+      ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+      const data = sheet.getDataRange().getValues();
+      const numRows = data.length - 1;
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
-  const data = sheet.getDataRange().getValues();
-  const numRows = data.length - 1;
+      let updatedCount = 0;
+      const today = new Date();
+      const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
-  let updatedCount = 0;
-  const today = new Date();
-  const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
+      // M-PERF: Batch write — read columns, modify in-memory, write back
+      const statusCol = sheet.getRange(2, GRIEVANCE_COLS.STATUS, numRows, 1).getValues();
+      const lastUpdatedCol = sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, numRows, 1).getValues();
+      const resolutionCol = notes ? sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, numRows, 1).getValues() : null;
 
-  // M-PERF: Batch write — read columns, modify in-memory, write back
-  const statusCol = sheet.getRange(2, GRIEVANCE_COLS.STATUS, numRows, 1).getValues();
-  const lastUpdatedCol = sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, numRows, 1).getValues();
-  const resolutionCol = notes ? sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, numRows, 1).getValues() : null;
+      for (let i = 1; i < data.length; i++) {
+        const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
-  for (let i = 1; i < data.length; i++) {
-    const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+        if (grievanceIds.includes(grievanceId)) {
+          statusCol[i - 1][0] = newStatus;
+          lastUpdatedCol[i - 1][0] = today;
 
-    if (grievanceIds.includes(grievanceId)) {
-      statusCol[i - 1][0] = newStatus;
-      lastUpdatedCol[i - 1][0] = today;
+          if (notes) {
+            const existingResolution = resolutionCol[i - 1][0] || '';
+            const newResolution = existingResolution + (existingResolution ? '\n' : '') +
+                             `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
+            resolutionCol[i - 1][0] = escapeForFormula(newResolution);
+          }
 
-      if (notes) {
-        const existingResolution = resolutionCol[i - 1][0] || '';
-        const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                         `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
-        resolutionCol[i - 1][0] = escapeForFormula(newResolution);
+          updatedCount++;
+        }
       }
 
-      updatedCount++;
-    }
-  }
+      // Write all columns back (2-3 calls total instead of 2-3 per matched row)
+      sheet.getRange(2, GRIEVANCE_COLS.STATUS, numRows, 1).setValues(statusCol);
+      sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, numRows, 1).setValues(lastUpdatedCol);
+      if (notes && resolutionCol) {
+        sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, numRows, 1).setValues(resolutionCol);
+      }
 
-  // Write all columns back (2-3 calls total instead of 2-3 per matched row)
-  sheet.getRange(2, GRIEVANCE_COLS.STATUS, numRows, 1).setValues(statusCol);
-  sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, numRows, 1).setValues(lastUpdatedCol);
-  if (notes && resolutionCol) {
-    sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, numRows, 1).setValues(resolutionCol);
-  }
-
-  return {
-    success: true,
-    updatedCount: updatedCount,
-    message: `Updated status for ${updatedCount} grievances`
-  };
-
-  } finally {
-    lock.releaseLock();
+      return {
+        success: true,
+        updatedCount: updatedCount,
+        message: `Updated status for ${updatedCount} grievances`
+      };
+    });
+  } catch (error) {
+    console.error('Error in bulk status update:', error);
+    return errorResponse(error.message, 'bulkUpdateGrievanceStatus');
   }
 }
 
@@ -2463,78 +2430,73 @@ function getGrievanceStats() {
  * @return {Object} Result object
  */
 function resolveGrievance(grievanceId, outcome, resolution, notes) {
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) {
-    return errorResponse('Could not acquire lock for resolveGrievance');
-  }
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
-    const data = sheet.getDataRange().getValues();
+    return withScriptLock_(function() {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+      ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+      const data = sheet.getDataRange().getValues();
 
-    let rowIndex = -1;
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
-        rowIndex = i + 1;
-        break;
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+          rowIndex = i + 1;
+          break;
+        }
       }
-    }
 
-    if (rowIndex === -1) {
-      return errorResponse('Grievance not found');
-    }
+      if (rowIndex === -1) {
+        return errorResponse('Grievance not found');
+      }
 
-    const today = new Date();
-    const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
+      const today = new Date();
+      const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
-    // Build combined resolution text
-    var resolutionText = outcome || '';
-    if (resolution) {
-      resolutionText += (resolutionText ? ': ' : '') + resolution;
-    }
-    if (notes) {
-      resolutionText += (resolutionText ? '\n' : '') +
-                        '[' + timestamp + '] ' + notes;
-    }
-    // H-29: Use outcome parameter to determine status instead of always 'Settled'
-    var validOutcomes = {
-      'Won': GRIEVANCE_STATUS.WON,
-      'Denied': GRIEVANCE_STATUS.DENIED,
-      'Settled': GRIEVANCE_STATUS.SETTLED,
-      'Withdrawn': GRIEVANCE_STATUS.WITHDRAWN,
-      'Closed': GRIEVANCE_STATUS.CLOSED
-    };
-    var resolvedStatus = (outcome && validOutcomes[outcome]) ? validOutcomes[outcome] : GRIEVANCE_STATUS.SETTLED;
+      // Build combined resolution text
+      var resolutionText = outcome || '';
+      if (resolution) {
+        resolutionText += (resolutionText ? ': ' : '') + resolution;
+      }
+      if (notes) {
+        resolutionText += (resolutionText ? '\n' : '') +
+                          '[' + timestamp + '] ' + notes;
+      }
+      // H-29: Use outcome parameter to determine status instead of always 'Settled'
+      var validOutcomes = {
+        'Won': GRIEVANCE_STATUS.WON,
+        'Denied': GRIEVANCE_STATUS.DENIED,
+        'Settled': GRIEVANCE_STATUS.SETTLED,
+        'Withdrawn': GRIEVANCE_STATUS.WITHDRAWN,
+        'Closed': GRIEVANCE_STATUS.CLOSED
+      };
+      var resolvedStatus = (outcome && validOutcomes[outcome]) ? validOutcomes[outcome] : GRIEVANCE_STATUS.SETTLED;
 
-    // M-PERF: Batch write — read row, apply 4 updates, write back in single call
-    var totalCols = sheet.getLastColumn();
-    var rowData = sheet.getRange(rowIndex, 1, 1, totalCols).getValues()[0];
-    rowData[GRIEVANCE_COLS.RESOLUTION - 1] = escapeForFormula(resolutionText);
-    rowData[GRIEVANCE_COLS.STATUS - 1] = resolvedStatus;
-    rowData[GRIEVANCE_COLS.DATE_CLOSED - 1] = today;
-    rowData[GRIEVANCE_COLS.LAST_UPDATED - 1] = today;
-    sheet.getRange(rowIndex, 1, 1, totalCols).setValues([rowData]);
+      // M-PERF: Batch write — read row, apply 4 updates, write back in single call
+      var totalCols = sheet.getLastColumn();
+      var rowData = sheet.getRange(rowIndex, 1, 1, totalCols).getValues()[0];
+      rowData[GRIEVANCE_COLS.RESOLUTION - 1] = escapeForFormula(resolutionText);
+      rowData[GRIEVANCE_COLS.STATUS - 1] = resolvedStatus;
+      rowData[GRIEVANCE_COLS.DATE_CLOSED - 1] = today;
+      rowData[GRIEVANCE_COLS.LAST_UPDATED - 1] = today;
+      sheet.getRange(rowIndex, 1, 1, totalCols).setValues([rowData]);
 
-    // Log the resolution
-    logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
-      grievanceId: grievanceId,
-      action: 'RESOLVED',
-      outcome: outcome,
-      resolvedBy: Session.getActiveUser().getEmail()
+      // Log the resolution
+      logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
+        grievanceId: grievanceId,
+        action: 'RESOLVED',
+        outcome: outcome,
+        resolvedBy: Session.getActiveUser().getEmail()
+      });
+
+      return {
+        success: true,
+        grievanceId: grievanceId,
+        message: `Grievance ${grievanceId} resolved as "${outcome}"`
+      };
     });
-
-    return {
-      success: true,
-      grievanceId: grievanceId,
-      message: `Grievance ${grievanceId} resolved as "${outcome}"`
-    };
-
   } catch (error) {
     console.error('Error resolving grievance:', error);
     return errorResponse(error.message);
-  } finally {
-    lock.releaseLock();
   }
 }
 

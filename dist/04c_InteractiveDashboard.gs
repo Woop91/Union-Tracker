@@ -74,6 +74,7 @@
  * @deprecated v4.3.2 - Use showStewardDashboard() instead.
  * Interactive dashboard is now consolidated into Steward Dashboard.
  */
+/** @deprecated Use showStewardDashboard() directly. Kept for caller backward compat. */
 function showInteractiveDashboardTab() {
   showStewardDashboard();
 }
@@ -1069,7 +1070,7 @@ function getInteractiveOverviewData() {
     memberData.forEach(function(row) {
       var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
       // Skip blank rows - must have a valid member ID starting with M
-      if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return;
+      if (!isMemberId_(memberId)) return;
 
       data.totalMembers++;
       if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) data.activeStewards++;
@@ -1095,14 +1096,14 @@ function getInteractiveOverviewData() {
     grievanceData.forEach(function(row) {
       var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
       // Skip blank rows - must have a valid grievance ID starting with G
-      if (!grievanceId || (typeof grievanceId === 'string' && !grievanceId.toString().match(/^G/i))) return;
+      if (!isGrievanceId_(grievanceId)) return;
 
       data.totalGrievances++;
       var status = row[GRIEVANCE_COLS.STATUS - 1];
       var resolution = row[GRIEVANCE_COLS.RESOLUTION - 1] || '';
-      if (status === 'Open') data.openGrievances++;
-      if (status === 'Pending Info') data.pendingInfo++;
-      if (status !== 'Open' && status !== 'Pending Info') closedCount++;
+      if (status === GRIEVANCE_STATUS.OPEN) data.openGrievances++;
+      if (status === GRIEVANCE_STATUS.PENDING) data.pendingInfo++;
+      if (status !== GRIEVANCE_STATUS.OPEN && status !== GRIEVANCE_STATUS.PENDING) closedCount++;
       if (resolution.toLowerCase().indexOf('won') >= 0 || resolution.toLowerCase().indexOf('favorable') >= 0) wonCount++;
     });
     if (closedCount > 0) {
@@ -1164,7 +1165,7 @@ function getInteractiveMemberData() {
   return data.map(function(row) {
     var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
     // Skip blank rows - must have a valid member ID starting with M
-    if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return null;
+    if (!isMemberId_(memberId)) return null;
 
     return {
       id: memberId,
@@ -1203,7 +1204,7 @@ function getInteractiveGrievanceData() {
   return data.map(function(row, idx) {
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
     // Skip blank rows - must have a valid grievance ID starting with G
-    if (!grievanceId || (typeof grievanceId === 'string' && !grievanceId.toString().match(/^G/i))) return null;
+    if (!isGrievanceId_(grievanceId)) return null;
 
     var filed = row[GRIEVANCE_COLS.DATE_FILED - 1];
     var incident = row[GRIEVANCE_COLS.INCIDENT_DATE - 1];
@@ -1263,7 +1264,7 @@ function getMyStewardCases() {
   return data.map(function(row, idx) {
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
     // Skip blank rows
-    if (!grievanceId || (typeof grievanceId === 'string' && !grievanceId.toString().match(/^G/i))) return null;
+    if (!isGrievanceId_(grievanceId)) return null;
 
     // Check if current user is the steward for this grievance
     var steward = row[GRIEVANCE_COLS.STEWARD - 1] || '';
@@ -1355,7 +1356,7 @@ function getInteractiveAnalyticsData() {
 
     memberData.forEach(function(row) {
       var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
-      if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return;
+      if (!isMemberId_(memberId)) return;
 
       data.memberStats.total++;
       if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) data.memberStats.stewards++;
@@ -1400,7 +1401,7 @@ function getInteractiveAnalyticsData() {
 
     rows.forEach(function(row) {
       var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
-      if (!grievanceId || (typeof grievanceId === 'string' && !grievanceId.toString().match(/^G/i))) return;
+      if (!isGrievanceId_(grievanceId)) return;
 
       var status = row[GRIEVANCE_COLS.STATUS - 1] || '';
       var category = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
@@ -1412,15 +1413,15 @@ function getInteractiveAnalyticsData() {
       var daysOpen = row[GRIEVANCE_COLS.DAYS_OPEN - 1];
 
       // Status counts
-      if (status === 'Open') {
+      if (status === GRIEVANCE_STATUS.OPEN) {
         data.statusCounts.open++;
-        if (!statusMap['Open']) statusMap['Open'] = { count: 0, color: '#DC2626' };
-        statusMap['Open'].count++;
-      } else if (status === 'Pending Info') {
+        if (!statusMap[GRIEVANCE_STATUS.OPEN]) statusMap[GRIEVANCE_STATUS.OPEN] = { count: 0, color: '#DC2626' };
+        statusMap[GRIEVANCE_STATUS.OPEN].count++;
+      } else if (status === GRIEVANCE_STATUS.PENDING) {
         data.statusCounts.pending++;
-        if (!statusMap['Pending Info']) statusMap['Pending Info'] = { count: 0, color: '#F97316' };
-        statusMap['Pending Info'].count++;
-      } else if (status === 'Resolved' || status === 'Closed' || status === 'Withdrawn') {
+        if (!statusMap[GRIEVANCE_STATUS.PENDING]) statusMap[GRIEVANCE_STATUS.PENDING] = { count: 0, color: '#F97316' };
+        statusMap[GRIEVANCE_STATUS.PENDING].count++;
+      } else if (status === GRIEVANCE_STATUS.RESOLVED || status === GRIEVANCE_STATUS.CLOSED || status === GRIEVANCE_STATUS.WITHDRAWN) {
         data.statusCounts.closed++;
         if (!statusMap[status]) statusMap[status] = { count: 0, color: '#059669' };
         statusMap[status].count++;
@@ -1449,13 +1450,13 @@ function getInteractiveAnalyticsData() {
       if (steward && steward !== 'Unassigned') {
         if (!stewardCaseCount[steward]) stewardCaseCount[steward] = { total: 0, open: 0 };
         stewardCaseCount[steward].total++;
-        if (status === 'Open' || status === 'Pending Info') stewardCaseCount[steward].open++;
+        if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) stewardCaseCount[steward].open++;
       }
 
       // Location grievance counts
       if (!grievanceLocationMap[location]) grievanceLocationMap[location] = { total: 0, open: 0 };
       grievanceLocationMap[location].total++;
-      if (status === 'Open' || status === 'Pending Info') grievanceLocationMap[location].open++;
+      if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) grievanceLocationMap[location].open++;
 
       // Monthly trends
       if (dateFiled instanceof Date) {

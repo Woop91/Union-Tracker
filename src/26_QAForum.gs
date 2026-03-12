@@ -480,15 +480,9 @@ var QAForum = (function () {
     }
   }
 
-  function _fmtDate(date) {
-    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
-  }
-
-  function _hashEmail(email) {
-    var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, email.toLowerCase().trim());
-    return hash.map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('').substring(0, 12);
-  }
+  // Delegate to shared helpers in 01_Core.gs (eliminates duplicate definitions)
+  function _fmtDate(date) { return fmtDateShort_(date); }
+  function _hashEmail(email) { return hashEmail_(email); }
 
   function _sanitize(text) {
     if (typeof escapeForFormula === 'function') text = escapeForFormula(text);
@@ -524,8 +518,8 @@ function qaGetQuestionDetail(sessionToken, questionId) { var e = _resolveCallerE
 function qaSubmitQuestion(sessionToken, name, text, isAnonymous) { var e = _resolveCallerEmail(sessionToken); return QAForum.submitQuestion(e, name, text, isAnonymous); }
 function qaSubmitAnswer(sessionToken, name, questionId, text, isSteward) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.submitAnswer(e, name, questionId, text, true); }
 function qaUpvoteQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); return QAForum.upvoteQuestion(e, questionId); }
-function qaModerateQuestion(sessionToken, questionId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return QAForum.moderateQuestion(e, questionId, action); }
-function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return QAForum.moderateAnswer(e, answerId, action); }
-function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return null; return QAForum.getFlaggedContent(e); }
-function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); var isSteward = false; try { var auth = checkWebAppAuthorization('steward'); isSteward = auth.isAuthorized; } catch(_) {} return QAForum.resolveQuestion(e, questionId, isSteward); }
+function qaModerateQuestion(sessionToken, questionId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateQuestion(e, questionId, action); }
+function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateAnswer(e, answerId, action); }
+function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
+function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch(_) {} return QAForum.resolveQuestion(e, questionId, isSteward); }
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

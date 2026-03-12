@@ -221,6 +221,7 @@ function SEED_SAMPLE_DATA() {
     '• Union stats, resources, notifications\n' +
     '• Workload, tasks, polls, minutes\n' +
     '• Check-ins, timeline events\n' +
+    '• Q&A Forum questions & answers\n' +
     '• Auto-sync trigger installed\n\n' +
     'Member Directory auto-updates when Grievance Log changes.', ui.ButtonSet.OK);
 }
@@ -311,6 +312,9 @@ function SEED_PHASE_3() {
 
   ss.toast('Seeding timeline events...', '🌱 Phase 3', 2);
   seedTimelineData();
+
+  ss.toast('Seeding Q&A Forum...', '🌱 Phase 3', 2);
+  seedQAForumData();
 
   ss.toast('Installing auto-sync trigger...', '🔧 Setup', 3);
   installAutoSyncTriggerQuick();
@@ -1099,6 +1103,17 @@ function SEED_MEMBERS_ONLY(count) {
   var batchSize = 100; // Larger batches for 1000 members
   var today = new Date();
 
+  // Pick 2-3 random office days (comma-separated, matching multi-select format)
+  function randomOfficeDays(days) {
+    var shuffled = days.slice();
+    for (var d = shuffled.length - 1; d > 0; d--) {
+      var j = Math.floor(Math.random() * (d + 1));
+      var tmp = shuffled[d]; shuffled[d] = shuffled[j]; shuffled[j] = tmp;
+    }
+    var count2 = Math.random() < 0.5 ? 2 : 3;
+    return shuffled.slice(0, count2).join(', ');
+  }
+
   var sampleContactNotes = [
     'Discussed workload concerns', 'Follow up on scheduling issue', 'Interested in becoming steward',
     'Addressed safety complaint', 'Positive feedback received', 'Needs info on benefits',
@@ -1124,7 +1139,7 @@ function SEED_MEMBERS_ONLY(count) {
 
     var row = generateSingleMemberRow(
       memberId, firstName, lastName,
-      randomChoice(jobTitles), randomChoice(locations), randomChoice(units), randomChoice(officeDays),
+      randomChoice(jobTitles), randomChoice(locations), randomChoice(units), randomOfficeDays(officeDays),
       email, phone, randomChoice(commMethods), 'Morning',
       randomChoice(supervisors), randomChoice(managers),
       isSteward, isSteward === 'Yes' ? randomChoice(committees) : '', '',
@@ -1416,7 +1431,7 @@ function generateSingleGrievanceRow(grievanceId, memberId, firstName, lastName, 
   var step3AppealFiled = '';
   var dateClosed = '';
 
-  var isClosed = (status === 'Settled' || status === 'Withdrawn' || status === 'Denied' || status === 'Won' || status === 'Closed');
+  var isClosed = GRIEVANCE_CLOSED_STATUSES.indexOf(status) !== -1;
   var stepIndex = ['Informal', 'Step I', 'Step II', 'Step III', 'Mediation', 'Arbitration'].indexOf(step);
 
   if (stepIndex >= 1 || isClosed) {
@@ -2522,6 +2537,291 @@ function seedTimelineData() {
 
   sheet.getRange(2, 1, events.length, 12).setValues(events);
   Logger.log('Seeded ' + events.length + ' timeline events');
+}
+
+// ============================================================================
+// SEED: Q&A FORUM
+// ============================================================================
+
+/**
+ * Seeds sample Q&A Forum data with realistic questions and answers.
+ * Populates _QA_Forum (questions) and _QA_Answers (answers) sheets.
+ * Demonstrates anonymous posting, upvoting, steward answers, and moderation.
+ */
+function seedQAForumData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Ensure sheets exist
+  if (typeof QAForum !== 'undefined' && QAForum.initSheets) {
+    try { QAForum.initSheets(); } catch (_e) { /* ok */ }
+  }
+
+  var forumSheet = ss.getSheetByName(SHEETS.QA_FORUM);
+  var answerSheet = ss.getSheetByName(SHEETS.QA_ANSWERS);
+
+  if (!forumSheet || !answerSheet) {
+    Logger.log('QA Forum sheets not found. Skipping seed.');
+    return;
+  }
+
+  if (forumSheet.getLastRow() > 1) {
+    Logger.log('QA Forum already has data. Skipping seed.');
+    return;
+  }
+
+  // Gather member emails from Member Directory for realistic authors
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var memberEmails = [];
+  var memberNames = [];
+  var stewardEmails = [];
+  var stewardNames = [];
+
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var memberData = memberSheet.getDataRange().getValues();
+    for (var m = 1; m < memberData.length && memberEmails.length < 30; m++) {
+      var mEmail = String(memberData[m][MEMBER_COLS.EMAIL - 1] || '').trim();
+      var mFirst = String(memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '');
+      var mLast = String(memberData[m][MEMBER_COLS.LAST_NAME - 1] || '');
+      var mName = (mFirst + ' ' + mLast).trim();
+      var isSteward = String(memberData[m][MEMBER_COLS.IS_STEWARD - 1] || '').toLowerCase() === 'yes';
+      if (mEmail) {
+        memberEmails.push(mEmail);
+        memberNames.push(mName);
+        if (isSteward) {
+          stewardEmails.push(mEmail);
+          stewardNames.push(mName);
+        }
+      }
+    }
+  }
+
+  if (memberEmails.length === 0) {
+    memberEmails = ['member1@example.org', 'member2@example.org', 'member3@example.org'];
+    memberNames = ['Jane Doe', 'John Smith', 'Alex Rivera'];
+  }
+  if (stewardEmails.length === 0) {
+    stewardEmails = [memberEmails[0]];
+    stewardNames = [memberNames[0]];
+  }
+
+  var now = new Date();
+  var qIdCounter = 1;
+  var aIdCounter = 1;
+
+  // Sample questions covering topics members would realistically ask
+  var questions = [
+    {
+      text: 'How do I file a grievance if my supervisor denied my schedule change request?',
+      isAnon: false, upvotes: 12, status: 'active', daysAgo: 21,
+      answers: [
+        { text: 'Great question! First, document the denial in writing. Then contact your assigned steward within the contractual time limit (usually 21 days). Your steward will help you complete the grievance form and determine which article was violated. The process starts at the informal step where we try to resolve it directly with management.', isSteward: true, daysAgo: 20 },
+        { text: 'I had a similar situation last year. My steward was really helpful walking me through it. Make sure to save any emails or written communication about the denial.', isSteward: false, daysAgo: 19 }
+      ]
+    },
+    {
+      text: 'What are the current contract rules about overtime assignments?',
+      isAnon: false, upvotes: 18, status: 'active', daysAgo: 18,
+      answers: [
+        { text: 'Per Article 7 of our CBA, overtime is first offered by seniority within the unit. If no volunteers, it can be mandated in reverse seniority order. Management must give at least 24 hours notice for non-emergency overtime. Check the Resources tab for the full contract language.', isSteward: true, daysAgo: 17 },
+        { text: 'Also worth noting — if you\'re consistently being skipped for OT or assigned OT out of order, that could be a contract violation. Keep a log of OT assignments in your unit.', isSteward: true, daysAgo: 16 }
+      ]
+    },
+    {
+      text: 'Is there a way to see how many members have completed the satisfaction survey?',
+      isAnon: true, upvotes: 7, status: 'active', daysAgo: 14,
+      answers: [
+        { text: 'Yes! Stewards can check the Survey Tracking page which shows overall completion rate and a list of pending members. We send reminders periodically. The survey is anonymous — we can see who completed it but not individual responses.', isSteward: true, daysAgo: 13 }
+      ]
+    },
+    {
+      text: 'Can someone explain what the different grievance steps mean?',
+      isAnon: true, upvotes: 24, status: 'active', daysAgo: 30,
+      answers: [
+        { text: 'Here\'s the quick rundown:\n\n• Informal: First attempt to resolve directly with your supervisor\n• Step I: Formal written grievance filed, management has 30 days to respond\n• Step II: Appeal to next management level if Step I denied\n• Step III: Appeal to agency head/labor relations\n• Mediation: Neutral third party helps find resolution\n• Arbitration: Binding decision by an independent arbitrator\n\nMost cases resolve at Informal or Step I. Your steward guides you through each step.', isSteward: true, daysAgo: 29 }
+      ]
+    },
+    {
+      text: 'When is the next union meeting? I want to bring up staffing concerns in our unit.',
+      isAnon: false, upvotes: 9, status: 'active', daysAgo: 7,
+      answers: [
+        { text: 'Check the Events tab for upcoming meeting dates. You can also raise staffing concerns with your steward anytime — we can bring it to the labor-management committee. If it affects the whole unit, a group grievance might be appropriate.', isSteward: true, daysAgo: 6 },
+        { text: 'Our unit had the same issue. We documented caseload numbers over 3 months and presented it at the last meeting. Management agreed to post two new positions. Numbers matter!', isSteward: false, daysAgo: 5 }
+      ]
+    },
+    {
+      text: 'I\'m interested in becoming a steward. What does it involve?',
+      isAnon: false, upvotes: 15, status: 'active', daysAgo: 25,
+      answers: [
+        { text: 'That\'s wonderful to hear! Being a steward involves:\n\n• Attending monthly steward meetings\n• Being a point of contact for members in your area\n• Helping members with workplace issues and grievances\n• Participating in steward training (we provide it)\n• Advocating for members in meetings with management\n\nYou get protected time for union activities under our contract. Reach out to any current steward or check the Steward Directory to connect with someone who can sponsor you.', isSteward: true, daysAgo: 24 }
+      ]
+    },
+    {
+      text: 'Has anyone used the workload tracker? Does management actually look at the data?',
+      isAnon: true, upvotes: 11, status: 'active', daysAgo: 10,
+      answers: [
+        { text: 'Yes! We compile the workload data and present aggregate trends to management at labor-management meetings. The more members who submit weekly data, the stronger our case for staffing changes. Individual submissions are confidential.', isSteward: true, daysAgo: 9 },
+        { text: 'I\'ve been using it for about 2 months. It only takes a minute to fill out. Our steward showed us a chart at the last meeting that really highlighted how overloaded our unit is.', isSteward: false, daysAgo: 8 }
+      ]
+    },
+    {
+      text: 'What happens to our contract if there\'s a change in administration?',
+      isAnon: false, upvotes: 20, status: 'active', daysAgo: 35,
+      answers: [
+        { text: 'Our collective bargaining agreement remains in effect regardless of changes in administration. The contract is a legally binding document between the union and the employer. A new administration cannot unilaterally change its terms. If they try, that\'s a contract violation and we file grievances. Our legal team monitors these transitions closely.', isSteward: true, daysAgo: 34 }
+      ]
+    },
+    {
+      text: 'How do I update my contact information in the system?',
+      isAnon: false, upvotes: 5, status: 'active', daysAgo: 3,
+      answers: [
+        { text: 'You can update your profile directly in the web app — go to the Profile tab and edit your phone number, preferred communication method, address, etc. Changes save automatically. If you need to update your work email, contact your steward as that requires admin access.', isSteward: true, daysAgo: 2 }
+      ]
+    },
+    {
+      text: 'Are union dues tax deductible?',
+      isAnon: true, upvotes: 14, status: 'active', daysAgo: 45,
+      answers: [
+        { text: 'Under current federal tax law, union dues are NOT deductible on federal taxes for most employees (this changed in 2018). However, some states still allow a state tax deduction. Check your state tax rules or consult a tax professional. Your annual dues statement is available from the union office.', isSteward: true, daysAgo: 44 }
+      ]
+    }
+  ];
+
+  var questionRows = [];
+  var answerRows = [];
+
+  for (var q = 0; q < questions.length; q++) {
+    var question = questions[q];
+    var qId = 'QA_SEED_Q' + qIdCounter++;
+    var authorIdx = q % memberEmails.length;
+    var created = new Date(now.getTime() - question.daysAgo * 86400000);
+
+    // Build upvoters string (random subset of member emails)
+    var upvoterList = [];
+    for (var u = 0; u < Math.min(question.upvotes, memberEmails.length); u++) {
+      var uIdx = (authorIdx + u + 1) % memberEmails.length;
+      upvoterList.push(memberEmails[uIdx]);
+    }
+
+    questionRows.push([
+      qId,
+      question.isAnon ? memberEmails[(authorIdx + 3) % memberEmails.length] : memberEmails[authorIdx],
+      question.isAnon ? 'Anonymous' : memberNames[authorIdx],
+      question.isAnon ? 'Yes' : 'No',
+      question.text,
+      question.status,
+      question.upvotes,
+      upvoterList.join(','),
+      question.answers.length,
+      created,
+      created
+    ]);
+
+    // Add answers
+    for (var a = 0; a < question.answers.length; a++) {
+      var answer = question.answers[a];
+      var aId = 'QA_SEED_A' + aIdCounter++;
+      var ansCreated = new Date(now.getTime() - answer.daysAgo * 86400000);
+      var ansAuthorIdx = answer.isSteward
+        ? (a % stewardEmails.length)
+        : ((authorIdx + a + 1) % memberEmails.length);
+
+      answerRows.push([
+        aId,
+        qId,
+        answer.isSteward ? stewardEmails[ansAuthorIdx] : memberEmails[ansAuthorIdx],
+        answer.isSteward ? stewardNames[ansAuthorIdx] : memberNames[ansAuthorIdx],
+        answer.isSteward ? 'Yes' : 'No',
+        answer.text,
+        'active',
+        ansCreated
+      ]);
+    }
+  }
+
+  if (questionRows.length > 0) {
+    forumSheet.getRange(2, 1, questionRows.length, 11).setValues(questionRows);
+  }
+  if (answerRows.length > 0) {
+    answerSheet.getRange(2, 1, answerRows.length, 8).setValues(answerRows);
+  }
+
+  Logger.log('Seeded ' + questionRows.length + ' questions and ' + answerRows.length + ' answers in QA Forum');
+}
+
+
+// ============================================================================
+// SEED: MEMBER TASKS
+// ============================================================================
+
+/**
+ * Seeds 8 sample member-assigned tasks in the Steward Tasks sheet.
+ * Demonstrates task assignment from stewards to members.
+ */
+function seedMemberTasksData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
+  if (!sheet) {
+    Logger.log('Steward Tasks sheet not found. Skipping member tasks seed.');
+    return;
+  }
+
+  if (sheet.getLastRow() > 1) {
+    var existing = sheet.getDataRange().getValues();
+    var assigneeTypeCol = -1;
+    for (var h = 0; h < existing[0].length; h++) {
+      if (String(existing[0][h]).trim() === 'Assignee Type') { assigneeTypeCol = h; break; }
+    }
+    for (var c = 1; c < existing.length; c++) {
+      if (String(existing[c][0] || '').indexOf('MT_SEED_') === 0 &&
+          (assigneeTypeCol < 0 || String(existing[c][assigneeTypeCol] || '').toLowerCase() === 'member')) {
+        Logger.log('Member tasks already seeded. Skipping.');
+        return;
+      }
+    }
+  }
+
+  var ownerEmail = '';
+  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
+  if (!ownerEmail) ownerEmail = 'steward@example.org';
+
+  var memberEmails = [];
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var mData = memberSheet.getRange(2, MEMBER_COLS.EMAIL, Math.min(memberSheet.getLastRow() - 1, 30), 1).getValues();
+    for (var i = 0; i < mData.length; i++) {
+      if (mData[i][0]) memberEmails.push(String(mData[i][0]));
+    }
+  }
+  if (memberEmails.length === 0) memberEmails.push('member@example.org');
+
+  var now = new Date();
+  var tasks = [
+    ['MT_SEED_1', ownerEmail, 'Complete the member satisfaction survey', 'Please fill out the quarterly satisfaction survey in the Survey tab.', memberEmails[0], 'medium', 'open', new Date(now.getTime() + 7 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_2', ownerEmail, 'Update your profile information', 'Please verify your phone number and preferred contact method are current.', memberEmails[Math.min(1, memberEmails.length - 1)], 'low', 'open', new Date(now.getTime() + 14 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_3', ownerEmail, 'Sign up for Legislative Action Day', 'We need members to call legislators about workforce funding.', memberEmails[Math.min(2, memberEmails.length - 1)], 'high', 'open', new Date(now.getTime() + 5 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_4', ownerEmail, 'Review draft contract language', 'Read the proposed Article 12 changes and submit feedback via Q&A Forum.', memberEmails[Math.min(3, memberEmails.length - 1)], 'high', 'open', new Date(now.getTime() + 10 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_5', ownerEmail, 'Submit your workload report', 'Please complete your weekly workload report in the Workload Tracker.', memberEmails[Math.min(4, memberEmails.length - 1)], 'medium', 'open', new Date(now.getTime() + 3 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_6', ownerEmail, 'Attend new member orientation', 'Welcome! Please attend the upcoming orientation session.', memberEmails[Math.min(5, memberEmails.length - 1)], 'medium', 'open', new Date(now.getTime() + 12 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_7', ownerEmail, 'Read Know Your Rights materials', 'Review the Weingarten rights and workplace safety guides in Resources.', memberEmails[Math.min(6, memberEmails.length - 1)], 'low', 'completed', new Date(now.getTime() - 3 * 86400000), new Date(now.getTime() - 10 * 86400000), new Date(now.getTime() - 3 * 86400000), 'member', ownerEmail],
+    ['MT_SEED_8', ownerEmail, 'Provide witness statement for grievance', 'Please write up what you observed regarding the scheduling incident.', memberEmails[Math.min(7, memberEmails.length - 1)], 'high', 'completed', new Date(now.getTime() - 1 * 86400000), new Date(now.getTime() - 5 * 86400000), new Date(now.getTime() - 1 * 86400000), 'member', ownerEmail],
+  ];
+
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 12) {
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var hasAssigneeType = false;
+    for (var ht = 0; ht < headers.length; ht++) {
+      if (String(headers[ht]).trim() === 'Assignee Type') { hasAssigneeType = true; break; }
+    }
+    if (!hasAssigneeType) {
+      sheet.getRange(1, 11).setValue('Assignee Type');
+      sheet.getRange(1, 12).setValue('Assigned By');
+    }
+  }
+
+  var startRow = Math.max(sheet.getLastRow() + 1, 2);
+  sheet.getRange(startRow, 1, tasks.length, 12).setValues(tasks);
+  Logger.log('Seeded ' + tasks.length + ' member tasks');
 }
 
 // ============================================================================

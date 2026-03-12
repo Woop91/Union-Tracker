@@ -971,24 +971,32 @@ input { font: inherit; }
 .loading-spinner {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  gap: 16px;
+  gap: 12px;
+  padding: 16px 0;
 }
-.spinner {
-  width: 32px; height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.skeleton-row {
+  height: 14px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
-.loading-text {
-  font-family: var(--fontBody);
-  font-size: 13px;
-  color: var(--muted);
+.skeleton-row:nth-child(2) { width: 60%; }
+.skeleton-row:nth-child(3) { width: 85%; }
+.skeleton-row:nth-child(5) { width: 45%; }
+.skeleton-card {
+  height: 64px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.skeleton-card:nth-child(odd) { animation-delay: 0.3s; }
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+/* Legacy compat — spinner/loading-text kept for any external callers */
+.spinner { display: none; }
+.loading-text { display: none; }
 
 .fade-in {
   animation: fadeIn 0.3s ease-out;
@@ -1943,4 +1951,52 @@ input { font: inherit; }
     transition-duration: 0.01s !important;
   }
 }
+
+/* ═══════════════════════════════════════
+   C1: SKELETON UI — Placeholder shimmer while batch data loads
+   ═══════════════════════════════════════ */
+.skeleton-wrap {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.skeleton-header {
+  margin-bottom: 24px;
+}
+.skeleton-box {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+.skeleton-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.skeleton-kpi {
+  height: 72px;
+}
+.skeleton-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skeleton-card {
+  height: 64px;
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+/* Light mode skeleton */
+[data-theme-mode="light"] .skeleton-box,
+:root:not([data-theme-mode]) .skeleton-box {
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+}
+
+/* N2: Deferred non-critical animations — these load after first paint */
 </style>
