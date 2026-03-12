@@ -2109,7 +2109,7 @@ function renderSurveyTracking(appContainer) {
           item.appendChild(info);
           item.appendChild(el('span', { style: { fontSize: '14px', color: 'var(--muted)' } }, '\u23F3'));
           if (m.email && typeof _showMemberDetail === 'function') {
-            item.onclick = (function(member) { return function() { _showMemberDetail(member); }; })(m);
+            item.onclick = (function(member, el) { return function() { _showMemberDetail(dataWrap, el, member); }; })(m, item);
           }
           dataWrap.appendChild(item);
         });

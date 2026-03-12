@@ -376,22 +376,20 @@
           break;
         case 'steward':
         case 'member':
-          // Render view shell immediately, pre-fetch batch data in parallel.
-          // The view renders with loading state; batch data arrives and populates content.
+          // Pre-fetch batch data in a single round-trip, then init the view.
+          // Falls back to per-view init if batch fails.
           if (CURRENT_USER && CURRENT_USER.email) {
-            // Start view init immediately (renders nav + loading skeleton)
-            if (CURRENT_VIEW === 'steward') initStewardView(app);
-            else initMemberView(app);
-            // Fetch batch data in parallel — views use it if available
             google.script.run
               .withSuccessHandler(function(batch) {
                 AppState.batchData = batch || {};
-                // Signal that batch data arrived (views can listen)
-                if (typeof AppState.onBatchReady === 'function') AppState.onBatchReady();
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
               })
               .withFailureHandler(function() {
+                // Batch unavailable — views will make individual calls
                 AppState.batchData = null;
-                if (typeof AppState.onBatchReady === 'function') AppState.onBatchReady();
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
               })
               .dataGetBatchData(SESSION_TOKEN);
           } else {
@@ -723,6 +721,7 @@
         { id: 'meetings', icon: '\uD83D\uDCC5', label: 'My Meetings' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
         { divider: true },
+        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
