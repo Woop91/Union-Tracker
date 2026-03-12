@@ -3194,3 +3194,39 @@ Added 12 new test files covering all previously untested source files:
 | `29_Migrations.test.js` | `29_Migrations.gs` | 1 | Function existence |
 
 Total: 54 test suites, 2,744 tests passing (previously 41 suites, 2,446 tests).
+
+---
+
+## 🔍 CONTRACT AUDIT + FIXES — 2026-03-11 (v4.25.9, Batch 3)
+
+### Verified Contract: SEIU Local 509 Unit 8 CBA (2024–2026), Article 23
+Source: MA DOC Grievance Policy 270.03 for Bargaining Units 8 & 10 (July 2025).
+
+**Actual Unit 8 Grievance Deadlines (calendar days unless noted):**
+
+| Stage | Contract Value | Was in DEADLINE_DEFAULTS | Status |
+|-------|---------------|--------------------------|--------|
+| Filing (after incident) | 21 calendar days | 21 | ✅ Correct |
+| Step I response | 30 cal (21 if meeting) | **7** | ❌ WRONG |
+| Step II appeal | **10 BUSINESS days** | **7** | ❌ WRONG |
+| Step II response | 30 cal (21 if conf.) | **14** | ❌ WRONG |
+| Step III | **Not in Unit 8 CBA** | 10/21 retained | ⚠️ N/A |
+| Arbitration demand | 30 calendar days | 30 | ✅ Correct |
+
+> Unit 8 has only 2 formal steps (Step I → Step II → Arbitration). Step III fields
+> retained in DEADLINE_DEFAULTS for configurable non-Unit-8 deployments.
+
+> **Config sheet MUST be re-seeded** with correct contract values. DEADLINE_DEFAULTS
+> are fallback only — if Config sheet has wrong values, they take precedence.
+
+### Fixes Applied
+
+| ID | Fix | File(s) |
+|----|-----|---------|
+| FIX-CORE-01 | Corrected `DEADLINE_DEFAULTS` to match Art. 23 (Step1Response 7→30, Step2Appeal 7→10, Step2Response 14→30). Added contract source citation in comments. | `01_Core.gs` |
+| FIX-CORE-02 | Removed `SHEETS.GRIEVANCE_TRACKER` duplicate alias (pointed to same string as `SHEETS.GRIEVANCE_LOG`). Migrated all 22 callers to canonical `SHEETS.GRIEVANCE_LOG`. Removed stale skipKey from sheet-existence checker. | `01_Core.gs`, `02_DataManagers.gs`, `05_Integrations.gs`, `06_Maintenance.gs`, `08b_SearchAndCharts.gs`, `08d_AuditAndFormulas.gs`, `10_Main.gs` |
+| FIX-FORMS-01 | Added `auditAndRemoveSatisfactionTrigger()` to detect and delete the stale `onSatisfactionFormSubmit` form-submit trigger (deprecated v4.21.0, still potentially installed). Run from Admin menu or Dev Tools. | `08c_FormsAndNotifications.gs` |
+
+### Action Required
+- [ ] **Re-seed Config sheet** with correct Article 23 deadline values (30, 10, 30, 30)
+- [ ] **Run `auditAndRemoveSatisfactionTrigger()`** once to clean stale trigger
