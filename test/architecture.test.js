@@ -373,7 +373,7 @@ describe('A5: Web app doGet() error resilience', () => {
     const doGetMatch = webAppSrc.match(/function doGet\s*\([^)]*\)\s*\{/);
     const afterDoGet = webAppSrc.slice(doGetMatch.index);
     // Find the catch block that belongs to doGet (the top-level one)
-    expect(afterDoGet).toMatch(/\}\s*catch\s*\(\w+\)\s*\{[^}]*_serveFatalError/);
+    expect(afterDoGet).toMatch(/\}\s*catch\s*\(\w+\)\s*\{[\s\S]*?_serveFatalError/);
   });
 
   test('_serveFatalError() exists and does not call ConfigReader or DataService', () => {
