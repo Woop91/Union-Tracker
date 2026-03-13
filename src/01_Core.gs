@@ -502,7 +502,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.25.10",
+  VERSION: "4.25.11",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -686,16 +686,18 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.10';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.13';
   var parts = ver.split('.');
   return {
+    version: ver,
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 25,
-    PATCH: parseInt(parts[2], 10) || 3,
+    PATCH: parseInt(parts[2], 10) || 13,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-11',
-    CODENAME: 'Web App Diagnostics & Parallel Render'
+    BUILD_DATE: '2026-03-13',
+    CODENAME: 'Insights Enhancement + Menu Consolidation + Diagnostics Fix',
+    codename: 'Insights Enhancement + Menu Consolidation + Diagnostics Fix'
   };
 })();
 
@@ -706,6 +708,10 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.25.12', date: '2026-03-12', codename: 'Function Cohesion Phase 2', changes: 'Inline lock patterns replaced with withScriptLock_() in 6 functions (addMember, updateMember, startNewGrievance, advanceGrievanceStep, bulkUpdateGrievanceStatus, resolveGrievance). Centralized ID validators isGrievanceId_()/isMemberId_() replace 10+ inline regex checks across 04c, 04d, 04e, 05, 09. Hardcoded grievance status strings replaced with GRIEVANCE_STATUS constants and GRIEVANCE_CLOSED_STATUSES across 03, 04e, 06, 07, 08b, 09, 11, 12, 17. onEdit() if/else chain replaced with EventBus dispatch via emitEditEvent() — all sheet-specific handlers now route through priority-ordered EventBus subscribers. ThemeEngine consolidated in auth_view.html and error_view.html. Dashboard entry points deprecated (showExecutiveDashboard → showStewardDashboard, showInteractiveDashboardTab → showStewardDashboard).' },
+  { version: '4.25.11', date: '2026-03-12', codename: 'Function Cohesion & Process Consistency', changes: 'Comprehensive cohesion review and refactoring. UX fixes: badge refresh added to qaSubmitQuestion (member_view.html), missing withFailureHandler added to 3 steward task creation paths (steward_view.html). Auth fixes: QA moderation wrappers (qaModerateQuestion, qaModerateAnswer, qaGetFlaggedContent, qaResolveQuestion) now return consistent {success:false} objects instead of null; sessionToken passed to checkWebAppAuthorization in dataUpdateProfile and qaResolveQuestion; deprecated poll stubs (dataGetActivePolls/dataSubmitPollVote/dataAddPoll) now enforce auth gates. Cohesion: extracted maskObjectPII_() shared helper to replace 3 identical PII masking loops in 00_Security.gs (secureLog, sendSecurityAlertEmail_, queueSecurityDigestEvent_); sendDailySecurityDigest now routes through safeSendEmail_() instead of direct MailApp.sendEmail; shared fmtDateShort_() and hashEmail_() helpers in 01_Core.gs replace duplicate private definitions in QAForum, TimelineService, FailsafeService.' },
+  { version: '4.25.11', date: '2026-03-12', codename: 'Web App Test Suites', changes: '9 new GAS-native test suites in 31_WebAppTests.gs covering all web app modules: webapp (doGet routing, templates, diagnoseWebApp), configrd (ConfigReader completeness, validation, JSON output), portal (PortalSheets 0-indexed column constants, sheet setup), weeklyq (WeeklyQuestions API, poll frequency, pool count), workload (WorkloadService categories, health status, sub-categories), qaforum (QAForum API, pagination, flagged content), timeline (TimelineService events, categories), failsafe (FailsafeService digest config, diagnostics), endpoints (comprehensive data/wq/qa/tl/fs wrapper existence + write endpoint null-token rejection). Total: 20 suites, ~170 tests. All read-only.' },
+  { version: '4.25.11', date: '2026-03-12', codename: 'Seed Data Expansion & Survey UX', changes: 'New seedQAForumData() seeds 10 realistic Q&A questions with 15 answers (mix of steward and member responses, anonymous posts, upvotes). Added to SEED_PHASE_3. Member seed data now assigns 2-3 random office days (comma-separated multi-select) instead of 1. Survey Tracking: individual member participation progress bars (snapped to 5% chunks) showing lifetime completion rate with color coding (green >= 80%, yellow >= 50%, red < 50%). getPendingSurveyMembers() now returns allMembers array with totalCompleted/totalMissed stats. Loading indicator replaced: spinner removed, skeleton placeholder UI (pulsing cards/rows) for subtler loading state.' },
   { version: '4.25.10', date: '2026-03-11', codename: 'Web App Diagnostics & Parallel Render', changes: 'Parallel view rendering in index.html (steward + member views load concurrently). Nav tab reorder: Feedback moved to Admin section, stewarddirectory removed from member sidebar. diagnoseWebApp() 14-step diagnostic function in 22_WebDashApp.gs for debugging app loading issues. memberId added to profile data in 21_WebDashDataService.gs. Workload sheet diagnostics in 28_FailsafeService.gs. Enhanced error reporting: null-guard on fatalErr.stack, actual error message shown in bootstrap screen instead of generic failure.' },
   { version: '4.25.7', date: '2026-03-10', codename: 'onOpen Simple Trigger Fix', changes: 'Fixed critical bug: onOpen() called ScriptApp.getProjectTriggers() (not permitted in simple triggers — throws silently) and finally block deleted the deferred trigger before 1000ms elapsed. Result: onOpenDeferred_ never ran on sheet open. Fix: onOpen now only does cache clear + createDashboardMenu(). setupOpenDeferredTrigger() installs onOpenDeferred_ as an installable onOpen trigger. menuInstallSurveyTriggers() updated to include this. New menu item in Admin > Triggers.' },
   { version: '4.25.6', date: '2026-03-09', codename: 'Test Runner Timeout Fix', changes: 'Fixed GAS 6-minute execution timeout crash when running all 82 tests. Root cause: 5-min soft guard too tight + 16 redundant SpreadsheetApp.getActiveSpreadsheet() network calls + authsweep endpoints each doing sheet reads via getUserRole_(). Fixes: (1) timeout lowered 5min→3.5min for 2.5min safety margin, (2) _getCachedSS() replaces 12 individual SpreadsheetApp calls in test functions, (3) cache reset at start of runAll(), (4) SPA UI now shows timeout warning banner, skipped test count card, suite skipped counts, and failure handler detects execution time errors with helpful guidance to use suite filter.' },
@@ -1365,7 +1371,8 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'STATE',              header: 'State' },
   { key: 'ZIP_CODE',           header: 'Zip Code' },
   { key: 'DUES_STATUS',             header: 'Dues Status' },
-  { key: 'MEMBER_ADMIN_FOLDER_URL',  header: 'Member Admin Folder URL' }   // Drive master folder URL — auto-set on first contact or grievance; steward-visible only
+  { key: 'MEMBER_ADMIN_FOLDER_URL',  header: 'Member Admin Folder URL' },   // Drive master folder URL — auto-set on first contact or grievance; steward-visible only
+  { key: 'ROLE',                     header: 'Role' }                        // Member/Steward/Both — used by auth to support dual-role users
 ];
 
 // CONVENTION: Column constants are 1-indexed (Range API). Use COL - 1 for 0-indexed array access.
@@ -1461,7 +1468,10 @@ var GRIEVANCE_HEADER_MAP_ = [
   { key: 'LAST_UPDATED',       header: 'Last Updated' }
 ];
 
-var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_);
+var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_, {
+  GRIEVANCE_STATUS: 'STATUS',
+  GRIEVANCE_STEP: 'CURRENT_STEP'
+});
 
 // ============================================================================
 // CONFIG COLUMN MAPPING — Auto-derived from header map
@@ -3549,4 +3559,64 @@ function getHapticFeedbackScript() {
  */
 function getMobileOptimizedHead() {
   return getMobileMetaTag() + getMobileResponsiveStyles() + getHapticFeedbackScript();
+}
+
+// ============================================================================
+// SHARED DATE/HASH HELPERS
+// ============================================================================
+// Centralized helpers used by web dashboard IIFEs (QAForum, Timeline, Failsafe).
+// Eliminates identical private _fmtDate / _hashEmail copies across modules.
+
+// ============================================================================
+// ID PATTERN VALIDATORS
+// ============================================================================
+// Centralized ID format checks. All modules must use these instead of inline
+// regex like match(/^G/i) or match(/^M/i) which scatter business rules.
+
+/** @const {RegExp} Grievance IDs start with 'G' (case-insensitive) */
+var GRIEVANCE_ID_PATTERN = /^G/i;
+/** @const {RegExp} Member IDs start with 'M' (case-insensitive) */
+var MEMBER_ID_PATTERN = /^M/i;
+
+/**
+ * Returns true if the value looks like a valid Grievance ID.
+ * @param {*} id
+ * @returns {boolean}
+ */
+function isGrievanceId_(id) {
+  return !!id && GRIEVANCE_ID_PATTERN.test(String(id));
+}
+
+/**
+ * Returns true if the value looks like a valid Member ID.
+ * @param {*} id
+ * @returns {boolean}
+ */
+function isMemberId_(id) {
+  return !!id && MEMBER_ID_PATTERN.test(String(id));
+}
+
+// ============================================================================
+// SHARED DATE/HASH HELPERS
+// ============================================================================
+
+/**
+ * Formats a Date object as "Mon DD, YYYY" (e.g., "Mar 12, 2026").
+ * @param {Date} date
+ * @returns {string}
+ */
+function fmtDateShort_(date) {
+  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+}
+
+/**
+ * Returns a truncated SHA-256 hash of an email (12 hex chars).
+ * Used for anonymous attribution without storing PII.
+ * @param {string} email
+ * @returns {string}
+ */
+function hashEmail_(email) {
+  var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, email.toLowerCase().trim());
+  return hash.map(function(b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('').substring(0, 12);
 }

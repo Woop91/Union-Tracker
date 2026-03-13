@@ -3,18 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5.0, user-scalable=yes">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Dashboard</title>
 
-  <!-- Fonts — load only weights used (400, 600) to reduce payload -->
+  <!-- N1: Fonts — reduced to 3 families (dropped Sora, subset weights) to cut payload ~20% -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
   <?!= include('styles') ?>
 
   <!-- Chart.js — deferred until actually needed (lazy-loaded by ChartHelper) -->
 </head>
 <body>
+  <div id="nav-progress"></div>
   <div id="app"></div>
 
   <script>
@@ -37,7 +41,11 @@
 
     // Store session token in localStorage if provided
     if (SESSION_TOKEN) {
-      localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
+      try {
+        localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
+        // Reset redirect counter — token is valid, auth succeeded
+        localStorage.removeItem('dashboardSessionRedirectCount');
+      } catch (_lsErr) { /* localStorage may be blocked */ }
     }
 
     // On auth page: try to restore session from localStorage
@@ -46,14 +54,29 @@
         if (PAGE_DATA.error === 'loggedout') {
           // User just signed out — clear any stored session token
           localStorage.removeItem('dashboardSessionToken');
+          localStorage.removeItem('dashboardSessionRedirectCount');
+        } else if (PAGE_DATA.tokenChecked) {
+          // Server already rejected this token — clear it and reset redirect counter
+          localStorage.removeItem('dashboardSessionToken');
+          localStorage.removeItem('dashboardSessionRedirectCount');
         } else {
           var storedToken = localStorage.getItem('dashboardSessionToken');
-          if (storedToken && !PAGE_DATA.tokenChecked) {
-            // Redirect to web app URL with stored session token so server can validate
-            window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
-          } else if (PAGE_DATA.tokenChecked && storedToken) {
-            // Server already rejected this token — clear it
-            localStorage.removeItem('dashboardSessionToken');
+          if (storedToken) {
+            // Redirect-loop guard: max 2 attempts before clearing stale token.
+            // Without this, Chrome's aggressive caching + stale localStorage token
+            // can cause an infinite redirect cycle (works in incognito because
+            // localStorage starts empty).
+            var redirectCount = parseInt(localStorage.getItem('dashboardSessionRedirectCount') || '0', 10);
+            if (redirectCount >= 2) {
+              // Too many redirects — token is likely expired/invalid, clear it
+              localStorage.removeItem('dashboardSessionToken');
+              localStorage.removeItem('dashboardSessionRedirectCount');
+              console.warn('Session restore: cleared stale token after ' + redirectCount + ' failed attempts');
+            } else {
+              localStorage.setItem('dashboardSessionRedirectCount', String(redirectCount + 1));
+              // Redirect to web app URL with stored session token so server can validate
+              window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
+            }
           }
         }
       } catch (_lsErr) {
@@ -61,6 +84,89 @@
         console.warn('Session restore skipped:', _lsErr.message);
       }
     }
+
+    // ═══════════════════════════════════════
+    // N3: PRELOAD — Fire batch data call IMMEDIATELY, before module definitions parse.
+    // This overlaps the server round-trip with JS parsing time.
+    // ═══════════════════════════════════════
+    var _preloadedBatch = null;
+    var _preloadReady = false;
+    var _preloadCallbacks = [];
+
+    if ((CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member') && CURRENT_USER && CURRENT_USER.email) {
+      google.script.run
+        .withSuccessHandler(function(batch) {
+          _preloadedBatch = batch || {};
+          _preloadReady = true;
+          // C3: Stale-while-revalidate — persist batch data for instant return visits
+          try { localStorage.setItem('dds_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch })); } catch(_) {}
+          for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](_preloadedBatch);
+          _preloadCallbacks = [];
+        })
+        .withFailureHandler(function() {
+          _preloadedBatch = null;
+          _preloadReady = true;
+          for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](null);
+          _preloadCallbacks = [];
+        })
+        .dataGetBatchData(SESSION_TOKEN);
+    }
+
+    /**
+     * Returns preloaded batch data. If not ready yet, queues the callback.
+     * @param {Function} cb - Called with batch data (or null on failure)
+     */
+    function _onPreloadReady(cb) {
+      if (_preloadReady) { cb(_preloadedBatch); return; }
+      _preloadCallbacks.push(cb);
+    }
+
+    // ═══════════════════════════════════════
+    // C1: SKELETON UI — Show layout skeleton immediately instead of blank screen.
+    // Renders placeholder boxes that match the final layout, replaced when data arrives.
+    // ═══════════════════════════════════════
+    (function _renderSkeleton() {
+      if (CURRENT_VIEW !== 'steward' && CURRENT_VIEW !== 'member') return;
+      var app = document.getElementById('app');
+      if (!app) return;
+      var skeletonHtml =
+        '<div class="skeleton-wrap">' +
+          '<div class="skeleton-header">' +
+            '<div class="skeleton-box" style="width:120px;height:18px;"></div>' +
+            '<div class="skeleton-box" style="width:80px;height:14px;margin-top:4px;"></div>' +
+          '</div>' +
+          '<div class="skeleton-kpis">' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+            '<div class="skeleton-box skeleton-kpi"></div>' +
+          '</div>' +
+          '<div class="skeleton-cards">' +
+            '<div class="skeleton-box skeleton-card"></div>' +
+            '<div class="skeleton-box skeleton-card"></div>' +
+            '<div class="skeleton-box skeleton-card"></div>' +
+          '</div>' +
+        '</div>';
+      app.innerHTML = skeletonHtml;
+    })();
+
+    // C3: Stale-while-revalidate — render from cached batch data instantly on return visits
+    var _swrApplied = false;
+    (function _trySWR() {
+      if (CURRENT_VIEW !== 'steward' && CURRENT_VIEW !== 'member') return;
+      try {
+        var raw = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
+        if (!raw) return;
+        var parsed = JSON.parse(raw);
+        // Only use SWR data if less than 5 minutes old
+        if (Date.now() - parsed.ts > 300000) return;
+        if (parsed.data) {
+          _preloadedBatch = parsed.data;
+          // Don't set _preloadReady — let the fresh server call complete and overwrite
+          _swrApplied = true;
+        }
+      } catch (_) {}
+    })();
 
     // ═══════════════════════════════════════
     // THEME ENGINE
@@ -107,7 +213,7 @@
             success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
             border: 'rgba(255,255,255,0.08)', radius: '20px',
             fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            fontDisplay: "'Space Grotesk', sans-serif",
             mode: 'dark',
           },
           light: {
@@ -116,7 +222,7 @@
             success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
             border: 'rgba(0,0,0,0.08)', radius: '20px',
             fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            fontDisplay: "'Space Grotesk', sans-serif",
             mode: 'light',
           }
         }
@@ -285,12 +391,22 @@
         // Dismiss any loading spinners and show the ACTUAL error
         var spinners = document.querySelectorAll('.loading-spinner');
         spinners.forEach(function(s) {
-          s.innerHTML = '<div class="empty-state" style="text-align:center;padding:20px;">'
-            + '<div style="font-size:24px;margin-bottom:8px;">⚠️</div>'
-            + '<div style="color:var(--text);font-weight:600;margin-bottom:6px;">Something went wrong</div>'
-            + '<div style="color:var(--muted);font-size:12px;max-width:400px;margin:0 auto 12px;word-break:break-word;">' + msg + '</div>'
-            + '<button onclick="location.reload()" style="padding:6px 16px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:12px;">Reload</button>'
-            + '</div>';
+          // Clear any loading timeout
+          if (s._loadingTimeout) { clearTimeout(s._loadingTimeout); s._loadingTimeout = null; }
+          // Build error UI safely (no innerHTML with untrusted data)
+          s.innerHTML = '';
+          var errorDiv = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '20px' } });
+          errorDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\u26A0\uFE0F'));
+          errorDiv.appendChild(el('div', { style: { color: 'var(--text)', fontWeight: '600', marginBottom: '6px' } }, 'Something went wrong'));
+          var msgEl = el('div', { style: { color: 'var(--muted)', fontSize: '12px', maxWidth: '400px', margin: '0 auto 12px', wordBreak: 'break-word' } });
+          msgEl.textContent = msg;
+          errorDiv.appendChild(msgEl);
+          var reloadBtn = el('button', {
+            style: { padding: '6px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px' },
+            onClick: function() { location.reload(); }
+          }, 'Reload');
+          errorDiv.appendChild(reloadBtn);
+          s.appendChild(errorDiv);
         });
       });
       return runner;
@@ -302,6 +418,9 @@
     var DataCache = (function() {
       var _cache = {};
       var DEFAULT_TTL = 120000; // 2 minutes
+      // C6: Longer TTLs for stable data (member directory, config rarely change)
+      var STABLE_TTL = 300000; // 5 minutes — for member directory, steward directory
+      var CONFIG_TTL = 1800000; // 30 minutes — for config data
 
       function get(key) {
         var entry = _cache[key];
@@ -342,8 +461,77 @@
         runner[fnName].apply(runner, args || []);
       }
 
-      return { get: get, set: set, invalidate: invalidate, cachedCall: cachedCall };
+      return { get: get, set: set, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
     })();
+
+    // ═══════════════════════════════════════
+    // C2: LAZY LIST RENDERER — Renders first N items, lazy-loads rest on scroll via IntersectionObserver
+    // ═══════════════════════════════════════
+    var LazyList = (function() {
+      var PAGE_SIZE = 50;
+
+      /**
+       * Renders items into a container with pagination via IntersectionObserver.
+       * @param {Element} container - Parent container
+       * @param {Array} items - Full array of items
+       * @param {Function} renderItem - fn(item, index) → Element
+       * @param {Object} [opts] - { pageSize: number, emptyMsg: string }
+       */
+      function render(container, items, renderItem, opts) {
+        opts = opts || {};
+        var ps = opts.pageSize || PAGE_SIZE;
+        if (!items || items.length === 0) {
+          if (opts.emptyMsg) container.appendChild(el('div', { className: 'empty-state' }, opts.emptyMsg));
+          return;
+        }
+        var rendered = 0;
+
+        function renderPage() {
+          var end = Math.min(rendered + ps, items.length);
+          var frag = document.createDocumentFragment();
+          for (var i = rendered; i < end; i++) {
+            var node = renderItem(items[i], i);
+            if (node) frag.appendChild(node);
+          }
+          // Remove sentinel before appending new items
+          var oldSentinel = container.querySelector('.lazy-sentinel');
+          if (oldSentinel) oldSentinel.remove();
+          container.appendChild(frag);
+          rendered = end;
+
+          // Add sentinel for next page
+          if (rendered < items.length) {
+            var sentinel = document.createElement('div');
+            sentinel.className = 'lazy-sentinel';
+            sentinel.style.height = '1px';
+            container.appendChild(sentinel);
+            if (typeof IntersectionObserver !== 'undefined') {
+              var obs = new IntersectionObserver(function(entries) {
+                if (entries[0].isIntersecting) {
+                  obs.disconnect();
+                  renderPage();
+                }
+              }, { rootMargin: '200px' });
+              obs.observe(sentinel);
+            } else {
+              // Fallback: render all if no IntersectionObserver
+              renderPage();
+            }
+          }
+        }
+
+        renderPage();
+      }
+
+      return { render: render, PAGE_SIZE: PAGE_SIZE };
+    })();
+
+    // ═══════════════════════════════════════
+    // C5: IDLE CALLBACK — Defers non-critical rendering to idle frames
+    // ═══════════════════════════════════════
+    var _scheduleIdle = (typeof requestIdleCallback === 'function')
+      ? function(fn) { requestIdleCallback(fn, { timeout: 2000 }); }
+      : function(fn) { setTimeout(fn, 16); };
 
     // ═══════════════════════════════════════
     // APP STATE
@@ -376,24 +564,25 @@
           break;
         case 'steward':
         case 'member':
-          // Render view shell immediately, pre-fetch batch data in parallel.
-          // The view renders with loading state; batch data arrives and populates content.
+          // N3: Use preloaded batch data (fired at top of <script> before module defs).
+          // C3: If SWR data was applied, render immediately with stale data, then refresh.
           if (CURRENT_USER && CURRENT_USER.email) {
-            // Start view init immediately (renders nav + loading skeleton)
-            if (CURRENT_VIEW === 'steward') initStewardView(app);
-            else initMemberView(app);
-            // Fetch batch data in parallel — views use it if available
-            google.script.run
-              .withSuccessHandler(function(batch) {
-                AppState.batchData = batch || {};
-                // Signal that batch data arrived (views can listen)
-                if (typeof AppState.onBatchReady === 'function') AppState.onBatchReady();
-              })
-              .withFailureHandler(function() {
-                AppState.batchData = null;
-                if (typeof AppState.onBatchReady === 'function') AppState.onBatchReady();
-              })
-              .dataGetBatchData(SESSION_TOKEN);
+            if (_swrApplied && _preloadedBatch) {
+              // Render instantly from SWR cache
+              AppState.batchData = _preloadedBatch;
+              if (CURRENT_VIEW === 'steward') initStewardView(app);
+              else initMemberView(app);
+              // When fresh data arrives, update in background (no re-render unless data changed)
+              _onPreloadReady(function(freshBatch) {
+                if (freshBatch) AppState.batchData = freshBatch;
+              });
+            } else {
+              _onPreloadReady(function(batch) {
+                AppState.batchData = batch;
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
+              });
+            }
           } else {
             if (CURRENT_VIEW === 'steward') initStewardView(app);
             else initMemberView(app);
@@ -461,11 +650,143 @@
       return div.firstChild;
     }
 
-    function showLoading(container) {
+    /**
+     * Shows a skeleton loading indicator inside the given container.
+     * @param {HTMLElement} container - The element to show loading in
+     * @param {string} [variant] - Optional: 'list', 'form', 'kpi', or default card layout
+     * @returns {HTMLElement} The loader element (for timeout tracking)
+     */
+    function showLoading(container, variant) {
       container.innerHTML = '';
-      var loader = el('div', { className: 'loading-spinner' });
-      loader.innerHTML = '<div class="spinner"></div><div class="loading-text">Loading...</div>';
+      var cls = 'loading-spinner';
+      var innerHtml;
+      if (variant === 'list') {
+        cls += ' loading-list';
+        innerHtml =
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>';
+      } else if (variant === 'form') {
+        cls += ' loading-form';
+        innerHtml =
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>';
+      } else if (variant === 'kpi') {
+        cls += ' loading-kpi';
+        innerHtml =
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-card"></div>';
+
+      } else if (variant === 'member-list') {
+        // Matches .member-list-item: avatar circle + name + meta + chevron
+        cls += ' loading-member-list';
+        var mkRow = function() {
+          return '<div class="sk-member-row">' +
+            '<div class="sk-avatar"></div>' +
+            '<div class="sk-info"><div class="sk-name"></div><div class="sk-meta"></div></div>' +
+            '<div class="sk-chevron"></div>' +
+          '</div>';
+        };
+        innerHtml = mkRow() + mkRow() + mkRow() + mkRow() + mkRow();
+
+      } else if (variant === 'grievance') {
+        // Matches grievance card: glow-bar + label + step title + id/date + deadline box
+        cls += ' loading-grievance';
+        var mkGCard = function() {
+          return '<div class="sk-grievance-card">' +
+            '<div class="sk-glow"></div>' +
+            '<div class="sk-g-label"></div>' +
+            '<div class="sk-g-title"></div>' +
+            '<div class="sk-g-id"></div>' +
+            '<div class="sk-g-deadline">' +
+              '<div class="sk-g-dl-label"></div>' +
+              '<div class="sk-g-dl-num"></div>' +
+            '</div>' +
+          '</div>';
+        };
+        innerHtml = mkGCard() + mkGCard();
+
+      } else {
+        innerHtml =
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-row"></div>';
+      }
+      var loader = el('div', { className: cls });
+      loader.innerHTML = innerHtml;
       container.appendChild(loader);
+
+      // Loading timeout: after 30s, show a retry prompt if still loading
+      var timeoutId = setTimeout(function() {
+        if (loader.parentNode && loader.classList.contains('loading-spinner')) {
+          loader.innerHTML =
+            '<div class="loading-timeout">' +
+              '<div style="font-size:20px;margin-bottom:8px;">\u23F3</div>' +
+              '<div>This is taking longer than expected.</div>' +
+              '<button onclick="location.reload()">Reload page</button>' +
+            '</div>';
+        }
+      }, 30000);
+      loader._loadingTimeout = timeoutId;
+      return loader;
+    }
+
+    /** Clears loading state and cancels timeout if present */
+    function clearLoading(loaderOrContainer) {
+      if (!loaderOrContainer) return;
+      var loader = loaderOrContainer.classList && loaderOrContainer.classList.contains('loading-spinner')
+        ? loaderOrContainer
+        : loaderOrContainer.querySelector('.loading-spinner');
+      if (loader && loader._loadingTimeout) {
+        clearTimeout(loader._loadingTimeout);
+        loader._loadingTimeout = null;
+      }
+    }
+
+    /**
+     * Nav progress bar — thin top-of-screen indicator on tab switches.
+     * Usage: call _navProgressStart() before render, _navProgressDone() after.
+     * CSS handles the animation via #nav-progress in styles.html.
+     */
+    var _navProgressTimer = null;
+    function _navProgressStart() {
+      var bar = document.getElementById('nav-progress');
+      if (!bar) return;
+      // Cancel any in-flight finish animation
+      if (_navProgressTimer) { clearTimeout(_navProgressTimer); _navProgressTimer = null; }
+      bar.style.transition = 'none';
+      bar.style.width = '0%';
+      bar.style.opacity = '1';
+      bar.classList.add('np-active');
+      // Force reflow so transition fires on next frame
+      bar.offsetWidth; // eslint-disable-line no-unused-expressions
+      bar.style.transition = '';
+      // Animate to 85% — holds there until _navProgressDone() is called
+      bar.style.width = '85%';
+    }
+    function _navProgressDone() {
+      var bar = document.getElementById('nav-progress');
+      if (!bar) return;
+      // Snap to 100% then fade out
+      bar.style.width = '100%';
+      _navProgressTimer = setTimeout(function() {
+        bar.style.opacity = '0';
+        _navProgressTimer = setTimeout(function() {
+          bar.style.transition = 'none';
+          bar.style.width = '0%';
+          bar.classList.remove('np-active');
+          _navProgressTimer = null;
+        }, 320);
+      }, 180);
     }
 
     function handleLogout() {
@@ -723,6 +1044,7 @@
         { id: 'meetings', icon: '\uD83D\uDCC5', label: 'My Meetings' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
         { divider: true },
+        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
@@ -789,9 +1111,10 @@
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
       AppState.activeTab = tabId; // track for badge refresh
+      _navProgressStart();
       // Handle "More" menus for both roles (mobile bottom-nav)
-      if (tabId === '_member_more') { renderMemberMore(app); return; }
-      if (tabId === '_steward_more') { renderStewardMore(app); return; }
+      if (tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
+      if (tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); return; }
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
         // Block non-dues-paying members from org chart; stewards always have access
@@ -799,14 +1122,17 @@
           if (typeof _renderDuesGate === 'function') {
             _renderDuesGate(app, 'Org Chart', function() { _handleTabNav(role, 'home'); });
           }
+          _navProgressDone();
           return;
         }
         renderOrgChart(app, role);
+        _navProgressDone();
         return;
       }
       // POMS Reference — shared across both roles
       if (tabId === 'poms') {
         renderPOMSReference(app, role);
+        _navProgressDone();
         return;
       }
 
@@ -857,6 +1183,7 @@
           default: renderStewardDashboard(app);
         }
       }
+      _navProgressDone();
     }
 
     /**

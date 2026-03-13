@@ -218,16 +218,25 @@ input { font: inherit; }
   font-family: var(--fontBody);
 }
 
+/* Glow-bar — decorative status stripe on grievance cards.
+   Sweep animation: bright peak travels left→right, matching skeleton shimmer language. */
+@keyframes glowSweep {
+  0%   { background-position: -300px 0; }
+  100% { background-position:  300px 0; }
+}
 .glow-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   height: 3px;
-  opacity: 0.6;
+  background-size: 300px 100%;
+  animation: glowSweep 2.5s linear infinite;
 }
-.glow-bar.warning { background: linear-gradient(90deg, transparent, var(--warning), transparent); }
-.glow-bar.danger { background: linear-gradient(90deg, transparent, var(--danger), transparent); }
-.glow-bar.success { background: linear-gradient(90deg, transparent, var(--success), transparent); }
-.glow-bar.info { background: linear-gradient(90deg, transparent, var(--info), transparent); }
+/* 3-stop gradient: sweep animation creates the moving bright-peak effect without color-mix().
+   Compatible with all browsers (Chrome 49+, Safari 10+, Firefox 52+). */
+.glow-bar.warning { background: linear-gradient(90deg, transparent 20%, var(--warning) 50%, transparent 80%); background-size: 300px 100%; }
+.glow-bar.danger  { background: linear-gradient(90deg, transparent 20%, var(--danger)  50%, transparent 80%); background-size: 300px 100%; }
+.glow-bar.success { background: linear-gradient(90deg, transparent 20%, var(--success) 50%, transparent 80%); background-size: 300px 100%; }
+.glow-bar.info    { background: linear-gradient(90deg, transparent 20%, var(--info)    50%, transparent 80%); background-size: 300px 100%; }
 
 /* ═══════════════════════════════════════
    FILTER TABS
@@ -250,6 +259,34 @@ input { font: inherit; }
   color: var(--accent);
   background: var(--accentBg);
   border-color: var(--accentBorder);
+}
+
+/* ═══════════════════════════════════════
+   NAV PROGRESS BAR
+   Thin top-of-screen bar shown on tab navigation (YouTube-style).
+   Controlled by _navProgressStart() / _navProgressDone() in index.html.
+   ═══════════════════════════════════════ */
+#nav-progress {
+  position: fixed;
+  top: 0; left: 0;
+  height: 2px;
+  width: 0%;
+  background: var(--accent);
+  z-index: 300;
+  opacity: 0;
+  /* two transitions: width (fast expand) and opacity (fade out at end) */
+  transition: width 0.35s cubic-bezier(0.1, 0.6, 0.4, 1), opacity 0.3s ease;
+  pointer-events: none;
+  border-radius: 0 1px 1px 0;
+  /* Glow: brightens bar against both dark and light surfaces */
+  box-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
+}
+#nav-progress.np-active {
+  opacity: 1;
+}
+/* prefers-reduced-motion: skip animation, still show brief flash */
+@media (prefers-reduced-motion: reduce) {
+  #nav-progress { transition: opacity 0.15s ease; }
 }
 
 /* ═══════════════════════════════════════
@@ -781,6 +818,41 @@ input { font: inherit; }
   opacity: 0.4;
 }
 
+/* ═══════════════════════════════════════
+   SHARED PROGRESS BAR SYSTEM
+   Use .prog-track + .prog-fill everywhere instead of inline styles.
+   Size modifiers: --sm (4px), default (6px), --md (8px), --lg (10px)
+   Color modifiers on .prog-fill: --success, --warning, --danger, --accent (default)
+   Light mode handled automatically via CSS vars.
+   ═══════════════════════════════════════ */
+.prog-track {
+  height: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.06);
+}
+[data-theme-mode="light"] .prog-track {
+  background: rgba(0,0,0,0.07);
+}
+.prog-track--sm  { height: 4px; }
+.prog-track--md  { height: 8px; }
+.prog-track--lg  { height: 10px; }
+
+.prog-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+.prog-fill--success { background: var(--success); }
+.prog-fill--warning { background: var(--warning); }
+.prog-fill--danger  { background: var(--danger); }
+
+/* Semantic shorthand: auto-color fill based on a data-rate attribute on .prog-track
+   Usage: <div class="prog-track prog-track--semantic" data-rate="73">
+          <div class="prog-fill" style="width:73%"></div>
+   The JS sets the color on the fill via the helper — this just documents the pattern. */
+
 /* Celebration between chapters */
 .survey-celeb {
   display: flex;
@@ -966,29 +1038,263 @@ input { font: inherit; }
 }
 
 /* ═══════════════════════════════════════
-   LOADING & ANIMATIONS
+   LOADING & ANIMATIONS — Cohesive loading indicator system
    ═══════════════════════════════════════ */
+
+/* --- Shimmer sweep — replaces opacity pulse for skeleton elements --- */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+/* --- Loading container (used by showLoading()) --- */
 .loading-spinner {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+/* --- Skeleton row placeholders --- */
+.loading-spinner .skeleton-row {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.20) 50%, rgba(255,255,255,0.06) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+[data-theme-mode="light"] .loading-spinner .skeleton-row {
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.11) 50%, rgba(0,0,0,0.04) 75%);
+  background-size: 600px 100%;
+}
+.loading-spinner .skeleton-row:nth-child(2) { width: 60%; }
+.loading-spinner .skeleton-row:nth-child(3) { width: 85%; }
+.loading-spinner .skeleton-row:nth-child(5) { width: 45%; }
+
+/* --- Skeleton card placeholders --- */
+.loading-spinner .skeleton-card {
+  height: 64px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+[data-theme-mode="light"] .loading-spinner .skeleton-card {
+  background: linear-gradient(90deg, rgba(0,0,0,0.03) 25%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.03) 75%);
+  background-size: 600px 100%;
+}
+.loading-spinner .skeleton-card:nth-child(odd) { animation-delay: 0.3s; }
+
+/* --- Contextual loading variants --- */
+.loading-spinner.loading-list .skeleton-row { height: 44px; border-radius: 10px; margin-bottom: 2px; }
+.loading-spinner.loading-list .skeleton-row:nth-child(2) { width: 100%; }
+.loading-spinner.loading-list .skeleton-row:nth-child(3) { width: 100%; }
+.loading-spinner.loading-list .skeleton-row:nth-child(5) { width: 100%; }
+
+.loading-spinner.loading-form .skeleton-row { height: 36px; border-radius: 8px; }
+.loading-spinner.loading-form .skeleton-row:nth-child(odd) { width: 30%; height: 12px; }
+
+.loading-spinner.loading-kpi {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.loading-spinner.loading-kpi .skeleton-card {
+  flex: 1 1 140px;
+  height: 72px;
+}
+
+/* --- member-list skeleton: matches .member-list-item (avatar circle + 2 text lines + chevron) --- */
+.loading-spinner.loading-member-list { gap: 0; }
+.loading-member-list .sk-member-row {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  gap: 16px;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.loading-member-list .sk-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.20) 50%, rgba(255,255,255,0.06) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+[data-theme-mode="light"] .loading-member-list .sk-avatar {
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 600px 100%;
+}
+.loading-member-list .sk-info { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.loading-member-list .sk-name {
+  height: 12px; width: 55%; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.20) 50%, rgba(255,255,255,0.06) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+.loading-member-list .sk-meta {
+  height: 9px; width: 38%; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite 0.1s;
+}
+[data-theme-mode="light"] .loading-member-list .sk-name {
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 600px 100%;
+}
+[data-theme-mode="light"] .loading-member-list .sk-meta {
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.04) 75%);
+  background-size: 600px 100%;
+}
+.loading-member-list .sk-chevron {
+  width: 7px; height: 12px; border-radius: 2px; flex-shrink: 0;
+  background: rgba(255,255,255,0.06);
+}
+[data-theme-mode="light"] .loading-member-list .sk-chevron { background: rgba(0,0,0,0.06); }
+/* stagger shimmer across rows */
+.loading-member-list .sk-member-row:nth-child(2) .sk-avatar,
+.loading-member-list .sk-member-row:nth-child(2) .sk-name,
+.loading-member-list .sk-member-row:nth-child(2) .sk-meta { animation-delay: 0.15s; }
+.loading-member-list .sk-member-row:nth-child(3) .sk-avatar,
+.loading-member-list .sk-member-row:nth-child(3) .sk-name,
+.loading-member-list .sk-member-row:nth-child(3) .sk-meta { animation-delay: 0.3s; }
+.loading-member-list .sk-member-row:nth-child(4) .sk-avatar,
+.loading-member-list .sk-member-row:nth-child(4) .sk-name,
+.loading-member-list .sk-member-row:nth-child(4) .sk-meta { animation-delay: 0.45s; }
+.loading-member-list .sk-member-row:nth-child(5) .sk-avatar,
+.loading-member-list .sk-member-row:nth-child(5) .sk-name,
+.loading-member-list .sk-member-row:nth-child(5) .sk-meta { animation-delay: 0.6s; }
+/* vary name widths so it doesn't look robotic */
+.loading-member-list .sk-member-row:nth-child(2) .sk-name { width: 42%; }
+.loading-member-list .sk-member-row:nth-child(3) .sk-name { width: 61%; }
+.loading-member-list .sk-member-row:nth-child(4) .sk-name { width: 35%; }
+.loading-member-list .sk-member-row:nth-child(5) .sk-name { width: 50%; }
+.loading-member-list .sk-member-row:nth-child(2) .sk-meta { width: 28%; }
+.loading-member-list .sk-member-row:nth-child(3) .sk-meta { width: 45%; }
+.loading-member-list .sk-member-row:nth-child(5) .sk-meta { width: 33%; }
+
+/* --- grievance skeleton: matches grievance card (glow-bar + label + title + meta + deadline box) --- */
+.loading-spinner.loading-grievance { gap: 14px; }
+.loading-grievance .sk-grievance-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+}
+.loading-grievance .sk-glow {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.06) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+[data-theme-mode="light"] .loading-grievance .sk-glow {
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.18) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 600px 100%;
+}
+.loading-grievance .sk-g-label {
+  height: 9px; width: 30%; border-radius: 4px; margin-bottom: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite 0.05s;
+}
+.loading-grievance .sk-g-title {
+  height: 16px; width: 70%; border-radius: 6px; margin-bottom: 4px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.07) 25%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.07) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite 0.1s;
+}
+.loading-grievance .sk-g-id {
+  height: 9px; width: 45%; border-radius: 4px; margin-bottom: 14px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite 0.15s;
+}
+.loading-grievance .sk-g-deadline {
+  height: 44px; border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 14px;
+}
+.loading-grievance .sk-g-dl-label {
+  height: 10px; width: 80px; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.05) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite 0.2s;
+}
+.loading-grievance .sk-g-dl-num {
+  height: 22px; width: 36px; border-radius: 5px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.07) 25%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.07) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.6s linear infinite 0.25s;
+}
+[data-theme-mode="light"] .loading-grievance .sk-g-label,
+[data-theme-mode="light"] .loading-grievance .sk-g-id,
+[data-theme-mode="light"] .loading-grievance .sk-g-dl-label {
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.04) 75%);
+  background-size: 600px 100%;
+}
+[data-theme-mode="light"] .loading-grievance .sk-g-title,
+[data-theme-mode="light"] .loading-grievance .sk-g-dl-num {
+  background: linear-gradient(90deg, rgba(0,0,0,0.07) 25%, rgba(0,0,0,0.18) 50%, rgba(0,0,0,0.07) 75%);
+  background-size: 600px 100%;
+}
+[data-theme-mode="light"] .loading-grievance .sk-g-deadline { background: rgba(0,0,0,0.04); }
+/* second card slightly delayed so they don't shimmer in lockstep */
+.loading-grievance .sk-grievance-card:nth-child(2) .sk-glow,
+.loading-grievance .sk-grievance-card:nth-child(2) .sk-g-title { animation-delay: 0.3s; }
+
+/* --- Inline spinner (three dots) — auth, survey submit, inline actions --- */
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.55); opacity: 0.35; }
+  40%           { transform: scale(1);    opacity: 1; }
 }
 .spinner {
-  width: 32px; height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
+  display: inline-block;
+  position: relative;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  background: var(--accent, #7c6ef6);
+  animation: dotPulse 1.2s ease-in-out infinite;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
-.loading-text {
-  font-family: var(--fontBody);
-  font-size: 13px;
+.spinner::before,
+.spinner::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #7c6ef6);
+  top: 0;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+.spinner::before { left: -13px; animation-delay: -0.24s; }
+.spinner::after  { left:  13px; animation-delay:  0.24s; }
+
+/* --- Loading timeout error state --- */
+.loading-timeout {
+  text-align: center;
+  padding: 24px 16px;
   color: var(--muted);
+  font-size: 13px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.loading-timeout button {
+  margin-top: 10px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* Legacy compat */
+.loading-text { display: none; }
 
 .fade-in {
   animation: fadeIn 0.3s ease-out;
@@ -1937,10 +2243,68 @@ input { font: inherit; }
   .celebration-emoji {
     animation: none !important;
   }
+  /* Reduce skeleton/spinner animations to simple opacity */
+  .skeleton-row,
+  .skeleton-card,
+  .skeleton-box {
+    animation: none !important;
+    opacity: 0.5;
+  }
+  .spinner {
+    animation-duration: 1.2s !important;
+  }
   /* Keep transitions but make them instant */
   .nav-theme-blobLava .bottom-nav .nav-blob-indicator,
   .nav-theme-cyberpunk .bottom-nav .nav-blob-indicator {
     transition-duration: 0.01s !important;
   }
 }
+
+/* ═══════════════════════════════════════
+   C1: SKELETON UI — Placeholder shimmer while batch data loads
+   ═══════════════════════════════════════ */
+.skeleton-wrap {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.skeleton-header {
+  margin-bottom: 24px;
+}
+.skeleton-box {
+  background: linear-gradient(90deg, rgba(255,255,255,0.10) 25%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.10) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+.skeleton-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.skeleton-kpi {
+  height: 72px;
+}
+.skeleton-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skeleton-wrap .skeleton-card {
+  height: 64px;
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+/* Light mode skeleton */
+[data-theme-mode="light"] .skeleton-box,
+:root:not([data-theme-mode]) .skeleton-box {
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+}
+
+/* N2: Deferred non-critical animations — these load after first paint */
 </style>

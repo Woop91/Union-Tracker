@@ -274,7 +274,7 @@ function getUnifiedDashboardData(includePII) {
     var memberData = memberSheet.getDataRange().getValues();
     for (var m = 1; m < memberData.length; m++) {
       var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
-      if (!memberId || !memberId.toString().match(/^M/i)) continue;
+      if (!isMemberId_(memberId)) continue;
 
       data.totalMembers++;
       var firstName = memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '';
@@ -601,7 +601,7 @@ function getUnifiedDashboardData(includePII) {
       // Track Step 2 denial rate
       if (grievanceData[g][GRIEVANCE_COLS.STEP2_RCVD - 1]) {
         step2Total++;
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1]) step2Denials++;
+        if (status !== GRIEVANCE_STATUS.WON && grievanceData[g][GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1]) step2Denials++;
       }
 
       // Open cases list for drill-down (member hidden in non-PII, steward always shown)
@@ -656,7 +656,7 @@ function getUnifiedDashboardData(includePII) {
       // Step 1 denial rate
       if (grievanceData[g][GRIEVANCE_COLS.STEP1_RCVD - 1]) {
         step1Total++;
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1]) step1Denials++;
+        if (status !== GRIEVANCE_STATUS.WON && grievanceData[g][GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1]) step1Denials++;
       }
 
       // Settlement time

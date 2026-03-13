@@ -466,10 +466,8 @@ var FailsafeService = (function () {
     }).join('\n');
   }
 
-  function _fmtDate(date) {
-    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
-  }
+  // Delegate to shared helper in 01_Core.gs (eliminates duplicate definition)
+  function _fmtDate(date) { return fmtDateShort_(date); }
 
   // ═══════════════════════════════════════
   // Public API

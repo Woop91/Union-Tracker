@@ -59,7 +59,7 @@ function getDashboardStats() {
     // Filter to only rows with a valid grievance ID (starts with "G")
     logData = logData.filter(function(row) {
       var gid = (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '').toString();
-      return gid.match(/^G/i);
+      return isGrievanceId_(gid);
     });
     stats.totalGrievances = logData.length;
 
@@ -311,9 +311,9 @@ function getExecutiveMetrics_() {
 
       for (var g = 1; g < grievanceData.length; g++) {
         var status = grievanceData[g][GRIEVANCE_COLS.STATUS - 1];
-        if (status === 'Open' || status === 'Pending Info') openCount++;
-        if (status === 'Won') wonCount++;
-        if (status === 'Won' || status === 'Denied' || status === 'Settled' || status === 'Withdrawn') closedCount++;
+        if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) openCount++;
+        if (status === GRIEVANCE_STATUS.WON) wonCount++;
+        if (GRIEVANCE_CLOSED_STATUSES.indexOf(status) !== -1) closedCount++;
 
         var daysToDeadline = grievanceData[g][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
         if (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0)) {
@@ -584,7 +584,7 @@ function checkOverdueGrievances_() {
       var daysToDeadline = data[i][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
 
       // Check for active cases that are overdue
-      if ((status === 'Open' || status === 'Pending Info') &&
+      if ((status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) &&
           (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0))) {
         overdueList.push({
           id: data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1],

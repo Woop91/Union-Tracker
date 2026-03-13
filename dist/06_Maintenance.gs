@@ -46,7 +46,8 @@ function DIAGNOSE_SETUP() {
     DASHBOARD: true,           // @deprecated v4.3.2 - modal dashboards now
     REPORTS: true,             // Backward-compat alias for DASHBOARD
     TEST_RESULTS: true,        // Created on-demand by test framework only
-    MEMBER_DIRECTORY: true     // Backward-compat alias for MEMBER_DIR
+    MEMBER_DIRECTORY: true,    // Backward-compat alias for MEMBER_DIR
+    WORKLOAD_ARCHIVE: true     // Created on-demand by WorkloadService.archiveOldData()
     // GRIEVANCE_TRACKER removed v4.25.9 - alias deleted, all callers use GRIEVANCE_LOG
   };
 
@@ -758,11 +759,68 @@ function warmUpCaches() {
     getCachedMembers();
     getCachedStewards();
     getCachedDashboardMetrics();
+    // A1: Also warm the web app SD_* caches (used by DataService._getCachedSheetData)
+    warmWebAppCaches_();
     SpreadsheetApp.getActiveSpreadsheet().toast('Caches warmed successfully', 'Cache', 3);
   } catch (e) {
     Logger.log('Cache warmup error: ' + e.message);
     SpreadsheetApp.getActiveSpreadsheet().toast('Cache warmup failed: ' + e.message, 'Error', 5);
   }
+}
+
+/**
+ * A1: Warms web app SD_* caches used by DataService._getCachedSheetData.
+ * These are the CacheService keys that the web app reads from on each request.
+ * Can be called by a time-based trigger every 5 minutes to keep caches hot.
+ * @private
+ */
+function warmWebAppCaches_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var cache = CacheService.getScriptCache();
+  var ttl = 300; // 5 minutes — matches trigger interval
+  var sheetsToWarm = [
+    (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ? SHEETS.MEMBER_DIR : 'Member Directory',
+    (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ? SHEETS.GRIEVANCE_LOG : 'Grievance Log',
+    (typeof SHEETS !== 'undefined' && SHEETS.STEWARD_TASKS) ? SHEETS.STEWARD_TASKS : '_Steward_Tasks',
+  ];
+
+  for (var i = 0; i < sheetsToWarm.length; i++) {
+    try {
+      var sheetName = sheetsToWarm[i];
+      var sheet = ss.getSheetByName(sheetName);
+      if (!sheet) continue;
+      var data = sheet.getDataRange().getValues();
+      var cacheKey = 'SD_' + sheetName.replace(/\s/g, '_');
+      var serializable = data.map(function(row) {
+        return row.map(function(cell) {
+          return cell instanceof Date ? { __d: cell.toISOString() } : cell;
+        });
+      });
+      var json = JSON.stringify({ data: serializable });
+      if (json.length < 95000) {
+        cache.put(cacheKey, json, ttl);
+      }
+    } catch (_e) {
+      Logger.log('warmWebAppCaches_ error for ' + sheetsToWarm[i] + ': ' + _e.message);
+    }
+  }
+}
+
+/**
+ * A1: Installs a time-based trigger that warms web app caches every 5 minutes.
+ * Run once from the menu. Prevents cold-cache penalties for web app users.
+ */
+function setupWebAppCacheWarmingTrigger() {
+  // Remove existing to avoid duplicates
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'warmWebAppCaches_') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('warmWebAppCaches_')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Web app cache warming trigger installed (every 5 min)', 'Setup', 5);
 }
 
 // ============================================================================
@@ -850,8 +908,8 @@ function getCachedDashboardMetrics() {
       }
 
       // Update counts
-      if (status === 'Open') metrics.open++;
-      if (status === 'Closed' || status === 'Resolved') metrics.closed++;
+      if (status === GRIEVANCE_STATUS.OPEN) metrics.open++;
+      if (status === GRIEVANCE_STATUS.CLOSED || status === GRIEVANCE_STATUS.RESOLVED) metrics.closed++;
       if (daysTo !== null && daysTo < 0) metrics.overdue++;
 
       // Update breakdowns

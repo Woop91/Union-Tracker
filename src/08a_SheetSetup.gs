@@ -522,6 +522,24 @@ function setupHiddenSheets(ss) {
 
   // Survey Periods — period lifecycle tracking (v4.21.0)
   setupSurveyPeriodsSheet();
+
+  // Archive Grievances — created empty if missing (auto-populated by archive function)
+  var archGriev = ss.getSheetByName(HIDDEN_SHEETS.ARCHIVE_GRIEVANCES);
+  if (!archGriev) {
+    archGriev = ss.insertSheet(HIDDEN_SHEETS.ARCHIVE_GRIEVANCES);
+    archGriev.getRange(1, 1).setValue('Archived Grievances');
+    setSheetVeryHidden_(archGriev);
+  }
+
+  // Workload Archive — created empty if missing (auto-populated by WorkloadService.archiveOldData)
+  if (typeof SHEETS !== 'undefined' && SHEETS.WORKLOAD_ARCHIVE) {
+    var wlArchive = ss.getSheetByName(SHEETS.WORKLOAD_ARCHIVE);
+    if (!wlArchive) {
+      wlArchive = ss.insertSheet(SHEETS.WORKLOAD_ARCHIVE);
+      wlArchive.getRange(1, 1).setValue('Workload Archive');
+      setSheetVeryHidden_(wlArchive);
+    }
+  }
 }
 
 

@@ -74,10 +74,12 @@ var Auth = (function () {
    * @returns {Object} { success: boolean, message: string }
    */
   function sendMagicLink(email, rememberMe) {
+    var step = 'init';
     try {
     email = String(email).trim().toLowerCase();
 
     // Rate limiting — max 3 magic links per email per 15 minutes
+    step = 'cache';
     var cache = CacheService.getScriptCache();
     var rateKey = 'MAGIC_RATE_' + email;
     var count = parseInt(cache.get(rateKey) || '0', 10);
@@ -87,6 +89,7 @@ var Auth = (function () {
     cache.put(rateKey, String(count + 1), 900);
 
     // Validate email exists in directory
+    step = 'lookup';
     Logger.log('Auth.sendMagicLink STEP 0: looking up ' + email + ' in Member Directory');
     var userRecord = DataService.findUserByEmail(email);
     if (!userRecord) {
@@ -97,12 +100,31 @@ var Auth = (function () {
       return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
     }
 
+    step = 'config';
     Logger.log('Auth.sendMagicLink STEP 1: user found, building token for ' + email);
-    var config = ConfigReader.getConfig();
+    // ConfigReader.getConfig() can throw if its CacheService cache expired and
+    // getActiveSpreadsheet() returns null in certain web app execution contexts.
+    // Magic link emails only need a few config fields — fall back to safe defaults
+    // so the email still sends even when the config sheet is temporarily unreachable.
+    var config;
+    try {
+      config = ConfigReader.getConfig();
+    } catch (cfgErr) {
+      Logger.log('Auth.sendMagicLink: ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
+      config = {
+        orgName: 'Dashboard',
+        logoInitials: '',
+        accentHue: 250,
+        magicLinkExpiryMs: 7 * 24 * 60 * 60 * 1000,
+        magicLinkExpiryDays: 7,
+      };
+    }
 
+    step = 'token';
     Logger.log('Auth.sendMagicLink STEP 2: config loaded, orgName=' + config.orgName);
-    var token = _generateMagicToken(email);
+    var token = _generateMagicToken(email, config);
 
+    step = 'url';
     Logger.log('Auth.sendMagicLink STEP 3: token generated, fetching web app URL');
     var webAppUrl = ScriptApp.getService().getUrl();
     if (!webAppUrl) {
@@ -117,9 +139,11 @@ var Auth = (function () {
 
     var signInUrl = webAppUrl + linkParams;
 
+    step = 'build-email';
     var subject = 'Sign in to ' + config.orgName + ' Dashboard';
     var htmlBody = _buildEmailHtml(config, signInUrl, email);
 
+    step = 'send';
     Logger.log('Auth.sendMagicLink STEP 4: attempting email send to ' + email);
 
     // PRIMARY: GmailApp (uses gmail.send scope — authorized in web app deployment)
@@ -177,8 +201,24 @@ var Auth = (function () {
       return { success: false, message: msg };
     }
     } catch (outerErr) {
-      Logger.log('Auth.sendMagicLink OUTER ERROR: ' + outerErr.message + '\n' + (outerErr.stack || ''));
-      return { success: false, message: 'Failed to send email. Please try again.' };
+      Logger.log('Auth.sendMagicLink OUTER ERROR at step [' + step + ']: ' + outerErr.message + '\n' + (outerErr.stack || ''));
+
+      // Provide actionable error messages based on which step failed
+      var outerMsg = 'Failed to send email. ';
+      if (step === 'cache') {
+        outerMsg += 'A temporary service error occurred. Please try again.';
+      } else if (step === 'lookup') {
+        outerMsg += 'Could not access the member directory. Please try again or use Google Sign-In.';
+      } else if (step === 'config') {
+        outerMsg += 'Could not load dashboard configuration. Please contact your administrator.';
+      } else if (step === 'token' || step === 'url') {
+        outerMsg += 'A server configuration error occurred. Please contact your administrator.';
+      } else if (step === 'build-email' || step === 'send') {
+        outerMsg += 'Please try again or use Google Sign-In.';
+      } else {
+        outerMsg += 'Please try again.';
+      }
+      return { success: false, message: outerMsg };
     }
   }
 
@@ -247,8 +287,8 @@ var Auth = (function () {
   // PRIVATE METHODS
   // ═══════════════════════════════════════
 
-  function _generateMagicToken(email) {
-    var config = ConfigReader.getConfig();
+  function _generateMagicToken(email, config) {
+    config = config || ConfigReader.getConfig();
     var token = _generateToken();
     var expiry = Date.now() + config.magicLinkExpiryMs;
 
@@ -368,6 +408,7 @@ var Auth = (function () {
      * @returns {string|null} verified email or null
      */
     resolveEmailFromToken: _validateSessionToken,
+    validateSessionToken: _validateSessionToken,
   };
 
 })();

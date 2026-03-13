@@ -15,21 +15,27 @@ var ConfigReader = (function () {
 
   var CACHE_KEY = 'ORG_CONFIG';
   var CACHE_TTL = 21600; // 6 hours in seconds
+  // S3: In-execution memo — avoids repeated cache.get() + JSON.parse() within same request
+  var _memo = null;
 
   /**
    * Reads the Config tab and returns a settings object.
-   * Uses CacheService for performance.
+   * Uses in-execution memo + CacheService for performance.
    * @param {boolean} [forceRefresh=false] - Bypass cache
    * @returns {Object} Config settings
    */
   function getConfig(forceRefresh) {
+    // S3: Return in-execution memo if available (same GAS execution)
+    if (!forceRefresh && _memo) return _memo;
+
     // Try cache first
     if (!forceRefresh) {
       var cache = CacheService.getScriptCache();
       var cached = cache.get(CACHE_KEY);
       if (cached) {
         try {
-          return JSON.parse(cached);
+          _memo = JSON.parse(cached);
+          return _memo;
         } catch (_e) {
           // Cache corrupted, fall through to read from sheet
         }
@@ -47,8 +53,15 @@ var ConfigReader = (function () {
       throw new Error('Config tab "' + SHEETS.CONFIG + '" not found. Please create it.');
     }
 
-    // Read org-level values from row 3 using CONFIG_COLS
-    var orgName = _readCell(sheet, CONFIG_COLS.ORG_NAME) || 'My Organization';
+    // S4: Single-row read — read entire row 3 once instead of 12 individual getRange calls
+    var lastCol = sheet.getLastColumn();
+    var row3 = lastCol > 0 ? sheet.getRange(3, 1, 1, lastCol).getValues()[0] : [];
+    function _readRow(col) {
+      if (!col || col < 1 || col > row3.length) return '';
+      return row3[col - 1];
+    }
+
+    var orgName = _readRow(CONFIG_COLS.ORG_NAME) || 'My Organization';
 
     var config = {
       orgName:             orgName,
@@ -60,20 +73,20 @@ var ConfigReader = (function () {
       stewardLabel:        'Steward',
       memberLabel:         'Member',
       // Insights cache TTL in minutes (default 5). Admins can override via Config tab.
-      insightsCacheTTLMin: Number(_readCell(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN) || 5) || 5,
+      insightsCacheTTLMin: Number(_readRow(CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN) || 5) || 5,
       // Broadcast scope: 'yes' = stewards can send to all members, 'no' (default) = assigned only
-      broadcastScopeAll:   _readCell(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL) || 'no',
+      broadcastScopeAll:   _readRow(CONFIG_COLS.BROADCAST_SCOPE_ALL) || 'no',
       // Org links — from Config tab columns
-      calendarId:          _readCell(sheet, CONFIG_COLS.CALENDAR_ID) || '',
-      driveFolderId:       _readCell(sheet, CONFIG_COLS.DRIVE_FOLDER_ID) || '',
+      calendarId:          _readRow(CONFIG_COLS.CALENDAR_ID) || '',
+      driveFolderId:       _readRow(CONFIG_COLS.DRIVE_FOLDER_ID) || '',
       // satisfactionFormUrl removed v4.22.7 — survey is native webapp (see member_view.html renderSurveyFormPage)
-      orgWebsite:          _readCell(sheet, CONFIG_COLS.ORG_WEBSITE) || '',
+      orgWebsite:          _readRow(CONFIG_COLS.ORG_WEBSITE) || '',
       // Dashboard folder structure (v4.20.17)
-      dashboardRootFolderId:  _readCell(sheet, CONFIG_COLS.DASHBOARD_ROOT_FOLDER_ID) || '',
-      grievancesFolderId:     _readCell(sheet, CONFIG_COLS.GRIEVANCES_FOLDER_ID) || '',
-      resourcesFolderId:      _readCell(sheet, CONFIG_COLS.RESOURCES_FOLDER_ID) || '',
-      minutesFolderId:        _readCell(sheet, CONFIG_COLS.MINUTES_FOLDER_ID) || '',
-      eventCheckinFolderId:   _readCell(sheet, CONFIG_COLS.EVENT_CHECKIN_FOLDER_ID) || '',
+      dashboardRootFolderId:  _readRow(CONFIG_COLS.DASHBOARD_ROOT_FOLDER_ID) || '',
+      grievancesFolderId:     _readRow(CONFIG_COLS.GRIEVANCES_FOLDER_ID) || '',
+      resourcesFolderId:      _readRow(CONFIG_COLS.RESOURCES_FOLDER_ID) || '',
+      minutesFolderId:        _readRow(CONFIG_COLS.MINUTES_FOLDER_ID) || '',
+      eventCheckinFolderId:   _readRow(CONFIG_COLS.EVENT_CHECKIN_FOLDER_ID) || '',
       // Derived (computed below)
       magicLinkExpiryMs:   0,
       cookieDurationMs:    0,
@@ -81,6 +94,9 @@ var ConfigReader = (function () {
 
     config.magicLinkExpiryMs = config.magicLinkExpiryDays * 24 * 60 * 60 * 1000;
     config.cookieDurationMs = config.cookieDurationDays * 24 * 60 * 60 * 1000;
+
+    // S3: Store in-execution memo
+    _memo = config;
 
     // Cache it
     try {
@@ -107,6 +123,7 @@ var ConfigReader = (function () {
    * @returns {Object} Fresh config
    */
   function refreshConfig() {
+    _memo = null;
     return getConfig(true);
   }
 

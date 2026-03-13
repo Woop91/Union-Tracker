@@ -121,8 +121,7 @@ function onOpenDeferred_() {
     }
 
     // Initialize EventBus subscribers so the bus is ready for event routing.
-    // Note: onEdit() currently calls handlers directly. To fully migrate to
-    // EventBus routing, replace direct calls in onEdit() with emitEditEvent(e).
+    // onEdit() dispatches via emitEditEvent(e) → EventBus subscribers.
     try {
       if (typeof registerEventBusSubscribers === 'function') {
         registerEventBusSubscribers();
@@ -164,6 +163,13 @@ function onEdit(e) {
     // which are wrong if a user manually reordered columns.
     try { loadCachedColumnMaps_(); } catch (_cacheErr) { /* use defaults */ }
 
+    // Ensure EventBus subscribers are registered for this execution context.
+    // GAS runs each trigger invocation in an isolated context — global state
+    // from onOpenDeferred_ doesn't persist into onEdit executions.
+    try {
+      if (typeof registerEventBusSubscribers === 'function') registerEventBusSubscribers();
+    } catch (_busErr) { /* proceed with fallback */ }
+
     var sheet = e.range.getSheet();
     var sheetName = sheet.getName();
     var row = e.range.getRow();
@@ -196,79 +202,14 @@ function onEdit(e) {
     }
 
     // ========================================
-    // 3. Sheet-Specific Handlers (else-if: only one sheet matches)
+    // 3. Sheet-Specific Handlers via EventBus
     // ========================================
-
-    if (sheetName === SHEETS.GRIEVANCE_LOG) {
-      // Grievance Log edits
-      handleGrievanceEdit(e);
-      applyAutoStyleToRow_(sheet, row);
-      handleStageGateWorkflow_(e);
-
-      // Bidirectional sync: sync custom dropdown values back to Config
-      try { syncDropdownToConfig_(e, sheetName); }
-      catch (syncErr) { console.log('Config sync error: ' + syncErr.message); }
-
-      if (typeof sortGrievanceLogByStatus === 'function') {
-        try { sortGrievanceLogByStatus(); }
-        catch (sortError) { Logger.log('Auto-sort error: ' + sortError.message); }
-      }
-
-      // M-48: onEditAutoSync calls syncGrievanceFormulasToLog internally.
-      // Mark the event so onEditAutoSync can skip redundant formula sync
-      // since handleGrievanceEdit already computed deadline values for this row.
-      if (typeof onEditAutoSync === 'function') {
-        try {
-          e._grievanceEditHandled = true;
-          onEditAutoSync(e);
-        }
-        catch (syncError) { console.log('AutoSync handler error: ' + syncError.message); }
-      }
-
-    } else if (sheetName === SHEETS.MEMBER_DIR) {
-      // Member Directory edits
-      handleMemberEdit(e);
-      applyAutoStyleToRow_(sheet, row);
-
-      // Bidirectional sync: sync custom dropdown values back to Config
-      try { syncDropdownToConfig_(e, sheetName); }
-      catch (syncErr) { console.log('Config sync error: ' + syncErr.message); }
-
-    } else if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
-      // Case Checklist edits
-      if (typeof handleChecklistEdit === 'function') {
-        handleChecklistEdit(e);
-      }
-
-    } else if (sheetName === SHEETS.VOLUNTEER_HOURS) {
-      // Volunteer Hours edits
-      if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
-        try { syncVolunteerHoursToMemberDirectory(); }
-        catch (syncError) { Logger.log('Volunteer Hours sync error: ' + syncError.message); }
-      }
-
-    } else if (sheetName === SHEETS.MEETING_ATTENDANCE) {
-      // Meeting Attendance edits
-      if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
-        try { syncMeetingAttendanceToMemberDirectory(); }
-        catch (syncError) { Logger.log('Meeting Attendance sync error: ' + syncError.message); }
-      }
-
-    } else if (sheetName === SHEETS.CONFIG) {
-      // Config sheet edits — sync STEWARDS column to Member Directory
-      handleConfigStewardEdit_(e);
-    }
-
-    // ========================================
-    // 4. Additional Audit Logging (high-value sheets only)
-    // ========================================
-    if (typeof onEditAudit === 'function' &&
-        (sheetName === SHEETS.GRIEVANCE_LOG || sheetName === SHEETS.MEMBER_DIR)) {
-      try {
-        onEditAudit(e);
-      } catch (auditError) {
-        console.log('Audit handler error: ' + auditError.message);
-      }
+    // All sheet-specific handlers (grievance edit, member edit, checklist,
+    // volunteer hours, meeting attendance, config, auto-sync, audit) are
+    // registered as EventBus subscribers in registerEventBusSubscribers()
+    // (15_EventBus.gs). Priority ordering ensures correct execution sequence.
+    if (typeof emitEditEvent === 'function') {
+      emitEditEvent(e);
     }
 
   } catch (error) {

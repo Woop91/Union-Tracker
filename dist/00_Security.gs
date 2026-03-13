@@ -574,6 +574,38 @@ function maskGrievanceForLog(grievance) {
 // ============================================================================
 
 /**
+ * Masks PII fields in an arbitrary key-value object.
+ * Shared utility used by secureLog, sendSecurityAlertEmail_, and queueSecurityDigestEvent_.
+ * @param {Object} obj - Object with potential PII fields
+ * @param {boolean} [skipInternal=false] - If true, skip keys starting with '_'
+ * @returns {Object} New object with PII fields masked
+ */
+function maskObjectPII_(obj, skipInternal) {
+  if (!obj || typeof obj !== 'object') return {};
+  var masked = {};
+  for (var key in obj) {
+    if (!obj.hasOwnProperty(key)) continue;
+    if (skipInternal && key.charAt(0) === '_') continue;
+    var val = obj[key];
+    var keyLower = key.toLowerCase();
+    if (keyLower.indexOf('email') !== -1 && typeof val === 'string') {
+      masked[key] = maskEmail(val);
+    } else if (keyLower.indexOf('phone') !== -1 && typeof val === 'string') {
+      masked[key] = maskPhone(val);
+    } else if ((key === 'firstName' || key === 'lastName' || key === 'name') && (typeof val === 'string' || !val)) {
+      masked[key] = val ? String(val).charAt(0) + '.' : '';
+    } else if ((keyLower.indexOf('address') !== -1 || keyLower.indexOf('ssn') !== -1 ||
+                keyLower.indexOf('social') !== -1 || keyLower.indexOf('dob') !== -1 ||
+                keyLower.indexOf('birthdate') !== -1) && typeof val === 'string') {
+      masked[key] = '[REDACTED]';
+    } else {
+      masked[key] = val;
+    }
+  }
+  return masked;
+}
+
+/**
  * Logs a message without exposing PII
  * @param {string} context - The context/function name
  * @param {string} message - The log message
@@ -583,29 +615,7 @@ function secureLog(context, message, data) {
   var logMessage = '[' + context + '] ' + message;
 
   if (data) {
-    // Create a masked version of data for logging
-    var maskedData = {};
-    for (var key in data) {
-      if (data.hasOwnProperty(key)) {
-        var value = data[key];
-        // Check for PII fields and mask them
-        var keyLower = key.toLowerCase();
-        if (keyLower.indexOf('email') !== -1) {
-          maskedData[key] = maskEmail(value);
-        } else if (keyLower.indexOf('phone') !== -1) {
-          maskedData[key] = maskPhone(value);
-        } else if (key === 'firstName' || key === 'lastName' || key === 'name') {
-          maskedData[key] = value ? String(value).charAt(0) + '.' : '';
-        } else if (keyLower.indexOf('address') !== -1 || keyLower.indexOf('ssn') !== -1 ||
-                   keyLower.indexOf('social') !== -1 || keyLower.indexOf('dob') !== -1 ||
-                   keyLower.indexOf('birthdate') !== -1) {
-          maskedData[key] = '[REDACTED]';
-        } else {
-          maskedData[key] = value;
-        }
-      }
-    }
-    logMessage += ' | Data: ' + JSON.stringify(maskedData);
+    logMessage += ' | Data: ' + JSON.stringify(maskObjectPII_(data));
   }
 
   Logger.log(logMessage);
@@ -805,26 +815,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     if (recipients.length === 0) return;
 
     // Mask PII in details before including in email
-    var safeDetails = {};
-    for (var key in details) {
-      if (details.hasOwnProperty(key) && key.charAt(0) !== '_') {
-        var val = details[key];
-        var keyLower = key.toLowerCase();
-        if (keyLower.indexOf('email') !== -1 && typeof val === 'string') {
-          safeDetails[key] = maskEmail(val);
-        } else if (keyLower.indexOf('phone') !== -1 && typeof val === 'string') {
-          safeDetails[key] = maskPhone(val);
-        } else if ((key === 'firstName' || key === 'lastName' || key === 'name') && typeof val === 'string') {
-          safeDetails[key] = val ? String(val).charAt(0) + '.' : '';
-        } else if ((keyLower.indexOf('address') !== -1 || keyLower.indexOf('ssn') !== -1 ||
-                    keyLower.indexOf('social') !== -1 || keyLower.indexOf('dob') !== -1 ||
-                    keyLower.indexOf('birthdate') !== -1) && typeof val === 'string') {
-          safeDetails[key] = '[REDACTED]';
-        } else {
-          safeDetails[key] = val;
-        }
-      }
-    }
+    var safeDetails = maskObjectPII_(details, true);
 
     var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
@@ -878,26 +869,7 @@ function queueSecurityDigestEvent_(eventType, description, details) {
     var queue = JSON.parse(existing);
 
     // Mask PII before storing
-    var safeDetails = {};
-    for (var key in details) {
-      if (details.hasOwnProperty(key) && key.charAt(0) !== '_') {
-        var val = details[key];
-        var keyLower = key.toLowerCase();
-        if (keyLower.indexOf('email') !== -1 && typeof val === 'string') {
-          safeDetails[key] = maskEmail(val);
-        } else if (keyLower.indexOf('phone') !== -1 && typeof val === 'string') {
-          safeDetails[key] = maskPhone(val);
-        } else if ((key === 'firstName' || key === 'lastName' || key === 'name') && typeof val === 'string') {
-          safeDetails[key] = val ? String(val).charAt(0) + '.' : '';
-        } else if ((keyLower.indexOf('address') !== -1 || keyLower.indexOf('ssn') !== -1 ||
-                    keyLower.indexOf('social') !== -1 || keyLower.indexOf('dob') !== -1 ||
-                    keyLower.indexOf('birthdate') !== -1) && typeof val === 'string') {
-          safeDetails[key] = '[REDACTED]';
-        } else {
-          safeDetails[key] = val;
-        }
-      }
-    }
+    var safeDetails = maskObjectPII_(details, true);
 
     queue.push({
       time: new Date().toISOString(),
@@ -967,7 +939,7 @@ function sendDailySecurityDigest() {
       } catch (_e) { /* skip */ }
     }
 
-    if (recipients.length === 0 || MailApp.getRemainingDailyQuota() < 1) return;
+    if (recipients.length === 0) return;
 
     var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
@@ -1032,7 +1004,7 @@ function sendDailySecurityDigest() {
     }
     body += footer;
 
-    MailApp.sendEmail({
+    safeSendEmail_({
       to: recipients.join(','),
       subject: subjectPrefix + ' Daily Security Digest — ' + queue.length + ' event(s)',
       body: body

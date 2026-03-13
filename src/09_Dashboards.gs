@@ -1799,10 +1799,10 @@ function syncGrievanceToMemberDirectory() {
       lookup[memberId].hasOpen = 'Yes';
 
       // Set status priority: Open > Pending Info
-      if (status === 'Open') {
-        lookup[memberId].status = 'Open';
-      } else if (status === 'Pending Info' && lookup[memberId].status !== 'Open') {
-        lookup[memberId].status = 'Pending Info';
+      if (status === GRIEVANCE_STATUS.OPEN) {
+        lookup[memberId].status = GRIEVANCE_STATUS.OPEN;
+      } else if (status === GRIEVANCE_STATUS.PENDING && lookup[memberId].status !== GRIEVANCE_STATUS.OPEN) {
+        lookup[memberId].status = GRIEVANCE_STATUS.PENDING;
       }
 
       // Handle Days to Deadline (can be number or "Overdue" text)
@@ -2645,15 +2645,15 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var daysToDeadline = gRow[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
 
     // Status counts
-    if (status === 'Open') metrics.open++;
-    else if (status === 'Pending Info') metrics.pendingInfo++;
-    else if (status === 'Settled') metrics.settled++;
-    else if (status === 'Won') metrics.won++;
-    else if (status === 'Denied') metrics.denied++;
-    else if (status === 'Withdrawn') metrics.withdrawn++;
+    if (status === GRIEVANCE_STATUS.OPEN) metrics.open++;
+    else if (status === GRIEVANCE_STATUS.PENDING) metrics.pendingInfo++;
+    else if (status === GRIEVANCE_STATUS.SETTLED) metrics.settled++;
+    else if (status === GRIEVANCE_STATUS.WON) metrics.won++;
+    else if (status === GRIEVANCE_STATUS.DENIED) metrics.denied++;
+    else if (status === GRIEVANCE_STATUS.WITHDRAWN) metrics.withdrawn++;
 
     // Active grievances
-    if (status === 'Open' || status === 'Pending Info') {
+    if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) {
       metrics.activeGrievances++;
     }
 
@@ -2689,13 +2689,13 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     if (dateClosed instanceof Date && dateClosed >= thisMonthStart && dateClosed <= today) {
       metrics.closedThisMonth++;
       metrics.trends.closed.thisMonth++;
-      if (status === 'Won') {
+      if (status === GRIEVANCE_STATUS.WON) {
         metrics.trends.won.thisMonth++;
       }
     }
     if (dateClosed instanceof Date && dateClosed >= lastMonthStart && dateClosed <= lastMonthEnd) {
       metrics.trends.closed.lastMonth++;
-      if (status === 'Won') {
+      if (status === GRIEVANCE_STATUS.WON) {
         metrics.trends.won.lastMonth++;
       }
     }
@@ -2706,12 +2706,12 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
         categoryStats[category] = { total: 0, open: 0, resolved: 0, won: 0, denied: 0, settled: 0, withdrawn: 0, daysOpen: [] };
       }
       categoryStats[category].total++;
-      if (status === 'Open') categoryStats[category].open++;
-      if (status !== 'Open' && status !== 'Pending Info') categoryStats[category].resolved++;
-      if (status === 'Won') categoryStats[category].won++;
-      if (status === 'Denied') categoryStats[category].denied++;
-      if (status === 'Settled') categoryStats[category].settled++;
-      if (status === 'Withdrawn') categoryStats[category].withdrawn++;
+      if (status === GRIEVANCE_STATUS.OPEN) categoryStats[category].open++;
+      if (status !== GRIEVANCE_STATUS.OPEN && status !== GRIEVANCE_STATUS.PENDING) categoryStats[category].resolved++;
+      if (status === GRIEVANCE_STATUS.WON) categoryStats[category].won++;
+      if (status === GRIEVANCE_STATUS.DENIED) categoryStats[category].denied++;
+      if (status === GRIEVANCE_STATUS.SETTLED) categoryStats[category].settled++;
+      if (status === GRIEVANCE_STATUS.WITHDRAWN) categoryStats[category].withdrawn++;
       if (typeof daysOpen === 'number') categoryStats[category].daysOpen.push(daysOpen);
     }
 
@@ -2721,11 +2721,11 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
         locationStats[location] = { members: 0, grievances: 0, open: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 };
       }
       locationStats[location].grievances++;
-      if (status === 'Open') locationStats[location].open++;
-      if (status === 'Won') locationStats[location].won++;
-      if (status === 'Denied') locationStats[location].denied++;
-      if (status === 'Settled') locationStats[location].settled++;
-      if (status === 'Withdrawn') locationStats[location].withdrawn++;
+      if (status === GRIEVANCE_STATUS.OPEN) locationStats[location].open++;
+      if (status === GRIEVANCE_STATUS.WON) locationStats[location].won++;
+      if (status === GRIEVANCE_STATUS.DENIED) locationStats[location].denied++;
+      if (status === GRIEVANCE_STATUS.SETTLED) locationStats[location].settled++;
+      if (status === GRIEVANCE_STATUS.WITHDRAWN) locationStats[location].withdrawn++;
     }
 
     // Steward stats
@@ -2734,10 +2734,10 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
         stewardGrievances[steward] = { active: 0, open: 0, pendingInfo: 0, total: 0 };
       }
       stewardGrievances[steward].total++;
-      if (status === 'Open') {
+      if (status === GRIEVANCE_STATUS.OPEN) {
         stewardGrievances[steward].active++;
         stewardGrievances[steward].open++;
-      } else if (status === 'Pending Info') {
+      } else if (status === GRIEVANCE_STATUS.PENDING) {
         stewardGrievances[steward].active++;
         stewardGrievances[steward].pendingInfo++;
       }
@@ -3786,7 +3786,7 @@ function getPublicOverviewData() {
 
     for (var i = 1; i < memberData.length; i++) {
       var memberId = memberData[i][MEMBER_COLS.MEMBER_ID - 1];
-      if (!memberId || !memberId.toString().match(/^M/i)) continue;
+      if (!isMemberId_(memberId)) continue;
 
       result.totalMembers++;
 
@@ -3985,7 +3985,7 @@ function getPublicGrievanceData() {
     typeCounts[gType] = (typeCounts[gType] || 0) + 1;
 
     // Track open/won/settled
-    if (status === 'Open' || status === 'Pending Info') {
+    if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) {
       result.open++;
     }
     if (resolution.toLowerCase().includes('won') || resolution.toLowerCase().includes('favor')) {
@@ -3996,7 +3996,7 @@ function getPublicGrievanceData() {
     }
 
     // Calculate days to resolve for closed grievances
-    if (status === 'Closed' || status === 'Resolved') {
+    if (GRIEVANCE_CLOSED_STATUSES.indexOf(status) !== -1) {
       var dateOpened = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
       var dateClosed = data[i][GRIEVANCE_COLS.DATE_CLOSED - 1];
       if (dateOpened && dateClosed) {

@@ -2159,8 +2159,7 @@ function getDueReminders(daysAhead) {
     const status = row[colStatus];
 
     // Skip closed/resolved grievances
-    if (!grievanceId || status === 'Closed' || status === 'Won' ||
-        status === 'Denied' || status === 'Withdrawn' || status === 'Settled') {
+    if (!grievanceId || GRIEVANCE_CLOSED_STATUSES.indexOf(status) !== -1) {
       continue;
     }
 
@@ -2875,9 +2874,9 @@ function refreshLookerMembers_() {
         grievanceStats[memberId] = { total: 0, won: 0, lost: 0, open: 0 };
       }
       grievanceStats[memberId].total++;
-      if (status === 'Won') grievanceStats[memberId].won++;
-      if (status === 'Denied') grievanceStats[memberId].lost++;
-      if (status === 'Open' || status === 'Pending Info' || status === 'Appealed' || status === 'In Arbitration') {
+      if (status === GRIEVANCE_STATUS.WON) grievanceStats[memberId].won++;
+      if (status === GRIEVANCE_STATUS.DENIED) grievanceStats[memberId].lost++;
+      if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING || status === GRIEVANCE_STATUS.APPEALED || status === GRIEVANCE_STATUS.IN_ARBITRATION) {
         grievanceStats[memberId].open++;
       }
     }
@@ -3377,9 +3376,9 @@ function refreshLookerAnonMembers_() {
         grievanceStats[memberId] = { total: 0, won: 0, lost: 0, open: 0 };
       }
       grievanceStats[memberId].total++;
-      if (status === 'Won') grievanceStats[memberId].won++;
-      if (status === 'Denied') grievanceStats[memberId].lost++;
-      if (status === 'Open' || status === 'Pending Info' || status === 'Appealed' || status === 'In Arbitration') {
+      if (status === GRIEVANCE_STATUS.WON) grievanceStats[memberId].won++;
+      if (status === GRIEVANCE_STATUS.DENIED) grievanceStats[memberId].lost++;
+      if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING || status === GRIEVANCE_STATUS.APPEALED || status === GRIEVANCE_STATUS.IN_ARBITRATION) {
         grievanceStats[memberId].open++;
       }
     }
@@ -3862,11 +3861,11 @@ function getQuarter_(date) {
  * @private
  */
 function getOutcomeCategory_(status) {
-  if (status === 'Won') return 'Win';
-  if (status === 'Denied') return 'Loss';
-  if (status === 'Settled') return 'Settlement';
-  if (status === 'Withdrawn') return 'Withdrawn';
-  if (status === 'Closed') return 'Closed';
+  if (status === GRIEVANCE_STATUS.WON) return 'Win';
+  if (status === GRIEVANCE_STATUS.DENIED) return 'Loss';
+  if (status === GRIEVANCE_STATUS.SETTLED) return 'Settlement';
+  if (status === GRIEVANCE_STATUS.WITHDRAWN) return 'Withdrawn';
+  if (status === GRIEVANCE_STATUS.CLOSED) return 'Closed';
   return 'Active';
 }
 
