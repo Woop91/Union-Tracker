@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.25.13] - 2026-03-13
+
+### Fixed
+- XSS vulnerability in serverCall error handler — error messages now use textContent instead of raw innerHTML
+- `.spinner` class was `display:none` — now renders as a visible rotating ring for auth/survey submit states
+- Duplicate `.skeleton-card` CSS definitions consolidated — C1 skeleton scoped under `.skeleton-wrap`
+
+### Added
+- Cohesive loading indicator system with contextual variants: `showLoading(container, 'list'|'form'|'kpi')`
+- Light-mode support for skeleton-pulse loading indicators (`.skeleton-row`, `.skeleton-card`)
+- 30-second loading timeout fallback prevents infinite spinners with reload prompt
+- `clearLoading()` helper to cancel loading timeouts when content arrives
+- `prefers-reduced-motion` support for skeleton and spinner animations
+- `.loading-timeout` CSS class for timeout error state styling
+
+## [4.25.12] - 2026-03-12
+
+### Changed
+- Loading spinner replaced with pulsing dots animation for a cleaner loading state
+
 ## [4.25.11] - 2026-03-12
 
 ### Added

@@ -686,7 +686,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.11';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.13';
   var parts = ver.split('.');
   return {
     version: ver,

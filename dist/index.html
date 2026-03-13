@@ -390,12 +390,22 @@
         // Dismiss any loading spinners and show the ACTUAL error
         var spinners = document.querySelectorAll('.loading-spinner');
         spinners.forEach(function(s) {
-          s.innerHTML = '<div class="empty-state" style="text-align:center;padding:20px;">'
-            + '<div style="font-size:24px;margin-bottom:8px;">⚠️</div>'
-            + '<div style="color:var(--text);font-weight:600;margin-bottom:6px;">Something went wrong</div>'
-            + '<div style="color:var(--muted);font-size:12px;max-width:400px;margin:0 auto 12px;word-break:break-word;">' + msg + '</div>'
-            + '<button onclick="location.reload()" style="padding:6px 16px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:12px;">Reload</button>'
-            + '</div>';
+          // Clear any loading timeout
+          if (s._loadingTimeout) { clearTimeout(s._loadingTimeout); s._loadingTimeout = null; }
+          // Build error UI safely (no innerHTML with untrusted data)
+          s.innerHTML = '';
+          var errorDiv = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '20px' } });
+          errorDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\u26A0\uFE0F'));
+          errorDiv.appendChild(el('div', { style: { color: 'var(--text)', fontWeight: '600', marginBottom: '6px' } }, 'Something went wrong'));
+          var msgEl = el('div', { style: { color: 'var(--muted)', fontSize: '12px', maxWidth: '400px', margin: '0 auto 12px', wordBreak: 'break-word' } });
+          msgEl.textContent = msg;
+          errorDiv.appendChild(msgEl);
+          var reloadBtn = el('button', {
+            style: { padding: '6px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px' },
+            onClick: function() { location.reload(); }
+          }, 'Reload');
+          errorDiv.appendChild(reloadBtn);
+          s.appendChild(errorDiv);
         });
       });
       return runner;
@@ -639,16 +649,76 @@
       return div.firstChild;
     }
 
-    function showLoading(container) {
+    /**
+     * Shows a skeleton loading indicator inside the given container.
+     * @param {HTMLElement} container - The element to show loading in
+     * @param {string} [variant] - Optional: 'list', 'form', 'kpi', or default card layout
+     * @returns {HTMLElement} The loader element (for timeout tracking)
+     */
+    function showLoading(container, variant) {
       container.innerHTML = '';
-      var loader = el('div', { className: 'loading-spinner' });
-      loader.innerHTML =
-        '<div class="skeleton-card"></div>' +
-        '<div class="skeleton-row"></div>' +
-        '<div class="skeleton-row"></div>' +
-        '<div class="skeleton-card"></div>' +
-        '<div class="skeleton-row"></div>';
+      var cls = 'loading-spinner';
+      var innerHtml;
+      if (variant === 'list') {
+        cls += ' loading-list';
+        innerHtml =
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>';
+      } else if (variant === 'form') {
+        cls += ' loading-form';
+        innerHtml =
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>';
+      } else if (variant === 'kpi') {
+        cls += ' loading-kpi';
+        innerHtml =
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-card"></div>';
+      } else {
+        innerHtml =
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-row"></div>' +
+          '<div class="skeleton-card"></div>' +
+          '<div class="skeleton-row"></div>';
+      }
+      var loader = el('div', { className: cls });
+      loader.innerHTML = innerHtml;
       container.appendChild(loader);
+
+      // Loading timeout: after 30s, show a retry prompt if still loading
+      var timeoutId = setTimeout(function() {
+        if (loader.parentNode && loader.classList.contains('loading-spinner')) {
+          loader.innerHTML =
+            '<div class="loading-timeout">' +
+              '<div style="font-size:20px;margin-bottom:8px;">\u23F3</div>' +
+              '<div>This is taking longer than expected.</div>' +
+              '<button onclick="location.reload()">Reload page</button>' +
+            '</div>';
+        }
+      }, 30000);
+      loader._loadingTimeout = timeoutId;
+      return loader;
+    }
+
+    /** Clears loading state and cancels timeout if present */
+    function clearLoading(loaderOrContainer) {
+      if (!loaderOrContainer) return;
+      var loader = loaderOrContainer.classList && loaderOrContainer.classList.contains('loading-spinner')
+        ? loaderOrContainer
+        : loaderOrContainer.querySelector('.loading-spinner');
+      if (loader && loader._loadingTimeout) {
+        clearTimeout(loader._loadingTimeout);
+        loader._loadingTimeout = null;
+      }
     }
 
     function handleLogout() {
