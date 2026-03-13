@@ -17,7 +17,7 @@ describe('08b function existence', () => {
     'getDesktopSearchLocations', 'getDesktopSearchData',
     'navigateToSearchResult', 'viewActiveGrievances',
     'searchDashboard', 'quickSearchDashboard', 'advancedSearch',
-    'getDepartmentList', 'getMemberList', 'getCalcValue',
+    'getDepartmentList', 'getMemberList',
     'generateSelectedChart',
     'createGaugeStyleChart_', 'createScorecardChart_',
     'createTrendLineChart_', 'createAreaChart_', 'createComboChart_',

@@ -105,69 +105,7 @@ function toRanks_(arr) {
   return ranks;
 }
 
-/**
- * Calculates a simple chi-square statistic for a 2D contingency table.
- * Used for categorical-vs-categorical associations (e.g., location vs outcome).
- *
- * @param {Object} contingency - { rowKey: { colKey: count } }
- * @returns {Object} { chiSquare, cramersV, degreesOfFreedom }
- */
-function chiSquareTest_(contingency) {
-  var rowKeys = Object.keys(contingency);
-  if (rowKeys.length < 2) return { chiSquare: 0, cramersV: 0, degreesOfFreedom: 0 };
-
-  // Collect all column keys
-  var colKeySet = {};
-  for (var r = 0; r < rowKeys.length; r++) {
-    var cols = contingency[rowKeys[r]];
-    for (var c in cols) {
-      if (cols.hasOwnProperty(c)) colKeySet[c] = true;
-    }
-  }
-  var colKeys = Object.keys(colKeySet);
-  if (colKeys.length < 2) return { chiSquare: 0, cramersV: 0, degreesOfFreedom: 0 };
-
-  // Build observed matrix and marginals
-  var rowTotals = [];
-  var colTotals = new Array(colKeys.length);
-  for (var ci = 0; ci < colKeys.length; ci++) colTotals[ci] = 0;
-  var grandTotal = 0;
-
-  var observed = [];
-  for (var ri = 0; ri < rowKeys.length; ri++) {
-    var row = [];
-    var rowSum = 0;
-    for (var cj = 0; cj < colKeys.length; cj++) {
-      var val = (contingency[rowKeys[ri]] && contingency[rowKeys[ri]][colKeys[cj]]) || 0;
-      row.push(val);
-      rowSum += val;
-      colTotals[cj] += val;
-    }
-    observed.push(row);
-    rowTotals.push(rowSum);
-    grandTotal += rowSum;
-  }
-
-  if (grandTotal === 0) return { chiSquare: 0, cramersV: 0, degreesOfFreedom: 0 };
-
-  // Calculate chi-square
-  var chiSq = 0;
-  for (var ri2 = 0; ri2 < rowKeys.length; ri2++) {
-    for (var cj2 = 0; cj2 < colKeys.length; cj2++) {
-      var expected = (rowTotals[ri2] * colTotals[cj2]) / grandTotal;
-      if (expected > 0) {
-        var diff = observed[ri2][cj2] - expected;
-        chiSq += (diff * diff) / expected;
-      }
-    }
-  }
-
-  var df = (rowKeys.length - 1) * (colKeys.length - 1);
-  var minDim = Math.min(rowKeys.length - 1, colKeys.length - 1);
-  var cramersV = minDim > 0 ? Math.sqrt(chiSq / (grandTotal * minDim)) : 0;
-
-  return { chiSquare: Math.round(chiSq * 100) / 100, cramersV: Math.round(cramersV * 1000) / 1000, degreesOfFreedom: df };
-}
+// chiSquareTest_ removed — dead code cleanup v4.25.11
 
 /**
  * Classifies correlation strength and returns a plain-language label.
@@ -212,38 +150,7 @@ function classifyCorrelation_(r, n) {
 // DATA EXTRACTION HELPERS
 // ============================================================================
 
-/**
- * Extracts paired numeric arrays from per-group aggregate data.
- * Used to build [x, y] pairs from objects like { "Location A": { rate: 0.6, count: 10 }, ... }
- *
- * @param {Object} groupedData - Keyed object with numeric fields
- * @param {string} fieldX - Field name for X dimension
- * @param {string} fieldY - Field name for Y dimension
- * @param {number} [minCount] - Minimum sample size per group to include
- * @returns {Object} { x: number[], y: number[], labels: string[], n: number }
- * @private
- */
-function extractPairs_(groupedData, fieldX, fieldY, minCount) {
-  minCount = minCount || 1;
-  var x = [], y = [], labels = [];
-
-  for (var key in groupedData) {
-    if (!groupedData.hasOwnProperty(key)) continue;
-    var group = groupedData[key];
-    var count = group.count || group.n || 1;
-    if (count < minCount) continue;
-
-    var valX = parseFloat(group[fieldX]);
-    var valY = parseFloat(group[fieldY]);
-    if (isNaN(valX) || isNaN(valY)) continue;
-
-    x.push(valX);
-    y.push(valY);
-    labels.push(key);
-  }
-
-  return { x: x, y: y, labels: labels, n: x.length };
-}
+// extractPairs_ removed — dead code cleanup v4.25.11
 
 
 // ============================================================================

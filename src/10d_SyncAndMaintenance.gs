@@ -2,68 +2,7 @@
 // ENHANCED VISUAL FORMATTING - Gradient Heatmaps
 // ============================================================================
 
-/**
- * Applies gradient heatmap conditional formatting to numeric columns
- * Creates smooth color transitions instead of solid fills
- * Applies to: Days Open, Days to Deadline columns in Grievance Log
- */
-function applyGradientHeatmaps() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Grievance Log sheet not found.');
-    return;
-  }
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    ss.toast('No data to format', 'ℹ️ Info', 3);
-    return;
-  }
-
-  // Get existing rules to preserve them
-  var existingRules = sheet.getConditionalFormatRules();
-
-  // Days Open column (column S = 19)
-  var daysOpenCol = getColumnLetter(GRIEVANCE_COLS.DAYS_OPEN);
-  var daysOpenRange = sheet.getRange(daysOpenCol + '2:' + daysOpenCol + lastRow);
-
-  // Days to Deadline column (column U = 21)
-  var daysToDeadlineCol = getColumnLetter(GRIEVANCE_COLS.DAYS_TO_DEADLINE);
-  var deadlineRange = sheet.getRange(daysToDeadlineCol + '2:' + daysToDeadlineCol + lastRow);
-
-  // Create gradient rule for Days Open (Green = low/good, Red = high/bad)
-  // Lower days open is better
-  var daysOpenGradient = SpreadsheetApp.newConditionalFormatRule()
-    .setGradientMinpointWithValue(COLORS.GRADIENT_LOW, SpreadsheetApp.InterpolationType.NUMBER, '0')
-    .setGradientMidpointWithValue(COLORS.GRADIENT_MID_LOW, SpreadsheetApp.InterpolationType.NUMBER, '30')
-    .setGradientMaxpointWithValue(COLORS.GRADIENT_HIGH, SpreadsheetApp.InterpolationType.NUMBER, '90')
-    .setRanges([daysOpenRange])
-    .build();
-
-  // Create gradient rule for Days to Deadline (Green = high/good, Red = low/urgent)
-  // More days remaining is better
-  var deadlineGradient = SpreadsheetApp.newConditionalFormatRule()
-    .setGradientMinpointWithValue(COLORS.GRADIENT_HIGH, SpreadsheetApp.InterpolationType.NUMBER, '0')
-    .setGradientMidpointWithValue(COLORS.GRADIENT_MID, SpreadsheetApp.InterpolationType.NUMBER, '7')
-    .setGradientMaxpointWithValue(COLORS.GRADIENT_LOW, SpreadsheetApp.InterpolationType.NUMBER, '14')
-    .setRanges([deadlineRange])
-    .build();
-
-  // H14: Filter out existing gradient rules targeting our columns before adding new ones
-  var heatmapCols = [GRIEVANCE_COLS.DAYS_OPEN, GRIEVANCE_COLS.DAYS_TO_DEADLINE];
-  var filtered = existingRules.filter(function(r) {
-    var ranges = r.getRanges();
-    if (!ranges || ranges.length === 0) return true;
-    var col = ranges[0].getColumn();
-    return heatmapCols.indexOf(col) === -1;
-  });
-  filtered.push(daysOpenGradient, deadlineGradient);
-  sheet.setConditionalFormatRules(filtered);
-
-  ss.toast('Gradient heatmaps applied to Days Open & Days to Deadline columns!', '🎨 Heatmaps Applied', 5);
-}
+// applyGradientHeatmaps removed — dead code cleanup v4.25.11
 
 /**
  * Applies gradient heatmap to Win Rate columns across all steward performance sections
@@ -829,18 +768,7 @@ function repairMemberCheckboxes() {
   Logger.log('Repaired checkboxes for ' + (lastRow - 1) + ' member rows');
 }
 
-/**
- * Repair all checkboxes in both sheets
- */
-function repairAllCheckboxes() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Repairing checkboxes...', '🔧 Repair', 2);
-
-  repairGrievanceCheckboxes();
-  repairMemberCheckboxes();
-
-  ss.toast('All checkboxes repaired!', '✅ Success', 3);
-}
+// repairAllCheckboxes removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // ENGAGEMENT TRACKING SYNC FUNCTIONS
@@ -864,8 +792,7 @@ function isSyncDebounced_(syncName) {
   cache.put(key, 'running', 30);
   return false;
 }
-/** Returns true only for real, non-NaN Date objects. */
-function isValidDate_(val) { return (val instanceof Date) && !isNaN(val.getTime()); }
+// isValidDate_ removed — dead code cleanup v4.25.11
 /** Builds {memberId: true} lookup from Member Directory data (skips header row).
  *  M-68: Explicitly starts at index 1 to skip the header row. Also validates
  *  that the value looks like a member ID (not a header label) as a safeguard. */

@@ -1,8 +1,8 @@
 /**
  * Tests for 02_DataManagers.gs
  *
- * Covers: validateGrievanceData, addBusinessDays, getDaysUntilDeadline,
- * calculateInitialDeadlines, calculateNextStepDeadline, calculateResponseDeadline,
+ * Covers: validateGrievanceData, addBusinessDays,
+ * calculateInitialDeadlines, calculateResponseDeadline,
  * findExistingMember, getGrievanceStats, addMember, getMemberById, searchMembers.
  */
 
@@ -173,101 +173,18 @@ describe('addBusinessDays', () => {
 });
 
 // ============================================================================
-// getDaysUntilDeadline
-// ============================================================================
-
-describe('getDaysUntilDeadline', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('returns positive days for future deadline', () => {
-    const future = new Date();
-    future.setDate(future.getDate() + 10);
-    const result = getDaysUntilDeadline(future);
-    expect(result).toBe(10);
-  });
-
-  test('returns negative days for past deadline', () => {
-    const past = new Date();
-    past.setDate(past.getDate() - 5);
-    const result = getDaysUntilDeadline(past);
-    expect(result).toBe(-5);
-  });
-
-  test('returns 0 for today', () => {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    const result = getDaysUntilDeadline(today);
-    expect(result).toBe(0);
-  });
-
-  test('returns 1 for tomorrow', () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(12, 0, 0, 0);
-    const result = getDaysUntilDeadline(tomorrow);
-    expect(result).toBe(1);
-  });
-
-  // TEST-04: DST transition edge cases — verifies Math.round fix (was Math.ceil)
-  // Spring forward: clocks jump 2:00→3:00 AM, so a "day" is only 23 hours
-  // Fall back: clocks jump 2:00→1:00 AM, so a "day" is 25 hours
-  test('handles spring-forward DST transition (23-hour day)', () => {
-    // Simulate: deadline is 7 days after a spring-forward date
-    // On the spring-forward day, 7 calendar days = 7*24 - 1 = 167 hours
-    const now = new Date(2026, 2, 8, 10, 0, 0, 0); // Mar 8 2026 (day before spring forward)
-    const deadline = new Date(2026, 2, 15, 10, 0, 0, 0); // Mar 15 2026
-    jest.spyOn(Date, 'now').mockReturnValue(now.getTime());
-    // Override "new Date()" to return our mocked "now"
-    const origDate = global.Date;
-    const mockDate = function (...args) {
-      if (args.length === 0) return new origDate(now.getTime());
-      return new origDate(...args);
-    };
-    mockDate.now = () => now.getTime();
-    mockDate.prototype = origDate.prototype;
-    global.Date = mockDate;
-    try {
-      const result = getDaysUntilDeadline(deadline);
-      expect(result).toBe(7);
-    } finally {
-      global.Date = origDate;
-    }
-  });
-
-  test('handles fall-back DST transition (25-hour day)', () => {
-    // Nov 1 2026 is the fall-back date
-    const now = new Date(2026, 10, 1, 10, 0, 0, 0); // Nov 1 2026
-    const deadline = new Date(2026, 10, 8, 10, 0, 0, 0); // Nov 8 2026
-    const origDate = global.Date;
-    const mockDate = function (...args) {
-      if (args.length === 0) return new origDate(now.getTime());
-      return new origDate(...args);
-    };
-    mockDate.now = () => now.getTime();
-    mockDate.prototype = origDate.prototype;
-    global.Date = mockDate;
-    try {
-      const result = getDaysUntilDeadline(deadline);
-      expect(result).toBe(7);
-    } finally {
-      global.Date = origDate;
-    }
-  });
-});
-
-// ============================================================================
 // calculateInitialDeadlines
 // ============================================================================
 
 describe('calculateInitialDeadlines', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('returns step1Due using DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE', () => {
+  test('returns step1Due using getDeadlineRules().STEP_1.DAYS_FOR_RESPONSE', () => {
     const filingDate = new Date(2025, 0, 6); // Monday
     const result = calculateInitialDeadlines(filingDate);
     expect(result).toHaveProperty('step1Due');
     // 7 business days from Jan 6 = Jan 15 (Wednesday)
-    const expected = addBusinessDays(filingDate, DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE);
+    const expected = addBusinessDays(filingDate, getDeadlineRules().STEP_1.DAYS_FOR_RESPONSE);
     expect(result.step1Due.getTime()).toBe(expected.getTime());
   });
 
@@ -285,50 +202,6 @@ describe('calculateInitialDeadlines', () => {
 });
 
 // ============================================================================
-// calculateNextStepDeadline
-// ============================================================================
-
-describe('calculateNextStepDeadline', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('step 1 uses STEP_2.DAYS_TO_APPEAL', () => {
-    const stepDate = new Date(2025, 0, 6); // Monday
-    const result = calculateNextStepDeadline(1, stepDate);
-    const expected = addBusinessDays(stepDate, DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL);
-    expect(result.getTime()).toBe(expected.getTime());
-  });
-
-  test('step 2 uses STEP_3.DAYS_TO_APPEAL', () => {
-    const stepDate = new Date(2025, 0, 6);
-    const result = calculateNextStepDeadline(2, stepDate);
-    const expected = addBusinessDays(stepDate, DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL);
-    expect(result.getTime()).toBe(expected.getTime());
-  });
-
-  test('step 3 uses ARBITRATION.DAYS_TO_DEMAND', () => {
-    const stepDate = new Date(2025, 0, 6);
-    const result = calculateNextStepDeadline(3, stepDate);
-    const expected = addBusinessDays(stepDate, DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND);
-    expect(result.getTime()).toBe(expected.getTime());
-  });
-
-  test('returns null for invalid step (0)', () => {
-    const result = calculateNextStepDeadline(0, new Date());
-    expect(result).toBeNull();
-  });
-
-  test('returns null for invalid step (4)', () => {
-    const result = calculateNextStepDeadline(4, new Date());
-    expect(result).toBeNull();
-  });
-
-  test('returns a Date for valid steps', () => {
-    const result = calculateNextStepDeadline(1, new Date(2025, 0, 6));
-    expect(result).toBeInstanceOf(Date);
-  });
-});
-
-// ============================================================================
 // calculateResponseDeadline
 // ============================================================================
 
@@ -338,21 +211,21 @@ describe('calculateResponseDeadline', () => {
   test('step 1 uses STEP_1.DAYS_FOR_RESPONSE (7 business days)', () => {
     const stepDate = new Date(2025, 0, 6);
     const result = calculateResponseDeadline(1, stepDate);
-    const expected = addBusinessDays(stepDate, DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE);
+    const expected = addBusinessDays(stepDate, getDeadlineRules().STEP_1.DAYS_FOR_RESPONSE);
     expect(result.getTime()).toBe(expected.getTime());
   });
 
   test('step 2 uses STEP_2.DAYS_FOR_RESPONSE (14 business days)', () => {
     const stepDate = new Date(2025, 0, 6);
     const result = calculateResponseDeadline(2, stepDate);
-    const expected = addBusinessDays(stepDate, DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE);
+    const expected = addBusinessDays(stepDate, getDeadlineRules().STEP_2.DAYS_FOR_RESPONSE);
     expect(result.getTime()).toBe(expected.getTime());
   });
 
   test('step 3 uses STEP_3.DAYS_FOR_RESPONSE (21 business days)', () => {
     const stepDate = new Date(2025, 0, 6);
     const result = calculateResponseDeadline(3, stepDate);
-    const expected = addBusinessDays(stepDate, DEADLINE_RULES.STEP_3.DAYS_FOR_RESPONSE);
+    const expected = addBusinessDays(stepDate, getDeadlineRules().STEP_3.DAYS_FOR_RESPONSE);
     expect(result.getTime()).toBe(expected.getTime());
   });
 

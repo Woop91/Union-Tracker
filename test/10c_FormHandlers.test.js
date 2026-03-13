@@ -14,14 +14,10 @@ loadSources([
 
 describe('10c function existence', () => {
   const required = [
-    'getFormFieldIds_', 'saveFormFieldIds_', 'getCurrentStewardInfo_',
-    'getExistingGrievanceIds_', 'createGrievanceFolderFromData_',
+    'getCurrentStewardInfo_',
     'sanitizeFolderName_', 'shareWithCoordinators_',
-    'testGrievanceFormSubmission', 'refreshMemberDirectoryFormulas',
-    'rebuildDashboard', 'refreshAllFormulas',
-    'simplifyTimelineView', 'showFullTimelineView',
-    'setupTimelineColumnGroups', 'applyStepHighlighting',
-    'freezeKeyColumns', 'unfreezeAllColumns'
+    'refreshMemberDirectoryFormulas',
+    'rebuildDashboard', 'refreshAllFormulas'
   ];
 
   required.forEach(fn => {

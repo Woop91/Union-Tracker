@@ -2,8 +2,8 @@
  * Tests for 01_Core.gs
  *
  * Covers column constant validation (MEMBER_COLS, GRIEVANCE_COLS),
- * version consistency, DEADLINE_RULES, header arrays, sanitize functions,
- * and error handling.
+ * version consistency, error handling constants,
+ * and GRIEVANCE_OUTCOMES.
  */
 
 require('./gas-mock');
@@ -139,43 +139,6 @@ describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => 
   });
 });
 
-// ============================================================================
-// DEADLINE_RULES consistency with TIME_CONSTANTS.DEADLINE_DAYS
-// ============================================================================
-
-describe('DEADLINE_RULES ↔ TIME_CONSTANTS.DEADLINE_DAYS consistency', () => {
-  test('STEP_1 response matches STEP1_RESPONSE', () => {
-    expect(DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE)
-      .toBe(TIME_CONSTANTS.DEADLINE_DAYS.STEP1_RESPONSE);
-  });
-
-  test('STEP_2 appeal matches STEP2_APPEAL', () => {
-    expect(DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL)
-      .toBe(TIME_CONSTANTS.DEADLINE_DAYS.STEP2_APPEAL);
-  });
-
-  test('STEP_2 response matches STEP2_RESPONSE', () => {
-    expect(DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE)
-      .toBe(TIME_CONSTANTS.DEADLINE_DAYS.STEP2_RESPONSE);
-  });
-
-  test('STEP_3 appeal matches STEP3_APPEAL', () => {
-    expect(DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL)
-      .toBe(TIME_CONSTANTS.DEADLINE_DAYS.STEP3_APPEAL);
-  });
-
-  test('DEADLINE_RULES has all required steps', () => {
-    expect(DEADLINE_RULES.STEP_1).toBeDefined();
-    expect(DEADLINE_RULES.STEP_2).toBeDefined();
-    expect(DEADLINE_RULES.STEP_3).toBeDefined();
-    expect(DEADLINE_RULES.ARBITRATION).toBeDefined();
-  });
-
-  test('ARBITRATION days to demand is 30', () => {
-    expect(DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND).toBe(30);
-  });
-});
-
 // NOTE: getMemberHeaders/getGrievanceHeaders header↔position tests
 // are covered in columns.test.js (Header map → COLS consistency).
 
@@ -200,42 +163,8 @@ describe('SHEETS constant', () => {
 });
 
 // ============================================================================
-// sanitizeForQuery
-// ============================================================================
-
-describe('sanitizeForQuery', () => {
-  test('escapes single quotes', () => {
-    expect(sanitizeForQuery("O'Brien")).toBe("O''Brien");
-  });
-
-  test('escapes backslashes', () => {
-    expect(sanitizeForQuery("a\\b")).toBe("a\\\\b");
-  });
-
-  test('handles empty input', () => {
-    expect(sanitizeForQuery('')).toBe('');
-    expect(sanitizeForQuery(null)).toBe('');
-  });
-});
-
-// ============================================================================
 // Error handling utilities
 // ============================================================================
-
-describe('withErrorHandling', () => {
-  test('returns wrapped function', () => {
-    const fn = () => 42;
-    const wrapped = withErrorHandling(fn, 'test');
-    expect(typeof wrapped).toBe('function');
-    expect(wrapped()).toBe(42);
-  });
-
-  test('catches errors and returns null', () => {
-    const fn = () => { throw new Error('boom'); };
-    const wrapped = withErrorHandling(fn, 'test');
-    expect(wrapped()).toBeNull();
-  });
-});
 
 describe('ERROR_LEVEL', () => {
   test('has all severity levels', () => {
@@ -244,23 +173,6 @@ describe('ERROR_LEVEL', () => {
     expect(ERROR_LEVEL.WARNING).toBe('WARNING');
     expect(ERROR_LEVEL.ERROR).toBe('ERROR');
     expect(ERROR_LEVEL.CRITICAL).toBe('CRITICAL');
-  });
-});
-
-describe('isVersionCompatible', () => {
-  test('accepts same major version', () => {
-    expect(isVersionCompatible('4.0.0')).toBe(true);
-    expect(isVersionCompatible('4.9.9')).toBe(true);
-  });
-
-  test('rejects different major version', () => {
-    expect(isVersionCompatible('3.0.0')).toBe(false);
-    expect(isVersionCompatible('5.0.0')).toBe(false);
-  });
-
-  test('rejects empty/null', () => {
-    expect(isVersionCompatible('')).toBe(false);
-    expect(isVersionCompatible(null)).toBe(false);
   });
 });
 

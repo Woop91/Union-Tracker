@@ -18,7 +18,7 @@ describe('04c function existence', () => {
     'getInteractiveOverviewData', 'getConfigDropdownValues',
     'getInteractiveMemberData', 'getInteractiveGrievanceData',
     'getMyStewardCases', 'getInteractiveAnalyticsData',
-    'getInteractiveResourceLinks', 'getInteractiveMemberFilters',
+    'getInteractiveResourceLinks',
     'saveInteractiveMember'
   ];
 

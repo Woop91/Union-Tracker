@@ -2,8 +2,7 @@
  * Tests for 10_Code (split into 10a-10d modules)
  *
  * Covers form config constants, sanitizeFolderName_, padRight,
- * getExistingGrievanceIds_, getCurrentStewardInfo_,
- * createGrievanceFolderFromData_, and sheet creation smoke tests.
+ * getCurrentStewardInfo_, and sheet creation smoke tests.
  */
 
 require('./gas-mock');
@@ -195,39 +194,6 @@ describe('padRight', () => {
 });
 
 // ============================================================================
-// getExistingGrievanceIds_
-// ============================================================================
-
-describe('getExistingGrievanceIds_', () => {
-  test('returns an object mapping existing IDs from sheet data', () => {
-    // Build mock data: header row + data rows with grievance IDs
-    const idCol = GRIEVANCE_COLS.GRIEVANCE_ID - 1;
-    const headerRow = new Array(20).fill('Header');
-    const row1 = new Array(20).fill('');
-    row1[idCol] = 'GRV-001';
-    const row2 = new Array(20).fill('');
-    row2[idCol] = 'GRV-002';
-    const row3 = new Array(20).fill('');
-    row3[idCol] = '';  // empty ID should be skipped
-
-    const mockSheet = createMockSheet('Grievance Log', [headerRow, row1, row2, row3]);
-    const result = getExistingGrievanceIds_(mockSheet);
-
-    expect(result['GRV-001']).toBe(true);
-    expect(result['GRV-002']).toBe(true);
-    expect(Object.keys(result).length).toBe(2);
-  });
-
-  test('returns empty object for sheet with only header row', () => {
-    const headerRow = new Array(20).fill('Header');
-    const mockSheet = createMockSheet('Grievance Log', [headerRow]);
-    const result = getExistingGrievanceIds_(mockSheet);
-
-    expect(Object.keys(result).length).toBe(0);
-  });
-});
-
-// ============================================================================
 // getCurrentStewardInfo_
 // ============================================================================
 
@@ -283,55 +249,6 @@ describe('getCurrentStewardInfo_', () => {
   });
 });
 
-// ============================================================================
-// createGrievanceFolderFromData_ (Drive mock)
-// ============================================================================
-
-describe('createGrievanceFolderFromData_', () => {
-  beforeEach(() => {
-    // Reset DriveApp mocks
-    const mockSubFolder = {
-      getId: jest.fn(() => 'sub-folder-id'),
-      getUrl: jest.fn(() => 'https://drive.google.com/sub-folder'),
-      setDescription: jest.fn(),
-      createFolder: jest.fn(),
-      getFoldersByName: jest.fn(() => ({ hasNext: jest.fn(() => false) })),
-      addEditor: jest.fn()
-    };
-
-    const mockRootFolder = {
-      getId: jest.fn(() => 'root-folder-id'),
-      getUrl: jest.fn(() => 'https://drive.google.com/root'),
-      getFoldersByName: jest.fn(() => ({ hasNext: jest.fn(() => false) })),
-      createFolder: jest.fn(() => mockSubFolder)
-    };
-
-    // Mock getOrCreateDashboardFolder_ to return our mock root
-    global.getOrCreateDashboardFolder_ = jest.fn(() => mockRootFolder);
-    // Mock shareWithCoordinators_ to avoid side effects
-    global.shareWithCoordinators_ = jest.fn();
-  });
-
-  test('returns object with id and url on success', () => {
-    const result = createGrievanceFolderFromData_(
-      'GRV-001', 'MBR-001', 'John', 'Smith', 'Discipline', '2026-01-15'
-    );
-    expect(result).toHaveProperty('id');
-    expect(result).toHaveProperty('url');
-  });
-
-  test('returns empty id/url when folder creation throws', () => {
-    global.getOrCreateDashboardFolder_ = jest.fn(() => {
-      throw new Error('Drive error');
-    });
-
-    const result = createGrievanceFolderFromData_(
-      'GRV-001', 'MBR-001', 'John', 'Smith', 'Discipline', '2026-01-15'
-    );
-    expect(result.id).toBe('');
-    expect(result.url).toBe('');
-  });
-});
 
 // ============================================================================
 // Sheet creation smoke tests

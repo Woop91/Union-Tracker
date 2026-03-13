@@ -263,13 +263,7 @@ function startPomodoroTimer() {
   ui.showModelessDialog(html, '🍅 Pomodoro Timer');
 }
 
-/**
- * Called when Pomodoro timer ends (placeholder for trigger-based implementation)
- */
-function onPomodoroEnd_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('🍅 Pomodoro complete! Take a 5-minute break.', 'Break Time!', 30);
-}
+// onPomodoroEnd_ removed — dead code cleanup v4.25.11
 
 // ==================== QUICK CAPTURE NOTEPAD ====================
 
@@ -318,20 +312,7 @@ function clearQuickCaptureNotes() {
   }
 }
 
-/**
- * Gets metadata about the quick capture notes
- * @returns {Object} Object with lastSaved timestamp and character count
- */
-function getQuickCaptureMetadata() {
-  var userProps = PropertiesService.getUserProperties();
-  var notes = userProps.getProperty('quickCaptureNotes') || '';
-  var lastSaved = userProps.getProperty('quickCaptureLastSaved') || null;
-  return {
-    charCount: notes.length,
-    wordCount: notes.trim() ? notes.trim().split(/\s+/).length : 0,
-    lastSaved: lastSaved
-  };
-}
+// getQuickCaptureMetadata removed — dead code cleanup v4.25.11
 
 /**
  * Shows the Quick Capture Notepad dialog
@@ -433,17 +414,7 @@ function showQuickCaptureNotepad() {
   SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture Notepad');
 }
 
-/**
- * Shows import dialog for bulk member import from CSV
- * Provides paste area for CSV data with preview and validation
- * NOTE: Duplicate exists in 09_Main.gs - keeping both for compatibility
- */
-function showImportDialog_UIService_() {
-  var html = HtmlService.createHtmlOutput(getImportDialogHtml_())
-    .setWidth(700)
-    .setHeight(600);
-  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members from CSV');
-}
+// showImportDialog_UIService_ removed — dead code cleanup v4.25.11
 
 /**
  * Generates HTML for import dialog
@@ -671,95 +642,9 @@ function mapImportColumns_(headers) {
   return map;
 }
 
-/**
- * Shows export dialog for member directory export
- * Creates downloadable CSV file
- * NOTE: Duplicate exists in 09_Main.gs - keeping both for compatibility
- */
-function showExportDialog_UIService_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+// showExportDialog_UIService_ removed — dead code cleanup v4.25.11
 
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
-    return;
-  }
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    SpreadsheetApp.getUi().alert('No member data to export.');
-    return;
-  }
-
-  // Get data, excluding PII and sensitive columns (PIN_HASH, STREET_ADDRESS, CITY, STATE)
-  var allData = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
-  var excludeCols = PII_MEMBER_COLS.concat([MEMBER_COLS.PIN_HASH]);
-  var data = allData.map(function(row) {
-    return row.filter(function(_, colIdx) {
-      return excludeCols.indexOf(colIdx + 1) === -1;
-    });
-  });
-
-  // Convert to CSV
-  var csv = data.map(function(row) {
-    return row.map(function(cell) {
-      var str = String(cell === null || cell === undefined ? '' : cell);
-      // Escape quotes and wrap in quotes if contains comma, quote, or newline
-      if (str.indexOf(',') >= 0 || str.indexOf('"') >= 0 || str.indexOf('\n') >= 0) {
-        return '"' + str.replace(/"/g, '""') + '"';
-      }
-      return str;
-    }).join(',');
-  }).join('\n');
-
-  // Create temporary file in Drive
-  var fileName = 'MemberDirectory_Export_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmm') + '.csv';
-  var blob = Utilities.newBlob(csv, 'text/csv', fileName);
-  var file = DriveApp.createFile(blob);
-
-  // C4: Restrict sharing to private — CSV contains member PII
-  file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-
-  // Show download link
-  var html = HtmlService.createHtmlOutput(
-    '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
-    'body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }' +
-    '.success { color: #137333; font-size: 48px; margin-bottom: 10px; }' +
-    'h2 { color: #333; margin-bottom: 20px; }' +
-    '.info { background: #e8f0fe; padding: 15px; border-radius: 8px; margin: 20px 0; }' +
-    '.btn { display: inline-block; background: #1a73e8; color: white; padding: 12px 24px; ' +
-    'text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px; }' +
-    '.btn:hover { background: #1557b0; }' +
-    '.btn-secondary { background: #5f6368; }' +
-    '.note { color: #666; font-size: 12px; margin-top: 20px; }' +
-    '</style>' +
-    '<div class="success">✅</div>' +
-    '<h2>Export Ready!</h2>' +
-    '<div class="info">' +
-    '<strong>' + (lastRow - 1) + ' members</strong> exported to CSV<br>' +
-    'File: ' + escapeHtml(fileName) +
-    '</div>' +
-    '<a href="' + escapeHtml(file.getDownloadUrl()) + '" target="_blank" class="btn">📥 Download CSV</a>' +
-    '<a href="' + escapeHtml(file.getUrl()) + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
-    '<p class="note">File will be available in your Google Drive.<br>Link expires when you close this dialog.</p>' +
-    '<script>setTimeout(function() { google.script.host.setHeight(350); }, 100);</script>'
-  ).setWidth(450).setHeight(350);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '📤 Export Complete');
-}
-
-function setBreakReminders(minutes) {
-  var settings = getADHDSettings();
-  settings.breakInterval = minutes;
-  saveADHDSettings(settings);
-  ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'showBreakReminder') ScriptApp.deleteTrigger(t);
-  });
-  if (minutes > 0) {
-    ScriptApp.newTrigger('showBreakReminder').timeBased().everyMinutes(minutes).create();
-    SpreadsheetApp.getActiveSpreadsheet().toast('✅ Break reminders: every ' + minutes + ' min', 'Comfort View', 3);
-  }
-}
+// setBreakReminders removed — dead code cleanup v4.25.11
 
 function showBreakReminder() {
   SpreadsheetApp.getActiveSpreadsheet().toast('💆 Time for a break! Stretch and rest your eyes.', 'Break Reminder', 10);

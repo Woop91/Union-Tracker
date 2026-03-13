@@ -52,9 +52,9 @@ function DIAGNOSE_SETUP() {
   };
 
   var checkedValues = {};
-  for (var key in SHEET_NAMES) {
+  for (var key in SHEETS) {
     if (skipKeys[key]) continue;
-    var sheetName = SHEET_NAMES[key];
+    var sheetName = SHEETS[key];
     // Hidden sheets (underscore prefix) are checked separately in Check 2
     if (sheetName.charAt(0) === '_') continue;
     // Avoid reporting the same sheet name twice (e.g. aliases)
@@ -714,20 +714,7 @@ function setCachedData(key, data, ttl) {
   }
 }
 
-/**
- * Invalidates a specific cache key
- * @param {string} key - Cache key to invalidate
- * @returns {void}
- */
-function invalidateCache(key) {
-  try {
-    CacheService.getScriptCache().remove(key);
-    PropertiesService.getScriptProperties().deleteProperty(key);
-    if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('Cache invalidated: ' + key);
-  } catch (e) {
-    Logger.log('Invalidate error for ' + key + ': ' + e.message);
-  }
-}
+// invalidateCache removed — dead code cleanup v4.25.11
 
 /**
  * Invalidates all caches
@@ -807,21 +794,7 @@ function warmWebAppCaches_() {
   }
 }
 
-/**
- * A1: Installs a time-based trigger that warms web app caches every 5 minutes.
- * Run once from the menu. Prevents cold-cache penalties for web app users.
- */
-function setupWebAppCacheWarmingTrigger() {
-  // Remove existing to avoid duplicates
-  ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'warmWebAppCaches_') ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger('warmWebAppCaches_')
-    .timeBased()
-    .everyMinutes(5)
-    .create();
-  SpreadsheetApp.getActiveSpreadsheet().toast('Web app cache warming trigger installed (every 5 min)', 'Setup', 5);
-}
+// setupWebAppCacheWarmingTrigger removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // CACHED DATA LOADERS
@@ -1109,65 +1082,11 @@ function recordAction(type, description, beforeState, afterState) {
   saveUndoHistory(history);
 }
 
-/**
- * Records a cell edit action
- * @param {number} row - Row number
- * @param {number} col - Column number
- * @param {*} oldValue - Value before edit
- * @param {*} newValue - Value after edit
- * @returns {void}
- */
-function recordCellEdit(row, col, oldValue, newValue) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return;
-  var sheet = ss.getActiveSheet();
-  var colName = sheet.getRange(1, col).getValue();
+// recordCellEdit removed — dead code cleanup v4.25.11
 
-  recordAction(
-    'EDIT_CELL',
-    'Edited ' + colName + ' in row ' + row,
-    { row: row, col: col, value: oldValue, sheet: sheet.getName() },
-    { row: row, col: col, value: newValue, sheet: sheet.getName() }
-  );
-}
+// recordRowAddition removed — dead code cleanup v4.25.11
 
-/**
- * Records a row addition action
- * @param {number} row - Row number
- * @param {Array} rowData - Data in the new row
- * @returns {void}
- */
-function recordRowAddition(row, rowData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return;
-  var sheet = ss.getActiveSheet();
-
-  recordAction(
-    'ADD_ROW',
-    'Added row ' + row,
-    null,
-    { row: row, data: rowData, sheet: sheet.getName() }
-  );
-}
-
-/**
- * Records a row deletion action
- * @param {number} row - Row number
- * @param {Array} rowData - Data that was in the row
- * @returns {void}
- */
-function recordRowDeletion(row, rowData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return;
-  var sheet = ss.getActiveSheet();
-
-  recordAction(
-    'DELETE_ROW',
-    'Deleted row ' + row,
-    { row: row, data: rowData, sheet: sheet.getName() },
-    null
-  );
-}
+// recordRowDeletion removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // UNDO/REDO OPERATIONS
@@ -1228,18 +1147,7 @@ function undoToIndex(targetIndex) {
   }
 }
 
-/**
- * Redoes all actions up to a specific index
- * @param {number} targetIndex - Target index to redo to
- * @returns {void}
- */
-function redoToIndex(targetIndex) {
-  var history = getUndoHistory();
-  while (history.currentIndex <= targetIndex && history.currentIndex < history.actions.length) {
-    redoLastAction();
-    history = getUndoHistory();
-  }
-}
+// redoToIndex removed — dead code cleanup v4.25.11
 
 /**
  * Applies a saved state to the spreadsheet
@@ -1444,79 +1352,7 @@ function exportUndoHistoryToSheet() {
   return ss.getUrl() + '#gid=' + sheet.getSheetId();
 }
 
-/**
- * Shows the undo/redo panel
- * @returns {void}
- */
-function showUndoRedoPanel() {
-  var history = getUndoHistory();
-
-  var rows = history.actions.length === 0
-    ? '<tr><td colspan="5" style="text-align:center;padding:40px;color:#999">No actions recorded</td></tr>'
-    : history.actions.slice().reverse().map(function(a, i) {
-        var idx = history.actions.length - i;
-        var time = new Date(a.timestamp).toLocaleString();
-        var canUndo = idx <= history.currentIndex;
-
-        return '<tr>' +
-          '<td>' + idx + '</td>' +
-          '<td><span class="badge ' + escapeHtml(a.type.toLowerCase()) + '">' + escapeHtml(a.type) + '</span></td>' +
-          '<td>' + escapeHtml(a.description) + '</td>' +
-          '<td style="font-size:12px;color:#666">' + escapeHtml(time) + '</td>' +
-          '<td>' + (canUndo ? '<button onclick="undo(' + (idx - 1) + ')">↩️</button>' : '') + '</td>' +
-          '</tr>';
-      }).join('');
-
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
-    '<style>' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
-    '.container{background:white;padding:25px;border-radius:12px}' +
-    'h2{color:#7c3aed}' +
-    '.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0}' +
-    '.stat{background:#f8f9fa;padding:15px;border-radius:8px;text-align:center;border-left:4px solid #7c3aed}' +
-    '.num{font-size:32px;font-weight:bold;color:#7c3aed}' +
-    'table{width:100%;border-collapse:collapse;margin:20px 0}' +
-    'th{background:#7c3aed;color:white;padding:12px;text-align:left}' +
-    'td{padding:12px;border-bottom:1px solid #e0e0e0}' +
-    'button{background:#7c3aed;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;margin:2px}' +
-    '.badge{display:inline-block;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:bold}' +
-    '.edit_cell{background:#e3f2fd;color:#1976d2}' +
-    '.add_row{background:#e8f5e9;color:#388e3c}' +
-    '.delete_row{background:#ffebee;color:#d32f2f}' +
-    '.actions{margin:20px 0;padding:20px;background:#f8f9fa;border-radius:8px}' +
-    '.btn-danger{background:#ef4444}' +
-    '.btn-success{background:#10b981}' +
-    '</style></head><body>' +
-    '<div class="container">' +
-    '<h2>↩️ Undo/Redo History</h2>' +
-    '<div class="stats">' +
-    '<div class="stat"><div class="num">' + history.actions.length + '</div><div>Total Actions</div></div>' +
-    '<div class="stat"><div class="num">' + history.currentIndex + '</div><div>Current Position</div></div>' +
-    '<div class="stat"><div class="num">' + (history.actions.length - history.currentIndex) + '</div><div>Can Redo</div></div>' +
-    '</div>' +
-    '<div class="actions">' +
-    '<button onclick="performUndo()">↩️ Undo Last</button>' +
-    '<button onclick="performRedo()">↪️ Redo</button>' +
-    '<button class="btn-danger" onclick="clearHistory()">🗑️ Clear All</button>' +
-    '<button class="btn-success" onclick="exportHistory()">📥 Export</button>' +
-    '</div>' +
-    '<table>' +
-    '<tr><th>#</th><th>Type</th><th>Description</th><th>Time</th><th></th></tr>' +
-    rows +
-    '</table>' +
-    '</div>' +
-    '<script>' +
-    'function performUndo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).undoLastAction()}' +
-    'function performRedo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).redoLastAction()}' +
-    'function undo(i){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Undo failed: "+e.message)}).undoToIndex(i)}' +
-    'function clearHistory(){if(confirm("Clear all history?")){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Clear failed: "+e.message)}).clearUndoHistory()}}' +
-    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");if(/^https:\\/\\/docs\\.google\\.com\\//.test(url))window.open(url,"_blank");else alert("Invalid URL")}).withFailureHandler(function(e){alert("Export failed: "+e.message)}).exportUndoHistoryToSheet()}' +
-    '</script></body></html>'
-  ).setWidth(800).setHeight(600);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '↩️ Undo/Redo History');
-}
+// showUndoRedoPanel removed — dead code cleanup v4.25.11
 
 
 
@@ -1681,36 +1517,7 @@ function logAuditEvent(eventType, details) {
   }
 }
 
-/**
- * Gets recent audit log entries
- * @param {number} count - Number of entries to retrieve
- * @return {Array} Array of audit log entries
- */
-function getRecentAuditLogs(count) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
-
-  if (!auditSheet) return [];
-
-  const lastRow = auditSheet.getLastRow();
-  const startRow = Math.max(2, lastRow - count + 1);
-  const numRows = lastRow - startRow + 1;
-
-  if (numRows <= 0) return [];
-
-  // Read all columns including Integrity Hash
-  var numCols = EVENT_AUDIT_COLS.INTEGRITY_HASH;
-  const data = auditSheet.getRange(startRow, 1, numRows, numCols).getValues();
-
-  return data.map(row => ({
-    timestamp: row[EVENT_AUDIT_COLS.TIMESTAMP - 1],
-    eventType: row[EVENT_AUDIT_COLS.EVENT_TYPE - 1],
-    user: row[EVENT_AUDIT_COLS.USER - 1],
-    details: row[EVENT_AUDIT_COLS.DETAILS - 1],
-    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1],
-    integrityHash: row[EVENT_AUDIT_COLS.INTEGRITY_HASH - 1] || ''
-  })).reverse();
-}
+// getRecentAuditLogs removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // NUCLEAR OPTIONS (ADMIN ONLY)
@@ -2007,30 +1814,7 @@ function setupWeeklySnapshotTrigger() {
   );
 }
 
-/**
- * Sets up weekly Drive folder cleanup trigger.
- * Runs every Saturday at 3am to remove empty sub-folders for resolved grievances.
- */
-function setupWeeklyDriveCleanupTrigger() {
-  var triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === 'cleanupEmptyDriveFolders') {
-      ScriptApp.deleteTrigger(trigger);
-    }
-  });
-
-  ScriptApp.newTrigger('cleanupEmptyDriveFolders')
-    .timeBased()
-    .onWeekDay(ScriptApp.WeekDay.SATURDAY)
-    .atHour(3)
-    .create();
-
-  SpreadsheetApp.getUi().alert(
-    'Drive Cleanup Enabled',
-    'Empty Drive folders for resolved grievances will be cleaned up every Saturday at 3:00 AM.',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
-}
+// setupWeeklyDriveCleanupTrigger removed — dead code cleanup v4.25.11
 
 /**
  * Cleans up old export files from Drive.
@@ -2396,49 +2180,9 @@ function batchSetValues(sheet, updates) {
   });
 }
 
-/**
- * Batch write utility for a specific row - updates multiple columns in one operation
- * @param {Sheet} sheet - Target sheet
- * @param {number} row - Row number (1-indexed)
- * @param {Object} columnValues - Object mapping column numbers to values {col: value}
- */
-function batchSetRowValues(sheet, row, columnValues) {
-  var cols = Object.keys(columnValues);
-  if (cols.length === 0) return;
+// batchSetRowValues removed — dead code cleanup v4.25.11
 
-  // Find range bounds
-  var minCol = Math.min.apply(null, cols.map(Number));
-  var maxCol = Math.max.apply(null, cols.map(Number));
-  var numCols = maxCol - minCol + 1;
-
-  // Read current row data
-  var rowData = sheet.getRange(row, minCol, 1, numCols).getValues()[0];
-
-  // Apply updates
-  cols.forEach(function(col) {
-    var colNum = parseInt(col);
-    rowData[colNum - minCol] = columnValues[col];
-  });
-
-  // Write back in single operation
-  sheet.getRange(row, minCol, 1, numCols).setValues([rowData]);
-}
-
-/**
- * Batch append rows - adds multiple rows in a single operation
- * Much faster than multiple appendRow() calls
- * @param {Sheet} sheet - Target sheet
- * @param {Array<Array>} rows - 2D array of row data
- */
-function batchAppendRows(sheet, rows) {
-  if (!rows || rows.length === 0) return;
-
-  var lastRow = sheet.getLastRow();
-  var numCols = rows[0].length;
-
-  // Write all rows in a single operation
-  sheet.getRange(lastRow + 1, 1, rows.length, numCols).setValues(rows);
-}
+// batchAppendRows removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // ERROR HANDLING WITH RETRY LOGIC
@@ -2481,84 +2225,15 @@ function executeWithRetry(fn, options) {
   throw new Error('Operation failed after ' + (maxRetries + 1) + ' attempts: ' + lastError.message);
 }
 
-/**
- * Safe sheet operation wrapper with error handling
- * @param {Function} operation - Sheet operation to perform
- * @param {string} operationName - Name for logging
- * @returns {Object} {success: boolean, result: *, error: string}
- */
-function safeSheetOperation(operation, operationName) {
-  try {
-    var result = executeWithRetry(operation, {
-      maxRetries: 2,
-      baseDelay: 500,
-      onError: function(error, attempt) {
-        Logger.log(operationName + ' - Retry ' + (attempt + 1) + ': ' + error.message);
-      }
-    });
-    return { success: true, result: result, error: null };
-  } catch (error) {
-    Logger.log(operationName + ' FAILED: ' + error.message);
-    return { success: false, result: null, error: error.message };
-  }
-}
+// safeSheetOperation removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // CONFIRMATION DIALOGS FOR DESTRUCTIVE ACTIONS
 // ============================================================================
 
-/**
- * Safe version of getOrCreateSheet that confirms before deleting existing data
- * @param {Spreadsheet} ss - Active spreadsheet
- * @param {string} name - Sheet name
- * @param {boolean} forceDelete - Skip confirmation if true
- * @returns {Sheet|null} The created sheet, or null if user cancelled
- */
-function getOrCreateSheetSafe(ss, name, forceDelete) {
-  var sheet = ss.getSheetByName(name);
+// getOrCreateSheetSafe removed — dead code cleanup v4.25.11
 
-  if (sheet) {
-    // Check if sheet has data
-    var hasData = sheet.getLastRow() > 1 || sheet.getLastColumn() > 1;
-
-    if (hasData && !forceDelete) {
-      var ui = SpreadsheetApp.getUi();
-      var response = ui.alert(
-        '⚠️ Confirm Data Deletion',
-        'The sheet "' + name + '" already exists and contains data.\n\n' +
-        'Deleting this sheet will permanently remove all data in it.\n\n' +
-        'Are you sure you want to continue?',
-        ui.ButtonSet.YES_NO
-      );
-
-      if (response !== ui.Button.YES) {
-        Logger.log('User cancelled deletion of sheet: ' + name);
-        return null;
-      }
-    }
-
-    ss.deleteSheet(sheet);
-    Logger.log('Deleted existing sheet: ' + name);
-  }
-
-  return ss.insertSheet(name);
-}
-
-/**
- * Confirm before performing any destructive operation
- * @param {string} actionName - Description of the action
- * @param {string} warningMessage - Detailed warning message
- * @returns {boolean} True if user confirmed, false otherwise
- */
-function confirmDestructiveAction(actionName, warningMessage) {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert(
-    '⚠️ ' + actionName,
-    warningMessage + '\n\nThis action cannot be undone. Continue?',
-    ui.ButtonSet.YES_NO
-  );
-  return response === ui.Button.YES;
-}
+// confirmDestructiveAction removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // DYNAMIC VALIDATION RANGES
@@ -2744,43 +2419,7 @@ function highlightOrphanedGrievances() {
   logIntegrityEvent('GHOST_VALIDATION', 'Found ' + orphaned.length + ' orphaned grievances');
 }
 
-/**
- * Run ghost validation automatically (for scheduled trigger)
- * Sends email to admin if orphans are found
- */
-function runScheduledGhostValidation() {
-  var orphaned = findOrphanedGrievances();
-
-  if (orphaned.length > 0) {
-    // Get admin emails from Config
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-    var adminEmail = configSheet.getRange(3, CONFIG_COLS.ADMIN_EMAILS, 1, 1).getValue();
-
-    if (adminEmail) {
-      var subject = '⚠️ ' + COMMAND_CONFIG.SYSTEM_NAME + ': Orphaned Grievances Detected';
-      var body = 'The scheduled data integrity check found ' + orphaned.length + ' grievances with invalid Member IDs.\n\n';
-
-      orphaned.slice(0, 20).forEach(function(item) {
-        body += '• Row ' + item.row + ': ' + item.grievanceId + ' - Member ID: ' + item.memberId + ' (' + item.memberName + ')\n';
-      });
-
-      if (orphaned.length > 20) {
-        body += '\n...and ' + (orphaned.length - 20) + ' more.\n';
-      }
-
-      body += '\nPlease review and correct these records in the Grievance Log.';
-      body += '\n\n--\n' + COMMAND_CONFIG.SYSTEM_NAME + ' Automated Alert';
-
-      try {
-        MailApp.sendEmail(adminEmail, subject, body);
-        Logger.log('Orphan alert sent to: ' + adminEmail);
-      } catch (e) {
-        Logger.log('Failed to send orphan alert: ' + e.message);
-      }
-    }
-  }
-}
+// runScheduledGhostValidation removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // STEWARD LOAD BALANCING METRICS
@@ -2917,38 +2556,7 @@ function showStewardWorkloadDashboard() {
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Steward Workload Analysis');
 }
 
-/**
- * Get steward with lowest workload for new case assignment
- * @returns {string|null} Name of steward with lowest load, or null if none
- */
-function getStewardWithLowestWorkload() {
-  var stewards = calculateStewardWorkload();
-
-  // Also get all stewards from Config (some may have 0 cases)
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet || configSheet.getLastRow() <= 1) return null;
-  var stewardList = configSheet.getRange(3, CONFIG_COLS.STEWARDS, 50, 1).getValues()
-    .filter(function(row) { return row[0] !== ''; })
-    .map(function(row) { return row[0]; });
-
-  // Find stewards with 0 active cases
-  var activeStewardNames = stewards.map(function(s) { return s.name; });
-  var availableStewards = stewardList.filter(function(name) {
-    return activeStewardNames.indexOf(name) === -1;
-  });
-
-  if (availableStewards.length > 0) {
-    return availableStewards[0]; // Return first available steward with 0 cases
-  }
-
-  // Otherwise return steward with lowest load score
-  if (stewards.length > 0) {
-    return stewards[stewards.length - 1].name;
-  }
-
-  return null;
-}
+// getStewardWithLowestWorkload removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SELF-HEALING CONFIG VALIDATION TOOL
@@ -3413,67 +3021,7 @@ function showArchiveDialog() {
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Archive Grievances');
 }
 
-/**
- * Restore grievances from archive
- * @param {Array<string>} grievanceIds - Array of grievance IDs to restore
- */
-function restoreFromArchive(grievanceIds) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  var archiveSheet = ss.getSheetByName(HIDDEN_SHEETS.ARCHIVE_GRIEVANCES);
-
-  if (!archiveSheet || !grievanceSheet) {
-    return { restored: 0, error: 'Required sheets not found' };
-  }
-
-  if (archiveSheet.getLastRow() <= 1) {
-    return { restored: 0 };
-  }
-
-  var archiveData = archiveSheet.getRange(2, 1, archiveSheet.getLastRow() - 1, archiveSheet.getLastColumn()).getValues();
-
-  var rowsToRestore = [];
-  var rowIndicesToDelete = [];
-
-  archiveData.forEach(function(row, index) {
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    if (grievanceIds.indexOf(grievanceId) !== -1) {
-      rowsToRestore.push(row);
-      rowIndicesToDelete.push(index + 2);
-    }
-  });
-
-  if (rowsToRestore.length === 0) {
-    return { restored: 0 };
-  }
-
-  // Add back to main sheet
-  var lastRow = grievanceSheet.getLastRow();
-  grievanceSheet.getRange(lastRow + 1, 1, rowsToRestore.length, rowsToRestore[0].length)
-    .setValues(rowsToRestore);
-
-  // Remove from archive (track failures rather than stopping on first error)
-  var restoreFailedDeletes = [];
-  rowIndicesToDelete.reverse().forEach(function(rowIndex) {
-    try {
-      archiveSheet.deleteRow(rowIndex);
-    } catch (deleteErr) {
-      restoreFailedDeletes.push({ row: rowIndex, error: deleteErr.message });
-      Logger.log('Failed to delete archive row ' + rowIndex + ': ' + deleteErr.message);
-    }
-  });
-
-  logIntegrityEvent('ARCHIVE_RESTORE',
-    'Restored ' + rowsToRestore.length + ' grievances from archive',
-    { grievanceIds: grievanceIds, deleteFailed: restoreFailedDeletes.length }
-  );
-
-  return {
-    restored: rowsToRestore.length,
-    failedDeletes: restoreFailedDeletes.length,
-    failedRows: restoreFailedDeletes.length > 0 ? restoreFailedDeletes : undefined
-  };
-}
+// restoreFromArchive removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // VISUAL DEADLINE HEATMAP WITH SPARKLINES
@@ -3909,24 +3457,4 @@ function dataAuditTriggers(sessionToken) {
 // MENU ADDITIONS
 // ============================================================================
 
-/**
- * Add Data Integrity menu items to the existing menu structure
- * Call this from onOpen or add to existing menu creation
- */
-function addDataIntegrityMenuItems() {
-  var ui = SpreadsheetApp.getUi();
-
-  ui.createMenu('🛡️ Data Integrity')
-    .addItem('🔍 Find Orphaned Grievances', 'highlightOrphanedGrievances')
-    .addItem('⚙️ Config Health Check', 'showConfigHealthCheck')
-    .addSeparator()
-    .addItem('📊 Steward Workload Dashboard', 'showStewardWorkloadDashboard')
-    .addItem('📱 Create/Update Steward Portal', 'createMobileStewardPortal')
-    .addSeparator()
-    .addItem('🎨 Apply Deadline Heatmap', 'applyDeadlineHeatmap')
-    .addItem('📦 Archive Closed Grievances', 'showArchiveDialog')
-    .addSeparator()
-    .addItem('📜 View Audit Log', 'showAuditLogViewer')
-    .addItem('🔧 Audit Triggers (check logs)', 'auditAllTriggers')
-    .addToUi();
-}
+// addDataIntegrityMenuItems removed — dead code cleanup v4.25.11

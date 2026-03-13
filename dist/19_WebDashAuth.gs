@@ -496,44 +496,6 @@ function testAuthEmailSend(testEmail) {
   return results;
 }
 
-/**
- * Installs a daily trigger to auto-clean expired auth tokens.
- * Run once from the Apps Script editor. Idempotent — removes existing trigger first.
- */
-function installTokenCleanupTrigger() {
-  // Remove any existing cleanup triggers to prevent duplicates
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'authCleanupExpiredTokens') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
+// installTokenCleanupTrigger removed — dead code cleanup v4.25.11
 
-  // Create new daily trigger (runs between 2-3 AM in script timezone)
-  ScriptApp.newTrigger('authCleanupExpiredTokens')
-    .timeBased()
-    .everyDays(1)
-    .atHour(2)
-    .create();
-
-  Logger.log('Token cleanup trigger installed — runs daily at ~2 AM.');
-}
-
-/**
- * Script-editor verification: checks SSO, ScriptProperties, and Config tab.
- * Run from the Apps Script editor to confirm the auth module is ready.
- */
-function initWebDashboardAuth() {
-  var email = Session.getActiveUser().getEmail();
-  Logger.log('SSO email: ' + (email || '(not available — deploy as web app to test SSO)'));
-
-  var props = PropertiesService.getScriptProperties();
-  Logger.log('ScriptProperties accessible: ' + (props !== null));
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return;
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  Logger.log('Config tab found: ' + (configSheet !== null));
-
-  Logger.log('Auth module ready.');
-}
+// initWebDashboardAuth removed — dead code cleanup v4.25.11

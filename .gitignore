@@ -27,10 +27,7 @@ npm-debug.log*
 # Environment files
 .env
 .env.local
+Union-Tracker/
 
-# --- DDS-Specific Exclusions (UT is public) ---
-# DDS Apps Script ID must never appear in UT
-# GitHub tokens, API keys, credentials
-credentials.json
-token.json
-*.secret
+# Temporary previews
+spinner-preview.html

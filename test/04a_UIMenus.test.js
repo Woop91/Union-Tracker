@@ -16,9 +16,8 @@ describe('04a function existence', () => {
   const required = [
     'showVisualControlPanel', 'getVisualControlPanelHtml',
     'showExecutiveDashboard', 'showStewardDirectory',
-    'refreshVisualsSimple_', 'openCellMultiSelectEditor',
-    'showMultiSelectDialog', 'getMultiSelectHtml',
-    'showDashboardSidebar', 'getDashboardSidebarHtml'
+    'openCellMultiSelectEditor',
+    'showMultiSelectDialog', 'getMultiSelectHtml'
   ];
 
   required.forEach(fn => {

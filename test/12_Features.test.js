@@ -740,46 +740,5 @@ describe('Expansion Column Engine', () => {
     });
   });
 
-  describe('generateExpansionFieldsHtml', () => {
-    test('returns no-columns comment when no extra columns', () => {
-      const headers = [];
-      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
-        headers.push('CoreCol' + i);
-      }
-
-      setupExpansionMock(headers);
-
-      const html = generateExpansionFieldsHtml();
-      expect(html).toContain('No custom columns');
-    });
-
-    test('generates input fields for each extra column', () => {
-      const headers = [];
-      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
-        headers.push('CoreCol' + i);
-      }
-      headers.push('Favorite Color');
-      headers.push('Badge Number');
-
-      setupExpansionMock(headers);
-
-      const html = generateExpansionFieldsHtml();
-      expect(html).toContain('Favorite Color');
-      expect(html).toContain('Badge Number');
-      expect(html).toContain('Custom Fields');
-      expect(html).toContain('<input');
-    });
-  });
-
-  describe('saveExpansionData', () => {
-    test('rejects missing memberId', () => {
-      const result = saveExpansionData(null, { field: 'val' });
-      expect(result.success).toBe(false);
-    });
-
-    test('rejects missing customData', () => {
-      const result = saveExpansionData('M001', null);
-      expect(result.success).toBe(false);
-    });
-  });
 });
+

@@ -1605,42 +1605,7 @@ function getInteractiveResourceLinks() {
   return links;
 }
 
-/**
- * Get unique filter options for members (locations, units, office days)
- */
-function getInteractiveMemberFilters() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-
-  var filters = {
-    locations: [],
-    units: [],
-    officeDays: []
-  };
-
-  if (configSheet && configSheet.getLastRow() > 1) {
-    try {
-      var lastRow = configSheet.getLastRow();
-      if (lastRow < 3) return filters;
-      var data = configSheet.getRange(3, 1, lastRow - 2, CONFIG_COLS.OFFICE_DAYS).getValues();
-
-      // Get unique values from config
-      data.forEach(function(row) {
-        var loc = row[CONFIG_COLS.OFFICE_LOCATIONS - 1];
-        var unit = row[CONFIG_COLS.UNITS - 1];
-        var days = row[CONFIG_COLS.OFFICE_DAYS - 1];
-
-        if (loc && filters.locations.indexOf(loc) === -1) filters.locations.push(loc);
-        if (unit && filters.units.indexOf(unit) === -1) filters.units.push(unit);
-        if (days && filters.officeDays.indexOf(days) === -1) filters.officeDays.push(days);
-      });
-    } catch (e) {
-      Logger.log('Error getting filter options: ' + e.message);
-    }
-  }
-
-  return filters;
-}
+// getInteractiveMemberFilters removed — dead code cleanup v4.25.11
 
 /**
  * Navigate to a specific member in the Member Directory sheet

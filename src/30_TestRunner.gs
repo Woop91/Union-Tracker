@@ -694,22 +694,7 @@ function dataGetTestResults(sessionToken) {
   return { success: true, results: results, status: status };
 }
 
-/**
- * SPA endpoint: Get unified error summary from last test run (steward-only).
- * Returns all failures in a flat list for the "show all errors" panel.
- * @param {string} [sessionToken]
- * @returns {Object} { success, ...errorSummary }
- */
-function dataGetTestErrorSummary(sessionToken) {
-  var e = _resolveCallerEmail(sessionToken);
-  if (!e) return { success: false, error: 'Not authenticated' };
-
-  var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, error: 'Steward access required' };
-
-  var summary = TestRunner.getErrorSummary();
-  return { success: true, summary: summary };
-}
+// dataGetTestErrorSummary removed — dead code cleanup v4.25.11
 
 /**
  * SPA endpoint: Manage test trigger (steward-only).

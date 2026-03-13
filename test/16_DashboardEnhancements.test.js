@@ -80,38 +80,6 @@ beforeEach(() => {
 });
 
 // ============================================================================
-// 1. getDateRangePresets
-// ============================================================================
-
-describe('getDateRangePresets', () => {
-  test('returns an array', () => {
-    const presets = getDateRangePresets();
-    expect(Array.isArray(presets)).toBe(true);
-  });
-
-  test('includes last7, last30, ytd, and custom presets', () => {
-    const presets = getDateRangePresets();
-    const ids = presets.map(p => p.id);
-    expect(ids).toContain('last7');
-    expect(ids).toContain('last30');
-    expect(ids).toContain('ytd');
-    expect(ids).toContain('custom');
-  });
-
-  test('each preset has id, label, and days properties', () => {
-    const presets = getDateRangePresets();
-    for (const preset of presets) {
-      expect(preset).toHaveProperty('id');
-      expect(preset).toHaveProperty('label');
-      expect(preset).toHaveProperty('days');
-      expect(typeof preset.id).toBe('string');
-      expect(typeof preset.label).toBe('string');
-      expect(typeof preset.days).toBe('number');
-    }
-  });
-});
-
-// ============================================================================
 // 2. saveChartImageToDrive
 // ============================================================================
 
@@ -628,50 +596,6 @@ describe('deleteChartPreset', () => {
 
     deleteChartPreset('preset_99');
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ presetId: 'preset_99' }));
-  });
-});
-
-describe('updateChartPreset', () => {
-  test('updates specific fields of an existing preset', () => {
-    const presets = [
-      { id: 'preset_1', name: 'Old Name', visibleCharts: ['a'], chartOptions: {}, layout: { columns: 2 }, filters: {} }
-    ];
-    const props = PropertiesService.getUserProperties();
-    props.getProperty.mockImplementation(k => {
-      if (k === 'chart_presets') return JSON.stringify(presets);
-      return null;
-    });
-
-    const result = updateChartPreset('preset_1', { name: 'New Name', layout: { columns: 4 } });
-    expect(result.success).toBe(true);
-    expect(result.preset.name).toBe('New Name');
-    expect(result.preset.layout.columns).toBe(4);
-    // Unchanged field should remain
-    expect(result.preset.visibleCharts).toEqual(['a']);
-  });
-
-  test('returns error for nonexistent preset', () => {
-    const props = PropertiesService.getUserProperties();
-    props.getProperty.mockImplementation(() => '[]');
-
-    const result = updateChartPreset('nonexistent', { name: 'X' });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('not found');
-  });
-
-  test('emits preset:updated event', () => {
-    const handler = jest.fn();
-    EventBus.on('preset:updated', handler);
-
-    const presets = [{ id: 'preset_1', name: 'A' }];
-    const props = PropertiesService.getUserProperties();
-    props.getProperty.mockImplementation(k => {
-      if (k === 'chart_presets') return JSON.stringify(presets);
-      return null;
-    });
-
-    updateChartPreset('preset_1', { name: 'B' });
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ presetId: 'preset_1' }));
   });
 });
 

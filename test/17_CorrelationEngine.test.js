@@ -167,44 +167,6 @@ describe('toRanks_', () => {
 });
 
 // ============================================================================
-// 6. chiSquareTest_
-// ============================================================================
-
-describe('chiSquareTest_', () => {
-  test('returns zeros for fewer than 2 row keys', () => {
-    const result = chiSquareTest_({ 'A': { x: 5, y: 10 } });
-    expect(result).toEqual({ chiSquare: 0, cramersV: 0, degreesOfFreedom: 0 });
-  });
-
-  test('returns zeros when fewer than 2 column keys', () => {
-    const result = chiSquareTest_({ 'A': { x: 5 }, 'B': { x: 10 } });
-    expect(result).toEqual({ chiSquare: 0, cramersV: 0, degreesOfFreedom: 0 });
-  });
-
-  test('computes chi-square for a 2x2 contingency table', () => {
-    // Simple 2x2 table:
-    //       col1  col2
-    // row1:  10    20
-    // row2:  20    10
-    const result = chiSquareTest_({
-      'row1': { col1: 10, col2: 20 },
-      'row2': { col1: 20, col2: 10 }
-    });
-    expect(result.chiSquare).toBeGreaterThan(0);
-    expect(result.degreesOfFreedom).toBe(1); // (2-1)*(2-1)
-  });
-
-  test('computes Cramers V for 2x2 table', () => {
-    const result = chiSquareTest_({
-      'row1': { col1: 10, col2: 20 },
-      'row2': { col1: 20, col2: 10 }
-    });
-    expect(result.cramersV).toBeGreaterThan(0);
-    expect(result.cramersV).toBeLessThanOrEqual(1);
-  });
-});
-
-// ============================================================================
 // 7. classifyCorrelation_
 // ============================================================================
 
@@ -252,54 +214,6 @@ describe('classifyCorrelation_', () => {
     const clsUnreliable = classifyCorrelation_(0.3, 15);
     expect(clsUnreliable.confidence).toBe('moderate');
     expect(clsUnreliable.reliable).toBe(false);
-  });
-});
-
-// ============================================================================
-// 8. extractPairs_
-// ============================================================================
-
-describe('extractPairs_', () => {
-  test('extracts x and y from grouped data', () => {
-    const grouped = {
-      'A': { rate: 0.6, score: 8, count: 10 },
-      'B': { rate: 0.4, score: 6, count: 15 }
-    };
-    const result = extractPairs_(grouped, 'rate', 'score');
-    expect(result.x).toEqual([0.6, 0.4]);
-    expect(result.y).toEqual([8, 6]);
-    expect(result.labels).toEqual(['A', 'B']);
-    expect(result.n).toBe(2);
-  });
-
-  test('respects minCount filter', () => {
-    const grouped = {
-      'A': { rate: 0.6, score: 8, count: 10 },
-      'B': { rate: 0.4, score: 6, count: 2 }
-    };
-    const result = extractPairs_(grouped, 'rate', 'score', 5);
-    expect(result.n).toBe(1);
-    expect(result.labels).toEqual(['A']);
-  });
-
-  test('skips NaN values', () => {
-    const grouped = {
-      'A': { rate: 'not-a-number', score: 8, count: 10 },
-      'B': { rate: 0.4, score: 6, count: 10 }
-    };
-    const result = extractPairs_(grouped, 'rate', 'score');
-    expect(result.n).toBe(1);
-    expect(result.labels).toEqual(['B']);
-  });
-
-  test('returns labels matching the keys', () => {
-    const grouped = {
-      'Location Alpha': { val: 1, metric: 2, count: 5 },
-      'Location Beta': { val: 3, metric: 4, count: 5 }
-    };
-    const result = extractPairs_(grouped, 'val', 'metric');
-    expect(result.labels).toContain('Location Alpha');
-    expect(result.labels).toContain('Location Beta');
   });
 });
 

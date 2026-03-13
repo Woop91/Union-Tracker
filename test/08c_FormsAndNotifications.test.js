@@ -19,18 +19,16 @@ loadSources([
 
 describe('08c function existence', () => {
   const required = [
-    'getFormUrlFromConfig', 'buildGrievanceFormUrl_', 'saveFormUrlsToConfig',
+    'getFormUrlFromConfig', 'buildGrievanceFormUrl_',
     'saveFormUrlsToConfig_silent', 'getFormValue_', 'getFormMultiValue_',
     'parseFormDate_', 'sendContactInfoForm', 'onContactFormSubmit',
-    'setupContactFormTrigger', 'setupGrievanceFormTrigger',
     'getSatisfactionSurveyLink', 'onSatisfactionFormSubmit',
     'setupSatisfactionFormTrigger', 'showNotificationSettings',
     'installDailyTrigger_', 'removeDailyTrigger_',
     'checkDeadlinesAndNotify_', 'testDeadlineNotifications',
-    'sendStewardDeadlineAlerts', 'sendStewardAlertsNow',
-    'configureAlertSettings', 'sendRandomSurveyEmails',
+    'sendStewardDeadlineAlerts',
     'executeSendRandomSurveyEmails', 'validateMemberEmail',
-    'getCurrentQuarter', 'getQuarterFromDate',
+    'getCurrentQuarter',
     'populateSurveyTrackingFromMembers', 'startNewSurveyRound',
     'sendSurveyCompletionReminders', 'getSurveyCompletionStats',
     'showSurveyTrackingDialog', 'getSurveyQuestions',
@@ -53,27 +51,6 @@ describe('getCurrentQuarter', () => {
   test('returns a YYYY-QN format string', () => {
     const q = getCurrentQuarter();
     expect(q).toMatch(/^\d{4}-Q[1-4]$/);
-  });
-});
-
-describe('getQuarterFromDate', () => {
-  test('January is Q1', () => {
-    expect(getQuarterFromDate(new Date(2026, 0, 15))).toBe('2026-Q1');
-  });
-  test('April is Q2', () => {
-    expect(getQuarterFromDate(new Date(2026, 3, 1))).toBe('2026-Q2');
-  });
-  test('July is Q3', () => {
-    expect(getQuarterFromDate(new Date(2026, 6, 30))).toBe('2026-Q3');
-  });
-  test('October is Q4', () => {
-    expect(getQuarterFromDate(new Date(2026, 9, 1))).toBe('2026-Q4');
-  });
-  test('December is Q4', () => {
-    expect(getQuarterFromDate(new Date(2026, 11, 31))).toBe('2026-Q4');
-  });
-  test('invalid date returns empty string', () => {
-    expect(getQuarterFromDate('not-a-date')).toBe('');
   });
 });
 

@@ -16,12 +16,11 @@ describe('08a function existence', () => {
   const required = [
     'CREATE_DASHBOARD', '_ensureContactLogSheet', '_ensureStewardTasksSheet',
     'getOrCreateSheet', 'reorderSheetsToStandard', 'setupHiddenSheets',
-    'setupDataValidations', 'setMemberIdValidation',
+    'setupDataValidations',
     'setDropdownValidation', 'setMultiSelectValidation',
     'getConfigValues', 'applyMultiSelectValue', 'clearMultiSelectState',
     'onEditMultiSelect', 'onSelectionChangeMultiSelect',
-    'installMultiSelectTrigger', 'removeMultiSelectTrigger',
-    'setDropdownValidationDynamic', 'setMultiSelectValidationDynamic'
+    'installMultiSelectTrigger', 'removeMultiSelectTrigger'
   ];
 
   required.forEach(fn => {

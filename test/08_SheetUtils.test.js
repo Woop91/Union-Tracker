@@ -1,8 +1,8 @@
 /**
  * Tests for 08_SheetUtils (split into 08a-08d modules)
  *
- * Covers: padRight, getCurrentQuarter, getQuarterFromDate, validateMemberEmail,
- * getConfigValues, setupAuditLogSheet, getAuditHistory, CREATE_DASHBOARD,
+ * Covers: padRight, getCurrentQuarter, validateMemberEmail,
+ * getConfigValues, setupAuditLogSheet, CREATE_DASHBOARD,
  * getOrCreateSheet, and related utilities.
  */
 
@@ -94,48 +94,6 @@ describe('getCurrentQuarter', () => {
     const result = getCurrentQuarter();
     const year = parseInt(result.split('-Q')[0], 10);
     expect(year).toBe(new Date().getFullYear());
-  });
-});
-
-// ============================================================================
-// getQuarterFromDate
-// ============================================================================
-
-describe('getQuarterFromDate', () => {
-  test('January is Q1', () => {
-    expect(getQuarterFromDate(new Date(2026, 0, 15))).toBe('2026-Q1');
-  });
-
-  test('March is Q1', () => {
-    expect(getQuarterFromDate(new Date(2026, 2, 31))).toBe('2026-Q1');
-  });
-
-  test('April is Q2', () => {
-    expect(getQuarterFromDate(new Date(2026, 3, 1))).toBe('2026-Q2');
-  });
-
-  test('June is Q2', () => {
-    expect(getQuarterFromDate(new Date(2026, 5, 15))).toBe('2026-Q2');
-  });
-
-  test('July is Q3', () => {
-    expect(getQuarterFromDate(new Date(2026, 6, 4))).toBe('2026-Q3');
-  });
-
-  test('September is Q3', () => {
-    expect(getQuarterFromDate(new Date(2026, 8, 30))).toBe('2026-Q3');
-  });
-
-  test('October is Q4', () => {
-    expect(getQuarterFromDate(new Date(2026, 9, 1))).toBe('2026-Q4');
-  });
-
-  test('December is Q4', () => {
-    expect(getQuarterFromDate(new Date(2026, 11, 25))).toBe('2026-Q4');
-  });
-
-  test('handles different years', () => {
-    expect(getQuarterFromDate(new Date(2024, 7, 10))).toBe('2024-Q3');
   });
 });
 
@@ -317,63 +275,6 @@ describe('setupAuditLogSheet', () => {
     setupAuditLogSheet();
 
     expect(auditSheet.setFrozenRows).toHaveBeenCalledWith(1);
-  });
-});
-
-// ============================================================================
-// getAuditHistory
-// ============================================================================
-
-describe('getAuditHistory', () => {
-  test('returns empty array when audit sheet does not exist', () => {
-    const mockSS = createMockSpreadsheet([]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    const result = getAuditHistory('GRV-001');
-    expect(result).toEqual([]);
-  });
-
-  test('returns empty array when sheet has no data rows', () => {
-    const auditSheet = createMockSheet(SHEETS.AUDIT_LOG || '_Audit_Log', [['Header']]);
-    auditSheet.getLastRow.mockReturnValue(1);
-    const mockSS = createMockSpreadsheet([auditSheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    const result = getAuditHistory('GRV-001');
-    expect(result).toEqual([]);
-  });
-
-  test('returns matching audit entries for a record ID', () => {
-    const auditData = [
-      ['Timestamp', 'User', 'Sheet', 'Row', 'Col', 'Field', 'Old', 'New', 'RecordID', 'Action'],
-      ['2026-01-01', 'user@test.com', 'Grievance Log', 2, 3, 'Status', 'Open', 'Closed', 'GRV-001', 'Edit'],
-      ['2026-01-02', 'other@test.com', 'Member Dir', 3, 4, 'Name', 'A', 'B', 'M-002', 'Edit'],
-      ['2026-01-03', 'user@test.com', 'Grievance Log', 2, 5, 'Notes', '', 'Resolved', 'GRV-001', 'Add']
-    ];
-    const auditSheet = createMockSheet(SHEETS.AUDIT_LOG || '_Audit_Log', auditData);
-    auditSheet.getLastRow.mockReturnValue(4);
-    const mockSS = createMockSpreadsheet([auditSheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    const result = getAuditHistory('GRV-001');
-    expect(result).toHaveLength(2);
-    expect(result[0].field).toBe('Status');
-    expect(result[1].field).toBe('Notes');
-    expect(result[0].user).toBe('user@test.com');
-  });
-
-  test('returns empty array when no records match', () => {
-    const auditData = [
-      ['Timestamp', 'User', 'Sheet', 'Row', 'Col', 'Field', 'Old', 'New', 'RecordID', 'Action'],
-      ['2026-01-01', 'user@test.com', 'Grievance Log', 2, 3, 'Status', 'Open', 'Closed', 'GRV-999', 'Edit']
-    ];
-    const auditSheet = createMockSheet(SHEETS.AUDIT_LOG || '_Audit_Log', auditData);
-    auditSheet.getLastRow.mockReturnValue(2);
-    const mockSS = createMockSpreadsheet([auditSheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    const result = getAuditHistory('GRV-001');
-    expect(result).toEqual([]);
   });
 });
 

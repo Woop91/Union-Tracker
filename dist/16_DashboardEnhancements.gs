@@ -22,66 +22,9 @@
 // 1. CUSTOM DATE RANGES - Server-side helpers
 // ============================================================================
 
-/**
- * Returns available date range presets for the UI picker
- * @returns {Object[]} Array of preset definitions
- */
-function getDateRangePresets() {
-  return [
-    { id: 'last7',    label: 'Last 7 Days',    days: 7 },
-    { id: 'last30',   label: 'Last 30 Days',   days: 30 },
-    { id: 'last90',   label: 'Last 90 Days',   days: 90 },
-    { id: 'last180',  label: 'Last 6 Months',  days: 180 },
-    { id: 'lastYear', label: 'Last Year',       days: 365 },
-    { id: 'ytd',      label: 'Year to Date',    days: -1 },
-    { id: 'custom',   label: 'Custom Range',    days: 0 }
-  ];
-}
+// getDateRangePresets removed — dead code cleanup v4.25.11
 
-/**
- * Gets trend comparison data for two date ranges (period-over-period)
- * @param {boolean} isPII - Include PII data
- * @param {string} fromDate1 - First period start (ISO)
- * @param {string} toDate1 - First period end (ISO)
- * @param {string} fromDate2 - Second period start (ISO)
- * @param {string} toDate2 - Second period end (ISO)
- * @returns {string} JSON with both periods and calculated deltas
- */
-function getTrendComparisonData(isPII, fromDate1, toDate1, fromDate2, toDate2) {
-  var period1 = JSON.parse(getUnifiedDashboardDataWithDateRange(isPII, 0, fromDate1, toDate1));
-  var period2 = JSON.parse(getUnifiedDashboardDataWithDateRange(isPII, 0, fromDate2, toDate2));
-
-  var comparison = {
-    period1: {
-      label: fromDate1 + ' to ' + toDate1,
-      totalCases: period1.totalCases || 0,
-      openCases: period1.openCases || 0,
-      winRate: period1.winRate || 0,
-      moraleScore: period1.moraleScore || 0,
-      totalMembers: period1.totalMembers || 0
-    },
-    period2: {
-      label: fromDate2 + ' to ' + toDate2,
-      totalCases: period2.totalCases || 0,
-      openCases: period2.openCases || 0,
-      winRate: period2.winRate || 0,
-      moraleScore: period2.moraleScore || 0,
-      totalMembers: period2.totalMembers || 0
-    },
-    deltas: {}
-  };
-
-  // Calculate percentage deltas
-  var metrics = ['totalCases', 'openCases', 'winRate', 'moraleScore', 'totalMembers'];
-  for (var i = 0; i < metrics.length; i++) {
-    var key = metrics[i];
-    var v1 = comparison.period1[key];
-    var v2 = comparison.period2[key];
-    comparison.deltas[key] = v1 === 0 ? 0 : Math.round(((v2 - v1) / v1) * 100);
-  }
-
-  return JSON.stringify(comparison);
-}
+// getTrendComparisonData removed — dead code cleanup v4.25.11
 
 
 // ============================================================================
@@ -600,34 +543,7 @@ function deleteChartPreset(presetId) {
   return { success: true };
 }
 
-/**
- * Updates an existing chart preset
- * @param {string} presetId - Preset ID to update
- * @param {Object} updates - Partial preset data to merge
- * @returns {Object} Updated preset
- */
-function updateChartPreset(presetId, updates) {
-  var props = PropertiesService.getUserProperties();
-  var presets = JSON.parse(props.getProperty('chart_presets') || '[]');
-
-  for (var i = 0; i < presets.length; i++) {
-    if (presets[i].id === presetId) {
-      if (updates.name) presets[i].name = updates.name;
-      if (updates.visibleCharts) presets[i].visibleCharts = updates.visibleCharts;
-      if (updates.chartOptions) presets[i].chartOptions = updates.chartOptions;
-      if (updates.layout) presets[i].layout = updates.layout;
-      if (updates.filters) presets[i].filters = updates.filters;
-      if (updates.dateRange !== undefined) presets[i].dateRange = updates.dateRange;
-      presets[i].updatedAt = new Date().toISOString();
-
-      props.setProperty('chart_presets', JSON.stringify(presets));
-      EventBus.emit('preset:updated', { presetId: presetId });
-      return { success: true, preset: presets[i] };
-    }
-  }
-
-  return { success: false, error: 'Preset not found' };
-}
+// updateChartPreset removed — dead code cleanup v4.25.11
 
 
 // ============================================================================
@@ -748,88 +664,13 @@ function getFilteredDashboardData(isPII, filters) {
   return JSON.stringify(fullData);
 }
 
-/**
- * Returns available filter options based on current data
- * @param {boolean} isPII - Whether to include PII data
- * @returns {string} JSON with available filter values per dimension
- */
-function getAvailableFilterOptions(isPII) {
-  var data = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+// getAvailableFilterOptions removed — dead code cleanup v4.25.11
 
-  var options = {
-    statuses: Object.keys(data.statusDistribution || {}),
-    locations: Object.keys(data.locationBreakdown || {}),
-    units: Object.keys(data.unitBreakdown || {}),
-    categories: Object.keys(data.grievancesByCategory || {}),
-    stewards: [],
-    steps: [1, 2, 3, 4]
-  };
+// saveFilterPreset removed — dead code cleanup v4.25.11
 
-  // Extract steward names from drill-down data
-  if (data.chartDrillDown && data.chartDrillDown.stewardByCase) {
-    options.stewards = Object.keys(data.chartDrillDown.stewardByCase);
-  }
+// getFilterPresets removed — dead code cleanup v4.25.11
 
-  // Extract from steward performance if available
-  if (data.stewardPerformance) {
-    for (var i = 0; i < data.stewardPerformance.length; i++) {
-      var name = data.stewardPerformance[i].name;
-      if (name && options.stewards.indexOf(name) < 0) {
-        options.stewards.push(name);
-      }
-    }
-  }
-
-  return JSON.stringify(options);
-}
-
-/**
- * Saves a named filter preset for quick reuse
- * @param {string} name - Filter preset name
- * @param {Object} filters - Filter configuration object
- * @returns {Object} Saved filter preset with ID
- */
-function saveFilterPreset(name, filters) {
-  return withScriptLock_(function() {
-  var props = PropertiesService.getUserProperties();
-  var presets = JSON.parse(props.getProperty('filter_presets') || '[]');
-
-  var preset = {
-    id: 'filt_' + Date.now(),
-    name: name,
-    filters: filters,
-    createdAt: new Date().toISOString()
-  };
-
-  presets.push(preset);
-  props.setProperty('filter_presets', JSON.stringify(presets));
-
-  EventBus.emit('filter:presetSaved', { presetId: preset.id, name: name });
-  return { success: true, preset: preset };
-  });
-}
-
-/**
- * Gets saved filter presets
- * @returns {string} JSON array of filter presets
- */
-function getFilterPresets() {
-  var props = PropertiesService.getUserProperties();
-  return props.getProperty('filter_presets') || '[]';
-}
-
-/**
- * Deletes a saved filter preset
- * @param {string} presetId - Preset ID to delete
- * @returns {Object} Deletion result
- */
-function deleteFilterPreset(presetId) {
-  var props = PropertiesService.getUserProperties();
-  var presets = JSON.parse(props.getProperty('filter_presets') || '[]');
-  presets = presets.filter(function(p) { return p.id !== presetId; });
-  props.setProperty('filter_presets', JSON.stringify(presets));
-  return { success: true };
-}
+// deleteFilterPreset removed — dead code cleanup v4.25.11
 
 
 // ============================================================================
@@ -937,32 +778,4 @@ function getSubGroupDimensions_(chartType) {
   });
 }
 
-/**
- * Gets a summary overview for drill-down (counts per sub-group)
- * @param {boolean} isPII - Whether to include PII data
- * @param {string} chartType - Chart category
- * @returns {string} JSON summary with counts per group
- */
-function getDrillDownSummary(isPII, chartType) {
-  var data = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
-  var drillDown = data.chartDrillDown || {};
-  var summary = { chartType: chartType, groups: {} };
-
-  var sourceMap = {
-    status: drillDown.statusByCase,
-    location: drillDown.locationByCase,
-    category: drillDown.categoryByCase,
-    unit: drillDown.unitByMember,
-    steward: drillDown.stewardByCase
-  };
-
-  var source = sourceMap[chartType] || {};
-  for (var key in source) {
-    summary.groups[key] = {
-      count: source[key].length,
-      label: key
-    };
-  }
-
-  return JSON.stringify(summary);
-}
+// getDrillDownSummary removed — dead code cleanup v4.25.11

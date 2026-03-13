@@ -51,22 +51,7 @@ var ERROR_CONFIG = {
 // CORE ERROR HANDLING
 // ============================================================================
 
-/**
- * Wraps a function with error handling
- * @param {Function} fn - Function to wrap
- * @param {string} context - Context description for error messages
- * @returns {Function} Wrapped function
- */
-function withErrorHandling(fn, context) {
-  return function() {
-    try {
-      return fn.apply(this, arguments);
-    } catch (error) {
-      handleError(error, context);
-      return null;
-    }
-  };
-}
+// withErrorHandling removed — dead code cleanup v4.25.11
 
 /**
  * Creates a standardized success response object
@@ -359,38 +344,7 @@ function validateRequiredSheets() {
   };
 }
 
-/**
- * Run all startup validations
- * @returns {boolean} True if all validations pass
- */
-function runStartupValidation() {
-  var constantsResult = validateConstants();
-  var sheetsResult = validateRequiredSheets();
-
-  if (!constantsResult.valid) {
-    handleError(
-      new Error('Missing constants: ' + constantsResult.missing.join(', ')),
-      'Startup Validation',
-      ERROR_LEVEL.CRITICAL
-    );
-    return false;
-  }
-
-  if (constantsResult.warnings.length > 0) {
-    Logger.log('[WARNING] Constants warnings: ' + constantsResult.warnings.join(', '));
-  }
-
-  if (!sheetsResult.valid) {
-    handleError(
-      new Error('Missing sheets: ' + sheetsResult.missing.join(', ')),
-      'Startup Validation',
-      ERROR_LEVEL.WARNING
-    );
-  }
-
-  Logger.log('[INFO] Startup validation completed');
-  return true;
-}
+// runStartupValidation removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // API VERSIONING
@@ -407,68 +361,17 @@ var API_VERSION = {
   toString: function() { return COMMAND_CONFIG.VERSION; }
 };
 
-/**
- * Get current API version
- * @returns {string} Version string
- */
-function getApiVersion() {
-  return API_VERSION.toString();
-}
+// getApiVersion removed — dead code cleanup v4.25.11
 
-/**
- * Check if client version is compatible
- * @param {string} clientVersion - Client version string (e.g., "4.2.0")
- * @returns {boolean} True if compatible
- */
-function isVersionCompatible(clientVersion) {
-  if (!clientVersion) return false;
-  var parts = clientVersion.split('.');
-  var clientMajor = parseInt(parts[0], 10);
-  return clientMajor === API_VERSION.major;
-}
+// isVersionCompatible removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // ERROR LOG VIEWER
 // ============================================================================
 
-/**
- * Show error log viewer dialog
- */
-function showErrorLog() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ERROR_CONFIG.LOG_SHEET_NAME);
+// showErrorLog removed — dead code cleanup v4.25.11
 
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('No error log found.');
-    return;
-  }
-
-  setSheetVisible_(sheet);
-  ss.setActiveSheet(sheet);
-}
-
-/**
- * Clear error log
- */
-function clearErrorLog() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ERROR_CONFIG.LOG_SHEET_NAME);
-
-  if (sheet) {
-    var lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      sheet.deleteRows(2, lastRow - 1);
-    }
-    // L-29: Log audit event for error log clearing (security-relevant action)
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('CLEAR_ERROR_LOG', {
-        sheet: ERROR_CONFIG.LOG_SHEET_NAME,
-        rowsCleared: lastRow > 1 ? lastRow - 1 : 0
-      });
-    }
-    SpreadsheetApp.getActiveSpreadsheet().toast('Error log cleared', 'Success');
-  }
-}
+// clearErrorLog removed — dead code cleanup v4.25.11
 
 
 
@@ -686,7 +589,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.13';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.25.14';
   var parts = ver.split('.');
   return {
     version: ver,
@@ -790,19 +693,7 @@ var VERSION_HISTORY = [
   { version: '2.0.0', date: '2025-11-15', codename: 'Modular Architecture',                       changes: 'Split monolith into modular source files, build system, UI/business logic separation' }
 ];
 
-/**
- * Look up release info for a specific version.
- * @param {string} ver - Version string, e.g. "4.5.0"
- * @returns {Object|null} The matching VERSION_HISTORY entry, or null.
- */
-function getVersionDate(ver) {
-  for (var i = 0; i < VERSION_HISTORY.length; i++) {
-    if (VERSION_HISTORY[i].version === ver) {
-      return VERSION_HISTORY[i];
-    }
-  }
-  return null;
-}
+// getVersionDate removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SHEET NAMES
@@ -1140,20 +1031,7 @@ function installHiddenSheetEnforcerTrigger() {
   Logger.log('Installed hourly hidden-sheet enforcer trigger');
 }
 
-/**
- * Removes the hidden-sheet enforcer trigger.
- */
-function removeHiddenSheetEnforcerTrigger() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var triggers = ScriptApp.getUserTriggers(ss);
-
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
-      ScriptApp.deleteTrigger(triggers[i]);
-      Logger.log('Removed hidden-sheet enforcer trigger');
-    }
-  }
-}
+// removeHiddenSheetEnforcerTrigger removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
@@ -2355,18 +2233,7 @@ function getColumnLetter(columnNumber) {
   return letter;
 }
 
-/**
- * Convert column letter to number (e.g., A -> 1, AA -> 27)
- * @param {string} columnLetter - Column letter(s)
- * @returns {number} Column number (1-indexed)
- */
-function getColumnNumber(columnLetter) {
-  var result = 0;
-  for (var i = 0; i < columnLetter.length; i++) {
-    result = result * 26 + (columnLetter.charCodeAt(i) - 64);
-  }
-  return result;
-}
+// getColumnNumber removed — dead code cleanup v4.25.11
 
 /**
  * Safe accessor for numeric fields — returns the value as-is when it's a
@@ -2381,97 +2248,9 @@ function numericField_(value) {
   return value;
 }
 
-/**
- * Map a Member Directory row array to a structured object
- * @param {Array} row - Row data array from Member Directory
- * @returns {Object} Structured member object
- */
-function mapMemberRow(row) {
-  return {
-    memberId: row[MEMBER_COLS.MEMBER_ID - 1] || '',
-    firstName: row[MEMBER_COLS.FIRST_NAME - 1] || '',
-    lastName: row[MEMBER_COLS.LAST_NAME - 1] || '',
-    fullName: (row[MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (row[MEMBER_COLS.LAST_NAME - 1] || ''),
-    jobTitle: row[MEMBER_COLS.JOB_TITLE - 1] || '',
-    workLocation: row[MEMBER_COLS.WORK_LOCATION - 1] || '',
-    unit: row[MEMBER_COLS.UNIT - 1] || '',
-    cubicle: row[MEMBER_COLS.CUBICLE - 1] || '',
-    officeDays: row[MEMBER_COLS.OFFICE_DAYS - 1] || '',
-    email: row[MEMBER_COLS.EMAIL - 1] || '',
-    phone: row[MEMBER_COLS.PHONE - 1] || '',
-    preferredComm: row[MEMBER_COLS.PREFERRED_COMM - 1] || '',
-    bestTime: row[MEMBER_COLS.BEST_TIME - 1] || '',
-    supervisor: row[MEMBER_COLS.SUPERVISOR - 1] || '',
-    manager: row[MEMBER_COLS.MANAGER - 1] || '',
-    isSteward: row[MEMBER_COLS.IS_STEWARD - 1] || '',
-    committees: row[MEMBER_COLS.COMMITTEES - 1] || '',
-    assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',
-    lastVirtualMtg: row[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] || '',
-    lastInPersonMtg: row[MEMBER_COLS.LAST_INPERSON_MTG - 1] || '',
-    openRate: numericField_(row[MEMBER_COLS.OPEN_RATE - 1]),
-    volunteerHours: numericField_(row[MEMBER_COLS.VOLUNTEER_HOURS - 1]),
-    interestLocal: row[MEMBER_COLS.INTEREST_LOCAL - 1] || '',
-    interestChapter: row[MEMBER_COLS.INTEREST_CHAPTER - 1] || '',
-    interestAllied: row[MEMBER_COLS.INTEREST_ALLIED - 1] || '',
-    recentContactDate: row[MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '',
-    contactSteward: row[MEMBER_COLS.CONTACT_STEWARD - 1] || '',
-    contactNotes: row[MEMBER_COLS.CONTACT_NOTES - 1] || '',
-    hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] || '',
-    grievanceStatus: row[MEMBER_COLS.GRIEVANCE_STATUS - 1] || '',
-    nextDeadline: row[MEMBER_COLS.NEXT_DEADLINE - 1] || '',
-    startGrievance: row[MEMBER_COLS.START_GRIEVANCE - 1] || false
-  };
-}
+// mapMemberRow removed — dead code cleanup v4.25.11
 
-/**
- * Map a Grievance Log row array to a structured object
- * @param {Array} row - Row data array from Grievance Log
- * @returns {Object} Structured grievance object
- */
-function mapGrievanceRow(row) {
-  return {
-    grievanceId: row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '',
-    memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1] || '',
-    firstName: row[GRIEVANCE_COLS.FIRST_NAME - 1] || '',
-    lastName: row[GRIEVANCE_COLS.LAST_NAME - 1] || '',
-    fullName: (row[GRIEVANCE_COLS.FIRST_NAME - 1] || '') + ' ' + (row[GRIEVANCE_COLS.LAST_NAME - 1] || ''),
-    status: row[GRIEVANCE_COLS.STATUS - 1] || '',
-    currentStep: row[GRIEVANCE_COLS.CURRENT_STEP - 1] || '',
-    incidentDate: row[GRIEVANCE_COLS.INCIDENT_DATE - 1] || '',
-    filingDeadline: row[GRIEVANCE_COLS.FILING_DEADLINE - 1] || '',
-    dateFiled: row[GRIEVANCE_COLS.DATE_FILED - 1] || '',
-    step1Due: row[GRIEVANCE_COLS.STEP1_DUE - 1] || '',
-    step1Rcvd: row[GRIEVANCE_COLS.STEP1_RCVD - 1] || '',
-    step2AppealDue: row[GRIEVANCE_COLS.STEP2_APPEAL_DUE - 1] || '',
-    step2AppealFiled: row[GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1] || '',
-    step2Due: row[GRIEVANCE_COLS.STEP2_DUE - 1] || '',
-    step2Rcvd: row[GRIEVANCE_COLS.STEP2_RCVD - 1] || '',
-    step3AppealDue: row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1] || '',
-    step3AppealFiled: row[GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1] || '',
-    dateClosed: row[GRIEVANCE_COLS.DATE_CLOSED - 1] || '',
-    daysOpen: numericField_(row[GRIEVANCE_COLS.DAYS_OPEN - 1]),
-    nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] || '',
-    daysToDeadline: numericField_(row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1]),
-    articles: row[GRIEVANCE_COLS.ARTICLES - 1] || '',
-    issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
-    memberEmail: row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] || '',
-    location: row[GRIEVANCE_COLS.LOCATION - 1] || '',
-    steward: row[GRIEVANCE_COLS.STEWARD - 1] || '',
-    resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || '',
-    messageAlert: row[GRIEVANCE_COLS.MESSAGE_ALERT - 1] || false,
-    coordinatorMessage: row[GRIEVANCE_COLS.COORDINATOR_MESSAGE - 1] || '',
-    acknowledgedBy: row[GRIEVANCE_COLS.ACKNOWLEDGED_BY - 1] || '',
-    acknowledgedDate: row[GRIEVANCE_COLS.ACKNOWLEDGED_DATE - 1] || '',
-    driveFolderId: row[GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1] || '',
-    driveFolderUrl: row[GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1] || '',
-    actionType: row[GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance',
-    checklistProgress: row[GRIEVANCE_COLS.CHECKLIST_PROGRESS - 1] || '',
-    reminder1Date: row[GRIEVANCE_COLS.REMINDER_1_DATE - 1] || '',
-    reminder1Note: row[GRIEVANCE_COLS.REMINDER_1_NOTE - 1] || '',
-    reminder2Date: row[GRIEVANCE_COLS.REMINDER_2_DATE - 1] || '',
-    reminder2Note: row[GRIEVANCE_COLS.REMINDER_2_NOTE - 1] || ''
-  };
-}
+// mapGrievanceRow removed — dead code cleanup v4.25.11
 
 /**
  * Get all member header labels in order — auto-derived from MEMBER_HEADER_MAP_
@@ -2679,13 +2458,7 @@ function getDeadlineRules() {
   };
 }
 
-/** @deprecated Use getDeadlineRules() instead. Kept for backward compatibility. */
-var DEADLINE_RULES = {
-  STEP_1: { DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_1_RESPONSE },
-  STEP_2: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_2_RESPONSE },
-  STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
-  ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
-};
+// DEADLINE_RULES removed — dead code cleanup v4.25.11 (use getDeadlineRules() instead)
 
 /**
  * Dashboard sheet layout configuration.
@@ -2789,19 +2562,7 @@ var JOB_METADATA_FIELDS = [
   { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
 ];
 
-/**
- * Get job metadata field config by label
- * @param {string} label - The field label (e.g., 'Job Title')
- * @returns {Object|null} Field config if found, null otherwise
- */
-function getJobMetadataField(label) {
-  for (var i = 0; i < JOB_METADATA_FIELDS.length; i++) {
-    if (JOB_METADATA_FIELDS[i].label === label) {
-      return JOB_METADATA_FIELDS[i];
-    }
-  }
-  return null;
-}
+// getJobMetadataField removed — dead code cleanup v4.25.11
 
 /**
  * Get job metadata field config by member column number
@@ -3020,19 +2781,7 @@ var ACTION_TYPE_CONFIG = [
   { value: 'Other Admin', label: 'Other Administrative Action', icon: '📝', usesGrievanceSteps: false, color: '#64748B' }
 ];
 
-/**
- * Get action type configuration by value
- * @param {string} actionType - The action type value
- * @returns {Object|null} Action type config if found
- */
-function getActionTypeConfig(actionType) {
-  for (var i = 0; i < ACTION_TYPE_CONFIG.length; i++) {
-    if (ACTION_TYPE_CONFIG[i].value === actionType) {
-      return ACTION_TYPE_CONFIG[i];
-    }
-  }
-  return null;
-}
+// getActionTypeConfig removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // CHECKLIST CONFIGURATION
@@ -3274,35 +3023,7 @@ function getChecklistTemplate(actionType, issueCategory) {
   return templates['_default'] || [];
 }
 
-/**
- * Generate a sequential ID for high-volume environments
- * Alternative to name-based IDs when strict uniqueness is required
- * @param {string} prefix - ID prefix ('M' for members, 'G' for grievances)
- * @param {Sheet} sheet - Sheet to check for existing IDs
- * @param {number} idColumn - Column number containing IDs (1-indexed)
- * @returns {string} Sequential ID (e.g., M00001, G00042)
- */
-function generateSequentialId(prefix, sheet, idColumn) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    return prefix + '00001';
-  }
-
-  var ids = sheet.getRange(2, idColumn, lastRow - 1, 1).getValues();
-  var maxNum = 0;
-
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i][0];
-    if (id && typeof id === 'string' && id.indexOf(prefix) === 0) {
-      var numPart = parseInt(id.substring(prefix.length), 10);
-      if (!isNaN(numPart) && numPart > maxNum) {
-        maxNum = numPart;
-      }
-    }
-  }
-
-  return prefix + String(maxNum + 1).padStart(5, '0');
-}
+// generateSequentialId removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // MOBILE OPTIMIZATION UTILITIES

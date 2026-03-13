@@ -236,21 +236,7 @@ function safeSheetNameForFormula(sheetName) {
   return escaped;
 }
 
-/**
- * Sanitizes a value for use inside a Google Visualization API query string.
- * Escapes single quotes (doubled) and backslashes (doubled).
- * @param {*} value - The value to sanitize
- * @returns {string} Sanitized string safe for query embedding
- */
-function sanitizeForQuery(value) {
-  if (value === null || value === undefined) return '';
-  var str = String(value);
-  if (!str) return '';
-  // Google Visualization API: escape backslashes first, then single quotes
-  str = str.replace(/\\/g, '\\\\');
-  str = str.replace(/'/g, "''");
-  return str;
-}
+// sanitizeForQuery removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // ACCESS CONTROL FOR WEB APP
@@ -384,104 +370,9 @@ function getUserRole_(email) {
   }
 }
 
-/**
- * Validates web app request parameters
- * @param {Object} e - The event object from doGet
- * @returns {Object} Validation result with isValid and sanitized parameters
- */
-function validateWebAppRequest(e) {
-  var result = {
-    isValid: true,
-    params: {},
-    errors: [],
-    hasParams: false
-  };
+// validateWebAppRequest removed — dead code cleanup v4.25.11
 
-  if (!e || !e.parameter) {
-    // No parameters is structurally valid; callers must check result.hasParams
-    // independently if they require specific parameters to be present.
-    return result;
-  }
-
-  result.hasParams = !!(e && e.parameter && Object.keys(e.parameter).length > 0);
-
-  // Validate and sanitize 'mode' parameter
-  if (e.parameter.mode) {
-    var mode = String(e.parameter.mode).toLowerCase();
-    if (ACCESS_CONTROL.ALLOWED_MODES.indexOf(mode) === -1) {
-      result.isValid = false;
-      result.errors.push('Invalid mode parameter');
-    } else {
-      result.params.mode = mode;
-    }
-  }
-
-  // Validate and sanitize 'page' parameter
-  if (e.parameter.page) {
-    var page = String(e.parameter.page).toLowerCase();
-    if (ACCESS_CONTROL.ALLOWED_PAGES.indexOf(page) === -1) {
-      result.isValid = false;
-      result.errors.push('Invalid page parameter');
-    } else {
-      result.params.page = page;
-    }
-  }
-
-  // Validate and sanitize 'id' parameter (member ID)
-  if (e.parameter.id) {
-    var id = String(e.parameter.id);
-    // Only allow alphanumeric and hyphen for IDs
-    if (!/^[a-zA-Z0-9\-_]+$/.test(id)) {
-      result.isValid = false;
-      result.errors.push('Invalid ID format');
-    } else {
-      result.params.id = id;
-    }
-  }
-
-  // Validate and sanitize 'filter' parameter
-  if (e.parameter.filter) {
-    var filter = String(e.parameter.filter).toLowerCase();
-    var allowedFilters = ['open', 'closed', 'overdue', 'pending', 'all'];
-    if (allowedFilters.indexOf(filter) === -1) {
-      result.isValid = false;
-      result.errors.push('Invalid filter parameter');
-    } else {
-      result.params.filter = filter;
-    }
-  }
-
-  return result;
-}
-
-/**
- * Returns an access denied HTML page
- * @param {string} [message] - Custom message to display
- * @returns {HtmlOutput} Access denied page
- */
-function getAccessDeniedPage(message) {
-  var html = '<!DOCTYPE html>' +
-    '<html><head>' +
-    '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-    '<title>Access Denied</title>' +
-    '<style>' +
-    'body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}' +
-    '.container{background:white;padding:40px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);text-align:center;max-width:400px}' +
-    '.icon{font-size:64px;margin-bottom:20px}' +
-    'h1{color:#DC2626;margin:0 0 15px}' +
-    'p{color:#666;margin:0}' +
-    '</style></head><body>' +
-    '<div class="container">' +
-    '<div class="icon">🔒</div>' +
-    '<h1>Access Denied</h1>' +
-    '<p>' + escapeHtml(message || 'You do not have permission to access this resource.') + '</p>' +
-    '</div></body></html>';
-
-  return HtmlService.createHtmlOutput(html)
-    .setTitle('Access Denied')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
-}
+// getAccessDeniedPage removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // PII MASKING FOR LOGS
@@ -534,40 +425,9 @@ function maskName(firstName, lastName) {
   return (first + ' ' + last).trim() || '[anonymous]';
 }
 
-/**
- * Creates a log-safe version of a member object (masks PII)
- * @param {Object} member - Member object with PII
- * @returns {Object} Member object with masked PII
- */
-function maskMemberForLog(member) {
-  if (!member) return null;
+// maskMemberForLog removed — dead code cleanup v4.25.11
 
-  return {
-    id: member.memberId || member.id || '[no id]',
-    name: maskName(member.firstName, member.lastName),
-    email: maskEmail(member.email),
-    phone: maskPhone(member.phone),
-    unit: member.unit || '[no unit]',
-    location: member.location || member.workLocation || '[no location]'
-  };
-}
-
-/**
- * Creates a log-safe version of a grievance object (masks PII)
- * @param {Object} grievance - Grievance object with PII
- * @returns {Object} Grievance object with masked PII
- */
-function maskGrievanceForLog(grievance) {
-  if (!grievance) return null;
-
-  return {
-    id: grievance.grievanceId || grievance.id || '[no id]',
-    memberName: maskName(grievance.firstName, grievance.lastName),
-    status: grievance.status || '[no status]',
-    step: grievance.currentStep || grievance.step || '[no step]',
-    category: grievance.issueCategory || grievance.category || '[no category]'
-  };
-}
+// maskGrievanceForLog removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SECURE LOGGING
@@ -657,16 +517,7 @@ function isValidSafeString(input, maxLength) {
   return true;
 }
 
-/**
- * Validates a member ID format
- * @param {string} memberId - Member ID to validate
- * @returns {boolean} True if valid format
- */
-function isValidMemberId(memberId) {
-  if (!memberId) return false;
-  // Allow alphanumeric, hyphen, underscore, max 50 chars
-  return /^[a-zA-Z0-9\-_]{1,50}$/.test(String(memberId));
-}
+// isValidMemberId removed — dead code cleanup v4.25.11
 
 /**
  * Validates a grievance ID format
@@ -706,18 +557,7 @@ function getClientSideEscapeHtml() {
     'function safeText(t){return escapeHtml(t);}';
 }
 
-/**
- * Returns the full client-side security script as a <script> tag.
- * Include this at the start of your HTML body.
- *
- * @returns {string} Full script tag with security functions
- */
-function getClientSecurityScript() {
-  return '<script>' +
-    getClientSideEscapeHtml() +
-    "function safeAttr(t){return escapeHtml(t);}" +
-    '</script>';
-}
+// getClientSecurityScript removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SECURITY EVENT ALERTING SYSTEM
@@ -1046,76 +886,7 @@ function installSecurityDigestTrigger() {
     SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
-/**
- * Shows a security status overview dialog for admins.
- * Displays current security posture at a glance.
- */
-function showSecurityStatusDialog() {
-  var ui = SpreadsheetApp.getUi();
-
-  // Check pending digest events
-  var pendingEvents = 0;
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var queue = JSON.parse(props.getProperty('SECURITY_DIGEST_QUEUE') || '[]');
-    pendingEvents = queue.length;
-  } catch (_e) { /* skip */ }
-
-  // Check audit integrity
-  var auditStatus = 'Not checked';
-  if (typeof verifyAuditLogIntegrity === 'function') {
-    try {
-      var auditResult = verifyAuditLogIntegrity();
-      auditStatus = auditResult.valid ? 'PASS (' + auditResult.totalRows + ' entries)' :
-        'FAIL — ' + auditResult.invalidRows.length + ' tampered row(s)';
-      if (auditResult.message) auditStatus += '\n   ' + auditResult.message;
-    } catch (_e) {
-      auditStatus = 'Error running check';
-    }
-  }
-
-  // Check vault integrity
-  var vaultStatus = 'Not checked';
-  if (typeof verifySurveyVaultIntegrity === 'function') {
-    try {
-      var vaultResult = verifySurveyVaultIntegrity();
-      vaultStatus = vaultResult.valid ? 'PASS (' + vaultResult.stats.totalEntries + ' entries)' :
-        'ISSUES — ' + vaultResult.issues.length + ' problem(s)';
-    } catch (_e) {
-      vaultStatus = 'Error running check';
-    }
-  }
-
-  // Check dashboard auth
-  var dashAuthStatus = 'Disabled (open access)';
-  if (typeof isDashboardMemberAuthRequired === 'function') {
-    dashAuthStatus = isDashboardMemberAuthRequired() ? 'ENABLED (PIN required)' : 'Disabled (open access)';
-  }
-
-  // Check for digest trigger
-  var digestTriggerInstalled = false;
-  try {
-    var triggers = ScriptApp.getProjectTriggers();
-    for (var i = 0; i < triggers.length; i++) {
-      if (triggers[i].getHandlerFunction() === 'sendDailySecurityDigest') {
-        digestTriggerInstalled = true;
-        break;
-      }
-    }
-  } catch (_e) { /* skip */ }
-
-  var message =
-    'SECURITY POSTURE OVERVIEW\n\n' +
-    'Audit Log Integrity: ' + auditStatus + '\n' +
-    'Survey Vault Integrity: ' + vaultStatus + '\n' +
-    'Dashboard Auth: ' + dashAuthStatus + '\n' +
-    'Daily Digest Trigger: ' + (digestTriggerInstalled ? 'Installed' : 'NOT installed') + '\n' +
-    'Pending Security Events: ' + pendingEvents + '\n\n' +
-    'To enable daily alerts:\n' +
-    '  Run: installSecurityDigestTrigger()';
-
-  ui.alert('🛡️ Security Status', message, ui.ButtonSet.OK);
-}
+// showSecurityStatusDialog removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SAFE EMAIL WRAPPER

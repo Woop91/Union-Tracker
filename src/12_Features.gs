@@ -564,36 +564,7 @@ function updateChecklistItem(checklistId, updates) {
   return errorResponse('Checklist item not found');
 }
 
-/**
- * Delete all checklist items for a case
- * @param {string} caseId - The case/grievance ID
- * @returns {Object} Result with count of deleted items
- */
-function deleteAllChecklistItems(caseId) {
-  var sheet = getOrCreateChecklistSheet();
-  var lastRow = sheet.getLastRow();
-
-  if (lastRow < 2) {
-    return { success: true, deletedCount: 0 };
-  }
-
-  var data = sheet.getRange(2, CHECKLIST_COLS.CASE_ID, lastRow - 1, 1).getValues();
-  var rowsToDelete = [];
-
-  // Find rows to delete (in reverse order to avoid index shifting)
-  for (var i = data.length - 1; i >= 0; i--) {
-    if (data[i][0] === caseId) {
-      rowsToDelete.push(i + 2);
-    }
-  }
-
-  // Delete rows in reverse order
-  for (var j = 0; j < rowsToDelete.length; j++) {
-    sheet.deleteRow(rowsToDelete[j]);
-  }
-
-  return { success: true, deletedCount: rowsToDelete.length };
-}
+// deleteAllChecklistItems removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // CHECKLIST UI HELPERS
@@ -628,114 +599,15 @@ function getChecklistForUI(caseId) {
   };
 }
 
-/**
- * Get all available checklist templates for a given action type
- * @param {string} actionType - The action type
- * @returns {Array} Array of template names
- */
-function getAvailableTemplates(actionType) {
-  var templates = CHECKLIST_TEMPLATES[actionType];
-  if (!templates) {
-    return ['_default'];
-  }
-  return Object.keys(templates);
-}
+// getAvailableTemplates removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // BATCH OPERATIONS
 // ============================================================================
 
-/**
- * Update checklist progress for all open cases
- * Useful for maintenance/sync operations
- */
-function updateAllChecklistProgress() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+// updateAllChecklistProgress removed — dead code cleanup v4.25.11
 
-  if (!grievanceSheet) {
-    return errorResponse('Grievance Log not found');
-  }
-
-  var lastRow = grievanceSheet.getLastRow();
-  if (lastRow < 2) {
-    return { success: true, updatedCount: 0 };
-  }
-
-  var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
-  var updatedCount = 0;
-
-  for (var i = 0; i < grievanceIds.length; i++) {
-    var caseId = grievanceIds[i][0];
-    if (caseId) {
-      updateChecklistProgress(caseId);
-      updatedCount++;
-    }
-
-    // Pause every 50 items to avoid timeout
-    if (updatedCount % 50 === 0) {
-      Utilities.sleep(100);
-    }
-  }
-
-  return { success: true, updatedCount: updatedCount };
-}
-
-/**
- * Create checklists for all existing grievances that don't have one
- * Useful for migrating existing data
- */
-function createChecklistsForExistingCases() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!grievanceSheet) {
-    return errorResponse('Grievance Log not found');
-  }
-
-  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
-
-  var lastRow = grievanceSheet.getLastRow();
-  if (lastRow < 2) {
-    return { success: true, createdCount: 0 };
-  }
-
-  var data = grievanceSheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.CHECKLIST_PROGRESS).getValues();
-  var createdCount = 0;
-
-  for (var i = 0; i < data.length; i++) {
-    var caseId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var actionType = data[i][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
-    var issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1];
-    var checklistProgress = data[i][GRIEVANCE_COLS.CHECKLIST_PROGRESS - 1];
-
-    // Skip if already has a checklist
-    if (checklistProgress && checklistProgress !== 'No checklist') {
-      continue;
-    }
-
-    // Check if items exist
-    var existingItems = getChecklistItems(caseId);
-    if (existingItems.length > 0) {
-      // Just update the progress display
-      updateChecklistProgress(caseId);
-      continue;
-    }
-
-    // Create checklist from template
-    var result = createChecklistFromTemplate(caseId, actionType, issueCategory);
-    if (result.success) {
-      createdCount++;
-    }
-
-    // Pause every 10 items to avoid timeout
-    if (createdCount % 10 === 0) {
-      Utilities.sleep(100);
-    }
-  }
-
-  return { success: true, createdCount: createdCount };
-}
+// createChecklistsForExistingCases removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // ONOPEN / ONEDIT INTEGRATION
@@ -1099,48 +971,7 @@ function setupActionTypeColumn() {
   return { success: true };
 }
 
-/**
- * Get a summary of cases by action type
- * @returns {Object} Summary with counts by action type
- */
-function getCasesByActionType() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!grievanceSheet) {
-    return {};
-  }
-
-  var lastRow = grievanceSheet.getLastRow();
-  if (lastRow < 2) {
-    return {};
-  }
-
-  var data = grievanceSheet.getRange(2, GRIEVANCE_COLS.ACTION_TYPE, lastRow - 1, 1).getValues();
-  var statusData = grievanceSheet.getRange(2, GRIEVANCE_COLS.STATUS, lastRow - 1, 1).getValues();
-
-  var summary = {};
-  var openStatuses = ['Open', 'Pending Info', 'Appealed', 'In Arbitration'];
-
-  for (var i = 0; i < data.length; i++) {
-    var actionType = data[i][0] || 'Grievance';
-    var status = statusData[i][0];
-
-    if (!summary[actionType]) {
-      summary[actionType] = { total: 0, open: 0, closed: 0 };
-    }
-
-    summary[actionType].total++;
-
-    if (openStatuses.indexOf(status) !== -1) {
-      summary[actionType].open++;
-    } else {
-      summary[actionType].closed++;
-    }
-  }
-
-  return summary;
-}
+// getCasesByActionType removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // CHECKLIST SHEET PROTECTION MANAGEMENT
@@ -1203,37 +1034,7 @@ function unlockChecklistSheet() {
   );
 }
 
-/**
- * Re-protect the Checklist sheet (keeps data rows editable)
- * Only protects the header row
- */
-function reprotectChecklistSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(CHECKLIST_SHEET_NAME);
-
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Error', 'Checklist sheet not found', SpreadsheetApp.getUi().ButtonSet.OK);
-    return;
-  }
-
-  // First remove any existing protections
-  var existingProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
-  existingProtections.forEach(function(p) { if (p.canEdit()) p.remove(); });
-
-  // Add protection that only protects header row
-  var protection = sheet.protect().setDescription('Checklist Sheet Structure');
-  var lastCol = sheet.getLastColumn() || 12;
-  var lastRow = Math.max(sheet.getLastRow(), 1000);
-
-  // Allow editing everything except row 1 (header)
-  protection.setUnprotectedRanges([sheet.getRange(2, 1, lastRow - 1, lastCol)]);
-
-  SpreadsheetApp.getUi().alert(
-    'Checklist Sheet Protected',
-    'The header row is now protected. All data rows remain editable.',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
-}
+// reprotectChecklistSheet removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // HIDDEN SHEET: _Checklist_Calc (Self-Healing Formulas)
@@ -1413,13 +1214,7 @@ function syncChecklistCalcToGrievanceLog() {
   return { success: true, updatedCount: updatedCount };
 }
 
-/**
- * Repair/rebuild the checklist calc sheet
- * Called by repairAllHiddenSheets()
- */
-function repairChecklistCalcSheet() {
-  return setupChecklistCalcSheet();
-}
+// repairChecklistCalcSheet removed — dead code cleanup v4.25.11
 
 
 
@@ -1629,14 +1424,7 @@ function loadMemberData_(options) {
 // PUBLIC API - MEMBER LEADERS
 // ============================================================================
 
-/**
- * Fetches all members tagged as 'Member Leader'.
- * These individuals are organizational and do not appear in Grievance lists.
- * @returns {Array} Array of leader objects
- */
-function getMemberLeaders() {
-  return loadMemberData_().leaders;
-}
+// getMemberLeaders removed — dead code cleanup v4.25.11
 
 /**
  * Gets stewards for grievance dropdowns, EXCLUDING Member Leaders.
@@ -1647,26 +1435,9 @@ function getStewardsForGrievance() {
   return loadMemberData_().stewards;
 }
 
-/**
- * Gets both leaders and stewards in a single optimized call.
- * Use when you need both datasets to avoid duplicate sheet reads.
- * @returns {Object} { leaders: Array, stewards: Array }
- */
-function getLeadersAndStewards() {
-  const result = loadMemberData_();
-  return { leaders: result.leaders, stewards: result.stewards };
-}
+// getLeadersAndStewards removed — dead code cleanup v4.25.11
 
-/**
- * Checks if a member is a Member Leader (not a Steward).
- * @param {string} memberId - The member ID to check
- * @returns {boolean} True if member is a Member Leader
- */
-function isMemberLeader(memberId) {
-  if (!memberId) return false;
-  const result = loadMemberData_({ findMemberId: memberId });
-  return result.found && result.found.roleValue === EXTENSION_CONFIG.LEADER_ROLE_NAME;
-}
+// isMemberLeader removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SELF-HEALING DYNAMIC FORMULAS
@@ -1767,113 +1538,9 @@ function getExpansionColumnData(memberId) {
   };
 }
 
-/**
- * Generates HTML form fields for custom columns.
- * Uses array join for efficient string building.
- * @param {string} memberId - Optional member ID to pre-fill values
- * @returns {string} HTML string with form fields
- */
-function generateExpansionFieldsHtml(memberId) {
-  const expansionData = getExpansionColumnData(memberId);
+// generateExpansionFieldsHtml removed — dead code cleanup v4.25.11
 
-  if (expansionData.extraHeaders.length === 0) {
-    return '<!-- No custom columns detected -->';
-  }
-
-  const parts = [
-    '<div class="expansion-fields" style="margin-top:16px;padding-top:16px;border-top:1px solid #E5E7EB;">',
-    '<div class="expansion-header" style="font-weight:600;color:#7C3AED;margin-bottom:12px;">Custom Fields</div>'
-  ];
-
-  const fields = expansionData.extraHeaders;
-  for (let i = 0; i < fields.length; i++) {
-    const field = fields[i];
-    const value = escapeHtml(String(expansionData.memberData[field.name] || ''));
-    const fieldId = 'custom_' + field.name.replace(/[^a-zA-Z0-9]/g, '_');
-
-    parts.push(
-      '<div class="form-group" style="margin-bottom:12px;">',
-      '<label class="form-label" style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">',
-      escapeHtml(field.name),
-      '</label>',
-      '<input type="text" class="form-input" id="', fieldId, '" name="', fieldId,
-      '" data-column="', field.column, '" value="', value,
-      '" style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:6px;font-family:Roboto,sans-serif;">',
-      '</div>'
-    );
-  }
-
-  parts.push('</div>');
-  return parts.join('');
-}
-
-/**
- * Saves custom column data for a member using batch write.
- * @param {string} memberId - The member ID
- * @param {Object} customData - Object with field names as keys
- * @returns {Object} Result with success status
- */
-function saveExpansionData(memberId, customData) {
-  if (!memberId || !customData) {
-    return errorResponse('Member ID and data required');
-  }
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetName = SHEETS.MEMBER_DIR;
-  const sheet = ss.getSheetByName(sheetName);
-
-  if (!sheet) {
-    return errorResponse('Sheet not found');
-  }
-
-  const headerMap = getHeaderMap(sheetName);
-  const result = loadMemberData_({ findMemberId: memberId });
-
-  if (!result.found) {
-    return errorResponse('Member not found');
-  }
-
-  const memberRow = result.found.row;
-  const coreCount = EXTENSION_CONFIG.CORE_COLUMN_COUNT;
-
-  // Collect updates for batch write
-  const updates = [];
-  const fieldNames = Object.keys(customData);
-
-  for (let i = 0; i < fieldNames.length; i++) {
-    const fieldName = fieldNames[i];
-    const col = headerMap[fieldName];
-    if (col && col > coreCount) {
-      var rawValue = customData[fieldName];
-      var safeValue = typeof rawValue === 'string' ? escapeForFormula(rawValue) : rawValue;
-      updates.push({ col: col, value: safeValue });
-    }
-  }
-
-  if (updates.length === 0) {
-    return { success: true, updated: 0 };
-  }
-
-  // Sort by column for potential range optimization
-  updates.sort((a, b) => a.col - b.col);
-
-  // Check if columns are contiguous for single batch write
-  const minCol = updates[0].col;
-  const maxCol = updates[updates.length - 1].col;
-
-  if (maxCol - minCol + 1 === updates.length) {
-    // Contiguous columns - single batch write
-    const values = updates.map(u => u.value);
-    sheet.getRange(memberRow, minCol, 1, values.length).setValues([values]);
-  } else {
-    // Non-contiguous - use individual writes (still fewer than per-field)
-    for (let i = 0; i < updates.length; i++) {
-      sheet.getRange(memberRow, updates[i].col).setValue(updates[i].value);
-    }
-  }
-
-  return { success: true, updated: updates.length };
-}
+// saveExpansionData removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SETUP & CONFIGURATION
@@ -1914,92 +1581,9 @@ function setupMemberLeaderRole() {
   return { success: true };
 }
 
-/**
- * Runs all Dynamic Engine setup tasks.
- * @returns {Object} Result with setup details
- */
-function setupDynamicEngine() {
-  const ui = SpreadsheetApp.getUi();
+// setupDynamicEngine removed — dead code cleanup v4.25.11
 
-  const response = ui.alert(
-    'Setup Dynamic Engine',
-    'This will:\n\n' +
-    '1. Add "Member Leader" to IS_STEWARD dropdown options\n' +
-    '2. Inject self-healing formulas into _Dashboard_Calc\n' +
-    '3. Scan for custom columns beyond Column AF\n\n' +
-    'Continue?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response !== ui.Button.YES) {
-    return { success: false, cancelled: true };
-  }
-
-  // Invalidate cache before setup
-  invalidateHeaderCache(SHEETS.MEMBER_DIR);
-
-  const roleResult = setupMemberLeaderRole();
-  const formulaResult = repairDynamicFormulas();
-  const expansionData = getExpansionColumnData();
-
-  const summary =
-    'Dynamic Engine Setup Complete:\n\n' +
-    '• Member Leader Role: ' + (roleResult.success ? 'OK' : 'Failed') + '\n' +
-    '• Self-Healing Formulas: ' + (formulaResult.success ? 'Injected at row ' + formulaResult.startRow : 'Failed') + '\n' +
-    '• Custom Columns Found: ' + expansionData.extraHeaders.length;
-
-  ui.alert('Setup Complete', summary, ui.ButtonSet.OK);
-
-  return {
-    success: true,
-    roleSetup: roleResult,
-    formulas: formulaResult,
-    expansionColumns: expansionData.extraHeaders.length
-  };
-}
-
-/**
- * Gets Dynamic Engine status for display in admin panels.
- * Optimized single-pass data collection.
- * @returns {Object} Status object with feature states
- */
-function getDynamicEngineStatus() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // Single load for leaders
-  const memberData = loadMemberData_();
-
-  // Get expansion columns (uses cached header map)
-  const expansionData = getExpansionColumnData();
-
-  // Check self-healing status
-  const calcSheet = ss.getSheetByName(EXTENSION_CONFIG.HIDDEN_CALC_SHEET);
-  let formulasInjected = false;
-
-  if (calcSheet) {
-    const checkValue = calcSheet.getRange(EXTENSION_CONFIG.DYNAMIC_FORMULA_ROW, 1).getValue();
-    formulasInjected = checkValue && checkValue.toString().indexOf('DYNAMIC ENGINE') !== -1;
-  }
-
-  return {
-    memberLeaders: {
-      count: memberData.leaders.length,
-      names: memberData.leaders.map(function(l) { return l.name; })
-    },
-    stewards: {
-      count: memberData.stewards.length
-    },
-    expansionColumns: {
-      count: expansionData.extraHeaders.length,
-      headers: expansionData.extraHeaders.map(function(h) { return h.name; })
-    },
-    selfHealing: {
-      active: formulasInjected,
-      sheet: EXTENSION_CONFIG.HIDDEN_CALC_SHEET,
-      row: EXTENSION_CONFIG.DYNAMIC_FORMULA_ROW
-    }
-  };
-}
+// getDynamicEngineStatus removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // GRIEVANCE REMINDERS FEATURE
@@ -2109,15 +1693,7 @@ function getGrievanceReminders(grievanceId) {
   return null;
 }
 
-/**
- * Clears a reminder for a grievance.
- * @param {string} grievanceId - The grievance ID
- * @param {number} reminderNum - Which reminder to clear (1 or 2)
- * @returns {Object} Result with success status
- */
-function clearGrievanceReminder(grievanceId, reminderNum) {
-  return setGrievanceReminder(grievanceId, reminderNum, '', '');
-}
+// clearGrievanceReminder removed — dead code cleanup v4.25.11
 
 /**
  * Gets all grievances with reminders due within specified days.
@@ -2223,52 +1799,7 @@ function getDueReminders(daysAhead) {
   return dueReminders;
 }
 
-/**
- * Shows the reminder management dialog for a grievance.
- * Can be called from Quick Actions or menu.
- * @param {string} grievanceId - Optional grievance ID (uses selected row if not provided)
- */
-function showReminderDialog(grievanceId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const ui = SpreadsheetApp.getUi();
-
-  // If no grievanceId provided, try to get from selected row
-  if (!grievanceId) {
-    const sheet = ss.getActiveSheet();
-    if (sheet.getName() !== (SHEETS.GRIEVANCE_LOG || 'Grievance Log')) {
-      ui.alert('Please select a grievance in the Grievance Log sheet, or provide a Grievance ID.');
-      return;
-    }
-
-    const row = sheet.getActiveRange().getRow();
-    if (row <= 1) {
-      ui.alert('Please select a grievance row (not the header).');
-      return;
-    }
-
-    grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
-  }
-
-  if (!grievanceId) {
-    ui.alert('No grievance selected.');
-    return;
-  }
-
-  // Get current reminders
-  const reminders = getGrievanceReminders(grievanceId);
-  if (!reminders) {
-    ui.alert('Grievance not found: ' + grievanceId);
-    return;
-  }
-
-  // Build the HTML dialog
-  const html = buildReminderDialogHtml_(grievanceId, reminders);
-  const dialog = HtmlService.createHtmlOutput(html)
-    .setWidth(500)
-    .setHeight(450);
-
-  ui.showModalDialog(dialog, '⏰ Reminders: ' + grievanceId);
-}
+// showReminderDialog removed — dead code cleanup v4.25.11
 
 /**
  * Builds the HTML for the reminder dialog.
@@ -2454,57 +1985,9 @@ function checkAndNotifyReminders(daysAhead) {
   };
 }
 
-/**
- * Installs the daily reminder check trigger.
- * Call once during setup to enable automatic reminder notifications.
- */
-function installReminderTrigger() {
-  // Remove existing reminder triggers first
-  const triggers = ScriptApp.getProjectTriggers();
-  for (let i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'checkAndNotifyReminders') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
+// installReminderTrigger removed — dead code cleanup v4.25.11
 
-  // Install new daily trigger at 8 AM
-  ScriptApp.newTrigger('checkAndNotifyReminders')
-    .timeBased()
-    .everyDays(1)
-    .atHour(8)
-    .create();
-
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Daily reminder check installed (8 AM)',
-    'Trigger Installed',
-    5
-  );
-
-  if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
-    logAuditEvent(AUDIT_EVENTS.TRIGGER_INSTALLED, {
-      triggerName: 'checkAndNotifyReminders',
-      schedule: 'Daily at 8 AM',
-      installedBy: Session.getActiveUser().getEmail()
-    });
-  }
-
-  return { success: true };
-}
-
-/**
- * Gets reminder summary for dashboard display.
- * @returns {Object} Summary with counts and upcoming reminders
- */
-function getReminderSummary() {
-  const todayReminders = getDueReminders(0); // Due today
-  const weekReminders = getDueReminders(7);  // Due within a week
-
-  return {
-    dueToday: todayReminders.length,
-    dueThisWeek: weekReminders.length,
-    upcoming: weekReminders.slice(0, 5) // Top 5 for dashboard
-  };
-}
+// getReminderSummary removed — dead code cleanup v4.25.11
 
 
 
@@ -3058,77 +2541,7 @@ function refreshLookerSatisfaction_() {
 // For external stakeholders, compliance, or public-facing dashboards.
 // Excludes: Names, Emails, Phones, Addresses, Member IDs
 
-/**
- * Sets up PII-free Looker sheets for external/compliance use.
- * @returns {Object} Result with created sheet names
- */
-function setupLookerAnonIntegration() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const ui = SpreadsheetApp.getUi();
-
-  const response = ui.alert(
-    'Setup PII-Free Looker Integration',
-    'This will create ANONYMIZED data sheets for external Looker reports:\n\n' +
-    '• _Looker_Anon_Members - Aggregated member data (no names/contact)\n' +
-    '• _Looker_Anon_Grievances - Case data (no member info)\n' +
-    '• _Looker_Anon_Satisfaction - Survey data (hashed, no email/member ID)\n\n' +
-    'These sheets contain NO personally identifiable information (PII).\n' +
-    'Safe for external dashboards and compliance reporting.\n\n' +
-    'Continue?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response !== ui.Button.YES) {
-    return { success: false, cancelled: true };
-  }
-
-  const created = [];
-
-  // Create each anonymous Looker sheet
-  for (const key in LOOKER_CONFIG.SHEETS_ANON) {
-    const sheetName = LOOKER_CONFIG.SHEETS_ANON[key];
-    let sheet = ss.getSheetByName(sheetName);
-
-    if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
-      setSheetVeryHidden_(sheet);
-      created.push(sheetName);
-    }
-  }
-
-  // Initialize headers for each sheet
-  initializeLookerAnonGrievancesSheet_();
-  initializeLookerAnonMembersSheet_();
-  initializeLookerAnonSatisfactionSheet_();
-
-  // Do initial data population
-  refreshLookerAnonData();
-
-  const summary = created.length > 0
-    ? 'Created sheets: ' + created.join(', ')
-    : 'All PII-free Looker sheets already exist';
-
-  ui.alert(
-    'PII-Free Setup Complete',
-    summary + '\n\nThese sheets contain NO personally identifiable information:\n' +
-    '• No names, emails, or phone numbers\n' +
-    '• No member IDs (uses anonymous hashes)\n' +
-    '• Safe for external/public dashboards',
-    ui.ButtonSet.OK
-  );
-
-  // Log setup
-  if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
-    logAuditEvent(AUDIT_EVENTS.SYSTEM_INITIALIZED, {
-      action: 'LOOKER_ANON_SETUP',
-      sheetsCreated: created,
-      piiExcluded: true,
-      performedBy: Session.getActiveUser().getEmail()
-    });
-  }
-
-  return { success: true, created: created, piiExcluded: true };
-}
+// setupLookerAnonIntegration removed — dead code cleanup v4.25.11
 
 /**
  * Initializes the anonymized Grievances sheet headers.
@@ -3676,142 +3089,11 @@ function getScoreBucket_(score) {
   return 'Low (1-4)';
 }
 
-/**
- * Shows help dialog for PII-free Looker connection.
- */
-function showLookerAnonConnectionHelp() {
-  const _ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  const _ssUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
+// showLookerAnonConnectionHelp removed — dead code cleanup v4.25.11
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  ${getMobileOptimizedHead()}
-  <style>
-    body { font-family: 'Google Sans', Roboto, sans-serif; padding: 20px; color: #1F2937; }
-    h2 { color: #059669; margin-bottom: 16px; }
-    .pii-badge { display: inline-block; background: #059669; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; margin-bottom: 16px; }
-    .step { background: #F3F4F6; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; }
-    .step-num { display: inline-block; width: 24px; height: 24px; background: #059669; color: white; border-radius: 50%; text-align: center; line-height: 24px; margin-right: 8px; font-size: 12px; }
-    code { background: #E5E7EB; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-    .sheets { margin: 16px 0; }
-    .sheet-name { display: inline-block; background: #334155; color: #F8FAFC; padding: 4px 12px; border-radius: 4px; margin: 4px; font-size: 13px; }
-    .excluded { margin: 16px 0; padding: 12px; background: #ECFDF5; border: 1px solid #059669; border-radius: 8px; }
-    .excluded h4 { color: #059669; margin-bottom: 8px; font-size: 13px; }
-    .excluded ul { margin: 0; padding-left: 20px; font-size: 12px; color: #065F46; }
-    .btn { display: inline-block; padding: 10px 20px; background: linear-gradient(135deg, #059669, #047857); color: white; text-decoration: none; border-radius: 6px; margin-top: 12px; }
-  </style>
-</head>
-<body>
-  <h2>PII-Free Looker Connection</h2>
-  <span class="pii-badge">✓ NO PERSONAL DATA</span>
+// getLookerAnonStatus removed — dead code cleanup v4.25.11
 
-  <div class="excluded">
-    <h4>Excluded from these sheets:</h4>
-    <ul>
-      <li>Member names (first, last, full)</li>
-      <li>Email addresses</li>
-      <li>Phone numbers</li>
-      <li>Member IDs (uses anonymous hashes)</li>
-      <li>Steward names</li>
-    </ul>
-  </div>
-
-  <div class="step">
-    <span class="step-num">1</span>
-    Open <a href="https://lookerstudio.google.com" target="_blank">Looker Studio</a> and create a new report
-  </div>
-
-  <div class="step">
-    <span class="step-num">2</span>
-    Add a data source → Select <strong>Google Sheets</strong>
-  </div>
-
-  <div class="step">
-    <span class="step-num">3</span>
-    Select these ANONYMIZED sheets:
-    <div class="sheets">
-      <span class="sheet-name">_Looker_Anon_Members</span>
-      <span class="sheet-name">_Looker_Anon_Grievances</span>
-      <span class="sheet-name">_Looker_Anon_Satisfaction</span>
-    </div>
-  </div>
-
-  <a class="btn" href="https://lookerstudio.google.com/reporting/create" target="_blank">
-    Open Looker Studio →
-  </a>
-
-  <p style="margin-top: 20px; font-size: 11px; color: #6B7280;">
-    Safe for: External stakeholders, public dashboards, compliance reporting
-  </p>
-</body>
-</html>`;
-
-  const dialog = HtmlService.createHtmlOutput(html)
-    .setWidth(480)
-    .setHeight(500);
-
-  SpreadsheetApp.getUi().showModalDialog(dialog, 'PII-Free Looker Connection');
-}
-
-/**
- * Gets status of PII-free Looker integration.
- * @returns {Object} Status info
- */
-function getLookerAnonStatus() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const status = {
-    isSetup: true,
-    piiExcluded: true,
-    sheets: {},
-    recordCounts: {}
-  };
-
-  for (const key in LOOKER_CONFIG.SHEETS_ANON) {
-    const sheetName = LOOKER_CONFIG.SHEETS_ANON[key];
-    const sheet = ss.getSheetByName(sheetName);
-
-    status.sheets[key] = {
-      exists: !!sheet,
-      name: sheetName,
-      rows: sheet ? Math.max(0, sheet.getLastRow() - 1) : 0
-    };
-
-    if (!sheet) status.isSetup = false;
-    status.recordCounts[key] = status.sheets[key].rows;
-  }
-
-  return status;
-}
-
-/**
- * Installs trigger to refresh both standard and PII-free Looker data.
- */
-function installLookerAllRefreshTrigger() {
-  // Remove existing triggers
-  const triggers = ScriptApp.getProjectTriggers();
-  for (let i = 0; i < triggers.length; i++) {
-    const fn = triggers[i].getHandlerFunction();
-    if (fn === 'refreshLookerData' || fn === 'refreshLookerAnonData' || fn === 'refreshAllLookerData_') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
-
-  // Install combined refresh trigger
-  ScriptApp.newTrigger('refreshAllLookerData_')
-    .timeBased()
-    .everyDays(1)
-    .atHour(LOOKER_CONFIG.AUTO_REFRESH_HOUR)
-    .create();
-
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Daily refresh installed for both standard and PII-free data',
-    'Looker Triggers Installed',
-    5
-  );
-
-  return { success: true };
-}
+// installLookerAllRefreshTrigger removed — dead code cleanup v4.25.11
 
 /**
  * Refreshes both standard and PII-free Looker data.
@@ -3873,161 +3155,10 @@ function getOutcomeCategory_(status) {
 // TRIGGERS & AUTOMATION
 // ============================================================================
 
-/**
- * Installs daily auto-refresh trigger for Looker data.
- */
-function installLookerRefreshTrigger() {
-  // Remove existing triggers
-  const triggers = ScriptApp.getProjectTriggers();
-  for (let i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'refreshLookerData') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
+// installLookerRefreshTrigger removed — dead code cleanup v4.25.11
 
-  // Install new trigger
-  ScriptApp.newTrigger('refreshLookerData')
-    .timeBased()
-    .everyDays(1)
-    .atHour(LOOKER_CONFIG.AUTO_REFRESH_HOUR)
-    .create();
+// getLookerConnectionUrl removed — dead code cleanup v4.25.11
 
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Daily refresh installed (' + LOOKER_CONFIG.AUTO_REFRESH_HOUR + ':00 AM)',
-    'Looker Trigger Installed',
-    5
-  );
+// showLookerConnectionHelp removed — dead code cleanup v4.25.11
 
-  return { success: true };
-}
-
-/**
- * Gets the Looker Studio connection URL for this spreadsheet.
- * @returns {string} URL to create new Looker Studio report
- */
-function getLookerConnectionUrl() {
-  const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  return 'https://lookerstudio.google.com/reporting/create?c.reportId=&r.reportName=Dashboard%20Report&ds.connector=googleSheets&ds.spreadsheetId=' + ssId;
-}
-
-/**
- * Shows dialog with Looker Studio connection instructions.
- * Lists only the 3 allowed data sources.
- */
-function showLookerConnectionHelp() {
-  const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  const ssUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  ${getMobileOptimizedHead()}
-  <style>
-    body { font-family: 'Google Sans', Roboto, sans-serif; padding: 20px; color: #1F2937; }
-    h2 { color: #7C3AED; margin-bottom: 16px; }
-    .step { background: #F3F4F6; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; }
-    .step-num { display: inline-block; width: 24px; height: 24px; background: #7C3AED; color: white; border-radius: 50%; text-align: center; line-height: 24px; margin-right: 8px; font-size: 12px; }
-    code { background: #E5E7EB; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-    .sheets { margin: 16px 0; }
-    .sheet-name { display: inline-block; background: #1E293B; color: #F8FAFC; padding: 4px 12px; border-radius: 4px; margin: 4px; font-size: 13px; }
-    .source-info { font-size: 11px; color: #6B7280; display: block; margin-top: 2px; }
-    .btn { display: inline-block; padding: 10px 20px; background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; text-decoration: none; border-radius: 6px; margin-top: 12px; }
-    .btn:hover { opacity: 0.9; }
-    .restricted { background: #FEF3C7; border: 1px solid #F59E0B; padding: 10px; border-radius: 6px; margin: 16px 0; font-size: 13px; }
-  </style>
-</head>
-<body>
-  <h2>Connect to Looker Studio</h2>
-
-  <div class="restricted">
-    <strong>Restricted Data Access:</strong> Only Member Directory, Grievance Log, and Member Satisfaction data is available to Looker Studio.
-  </div>
-
-  <div class="step">
-    <span class="step-num">1</span>
-    Open <a href="https://lookerstudio.google.com" target="_blank">Looker Studio</a> and create a new report
-  </div>
-
-  <div class="step">
-    <span class="step-num">2</span>
-    Add a data source → Select <strong>Google Sheets</strong>
-  </div>
-
-  <div class="step">
-    <span class="step-num">3</span>
-    Find this spreadsheet or paste the URL:<br>
-    <code style="word-break: break-all; display: block; margin-top: 8px;">${ssUrl}</code>
-  </div>
-
-  <div class="step">
-    <span class="step-num">4</span>
-    Select one of these sheets as your data source:
-    <div class="sheets">
-      <span class="sheet-name">_Looker_Members<span class="source-info">← Member Directory</span></span>
-      <span class="sheet-name">_Looker_Grievances<span class="source-info">← Grievance Log</span></span>
-      <span class="sheet-name">_Looker_Satisfaction<span class="source-info">← Survey Data</span></span>
-    </div>
-  </div>
-
-  <div class="step">
-    <span class="step-num">5</span>
-    Add multiple data sources to create relationships between members and grievances
-  </div>
-
-  <a class="btn" href="https://lookerstudio.google.com/reporting/create" target="_blank">
-    Open Looker Studio →
-  </a>
-
-  <p style="margin-top: 20px; font-size: 12px; color: #6B7280;">
-    Spreadsheet ID: <code>${ssId}</code>
-  </p>
-</body>
-</html>`;
-
-  const dialog = HtmlService.createHtmlOutput(html)
-    .setWidth(520)
-    .setHeight(520);
-
-  SpreadsheetApp.getUi().showModalDialog(dialog, 'Looker Studio Connection');
-}
-
-/**
- * Gets Looker integration status.
- * @returns {Object} Status of Looker sheets and data
- */
-function getLookerStatus() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const status = {
-    isSetup: true,
-    allowedSources: LOOKER_CONFIG.ALLOWED_SOURCES,
-    sheets: {},
-    lastRefresh: null,
-    recordCounts: {}
-  };
-
-  for (const key in LOOKER_CONFIG.SHEETS) {
-    const sheetName = LOOKER_CONFIG.SHEETS[key];
-    const sheet = ss.getSheetByName(sheetName);
-
-    status.sheets[key] = {
-      exists: !!sheet,
-      name: sheetName,
-      rows: sheet ? Math.max(0, sheet.getLastRow() - 1) : 0
-    };
-
-    if (!sheet) status.isSetup = false;
-    status.recordCounts[key] = status.sheets[key].rows;
-  }
-
-  // Get last refresh time from first data sheet
-  const memberSheet = ss.getSheetByName(LOOKER_CONFIG.SHEETS.MEMBERS);
-  if (memberSheet && memberSheet.getLastRow() > 1) {
-    const lastCol = memberSheet.getLastColumn();
-    const lastUpdate = memberSheet.getRange(2, lastCol).getValue();
-    if (lastUpdate instanceof Date) {
-      status.lastRefresh = lastUpdate;
-    }
-  }
-
-  return status;
-}
+// getLookerStatus removed — dead code cleanup v4.25.11

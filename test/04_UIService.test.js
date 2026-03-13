@@ -3,8 +3,8 @@
  *
  * Covers: parseCSVLine_, mapImportColumns_, getCommonStyles,
  * getQuickCaptureNotes, saveQuickCaptureNotes, clearQuickCaptureNotes,
- * setBreakReminders, getDashboardStats, showVisualControlPanel,
- * startPomodoroTimer, and HTML generator smoke tests.
+ * getDashboardStats, showVisualControlPanel,
+ * and HTML generator smoke tests.
  */
 
 const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
@@ -269,52 +269,6 @@ describe('clearQuickCaptureNotes', () => {
 });
 
 // ============================================================================
-// setBreakReminders
-// ============================================================================
-
-describe('setBreakReminders', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    setupUserPropertiesMock({});
-
-    // Mock ScriptApp triggers
-    const mockTrigger = {
-      getHandlerFunction: jest.fn(() => 'someOtherFunction')
-    };
-    ScriptApp.getProjectTriggers.mockReturnValue([mockTrigger]);
-    ScriptApp.newTrigger.mockReturnValue({
-      timeBased: jest.fn(function() { return this; }),
-      everyMinutes: jest.fn(function() { return this; }),
-      create: jest.fn()
-    });
-
-    // Mock toast
-    const mockSS = { toast: jest.fn() };
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-  });
-
-  test('creates a new trigger when minutes > 0', () => {
-    setBreakReminders(30);
-    expect(ScriptApp.newTrigger).toHaveBeenCalledWith('showBreakReminder');
-  });
-
-  test('does not create trigger when minutes is 0', () => {
-    setBreakReminders(0);
-    expect(ScriptApp.newTrigger).not.toHaveBeenCalled();
-  });
-
-  test('deletes existing showBreakReminder triggers', () => {
-    const breakTrigger = {
-      getHandlerFunction: jest.fn(() => 'showBreakReminder')
-    };
-    ScriptApp.getProjectTriggers.mockReturnValue([breakTrigger]);
-
-    setBreakReminders(15);
-    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(breakTrigger);
-  });
-});
-
-// ============================================================================
 // getDashboardStats (04_UIService version)
 // ============================================================================
 
@@ -413,13 +367,6 @@ describe('HTML generator functions (smoke tests)', () => {
     expect(typeof styles).toBe('string');
     expect(styles).toContain('<style>');
     expect(styles).toContain('</style>');
-  });
-
-  test('getDashboardSidebarHtml returns HTML string', () => {
-    expect(typeof getDashboardSidebarHtml).toBe('function');
-    const html = getDashboardSidebarHtml();
-    expect(typeof html).toBe('string');
-    expect(html).toContain('<!DOCTYPE html>');
   });
 
   test('getMultiSelectHtml returns HTML string', () => {

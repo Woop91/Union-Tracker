@@ -111,7 +111,6 @@ describe('A1: Cross-file dependencies', () => {
     const utilities = [
       'escapeHtml',
       'getClientSideEscapeHtml',
-      'getClientSecurityScript',
       'getConfigValue_',
       'isTruthyValue',
       'getMobileOptimizedHead',
@@ -276,19 +275,6 @@ describe('A2: HTML output functions', () => {
       expect(result).not.toContain('`');
       expect(result).toContain('='); // F107: = is not an XSS vector
       expect(result).toContain('&#x60;');
-    });
-  });
-
-  describe('getClientSecurityScript produces valid script tag', () => {
-    test('wraps output in script tags', () => {
-      const tag = getClientSecurityScript();
-      expect(tag).toMatch(/^<script>/);
-      expect(tag).toMatch(/<\/script>$/);
-    });
-
-    test('includes escapeHtml function', () => {
-      const tag = getClientSecurityScript();
-      expect(tag).toContain('function escapeHtml');
     });
   });
 

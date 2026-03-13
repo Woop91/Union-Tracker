@@ -25,7 +25,7 @@ describe('10a function existence', () => {
     'applyConfigSheetStyling', 'applySectionColors_', 'applyConfigStyling',
     'createConfigGuideSheet', '_addMissingMemberHeaders_',
     'createMemberDirectory', '_addMissingGrievanceHeaders_',
-    'createGrievanceLog', 'createDashboard',
+    'createGrievanceLog',
     'createVolunteerHoursSheet', 'createMeetingAttendanceSheet',
     'createMeetingCheckInLogSheet', 'setupMeetingCheckInSheet'
   ];

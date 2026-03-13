@@ -313,56 +313,6 @@ describe('computeDashboardMetrics_', () => {
 });
 
 // ============================================================================
-// getStewardCoverageStats
-// ============================================================================
-
-describe('getStewardCoverageStats', () => {
-  test('returns zero stats when member sheet does not exist', () => {
-    const mockSS = createMockSpreadsheet([]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    const result = getStewardCoverageStats();
-    expect(result.ratio).toBe(0);
-    expect(result.stewardCount).toBe(0);
-    expect(result.memberCount).toBe(0);
-    expect(result.targetRatio).toBe(15);
-  });
-
-  test('returns zero stats when sheet has no data', () => {
-    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR, [['Header']]);
-    memberSheet.getLastRow.mockReturnValue(1);
-    const mockSS = createMockSpreadsheet([memberSheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    const result = getStewardCoverageStats();
-    expect(result.ratio).toBe(0);
-    expect(result.memberCount).toBe(0);
-  });
-});
-
-// ============================================================================
-// getPublicOverviewData
-// ============================================================================
-
-describe('getPublicOverviewData', () => {
-  test('returns default structure when no sheets exist', () => {
-    const mockSS = createMockSpreadsheet([]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    const result = getPublicOverviewData();
-    expect(result.totalMembers).toBe(0);
-    expect(result.totalStewards).toBe(0);
-    expect(result.totalGrievances).toBe(0);
-    expect(result.winRate).toBe(0);
-    expect(result.locationBreakdown).toEqual([]);
-  });
-
-  test('is defined as a function', () => {
-    expect(typeof getPublicOverviewData).toBe('function');
-  });
-});
-
-// ============================================================================
 // syncAllData - smoke test
 // ============================================================================
 
@@ -545,64 +495,6 @@ describe('approveFlaggedSubmission / rejectFlaggedSubmission — formula injecti
     makeVaultSs([[1, 'hash', false, 'memhash', 'Q1', true, '', '']]);
 
     expect(() => approveFlaggedSubmission(1)).toThrow('Access denied');
-  });
-});
-
-// ============================================================================
-// getAggregateSatisfactionStats — vault VERIFIED / IS_LATEST isTruthyValue
-// The vault flags written by approveFlaggedSubmission ('Yes') and rejected
-// ('Rejected'/'No') flow through isTruthyValue(). Tests confirm all string
-// representations from Sheets are handled correctly.
-// ============================================================================
-
-describe('getAggregateSatisfactionStats — vault VERIFIED/IS_LATEST normalization', () => {
-  // Minimal satisfaction row: must be indexable by SATISFACTION_COLS constants.
-  // We only need a non-empty row; actual metric columns aren't tested here.
-  const SAT_HEADERS = ['Response'];
-  const SAT_ROW     = ['response-data'];
-
-  function makeSatisfactionSs() {
-    var satData = [SAT_HEADERS, SAT_ROW]; // row 2 = satRow index 2
-    var satSheet = createMockSheet(SHEETS.SATISFACTION || '_Satisfaction', satData);
-    // getRange for data read — return the row
-    satSheet.getRange = jest.fn(() => ({ getValues: jest.fn(() => [SAT_ROW]) }));
-    var ss = createMockSpreadsheet([satSheet]);
-    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
-  }
-
-  // Vault flag value pairs: [verified, isLatest, shouldInclude, label]
-  var vaultCases = [
-    // Values written by approveFlaggedSubmission
-    ['Yes',   'Yes',  true,  "approve writes 'Yes'/'Yes'"],
-    // Boolean true (manual entry or import)
-    [true,    true,   true,  'boolean true/true'],
-    // Common Sheets string variants
-    ['TRUE',  'TRUE', true,  "string 'TRUE'/'TRUE'"],
-    ['True',  'True', true,  "string 'True'/'True'"],
-    ['1',     '1',    true,  "string '1'/'1'"],
-    // Values written by rejectFlaggedSubmission
-    ['Rejected', 'No', false, "reject writes 'Rejected'/'No'"],
-    // Explicitly falsy
-    [false,   true,   false, 'boolean false verified'],
-    ['No',    'Yes',  false, "string 'No' verified"],
-    ['',      'Yes',  false, 'empty verified'],
-    ['Yes',   false,  false, 'boolean false isLatest'],
-    ['Yes',   '',     false, 'empty isLatest'],
-  ];
-
-  vaultCases.forEach(function(c) {
-    var verified = c[0], isLatest = c[1], shouldInclude = c[2], label = c[3];
-
-    test(label + ' → responseCount=' + (shouldInclude ? 1 : 0), function() {
-      makeSatisfactionSs();
-      // Inject vault map with the test values at row 2 (satRow for the single data row)
-      getVaultDataMap_.mockReturnValueOnce({
-        2: { verified: verified, isLatest: isLatest, quarter: 'Q1', vaultRow: 2 }
-      });
-
-      var result = getAggregateSatisfactionStats();
-      expect(result.responseCount).toBe(shouldInclude ? 1 : 0);
-    });
   });
 });
 

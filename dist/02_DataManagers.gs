@@ -1289,114 +1289,7 @@ function getImportMembersHtml_() {
     '</body></html>';
 }
 
-/**
- * Imports members from parsed CSV data
- * @param {Array<Array>} data - 2D array of CSV data (without headers)
- * @param {Object} mapping - Column mapping object {fieldName: columnIndex}
- * @returns {Object} Result with imported count and any errors
- */
-function importMembersFromData(data, mapping) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-    if (!sheet) {
-      return errorResponse('Member Directory sheet not found', 'bulkImportMembers');
-    }
-
-    // Get existing data for duplicate checking
-    var existingData = sheet.getDataRange().getValues();
-    var existingEmails = {};
-    var existingNames = {};
-
-    for (var i = 1; i < existingData.length; i++) {
-      var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
-      var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
-      if (email) existingEmails[email] = true;
-      if (name) existingNames[name] = true;
-    }
-
-    var imported = 0;
-    var skipped = 0;
-    var newRows = [];
-
-    for (var j = 0; j < data.length; j++) {
-      var row = data[j];
-
-      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
-      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-      email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
-
-      // Skip if no name
-      if (!firstName && !lastName) {
-        skipped++;
-        continue;
-      }
-
-      // Check for duplicates
-      var emailLower = email.toLowerCase();
-      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
-
-      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
-        skipped++;
-        continue;
-      }
-
-      // Mark as existing to prevent duplicates within import batch
-      if (emailLower) existingEmails[emailLower] = true;
-      existingNames[nameLower] = true;
-
-      // Generate Member ID
-      var memberId = generateMemberID_(firstName, lastName);
-
-      // Build new row with empty values for all columns
-      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
-      // CR-FORMULA: Escape all user-supplied values to prevent formula injection
-      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(firstName);
-      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(lastName);
-
-      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(row[mapping.email] || '');
-      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(row[mapping.phone] || '');
-      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(row[mapping.jobTitle] || '');
-      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(row[mapping.workLocation] || '');
-      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(row[mapping.unit] || '');
-      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = escapeForFormula(row[mapping.supervisor] || '');
-      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = escapeForFormula(row[mapping.manager] || '');
-
-      // Default Is Steward to No
-      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-
-      newRows.push(newRow);
-      imported++;
-    }
-
-    // Batch write all new rows
-    if (newRows.length > 0) {
-      var lastRow = sheet.getLastRow();
-      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-    }
-
-    // Log the import
-    logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
-      action: 'BULK_IMPORT',
-      importedCount: imported,
-      skippedCount: skipped,
-      importedBy: Session.getActiveUser().getEmail()
-    });
-
-    return {
-      success: true,
-      imported: imported,
-      skipped: skipped,
-      message: 'Import completed'
-    };
-
-  } catch (e) {
-    console.error('Import error: ' + e.message);
-    return errorResponse(e.message, 'bulkImportMembers');
-  }
-}
+// importMembersFromData removed — dead code cleanup v4.25.11
 
 /**
  * Returns existing member emails and names for client-side duplicate checking.
@@ -1826,32 +1719,7 @@ function calculateInitialDeadlines(filingDate) {
   };
 }
 
-/**
- * Calculates deadline for advancing to next step
- * @param {number} currentStep - Current grievance step (1-3)
- * @param {Date} currentStepDate - Date of current step
- * @return {Date} Deadline for next step
- */
-function calculateNextStepDeadline(currentStep, currentStepDate) {
-  var rules = getDeadlineRules();
-  let daysToAdd;
-
-  switch (currentStep) {
-    case 1:
-      daysToAdd = rules.STEP_2.DAYS_TO_APPEAL;
-      break;
-    case 2:
-      daysToAdd = rules.STEP_3.DAYS_TO_APPEAL;
-      break;
-    case 3:
-      daysToAdd = rules.ARBITRATION.DAYS_TO_DEMAND;
-      break;
-    default:
-      return null;
-  }
-
-  return addBusinessDays(currentStepDate, daysToAdd);
-}
+// calculateNextStepDeadline removed — dead code cleanup v4.25.11
 
 /**
  * Calculates response deadline for a given step
@@ -1902,21 +1770,7 @@ function addBusinessDays(startDate, days) {
   return result;
 }
 
-/**
- * Calculates days remaining until a deadline
- * @param {Date} deadline - Deadline date
- * @return {number} Days remaining (negative if overdue)
- */
-function getDaysUntilDeadline(deadline) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const deadlineDate = new Date(deadline);
-  deadlineDate.setHours(0, 0, 0, 0);
-
-  const diffTime = deadlineDate - today;
-  return Math.round(diffTime / (1000 * 60 * 60 * 24));
-}
+// getDaysUntilDeadline removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // STEP ADVANCEMENT
@@ -2023,19 +1877,7 @@ function advanceGrievanceStep(grievanceId, options) {
   }
 }
 
-/**
- * Gets column index for step date
- * @param {number} step - Step number
- * @return {number} 1-indexed column number
- */
-function getStepDateColumn(step) {
-  switch (step) {
-    case 1: return GRIEVANCE_COLS.STEP1_RCVD;
-    case 2: return GRIEVANCE_COLS.STEP2_APPEAL_FILED;
-    case 3: return GRIEVANCE_COLS.STEP3_APPEAL_FILED;
-    default: return null;
-  }
-}
+// getStepDateColumn removed — dead code cleanup v4.25.11
 
 /**
  * Returns explicit column references for a step's filed/due/rcvd columns.
@@ -2938,41 +2780,7 @@ function clearTrafficLightIndicators() {
   SpreadsheetApp.getActiveSpreadsheet().toast('Traffic light indicators cleared', COMMAND_CONFIG.SYSTEM_NAME, 3);
 }
 
-/**
- * Applies deadline-based row highlighting
- * Highlights entire rows based on urgency level
- */
-function highlightUrgentGrievances() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!sheet) return;
-
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  if (lastRow < 2) return;
-
-  var daysValues = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1).getValues();
-
-  // Build background color array and apply in a single batch
-  var backgrounds = [];
-  for (var i = 0; i < daysValues.length; i++) {
-    var days = daysValues[i][0];
-    var rowColors = new Array(lastCol).fill(null);
-
-    if (typeof days === 'number' && !isNaN(days)) {
-      if (days < 0) {
-        rowColors = new Array(lastCol).fill(COLORS.ROW_ALT_RED);
-      } else if (days <= 3) {
-        rowColors = new Array(lastCol).fill(COLORS.ROW_ALT_YELLOW);
-      }
-    }
-    backgrounds.push(rowColors);
-  }
-  sheet.getRange(2, 1, daysValues.length, lastCol).setBackgrounds(backgrounds);
-
-  SpreadsheetApp.getActiveSpreadsheet().toast('Urgent grievances highlighted', COMMAND_CONFIG.SYSTEM_NAME, 3);
-}
+// highlightUrgentGrievances removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // BULK ACTIONS — Grievance Log (PHASE2 Feature 4)

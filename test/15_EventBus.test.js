@@ -242,36 +242,6 @@ describe('emitEditEvent', () => {
   });
 });
 
-describe('emitFormEvent', () => {
-  test('emits form:submit:type event', () => {
-    const handler = jest.fn();
-    EventBus.on('form:submit:grievance', handler);
-    emitFormEvent('grievance', { id: 'G-001' });
-    expect(handler).toHaveBeenCalledWith({ id: 'G-001' });
-  });
-});
-
-describe('emitSyncComplete', () => {
-  test('emits sync:complete event with source', () => {
-    const handler = jest.fn();
-    EventBus.on('sync:complete', handler);
-    emitSyncComplete('grievance');
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ source: 'grievance' }));
-  });
-});
-
-describe('emitDataChanged', () => {
-  test('emits data:changed event with source and timestamp', () => {
-    const handler = jest.fn();
-    EventBus.on('data:changed', handler);
-    emitDataChanged('member_dir');
-    expect(handler).toHaveBeenCalledWith(expect.objectContaining({
-      source: 'member_dir',
-      timestamp: expect.any(String)
-    }));
-  });
-});
-
 // ============================================================================
 // registerEventBusSubscribers
 // ============================================================================

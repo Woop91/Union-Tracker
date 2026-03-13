@@ -14,13 +14,12 @@ loadSources([
 
 describe('04b function existence', () => {
   const required = [
-    'getCommonStyles', 'startPomodoroTimer', 'onPomodoroEnd_',
+    'getCommonStyles', 'startPomodoroTimer',
     'getQuickCaptureNotes', 'saveQuickCaptureNotes',
-    'clearQuickCaptureNotes', 'getQuickCaptureMetadata',
-    'showQuickCaptureNotepad', 'showImportDialog_UIService_',
+    'clearQuickCaptureNotes',
+    'showQuickCaptureNotepad',
     'getImportDialogHtml_', 'processMemberImport',
     'parseCSVLine_', 'mapImportColumns_',
-    'showExportDialog_UIService_', 'setBreakReminders',
     'showBreakReminder', 'showADHDControlPanel',
     'showThemeManager', 'showSmartDashboard', 'getSmartDashboardHtml'
   ];

@@ -1134,7 +1134,7 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
 
   <div class="chapter-row">
 
-    <!-- ─── MASSABILITY (always visible, starts expanded) ─── -->
+    <!-- ─── MASSABILITY (always visible, board expanded, sub-toggles collapsed) ─── -->
     <div class="chapter-branch" data-expand="true" style="max-width:none;">
       <div class="card tc ch-card" id="massability-card" >
         <span class="c-badge tc">MassAbility</span>
@@ -3186,7 +3186,7 @@ function pillToggle(id, btn) {
   btn.textContent = btn.textContent.replace(open ? '▾' : '▸', open ? '▸' : '▾');
 }
 
-// Expand MassAbility chapter board; collapse MA sub-sections by default (all screen sizes)
+// Collapse MA sub-sections by default (all screen sizes)
 function initDesktop() {
   // Collapse all MA sub-sections by default — user clicks to expand
   ['ma-jeb','ma-voc','ma-atlarge','ma-org','ma-vr-stewards'].forEach(id => {
@@ -3196,25 +3196,6 @@ function initDesktop() {
   document.querySelectorAll('.ma-sub-btn').forEach(btn => {
     btn.textContent = btn.textContent.replace('▼ hide', '▶ show');
   });
-  // Expand MassAbility chapter board (staff-list) on all screen sizes
-  const maCard = document.getElementById('massability-card');
-  if (maCard) {
-    const maBranch = maCard.closest('.chapter-branch');
-    if (maBranch) {
-      maBranch.querySelectorAll('.staff-list.collapsed').forEach(el => {
-        el.classList.remove('collapsed');
-      });
-      maBranch.querySelectorAll('.tog-btn').forEach(btn => {
-        btn.textContent = '▾ Hide board';
-      });
-      maBranch.querySelectorAll('.rep-list').forEach(el => {
-        el.style.display = 'block';
-      });
-      maBranch.querySelectorAll('.rep-btn').forEach(btn => {
-        btn.textContent = '▼ hide';
-      });
-    }
-  }
   // Attach click listeners to all ma-sub-btn as fallback
   document.querySelectorAll('.ma-sub-btn').forEach(btn => {
     const oc = btn.getAttribute('onclick');

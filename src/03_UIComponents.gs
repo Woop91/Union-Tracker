@@ -323,26 +323,8 @@ function createDashboardMenu() {
 // NAVIGATION FUNCTIONS
 // ============================================================================
 
-/**
- * Navigates to the Dashboard sheet
- * @returns {void}
- */
-function navToDash() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.DASHBOARD);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  }
-}
-
-/**
- * Navigates to mobile view
- * @returns {void}
- * @private
- */
-function navToMobile_UIService_() {
-  showSmartDashboard();
-}
+// navToDash removed — dead code cleanup v4.25.11
+// navToMobile_UIService_ removed — dead code cleanup v4.25.11
 
 /**
  * Navigates to a specific sheet by name
@@ -808,13 +790,7 @@ function toggleDarkMode() {
   );
 }
 
-/**
- * Shows the theme settings dialog
- * @returns {void}
- */
-function showThemeSettings() {
-  showVisualControlPanel();
-}
+// showThemeSettings removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // COMFORT VIEW / ADHD-FRIENDLY SETTINGS
@@ -892,17 +868,7 @@ function hideAllGridlines() {
   });
 }
 
-/**
- * Shows gridlines on all sheets
- * @returns {void}
- */
-function showAllGridlines() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-  sheets.forEach(function(sheet) {
-    sheet.setHiddenGridlines(false);
-  });
-}
+// showAllGridlines removed — dead code cleanup v4.25.11
 
 /**
  * Toggles gridlines visibility
@@ -985,19 +951,7 @@ function toggleZebraStripes() {
   }
 }
 
-/**
- * Toggles reduced motion setting
- * @returns {void}
- */
-function toggleReducedMotion() {
-  var settings = getADHDSettings();
-  settings.reducedMotion = !settings.reducedMotion;
-  saveADHDSettings(settings);
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    settings.reducedMotion ? 'Reduced motion enabled' : 'Reduced motion disabled',
-    'Accessibility', 2
-  );
-}
+// toggleReducedMotion removed — dead code cleanup v4.25.11
 
 /**
  * Activates focus mode
@@ -1065,37 +1019,10 @@ function applyTheme(themeKey, scope) {
   }
 }
 
-/**
- * Applies theme to a specific sheet
- * @param {Sheet} sheet - The sheet
- * @param {Object|string} [themeOrKey] - Theme object (ignored) or theme key string
- * @returns {void}
- */
-function applyThemeToSheet(sheet, themeOrKey) {
-  var key = (typeof themeOrKey === 'string') ? themeOrKey : undefined;
-  applyThemeToSheet_(sheet, key);
-}
+// applyThemeToSheet removed — dead code cleanup v4.25.11
 
-/**
- * Previews a theme
- * @param {string} themeKey - Theme key to preview
- * @returns {void}
- */
-function previewTheme(themeKey) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getActiveSheet();
-  applyThemeToSheet_(sheet, themeKey);
-  ss.toast('Previewing ' + themeKey + ' theme', 'Theme Preview', 2);
-}
-
-/**
- * Resets to default theme via system
- * @returns {void}
- * @private
- */
-function resetToDefaultThemeViaSystem_() {
-  resetToDefaultTheme();
-}
+// previewTheme removed — dead code cleanup v4.25.11
+// resetToDefaultThemeViaSystem_ removed — dead code cleanup v4.25.11
 
 /**
  * Quick toggle for dark mode
@@ -1116,35 +1043,8 @@ function setupADHDDefaults() {
   SpreadsheetApp.getActiveSpreadsheet().toast('Comfort View defaults applied', 'Settings', 3);
 }
 
-/**
- * Applies ADHD defaults with options
- * @param {Object} options - Options to apply
- * @returns {void}
- */
-function applyADHDDefaultsWithOptions(options) {
-  var settings = getADHDSettings();
-  Object.assign(settings, options);
-  applyADHDSettings(settings);
-}
-
-/**
- * Undoes ADHD/Comfort View defaults
- * @returns {void}
- */
-function undoADHDDefaults() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-
-  sheets.forEach(function(sheet) {
-    if (sheet.getName().indexOf('_Calc') !== 0) {
-      removeZebraStripes(sheet);
-      sheet.setHiddenGridlines(false);
-    }
-  });
-
-  resetADHDSettings();
-  ss.toast('Comfort View settings removed', 'Settings', 3);
-}
+// applyADHDDefaultsWithOptions removed — dead code cleanup v4.25.11
+// undoADHDDefaults removed — dead code cleanup v4.25.11
 
 /**
  * Refreshes all visual elements
@@ -2138,35 +2038,7 @@ function sendMemberDashboardLink() {
   }
 }
 
-/**
- * Sends the steward toolkit welcome email to a newly promoted steward
- * @private
- * @param {string} email - The steward's email address
- * @param {string} name - The steward's name
- */
-function sendStewardToolkit_(email, name) {
-  try {
-    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Welcome to the Steward Team!';
-    var body = 'Congratulations ' + name + '!\n\n' +
-      'You have been promoted to Union Steward. Welcome to the leadership team!\n\n' +
-      'STEWARD TOOLKIT:\n' +
-      '1. Access the Grievance Log to track and manage cases\n' +
-      '2. Use the Executive Command dashboard for your analytics\n' +
-      '3. Review the Member Directory for your assigned members\n' +
-      '4. Contact your Chief Steward for mentorship and guidance\n\n' +
-      'KEY RESPONSIBILITIES:\n' +
-      '- Represent members in grievance proceedings\n' +
-      '- Document workplace issues and contract violations\n' +
-      '- Maintain confidentiality of member information\n' +
-      '- Attend steward training and meetings\n\n' +
-      'We are stronger together!' +
-      COMMAND_CONFIG.EMAIL.FOOTER;
-
-    MailApp.sendEmail(email, subject, body);
-  } catch (e) {
-    Logger.log('Error sending steward toolkit: ' + e.message);
-  }
-}
+// sendStewardToolkit_ removed — dead code cleanup v4.25.11
 
 
 

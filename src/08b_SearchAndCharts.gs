@@ -392,23 +392,7 @@ function getMemberList() {
   return members;
 }
 
-/**
- * Gets a value from a hidden calculation sheet
- * @param {string} sheetName - The hidden sheet name
- * @param {string} cellRef - The cell reference (e.g., 'B4')
- * @returns {*} The cell value or null if not found
- */
-function getCalcValue(sheetName, cellRef) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName);
-
-  if (!sheet) {
-    Logger.log('Hidden sheet ' + sheetName + ' not found');
-    return null;
-  }
-
-  return sheet.getRange(cellRef).getValue();
-}
+// getCalcValue removed — dead code cleanup v4.25.11
 
 
 

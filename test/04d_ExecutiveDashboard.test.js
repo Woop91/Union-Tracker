@@ -14,19 +14,14 @@ loadSources([
 
 describe('04d function existence', () => {
   const required = [
-    'rebuildExecutiveDashboard', 'launchExecutiveDashboard',
-    'getDashboardStats', 'getExecutiveDashboardHtml_',
+    'rebuildExecutiveDashboard',
+    'getDashboardStats',
     'getExecutiveMetrics_', 'showStewardDashboard',
     'checkDashboardAlerts', 'renderBargainingCheatSheet',
     'renderHotZones', 'identifyRisingStars', 'renderHostilityFunnel',
     'createAutomationTriggers', 'setupMidnightTrigger',
     'removeMidnightTrigger', 'midnightAutoRefresh',
-    'checkOverdueGrievances_', 'emailExecutivePDF',
-    'generateMissingMemberIDs_UIService_',
-    'checkDuplicateMemberIDs_UIService_',
-    'createGrievancePDF_UIService_',
-    'createPDFForSelectedGrievance_UIService_',
-    'applyStatusColors'
+    'checkOverdueGrievances_', 'emailExecutivePDF'
   ];
 
   required.forEach(fn => {

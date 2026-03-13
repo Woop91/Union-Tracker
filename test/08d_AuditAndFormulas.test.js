@@ -19,8 +19,7 @@ loadSources([
 describe('08d function existence', () => {
   const required = [
     'setupAuditLogSheet', 'protectAuditLogSheet_', 'onEditAudit',
-    'installAuditTrigger', 'removeAuditTrigger', 'viewAuditLog',
-    'clearOldAuditEntries', 'getAuditHistory',
+    'removeAuditTrigger',
     'setupLiveGrievanceFormulas', 'setupGrievanceMemberDropdown',
     'setupGrievanceCalcSheet', 'setupGrievanceFormulasSheet',
     'setupMemberLookupSheet', 'setupStewardContactCalcSheet',

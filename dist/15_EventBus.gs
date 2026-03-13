@@ -417,63 +417,14 @@ function emitEditEvent(e) {
   return EventBus.emit('sheet:edit:' + sheetKey, e);
 }
 
-/**
- * Emit a form submission event
- * @param {string} formType - e.g. 'grievance', 'satisfaction', 'contact'
- * @param {Object} data - Form submission data
- * @returns {Object} Emit result
- */
-function emitFormEvent(formType, data) {
-  return EventBus.emit('form:submit:' + formType, data);
-}
+// emitFormEvent removed — dead code cleanup v4.25.11
 
-/**
- * Emit a sync completion event
- * @param {string} source - Which sync ran (e.g. 'grievance', 'member', 'all')
- * @returns {Object} Emit result
- */
-function emitSyncComplete(source) {
-  return EventBus.emit('sync:complete', { source: source, timestamp: new Date().toISOString() });
-}
+// emitSyncComplete removed — dead code cleanup v4.25.11
 
-/**
- * Emit a data changed notification
- * @param {string} source - What changed (e.g. 'grievance_log', 'member_dir')
- * @returns {Object} Emit result
- */
-function emitDataChanged(source) {
-  return EventBus.emit('data:changed', { source: source, timestamp: new Date().toISOString() });
-}
+// emitDataChanged removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // EVENT BUS DIAGNOSTICS
 // ============================================================================
 
-/**
- * Show event bus status in a dialog (for debugging / admin)
- */
-function showEventBusStatus() {
-  var events = EventBus.eventNames();
-  var log = EventBus.getLog(20);
-  var totalListeners = EventBus.listenerCount();
-
-  var html = '<h3>Event Bus Status</h3>' +
-    '<p><strong>Total listeners:</strong> ' + totalListeners + '</p>' +
-    '<h4>Registered Events (' + events.length + '):</h4><ul>';
-
-  events.forEach(function(name) {
-    html += '<li>' + escapeHtml(name) + ' (' + EventBus.listenerCount(name) + ' listeners)</li>';
-  });
-  html += '</ul>';
-
-  html += '<h4>Recent Events (' + log.length + '):</h4><ul>';
-  log.forEach(function(entry) {
-    html += '<li>' + escapeHtml(entry.timestamp.substr(11, 8)) + ' - ' + escapeHtml(entry.event) + '</li>';
-  });
-  html += '</ul>';
-
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(500).setHeight(400),
-    'Event Bus Diagnostics'
-  );
-}
+// showEventBusStatus removed — dead code cleanup v4.25.11

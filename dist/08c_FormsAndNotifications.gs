@@ -84,16 +84,7 @@ function buildGrievanceFormUrl_(memberData, stewardData) {
   return baseUrl + '?usp=pp_url&' + params.join('&');
 }
 
-/**
- * Save form URLs to the Config tab for easy reference and updating
- * Writes Grievance Form and Contact Form URLs to Config columns.
- * (Satisfaction Survey URL removed v4.22.7 — survey is now native webapp only)
- */
-function saveFormUrlsToConfig() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  saveFormUrlsToConfig_silent(ss);
-  ss.toast('Form URLs saved to Config tab', 'Saved', 3);
-}
+// saveFormUrlsToConfig removed — dead code cleanup v4.25.11
 
 /**
  * Silent version - used during CREATE_DASHBOARD setup
@@ -400,194 +391,13 @@ function onContactFormSubmit(e) {
   }
 }
 
-/**
- * Set up the contact form submission trigger
- * Run this once to enable automatic processing of form submissions
- */
-function setupContactFormTrigger() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
-
-  // Check for existing triggers
-  var triggers = ScriptApp.getProjectTriggers();
-  var hasContactTrigger = false;
-
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'onContactFormSubmit') {
-      hasContactTrigger = true;
-      break;
-    }
-  }
-
-  if (hasContactTrigger) {
-    ui.alert('Trigger Exists',
-      'A contact form trigger already exists.\n\n' +
-      'Form submissions will be automatically processed.',
-      ui.ButtonSet.OK);
-    return;
-  }
-
-  // Prompt for form URL
-  var response = ui.prompt('Setup Contact Form Trigger',
-    'This will set up automatic processing of contact info form submissions.\n\n' +
-    'Enter the Google Form edit URL (the one ending in /edit):',
-    ui.ButtonSet.OK_CANCEL);
-
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-
-  var formUrl = response.getResponseText().trim();
-
-  if (!formUrl) {
-    ui.alert('No URL', 'Please provide the form edit URL.', ui.ButtonSet.OK);
-    return;
-  }
-
-  try {
-    // Extract form ID from URL
-    var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!match) {
-      ui.alert('Invalid URL',
-        'Could not extract form ID from URL.\n\n' +
-        'Please use the form\'s edit URL. It should look like:\n' +
-        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
-        ui.ButtonSet.OK);
-      return;
-    }
-    var formId = match[1];
-
-    // Open the form and create trigger
-    var form = FormApp.openById(formId);
-
-    ScriptApp.newTrigger('onContactFormSubmit')
-      .forForm(form)
-      .onFormSubmit()
-      .create();
-
-    ui.alert('Trigger Created',
-      'Contact form trigger has been set up!\n\n' +
-      'When a contact form is submitted:\n' +
-      '- The member\'s record will be updated in Member Directory\n' +
-      '- Contact info, preferences, and interests will be saved',
-      ui.ButtonSet.OK);
-
-    ss.toast('Form trigger created successfully!', 'Success', 3);
-
-  } catch (e) {
-    ui.alert('Error',
-      'Failed to create trigger: ' + e.message + '\n\n' +
-      'Make sure you have edit access to the form.',
-      ui.ButtonSet.OK);
-  }
-}
+// setupContactFormTrigger removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // GRIEVANCE FORM TRIGGER SETUP
 // ============================================================================
 
-/**
- * Set up the grievance form submission trigger
- * Run this once to enable automatic processing of form submissions
- *
- * Note: The actual handler onGrievanceFormSubmit() is defined in 05_Integrations.gs
- */
-function setupGrievanceFormTrigger() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
-
-  // Check for existing triggers
-  var triggers = ScriptApp.getProjectTriggers();
-  var hasGrievanceTrigger = false;
-
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'onGrievanceFormSubmit') {
-      hasGrievanceTrigger = true;
-      break;
-    }
-  }
-
-  if (hasGrievanceTrigger) {
-    ui.alert('Trigger Exists',
-      'A grievance form trigger already exists.\n\n' +
-      'Form submissions will be automatically processed.',
-      ui.ButtonSet.OK);
-    return;
-  }
-
-  // Prompt for form URL
-  var response = ui.prompt('Setup Grievance Form Trigger',
-    'This will set up automatic processing of grievance form submissions.\n\n' +
-    'Enter the Google Form edit URL (the one ending in /edit):\n' +
-    '(Leave blank to use the configured form)',
-    ui.ButtonSet.OK_CANCEL);
-
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-
-  var formUrl = response.getResponseText().trim();
-
-  try {
-    var formId;
-
-    if (formUrl) {
-      // Extract form ID from URL
-      var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (!match) {
-        ui.alert('Invalid URL',
-        'Could not extract form ID from URL.\n\n' +
-        'Please use the form\'s edit URL. It should look like:\n' +
-        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
-        ui.ButtonSet.OK);
-        return;
-      }
-      formId = match[1];
-    } else {
-      // Use configured form
-      var configFormUrl = GRIEVANCE_FORM_CONFIG.FORM_URL;
-      match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
-      if (!match) {
-        ui.alert('No Form Configured',
-          'No form URL provided and could not extract ID from config.\n\n' +
-          'Please provide the form edit URL.',
-          ui.ButtonSet.OK);
-        return;
-      }
-      // Note: The /e/ URL is the published version, we need the actual form ID
-      ui.alert('Form URL Needed',
-        'Please provide the form edit URL (the one ending in /edit).\n\n' +
-        'You can find this by opening the form in edit mode.',
-        ui.ButtonSet.OK);
-      return;
-    }
-
-    // Open the form and create trigger
-    var form = FormApp.openById(formId);
-
-    ScriptApp.newTrigger('onGrievanceFormSubmit')
-      .forForm(form)
-      .onFormSubmit()
-      .create();
-
-    ui.alert('Trigger Created',
-      'Grievance form trigger has been set up!\n\n' +
-      'When a grievance form is submitted:\n' +
-      '- A new row will be added to Grievance Log\n' +
-      '- A Drive folder will be created automatically\n' +
-      '- Deadlines will be calculated\n' +
-      '- Member Directory will be updated',
-      ui.ButtonSet.OK);
-
-    ss.toast('Form trigger created successfully!', 'Success', 3);
-
-  } catch (e) {
-    ui.alert('Error',
-      'Failed to create trigger: ' + e.message + '\n\n' +
-      'Make sure you have edit access to the form.',
-      ui.ButtonSet.OK);
-  }
-}
+// setupGrievanceFormTrigger removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SATISFACTION SURVEY HANDLER
@@ -1194,118 +1004,15 @@ function sendStewardDeadlineAlerts() {
   return emailsSent;
 }
 
-/**
- * Manual trigger to send steward alerts now
- */
-function sendStewardAlertsNow() {
-  var ui = SpreadsheetApp.getUi();
+// sendStewardAlertsNow removed — dead code cleanup v4.25.11
 
-  var response = ui.alert('Send Steward Alerts',
-    'This will send deadline alert emails to all stewards with upcoming deadlines.\n\n' +
-    'Each steward will receive their own personalized digest.\n\n' +
-    'Continue?',
-    ui.ButtonSet.YES_NO);
-
-  if (response !== ui.Button.YES) return;
-
-  var emailsSent = sendStewardDeadlineAlerts();
-
-  ui.alert('Alerts Sent',
-    'Sent ' + emailsSent + ' steward alert email(s).\n\n' +
-    'Check the Logs for details.',
-    ui.ButtonSet.OK);
-}
-
-/**
- * Configure alert settings
- */
-function configureAlertSettings() {
-  var ui = SpreadsheetApp.getUi();
-  var props = PropertiesService.getScriptProperties();
-
-  var currentDays = props.getProperty('alert_days') || '7';
-  var stewardAlerts = props.getProperty('steward_alerts_enabled') === 'true';
-
-  var response = ui.prompt('Alert Settings',
-    'Current settings:\n' +
-    '* Alert window: ' + currentDays + ' days before deadline\n' +
-    '* Per-steward alerts: ' + (stewardAlerts ? 'ENABLED' : 'DISABLED') + '\n\n' +
-    'Enter new alert window (days before deadline):\n' +
-    '(Enter 3, 7, 14, or 30)',
-    ui.ButtonSet.OK_CANCEL);
-
-  if (response.getSelectedButton() !== ui.Button.OK) return;
-
-  var newDays = parseInt(response.getResponseText(), 10);
-  if (isNaN(newDays) || newDays < 1 || newDays > 30) {
-    ui.alert('Invalid input. Please enter a number between 1 and 30.');
-    return;
-  }
-
-  props.setProperty('alert_days', newDays.toString());
-
-  // Ask about per-steward alerts
-  var stewardResponse = ui.alert('Per-Steward Alerts',
-    'Enable per-steward email alerts?\n\n' +
-    'When enabled, each steward receives their own personalized deadline digest.\n\n' +
-    'Enable per-steward alerts?',
-    ui.ButtonSet.YES_NO);
-
-  props.setProperty('steward_alerts_enabled', stewardResponse === ui.Button.YES ? 'true' : 'false');
-
-  ui.alert('Settings Saved',
-    'Alert window: ' + newDays + ' days\n' +
-    'Per-steward alerts: ' + (stewardResponse === ui.Button.YES ? 'ENABLED' : 'DISABLED'),
-    ui.ButtonSet.OK);
-}
+// configureAlertSettings removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SURVEY EMAIL DISTRIBUTION
 // ============================================================================
 
-/**
- * Show dialog for sending random survey emails to members
- */
-function sendRandomSurveyEmails() {
-  var ui = SpreadsheetApp.getUi();
-  var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union') : 'Union';
-
-  // Show configuration dialog
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
-    'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
-    '.container{background:white;padding:25px;border-radius:8px;max-width:450px}' +
-    'h2{color:#5B4B9E;margin-top:0}' +
-    '.form-group{margin-bottom:15px}' +
-    'label{display:block;font-weight:bold;margin-bottom:5px}' +
-    'input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}' +
-    '.info{background:#e8f4fd;padding:12px;border-radius:8px;margin-bottom:15px;font-size:13px}' +
-    '.buttons{display:flex;gap:10px;margin-top:20px}' +
-    'button{padding:12px 24px;border:none;border-radius:4px;cursor:pointer;font-size:14px;flex:1}' +
-    '.primary{background:#5B4B9E;color:white}' +
-    '.secondary{background:#e0e0e0;color:#333}' +
-    '</style></head><body><div class="container">' +
-    '<h2>Send Survey to Random Members</h2>' +
-    '<div class="info">Select how many random members to email. Each member will receive a personalized survey link.</div>' +
-    '<div class="form-group"><label>Number of Members to Email</label>' +
-    '<select id="count"><option value="5">5 members</option><option value="10" selected>10 members</option>' +
-    '<option value="20">20 members</option><option value="50">50 members</option><option value="100">100 members</option></select></div>' +
-    '<div class="form-group"><label>Email Subject</label>' +
-    '<input type="text" id="subject" value="' + escapeHtml(orgName) + ' - Member Satisfaction Survey"></div>' +
-    '<div class="form-group"><label>Exclude members emailed in last (days)</label>' +
-    '<select id="excludeDays"><option value="0">No exclusion</option><option value="30" selected>30 days</option>' +
-    '<option value="60">60 days</option><option value="90">90 days</option></select></div>' +
-    '<div class="buttons">' +
-    '<button class="secondary" onclick="google.script.host.close()">Cancel</button>' +
-    '<button class="primary" onclick="send()">Send Surveys</button></div></div>' +
-    '<script>function send(){var opts={count:parseInt(document.getElementById("count").value),' +
-    'subject:document.getElementById("subject").value,excludeDays:parseInt(document.getElementById("excludeDays").value)};' +
-    'google.script.run.withSuccessHandler(function(r){alert(r);google.script.host.close()})' +
-    '.withFailureHandler(function(e){alert("Error: "+e.message)}).executeSendRandomSurveyEmails(opts)}</script></body></html>'
-  ).setWidth(500).setHeight(450);
-
-  ui.showModalDialog(html, 'Send Random Survey Emails');
-}
+// sendRandomSurveyEmails removed — dead code cleanup v4.25.11
 
 /**
  * Execute sending random survey emails
@@ -1507,17 +1214,7 @@ function getCurrentQuarter() {
   return now.getFullYear() + '-Q' + quarter;
 }
 
-/**
- * Get quarter string from a date
- * @param {Date} date - Date to get quarter from
- * @returns {string} Quarter string
- */
-function getQuarterFromDate(date) {
-  var d = new Date(date);
-  if (isNaN(d.getTime())) return '';
-  var quarter = Math.floor(d.getMonth() / 3) + 1;
-  return d.getFullYear() + '-Q' + quarter;
-}
+// getQuarterFromDate removed — dead code cleanup v4.25.11
 
 
 

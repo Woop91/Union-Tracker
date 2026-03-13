@@ -555,66 +555,7 @@ function getEscalationSteps_() {
   return COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
 }
 
-/**
- * Gets unit codes mapping from Config sheet or falls back to defaults
- * Config format: "Unit Name:CODE,Unit2:CODE2" (e.g., "Main Station:MS,Field Ops:FO")
- * @returns {Object} Object mapping unit names to code prefixes
- * @private
- */
-function getUnitCodes_() {
-  var configValue = getConfigValue_(CONFIG_COLS.UNIT_CODES);
-
-  if (configValue) {
-    var unitCodes = {};
-    configValue.split(',').forEach(function(pair) {
-      var parts = pair.split(':');
-      if (parts.length === 2) {
-        unitCodes[parts[0].trim()] = parts[1].trim();
-      }
-    });
-    if (Object.keys(unitCodes).length > 0) {
-      return unitCodes;
-    }
-  }
-
-  // H-12: Fall back to reading unit names from Config tab's UNITS column.
-  // If Config has units, derive codes from the first two chars of each name.
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-    if (configSheet && CONFIG_COLS.UNITS) {
-      var unitValues = getConfigValues(configSheet, CONFIG_COLS.UNITS);
-      if (unitValues.length > 0) {
-        var dynamicCodes = {};
-        for (var u = 0; u < unitValues.length; u++) {
-          var unitName = unitValues[u].toString().trim();
-          if (unitName) {
-            // Generate 2-char code from first letters of each word, or first 2 chars
-            var words = unitName.split(/\s+/);
-            var code = words.length >= 2
-              ? (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
-              : unitName.substring(0, 2).toUpperCase();
-            dynamicCodes[unitName] = code;
-          }
-        }
-        if (Object.keys(dynamicCodes).length > 0) {
-          return dynamicCodes;
-        }
-      }
-    }
-  } catch (configErr) {
-    console.log('Error reading units from Config: ' + configErr.message);
-  }
-
-  // Last resort: default codes (should be configured in Config tab UNIT_CODES column)
-  return {
-    "Main Station": "MS",
-    "Field Ops": "FO",
-    "Health": "HC",
-    "Admin": "AD",
-    "Remote": "RM"
-  };
-}
+// getUnitCodes_ removed — dead code cleanup v4.25.11
 
 /**
  * Handles edits to the Grievance Log sheet
@@ -1128,37 +1069,9 @@ function initializeDashboard() {
   CREATE_DASHBOARD();
 }
 
-/**
- * Sets up time-based triggers for the dashboard
- */
-function setupTriggers() {
-  // Remove existing triggers first
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(trigger => {
-    if (trigger.getHandlerFunction() === 'dailyTrigger') {
-      ScriptApp.deleteTrigger(trigger);
-    }
-  });
+// setupTriggers removed — dead code cleanup v4.25.11
 
-  // Create daily trigger at 8 AM
-  ScriptApp.newTrigger('dailyTrigger')
-    .timeBased()
-    .atHour(8)
-    .everyDays(1)
-    .create();
-}
-
-/**
- * Removes dashboard-specific triggers (dailyTrigger only)
- */
-function removeTriggers() {
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(trigger => {
-    if (trigger.getHandlerFunction() === 'dailyTrigger') {
-      ScriptApp.deleteTrigger(trigger);
-    }
-  });
-}
+// removeTriggers removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // HELP & DOCUMENTATION
@@ -1670,20 +1583,7 @@ function showHelpDialog() {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-/**
- * Gets the current version info
- * @return {Object} Version information
- */
-function getVersionInfo() {
-  return {
-    version: VERSION_INFO.CURRENT,
-    date: VERSION_INFO.BUILD_DATE,
-    codename: VERSION_INFO.CODENAME,
-    architecture: 'Modular Multi-File',
-    history: VERSION_HISTORY,
-    lastUpdated: new Date().toISOString()
-  };
-}
+// getVersionInfo removed — dead code cleanup v4.25.11
 
 /**
  * Updates a grievance with new data
@@ -2002,119 +1902,13 @@ function addNewMember(memberData) {
   }
 }
 
-/**
- * Starts a grievance for a specific member (from quick action)
- */
-function startGrievanceForMember() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEETS.MEMBER_DIRECTORY) {
-    showAlert('Please select a member in the Member Directory', 'Wrong Sheet');
-    return;
-  }
-
-  const row = sheet.getActiveRange().getRow();
-  if (row <= 1) {
-    showAlert('Please select a member row', 'No Selection');
-    return;
-  }
-
-  const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const memberId = data[MEMBER_COLS.MEMBER_ID - 1];
-  const memberName = `${data[MEMBER_COLS.FIRST_NAME - 1]} ${data[MEMBER_COLS.LAST_NAME - 1]}`;
-
-  // Open new grievance dialog pre-populated with member info
-  // Sanitize values before embedding in script context
-  const html = HtmlService.createHtmlOutput(
-    '<script>' +
-      'sessionStorage.setItem("prefillMemberId", ' + JSON.stringify(String(memberId || '')) + ');' +
-      'sessionStorage.setItem("prefillMemberName", ' + JSON.stringify(String(memberName || '')) + ');' +
-      'google.script.host.close();' +
-      'google.script.run.showNewGrievanceDialog();' +
-    '</script>'
-  ).setWidth(100).setHeight(50);
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Loading...');
-}
+// startGrievanceForMember removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // IMPORT/EXPORT DIALOGS (Added to fix missing menu functions)
 // ============================================================================
 
-/**
- * Shows import members dialog
- * Allows importing members from CSV/Excel format
- */
-function showImportDialog() {
-  const html = HtmlService.createHtmlOutput(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <base target="_top">
-      ${getMobileOptimizedHead()}
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-        .container { background: white; padding: 25px; border-radius: 8px; max-width: 500px; margin: 0 auto; }
-        h2 { color: #1a73e8; margin-top: 0; }
-        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
-        .format-section { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; }
-        .format-section h4 { margin-top: 0; color: #333; }
-        .format-section code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
-        textarea { width: 100%; height: 150px; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; }
-        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
-        .primary { background: #1a73e8; color: white; }
-        .secondary { background: #e0e0e0; color: #333; }
-        .result { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h2>📥 Import Members</h2>
-        <div class="info">
-          💡 Paste member data in CSV format. Each line represents one member.
-        </div>
-        <div class="format-section">
-          <h4>Expected Format (comma-separated):</h4>
-          <code>First Name, Last Name, Employee ID, Department, Job Title, Email, Phone</code>
-        </div>
-        <textarea id="importData" placeholder="John,Doe,EMP001,Engineering,Developer,john@example.com,555-1234
-Jane,Smith,EMP002,HR,Manager,jane@example.com,555-5678"></textarea>
-        <div>
-          <button class="primary" onclick="importMembers()">📥 Import</button>
-          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
-        </div>
-        <div id="result" class="result"></div>
-      </div>
-      <script>
-        function importMembers() {
-          var data = document.getElementById('importData').value.trim();
-          if (!data) {
-            showResult('Please paste some data to import', 'error');
-            return;
-          }
-          google.script.run
-            .withSuccessHandler(function(result) {
-              showResult('Successfully imported ' + result.count + ' members', 'success');
-            })
-            .withFailureHandler(function(e) {
-              showResult('Error: ' + e.message, 'error');
-            })
-            .importMembersFromText(data);
-        }
-        function showResult(msg, type) {
-          var el = document.getElementById('result');
-          el.textContent = msg;
-          el.className = 'result ' + type;
-          el.style.display = 'block';
-        }
-      </script>
-    </body>
-    </html>
-  `).setWidth(550).setHeight(500);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members');
-}
+// showImportDialog removed — dead code cleanup v4.25.11
 
 /**
  * Imports members from text (CSV format)
@@ -2167,94 +1961,7 @@ function importMembersFromText(text) {
   return { success: true, count: imported };
 }
 
-/**
- * Shows export directory dialog
- * Allows exporting member directory to various formats
- */
-function showExportDialog() {
-  const html = HtmlService.createHtmlOutput(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <base target="_top">
-      ${getMobileOptimizedHead()}
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-        .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
-        h2 { color: #1a73e8; margin-top: 0; }
-        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
-        .option { display: flex; align-items: center; padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
-        .option:hover { background: #e8f0fe; }
-        .option.selected { border-color: #1a73e8; background: #e8f0fe; }
-        .option-icon { font-size: 32px; margin-right: 15px; }
-        .option-text h4 { margin: 0 0 5px 0; }
-        .option-text p { margin: 0; font-size: 12px; color: #666; }
-        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
-        .primary { background: #1a73e8; color: white; }
-        .secondary { background: #e0e0e0; color: #333; }
-        .button-row { margin-top: 20px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h2>📤 Export Directory</h2>
-        <div class="info">
-          💡 Export member directory data to your preferred format.
-        </div>
-        <div class="option selected" onclick="selectOption(this, 'csv')">
-          <div class="option-icon">📄</div>
-          <div class="option-text">
-            <h4>CSV File</h4>
-            <p>Comma-separated values for Excel/Sheets</p>
-          </div>
-        </div>
-        <div class="option" onclick="selectOption(this, 'email')">
-          <div class="option-icon">📧</div>
-          <div class="option-text">
-            <h4>Email Report</h4>
-            <p>Send formatted report to your email</p>
-          </div>
-        </div>
-        <div class="option" onclick="selectOption(this, 'print')">
-          <div class="option-icon">🖨️</div>
-          <div class="option-text">
-            <h4>Print View</h4>
-            <p>Open print-friendly view in browser</p>
-          </div>
-        </div>
-        <div class="button-row">
-          <button class="primary" onclick="doExport()">📤 Export</button>
-          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
-        </div>
-      </div>
-      <script>
-        var selectedFormat = 'csv';
-        function selectOption(el, format) {
-          document.querySelectorAll('.option').forEach(function(o) { o.classList.remove('selected'); });
-          el.classList.add('selected');
-          selectedFormat = format;
-        }
-        function doExport() {
-          google.script.run
-            .withSuccessHandler(function(result) {
-              if (result.url) {
-                window.open(result.url, '_blank');
-              }
-              alert(result.message || 'Export complete!');
-              google.script.host.close();
-            })
-            .withFailureHandler(function(e) {
-              alert('Error: ' + e.message);
-            })
-            .exportMemberDirectory(selectedFormat);
-        }
-      </script>
-    </body>
-    </html>
-  `).setWidth(500).setHeight(450);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '📤 Export Directory');
-}
+// showExportDialog removed — dead code cleanup v4.25.11
 
 /**
  * Exports member directory to specified format

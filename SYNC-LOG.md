@@ -15,7 +15,7 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `Main`.
 - Source: DDS `Main` → Target: UT `Main`
 - **Single branch policy: Both repos use `Main` only.**
 - **Excluded from UT:**
-  - DDS Apps Script ID (`[REDACTED — SEE DDS-DASHBOARD REPO]`)
+  - DDS Apps Script ID (`[REDACTED-DDS-SCRIPT-ID]`)
   - Workload Tracker-exclusive files (see registry below)
   - Any credentials, tokens, or secrets (UT is public)
 

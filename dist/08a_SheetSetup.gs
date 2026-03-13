@@ -628,25 +628,7 @@ function setupDataValidations() {
   SpreadsheetApp.getActiveSpreadsheet().toast('Data validations applied successfully!', '✅ Success', 3);
 }
 
-/**
- * Sets Member ID validation dropdown from Member Directory
- * @param {Sheet} grievanceSheet - Grievance Log sheet
- * @param {Sheet} memberSheet - Member Directory sheet
- * @returns {void}
- */
-function setMemberIdValidation(grievanceSheet, memberSheet) {
-  var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var lastRow = Math.max(memberSheet.getLastRow(), 2);
-  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + lastRow);
-
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(false)
-    .build();
-
-  var targetRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_ID, Math.max(1, grievanceSheet.getMaxRows() - 1), 1);
-  targetRange.setDataValidation(rule);
-}
+// setMemberIdValidation removed — dead code cleanup v4.25.11
 
 /**
  * Sets dropdown validation from Config sheet
@@ -932,31 +914,9 @@ function removeMultiSelectTrigger() {
   }
 }
 
-/**
- * Sets dropdown validation dynamically
- * @param {Sheet} targetSheet - Sheet to apply validation
- * @param {number} targetCol - Column number in target sheet
- * @param {Sheet} configSheet - Config sheet with source values
- * @param {number} sourceCol - Column number in Config sheet
- * @returns {void}
- */
-function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  // Delegate to the main function which now uses dynamic value lists
-  setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol);
-}
+// setDropdownValidationDynamic removed — dead code cleanup v4.25.11
 
-/**
- * Sets multi-select validation dynamically
- * @param {Sheet} targetSheet - Sheet to apply validation
- * @param {number} targetCol - Column number in target sheet
- * @param {Sheet} configSheet - Config sheet with source values
- * @param {number} sourceCol - Column number in Config sheet
- * @returns {void}
- */
-function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  // Delegate to the main function which now uses dynamic value lists
-  setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol);
-}
+// setMultiSelectValidationDynamic removed — dead code cleanup v4.25.11
 
 
 

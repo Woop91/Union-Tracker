@@ -238,21 +238,6 @@ describe('isValidSafeString', () => {
   });
 });
 
-describe('isValidMemberId', () => {
-  test('accepts valid member IDs', () => {
-    expect(isValidMemberId('MEM-abc123')).toBe(true);
-  });
-
-  test('rejects empty/null', () => {
-    expect(isValidMemberId('')).toBe(false);
-    expect(isValidMemberId(null)).toBe(false);
-  });
-
-  test('rejects IDs with special characters', () => {
-    expect(isValidMemberId('MEM <script>')).toBe(false);
-  });
-});
-
 describe('isValidGrievanceId', () => {
   test('accepts valid grievance IDs', () => {
     expect(isValidGrievanceId('GRV-001')).toBe(true);
@@ -280,14 +265,6 @@ describe('getClientSideEscapeHtml', () => {
     // / and = are NOT escaped (F107: not XSS vectors, caused data corruption)
     expect(code).not.toContain('&#x2F;');
     expect(code).not.toContain('&#x3D;');
-  });
-});
-
-describe('getClientSecurityScript', () => {
-  test('includes safeAttr that delegates to escapeHtml (bug fix verification)', () => {
-    const result = getClientSecurityScript();
-    expect(result).toContain('function safeAttr(t)');
-    expect(result).toContain('escapeHtml(t)');
   });
 });
 
@@ -390,16 +367,3 @@ describe('sendDailySecurityDigest', () => {
   });
 });
 
-// ============================================================================
-// showSecurityStatusDialog
-// ============================================================================
-
-describe('showSecurityStatusDialog', () => {
-  test('is a function', () => {
-    expect(typeof showSecurityStatusDialog).toBe('function');
-  });
-
-  test('does not throw when called', () => {
-    expect(() => showSecurityStatusDialog()).not.toThrow();
-  });
-});

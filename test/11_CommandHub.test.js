@@ -2,7 +2,7 @@
  * Tests for 11_CommandHub.gs
  *
  * Covers COMMAND_CENTER_CONFIG, GEMINI_CONFIG, darkenColor_,
- * safetyValveScrub, scrubObjectPII, isProductionMode,
+ * safetyValveScrub, isProductionMode,
  * getCommandCenterConfig, and UI smoke tests.
  */
 
@@ -189,46 +189,6 @@ describe('safetyValveScrub', () => {
 });
 
 // ============================================================================
-// scrubObjectPII
-// ============================================================================
-
-describe('scrubObjectPII', () => {
-  test('scrubs phone numbers in object values', () => {
-    const result = scrubObjectPII({ name: 'John', phone: '(555) 123-4567' });
-    expect(result.name).toBe('John');
-    expect(result.phone).toBe('[REDACTED CONTACT]');
-  });
-
-  test('scrubs SSN in object values', () => {
-    const result = scrubObjectPII({ ssn: '123-45-6789' });
-    expect(result.ssn).toBe('[REDACTED ID]');
-  });
-
-  test('leaves non-string values unchanged', () => {
-    const result = scrubObjectPII({ count: 42, active: true });
-    expect(result.count).toBe(42);
-    expect(result.active).toBe(true);
-  });
-
-  test('returns non-object input as-is (null)', () => {
-    expect(scrubObjectPII(null)).toBeNull();
-  });
-
-  test('returns non-object input as-is (string)', () => {
-    expect(scrubObjectPII('hello')).toBe('hello');
-  });
-
-  test('returns non-object input as-is (number)', () => {
-    expect(scrubObjectPII(42)).toBe(42);
-  });
-
-  test('handles empty object', () => {
-    const result = scrubObjectPII({});
-    expect(Object.keys(result).length).toBe(0);
-  });
-});
-
-// ============================================================================
 // isProductionMode
 // ============================================================================
 
@@ -248,16 +208,6 @@ describe('isProductionMode', () => {
     PropertiesService.getScriptProperties().setProperty('PRODUCTION_MODE', 'false');
     expect(isProductionMode()).toBe(false);
     PropertiesService.getScriptProperties().deleteProperty('PRODUCTION_MODE');
-  });
-});
-
-// ============================================================================
-// generateMissingMemberIDsBatch (name-based IDs)
-// ============================================================================
-
-describe('generateMissingMemberIDsBatch', () => {
-  test('is defined as a function', () => {
-    expect(typeof generateMissingMemberIDsBatch).toBe('function');
   });
 });
 
@@ -290,20 +240,6 @@ describe('getCommandCenterConfig', () => {
 // ============================================================================
 // UI function smoke tests
 // ============================================================================
-
-describe('showDiagnosticReport (smoke test)', () => {
-  test('does not throw when called', () => {
-    const dashboardSheet = createMockSheet(SHEETS.DASHBOARD || 'Dashboard', [['Header']]);
-    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR, [['Header']]);
-    const grievanceSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [['Header']]);
-    const configSheet = createMockSheet(SHEETS.CONFIG, [['Header']]);
-
-    const ss = createMockSpreadsheet([dashboardSheet, memberSheet, grievanceSheet, configSheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
-
-    expect(() => showDiagnosticReport()).not.toThrow();
-  });
-});
 
 describe('navigateToDashboard (smoke test)', () => {
   test('sets active sheet when dashboard exists', () => {

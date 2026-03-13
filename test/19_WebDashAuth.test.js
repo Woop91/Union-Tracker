@@ -601,46 +601,6 @@ describe('Global wrappers', function () {
     expect(typeof result).toBe('number');
   });
 
-  test('installTokenCleanupTrigger creates time trigger', function () {
-    installTokenCleanupTrigger();
-    expect(ScriptApp.newTrigger).toHaveBeenCalledWith('authCleanupExpiredTokens');
-  });
-
-  test('installTokenCleanupTrigger removes existing triggers first', function () {
-    var existingTrigger = {
-      getHandlerFunction: jest.fn(function () { return 'authCleanupExpiredTokens'; })
-    };
-    ScriptApp.getProjectTriggers = jest.fn(function () { return [existingTrigger]; });
-
-    installTokenCleanupTrigger();
-    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(existingTrigger);
-    expect(ScriptApp.newTrigger).toHaveBeenCalledWith('authCleanupExpiredTokens');
-  });
-
-  test('installTokenCleanupTrigger does not remove unrelated triggers', function () {
-    var unrelatedTrigger = {
-      getHandlerFunction: jest.fn(function () { return 'onEditHandler'; })
-    };
-    ScriptApp.getProjectTriggers = jest.fn(function () { return [unrelatedTrigger]; });
-
-    installTokenCleanupTrigger();
-    expect(ScriptApp.deleteTrigger).not.toHaveBeenCalledWith(unrelatedTrigger);
-    expect(ScriptApp.newTrigger).toHaveBeenCalledWith('authCleanupExpiredTokens');
-  });
-
-  test('initWebDashboardAuth runs without error', function () {
-    // Set up required mocks for initWebDashboardAuth
-    var mockSheet = { getName: jest.fn(function () { return 'Config'; }) };
-    var mockSs = {
-      getSheetByName: jest.fn(function () { return mockSheet; }),
-      getSheets: jest.fn(function () { return [mockSheet]; })
-    };
-    SpreadsheetApp.getActiveSpreadsheet = jest.fn(function () { return mockSs; });
-
-    expect(function () {
-      initWebDashboardAuth();
-    }).not.toThrow();
-  });
 });
 
 // ============================================================================

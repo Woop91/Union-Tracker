@@ -167,31 +167,7 @@ function onEditAudit(e) {
   });
 }
 
-/**
- * Install the audit trigger
- * Sets up automatic change tracking for Member Directory and Grievance Log
- */
-function installAuditTrigger() {
-  // Remove existing audit triggers
-  removeAuditTrigger();
-
-  // Create new onEdit trigger
-  ScriptApp.newTrigger('onEditAudit')
-    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
-    .onEdit()
-    .create();
-
-  // Ensure audit sheet exists
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss.getSheetByName(SHEETS.AUDIT_LOG)) {
-    setupAuditLogSheet();
-  }
-
-  SpreadsheetApp.getUi().alert('✅ Audit Tracking Enabled',
-    'All changes to Member Directory and Grievance Log will now be logged.\n\n' +
-    'View the audit log via:\n⚙️ Administrator > 📋 Audit Log > 📋 View Audit Log',
-    SpreadsheetApp.getUi().ButtonSet.OK);
-}
+// installAuditTrigger removed — dead code cleanup v4.25.11
 
 /**
  * Remove the audit trigger
@@ -212,126 +188,15 @@ function removeAuditTrigger() {
 // AUDIT LOG VIEWING AND MANAGEMENT
 // ============================================================================
 
-/**
- * View the audit log sheet
- * Shows the hidden audit log and sorts entries by newest first
- */
-function viewAuditLog() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+// viewAuditLog removed — dead code cleanup v4.25.11
 
-  if (!sheet) {
-    var response = SpreadsheetApp.getUi().alert('📋 Audit Log Not Found',
-      'The audit log sheet does not exist yet.\n\nWould you like to create it now?',
-      SpreadsheetApp.getUi().ButtonSet.YES_NO);
-
-    if (response === SpreadsheetApp.getUi().Button.YES) {
-      setupAuditLogSheet();
-      sheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
-    } else {
-      return;
-    }
-  }
-
-  // Show the hidden sheet temporarily
-  setSheetVisible_(sheet);
-  ss.setActiveSheet(sheet);
-
-  // Sort by timestamp descending (newest first)
-  if (sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).sort({column: 1, ascending: false});
-  }
-
-  SpreadsheetApp.getUi().alert('📋 Audit Log',
-    'Viewing audit log.\n\n' +
-    'Total entries: ' + Math.max(0, sheet.getLastRow() - 1) + '\n\n' +
-    'The sheet will be hidden again when you navigate away.\n' +
-    'To keep it visible, right-click the tab and select "Unhide".',
-    SpreadsheetApp.getUi().ButtonSet.OK);
-}
-
-/**
- * Clear audit entries older than 30 days
- * Prompts for confirmation before deleting old entries
- */
-function clearOldAuditEntries() {
-  var ui = SpreadsheetApp.getUi();
-
-  var response = ui.alert('🗑️ Clear Old Audit Entries',
-    'This will delete all audit entries older than 30 days.\n\n' +
-    'This action cannot be undone.\n\nContinue?',
-    ui.ButtonSet.YES_NO);
-
-  if (response !== ui.Button.YES) return;
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
-
-  if (!sheet || sheet.getLastRow() < 2) {
-    ui.alert('No audit entries to clear.');
-    return;
-  }
-
-  var cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 30);
-
-  var data = sheet.getDataRange().getValues();
-  var rowsToDelete = [];
-
-  // Find rows older than 30 days (skip header)
-  for (var i = data.length - 1; i >= 1; i--) {
-    var timestamp = data[i][AUDIT_LOG_COLS.TIMESTAMP - 1];
-    if (timestamp instanceof Date && timestamp < cutoffDate) {
-      rowsToDelete.push(i + 1); // +1 for 1-indexed rows
-    }
-  }
-
-  // Delete rows from bottom to top to maintain correct indices
-  for (var j = 0; j < rowsToDelete.length; j++) {
-    sheet.deleteRow(rowsToDelete[j]);
-  }
-
-  ui.alert('✅ Cleanup Complete',
-    'Deleted ' + rowsToDelete.length + ' entries older than 30 days.\n\n' +
-    'Remaining entries: ' + Math.max(0, sheet.getLastRow() - 1),
-    ui.ButtonSet.OK);
-}
+// clearOldAuditEntries removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // AUDIT HISTORY RETRIEVAL
 // ============================================================================
 
-/**
- * Get audit summary for a specific record
- * @param {string} recordId - Member ID or Grievance ID
- * @returns {Array} Array of audit entries for this record
- */
-function getAuditHistory(recordId) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
-
-  if (!sheet || sheet.getLastRow() < 2) {
-    return [];
-  }
-
-  var data = sheet.getDataRange().getValues();
-  var history = [];
-
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][AUDIT_LOG_COLS.RECORD_ID - 1] === recordId) {
-      history.push({
-        timestamp: data[i][AUDIT_LOG_COLS.TIMESTAMP - 1],
-        user: data[i][AUDIT_LOG_COLS.USER_EMAIL - 1],
-        field: data[i][AUDIT_LOG_COLS.FIELD_NAME - 1],
-        oldValue: data[i][AUDIT_LOG_COLS.OLD_VALUE - 1],
-        newValue: data[i][AUDIT_LOG_COLS.NEW_VALUE - 1],
-        action: data[i][AUDIT_LOG_COLS.ACTION_TYPE - 1]
-      });
-    }
-  }
-
-  return history;
-}
+// getAuditHistory removed — dead code cleanup v4.25.11
 
 
 
@@ -2036,26 +1901,7 @@ function verifyAuditLogIntegrity() {
   return result;
 }
 
-/**
- * Menu-callable wrapper: verifies audit log integrity and shows result in a dialog.
- */
-function verifyAuditLogIntegrityDialog() {
-  var result = verifyAuditLogIntegrity();
-  var ui = SpreadsheetApp.getUi();
-
-  if (result.valid) {
-    ui.alert('✅ Audit Log Integrity',
-      'All ' + result.totalRows + ' audit entries passed integrity verification.' +
-      (result.message ? '\n\nNote: ' + result.message : ''),
-      ui.ButtonSet.OK);
-  } else {
-    ui.alert('⚠️ Audit Log Integrity Warning',
-      result.message + '\n\n' +
-      'Affected rows: ' + result.invalidRows.join(', ') + '\n\n' +
-      'This may indicate unauthorized modification of the audit log.',
-      ui.ButtonSet.OK);
-  }
-}
+// verifyAuditLogIntegrityDialog removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // VAULT INTEGRITY VERIFICATION
@@ -2152,28 +1998,4 @@ function verifySurveyVaultIntegrity() {
   };
 }
 
-/**
- * Menu-callable wrapper: verifies vault integrity and shows result in a dialog.
- */
-function verifySurveyVaultIntegrityDialog() {
-  var result = verifySurveyVaultIntegrity();
-  var ui = SpreadsheetApp.getUi();
-
-  var statsText = 'Entries: ' + result.stats.totalEntries +
-    ' | Verified: ' + result.stats.verified +
-    ' | Pending: ' + result.stats.pendingReview +
-    ' | Rejected: ' + result.stats.rejected;
-
-  if (result.valid) {
-    ui.alert('✅ Survey Vault Integrity',
-      'Vault passed all integrity checks.\n\n' + statsText,
-      ui.ButtonSet.OK);
-  } else {
-    ui.alert('⚠️ Survey Vault Issues Found',
-      result.issues.length + ' issue(s) detected:\n\n' +
-      result.issues.slice(0, 10).join('\n') +
-      (result.issues.length > 10 ? '\n... and ' + (result.issues.length - 10) + ' more' : '') +
-      '\n\n' + statsText,
-      ui.ButtonSet.OK);
-  }
-}
+// verifySurveyVaultIntegrityDialog removed — dead code cleanup v4.25.11

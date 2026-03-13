@@ -3,10 +3,9 @@
  *
  * Covers constants (CACHE_CONFIG, CACHE_KEYS, UNDO_CONFIG, TEST_RESULTS,
  * VALIDATION_PATTERNS, VALIDATION_MESSAGES), caching functions (getCachedData,
- * setCachedData, invalidateCache, invalidateAllCaches), undo/redo functions
+ * setCachedData, invalidateAllCaches), undo/redo functions
  * (getUndoHistory, saveUndoHistory, clearUndoHistory, recordAction), and
- * utility functions (executeWithRetry, batchSetValues, confirmDestructiveAction,
- * DIAGNOSE_SETUP).
+ * utility functions (executeWithRetry, batchSetValues, DIAGNOSE_SETUP).
  */
 
 require('./gas-mock');
@@ -228,29 +227,6 @@ describe('setCachedData', () => {
     setCachedData('key1', 'data', 99999);
 
     expect(mockCache.put).toHaveBeenCalledWith('key1', '"data"', 21600);
-  });
-});
-
-// ============================================================================
-// Cache Functions - invalidateCache
-// ============================================================================
-
-describe('invalidateCache', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  test('removes key from both caches', () => {
-    const mockCache = { get: jest.fn(), put: jest.fn(), remove: jest.fn() };
-    CacheService.getScriptCache.mockReturnValue(mockCache);
-
-    const mockProps = { getProperty: jest.fn(), setProperty: jest.fn(), deleteProperty: jest.fn() };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
-
-    invalidateCache('test_key');
-
-    expect(mockCache.remove).toHaveBeenCalledWith('test_key');
-    expect(mockProps.deleteProperty).toHaveBeenCalledWith('test_key');
   });
 });
 
@@ -551,42 +527,6 @@ describe('batchSetValues', () => {
     const written = mockRange.setValues.mock.calls[0][0];
     expect(written[1][0]).toBe('NEW_A2');
     expect(written[2][1]).toBe('NEW_B3');
-  });
-});
-
-// ============================================================================
-// Utility Functions - confirmDestructiveAction
-// ============================================================================
-
-describe('confirmDestructiveAction', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  test('returns true when user clicks YES', () => {
-    const mockUi = {
-      alert: jest.fn(() => 'YES'),
-      ButtonSet: { YES_NO: 'YES_NO' },
-      Button: { YES: 'YES', NO: 'NO' }
-    };
-    SpreadsheetApp.getUi.mockReturnValue(mockUi);
-
-    const result = confirmDestructiveAction('Delete Records', 'This will delete all records.');
-
-    expect(result).toBe(true);
-  });
-
-  test('returns false when user clicks NO', () => {
-    const mockUi = {
-      alert: jest.fn(() => 'NO'),
-      ButtonSet: { YES_NO: 'YES_NO' },
-      Button: { YES: 'YES', NO: 'NO' }
-    };
-    SpreadsheetApp.getUi.mockReturnValue(mockUi);
-
-    const result = confirmDestructiveAction('Delete Records', 'This will delete all records.');
-
-    expect(result).toBe(false);
   });
 });
 
