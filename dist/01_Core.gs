@@ -692,11 +692,12 @@ var VERSION_INFO = (function() {
     version: ver,
     MAJOR: parseInt(parts[0], 10) || 4,
     MINOR: parseInt(parts[1], 10) || 25,
-    PATCH: parseInt(parts[2], 10) || 12,
+    PATCH: parseInt(parts[2], 10) || 13,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-12',
-    CODENAME: 'Web App Test Suites + Seed Data + Function Cohesion + Perf'
+    BUILD_DATE: '2026-03-13',
+    CODENAME: 'Insights Enhancement + Menu Consolidation + Diagnostics Fix',
+    codename: 'Insights Enhancement + Menu Consolidation + Diagnostics Fix'
   };
 })();
 

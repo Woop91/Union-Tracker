@@ -46,7 +46,8 @@ function DIAGNOSE_SETUP() {
     DASHBOARD: true,           // @deprecated v4.3.2 - modal dashboards now
     REPORTS: true,             // Backward-compat alias for DASHBOARD
     TEST_RESULTS: true,        // Created on-demand by test framework only
-    MEMBER_DIRECTORY: true     // Backward-compat alias for MEMBER_DIR
+    MEMBER_DIRECTORY: true,    // Backward-compat alias for MEMBER_DIR
+    WORKLOAD_ARCHIVE: true     // Created on-demand by WorkloadService.archiveOldData()
     // GRIEVANCE_TRACKER removed v4.25.9 - alias deleted, all callers use GRIEVANCE_LOG
   };
 

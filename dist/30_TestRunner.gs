@@ -154,6 +154,14 @@ var TestRunner = (function () {
     }
   }
 
+  /**
+   * Explicitly fail a test with a message.
+   * @param {string} message - Failure reason
+   */
+  function fail(message) {
+    throw _assertionError(message || 'Test explicitly failed');
+  }
+
   // ── Test discovery & execution ──────────────────────────────────────
 
   /**
@@ -430,6 +438,7 @@ var TestRunner = (function () {
     assertThrows: assertThrows,
     assertGreaterThan: assertGreaterThan,
     assertHasKey: assertHasKey,
+    fail: fail,
 
     // Runner
     runAll: runAll,
@@ -601,13 +610,12 @@ function _sendTestFailureEmail(results) {
  */
 function runTestsFromMenu() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Running tests...', 'Test Runner', 30);
+  ss.toast('Running all 20 test suites — this takes ~90 seconds. Please wait...', '🧪 Test Runner', 120);
   var results = TestRunner.runAll();
-  var msg = results.summary.passed + ' passed, ' + results.summary.failed + ' failed (' + results.duration + 'ms)';
+  var msg = results.summary.passed + ' passed, ' + results.summary.failed + ' failed (' + Math.round(results.duration / 1000) + 's)';
 
   if (results.summary.failed > 0) {
     var summary = TestRunner.getErrorSummary();
-    // Log all errors to the Apps Script console for easy review
     Logger.log('=== TEST ERROR SUMMARY ===');
     Logger.log(summary.totalErrors + ' failure(s) across ' + summary.totalTests + ' total tests');
     for (var i = 0; i < summary.failures.length; i++) {
@@ -615,11 +623,20 @@ function runTestsFromMenu() {
       Logger.log('[' + f.suite.toUpperCase() + '] ' + f.test + ': ' + f.error);
     }
     Logger.log('=== END ERROR SUMMARY ===');
-    // Toast shows count; full details in View > Logs
     msg += ' — see View > Logs for details';
   }
 
-  ss.toast(msg, results.summary.failed > 0 ? '❌ Tests Failed' : '✅ Tests Passed', 10);
+  // Show results dialog (more visible than toast)
+  var icon = results.summary.failed > 0 ? '❌' : '✅';
+  var html = HtmlService.createHtmlOutput(
+    '<div style="font-family:sans-serif;padding:16px;">' +
+    '<h2 style="margin:0 0 12px;">' + icon + ' Test Results</h2>' +
+    '<p style="font-size:16px;font-weight:600;">' + msg + '</p>' +
+    (results.timedOut ? '<p style="color:#f59e0b;">⚠ Some suites timed out</p>' : '') +
+    '<p style="color:#666;font-size:13px;">Full details in View → Logs or use the SPA Test Runner tab.</p>' +
+    '</div>'
+  ).setWidth(400).setHeight(180);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Test Runner Results');
 }
 
 /**
