@@ -3005,56 +3005,194 @@ Prevents revert of the 2026-03-11 architectural fix. Guards three properties:
 
 ---
 
-## 🔍 CODE REVIEW SESSION — 2026-03-11 (Resumed)
+## 🎨 UI SYSTEM LOG — 2026-03-13 (Loading & Progress Bar Overhaul)
 
-### Scope
-Full end-to-end audit of all 38 .gs source files + 3 HTML files (~93K lines).
-Previous session covered: 00_Security.gs, 00_DataAccess.gs, 01_Core.gs, 19_WebDashAuth.gs, 22_WebDashApp.gs, 10_Main.gs.
-This session covered: 02_DataManagers.gs, 21_WebDashDataService.gs, 08c_FormsAndNotifications.gs, 05_Integrations.gs, 06_Maintenance.gs, 15_EventBus.gs, 20_WebDashConfigReader.gs, 28_FailsafeService.gs, 25_WorkloadService.gs, index.html, member_view.html, steward_view.html (partial deep + pattern scans).
+### Loading Indicator System (v4.25.13 → v4.25.14)
 
-### ✅ FIXED — FIX-WDS-01: dataGetFullProfile signature bug
-**File:** `src/21_WebDashDataService.gs` ~line 2947
-**Bug:** Function declared as `dataGetFullProfile(email)` but body referenced `sessionToken` (undefined in scope). This caused a `ReferenceError` on every call — members could NEVER load their full profile from the web dashboard.
-**Fix:** Renamed signature to `dataGetFullProfile(sessionToken, email)`. Also passed sessionToken to `checkWebAppAuthorization('steward', sessionToken)` for consistency.
-**Severity:** CRITICAL (profile page broken for all members)
+#### Bug Fixed: `.spinner` was `display:none` since v4.25.11
+**Root cause:** When the skeleton loading system was introduced in v4.25.11, `.spinner` was set to `display:none` and `@keyframes spin` was deleted. Four active call sites still used `.spinner`:
+- `auth_view.html` — Google SSO button ("Connecting to Google…")
+- `auth_view.html` — Magic link send ("Sending sign-in link…")
+- `member_view.html` — Survey submit
+- `member_view.html` — Survey retry
 
-### ✅ FIXED — FIX-SEC-01: sendSecurityAlertEmail_ used MailApp directly
-**File:** `src/00_Security.gs` ~line 804, 851
-**Bug:** `sendSecurityAlertEmail_()` called `MailApp.sendEmail()` directly and did its own `getRemainingDailyQuota()` check, inconsistent with every other email sender in codebase which uses `safeSendEmail_()`. If quota was exceeded, MailApp would throw an unhandled exception inside the catch block.
-**Fix:** Replaced `MailApp.sendEmail()` with `safeSendEmail_()`. Removed redundant quota check (safeSendEmail_ handles this internally with proper logging).
-**Severity:** MINOR (inconsistency; practical risk low since critical alerts are infrequent)
+**Fix:** Restored `.spinner` as three-dot `dotPulse` animation (see below).
 
-### ✅ FIXED — FIX-MAIN-01: recalculateDownstreamDeadlines_ hardcoded calendar day math
-**File:** `src/10_Main.gs` ~line 838
-**Bug:** Deadline cascade chain used hardcoded day values (21, 30, 10, 30, 30) and raw millisecond arithmetic (`* 86400000` = calendar days). All other deadline calculations use `getDeadlineRules()` for configurable values and `addBusinessDays()` for business-day math.
-**Fix:** Chain now reads `getDeadlineRules()` and uses `addBusinessDays()` for each cascade step.
-**Note:** The DEFAULTS for these chain values are: FILING_DAYS=21, STEP_1_RESPONSE=7, STEP_2_APPEAL=7, STEP_2_RESPONSE=14, STEP_3_APPEAL=10. Previous hardcoded values (30, 10, 30, 30) did NOT match these defaults. The old values may have reflected different contractual rules — verify Config sheet is seeded correctly.
-**Severity:** MEDIUM (wrong deadlines cascade when a steward overrides a date)
+---
 
-### ℹ️ OBSERVATION: GRIEVANCE_TRACKER and GRIEVANCE_LOG are aliases
-Both `SHEETS.GRIEVANCE_TRACKER` and `SHEETS.GRIEVANCE_LOG` point to `'Grievance Log'` (01_Core.gs lines 815, 859). This is intentional for backward compatibility but creates inconsistency in which alias different files use. Not a bug but a code smell.
+#### ✅ Two Parallel Loading Systems (both intentional)
 
-### ℹ️ OBSERVATION: onSatisfactionFormSubmit trigger deprecated v4.21.0
-`onSatisfactionFormSubmit()` in 08c_FormsAndNotifications.gs is now a no-op that logs a warning. If an old trigger is still installed in the project, it will fire on every form submit and log noise. Run `ScriptApp.getProjectTriggers()` to check and remove stale triggers.
+| System | Class | Purpose |
+|--------|-------|---------|
+| Skeleton | `.loading-spinner` + `.skeleton-card` / `.skeleton-row` | Section-level page loads (showLoading()) |
+| Inline dots | `.spinner` | User-triggered action confirmation (button clicks, form submits) |
 
-### ℹ️ OBSERVATION: Stale @version tags in file headers
-Multiple files still show old version numbers in their JSDoc `@version` tags (e.g., 4.7.0, 4.13.0). These are cosmetic only — the canonical version lives in `COMMAND_CONFIG.VERSION` in `01_Core.gs`. No action required but worth noting for maintainability.
+---
 
-### ✅ CONFIRMED OK: All client-side render functions resolve correctly
-`index.html` includes BOTH `steward_view.html` AND `member_view.html` unconditionally (lines 1094-1095). Functions like `renderFeedbackPage` (steward_view), `renderWorkloadTracker` (member_view), and `renderQAForum` (member_view) are available to both roles at runtime. No dead render routes found.
+#### Skeleton: Shimmer sweep (replaces opacity pulse)
+**File:** `src/styles.html`
+```css
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+```
+Applied via `background: linear-gradient(90deg, rgba low, rgba high, rgba low)` + `background-size: 600px 100%`.
+Light-mode: separate `[data-theme-mode="light"]` overrides on `.skeleton-row` and `.skeleton-card`.
 
-### ✅ CONFIRMED OK: All server function calls from member_view and steward_view resolve
-All `serverCall().funcName()` calls in `member_view.html` and `steward_view.html` were verified against source .gs files. Every function exists in either `21_WebDashDataService.gs`, `05_Integrations.gs`, `08e_SurveyEngine.gs`, or `25_WorkloadService.gs`. Zero dead RPC calls found.
+#### Inline spinner: Three-dot dotPulse (replaces rotating ring)
+**File:** `src/styles.html`
+```css
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.55); opacity: 0.35; }
+  40%           { transform: scale(1);    opacity: 1; }
+}
+.spinner { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.2s ease-in-out infinite; }
+.spinner::before { left: -13px; animation-delay: -0.24s; }
+.spinner::after  { left:  13px; animation-delay:  0.24s; }
+```
+Dots are accent-colored in both themes. `auth_view.html:47` inline style was updated to remove ring-specific `width/height/border-width` overrides.
 
-### ✅ CONFIRMED OK: XSS protection consistent across HTML files
-All user-data insertions via `innerHTML` in `member_view.html` and `steward_view.html` use `safeText()` (defined in `index.html` line 253). No raw interpolation of server data found.
+#### 30-second timeout fallback
+`showLoading()` now returns a loader element. After 30s, if the element is still in the DOM, replaces skeleton with a reload prompt. Call `clearLoading(loader)` in success handlers to cancel the timeout.
 
-### ✅ CONFIRMED OK: Deadline calculations in 02_DataManagers.gs use getDeadlineRules()
-`calculateInitialDeadlines()`, `calculateNextStepDeadline()`, and `calculateResponseDeadline()` all call `getDeadlineRules()` and `addBusinessDays()`. This is correct.
+---
 
-### ✅ CONFIRMED OK: Member deduplication (findExistingMember) is sound
-Priority: Member ID > Email > Name. Returns first high-confidence match. Does not stop scanning after name match (keeps looking for ID/email match). Correct.
+### Progress Bar System (v4.25.14)
 
-### ✅ CONFIRMED OK: Grievance ID sequence scanning is year-aware
-`getNextGrievanceId()` scans only current-year IDs (GRV-YYYY-NNNN format). Rolls over correctly on January 1.
+#### ⚠️ RULE: Never use inline styles for progress bars
+All progress bars MUST use the shared `.prog-track` / `.prog-fill` class system.
+Never write `height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden'` inline again.
+
+#### Shared CSS utility classes (`src/styles.html`)
+```css
+/* Track (background) */
+.prog-track        { height: 6px; }   /* default */
+.prog-track--sm    { height: 4px; }   /* micro — participation history, ranked chart */
+.prog-track--md    { height: 8px; }   /* standard — checklists, satisfaction, polls */
+.prog-track--lg    { height: 10px; }  /* hero — Response Rate card */
+
+/* Fill (colored bar) */
+.prog-fill                /* default: var(--accent) */
+.prog-fill--success       /* var(--success) — 100% complete, high scores */
+.prog-fill--warning       /* var(--warning) — mid range */
+.prog-fill--danger        /* var(--danger)  — low/overdue */
+```
+Light-mode: `.prog-track` background auto-swaps via `[data-theme-mode="light"]`.
+Transition: `cubic-bezier(0.34, 1.2, 0.64, 1)` — slight spring overshoot on all fills.
+
+#### Usage pattern
+```js
+var track = el('div', { className: 'prog-track prog-track--md', style: { flex: '1' } });
+var colorClass = val >= 70 ? 'prog-fill--success' : val >= 40 ? 'prog-fill--warning' : 'prog-fill--danger';
+track.appendChild(el('div', { className: 'prog-fill ' + colorClass, style: { width: val + '%' } }));
+```
+For chart bars with a custom color array (polls), pass `style: { background: colors[i] }` directly on `.prog-fill`.
+
+#### Bars refactored (9 total)
+| Bar | File | Size |
+|-----|------|------|
+| Response Rate hero | steward_view | `--lg` |
+| Member participation history | steward_view | `--sm` |
+| Ranked list chart | steward_view | `--sm` |
+| Satisfaction score bars | steward_view | `--md` |
+| Steward checklist completion | steward_view | `--md` |
+| Poll results (Q&A forum view) | steward_view | `--md` |
+| Poll results (steward weekly Q) | steward_view | `--md` |
+| Member checklist completion | member_view | `--md` |
+| Member poll results | member_view | `--md` |
+
+**Bug fixed:** 2 poll bars (steward_view:3884, 4055) were missing `transition` — bars snapped instead of animating. Now handled by `.prog-fill` shared transition.
+
+---
+
+### Glow-bar Animation (v4.25.14)
+
+**File:** `src/styles.html` — `.glow-bar` + `@keyframes glowSweep`
+
+Decorative 3px status stripe on grievance cards. Previously static. Now animates with a sweep (bright peak travels left→right over 2.5s), matching skeleton shimmer language.
+
+```css
+@keyframes glowSweep {
+  0%   { background-position: -300px 0; }
+  100% { background-position:  300px 0; }
+}
+```
+
+**Compatibility:** Uses 3-stop `linear-gradient` + `background-size` only. No `color-mix()` — compatible with Chrome 49+, Safari 10+, Firefox 52+.
+
+**Variants:** `.glow-bar.warning` / `.glow-bar.danger` / `.glow-bar.success` / `.glow-bar.info`
+
+**Deferred:** Alternative animation options (pulse, breathe) were previewed and noted in `TODO.md` for future review.
+
+
+---
+
+## 🎨 UI SYSTEM LOG — 2026-03-13 (Per-View Skeletons + Nav Progress Bar)
+
+### Per-View Skeleton Shapes (v4.25.15)
+
+Two new `showLoading()` variants added. All 34 call sites across `steward_view.html` and `member_view.html` now use explicit variants.
+
+#### Variant Map
+
+| Variant | CSS Class | Shape | Used For |
+|---------|-----------|-------|----------|
+| `'member-list'` | `.loading-member-list` | Avatar circle + name line + meta line + chevron | Member directory, steward directory, steward list |
+| `'grievance'` | `.loading-grievance` | Glow-bar + label + title + id + deadline box | Past cases list, member grievance section |
+| `'kpi'` | `.loading-kpi` | 4 wide skeleton cards in a row | Dashboard init, stats pages, insights |
+| `'form'` | `.loading-form` | Alternating label/input rows | Profile edit, survey form |
+| `'list'` | `.loading-list` | Full-width rows (44px height) | Notification list, task list, minutes, poll history |
+| *(default)* | `.loading-spinner` | Mixed card + row | Fallback only — avoid if a specific variant fits |
+
+#### CSS Location
+`src/styles.html` — search for `member-list skeleton` and `grievance skeleton` comments.
+
+#### Design Details — `member-list`
+Matches `.member-list-item` exactly: 36px avatar circle, name (12px, varied widths), meta (9px), chevron (7×12px stub). 5 rows with staggered shimmer delays (0/0.15/0.30/0.45/0.60s) and varied name widths (55/42/61/35/50%) to avoid mechanical repetition. Full light-mode support.
+
+#### Design Details — `grievance`
+Matches `renderGrievanceCard()` exactly: 3px glow-bar strip at top, label (9px), step title (16px), id/date (9px), deadline box (44px with label + number stubs). 2 cards rendered, second card shimmer offset by 0.3s.
+
+#### ⚠️ RULE: Always pass a variant to showLoading()
+`showLoading(container)` with no variant is a fallback — it renders a generic mixed layout.
+Always use the most specific variant for the content that will replace it.
+
+---
+
+### Nav Progress Bar (v4.25.15)
+
+YouTube-style thin top-of-screen bar that fires on every tab navigation.
+
+#### How it works
+1. `_handleTabNav()` calls `_navProgressStart()` at the very top (before any render)
+2. Bar animates 0% → 85% and holds (cubic-bezier, 350ms)
+3. After switch block completes, `_navProgressDone()` is called
+4. Bar snaps to 100%, then fades out over 180ms + 320ms
+
+#### Files changed
+- `src/styles.html` — `#nav-progress` CSS + `@media prefers-reduced-motion`
+- `src/index.html` — `<div id="nav-progress">` in body, `_navProgressStart()` / `_navProgressDone()` functions, hooks in `_handleTabNav()`
+
+#### CSS Details
+```
+height: 2px; z-index: 300 (above modal at 200)
+background: var(--accent)
+box-shadow: 0 0 8px var(--accent) — subtle glow
+border-radius: 0 1px 1px 0 — tapered right edge
+transition: width 0.35s cubic-bezier(0.1, 0.6, 0.4, 1)
+```
+
+#### ⚠️ RULE: Never call _navProgressStart() without _navProgressDone()
+Every early-return path in `_handleTabNav()` must call `_navProgressDone()` before returning.
+If a new early-return is added in the future, always add `_navProgressDone()` on that path.
+
+#### Reduced motion
+`@media (prefers-reduced-motion: reduce)` disables width animation — bar still flashes briefly at full opacity then fades, giving feedback without motion.
+
+---
+
+### File Moves (v4.25.14+)
+- `preview-loading-indicators.html` moved from repo root → `dev-tools/`
+- Root is now clean of dev/preview files
 

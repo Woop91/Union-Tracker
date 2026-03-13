@@ -18,6 +18,7 @@
   <!-- Chart.js — deferred until actually needed (lazy-loaded by ChartHelper) -->
 </head>
 <body>
+  <div id="nav-progress"></div>
   <div id="app"></div>
 
   <script>
@@ -682,6 +683,36 @@
           '<div class="skeleton-card"></div>' +
           '<div class="skeleton-card"></div>' +
           '<div class="skeleton-card"></div>';
+
+      } else if (variant === 'member-list') {
+        // Matches .member-list-item: avatar circle + name + meta + chevron
+        cls += ' loading-member-list';
+        var mkRow = function() {
+          return '<div class="sk-member-row">' +
+            '<div class="sk-avatar"></div>' +
+            '<div class="sk-info"><div class="sk-name"></div><div class="sk-meta"></div></div>' +
+            '<div class="sk-chevron"></div>' +
+          '</div>';
+        };
+        innerHtml = mkRow() + mkRow() + mkRow() + mkRow() + mkRow();
+
+      } else if (variant === 'grievance') {
+        // Matches grievance card: glow-bar + label + step title + id/date + deadline box
+        cls += ' loading-grievance';
+        var mkGCard = function() {
+          return '<div class="sk-grievance-card">' +
+            '<div class="sk-glow"></div>' +
+            '<div class="sk-g-label"></div>' +
+            '<div class="sk-g-title"></div>' +
+            '<div class="sk-g-id"></div>' +
+            '<div class="sk-g-deadline">' +
+              '<div class="sk-g-dl-label"></div>' +
+              '<div class="sk-g-dl-num"></div>' +
+            '</div>' +
+          '</div>';
+        };
+        innerHtml = mkGCard() + mkGCard();
+
       } else {
         innerHtml =
           '<div class="skeleton-card"></div>' +
@@ -719,6 +750,43 @@
         clearTimeout(loader._loadingTimeout);
         loader._loadingTimeout = null;
       }
+    }
+
+    /**
+     * Nav progress bar — thin top-of-screen indicator on tab switches.
+     * Usage: call _navProgressStart() before render, _navProgressDone() after.
+     * CSS handles the animation via #nav-progress in styles.html.
+     */
+    var _navProgressTimer = null;
+    function _navProgressStart() {
+      var bar = document.getElementById('nav-progress');
+      if (!bar) return;
+      // Cancel any in-flight finish animation
+      if (_navProgressTimer) { clearTimeout(_navProgressTimer); _navProgressTimer = null; }
+      bar.style.transition = 'none';
+      bar.style.width = '0%';
+      bar.style.opacity = '1';
+      bar.classList.add('np-active');
+      // Force reflow so transition fires on next frame
+      bar.offsetWidth; // eslint-disable-line no-unused-expressions
+      bar.style.transition = '';
+      // Animate to 85% — holds there until _navProgressDone() is called
+      bar.style.width = '85%';
+    }
+    function _navProgressDone() {
+      var bar = document.getElementById('nav-progress');
+      if (!bar) return;
+      // Snap to 100% then fade out
+      bar.style.width = '100%';
+      _navProgressTimer = setTimeout(function() {
+        bar.style.opacity = '0';
+        _navProgressTimer = setTimeout(function() {
+          bar.style.transition = 'none';
+          bar.style.width = '0%';
+          bar.classList.remove('np-active');
+          _navProgressTimer = null;
+        }, 320);
+      }, 180);
     }
 
     function handleLogout() {
@@ -1043,9 +1111,10 @@
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
       AppState.activeTab = tabId; // track for badge refresh
+      _navProgressStart();
       // Handle "More" menus for both roles (mobile bottom-nav)
-      if (tabId === '_member_more') { renderMemberMore(app); return; }
-      if (tabId === '_steward_more') { renderStewardMore(app); return; }
+      if (tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
+      if (tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); return; }
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
         // Block non-dues-paying members from org chart; stewards always have access
@@ -1053,14 +1122,17 @@
           if (typeof _renderDuesGate === 'function') {
             _renderDuesGate(app, 'Org Chart', function() { _handleTabNav(role, 'home'); });
           }
+          _navProgressDone();
           return;
         }
         renderOrgChart(app, role);
+        _navProgressDone();
         return;
       }
       // POMS Reference — shared across both roles
       if (tabId === 'poms') {
         renderPOMSReference(app, role);
+        _navProgressDone();
         return;
       }
 
@@ -1111,6 +1183,7 @@
           default: renderStewardDashboard(app);
         }
       }
+      _navProgressDone();
     }
 
     /**

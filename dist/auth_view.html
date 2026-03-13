@@ -44,7 +44,7 @@ function showAuthChoose(container) {
       if (!WEB_APP_URL) { showAuthError(container, 'Web app URL not available. Please reload the page.'); return; }
       // Show loading state so the button doesn't look dead
       googleBtn.disabled = true;
-      googleBtn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;margin-right:8px;display:inline-block;vertical-align:middle"></div> Connecting to Google\u2026';
+      googleBtn.innerHTML = '<div class="spinner" style="margin-right:16px;vertical-align:middle"></div> Connecting to Google\u2026';
       // Redirect to the actual web app URL (not the iframe URL) with sso=1 flag
       window.top.location.href = WEB_APP_URL + '?sso=1';
     }

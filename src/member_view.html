@@ -13,7 +13,7 @@ function initMemberView(container) {
   var t = ThemeEngine.getTheme('member', AppState.isDark);
   ThemeEngine.applyTheme(t);
   AppState.activeRole = 'member';
-  showLoading(container);
+  showLoading(container, 'kpi');
 
   // Use batch data if available from initApp pre-fetch
   var batch = AppState.batchData;
@@ -661,7 +661,7 @@ function _renderPastCasesSection(parentContainer) {
   section.appendChild(headerRow);
 
   var listArea = el('div', { style: { display: 'none' } });
-  showLoading(listArea);
+  showLoading(listArea, 'grievance');
   section.appendChild(listArea);
   parentContainer.appendChild(section);
 
@@ -847,7 +847,7 @@ function renderStewardContact(appContainer) {
     // ── Section 1: Your assigned steward ─────────────────────────────────
     var assignedSection = el('div', { style: { marginBottom: '20px' } });
     content.appendChild(assignedSection);
-    showLoading(assignedSection);
+    showLoading(assignedSection, 'member-list');
 
     serverCall().withSuccessHandler(function(info) {
       assignedSection.innerHTML = '';
@@ -949,7 +949,7 @@ function _showStewardPicker(targetSection) {
     fontSize: '10px', fontWeight: '700', color: 'var(--muted)',
     textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px'
   }}, 'Choose your ' + CONFIG.stewardLabel));
-  showLoading(targetSection);
+  showLoading(targetSection, 'member-list');
 
   serverCall().withSuccessHandler(function(stewards) {
     targetSection.innerHTML = '';
@@ -998,7 +998,7 @@ function _renderMemberDirectory(target) {
     textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px'
   }}, 'All ' + CONFIG.stewardLabel + 's');
   target.appendChild(labelRow);
-  showLoading(target);
+  showLoading(target, 'member-list');
 
   // PERF-06: Cache steward directory via DataCache (120s TTL) — avoids redundant
   // server calls on tab switches since the directory rarely changes mid-session.
@@ -1324,7 +1324,7 @@ function renderUpdateProfile(appContainer) {
   renderPageLayout(appContainer, 'member', 'profile', function(container) {
     _memberHeader(container, 'Update Profile');
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    showLoading(content, 'form');
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(profile) {
@@ -1415,7 +1415,7 @@ function renderMemberNotifications(appContainer) {
   renderPageLayout(appContainer, 'member', 'notifications', function(container) {
     _memberHeader(container, 'Notifications', 'Stay informed');
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    showLoading(content, 'list');
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(notifications) {
@@ -1603,7 +1603,7 @@ function renderSurveyFormPage(appContainer) {
   renderPageLayout(appContainer, 'member', 'survey-form', function(container) {
     _memberHeader(container, 'Quarterly Survey');
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    showLoading(content, 'form');
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(surveyData) {
@@ -2351,7 +2351,7 @@ function renderSurveyResultsPage(appContainer) {
   renderPageLayout(appContainer, 'member', 'survey', function(container) {
     _memberHeader(container, 'Survey Results');
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    showLoading(content, 'kpi');
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(data) {
@@ -3404,7 +3404,7 @@ function _openSubModal(cat, catIdx, mainInput, subData) {
 // ── History Tab ─────────────────────────────────────────────────────────────
 
 function _renderWTHistory(container) {
-  showLoading(container);
+  showLoading(container, 'list');
   serverCall().withSuccessHandler(function(result) {
     container.innerHTML = '';
     if (!result || !result.success || !result.history || result.history.length === 0) {
@@ -3499,7 +3499,7 @@ function _renderWTHistory(container) {
 // ── Stats Tab ───────────────────────────────────────────────────────────────
 
 function _renderWTStats(container) {
-  showLoading(container);
+  showLoading(container, 'kpi');
   serverCall().withSuccessHandler(function(result) {
     container.innerHTML = '';
 
@@ -3600,7 +3600,7 @@ function _wtStatCard(value, label) {
 // ── Reminders Tab ───────────────────────────────────────────────────────────
 
 function _renderWTReminders(container) {
-  showLoading(container);
+  showLoading(container, 'form');
   serverCall().withSuccessHandler(function(prefs) {
     container.innerHTML = '';
     prefs = prefs || { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
@@ -3719,7 +3719,7 @@ function renderEventsPage(appContainer) {
     }
 
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    showLoading(content, 'list');
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(events) {
@@ -3825,7 +3825,7 @@ function renderUnionStatsPage(appContainer) {
 }
 
 function _renderGrievanceStats(container) {
-  showLoading(container);
+  showLoading(container, 'kpi');
   serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data || !data.available) {
@@ -3883,7 +3883,7 @@ function _renderGrievanceStats(container) {
 }
 
 function _renderHotSpots(container) {
-  showLoading(container);
+  showLoading(container, 'list');
   serverCall().withSuccessHandler(function(spots) {
     container.innerHTML = '';
     if (!spots || spots.length === 0) {
@@ -3911,7 +3911,7 @@ function _renderHotSpots(container) {
 }
 
 function _renderMembershipStats(container) {
-  showLoading(container);
+  showLoading(container, 'kpi');
   serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data || !data.available) {
@@ -3938,7 +3938,7 @@ function _renderMembershipStats(container) {
 }
 
 function _renderEngagementStats(container) {
-  showLoading(container);
+  showLoading(container, 'kpi');
   serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data) {
@@ -4043,8 +4043,8 @@ function _renderMemberCaseChecklist(container, caseId) {
     var completed = items.filter(function(i) { return i.completed; }).length;
     var pct = Math.round((completed / items.length) * 100);
     var progRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } });
-    var progBar = el('div', { style: { flex: '1', height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
-    progBar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: pct === 100 ? 'var(--success)' : 'var(--accent)', borderRadius: '4px' } }));
+    var progBar = el('div', { className: 'prog-track prog-track--md', style: { flex: '1' } });
+    progBar.appendChild(el('div', { className: 'prog-fill' + (pct === 100 ? ' prog-fill--success' : ''), style: { width: pct + '%' } }));
     progRow.appendChild(progBar);
     progRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)', whiteSpace: 'nowrap' } }, completed + '/' + items.length + ' (' + pct + '%)'));
     checklistContent.appendChild(progRow);
@@ -4081,7 +4081,7 @@ function renderMeetingsPage(appContainer) {
   renderPageLayout(appContainer, 'member', 'meetings', function(container) {
     _memberHeader(container, 'My Meetings', 'Your meeting attendance history');
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    showLoading(content, 'list');
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(meetings) {
@@ -4236,8 +4236,8 @@ function _renderPollResults(container, q) {
     header.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '500' } }, opt));
     header.appendChild(el('span', { style: { color: 'var(--muted)' } }, pct + '%  (' + count + ')'));
     row.appendChild(header);
-    var bar = el('div', { style: { height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
-    bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: colors[i % colors.length], borderRadius: '4px', transition: 'width 0.5s ease' } }));
+    var bar = el('div', { className: 'prog-track prog-track--md' });
+    bar.appendChild(el('div', { className: 'prog-fill', style: { width: pct + '%', background: colors[i % colors.length] } }));
     row.appendChild(bar);
     container.appendChild(row);
   });
@@ -4451,7 +4451,7 @@ function renderMinutesPage(appContainer) {
 
     // Separate content area for the list — showLoading only clears this div, not the CTA above
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    showLoading(content, 'list');
     container.appendChild(content);
 
     serverCall().withSuccessHandler(function(minutes) {
@@ -4575,7 +4575,7 @@ function renderMemberTasks(appContainer) {
 
     function renderSubContent() {
       subContent.innerHTML = '';
-      showLoading(subContent);
+      showLoading(subContent, 'list');
       var statusFilter = activeSubTab === 'completed' ? 'completed' : null;
       serverCall().withSuccessHandler(function(tasks) {
         subContent.innerHTML = '';
