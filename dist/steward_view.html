@@ -437,6 +437,8 @@ function _refreshNavBadges() {
   _refreshNavBadgesTimer = setTimeout(function() {
     _refreshNavBadgesTimer = null;
 
+    // Flush tab DOM cache so stale content isn't shown on next tab switch
+    if (typeof _invalidateTabCache === 'function') _invalidateTabCache();
     // Re-fetch KPIs (case overdue count may have changed)
     serverCall().withSuccessHandler(function(kpis) {
       if (kpis) AppState.kpis = kpis;
@@ -640,26 +642,37 @@ function renderStewardMembers(appContainer) {
   renderPageLayout(appContainer, 'steward', 'members', function(container) {
     _stewardHeader(container, 'Members');
     var content = el('div', { className: 'content' });
-    showLoading(content, 'member-list');
+
+    // OPT-11: Skip skeleton if data is already cached — instant render path
+    var hasCachedMembers = typeof DataCache !== 'undefined' && DataCache.has('stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || ''));
+    if (!hasCachedMembers) {
+      showLoading(content, 'member-list');
+    }
     container.appendChild(content);
 
     // OPT-6: Pre-fire stats in parallel with members (no dependency between them)
+    // OPT-12: Cache stats to avoid redundant server call on tab revisit
     var _prefetchedStats = null;
-    if (typeof ChartHelper !== 'undefined') {
-      serverCall().withSuccessHandler(function(stats) {
-        _prefetchedStats = stats;
-        // If members already rendered, insert chart now
-        var searchEl = content.querySelector('.search-input');
-        if (searchEl && stats && stats.byLocation) {
-          var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
-          var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
-          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
-          var lLabels = Object.keys(stats.byLocation);
-          var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
-          ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
-          content.insertBefore(locCard, searchEl);
-        }
-      }).withFailureHandler(function() { /* chart optional */ }).dataGetStewardMemberStats(SESSION_TOKEN);
+    var _statsCacheKey = 'stewardMemberStats_' + (CURRENT_USER && CURRENT_USER.email || '');
+    function _onStatsLoaded(stats) {
+      _prefetchedStats = stats;
+      // If members already rendered, insert chart now
+      var searchEl = content.querySelector('.search-input');
+      if (searchEl && stats && stats.byLocation && typeof ChartHelper !== 'undefined') {
+        var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
+        var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
+        locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
+        var lLabels = Object.keys(stats.byLocation);
+        var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
+        ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
+        content.insertBefore(locCard, searchEl);
+      }
+    }
+    if (typeof DataCache !== 'undefined') {
+      DataCache.cachedCall(_statsCacheKey, 'dataGetStewardMemberStats', [SESSION_TOKEN],
+        _onStatsLoaded, function() { /* chart optional */ }, DataCache.STABLE_TTL);
+    } else if (typeof ChartHelper !== 'undefined') {
+      serverCall().withSuccessHandler(_onStatsLoaded).withFailureHandler(function() { /* chart optional */ }).dataGetStewardMemberStats(SESSION_TOKEN);
     }
 
     // OPT-2: Use DataCache for members — avoids re-fetch on tab revisit (5-min TTL)
@@ -791,9 +804,24 @@ function renderStewardMembers(appContainer) {
       }
       rerender();
     }
-    function _onMembersFailed() {
+    function _onMembersFailed(err) {
       content.innerHTML = '';
-      content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--danger)' } }, 'Failed to load members. Try refreshing.'));
+      var msg = (err && err.message) ? err.message : String(err || '');
+      var isNetwork = msg.indexOf('HTTP 0') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('Connection failure') !== -1;
+      var userMsg = isNetwork
+        ? 'Connection lost — could not reach the server. Check your internet and try again.'
+        : 'Failed to load members. Try refreshing.';
+      var errorWrap = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+      errorWrap.appendChild(el('div', { style: { color: isNetwork ? 'var(--warning)' : 'var(--danger)', marginBottom: '12px' } }, userMsg));
+      var retryBtn = el('button', {
+        style: { padding: '8px 20px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px' },
+        onClick: function() {
+          if (typeof DataCache !== 'undefined') DataCache.invalidate('stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || ''));
+          renderStewardMembers(appContainer);
+        }
+      }, 'Retry');
+      errorWrap.appendChild(retryBtn);
+      content.appendChild(errorWrap);
     }
     if (typeof DataCache !== 'undefined') {
       DataCache.cachedCall(
@@ -2447,8 +2475,8 @@ function _renderSurveyMemberItem(parentEl, m, showProximity) {
     item.appendChild(partRow);
   }
 
-  if (m.email && typeof _showMemberDetail === 'function') {
-    item.onclick = (function(member, itemEl) { return function() { _showMemberDetail(parentEl, itemEl, member); }; })(m, item);
+  if (m.email && typeof _toggleMemberDetail === 'function') {
+    item.onclick = (function(member, itemEl) { return function() { _toggleMemberDetail(parentEl, itemEl, member); }; })(m, item);
   }
   parentEl.appendChild(item);
 }

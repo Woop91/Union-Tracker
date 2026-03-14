@@ -535,6 +535,27 @@ var QAForum = (function () {
     return text;
   }
 
+  /**
+   * Lightweight count of unanswered questions — avoids building full question objects.
+   * Used by batch data to skip the expensive getQuestions(email, 1, 999, ...) call.
+   */
+  function getUnansweredCount() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return 0;
+    var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
+    if (!sheet || sheet.getLastRow() <= 1) return 0;
+
+    var data = _getCachedSheetData(SHEETS.QA_FORUM, 60) || sheet.getDataRange().getValues();
+    var count = 0;
+    for (var i = 1; i < data.length; i++) {
+      var status = String(data[i][5] || 'active').toLowerCase().trim();
+      if (status === 'deleted' || status === 'resolved') continue;
+      var answerCount = parseInt(data[i][8], 10) || 0;
+      if (answerCount === 0) count++;
+    }
+    return count;
+  }
+
   // ═══════════════════════════════════════
   // Public API
   // ═══════════════════════════════════════
@@ -543,6 +564,7 @@ var QAForum = (function () {
     initQAForumSheets: initQAForumSheets,
     getQuestions: getQuestions,
     getQuestionDetail: getQuestionDetail,
+    getUnansweredCount: getUnansweredCount,
     submitQuestion: submitQuestion,
     submitAnswer: submitAnswer,
     upvoteQuestion: upvoteQuestion,

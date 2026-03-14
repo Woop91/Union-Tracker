@@ -441,10 +441,12 @@ describe('G13: serverCall failure handler surfaces error details', () => {
   const indexCode = read('index.html');
 
   test('serverCall failure handler includes err.message', () => {
-    // Find the serverCall function
-    const funcMatch = indexCode.match(/function serverCall\(\)\s*\{[\s\S]*?return runner;\s*\}/);
-    expect(funcMatch).not.toBeNull();
-    const body = funcMatch[0];
+    // serverCall() may delegate error handling to _showFailureUI or inline handler.
+    // Check that the failure UI function (wherever it lives) references err.message.
+    const failureUIMatch = indexCode.match(/function _showFailureUI\(err\)\s*\{[\s\S]*?\n {4}\}/);
+    const inlineMatch = indexCode.match(/function serverCall\(\)\s*\{[\s\S]*?return runner;\s*\}/);
+    const body = failureUIMatch ? failureUIMatch[0] : (inlineMatch ? inlineMatch[0] : '');
+    expect(body.length).toBeGreaterThan(0);
 
     // Must reference err.message or err to show actual error
     expect(body).toMatch(/err\.message|err\b/);

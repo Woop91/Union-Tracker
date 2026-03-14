@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.28.4] - 2026-03-14
+
+### Fixed
+- **serverCall() now retries transient errors** — Refactored `serverCall()` to use Proxy-based interception so ALL server calls (including Insights tab's 6 parallel calls) get automatic retry with exponential backoff on HTTP 0/NetworkError. Previously only `DataCache.cachedCall` had retry.
+- **Concurrent call throttle** — Added `_throttledServerCall()` queue that limits in-flight `google.script.run` calls to 4 max. Prevents connection exhaustion when Insights (6 calls) or Union Stats (4 calls) fire simultaneously. Queued calls drain automatically as slots free.
+- **QA Forum 999-question scan in batch data** — Replaced `QAForum.getQuestions(email, 1, 999, 'recent')` + full-object iteration in `_getStewardBatchData` with new `QAForum.getUnansweredCount()` that counts directly from raw sheet data without building question objects. Saves ~200-400ms per batch call.
+
+## [4.28.3] - 2026-03-14
+
+### Fixed
+- **Slow tab switching (4+ sec)** — Added tab DOM cache that preserves rendered content on tab switches; revisiting a tab now restores instantly from cached DOM instead of re-rendering + re-fetching
+- **Loading skeleton shown on cache hits** — Members tab (and others via DataCache.has()) now skip the skeleton animation when data is already cached, eliminating 400-500ms of unnecessary visual delay
+- **Redundant stats server call** — `dataGetStewardMemberStats` now routed through DataCache (5-min TTL) instead of firing a fresh `serverCall()` on every members tab visit
+- **HTTP 0 / NetworkError crashes** — Added `_serverCallWithRetry()` with exponential backoff (1.5s, 3s) for transient network failures; `DataCache.cachedCall` uses retry automatically
+- **Poor error messages on network failure** — `serverCall()` default handler now distinguishes transient network errors ("Connection lost") from server errors ("Something went wrong"), with a "Retry" button for network issues
+- **Members tab error UX** — `_onMembersFailed` now shows network-aware error message with an inline Retry button (invalidates cache + re-renders) instead of a generic "Try refreshing" message
+
+### Changed
+- Architecture test A8 updated to accept `_serverCallWithRetry` as valid failure handler delegation pattern
+
 ## [4.28.2] - 2026-03-14
 
 ### Fixed

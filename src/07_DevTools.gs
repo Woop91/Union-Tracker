@@ -1771,31 +1771,41 @@ function seedCalendarEvents() {
     });
     PropertiesService.getScriptProperties().setProperty('SEEDED_CALENDAR_EVENT_IDS', JSON.stringify(createdIds));
     Logger.log('Seeded ' + createdIds.length + ' calendar events');
-  } else {
-    // Fallback: seed events into _Timeline_Events so the Events page has data
-    Logger.log('CalendarApp unavailable — seeding events into Timeline sheet instead');
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
-    if (!tlSheet) {
-      if (typeof TimelineService !== 'undefined' && TimelineService.initSheet) {
-        try { TimelineService.initSheet(); } catch (_e) { /* ok */ }
+  }
+
+  // Always seed events into _Timeline_Events as fallback data source
+  // (used when CalendarApp is unavailable at read time)
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
+  if (!tlSheet) {
+    if (typeof TimelineService !== 'undefined' && TimelineService.initSheet) {
+      try { TimelineService.initSheet(); } catch (_e) { /* ok */ }
+    }
+    tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
+  }
+  if (tlSheet) {
+    // Clear any previously seeded calendar events (IDs starting with TL_CAL_)
+    if (tlSheet.getLastRow() > 1) {
+      var tlData = tlSheet.getRange(2, 1, tlSheet.getLastRow() - 1, 1).getValues();
+      for (var ri = tlData.length - 1; ri >= 0; ri--) {
+        if (String(tlData[ri][0]).indexOf('TL_CAL_') === 0) {
+          tlSheet.deleteRow(ri + 2);
+        }
       }
-      tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     }
-    if (tlSheet) {
-      var tlRows = [];
-      events.forEach(function(evt, idx) {
-        var evtDate = new Date(now.getTime() + evt.offsetDays * 86400000);
-        evtDate.setHours(evt.hour, 0, 0, 0);
-        tlRows.push([
-          'TL_CAL_' + (idx + 1), evt.title, evtDate, evt.desc,
-          'meeting', '', '', '', '', 'system', now, ''
-        ]);
-      });
-      var startRow = Math.max(tlSheet.getLastRow() + 1, 2);
-      tlSheet.getRange(startRow, 1, tlRows.length, 12).setValues(tlRows);
-      Logger.log('Seeded ' + tlRows.length + ' events into Timeline sheet (calendar fallback)');
-    }
+    var tlRows = [];
+    events.forEach(function(evt, idx) {
+      var evtDate = new Date(now.getTime() + evt.offsetDays * 86400000);
+      evtDate.setHours(evt.hour, 0, 0, 0);
+      var endDate = new Date(evtDate.getTime() + evt.durationHrs * 3600000);
+      tlRows.push([
+        'TL_CAL_' + (idx + 1), evt.title, evtDate, evt.desc,
+        'meeting', '', '', '', endDate.toISOString(), 'system', now, ''
+      ]);
+    });
+    var startRow = Math.max(tlSheet.getLastRow() + 1, 2);
+    tlSheet.getRange(startRow, 1, tlRows.length, 12).setValues(tlRows);
+    Logger.log('Seeded ' + tlRows.length + ' events into Timeline sheet');
   }
 }
 
@@ -1823,9 +1833,9 @@ function seedWeeklyQuestions() {
     return;
   }
 
-  if (poolSheet.getLastRow() > 1) {
-    Logger.log('_Question_Pool already has data. Skipping seed.');
-    return;
+  var poolAlreadySeeded = poolSheet.getLastRow() > 1;
+  if (poolAlreadySeeded) {
+    Logger.log('_Question_Pool already has data. Refreshing active poll dates only.');
   }
 
   var poolQuestions = [
@@ -1855,24 +1865,26 @@ function seedWeeklyQuestions() {
       options: ['Extremely well', 'Well', 'Somewhat well', 'Not well'] },
   ];
 
-  var poolRows = poolQuestions.map(function(q, idx) {
-    var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-pool-member-' + idx)
-      .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
-    return [
-      'WP_SEED_' + (idx + 1),           // ID
-      q.text,                            // Text
-      JSON.stringify(q.options),         // Options (JSON) — required by _parseOptions()
-      fakeHash,                          // Submitted By Hash
-      'pending',                         // Status
-      new Date()                         // Created
-    ];
-  });
+  if (!poolAlreadySeeded) {
+    var poolRows = poolQuestions.map(function(q, idx) {
+      var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-pool-member-' + idx)
+        .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+      return [
+        'WP_SEED_' + (idx + 1),           // ID
+        q.text,                            // Text
+        JSON.stringify(q.options),         // Options (JSON) — required by _parseOptions()
+        fakeHash,                          // Submitted By Hash
+        'pending',                         // Status
+        new Date()                         // Created
+      ];
+    });
 
-  poolSheet.getRange(2, 1, poolRows.length, 6).setValues(poolRows);
+    poolSheet.getRange(2, 1, poolRows.length, 6).setValues(poolRows);
+  }
 
   // --- Active Weekly Questions for the current period (2 polls: 1 steward, 1 community) ---
   var wqSheet = ss.getSheetByName(SHEETS.WEEKLY_QUESTIONS);
-  if (wqSheet && wqSheet.getLastRow() <= 1) {
+  if (wqSheet) {
     var now = new Date();
     var weekStart = new Date(now);
     weekStart.setHours(0, 0, 0, 0);
@@ -1905,11 +1917,19 @@ function seedWeeklyQuestions() {
         now
       ],
     ];
+    // Clear existing seed rows and re-write with current period dates
+    if (wqSheet.getLastRow() > 1) {
+      wqSheet.getRange(2, 1, wqSheet.getLastRow() - 1, 8).clearContent();
+    }
     wqSheet.getRange(2, 1, activeQs.length, 8).setValues(activeQs);
 
     // --- Sample anonymous responses (10 per question) ---
     var wrSheet = ss.getSheetByName(SHEETS.WEEKLY_RESPONSES);
-    if (wrSheet && wrSheet.getLastRow() <= 1) {
+    if (wrSheet) {
+      // Clear stale responses and re-seed with current timestamps
+      if (wrSheet.getLastRow() > 1) {
+        wrSheet.getRange(2, 1, wrSheet.getLastRow() - 1, 5).clearContent();
+      }
       var responseDist = {
         'WQ-SEED-001': [
           'Higher wages', 'Reduced caseloads', 'Higher wages', 'Better benefits',
@@ -1942,7 +1962,7 @@ function seedWeeklyQuestions() {
     }
   }
 
-  Logger.log('seedWeeklyQuestions: ' + poolRows.length + ' pool questions, 2 active polls, 20 responses seeded.');
+  Logger.log('seedWeeklyQuestions: ' + poolQuestions.length + ' pool questions, 2 active polls, 20 responses seeded (period: ' + weekStr + ').');
 }
 
 // ============================================================================

@@ -2124,14 +2124,25 @@ var DataService = (function () {
     limit = limit || 10;
     try {
       var config = ConfigReader.getConfig();
-      if (!config.calendarId) return { _notConfigured: true, events: [] };
+      if (!config.calendarId) {
+        // No calendar configured — try _Timeline_Events fallback
+        var fallback = _getTimelineEvents(limit);
+        if (fallback.length > 0) return fallback;
+        return { _notConfigured: true, events: [] };
+      }
       var cache = CacheService.getScriptCache();
       var cacheKey = 'events_' + config.calendarId;
       var cached = cache.get(cacheKey);
       if (cached) return JSON.parse(cached);
 
-      var cal = CalendarApp.getCalendarById(config.calendarId);
-      if (!cal) return { _calNotFound: true };
+      var cal = null;
+      try { cal = CalendarApp.getCalendarById(config.calendarId); } catch (_e) { cal = null; }
+      if (!cal) {
+        // Calendar not accessible — try _Timeline_Events fallback
+        var fallback2 = _getTimelineEvents(limit);
+        if (fallback2.length > 0) return fallback2;
+        return { _calNotFound: true };
+      }
       var now = new Date();
       var future = new Date(now.getTime() + 90 * 86400000);
       var events = cal.getEvents(now, future);
@@ -2146,12 +2157,50 @@ var DataService = (function () {
           description: (ev.getDescription() || '').substring(0, 300),
         });
       }
-      cache.put(cacheKey, JSON.stringify(result), 900);
+      // If calendar returned no events, try timeline fallback
+      if (result.length === 0) {
+        var fallback3 = _getTimelineEvents(limit);
+        if (fallback3.length > 0) result = fallback3;
+      }
+      if (result.length > 0) cache.put(cacheKey, JSON.stringify(result), 900);
       return result;
     } catch (e) {
       Logger.log('getUpcomingEvents error: ' + e.message);
+      // Last resort: try timeline fallback
+      try { var fb = _getTimelineEvents(limit); if (fb.length > 0) return fb; } catch (_e2) { /* ok */ }
       return [];
     }
+  }
+
+  /**
+   * Reads upcoming events from _Timeline_Events sheet (seeded by DevTools).
+   * Returns array of {title, startTime, endTime, location, description} sorted by date.
+   */
+  function _getTimelineEvents(limit) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return [];
+    var tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
+    if (!tlSheet || tlSheet.getLastRow() <= 1) return [];
+    var data = tlSheet.getDataRange().getValues();
+    var now = new Date();
+    var results = [];
+    // Schema: ID(0), Title(1), Date(2), Description(3), Type(4), ..., EndTime(8)
+    for (var i = 1; i < data.length; i++) {
+      var evtDate = data[i][2];
+      if (!(evtDate instanceof Date)) continue;
+      if (evtDate < now) continue; // skip past events
+      var endStr = data[i][8] ? String(data[i][8]) : '';
+      var endDate = endStr ? new Date(endStr) : new Date(evtDate.getTime() + 3600000);
+      results.push({
+        title: String(data[i][1] || ''),
+        startTime: evtDate.toISOString(),
+        endTime: endDate instanceof Date && !isNaN(endDate) ? endDate.toISOString() : new Date(evtDate.getTime() + 3600000).toISOString(),
+        location: '',
+        description: String(data[i][3] || '').substring(0, 300),
+      });
+    }
+    results.sort(function(a, b) { return new Date(a.startTime) - new Date(b.startTime); });
+    return results.slice(0, limit || 10);
   }
 
   // ═══════════════════════════════════════
@@ -2331,13 +2380,8 @@ var DataService = (function () {
     var qaUnansweredCount = 0;
     try {
       if (typeof QAForum !== 'undefined') {
-        var qaResult = QAForum.getQuestions(email, 1, 999, 'recent');
-        if (qaResult && qaResult.questions) {
-          for (var q = 0; q < qaResult.questions.length; q++) {
-            var qq = qaResult.questions[q];
-            if (qq.answerCount === 0 && qq.status !== 'resolved' && qq.status !== 'deleted') qaUnansweredCount++;
-          }
-        }
+        // Use lightweight count — avoids building 999 full question objects
+        qaUnansweredCount = QAForum.getUnansweredCount();
       }
     } catch (_e) { /* non-fatal */ }
 

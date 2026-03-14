@@ -383,32 +383,68 @@
      * active loading state. Callers can still override with their
      * own .withFailureHandler() — it will replace the default.
      */
-    function serverCall() {
-      var runner = google.script.run;
-      runner = runner.withFailureHandler(function(err) {
-        var msg = (err && err.message) ? err.message : String(err || 'Unknown error');
-        console.error('Server call failed:', msg, err);
-        // Dismiss any loading spinners and show the ACTUAL error
-        var spinners = document.querySelectorAll('.loading-spinner');
-        spinners.forEach(function(s) {
-          // Clear any loading timeout
-          if (s._loadingTimeout) { clearTimeout(s._loadingTimeout); s._loadingTimeout = null; }
-          // Build error UI safely (no innerHTML with untrusted data)
-          s.innerHTML = '';
-          var errorDiv = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '20px' } });
-          errorDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\u26A0\uFE0F'));
-          errorDiv.appendChild(el('div', { style: { color: 'var(--text)', fontWeight: '600', marginBottom: '6px' } }, 'Something went wrong'));
-          var msgEl = el('div', { style: { color: 'var(--muted)', fontSize: '12px', maxWidth: '400px', margin: '0 auto 12px', wordBreak: 'break-word' } });
-          msgEl.textContent = msg;
-          errorDiv.appendChild(msgEl);
-          var reloadBtn = el('button', {
-            style: { padding: '6px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px' },
-            onClick: function() { location.reload(); }
-          }, 'Reload');
-          errorDiv.appendChild(reloadBtn);
-          s.appendChild(errorDiv);
-        });
+    /** Default failure UI — shows error in any active loading spinners */
+    function _showFailureUI(err) {
+      var msg = (err && err.message) ? err.message : String(err || 'Unknown error');
+      var isTransient = _isTransientError(err);
+      console.error('Server call failed:', msg, isTransient ? '(transient — retries exhausted)' : '', err);
+      var spinners = document.querySelectorAll('.loading-spinner');
+      spinners.forEach(function(s) {
+        if (s._loadingTimeout) { clearTimeout(s._loadingTimeout); s._loadingTimeout = null; }
+        s.innerHTML = '';
+        var errorDiv = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '20px' } });
+        errorDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\u26A0\uFE0F'));
+        var title = isTransient ? 'Connection lost' : 'Something went wrong';
+        var detail = isTransient ? 'The server could not be reached. Check your internet connection and try again.' : msg;
+        errorDiv.appendChild(el('div', { style: { color: 'var(--text)', fontWeight: '600', marginBottom: '6px' } }, title));
+        var msgEl = el('div', { style: { color: 'var(--muted)', fontSize: '12px', maxWidth: '400px', margin: '0 auto 12px', wordBreak: 'break-word' } });
+        msgEl.textContent = detail;
+        errorDiv.appendChild(msgEl);
+        var reloadBtn = el('button', {
+          style: { padding: '6px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px' },
+          onClick: function() { location.reload(); }
+        }, isTransient ? 'Retry' : 'Reload');
+        errorDiv.appendChild(reloadBtn);
+        s.appendChild(errorDiv);
       });
+    }
+
+    /**
+     * Returns a proxy around google.script.run that auto-retries transient errors
+     * (HTTP 0, NetworkError) with exponential backoff before invoking the failure handler.
+     *
+     * Usage (drop-in replacement for google.script.run):
+     *   serverCall()
+     *     .withSuccessHandler(fn)
+     *     .withFailureHandler(fn)   // optional — default shows error in spinners
+     *     .myServerFunction(args);
+     */
+    function serverCall() {
+      var _success = null;
+      var _failure = _showFailureUI;
+
+      var proxy = {
+        withSuccessHandler: function(fn) { _success = fn; return proxy; },
+        withFailureHandler: function(fn) { _failure = fn; return proxy; }
+      };
+
+      // Return a Proxy that intercepts any method call as the server function name
+      // For browsers without Proxy (older GAS iframe), fall back to direct runner
+      if (typeof Proxy !== 'undefined') {
+        return new Proxy(proxy, {
+          get: function(target, prop) {
+            if (prop === 'withSuccessHandler' || prop === 'withFailureHandler') return target[prop];
+            // prop is the server function name — execute with retry via throttle queue
+            return function() {
+              var args = Array.prototype.slice.call(arguments);
+              _throttledServerCall(prop, args, _success || function() {}, _failure);
+            };
+          }
+        });
+      }
+      // Fallback: no Proxy support — use runner directly with default failure handler
+      var runner = google.script.run;
+      runner = runner.withFailureHandler(_showFailureUI);
       return runner;
     }
 
@@ -435,8 +471,11 @@
 
       function invalidate(key) { if (key) delete _cache[key]; else _cache = {}; }
 
+      /** Check if a cache key has a valid (non-expired) entry */
+      function has(key) { return get(key) !== undefined; }
+
       /**
-       * Wraps a google.script.run call with caching.
+       * Wraps a google.script.run call with caching + retry on transient failures.
        * @param {string} cacheKey - Cache key
        * @param {string} fnName - server function name
        * @param {Array} args - arguments to pass
@@ -450,19 +489,76 @@
           onSuccess(cached);
           return;
         }
-        var runner = google.script.run
-          .withSuccessHandler(function(result) {
-            set(cacheKey, result, ttlMs);
-            onSuccess(result);
-          })
-          .withFailureHandler(onFailure || function(err) {
-            console.error('cachedCall(' + fnName + ') failed:', err);
-          });
-        runner[fnName].apply(runner, args || []);
+        _throttledServerCall(fnName, args, function(result) {
+          set(cacheKey, result, ttlMs);
+          onSuccess(result);
+        }, onFailure || function(err) {
+          console.error('cachedCall(' + fnName + ') failed:', err);
+        });
       }
 
-      return { get: get, set: set, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
+      return { get: get, set: set, has: has, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
     })();
+
+    // ═══════════════════════════════════════
+    // RETRY + THROTTLE — retries transient failures (HTTP 0) with exponential backoff
+    // and limits concurrent google.script.run calls to avoid connection exhaustion.
+    // ═══════════════════════════════════════
+    var _MAX_RETRIES = 2; // up to 2 retries (3 attempts total)
+    var _RETRY_BASE_MS = 1500; // 1.5s, 3s backoff
+    var _MAX_CONCURRENT = 4; // max in-flight server calls
+    var _inFlight = 0;
+    var _callQueue = [];
+
+    function _isTransientError(err) {
+      var msg = (err && err.message) ? err.message : String(err || '');
+      return msg.indexOf('HTTP 0') !== -1 ||
+             msg.indexOf('Connection failure') !== -1 ||
+             msg.indexOf('NetworkError') !== -1 ||
+             msg.indexOf('Failed to connect') !== -1 ||
+             msg.indexOf('net::ERR_') !== -1;
+    }
+
+    function _drainQueue() {
+      while (_callQueue.length > 0 && _inFlight < _MAX_CONCURRENT) {
+        var next = _callQueue.shift();
+        _serverCallWithRetry(next.fn, next.args, next.ok, next.fail, 0);
+      }
+    }
+
+    /** Queue-aware entry point: limits concurrent calls, then delegates to retry logic */
+    function _throttledServerCall(fnName, args, onSuccess, onFailure) {
+      if (_inFlight < _MAX_CONCURRENT) {
+        _serverCallWithRetry(fnName, args, onSuccess, onFailure, 0);
+      } else {
+        _callQueue.push({ fn: fnName, args: args, ok: onSuccess, fail: onFailure });
+      }
+    }
+
+    function _serverCallWithRetry(fnName, args, onSuccess, onFailure, attempt) {
+      attempt = attempt || 0;
+      _inFlight++;
+      var runner = google.script.run
+        .withSuccessHandler(function(result) {
+          _inFlight--;
+          _drainQueue();
+          onSuccess(result);
+        })
+        .withFailureHandler(function(err) {
+          _inFlight--;
+          if (attempt < _MAX_RETRIES && _isTransientError(err)) {
+            var delay = _RETRY_BASE_MS * Math.pow(2, attempt);
+            console.warn('Retrying ' + fnName + ' (attempt ' + (attempt + 2) + '/' + (_MAX_RETRIES + 1) + ') in ' + delay + 'ms');
+            setTimeout(function() {
+              _throttledServerCall(fnName, args, onSuccess, onFailure);
+            }, delay);
+          } else {
+            _drainQueue();
+            onFailure(err);
+          }
+        });
+      runner[fnName].apply(runner, args || []);
+    }
 
     // ═══════════════════════════════════════
     // C2: LAZY LIST RENDERER — Renders first N items, lazy-loads rest on scroll via IntersectionObserver
@@ -1129,9 +1225,28 @@
       });
     }
 
+    // ═══════════════════════════════════════
+    // TAB DOM CACHE — preserves rendered tab content for instant back-navigation
+    // Tabs that mutate data (notifications, feedback, profile) are excluded from caching.
+    // ═══════════════════════════════════════
+    var _tabDomCache = {};
+    var _tabDomCacheRole = null;
+
+    // Tabs that should NOT be DOM-cached (contain forms, mutation state, or must be fresh)
+    var _NO_DOM_CACHE_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
+
+    /** Invalidate tab DOM cache (call after data mutations like case update, badge refresh, etc.) */
+    function _invalidateTabCache(tabId) {
+      if (tabId) { delete _tabDomCache[tabId]; } else { _tabDomCache = {}; }
+    }
+
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
       AppState.activeTab = tabId; // track for badge refresh
+
+      // On role change, flush entire tab DOM cache
+      if (_tabDomCacheRole !== role) { _tabDomCache = {}; _tabDomCacheRole = role; }
+
       _navProgressStart();
       // Handle "More" menus for both roles (mobile bottom-nav)
       if (tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
@@ -1153,6 +1268,22 @@
       // POMS Reference — shared tab (both roles)
       if (tabId === 'poms') {
         renderPOMSReference(app, role);
+        _navProgressDone();
+        return;
+      }
+
+      // TAB DOM CACHE: If we have a cached DOM snapshot for this tab, restore it instantly
+      if (!_NO_DOM_CACHE_TABS[tabId] && _tabDomCache[tabId] && _layoutCache.content) {
+        _layoutCache.content.innerHTML = '';
+        _layoutCache.content.appendChild(_tabDomCache[tabId]);
+        // Update sidebar + bottom nav active states
+        if (_layoutCache.sidebar) {
+          _layoutCache.sidebar.innerHTML = '';
+          renderSidebarItems(_layoutCache.sidebar, role, tabId);
+        }
+        var oldBottom = app.querySelector('.bottom-nav');
+        if (oldBottom) oldBottom.remove();
+        renderBottomNav(app, role, tabId);
         _navProgressDone();
         return;
       }
@@ -1204,6 +1335,33 @@
           default: renderStewardDashboard(app);
         }
       }
+
+      // TAB DOM CACHE: After render, snapshot the content for instant restore on revisit
+      if (!_NO_DOM_CACHE_TABS[tabId] && _layoutCache.content) {
+        // Use requestIdleCallback (or setTimeout fallback) to snapshot after paint
+        var snapFn = function() {
+          if (_layoutCache.content && _layoutCache.content.firstChild && AppState.activeTab === tabId) {
+            // Only cache if the content is no longer showing a loading spinner
+            var spinner = _layoutCache.content.querySelector('.loading-spinner');
+            if (!spinner) {
+              _tabDomCache[tabId] = _layoutCache.content.firstChild;
+            } else {
+              // Data still loading — observe for when spinner is removed, then cache
+              var observer = new MutationObserver(function() {
+                if (_layoutCache.content && !_layoutCache.content.querySelector('.loading-spinner') && AppState.activeTab === tabId) {
+                  _tabDomCache[tabId] = _layoutCache.content.firstChild;
+                  observer.disconnect();
+                }
+              });
+              observer.observe(_layoutCache.content, { childList: true, subtree: true });
+              // Safety: disconnect after 30s to avoid leaks
+              setTimeout(function() { observer.disconnect(); }, 30000);
+            }
+          }
+        };
+        if (typeof requestIdleCallback === 'function') { requestIdleCallback(snapFn); } else { setTimeout(snapFn, 100); }
+      }
+
       _navProgressDone();
     }
 

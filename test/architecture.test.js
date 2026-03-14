@@ -555,12 +555,20 @@ describe('A8: Client-side serverCall() helper for safe google.script.run', () =>
   });
 
   test('DataCache.cachedCall always attaches a withFailureHandler', () => {
-    // The cachedCall function must always chain .withFailureHandler, not conditionally
+    // The cachedCall function must always chain .withFailureHandler — either directly,
+    // via _serverCallWithRetry, or via _throttledServerCall (which delegates to retry)
     const cachedCallMatch = indexHtml.match(/function cachedCall[\s\S]*?\n {6}\}/);
     expect(cachedCallMatch).not.toBeNull();
-    expect(cachedCallMatch[0]).toContain('.withFailureHandler(');
+    const hasDirectHandler = cachedCallMatch[0].includes('.withFailureHandler(');
+    const usesRetryHelper = cachedCallMatch[0].includes('_serverCallWithRetry(');
+    const usesThrottleHelper = cachedCallMatch[0].includes('_throttledServerCall(');
+    expect(hasDirectHandler || usesRetryHelper || usesThrottleHelper).toBe(true);
     // Must NOT have the old conditional pattern: if (onFailure) runner = runner.withFailureHandler
     expect(cachedCallMatch[0]).not.toMatch(/if\s*\(onFailure\)\s*runner/);
+    // Verify the retry call chain ends with .withFailureHandler
+    const retryFnMatch = indexHtml.match(/function _serverCallWithRetry[\s\S]*?\n {4}\}/);
+    expect(retryFnMatch).not.toBeNull();
+    expect(retryFnMatch[0]).toContain('.withFailureHandler(');
   });
 });
 
