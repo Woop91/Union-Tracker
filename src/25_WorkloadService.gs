@@ -280,25 +280,29 @@ var WorkloadService = (function() {
       ]);
     }
 
-    // Write to reporting sheet
-    report.clearContents();
-    if (reportRows.length > 0) {
-      report.getRange(1, 1, reportRows.length, header.length).setValues(reportRows);
-      report.getRange(1, 1, 1, header.length)
-        .setFontWeight('bold')
-        .setBackground('#0d47a1')
-        .setFontColor('#ffffff');
-      report.setFrozenRows(1);
+    // Write to reporting sheet — clear + write in try/catch to avoid leaving sheet empty on error
+    try {
+      report.clearContents();
+      if (reportRows.length > 0) {
+        report.getRange(1, 1, reportRows.length, header.length).setValues(reportRows);
+        report.getRange(1, 1, 1, header.length)
+          .setFontWeight('bold')
+          .setBackground('#0d47a1')
+          .setFontColor('#ffffff');
+        report.setFrozenRows(1);
 
-      // Pastel color coding
-      if (reportRows.length > 1) {
-        var numData = reportRows.length - 1;
-        report.getRange(2, 1, numData, 2).setBackground('#F1F5F9');
-        report.getRange(2, 3, numData, 8).setBackground('#ECFDF5');
-        report.getRange(2, 11, numData, 2).setBackground('#FEF3C7');
-        report.getRange(2, 13, numData, 2).setBackground('#FAF5FF');
-        report.getRange(2, 15, numData, 2).setBackground('#FEE2E2');
+        // Pastel color coding
+        if (reportRows.length > 1) {
+          var numData = reportRows.length - 1;
+          report.getRange(2, 1, numData, 2).setBackground('#F1F5F9');
+          report.getRange(2, 3, numData, 8).setBackground('#ECFDF5');
+          report.getRange(2, 11, numData, 2).setBackground('#FEF3C7');
+          report.getRange(2, 13, numData, 2).setBackground('#FAF5FF');
+          report.getRange(2, 15, numData, 2).setBackground('#FEE2E2');
+        }
       }
+    } catch (writeErr) {
+      Logger.log('_refreshReportingData: report write failed: ' + writeErr.message + '\n' + (writeErr.stack || ''));
     }
   }
 
@@ -855,7 +859,8 @@ var WorkloadService = (function() {
     var dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     var currentDay = dayNames[now.getDay()];
 
-    var portalUrl = ScriptApp.getService().getUrl();
+    var portalUrl = '';
+    try { portalUrl = ScriptApp.getService().getUrl() || ''; } catch (_e) { /* non-fatal */ }
 
     for (var i = 1; i < data.length; i++) {
       try {
@@ -901,7 +906,7 @@ var WorkloadService = (function() {
           sheet.getRange(i + 1, REMINDERS_COLS.LAST_SENT + 1).setValue(now);
         }
       } catch (err) {
-        console.error('Reminder error for row ' + i + ': ' + err.message);
+        Logger.log('Reminder error for row ' + i + ': ' + err.message);
       }
     }
   }
@@ -1046,12 +1051,19 @@ var WorkloadService = (function() {
     try {
       lock.waitLock(CONFIG.lockTimeoutMs);
     } catch (_lockErr) {
-      console.error('cleanVault: Could not acquire lock');
+      Logger.log('cleanVault: Could not acquire lock');
       return;
     }
     try {
       vault.clearContents();
       vault.getRange(1, 1, finalData.length, header.length).setValues(finalData);
+    } catch (writeErr) {
+      Logger.log('cleanVault: write failed after clear — data may be lost: ' + writeErr.message);
+      try {
+        vault.getRange(1, 1, data.length, header.length).setValues(data);
+      } catch (_recoveryErr) {
+        Logger.log('cleanVault: recovery also failed: ' + _recoveryErr.message);
+      }
     } finally {
       lock.releaseLock();
     }

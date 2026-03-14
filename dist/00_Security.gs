@@ -334,6 +334,7 @@ function getUserRole_(email) {
 
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return 'anonymous'; // Web app context — spreadsheet binding unavailable
 
     // Check if user is the spreadsheet owner (admin)
     var owner = ss.getOwner();

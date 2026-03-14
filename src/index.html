@@ -839,14 +839,27 @@
      * @param {string} activeTab - The currently active tab id
      * @param {Function} contentFn - Called with contentContainer to render page content
      */
+    // OPT-4: Preserve layout shell on tab switch — only rebuild content area + update active states
+    var _layoutCache = {};
+
     function renderPageLayout(container, role, activeTab, contentFn) {
-      container.innerHTML = '';
       getLayoutMode(); // keep LayoutState current for other callers (e.g. isSidebarLayout in headers)
 
-      // Always render both sidebar and bottom nav — CSS media queries control which is visible.
-      // Previously a JS conditional chose one or the other; if isSidebarLayout() was wrong,
-      // NO nav rendered at all. CSS-driven visibility is always accurate regardless of
-      // viewport detection timing or GAS iframe context.
+      if (_layoutCache.container === container && _layoutCache.role === role && _layoutCache.layout) {
+        // Same role, same container — preserve layout shell, rebuild sidebar state + content only
+        _layoutCache.sidebar.innerHTML = '';
+        renderSidebarItems(_layoutCache.sidebar, role, activeTab);
+        _layoutCache.content.innerHTML = '';
+        contentFn(_layoutCache.content);
+        // Swap bottom nav for active-state update
+        var oldBottom = container.querySelector('.bottom-nav');
+        if (oldBottom) oldBottom.remove();
+        renderBottomNav(container, role, activeTab);
+        return;
+      }
+
+      // Full rebuild (first render or role change)
+      container.innerHTML = '';
       var layout = el('div', { className: 'page-layout' });
       var sidebar = el('nav', { className: 'sidebar-nav' });
       renderSidebarItems(sidebar, role, activeTab);
@@ -859,6 +872,8 @@
 
       // Bottom nav always added to DOM; CSS hides it at tablet+ (min-width: 640px)
       renderBottomNav(container, role, activeTab);
+
+      _layoutCache = { container: container, role: role, layout: layout, sidebar: sidebar, content: content };
     }
 
     function renderSidebarItems(sidebar, role, activeTab) {
@@ -1060,9 +1075,13 @@
             container.appendChild(wrap);
             // Re-execute any <script> tags from org_chart.html
             wrap.querySelectorAll('script').forEach(function(old) {
-              var s = document.createElement('script');
-              s.textContent = old.textContent;
-              old.parentNode.replaceChild(s, old);
+              try {
+                var s = document.createElement('script');
+                s.textContent = old.textContent;
+                old.parentNode.replaceChild(s, old);
+              } catch (scriptErr) {
+                console.error('Org chart script re-execution failed:', scriptErr);
+              }
             });
           })
           .withFailureHandler(function(err) {
@@ -1093,9 +1112,13 @@
             container.appendChild(wrap);
             // Re-execute <script> tags from poms_reference.html
             wrap.querySelectorAll('script').forEach(function(old) {
-              var s = document.createElement('script');
-              s.textContent = old.textContent;
-              old.parentNode.replaceChild(s, old);
+              try {
+                var s = document.createElement('script');
+                s.textContent = old.textContent;
+                old.parentNode.replaceChild(s, old);
+              } catch (scriptErr) {
+                console.error('POMS script re-execution failed:', scriptErr);
+              }
             });
           })
           .withFailureHandler(function(err) {

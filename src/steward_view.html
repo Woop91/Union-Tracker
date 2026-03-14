@@ -31,49 +31,27 @@ function initStewardView(container) {
     return;
   }
 
-  // Fallback: load individually (batch unavailable)
-  // C4/S2: Single badge count call replaces 3 serial calls
-  serverCall().withSuccessHandler(function(counts) {
-    AppState.notificationCount = (counts && counts.notificationCount) || 0;
-    AppState.taskCount = (counts && counts.taskCount) || 0;
-    AppState.overdueTaskCount = (counts && counts.overdueTaskCount) || 0;
-    AppState.qaUnansweredCount = (counts && counts.qaUnansweredCount) || 0;
-  }).withFailureHandler(function() {
-    AppState.notificationCount = 0;
-    AppState.taskCount = 0;
-    AppState.overdueTaskCount = 0;
-    AppState.qaUnansweredCount = 0;
-  }).dataGetBadgeCounts(SESSION_TOKEN);
-
-  // Member count still needed for display
-  serverCall().withSuccessHandler(function(members) {
-    AppState.memberCount = (members || []).length;
-  }).withFailureHandler(function() { AppState.memberCount = 0; }).dataGetAllMembers(SESSION_TOKEN);
-
+  // OPT-1: Single batch endpoint replaces 3+ sequential server calls
   serverCall()
-    .withSuccessHandler(function(cases) {
-      AppState.cases = cases || [];
-      serverCall()
-        .withSuccessHandler(function(kpis) {
-          AppState.kpis = kpis;
-          AppState.loading = false;
-          renderStewardDashboard(container);
-          _checkDeepLink('steward');
-        })
-        .withFailureHandler(function() {
-          AppState.kpis = { totalCases: AppState.cases.length, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
-          AppState.loading = false;
-          renderStewardDashboard(container);
-          _checkDeepLink('steward');
-        })
-        .dataGetStewardKPIs(SESSION_TOKEN);
+    .withSuccessHandler(function(result) {
+      AppState.cases = result.cases || [];
+      AppState.kpis = result.kpis || { totalCases: 0, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
+      AppState.notificationCount = (result.badges && result.badges.notificationCount) || 0;
+      AppState.taskCount = (result.badges && result.badges.taskCount) || 0;
+      AppState.overdueTaskCount = (result.badges && result.badges.overdueTaskCount) || 0;
+      AppState.qaUnansweredCount = (result.badges && result.badges.qaUnansweredCount) || 0;
+      AppState.memberCount = result.memberCount || 0;
+      AppState.loading = false;
+      renderStewardDashboard(container);
+      _checkDeepLink('steward');
     })
     .withFailureHandler(function() {
       AppState.cases = [];
+      AppState.kpis = { totalCases: 0, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
       AppState.loading = false;
       renderStewardDashboard(container);
     })
-    .dataGetStewardCases(SESSION_TOKEN);
+    .dataGetStewardDashboardInit(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════
@@ -374,44 +352,72 @@ function renderCaseList(container, filter) {
     return;
   }
 
-  cases.forEach(function(c) {
-    var isOverdue = c.status === 'overdue';
-    var statusClass = c.status || 'active';
-    var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
+  // OPT-5: Paginate case list + OPT-9: Use DocumentFragment for batch DOM insertion
+  var CASE_PAGE_SIZE = 25;
+  var _caseRenderCount = CASE_PAGE_SIZE;
 
-    var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
-    var leftGroup = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
-    leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
-    leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
-    topRow.appendChild(leftGroup);
+  function _renderCasePage() {
+    var frag = document.createDocumentFragment();
+    var slice = cases.slice(0, _caseRenderCount);
 
-    var deadlineSpan = el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: isOverdue ? 'var(--danger)' : 'var(--muted)', fontWeight: isOverdue ? '700' : '400' } });
-    deadlineSpan.textContent = c.deadlineDays !== null ? c.deadlineDays + 'd' : '\u2014';
-    topRow.appendChild(deadlineSpan);
-    card.appendChild(topRow);
+    slice.forEach(function(c) {
+      var isOverdue = c.status === 'overdue';
+      var statusClass = c.status || 'active';
+      var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
 
-    var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
-    var memberDisplay = c.memberName || (c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown');
-    bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' } }, memberDisplay + ' \u00B7 ' + (c.step || '')));
-    bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' } }, c.unit || ''));
-    card.appendChild(bottomRow);
+      var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
+      var leftGroup = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+      leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
+      leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
+      topRow.appendChild(leftGroup);
 
-    // Expandable checklist (v4.16.0)
-    var checklistArea = el('div', { style: { display: 'none', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } });
-    var checklistLoaded = false;
-    card.appendChild(checklistArea);
-    card.addEventListener('click', function(ev) {
-      ev.stopPropagation();
-      var showing = checklistArea.style.display !== 'none';
-      checklistArea.style.display = showing ? 'none' : 'block';
-      if (!showing && !checklistLoaded) {
-        checklistLoaded = true;
-        _renderCaseChecklist(checklistArea, c.id);
-      }
+      var deadlineSpan = el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: isOverdue ? 'var(--danger)' : 'var(--muted)', fontWeight: isOverdue ? '700' : '400' } });
+      deadlineSpan.textContent = c.deadlineDays !== null ? c.deadlineDays + 'd' : '\u2014';
+      topRow.appendChild(deadlineSpan);
+      card.appendChild(topRow);
+
+      var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
+      var memberDisplay = c.memberName || (c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown');
+      bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' } }, memberDisplay + ' \u00B7 ' + (c.step || '')));
+      bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' } }, c.unit || ''));
+      card.appendChild(bottomRow);
+
+      // Expandable checklist (v4.16.0)
+      var checklistArea = el('div', { style: { display: 'none', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } });
+      var checklistLoaded = false;
+      card.appendChild(checklistArea);
+      card.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        var showing = checklistArea.style.display !== 'none';
+        checklistArea.style.display = showing ? 'none' : 'block';
+        if (!showing && !checklistLoaded) {
+          checklistLoaded = true;
+          _renderCaseChecklist(checklistArea, c.id);
+        }
+      });
+
+      frag.appendChild(card);
     });
 
-    container.appendChild(card);
-  });
+    container.innerHTML = '';
+    container.appendChild(frag);
+
+    // "Show more" button if there are remaining cases
+    if (_caseRenderCount < cases.length) {
+      var remaining = cases.length - _caseRenderCount;
+      var showMoreBtn = el('button', {
+        className: 'btn btn-secondary',
+        style: { width: '100%', margin: '8px 0', fontSize: '12px' },
+        onClick: function() {
+          _caseRenderCount += CASE_PAGE_SIZE;
+          _renderCasePage();
+        }
+      }, 'Show more (' + remaining + ' remaining)');
+      container.appendChild(showMoreBtn);
+    }
+  }
+
+  _renderCasePage();
 }
 
 // ═══════════════════════════════════════
@@ -622,11 +628,31 @@ function renderStewardMembers(appContainer) {
     showLoading(content, 'member-list');
     container.appendChild(content);
 
-    serverCall().withSuccessHandler(function(members) {
+    // OPT-6: Pre-fire stats in parallel with members (no dependency between them)
+    var _prefetchedStats = null;
+    if (typeof ChartHelper !== 'undefined') {
+      serverCall().withSuccessHandler(function(stats) {
+        _prefetchedStats = stats;
+        // If members already rendered, insert chart now
+        var searchEl = content.querySelector('.search-input');
+        if (searchEl && stats && stats.byLocation) {
+          var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
+          var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
+          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
+          var lLabels = Object.keys(stats.byLocation);
+          var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
+          ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
+          content.insertBefore(locCard, searchEl);
+        }
+      }).withFailureHandler(function() { /* chart optional */ }).dataGetStewardMemberStats(SESSION_TOKEN);
+    }
+
+    // OPT-2: Use DataCache for members — avoids re-fetch on tab revisit (5-min TTL)
+    function _onMembersLoaded(members) {
       content.innerHTML = '';
       if (!members || members.length === 0) {
         // If members is exactly [] (not null/undefined), auth may have failed silently
-        var msg = (members && members.length === 0) 
+        var msg = (members && members.length === 0)
           ? 'No members found. If this is unexpected, your session may have expired — try refreshing the page.'
           : 'Failed to load members. Please refresh and try again.';
         content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, msg));
@@ -651,22 +677,15 @@ function renderStewardMembers(appContainer) {
       });
       content.appendChild(kpiStrip);
 
-      // Chart.js stats
-      if (typeof ChartHelper !== 'undefined') {
-        serverCall().withSuccessHandler(function(stats) {
-          if (!stats || !stats.byLocation) return;
-          // Location bar
-          var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
-          var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
-          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
-          var lLabels = Object.keys(stats.byLocation);
-          var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
-          ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
-          // Insert after KPI strip
-          var searchEl = content.querySelector('.search-input');
-          if (searchEl) content.insertBefore(locCard, searchEl);
-          else content.appendChild(locCard);
-        }).withFailureHandler(function() { /* chart optional — skip on error */ }).dataGetStewardMemberStats(SESSION_TOKEN);
+      // OPT-6: If stats already arrived from parallel call, render chart now
+      if (_prefetchedStats && _prefetchedStats.byLocation && typeof ChartHelper !== 'undefined') {
+        var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
+        var locLabel = _prefetchedStats.scope === 'all' ? 'All Members by Location' : 'By Location';
+        locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
+        var lLabels = Object.keys(_prefetchedStats.byLocation);
+        var lData = lLabels.map(function(k) { return _prefetchedStats.byLocation[k]; });
+        ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
+        content.appendChild(locCard);
       }
 
       // Sort & Filter controls
@@ -690,19 +709,24 @@ function renderStewardMembers(appContainer) {
       controlRow.appendChild(filterSelect);
       content.appendChild(controlRow);
 
-      // Search
+      // Search — OPT-10: debounce filter/sort re-renders
+      var _memberFilterTimer = null;
+      function debouncedRerender() {
+        clearTimeout(_memberFilterTimer);
+        _memberFilterTimer = setTimeout(rerender, 150);
+      }
       var searchInput = el('input', {
         className: 'search-input',
         placeholder: 'Search members...',
-        onInput: rerender
+        onInput: debouncedRerender
       });
       content.appendChild(searchInput);
 
       var listArea = el('div');
       content.appendChild(listArea);
 
-      sortSelect.addEventListener('change', rerender);
-      filterSelect.addEventListener('change', rerender);
+      sortSelect.addEventListener('change', debouncedRerender);
+      filterSelect.addEventListener('change', debouncedRerender);
 
       function rerender() {
         _memberListPage = 0;
@@ -751,10 +775,20 @@ function renderStewardMembers(appContainer) {
         renderFilteredMembers(listArea, filtered, '');
       }
       rerender();
-    }).withFailureHandler(function() {
+    }
+    function _onMembersFailed() {
       content.innerHTML = '';
       content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--danger)' } }, 'Failed to load members. Try refreshing.'));
-    }).dataGetAllMembers(SESSION_TOKEN);
+    }
+    if (typeof DataCache !== 'undefined') {
+      DataCache.cachedCall(
+        'stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || ''),
+        'dataGetAllMembers', [SESSION_TOKEN],
+        _onMembersLoaded, _onMembersFailed, DataCache.STABLE_TTL
+      );
+    } else {
+      serverCall().withSuccessHandler(_onMembersLoaded).withFailureHandler(_onMembersFailed).dataGetAllMembers(SESSION_TOKEN);
+    }
   });
 }
 
@@ -784,6 +818,8 @@ function renderFilteredMembers(container, members, query) {
   var start = _memberListPage * _memberPageSize;
   var pageItems = filtered.slice(start, start + _memberPageSize);
 
+  // OPT-9: Use DocumentFragment for batch DOM insertion
+  var frag = document.createDocumentFragment();
   pageItems.forEach(function(m) {
     var item = el('div', { className: 'member-list-item', style: { cursor: 'pointer' } });
     item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
@@ -798,7 +834,7 @@ function renderFilteredMembers(container, members, query) {
     if (m.hasOpenGrievance) badges.appendChild(el('div', { className: 'status-dot active', title: 'Has open grievance' }));
     item.appendChild(badges);
     item.appendChild(el('span', { className: 'member-list-chevron' }, '\u25B6'));
-    container.appendChild(item);
+    frag.appendChild(item);
 
     // Click handler — toggle inline detail panel
     item.addEventListener('click', function() {
@@ -818,6 +854,7 @@ function renderFilteredMembers(container, members, query) {
       _showMemberDetail(container, item, m);
     }
   });
+  container.appendChild(frag);
 
   // Pagination controls
   if (totalPages > 1) {

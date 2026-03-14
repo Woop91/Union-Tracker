@@ -48,8 +48,16 @@ function doGet(e) {
 function doGetWebDashboard(e) {
   e = e || { parameter: {} };
 
+  // Load config once at top — reused in both success and error paths (Fix 2.1)
+  var config;
   try {
-    var config = ConfigReader.getConfig();
+    config = ConfigReader.getConfig();
+  } catch (cfgErr) {
+    Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
+    config = { orgName: 'Dashboard', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+  }
+
+  try {
     var user = Auth.resolveUser(e);
 
     if (!user) {
@@ -117,15 +125,7 @@ function doGetWebDashboard(e) {
 
   } catch (err) {
     Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
-    // Safe config fetch — if ConfigReader itself threw, fall back to defaults
-    // so _serveError can still render a page.
-    var safeConfig;
-    try {
-      safeConfig = ConfigReader.getConfig();
-    } catch (_cfgErr) {
-      safeConfig = { orgName: 'Dashboard', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
-    }
-    return _serveError(safeConfig, 'error', err.message);
+    return _serveError(config, 'error', err.message);
   }
 }
 
@@ -143,7 +143,7 @@ function _serveAuth(config, e, authError) {
     view: 'auth',
     config: _sanitizeConfig(config),
     error: e.parameter.authError || authError || null,
-    webAppUrl: ScriptApp.getService().getUrl(),
+    webAppUrl: _getWebAppUrlSafe(),
     tokenChecked: !!(e.parameter.sessionToken),
   });
 
@@ -187,7 +187,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     isDualRole: role === 'steward' || role === 'both',
     sessionToken: sessionToken || null,
     initialTab: initialTab || null,
-    webAppUrl: ScriptApp.getService().getUrl(),
+    webAppUrl: _getWebAppUrlSafe(),
   });
 
   return template.evaluate()
@@ -291,6 +291,21 @@ function _serveFatalError(detail) {
 }
 
 /**
+ * Returns the web app URL, or empty string if unavailable.
+ * Prevents null from being injected into pageData JSON.
+ * @returns {string}
+ * @private
+ */
+function _getWebAppUrlSafe() {
+  try {
+    return ScriptApp.getService().getUrl() || '';
+  } catch (_e) {
+    Logger.log('_getWebAppUrlSafe: ScriptApp.getService().getUrl() failed: ' + _e.message);
+    return '';
+  }
+}
+
+/**
  * Include helper — allows <?!= include('filename') ?> in HTML templates.
  * Used to compose the SPA from multiple HTML files.
  * @param {string} filename - Name of the HTML file (without .html extension)
@@ -303,19 +318,29 @@ function include(filename) {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .oc-wrap)
+ * @returns {string} Raw HTML content (CSS-scoped under .oc-wrap), or error message
  */
 function getOrgChartHtml() {
-  return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
+  try {
+    return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
+  } catch (e) {
+    Logger.log('getOrgChartHtml error: ' + e.message);
+    return '<div class="empty-state">Org chart could not be loaded.</div>';
+  }
 }
 
 /**
  * Client-callable: Returns the POMS Reference HTML for lazy-loading.
  * Loaded on-demand when the user navigates to the POMS Reference tab.
- * @returns {string} Raw HTML content (CSS-scoped under .poms-root)
+ * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
  */
 function getPOMSReferenceHtml() {
-  return HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+  try {
+    return HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+  } catch (e) {
+    Logger.log('getPOMSReferenceHtml error: ' + e.message);
+    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
+  }
 }
 
 /**
@@ -324,7 +349,7 @@ function getPOMSReferenceHtml() {
  * @returns {string}
  */
 function getWebAppUrl() {
-  return ScriptApp.getService().getUrl();
+  return _getWebAppUrlSafe();
 }
 
 /**

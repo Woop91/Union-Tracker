@@ -229,16 +229,27 @@ var Auth = (function () {
    * @returns {string} Session token
    */
   function createSessionToken(email) {
-    var config = ConfigReader.getConfig();
+    var config;
+    try {
+      config = ConfigReader.getConfig();
+    } catch (_cfgErr) {
+      Logger.log('Auth.createSessionToken: ConfigReader failed (' + _cfgErr.message + ') — using default cookie duration');
+      config = { cookieDurationMs: 30 * 24 * 60 * 60 * 1000 }; // 30 days default
+    }
     var token = _generateToken();
-    var expiry = Date.now() + config.cookieDurationMs;
+    var expiry = Date.now() + (config.cookieDurationMs || 30 * 24 * 60 * 60 * 1000);
 
-    var props = PropertiesService.getScriptProperties();
-    props.setProperty(SESSION_PREFIX + token, JSON.stringify({
-      email: email.toLowerCase(),
-      expiry: expiry,
-      created: Date.now(),
-    }));
+    try {
+      var props = PropertiesService.getScriptProperties();
+      props.setProperty(SESSION_PREFIX + token, JSON.stringify({
+        email: email.toLowerCase(),
+        expiry: expiry,
+        created: Date.now(),
+      }));
+    } catch (propErr) {
+      Logger.log('Auth.createSessionToken: PropertiesService write failed (' + propErr.message + ')');
+      // Token won't persist but page load can still proceed
+    }
 
     return token;
   }
@@ -280,6 +291,14 @@ var Auth = (function () {
     }
 
     Logger.log('Auth: Cleaned up ' + cleaned + ' expired tokens.');
+
+    // Fix 2.9: Monitor PropertiesService quota (500KB limit)
+    var remaining = props.getProperties();
+    var totalSize = JSON.stringify(remaining).length;
+    if (totalSize > 400000) {
+      Logger.log('WARNING: ScriptProperties usage at ' + Math.round(totalSize / 1024) + 'KB / 500KB');
+    }
+
     return cleaned;
   }
 

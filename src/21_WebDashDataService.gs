@@ -1023,6 +1023,7 @@ var DataService = (function () {
    * @returns {Object} { success, sentCount, message }
    */
   function sendBroadcastMessage(stewardEmail, filter, message, customSubject) {
+    try {
     var auth = checkWebAppAuthorization('steward'); if (!auth || !auth.isAuthorized) return { success: false, sentCount: 0, message: 'Unauthorized' };
     if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
 
@@ -1081,6 +1082,10 @@ var DataService = (function () {
     }
 
     return { success: true, sentCount: sentCount, message: 'Sent to ' + sentCount + ' member(s).' };
+    } catch (outerErr) {
+      Logger.log('sendBroadcastMessage error: ' + outerErr.message + '\n' + (outerErr.stack || ''));
+      return { success: false, sentCount: 0, message: 'An error occurred while sending the broadcast.' };
+    }
   }
 
   /**
@@ -2242,11 +2247,16 @@ var DataService = (function () {
   }
 
   function _getMemberBatchData(email) {
-    var grievances = getMemberGrievances(email);
-    var history = getMemberGrievanceHistory(email);
-    var stewardInfo = getAssignedStewardInfo(email);
-    var surveyStatus = getMemberSurveyStatus(email);
-    var events = getUpcomingEvents(5);
+    var grievances = [];
+    try { grievances = getMemberGrievances(email); } catch (_e) { Logger.log('_getMemberBatchData: getMemberGrievances failed: ' + _e.message); }
+    var history = { success: false, history: [] };
+    try { history = getMemberGrievanceHistory(email); } catch (_e) { Logger.log('_getMemberBatchData: getMemberGrievanceHistory failed: ' + _e.message); }
+    var stewardInfo = null;
+    try { stewardInfo = getAssignedStewardInfo(email); } catch (_e) { Logger.log('_getMemberBatchData: getAssignedStewardInfo failed: ' + _e.message); }
+    var surveyStatus = null;
+    try { surveyStatus = getMemberSurveyStatus(email); } catch (_e) { Logger.log('_getMemberBatchData: getMemberSurveyStatus failed: ' + _e.message); }
+    var events = [];
+    try { events = getUpcomingEvents(5); } catch (_e) { Logger.log('_getMemberBatchData: getUpcomingEvents failed: ' + _e.message); }
     var notifCount = 0;
     try {
       if (typeof getWebAppNotificationCount === 'function') {
@@ -2267,7 +2277,12 @@ var DataService = (function () {
 
   function _getStewardBatchData(email) {
     // Read cases once and compute KPIs from same data (avoids double sheet read)
-    var cases = getStewardCases(email);
+    var cases = [];
+    try {
+      cases = getStewardCases(email);
+    } catch (_e) {
+      Logger.log('_getStewardBatchData: getStewardCases failed: ' + _e.message);
+    }
     var kpis = _computeKPIsFromCases(cases);
 
     // Member counts — Member Directory already cached from getStewardCases call above.
@@ -3087,7 +3102,10 @@ function dataGetFullProfile(sessionToken, email) {
   var isSteward = checkWebAppAuthorization('steward', sessionToken).isAuthorized;
   // Members may only fetch their own profile; stewards can fetch any member's
   var targetEmail = (isSteward && email) ? email : caller;
-  return DataService.getFullMemberProfile(targetEmail);
+  var profile = DataService.getFullMemberProfile(targetEmail);
+  if (!profile) return { success: false, message: 'Member not found.' };
+  profile.success = true;
+  return profile;
 }
 // Member self-service: update own safe fields (address, workLocation, officeDays only)
 // Stewards can also update member profiles; both paths use updateMemberProfile's field allowlist
@@ -3375,6 +3393,25 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
   return { processed: processed, skipped: skipped, errors: errors, message: summary };
 }
 
+
+// OPT-1: Dedicated steward dashboard init — single round-trip combining cases, KPIs, badges, member count.
+// Used as fallback when the preloaded batch from dataGetBatchData is unavailable.
+function dataGetStewardDashboardInit(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { cases: [], kpis: {}, badges: { notificationCount: 0, taskCount: 0, overdueTaskCount: 0, qaUnansweredCount: 0 }, memberCount: 0 };
+  var batch = DataService.getBatchData(s, 'steward');
+  return {
+    cases: batch.cases || [],
+    kpis: batch.kpis || {},
+    badges: {
+      notificationCount: batch.notificationCount || 0,
+      taskCount: batch.taskCount || 0,
+      overdueTaskCount: batch.overdueTaskCount || 0,
+      qaUnansweredCount: batch.qaUnansweredCount || 0,
+    },
+    memberCount: batch.memberCount || 0,
+  };
+}
 
 // Batch data fetch — single round-trip for SPA init (CR-AUTH-3: server-side identity + role)
 // Role is re-verified server-side from the Member Directory; client-supplied role is ignored.

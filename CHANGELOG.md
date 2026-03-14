@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.28.0] - 2026-03-14
+
+### Added
+- **Speed optimizations (OPT-1 through OPT-10)** — webapp tab load reduced from ~3-4s to ~1-1.5s:
+  - OPT-1: `dataGetStewardDashboardInit()` — single batch endpoint replaces 3+ sequential server calls on fallback path
+  - OPT-2: DataCache wrapping for steward Members tab (5-min TTL, avoids re-fetch on revisit)
+  - OPT-4: Layout shell preservation on tab switch — sidebar/nav structure persists, only content area rebuilds
+  - OPT-5: Case list pagination (25 items per page with "Show more" button)
+  - OPT-6: Members tab `dataGetAllMembers` + `dataGetStewardMemberStats` fired in parallel (saves 0.5-1s)
+  - OPT-9: DocumentFragment for all list rendering (case list, member list) — single DOM write
+  - OPT-10: 150ms debounce on member filter/sort/search re-renders
+
+### Changed
+- OPT-7: Glow-bar CSS animation changed from `infinite` to single iteration (eliminates GPU jank)
+- OPT-8: Removed `backdrop-filter: blur()` from `.card-glass` (GPU perf, kept on modals/nav only)
+
+### Fixed
+- **Reliability fixes (remaining items from v4.27.2 audit):**
+  - `cleanVault()` — `console.error` → `Logger.log`; write-failure recovery after `clearContents()`
+  - QA Forum `submitQuestion()` / `submitAnswer()` — notification calls wrapped in try/catch (prevents silent swallow)
+  - `doGetWebDashboard()` — config loaded once at top of function (eliminates redundant `ConfigReader.getConfig()` in error path)
+  - Org chart / POMS script re-execution wrapped in per-script try/catch
+  - PropertiesService quota monitoring in `cleanupExpiredTokens()` (warns at 400KB/500KB)
+
+## [4.27.2] - 2026-03-14
+
+### Fixed
+- **Webapp reliability hardening** — 8 fixes to prevent silent failures and blank pages:
+  - `Auth.createSessionToken()` — wrapped in try/catch with fallback cookie duration; prevents page load failure when ConfigReader or PropertiesService is unavailable
+  - `getUserRole_()` — added null-guard on `getActiveSpreadsheet()`; prevents steward auth from crashing in web app context
+  - `dataGetFullProfile()` — returns `{success:false}` instead of raw `null` when member not found; prevents client-side crashes
+  - `sendBroadcastMessage()` — added outer try/catch; prevents unhandled throws from member lookup or config reads
+  - `_serveAuth()` / `_serveDashboard()` — `getUrl()` wrapped in null-safe helper; prevents `null` webAppUrl in page data
+  - `getOrgChartHtml()` / `getPOMSReferenceHtml()` — wrapped in try/catch with graceful fallback HTML
+  - `_getMemberBatchData()` / `_getStewardBatchData()` — all sub-calls individually wrapped; one failing section no longer takes down the entire batch
+
 ## [4.27.1] - 2026-03-13
 
 ### Changed

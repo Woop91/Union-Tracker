@@ -207,12 +207,16 @@ var QAForum = (function () {
       // Notify all stewards of the new unanswered question
       var preview = text.substring(0, 120) + (text.length > 120 ? '...' : '');
       var authorLabel = isAnonymous ? 'A member' : (name || 'A member');
-      _createNotificationInternal_(
-        'All Stewards',
-        'Q&A Forum',
-        'New Question in Q&A Forum',
-        authorLabel + ' posted: "' + preview + '"'
-      );
+      try {
+        _createNotificationInternal_(
+          'All Stewards',
+          'Q&A Forum',
+          'New Question in Q&A Forum',
+          authorLabel + ' posted: "' + preview + '"'
+        );
+      } catch (notifErr) {
+        Logger.log('QA submitQuestion: steward notification failed: ' + notifErr.message);
+      }
 
       return { success: true, questionId: id };
     } finally {
@@ -259,13 +263,17 @@ var QAForum = (function () {
 
       // Notify the question author that their question received an answer
       if (questionAuthorEmail) {
-        var preview = questionText + (questionText.length >= 80 ? '...' : '');
-        _createNotificationInternal_(
-          questionAuthorEmail,
-          'Q&A Forum',
-          'Your Question Got an Answer',
-          (name || 'A steward') + ' answered your question: "' + preview + '"'
-        );
+        try {
+          var preview = questionText + (questionText.length >= 80 ? '...' : '');
+          _createNotificationInternal_(
+            questionAuthorEmail,
+            'Q&A Forum',
+            'Your Question Got an Answer',
+            (name || 'A steward') + ' answered your question: "' + preview + '"'
+          );
+        } catch (notifErr) {
+          Logger.log('QA submitAnswer: author notification failed: ' + notifErr.message);
+        }
       }
 
       logAuditEvent('QA_ANSWER_SUBMITTED', 'Answer ' + id + ' on question ' + questionId);
@@ -513,11 +521,11 @@ var QAForum = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function qaGetQuestions(sessionToken, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken); return QAForum.getQuestions(e, page, pageSize, sort); }
-function qaGetQuestionDetail(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); return QAForum.getQuestionDetail(e, questionId); }
-function qaSubmitQuestion(sessionToken, name, text, isAnonymous) { var e = _resolveCallerEmail(sessionToken); return QAForum.submitQuestion(e, name, text, isAnonymous); }
+function qaGetQuestions(sessionToken, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getQuestions(e, page, pageSize, sort); }
+function qaGetQuestionDetail(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return QAForum.getQuestionDetail(e, questionId); }
+function qaSubmitQuestion(sessionToken, name, text, isAnonymous) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return QAForum.submitQuestion(e, name, text, isAnonymous); }
 function qaSubmitAnswer(sessionToken, name, questionId, text, isSteward) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.submitAnswer(e, name, questionId, text, true); }
-function qaUpvoteQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); return QAForum.upvoteQuestion(e, questionId); }
+function qaUpvoteQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return QAForum.upvoteQuestion(e, questionId); }
 function qaModerateQuestion(sessionToken, questionId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateQuestion(e, questionId, action); }
 function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateAnswer(e, answerId, action); }
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }

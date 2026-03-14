@@ -405,7 +405,7 @@ var API_VERSION = {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.27.1",
+  VERSION: "4.28.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -589,17 +589,17 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.27.0';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.27.2';
   var parts = ver.split('.');
   return {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
-    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 25,
-    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
+    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 27,
+    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 2,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-13',
-    CODENAME: 'Seed Phase Consolidation + Webapp Extras',
+    BUILD_DATE: '2026-03-14',
+    CODENAME: 'Webapp Reliability Hardening',
     codename: 'Seed Phase Consolidation + Webapp Extras'
   };
 })();

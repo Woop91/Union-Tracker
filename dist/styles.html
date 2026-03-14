@@ -154,8 +154,8 @@ input { font: inherit; }
   transition: background 0.2s, border-color 0.2s;
 }
 .card-glass {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* OPT-8: removed backdrop-filter from cards for GPU performance — kept on modals/nav only */
+  background: var(--surface);
 }
 .card-clickable { cursor: pointer; }
 .card-clickable:active { opacity: 0.85; }
@@ -229,7 +229,7 @@ input { font: inherit; }
   bottom: 0; left: 0; right: 0;
   height: 3px;
   background-size: 300px 100%;
-  animation: glowSweep 2.5s linear infinite;
+  animation: glowSweep 2.5s linear 1;
 }
 /* 3-stop gradient: sweep animation creates the moving bright-peak effect without color-mix().
    Compatible with all browsers (Chrome 49+, Safari 10+, Firefox 52+). */
