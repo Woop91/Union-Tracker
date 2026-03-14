@@ -30,7 +30,7 @@ For anything **outside** these two repos, ask user first.
 
 - **DDS-Dashboard** (private): Primary repo. Branches: `Main` (production), `staging` (pre-deploy mirror).
 - **Union-Tracker** (public): Mirror of DDS. Branches: `Main`, `staging`.
-- DDS Apps Script ID: `REDACTED_DDS_SCRIPT_ID`
+- DDS Apps Script ID: `[REDACTED]`
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in UT** (public repo).
 - DDS and UT are **identical**. No file exclusions remain (standalone WT removed in v4.20.0, now integrated into SPA via `25_WorkloadService.gs`). `typeof` guards in `index.html`, `member_view.html`, `03_UIComponents.gs` kept as defensive coding. If drift is found, it's a bug.

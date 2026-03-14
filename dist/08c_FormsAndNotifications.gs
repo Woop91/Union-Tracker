@@ -762,14 +762,7 @@ function checkDeadlinesAndNotify_() {
         days: daysToDeadline
       });
 
-      // Emit EventBus notification for SPA bell alerts
-      if (typeof EventBus !== 'undefined' && EventBus.emit) {
-        EventBus.emit('grievance:deadline:approaching', {
-          grievanceId: grievanceId,
-          memberName: String(data[i][GRIEVANCE_COLS.MEMBER_ID - 1] || ''),
-          daysLeft: daysToDeadline === 'Overdue' ? 0 : daysToDeadline
-        });
-      }
+      // NOTE: EventBus.emit removed v4.29.0 — EventBus is client-side only, never available in GAS triggers
     }
   }
 
@@ -900,14 +893,7 @@ function sendStewardDeadlineAlerts() {
       nextDue: nextDue
     });
 
-    // Emit EventBus notification for SPA bell alerts
-    if (typeof EventBus !== 'undefined' && EventBus.emit) {
-      EventBus.emit('grievance:deadline:approaching', {
-        grievanceId: grievanceId,
-        memberName: memberInfo.name,
-        daysLeft: daysRemaining
-      });
-    }
+    // NOTE: EventBus.emit removed v4.29.0 — EventBus is client-side only, never available in GAS triggers
   }
 
   // Get steward emails from Member Directory (stewards are members with IS_STEWARD = Yes)

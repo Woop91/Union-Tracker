@@ -1338,6 +1338,16 @@ function renderStewardNotifications(appContainer) {
     _stewardHeader(container, 'Notifications', 'View, compose, and manage');
     var content = el('div', { className: 'content' });
 
+    // v4.29.0: Mark notifications as read on tab open — zero notification count, keep Q&A count on badge
+    AppState.notificationCount = 0;
+    var _bellTotalAfterRead = AppState.qaUnansweredCount || 0;
+    var badge = document.querySelector('.notif-bell-badge');
+    if (_bellTotalAfterRead > 0) {
+      if (badge) badge.textContent = String(_bellTotalAfterRead);
+    } else {
+      if (badge) badge.remove();
+    }
+
     var activeSubTab = 'inbox';
     var subTabBar = el('div', { className: 'sub-tabs' });
     var subContent = el('div');
@@ -1382,6 +1392,10 @@ function renderStewardNotifications(appContainer) {
           var typeClass = typeColors[n.type] || 'system';
           top.appendChild(el('span', { className: 'notif-type-badge notif-type-' + typeClass }, n.type));
           if (n.priority === 'Urgent') top.appendChild(el('span', { className: 'notif-type-badge notif-type-deadline' }, 'Urgent'));
+          // v4.29.0: Show Auto-expires badge on Timed notifications (stewards can still dismiss)
+          if (n.dismissMode === 'Timed') {
+            top.appendChild(el('span', { className: 'notif-type-badge', style: { background: 'var(--border)', color: 'var(--muted)', fontSize: '10px' } }, 'Auto-expires'));
+          }
           card.appendChild(top);
           card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)', paddingRight: '28px' } }, n.title));
           card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', marginTop: '6px', lineHeight: '1.5' } }, n.message));
@@ -1490,7 +1504,7 @@ function renderStewardNotifications(appContainer) {
           }
           renderList('');
           searchInput.addEventListener('input', function() { renderList(searchInput.value.trim().toLowerCase()); });
-        }).getNotificationRecipientListFull();
+        }).getNotificationRecipientListFull(SESSION_TOKEN);
       }
 
       buildGroupPicker();
@@ -1659,12 +1673,13 @@ function renderStewardNotifications(appContainer) {
                 archiveBtn.disabled = true;
                 serverCall().withSuccessHandler(function(r) {
                   if (r && r.success) {
-                    // Update status pill and hide archive button in place
-                    row.querySelector('.notif-type-badge[style*="--success"]') &&
-                      (row.querySelector('.notif-type-badge[style*="--success"]').textContent = 'Archived');
-                    row.querySelector('.notif-type-badge[style*="--success"]') &&
-                      (row.querySelector('.notif-type-badge[style*="--success"]').style.borderColor = 'var(--muted)') &&
-                      (row.querySelector('.notif-type-badge[style*="--success"]').style.color = 'var(--muted)');
+                    // v4.29.0 fix: capture pill once to avoid null-chain silent no-op
+                    var statusPill = row.querySelector('.notif-type-badge[style*="--success"]');
+                    if (statusPill) {
+                      statusPill.textContent = 'Archived';
+                      statusPill.style.borderColor = 'var(--muted)';
+                      statusPill.style.color = 'var(--muted)';
+                    }
                     archiveBtn.remove();
                   } else {
                     archiveBtn.textContent = 'Archive';
@@ -5036,8 +5051,7 @@ function renderStewardTimelinePage(appContainer) {
     var PAGE_SIZE = 25;
     var cachedCategories = [];
     var cachedYears = [];
-
-    // ── Drive URL parser ──────────────────────────────────────────────────
+    var tlContainer = null;
     function parseDriveIds(raw) {
       if (!raw) return [];
       var parts = raw.split(/[\n,]+/);
@@ -5095,7 +5109,7 @@ function renderStewardTimelinePage(appContainer) {
         if (String(y) === filterYear) opt.selected = true;
         yearSelect.appendChild(opt);
       });
-      yearSelect.addEventListener('change', function() { filterYear = yearSelect.value; currentPage = 1; _loadEvents(cont, listArea); });
+      yearSelect.addEventListener('change', function() { filterYear = yearSelect.value; currentPage = 1; tlContainer = null; _loadEvents(cont, listArea); });
 
       var catSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '120px' } });
       catSelect.appendChild(el('option', { value: '' }, 'All Categories'));
@@ -5104,7 +5118,7 @@ function renderStewardTimelinePage(appContainer) {
         if (c === filterCategory) opt.selected = true;
         catSelect.appendChild(opt);
       });
-      catSelect.addEventListener('change', function() { filterCategory = catSelect.value; currentPage = 1; _loadEvents(cont, listArea); });
+      catSelect.addEventListener('change', function() { filterCategory = catSelect.value; currentPage = 1; tlContainer = null; _loadEvents(cont, listArea); });
 
       filterBar.appendChild(yearSelect);
       filterBar.appendChild(catSelect);
@@ -5147,20 +5161,33 @@ function renderStewardTimelinePage(appContainer) {
     }
 
     function _loadEvents(cont, listArea) {
-      showLoading(listArea);
+      if (currentPage === 1) showLoading(listArea);
       serverCall().withSuccessHandler(function(result) {
-        listArea.innerHTML = '';
+        // Remove stale Load More button before rebuilding
+        var oldBtn = listArea.querySelector('.tl-load-more');
+        if (oldBtn && oldBtn.parentNode) oldBtn.parentNode.removeChild(oldBtn);
+
+        if (currentPage === 1) {
+          listArea.innerHTML = '';
+          tlContainer = null;
+        }
+
         if (!result || !result.events || result.events.length === 0) {
-          var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
-          empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
-          empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
-          empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'Use \u201CAdd Event\u201D to create the first entry.'));
-          listArea.appendChild(empty);
+          if (currentPage === 1) {
+            var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+            empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
+            empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
+            empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'Use \u201CAdd Event\u201D to create the first entry.'));
+            listArea.appendChild(empty);
+          }
           return;
         }
 
-        var tlContainer = el('div', { className: 'timeline-container' });
-        tlContainer.appendChild(el('div', { className: 'timeline-line' }));
+        if (!tlContainer) {
+          tlContainer = el('div', { className: 'timeline-container' });
+          tlContainer.appendChild(el('div', { className: 'timeline-line' }));
+          listArea.appendChild(tlContainer);
+        }
 
         result.events.forEach(function(evt) {
           var item = el('div', { className: 'timeline-event' });
@@ -5204,21 +5231,27 @@ function renderStewardTimelinePage(appContainer) {
             card.appendChild(filesDiv);
           }
 
-          // Steward actions
+          if (evt.meetingMinutesId) {
+            card.appendChild(el('div', { style: { marginTop: '6px', fontSize: '11px' } },
+              el('a', { href: 'https://docs.google.com/document/d/' + evt.meetingMinutesId + '/edit', target: '_blank', style: { color: 'var(--accent)' } }, '\uD83D\uDCC4 Meeting Minutes')
+            ));
+          }
+
+          // ── Steward actions ──────────────────────────────────────────────
           var acts = el('div', { style: { display: 'flex', gap: '6px', marginTop: '10px' } });
 
           acts.appendChild(el('button', {
             style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--surfaceAlt)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: '600', cursor: 'pointer' },
-            onClick: function() { _openEditForm(card, acts, evt, function() { _loadEvents(cont, listArea); }); }
+            onClick: function() { _openEditForm(card, acts, evt, function() { currentPage = 1; tlContainer = null; _loadEvents(cont, listArea); }); }
           }, 'Edit'));
 
           var delBtn = el('button', {
             style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600', cursor: 'pointer' },
             onClick: function() {
               if (!confirm('Delete \u201C' + evt.title + '\u201D? This cannot be undone.')) return;
-              delBtn.disabled = true; delBtn.textContent = 'Deleting...';
+              delBtn.disabled = true; delBtn.textContent = 'Deleting\u2026';
               serverCall().withSuccessHandler(function(r) {
-                if (r && r.success) { _loadEvents(cont, listArea); }
+                if (r && r.success) { currentPage = 1; tlContainer = null; _loadEvents(cont, listArea); }
                 else { delBtn.disabled = false; delBtn.textContent = 'Delete'; alert((r && r.message) || 'Delete failed.'); }
               }).withFailureHandler(function() {
                 delBtn.disabled = false; delBtn.textContent = 'Delete';
@@ -5232,21 +5265,27 @@ function renderStewardTimelinePage(appContainer) {
           tlContainer.appendChild(item);
         });
 
-        listArea.appendChild(tlContainer);
-
         var total = result.total || 0;
         var shown = (result.page || 1) * (result.pageSize || PAGE_SIZE);
         if (shown < total) {
-          listArea.appendChild(el('button', {
-            className: 'btn',
+          var moreBtn = el('button', {
+            className: 'btn tl-load-more',
             style: { display: 'block', margin: '16px auto', fontSize: '13px' },
-            onClick: function() { currentPage++; _loadEvents(cont, listArea); }
-          }, 'Load More (' + (total - shown) + ' remaining)'));
+            onClick: function() {
+              currentPage++;
+              moreBtn.textContent = 'Loading\u2026';
+              moreBtn.disabled = true;
+              _loadEvents(cont, listArea);
+            }
+          }, 'Load More (' + (total - shown) + ' remaining)');
+          listArea.appendChild(moreBtn);
         }
 
       }).withFailureHandler(function() {
-        listArea.innerHTML = '';
-        listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
+        if (currentPage === 1) {
+          listArea.innerHTML = '';
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
+        }
       }).tlGetTimelineEvents(SESSION_TOKEN, currentPage, PAGE_SIZE, filterYear || null, filterCategory || null);
     }
 
@@ -5256,11 +5295,17 @@ function renderStewardTimelinePage(appContainer) {
       var editForm = el('div', { style: { borderTop: '1px solid var(--border)', marginTop: '10px', paddingTop: '10px' } });
 
       var titleInput = el('input', { className: 'form-input', value: evt.title, style: { marginBottom: '6px' } });
+
+      // UTC-safe date: use eventDateRaw ms but interpret in UTC to avoid timezone day-shift
       var dateInput = el('input', { className: 'form-input', type: 'date', style: { marginBottom: '6px' } });
       if (evt.eventDateRaw) {
         var d = new Date(evt.eventDateRaw);
-        dateInput.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        var yr = d.getUTCFullYear();
+        var mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+        var dy = String(d.getUTCDate()).padStart(2, '0');
+        dateInput.value = yr + '-' + mo + '-' + dy;
       }
+
       var descInput = el('textarea', { className: 'msg-textarea', style: { minHeight: '60px', marginBottom: '6px' } });
       descInput.value = evt.description || '';
 
@@ -5271,6 +5316,14 @@ function renderStewardTimelinePage(appContainer) {
         catSelect.appendChild(opt);
       });
 
+      // Meeting Minutes Doc ID / URL field
+      var minutesInput = el('input', { className: 'form-input', placeholder: 'Doc ID or docs.google.com URL', style: { marginBottom: '8px' } });
+      minutesInput.value = evt.meetingMinutesId || '';
+
+      // Drive file attach (add-only)
+      var driveHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Add Drive URLs or file IDs (one per line). Existing files are kept.');
+      var driveInput = el('textarea', { className: 'msg-textarea', placeholder: 'https://drive.google.com/file/d/... or raw ID', style: { minHeight: '44px', fontFamily: 'var(--fontMono, monospace)', fontSize: '11px', marginBottom: '8px' } });
+
       var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '6px' } });
       var btnRow = el('div', { style: { display: 'flex', gap: '6px' } });
 
@@ -5279,13 +5332,39 @@ function renderStewardTimelinePage(appContainer) {
         onClick: function() {
           var t = titleInput.value.trim();
           if (!t) { statusMsg.textContent = 'Title required.'; statusMsg.style.color = 'var(--danger)'; return; }
-          statusMsg.textContent = 'Saving...'; statusMsg.style.color = 'var(--muted)';
-          serverCall().withSuccessHandler(function(r) {
-            if (r && r.success) { onSave(); }
-            else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
-          }).withFailureHandler(function() {
-            statusMsg.textContent = 'Save failed.'; statusMsg.style.color = 'var(--danger)';
-          }).tlUpdateTimelineEvent(SESSION_TOKEN, evt.id, { title: t, eventDate: dateInput.value, description: descInput.value.trim(), category: catSelect.value });
+          statusMsg.textContent = 'Saving\u2026'; statusMsg.style.color = 'var(--muted)';
+
+          // Resolve meetingMinutesId from URL or raw ID
+          var rawMinutes = minutesInput.value.trim();
+          var minutesId = '';
+          if (rawMinutes) {
+            var mMatch = rawMinutes.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+            minutesId = mMatch ? mMatch[1] : rawMinutes;
+          }
+
+          var newDriveIds = parseDriveIds(driveInput.value);
+          var pending = 1;
+
+          function _finish() {
+            serverCall().withSuccessHandler(function(r) {
+              if (r && r.success) { onSave(); }
+              else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
+            }).withFailureHandler(function() {
+              statusMsg.textContent = 'Save failed.'; statusMsg.style.color = 'var(--danger)';
+            }).tlUpdateTimelineEvent(SESSION_TOKEN, evt.id, {
+              title: t, eventDate: dateInput.value,
+              description: descInput.value.trim(), category: catSelect.value,
+              meetingMinutesId: minutesId
+            });
+          }
+
+          if (newDriveIds.length) {
+            serverCall().withSuccessHandler(function() { _finish(); })
+              .withFailureHandler(function() { _finish(); })
+              .tlAttachDriveFiles(SESSION_TOKEN, evt.id, newDriveIds.join(','));
+          } else {
+            _finish();
+          }
         }
       }, 'Save'));
 
@@ -5302,6 +5381,11 @@ function renderStewardTimelinePage(appContainer) {
       editForm.appendChild(descInput);
       editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Category'));
       editForm.appendChild(catSelect);
+      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Meeting Minutes (optional)'));
+      editForm.appendChild(minutesInput);
+      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Attach Drive Files (optional)'));
+      editForm.appendChild(driveHint);
+      editForm.appendChild(driveInput);
       editForm.appendChild(statusMsg);
       editForm.appendChild(btnRow);
       card.appendChild(editForm);
@@ -5333,6 +5417,9 @@ function renderStewardTimelinePage(appContainer) {
       }
       _formGroup(cont, 'Category', catSelect);
 
+      var minutesInput = el('input', { className: 'form-input', placeholder: 'Doc ID or docs.google.com URL (optional)' });
+      _formGroup(cont, 'Meeting Minutes (optional)', minutesInput);
+
       var driveHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Paste Drive share URLs or file IDs, one per line.');
       var driveInput = el('textarea', { className: 'msg-textarea', placeholder: 'https://drive.google.com/file/d/... or raw ID', style: { minHeight: '50px', fontFamily: 'var(--fontMono, monospace)', fontSize: '11px' } });
       var driveGroup = el('div', { className: 'form-group' });
@@ -5349,14 +5436,29 @@ function renderStewardTimelinePage(appContainer) {
         onClick: function() {
           var title = titleInput.value.trim();
           if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
-          statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
+          statusMsg.textContent = 'Creating\u2026'; statusMsg.style.color = 'var(--muted)';
+
+          // Resolve meetingMinutesId from URL or raw ID
+          var rawMinutes = minutesInput.value.trim();
+          var minutesId = '';
+          if (rawMinutes) {
+            var mMatch = rawMinutes.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+            minutesId = mMatch ? mMatch[1] : rawMinutes;
+          }
+
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) {
               statusMsg.textContent = 'Event created!'; statusMsg.style.color = 'var(--success)';
-              titleInput.value = ''; descInput.value = ''; dateInput.value = ''; driveInput.value = '';
+              titleInput.value = ''; descInput.value = ''; dateInput.value = '';
+              driveInput.value = ''; minutesInput.value = '';
               setTimeout(function() { activeSubTab = 'timeline'; refreshSubTabs(); renderTLSubContent(); }, 800);
             } else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
-          }).tlAddTimelineEvent(SESSION_TOKEN, { title: title, eventDate: dateInput.value || '', description: descInput.value.trim(), category: catSelect.value, driveFileIds: parseDriveIds(driveInput.value).join(',') });
+          }).tlAddTimelineEvent(SESSION_TOKEN, {
+            title: title, eventDate: dateInput.value || '',
+            description: descInput.value.trim(), category: catSelect.value,
+            driveFileIds: parseDriveIds(driveInput.value).join(','),
+            meetingMinutesId: minutesId
+          });
         }
       }, 'Create Event'));
     }

@@ -167,10 +167,21 @@ var TimelineService = (function () {
       var id = 'TL_' + Date.now().toString(36);
       var now = new Date();
       var eventDate = data.eventDate ? new Date(data.eventDate) : now;
+      var driveIds   = String(data.driveFileIds   || '').trim();
+      var driveNames = String(data.driveFileNames || '').trim();
+      if (driveIds && !driveNames) {
+        var idsArr = driveIds.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        var namesArr = [];
+        for (var f = 0; f < idsArr.length; f++) {
+          try { namesArr.push(DriveApp.getFileById(idsArr[f]).getName()); }
+          catch (_e) { namesArr.push('Unknown'); }
+        }
+        driveNames = namesArr.join(',');
+      }
       sheet.appendRow([
         id, _sanitize(data.title.substring(0, 200)), eventDate,
         _sanitize((data.description || '').substring(0, 2000)), cat,
-        data.calendarEventId || '', data.driveFileIds || '', data.driveFileNames || '',
+        data.calendarEventId || '', driveIds, driveNames,
         data.meetingMinutesId || '', stewardEmail.toLowerCase().trim(), now, now
       ]);
       logAuditEvent('TIMELINE_EVENT_ADDED', 'Event ' + id + ' by ' + stewardEmail);
@@ -197,6 +208,7 @@ var TimelineService = (function () {
           var cat = updates.category.toLowerCase().trim();
           if (validCats.indexOf(cat) !== -1) sheet.getRange(i + 1, 5).setValue(cat);
         }
+        if (updates.meetingMinutesId !== undefined) sheet.getRange(i + 1, 9).setValue(String(updates.meetingMinutesId || ''));
         sheet.getRange(i + 1, 12).setValue(new Date());
         logAuditEvent('TIMELINE_EVENT_UPDATED', 'Event ' + eventId + ' updated by ' + stewardEmail);
         return { success: true };

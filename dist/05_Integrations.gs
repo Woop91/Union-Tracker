@@ -3814,52 +3814,19 @@ function archiveWebAppNotification(sessionToken, notificationId) {
 }
 
 
-/**
- * Get member list for notification recipient picker (steward use).
- * Returns simplified list: name + email for dropdown.
- * @returns {Object[]} [{ name, email }]
- */
-function getNotificationRecipientList() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-    if (!sheet) return [];
-
-    var data = sheet.getDataRange().getValues();
-    if (data.length < 2) return [];
-
-    var C = MEMBER_COLS;
-    var results = [];
-    // Preset groups first
-    results.push({ name: '📢 All Members', email: 'All Members' });
-    results.push({ name: '🛡️ All Stewards', email: 'All Stewards' });
-    results.push({ name: '🌐 Everyone', email: 'Everyone' });
-
-    for (var i = 1; i < data.length; i++) {
-      var firstName = String(data[i][C.FIRST_NAME - 1] || '').trim();
-      var lastName = String(data[i][C.LAST_NAME - 1] || '').trim();
-      var email = String(data[i][C.EMAIL - 1] || '').trim();
-      if (!email) continue;
-      var fullName = (firstName + ' ' + lastName).trim();
-      results.push({ name: fullName || email, email: email });
-    }
-
-    return results;
-  } catch (e) {
-    logError_('getNotificationRecipientList', e);
-    return [];
-  }
-}
-
+// getNotificationRecipientList removed v4.29.0 — dead code, superseded by getNotificationRecipientListFull (auth-gated)
 
 /**
  * Get full member list with directory columns for filtering/sorting.
  * Used by steward notification compose form recipient picker.
  * Returns: name, email, location, department, jobTitle for each member.
- * @returns {Object[]}
- */
-function getNotificationRecipientListFull() {
+ * @returns {Object[]}\n */
+function getNotificationRecipientListFull(sessionToken) {
   try {
+    // CR-AUTH: Steward-only — member email enumeration is a privacy risk (v4.29.0)
+    var auth = checkWebAppAuthorization('steward', sessionToken);
+    if (!auth.isAuthorized) return [];
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!sheet) return [];

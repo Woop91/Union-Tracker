@@ -1418,6 +1418,11 @@ function renderMemberNotifications(appContainer) {
     showLoading(content, 'list');
     container.appendChild(content);
 
+    // v4.29.0: Mark all as read on tab open — zero the bell badge immediately
+    AppState.notificationCount = 0;
+    var badge = document.querySelector('.notif-bell-badge');
+    if (badge) badge.remove();
+
     serverCall().withSuccessHandler(function(notifications) {
       content.innerHTML = '';
       if (!notifications || notifications.length === 0) {
@@ -4963,17 +4968,18 @@ function renderMemberTimelinePage(appContainer) {
     var PAGE_SIZE = 25;
     var cachedCategories = [];
     var cachedYears = [];
+    var tlContainer = null;
 
     // ── Filter bar ────────────────────────────────────────────────────────
     var filterBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' } });
 
     var yearSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '100px' } });
     yearSelect.appendChild(el('option', { value: '' }, 'All Years'));
-    yearSelect.addEventListener('change', function() { filterYear = yearSelect.value; currentPage = 1; _loadEvents(); });
+    yearSelect.addEventListener('change', function() { filterYear = yearSelect.value; currentPage = 1; tlContainer = null; _loadEvents(); });
 
     var catSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '120px' } });
     catSelect.appendChild(el('option', { value: '' }, 'All Categories'));
-    catSelect.addEventListener('change', function() { filterCategory = catSelect.value; currentPage = 1; _loadEvents(); });
+    catSelect.addEventListener('change', function() { filterCategory = catSelect.value; currentPage = 1; tlContainer = null; _loadEvents(); });
 
     filterBar.appendChild(yearSelect);
     filterBar.appendChild(catSelect);
@@ -5007,20 +5013,33 @@ function renderMemberTimelinePage(appContainer) {
     }
 
     function _loadEvents() {
-      showLoading(listArea);
+      if (currentPage === 1) showLoading(listArea);
       serverCall().withSuccessHandler(function(result) {
-        listArea.innerHTML = '';
+        // Remove stale Load More button before rebuilding
+        var oldBtn = listArea.querySelector('.tl-load-more');
+        if (oldBtn && oldBtn.parentNode) oldBtn.parentNode.removeChild(oldBtn);
+
+        if (currentPage === 1) {
+          listArea.innerHTML = '';
+          tlContainer = null;
+        }
+
         if (!result || !result.events || result.events.length === 0) {
-          var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
-          empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
-          empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
-          empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward will add events here to keep members informed.'));
-          listArea.appendChild(empty);
+          if (currentPage === 1) {
+            var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+            empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
+            empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
+            empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward will add events here to keep members informed.'));
+            listArea.appendChild(empty);
+          }
           return;
         }
 
-        var tlContainer = el('div', { className: 'timeline-container' });
-        tlContainer.appendChild(el('div', { className: 'timeline-line' }));
+        if (!tlContainer) {
+          tlContainer = el('div', { className: 'timeline-container' });
+          tlContainer.appendChild(el('div', { className: 'timeline-line' }));
+          listArea.appendChild(tlContainer);
+        }
 
         result.events.forEach(function(evt) {
           var item = el('div', { className: 'timeline-event' });
@@ -5064,21 +5083,25 @@ function renderMemberTimelinePage(appContainer) {
             card.appendChild(filesDiv);
           }
 
+          if (evt.meetingMinutesId) {
+            card.appendChild(el('div', { style: { marginTop: '6px', fontSize: '11px' } },
+              el('a', { href: 'https://docs.google.com/document/d/' + evt.meetingMinutesId + '/edit', target: '_blank', style: { color: 'var(--accent)' } }, '\uD83D\uDCC4 Meeting Minutes')
+            ));
+          }
+
           item.appendChild(card);
           tlContainer.appendChild(item);
         });
-
-        listArea.appendChild(tlContainer);
 
         var total = result.total || 0;
         var shown = (result.page || 1) * (result.pageSize || PAGE_SIZE);
         if (shown < total) {
           var moreBtn = el('button', {
-            className: 'btn',
+            className: 'btn tl-load-more',
             style: { display: 'block', margin: '16px auto', fontSize: '13px' },
             onClick: function() {
               currentPage++;
-              moreBtn.textContent = 'Loading...';
+              moreBtn.textContent = 'Loading\u2026';
               moreBtn.disabled = true;
               _loadEvents();
             }
@@ -5087,8 +5110,10 @@ function renderMemberTimelinePage(appContainer) {
         }
 
       }).withFailureHandler(function() {
-        listArea.innerHTML = '';
-        listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
+        if (currentPage === 1) {
+          listArea.innerHTML = '';
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
+        }
       }).tlGetTimelineEvents(SESSION_TOKEN, currentPage, PAGE_SIZE, filterYear || null, filterCategory || null);
     }
 

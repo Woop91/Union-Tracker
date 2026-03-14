@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `REDACTED_DDS_SCRIPT_ID`
+**DDS Apps Script ID:** `[REDACTED]`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -3005,194 +3005,136 @@ Prevents revert of the 2026-03-11 architectural fix. Guards three properties:
 
 ---
 
-## 🎨 UI SYSTEM LOG — 2026-03-13 (Loading & Progress Bar Overhaul)
+## 🔍 CODE REVIEW SESSION — 2026-03-11 (Resumed)
 
-### Loading Indicator System (v4.25.13 → v4.25.14)
+### Scope
+Full end-to-end audit of all 38 .gs source files + 3 HTML files (~93K lines).
+Previous session covered: 00_Security.gs, 00_DataAccess.gs, 01_Core.gs, 19_WebDashAuth.gs, 22_WebDashApp.gs, 10_Main.gs.
+This session covered: 02_DataManagers.gs, 21_WebDashDataService.gs, 08c_FormsAndNotifications.gs, 05_Integrations.gs, 06_Maintenance.gs, 15_EventBus.gs, 20_WebDashConfigReader.gs, 28_FailsafeService.gs, 25_WorkloadService.gs, index.html, member_view.html, steward_view.html (partial deep + pattern scans).
 
-#### Bug Fixed: `.spinner` was `display:none` since v4.25.11
-**Root cause:** When the skeleton loading system was introduced in v4.25.11, `.spinner` was set to `display:none` and `@keyframes spin` was deleted. Four active call sites still used `.spinner`:
-- `auth_view.html` — Google SSO button ("Connecting to Google…")
-- `auth_view.html` — Magic link send ("Sending sign-in link…")
-- `member_view.html` — Survey submit
-- `member_view.html` — Survey retry
+### ✅ FIXED — FIX-WDS-01: dataGetFullProfile signature bug
+**File:** `src/21_WebDashDataService.gs` ~line 2947
+**Bug:** Function declared as `dataGetFullProfile(email)` but body referenced `sessionToken` (undefined in scope). This caused a `ReferenceError` on every call — members could NEVER load their full profile from the web dashboard.
+**Fix:** Renamed signature to `dataGetFullProfile(sessionToken, email)`. Also passed sessionToken to `checkWebAppAuthorization('steward', sessionToken)` for consistency.
+**Severity:** CRITICAL (profile page broken for all members)
 
-**Fix:** Restored `.spinner` as three-dot `dotPulse` animation (see below).
+### ✅ FIXED — FIX-SEC-01: sendSecurityAlertEmail_ used MailApp directly
+**File:** `src/00_Security.gs` ~line 804, 851
+**Bug:** `sendSecurityAlertEmail_()` called `MailApp.sendEmail()` directly and did its own `getRemainingDailyQuota()` check, inconsistent with every other email sender in codebase which uses `safeSendEmail_()`. If quota was exceeded, MailApp would throw an unhandled exception inside the catch block.
+**Fix:** Replaced `MailApp.sendEmail()` with `safeSendEmail_()`. Removed redundant quota check (safeSendEmail_ handles this internally with proper logging).
+**Severity:** MINOR (inconsistency; practical risk low since critical alerts are infrequent)
 
----
+### ✅ FIXED — FIX-MAIN-01: recalculateDownstreamDeadlines_ hardcoded calendar day math
+**File:** `src/10_Main.gs` ~line 838
+**Bug:** Deadline cascade chain used hardcoded day values (21, 30, 10, 30, 30) and raw millisecond arithmetic (`* 86400000` = calendar days). All other deadline calculations use `getDeadlineRules()` for configurable values and `addBusinessDays()` for business-day math.
+**Fix:** Chain now reads `getDeadlineRules()` and uses `addBusinessDays()` for each cascade step.
+**Note:** The DEFAULTS for these chain values are: FILING_DAYS=21, STEP_1_RESPONSE=7, STEP_2_APPEAL=7, STEP_2_RESPONSE=14, STEP_3_APPEAL=10. Previous hardcoded values (30, 10, 30, 30) did NOT match these defaults. The old values may have reflected different contractual rules — verify Config sheet is seeded correctly.
+**Severity:** MEDIUM (wrong deadlines cascade when a steward overrides a date)
 
-#### ✅ Two Parallel Loading Systems (both intentional)
+### ℹ️ OBSERVATION: GRIEVANCE_TRACKER and GRIEVANCE_LOG are aliases
+Both `SHEETS.GRIEVANCE_TRACKER` and `SHEETS.GRIEVANCE_LOG` point to `'Grievance Log'` (01_Core.gs lines 815, 859). This is intentional for backward compatibility but creates inconsistency in which alias different files use. Not a bug but a code smell.
 
-| System | Class | Purpose |
-|--------|-------|---------|
-| Skeleton | `.loading-spinner` + `.skeleton-card` / `.skeleton-row` | Section-level page loads (showLoading()) |
-| Inline dots | `.spinner` | User-triggered action confirmation (button clicks, form submits) |
+### ℹ️ OBSERVATION: onSatisfactionFormSubmit trigger deprecated v4.21.0
+`onSatisfactionFormSubmit()` in 08c_FormsAndNotifications.gs is now a no-op that logs a warning. If an old trigger is still installed in the project, it will fire on every form submit and log noise. Run `ScriptApp.getProjectTriggers()` to check and remove stale triggers.
 
----
+### ℹ️ OBSERVATION: Stale @version tags in file headers
+Multiple files still show old version numbers in their JSDoc `@version` tags (e.g., 4.7.0, 4.13.0). These are cosmetic only — the canonical version lives in `COMMAND_CONFIG.VERSION` in `01_Core.gs`. No action required but worth noting for maintainability.
 
-#### Skeleton: Shimmer sweep (replaces opacity pulse)
-**File:** `src/styles.html`
-```css
-@keyframes shimmer {
-  0%   { background-position: -600px 0; }
-  100% { background-position:  600px 0; }
-}
-```
-Applied via `background: linear-gradient(90deg, rgba low, rgba high, rgba low)` + `background-size: 600px 100%`.
-Light-mode: separate `[data-theme-mode="light"]` overrides on `.skeleton-row` and `.skeleton-card`.
+### ✅ CONFIRMED OK: All client-side render functions resolve correctly
+`index.html` includes BOTH `steward_view.html` AND `member_view.html` unconditionally (lines 1094-1095). Functions like `renderFeedbackPage` (steward_view), `renderWorkloadTracker` (member_view), and `renderQAForum` (member_view) are available to both roles at runtime. No dead render routes found.
 
-#### Inline spinner: Three-dot dotPulse (replaces rotating ring)
-**File:** `src/styles.html`
-```css
-@keyframes dotPulse {
-  0%, 80%, 100% { transform: scale(0.55); opacity: 0.35; }
-  40%           { transform: scale(1);    opacity: 1; }
-}
-.spinner { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.2s ease-in-out infinite; }
-.spinner::before { left: -13px; animation-delay: -0.24s; }
-.spinner::after  { left:  13px; animation-delay:  0.24s; }
-```
-Dots are accent-colored in both themes. `auth_view.html:47` inline style was updated to remove ring-specific `width/height/border-width` overrides.
+### ✅ CONFIRMED OK: All server function calls from member_view and steward_view resolve
+All `serverCall().funcName()` calls in `member_view.html` and `steward_view.html` were verified against source .gs files. Every function exists in either `21_WebDashDataService.gs`, `05_Integrations.gs`, `08e_SurveyEngine.gs`, or `25_WorkloadService.gs`. Zero dead RPC calls found.
 
-#### 30-second timeout fallback
-`showLoading()` now returns a loader element. After 30s, if the element is still in the DOM, replaces skeleton with a reload prompt. Call `clearLoading(loader)` in success handlers to cancel the timeout.
+### ✅ CONFIRMED OK: XSS protection consistent across HTML files
+All user-data insertions via `innerHTML` in `member_view.html` and `steward_view.html` use `safeText()` (defined in `index.html` line 253). No raw interpolation of server data found.
 
----
+### ✅ CONFIRMED OK: Deadline calculations in 02_DataManagers.gs use getDeadlineRules()
+`calculateInitialDeadlines()`, `calculateNextStepDeadline()`, and `calculateResponseDeadline()` all call `getDeadlineRules()` and `addBusinessDays()`. This is correct.
 
-### Progress Bar System (v4.25.14)
+### ✅ CONFIRMED OK: Member deduplication (findExistingMember) is sound
+Priority: Member ID > Email > Name. Returns first high-confidence match. Does not stop scanning after name match (keeps looking for ID/email match). Correct.
 
-#### ⚠️ RULE: Never use inline styles for progress bars
-All progress bars MUST use the shared `.prog-track` / `.prog-fill` class system.
-Never write `height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden'` inline again.
-
-#### Shared CSS utility classes (`src/styles.html`)
-```css
-/* Track (background) */
-.prog-track        { height: 6px; }   /* default */
-.prog-track--sm    { height: 4px; }   /* micro — participation history, ranked chart */
-.prog-track--md    { height: 8px; }   /* standard — checklists, satisfaction, polls */
-.prog-track--lg    { height: 10px; }  /* hero — Response Rate card */
-
-/* Fill (colored bar) */
-.prog-fill                /* default: var(--accent) */
-.prog-fill--success       /* var(--success) — 100% complete, high scores */
-.prog-fill--warning       /* var(--warning) — mid range */
-.prog-fill--danger        /* var(--danger)  — low/overdue */
-```
-Light-mode: `.prog-track` background auto-swaps via `[data-theme-mode="light"]`.
-Transition: `cubic-bezier(0.34, 1.2, 0.64, 1)` — slight spring overshoot on all fills.
-
-#### Usage pattern
-```js
-var track = el('div', { className: 'prog-track prog-track--md', style: { flex: '1' } });
-var colorClass = val >= 70 ? 'prog-fill--success' : val >= 40 ? 'prog-fill--warning' : 'prog-fill--danger';
-track.appendChild(el('div', { className: 'prog-fill ' + colorClass, style: { width: val + '%' } }));
-```
-For chart bars with a custom color array (polls), pass `style: { background: colors[i] }` directly on `.prog-fill`.
-
-#### Bars refactored (9 total)
-| Bar | File | Size |
-|-----|------|------|
-| Response Rate hero | steward_view | `--lg` |
-| Member participation history | steward_view | `--sm` |
-| Ranked list chart | steward_view | `--sm` |
-| Satisfaction score bars | steward_view | `--md` |
-| Steward checklist completion | steward_view | `--md` |
-| Poll results (Q&A forum view) | steward_view | `--md` |
-| Poll results (steward weekly Q) | steward_view | `--md` |
-| Member checklist completion | member_view | `--md` |
-| Member poll results | member_view | `--md` |
-
-**Bug fixed:** 2 poll bars (steward_view:3884, 4055) were missing `transition` — bars snapped instead of animating. Now handled by `.prog-fill` shared transition.
+### ✅ CONFIRMED OK: Grievance ID sequence scanning is year-aware
+`getNextGrievanceId()` scans only current-year IDs (GRV-YYYY-NNNN format). Rolls over correctly on January 1.
 
 ---
 
-### Glow-bar Animation (v4.25.14)
+## ⚡ DevMenu.gs — Dev-Only Quick Deploy Menu (v4.27.0)
 
-**File:** `src/styles.html` — `.glow-bar` + `@keyframes glowSweep`
+**File:** `src/DevMenu.gs` (dev build only, excluded from `--prod` via `PROD_EXCLUDE` in `build.js`)
 
-Decorative 3px status stripe on grievance cards. Previously static. Now animates with a sweep (bright peak travels left→right over 2.5s), matching skeleton shimmer language.
+**Purpose:** Consolidated "⚡ Dev Tools" menu providing one-click access to all initialization, refresh, trigger, and setup functions. Adds a top-level menu to the spreadsheet UI in dev builds only.
 
-```css
-@keyframes glowSweep {
-  0%   { background-position: -300px 0; }
-  100% { background-position:  300px 0; }
-}
-```
+**Build Gating:**
+- `build.js` `PROD_EXCLUDE` array includes `DevMenu.gs`
+- `onOpen()` in `10_Main.gs` uses `typeof buildDevMenu === 'function'` guard
+- Production builds never reference or load this file
 
-**Compatibility:** Uses 3-stop `linear-gradient` + `background-size` only. No `color-mix()` — compatible with Chrome 49+, Safari 10+, Firefox 52+.
+**Architecture:**
+- `buildDevMenu()` — creates the menu (called from `onOpen`)
+- `runDevGroup_(groupName, items)` — shared helper for master group actions
+- `devRunAll_*()` — 4 master "run all" buttons
+- `devWrap_(label, fn)` — shared helper for individual wrappers
+- `devWrap_*()` — 27 named wrapper functions (required by GAS string-based menu refs)
 
-**Variants:** `.glow-bar.warning` / `.glow-bar.danger` / `.glow-bar.success` / `.glow-bar.info`
+### Menu Item → Function Map
 
-**Deferred:** Alternative animation options (pulse, breathe) were previewed and noted in `TODO.md` for future review.
+| # | Menu Label | Grp | Underlying Function | Source File | Line |
+|---|-----------|-----|---------------------|-------------|------|
+| 1 | Initialize All Trigger Functions | 1 | `menuInstallSurveyTriggers` | `08e_SurveyEngine.gs` | 851 |
+| 2 | Initialize All Sync Functions | 1 | `syncAllData` | `09_Dashboards.gs` | 1921 |
+| 3 | Initialize All Install Functions | 1 | `initializeDashboard` | `10_Main.gs` | 1066 |
+| 4 | Initialize All Refresh Functions | 1 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
+| 5 | Initialize Survey Engine | 1 | `initSurveyEngine` | `08e_SurveyEngine.gs` | 21 |
+| 6 | Initialize Poll Sheets | 1 | `wqInitSheets` | `24_WeeklyQuestions.gs` | 553 |
+| 7 | Workload: Initialize Sheets | 1 | `initWorkloadTrackerSheets` | `25_WorkloadService.gs` | 1131 |
+| 8 | Sync All Data Now | 2 | `syncAllData` | `09_Dashboards.gs` | 1921 |
+| 9 | Run Bulk Validation | 2 | `runBulkValidation` | `07_DevTools.gs` | 3446 |
+| 10 | Force Global Refresh | 2 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
+| 11 | Refresh All Formulas | 2 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
+| 12 | Refresh All Member Data | 2 | `refreshMemberDirectoryFormulas` | `10c_FormHandlers.gs` | 210 |
+| 13 | Refresh View | 2 | `refreshMemberView` | `11_CommandHub.gs` | 315 |
+| 14 | Backfill Minutes | 2 | `BACKFILL_MINUTES_DRIVE_DOCS` | `21_WebDashDataService.gs` | 3255 |
+| 15 | Warm Up All Caches | 2 | `warmUpCaches` | `06_Maintenance.gs` | 741 |
+| 16 | Install All Survey Triggers | 3 | `menuInstallSurveyTriggers` | `08e_SurveyEngine.gs` | 851 |
+| 17 | Install Quarterly Trigger | 3 | `setupQuarterlyTrigger` | `08e_SurveyEngine.gs` | 455 |
+| 18 | Install Weekly Reminder Trigger | 3 | `setupWeeklyReminderTrigger` | `08e_SurveyEngine.gs` | 740 |
+| 19 | Install Community Poll Draw Trigger | 3 | `setupCommunityPollTrigger` | `24_WeeklyQuestions.gs` | 658 |
+| 20 | Workload: Setup Reminders | 3 | `setupWorkloadReminderSystem` | `25_WorkloadService.gs` | 1139 |
+| 21 | Install onOpen Deferred Trigger | 3 | `setupOpenDeferredTrigger` | `08e_SurveyEngine.gs` | 882 |
+| 22 | Enable Midnight Auto-Refresh | 4 | `setupMidnightTrigger` | `04d_ExecutiveDashboard.gs` | 342 |
+| 23 | Enable 1 AM Dashboard Refresh | 4 | `createAutomationTriggers` | `04d_ExecutiveDashboard.gs` | 318 |
+| 24 | Setup Weekly Backup | 4 | `setupWeeklySnapshotTrigger` | `06_Maintenance.gs` | 1794 |
+| 25 | Setup Union Events Calendar | 4 | `SETUP_CALENDAR` | `05_Integrations.gs` | 4001 |
+| 26 | Setup / Repair Drive | 4 | `SETUP_DRIVE_FOLDERS` | `05_Integrations.gs` | 3982 |
+| 27 | Create Meeting Check-In | 4 | `setupMeetingCheckInSheet` | `10a_SheetCreation.gs` | 1752 |
+
+**Master Buttons:** Each runs all items in its group sequentially with per-item try/catch and a single summary alert.
+- ⚙️ Initialize All → Group 1 (7 items)
+- 🔄 Refresh All → Group 2 (8 items)
+- 📦 Install All Triggers → Group 3 (6 items)
+- 🗓️ Setup All Scheduled → Group 4 (6 items)
 
 
 ---
 
-## 🎨 UI SYSTEM LOG — 2026-03-13 (Per-View Skeletons + Nav Progress Bar)
+## v4.29.0 — Notifications Tab Fixes (2026-03-14)
 
-### Per-View Skeleton Shapes (v4.25.15)
+### Changes Made
+| # | File | Fix | Details |
+|---|------|-----|---------|
+| 1 | `steward_view.html` | Bug: Steward inbox missing "Auto-expires" badge on Timed notifications | Added `if (n.dismissMode === 'Timed')` badge block to `_renderNotifInbox` to match member view. Stewards retain dismiss button by design. |
+| 2 | `steward_view.html` | Bug: Archive pill DOM mutation silently no-ops | Replaced chained `querySelector` with single captured `statusPill` variable — prevents null-chain silent failure after `textContent` changes. |
+| 3 | `05_Integrations.gs` + `steward_view.html` | Security: `getNotificationRecipientListFull` had no auth gate | Added `checkWebAppAuthorization('steward', sessionToken)` guard. Updated function signature to accept `sessionToken`. Frontend compose call updated to pass `SESSION_TOKEN`. |
+| 4 | `08c_FormsAndNotifications.gs` | Dead code: EventBus.emit in GAS time-based triggers | Removed both `EventBus.emit` blocks from `checkDeadlinesAndNotify_()` and `sendStewardDeadlineAlerts()`. EventBus is client-side only — these blocks never executed. |
+| 5 | `05_Integrations.gs` | Dead code: `getNotificationRecipientList` | Removed — superseded by `getNotificationRecipientListFull`. No callers. |
+| 6 | `member_view.html` + `steward_view.html` | UX: Bell badge does not clear when notifications tab is opened | Added mark-all-read on tab open: `AppState.notificationCount = 0` + badge DOM update at entry of `renderMemberNotifications` and `renderStewardNotifications`. Steward bell preserves `qaUnansweredCount` portion. |
 
-Two new `showLoading()` variants added. All 34 call sites across `steward_view.html` and `member_view.html` now use explicit variants.
-
-#### Variant Map
-
-| Variant | CSS Class | Shape | Used For |
-|---------|-----------|-------|----------|
-| `'member-list'` | `.loading-member-list` | Avatar circle + name line + meta line + chevron | Member directory, steward directory, steward list |
-| `'grievance'` | `.loading-grievance` | Glow-bar + label + title + id + deadline box | Past cases list, member grievance section |
-| `'kpi'` | `.loading-kpi` | 4 wide skeleton cards in a row | Dashboard init, stats pages, insights |
-| `'form'` | `.loading-form` | Alternating label/input rows | Profile edit, survey form |
-| `'list'` | `.loading-list` | Full-width rows (44px height) | Notification list, task list, minutes, poll history |
-| *(default)* | `.loading-spinner` | Mixed card + row | Fallback only — avoid if a specific variant fits |
-
-#### CSS Location
-`src/styles.html` — search for `member-list skeleton` and `grievance skeleton` comments.
-
-#### Design Details — `member-list`
-Matches `.member-list-item` exactly: 36px avatar circle, name (12px, varied widths), meta (9px), chevron (7×12px stub). 5 rows with staggered shimmer delays (0/0.15/0.30/0.45/0.60s) and varied name widths (55/42/61/35/50%) to avoid mechanical repetition. Full light-mode support.
-
-#### Design Details — `grievance`
-Matches `renderGrievanceCard()` exactly: 3px glow-bar strip at top, label (9px), step title (16px), id/date (9px), deadline box (44px with label + number stubs). 2 cards rendered, second card shimmer offset by 0.3s.
-
-#### ⚠️ RULE: Always pass a variant to showLoading()
-`showLoading(container)` with no variant is a fallback — it renders a generic mixed layout.
-Always use the most specific variant for the content that will replace it.
-
----
-
-### Nav Progress Bar (v4.25.15)
-
-YouTube-style thin top-of-screen bar that fires on every tab navigation.
-
-#### How it works
-1. `_handleTabNav()` calls `_navProgressStart()` at the very top (before any render)
-2. Bar animates 0% → 85% and holds (cubic-bezier, 350ms)
-3. After switch block completes, `_navProgressDone()` is called
-4. Bar snaps to 100%, then fades out over 180ms + 320ms
-
-#### Files changed
-- `src/styles.html` — `#nav-progress` CSS + `@media prefers-reduced-motion`
-- `src/index.html` — `<div id="nav-progress">` in body, `_navProgressStart()` / `_navProgressDone()` functions, hooks in `_handleTabNav()`
-
-#### CSS Details
-```
-height: 2px; z-index: 300 (above modal at 200)
-background: var(--accent)
-box-shadow: 0 0 8px var(--accent) — subtle glow
-border-radius: 0 1px 1px 0 — tapered right edge
-transition: width 0.35s cubic-bezier(0.1, 0.6, 0.4, 1)
-```
-
-#### ⚠️ RULE: Never call _navProgressStart() without _navProgressDone()
-Every early-return path in `_handleTabNav()` must call `_navProgressDone()` before returning.
-If a new early-return is added in the future, always add `_navProgressDone()` on that path.
-
-#### Reduced motion
-`@media (prefers-reduced-motion: reduce)` disables width animation — bar still flashes briefly at full opacity then fades, giving feedback without motion.
-
----
-
-### File Moves (v4.25.14+)
-- `preview-loading-indicators.html` moved from repo root → `dev-tools/`
-- Root is now clean of dev/preview files
-
+### Notification System Reference
+- **Sheet**: `Notifications` (13 cols via `NOTIFICATIONS_HEADER_MAP_`)
+- **Schema**: Notification_ID, Recipient, Type, Title, Message, Priority, Sent_By, Sent_By_Name, Created_Date, Expires_Date, Dismissed_By, Status, Dismiss_Mode
+- **Dismiss modes**: `Dismissible` (member can permanently close) | `Timed` (auto-expires, no dismiss for members, stewards can still dismiss)
+- **Backend functions** (`05_Integrations.gs`): `getWebAppNotifications`, `getWebAppNotificationCount`, `dismissWebAppNotification`, `sendWebAppNotification`, `getAllWebAppNotifications`, `archiveWebAppNotification`, `getNotificationRecipientListFull` (steward-auth-gated)
+- **Bell badge**: Built from `AppState.notificationCount` (from batch preload) + `qaUnansweredCount` (steward only). Zeroed on notifications tab open.
+- **Priority sort**: Urgent always floats to top (reverse-then-sort, v4.22.0 fix).

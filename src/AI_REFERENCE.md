@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `REDACTED_DDS_SCRIPT_ID`
+**DDS Apps Script ID:** `[REDACTED]`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -3116,3 +3116,25 @@ Priority: Member ID > Email > Name. Returns first high-confidence match. Does no
 - 📦 Install All Triggers → Group 3 (6 items)
 - 🗓️ Setup All Scheduled → Group 4 (6 items)
 
+
+---
+
+## v4.29.0 — Notifications Tab Fixes (2026-03-14)
+
+### Changes Made
+| # | File | Fix | Details |
+|---|------|-----|---------|
+| 1 | `steward_view.html` | Bug: Steward inbox missing "Auto-expires" badge on Timed notifications | Added `if (n.dismissMode === 'Timed')` badge block to `_renderNotifInbox` to match member view. Stewards retain dismiss button by design. |
+| 2 | `steward_view.html` | Bug: Archive pill DOM mutation silently no-ops | Replaced chained `querySelector` with single captured `statusPill` variable — prevents null-chain silent failure after `textContent` changes. |
+| 3 | `05_Integrations.gs` + `steward_view.html` | Security: `getNotificationRecipientListFull` had no auth gate | Added `checkWebAppAuthorization('steward', sessionToken)` guard. Updated function signature to accept `sessionToken`. Frontend compose call updated to pass `SESSION_TOKEN`. |
+| 4 | `08c_FormsAndNotifications.gs` | Dead code: EventBus.emit in GAS time-based triggers | Removed both `EventBus.emit` blocks from `checkDeadlinesAndNotify_()` and `sendStewardDeadlineAlerts()`. EventBus is client-side only — these blocks never executed. |
+| 5 | `05_Integrations.gs` | Dead code: `getNotificationRecipientList` | Removed — superseded by `getNotificationRecipientListFull`. No callers. |
+| 6 | `member_view.html` + `steward_view.html` | UX: Bell badge does not clear when notifications tab is opened | Added mark-all-read on tab open: `AppState.notificationCount = 0` + badge DOM update at entry of `renderMemberNotifications` and `renderStewardNotifications`. Steward bell preserves `qaUnansweredCount` portion. |
+
+### Notification System Reference
+- **Sheet**: `Notifications` (13 cols via `NOTIFICATIONS_HEADER_MAP_`)
+- **Schema**: Notification_ID, Recipient, Type, Title, Message, Priority, Sent_By, Sent_By_Name, Created_Date, Expires_Date, Dismissed_By, Status, Dismiss_Mode
+- **Dismiss modes**: `Dismissible` (member can permanently close) | `Timed` (auto-expires, no dismiss for members, stewards can still dismiss)
+- **Backend functions** (`05_Integrations.gs`): `getWebAppNotifications`, `getWebAppNotificationCount`, `dismissWebAppNotification`, `sendWebAppNotification`, `getAllWebAppNotifications`, `archiveWebAppNotification`, `getNotificationRecipientListFull` (steward-auth-gated)
+- **Bell badge**: Built from `AppState.notificationCount` (from batch preload) + `qaUnansweredCount` (steward only). Zeroed on notifications tab open.
+- **Priority sort**: Urgent always floats to top (reverse-then-sort, v4.22.0 fix).
