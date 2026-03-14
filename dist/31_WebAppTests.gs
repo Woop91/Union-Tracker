@@ -659,6 +659,15 @@ function test_failsafe_ensureAllSheetsExists() {
  * Covers ALL web app callable functions across all modules.
  * ======================================================================== */
 
+function test_endpoints_thisBindingCanary() {
+  // Canary: verifies `this` inside test functions references the global scope.
+  // If this fails, TestRunner is calling test functions with wrong `this` binding
+  // (e.g., test.fn() method call instead of indirect call), which breaks all
+  // this[fnName] dynamic lookups in this suite.
+  TestRunner.assertEquals('function', typeof this['TestRunner'],
+    'this references global scope (canary)');
+}
+
 function test_endpoints_coreGrievanceFnsExist() {
   var fns = [
     'dataGetStewardCases', 'dataGetStewardKPIs',

@@ -272,7 +272,8 @@ var TestRunner = (function () {
         var testResult = { name: test.name, passed: false, error: null, duration: 0 };
 
         try {
-          test.fn();
+          var testFn_ = test.fn;
+          testFn_();
           testResult.passed = true;
           suiteResult.passed++;
         } catch (err) {
@@ -918,6 +919,7 @@ function _getTestRegistry() {
     { name: 'test_failsafe_ensureAllSheetsExists',         fn: test_failsafe_ensureAllSheetsExists },
 
     // ── endpoints suite (Comprehensive data* wrapper existence & auth) ──
+    { name: 'test_endpoints_thisBindingCanary',            fn: test_endpoints_thisBindingCanary },
     { name: 'test_endpoints_coreGrievanceFnsExist',        fn: test_endpoints_coreGrievanceFnsExist },
     { name: 'test_endpoints_taskFnsExist',                 fn: test_endpoints_taskFnsExist },
     { name: 'test_endpoints_surveyFeedbackFnsExist',       fn: test_endpoints_surveyFeedbackFnsExist },

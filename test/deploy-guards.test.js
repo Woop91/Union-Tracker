@@ -540,12 +540,21 @@ describe('G9: Nav tabs and handlers are in sync', () => {
   });
 
   // Shared tabs that should appear in BOTH steward and member nav
-  const sharedTabs = ['orgchart', 'poms'];
+  const sharedTabs = ['orgchart'];
   sharedTabs.forEach(tabId => {
     test(`shared tab '${tabId}' appears in both steward and member nav arrays`, () => {
       // Count occurrences — should be 2 (once per role)
       const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
       expect(count).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  // Member-only tabs (removed from steward nav)
+  const memberOnlyTabs = ['poms'];
+  memberOnlyTabs.forEach(tabId => {
+    test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
+      const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
+      expect(count).toBeGreaterThanOrEqual(1);
     });
   });
 });

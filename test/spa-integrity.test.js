@@ -155,6 +155,7 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
       renderStewardMinutes: ['minutes'],
       renderStewardDirectoryPage: ['stewarddirectory'],
       renderTimelinePage: ['timeline'],
+      renderStewardTimelinePage: ['timeline'],
       renderFeedbackPage: ['feedback'],
       renderFailsafePage: ['failsafe'],
       renderTestRunnerPage: ['testrunner'],

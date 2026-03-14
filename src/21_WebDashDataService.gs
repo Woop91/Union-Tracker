@@ -1980,7 +1980,7 @@ var DataService = (function () {
     var byCategory = {};
     var monthly = {};
     var monthlyResolved = {};
-    var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0;
+    var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0, withdrawnCount = 0;
     var overdueCount = 0, dueSoonCount = 0;
     for (var i = 1; i < data.length; i++) {
       try {
@@ -1997,7 +1997,8 @@ var DataService = (function () {
       if (s === 'won') wonCount++;
       else if (s === 'denied') deniedCount++;
       else if (s === 'settled') settledCount++;
-      else if (s !== 'resolved' && s !== 'withdrawn' && s !== 'closed') openCount++;
+      else if (s === 'withdrawn') withdrawnCount++;
+      else if (s !== 'resolved' && s !== 'closed') openCount++;
       // Deadline-based counts for org KPI cards
       if (s === 'overdue') {
         overdueCount++;
@@ -2032,7 +2033,7 @@ var DataService = (function () {
       available: true, total: total,
       byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory,
       monthly: monthlyArr, monthlyResolved: monthlyResolvedArr,
-      openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount,
+      openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount, withdrawnCount: withdrawnCount,
       overdueCount: overdueCount, dueSoonCount: dueSoonCount,
     };
   }
@@ -2075,6 +2076,11 @@ var DataService = (function () {
     var byUnit = {};
     var byLocation = {};
     var byDues = {};
+    var byHireMonth = {};
+    var newMembersLast90 = 0;
+    var now = new Date();
+    var ninetyDaysAgo = now.getTime() - 90 * 24 * 60 * 60 * 1000;
+    var twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
       var unit = rec.unit || 'Unknown';
@@ -2083,8 +2089,19 @@ var DataService = (function () {
       byLocation[loc] = (byLocation[loc] || 0) + 1;
       var dues = rec.duesStatus || 'Unknown';
       byDues[dues] = (byDues[dues] || 0) + 1;
+      // Hire date tracking
+      if (rec.hireDate) {
+        var hd = new Date(rec.hireDate);
+        if (!isNaN(hd.getTime())) {
+          if (hd.getTime() >= ninetyDaysAgo) newMembersLast90++;
+          if (hd.getTime() >= twelveMonthsAgo.getTime()) {
+            var hKey = hd.getFullYear() + '-' + ('0' + (hd.getMonth() + 1)).slice(-2);
+            byHireMonth[hKey] = (byHireMonth[hKey] || 0) + 1;
+          }
+        }
+      }
     }
-    return { available: true, total: total, byUnit: byUnit, byLocation: byLocation, byDues: byDues };
+    return { available: true, total: total, byUnit: byUnit, byLocation: byLocation, byDues: byDues, newMembersLast90: newMembersLast90, byHireMonth: byHireMonth };
   }
 
   // ═══════════════════════════════════════

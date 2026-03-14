@@ -287,14 +287,16 @@ describe('DataService.getGrievanceStats', () => {
     });
   });
 
-  test('returns summary counts (wonCount, deniedCount, settledCount)', () => {
+  test('returns summary counts (wonCount, deniedCount, settledCount, withdrawnCount)', () => {
     const stats = DataService.getGrievanceStats();
     expect(typeof stats.wonCount).toBe('number');
     expect(typeof stats.deniedCount).toBe('number');
     expect(typeof stats.settledCount).toBe('number');
+    expect(typeof stats.withdrawnCount).toBe('number');
     expect(stats.wonCount).toBe(3);
     expect(stats.deniedCount).toBe(1);
     expect(stats.settledCount).toBe(2);
+    expect(stats.withdrawnCount).toBe(0);
   });
 
   test('byStep counts are accurate', () => {
@@ -980,12 +982,14 @@ describe('getGrievanceStats return shape contract', () => {
     expect(stats).toHaveProperty('dueSoonCount');
     expect(stats).toHaveProperty('settledCount');
     expect(stats).toHaveProperty('wonCount');
+    expect(stats).toHaveProperty('withdrawnCount');
     // Type checks
     expect(typeof stats.total).toBe('number');
     expect(typeof stats.overdueCount).toBe('number');
     expect(typeof stats.dueSoonCount).toBe('number');
     expect(typeof stats.settledCount).toBe('number');
     expect(typeof stats.wonCount).toBe('number');
+    expect(typeof stats.withdrawnCount).toBe('number');
   });
 
   test('when available: false, does NOT include data keys', () => {
@@ -1001,6 +1005,50 @@ describe('getGrievanceStats return shape contract', () => {
     expect(stats.available).toBe(false);
     // When unavailable, frontend checks !stats.available and shows fallback
     // No data keys required — but must not throw
+  });
+});
+
+
+// ============================================================================
+// getMembershipStats return shape contract
+// ============================================================================
+
+describe('getMembershipStats return shape', () => {
+  beforeEach(() => {
+    if (DataService._invalidateSheetCache) {
+      DataService._invalidateSheetCache(SHEETS.MEMBER_DIR || 'Member Directory');
+    }
+    // Need 20+ members to pass threshold
+    const headers = ['Email', 'Name', 'First Name', 'Last Name', 'Role', 'Unit', 'Phone', 'Hire Date', 'Dues Status', 'Member ID', 'Work Location'];
+    const rows = [];
+    for (let i = 1; i <= 25; i++) {
+      const hireDate = i <= 5 ? new Date(Date.now() - (i * 10) * 24 * 60 * 60 * 1000) : new Date('2024-01-' + String(i).padStart(2, '0'));
+      rows.push(['m' + i + '@test.com', 'Member ' + i, 'M', String(i), 'Member', i <= 15 ? 'Unit A' : 'Unit B', '', hireDate, i <= 20 ? 'Active' : 'Inactive', 'MEM-' + i, i <= 10 ? 'HQ' : 'Remote']);
+    }
+    const data = [headers, ...rows];
+    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', data);
+    const mockSS = createMockSpreadsheet([memberSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
+  });
+
+  test('includes newMembersLast90 and byHireMonth when available', () => {
+    const ms = DataService.getMembershipStats();
+    expect(ms.available).toBe(true);
+    expect(ms.total).toBe(25);
+    expect(ms).toHaveProperty('newMembersLast90');
+    expect(ms).toHaveProperty('byHireMonth');
+    expect(typeof ms.newMembersLast90).toBe('number');
+    expect(ms.newMembersLast90).toBeGreaterThanOrEqual(0);
+    expect(typeof ms.byHireMonth).toBe('object');
+  });
+
+  test('includes byUnit, byLocation, byDues', () => {
+    const ms = DataService.getMembershipStats();
+    expect(ms).toHaveProperty('byUnit');
+    expect(ms).toHaveProperty('byLocation');
+    expect(ms).toHaveProperty('byDues');
+    expect(ms.byUnit['Unit A']).toBe(15);
+    expect(ms.byUnit['Unit B']).toBe(10);
   });
 });
 

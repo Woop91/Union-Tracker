@@ -207,7 +207,7 @@ describe('A1: Build order integrity', () => {
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
     '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_Migrations.gs', '30_TestRunner.gs',
-    '31_WebAppTests.gs'
+    '31_WebAppTests.gs', 'DevMenu.gs'
   ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {
@@ -1081,6 +1081,65 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
         expect(window).toContain('DataService.');
       });
     });
+});
+
+/* ========================================================================
+ * A19: TestRunner invocation safety — prevent this-binding regressions
+ *
+ * When TestRunner calls test functions as test.fn(), `this` inside the
+ * function is the registry entry object, NOT the global scope.  Tests that
+ * use `typeof this[fnName]` to check for globals silently get "undefined".
+ *
+ * Guard 1: runAll must NOT call test functions as method calls (test.fn()).
+ *          It must use an indirect call so `this` is the global object.
+ * Guard 2: Any this[...] usage in 31_WebAppTests.gs is counted and tracked
+ *          so new additions trigger a review.
+ * ======================================================================== */
+
+describe('A19: TestRunner invocation safety (this-binding)', () => {
+  const runnerSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '30_TestRunner.gs'), 'utf8'
+  );
+  const testsSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '31_WebAppTests.gs'), 'utf8'
+  );
+
+  test('runAll does not call test functions via method call (test.fn())', () => {
+    // The dangerous pattern: test.fn() — sets this to registry entry, not global scope.
+    // Safe patterns: var f = test.fn; f();  OR  test.fn.call(globalThis);
+    const dangerous = /\btest\.fn\s*\(/;
+    const match = runnerSrc.match(dangerous);
+    expect(match).toBeNull();
+  });
+
+  test('runAll uses indirect call pattern for test function invocation', () => {
+    // Verify the safe indirect-call pattern exists: extract fn to local var, then call
+    // Matches patterns like: var testFn_ = test.fn; testFn_();
+    //                    or: var fn = test.fn; fn();
+    //                    or: test.fn.call(
+    const indirectPatterns = [
+      /=\s*test\.fn\b/,            // assignment to local var (var x = test.fn)
+      /test\.fn\.call\s*\(/,       // explicit .call() binding
+      /test\.fn\.apply\s*\(/,      // explicit .apply() binding
+    ];
+    const hasIndirect = indirectPatterns.some(p => p.test(runnerSrc));
+    expect(hasIndirect).toBe(true);
+  });
+
+  test('this[...] usage count in 31_WebAppTests.gs is tracked (no silent growth)', () => {
+    // Count all this[...] references — if new ones are added without updating
+    // this threshold, the test fails to prompt a review.
+    const thisRefs = (testsSrc.match(/\bthis\[/g) || []);
+    // Current known count: 18 (14 assertEquals + 1 apply + 2 in grievanceDraftFnsExist + 1 canary)
+    // If this number changes, the developer must verify the runner provides correct this-binding.
+    expect(thisRefs.length).toBeLessThanOrEqual(18);
+    expect(thisRefs.length).toBeGreaterThanOrEqual(12); // catch accidental removal
+  });
+
+  test('test files using this[...] have a canary test verifying this-binding', () => {
+    // 31_WebAppTests.gs must include a canary test that validates this === global scope
+    expect(testsSrc).toContain('test_endpoints_thisBindingCanary');
+  });
 });
 
 describe('A15: Catch blocks in web app files do not cascade', () => {

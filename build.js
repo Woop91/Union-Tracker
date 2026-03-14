@@ -7,12 +7,13 @@
  *
  * Usage:
  *   node build.js           - Build (includes all files)
- *   node build.js --prod    - Production build (excludes DevTools.gs)
+ *   node build.js --prod    - Production build (excludes dev-only files)
  *   node build.js --clean   - Clean dist directory
  *
  * Production builds (--prod or --production):
  *   Excludes development/test files that should not be deployed:
  *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
+ *   - DevMenu.gs (dev-only quick deploy menu, guarded by typeof in onOpen)
  */
 
 const fs = require('fs');
@@ -69,6 +70,7 @@ const BUILD_ORDER = [
   '29_Migrations.gs',
   '30_TestRunner.gs',
   '31_WebAppTests.gs',
+  'DevMenu.gs',
 ];
 
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)
@@ -218,7 +220,7 @@ const shouldClean = args.includes('--clean');
 const isProd = args.includes('--prod') || args.includes('--production');
 
 // Files to exclude in production builds
-const PROD_EXCLUDE = ['07_DevTools.gs'];
+const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs'];
 
 if (shouldClean) {
   clean();

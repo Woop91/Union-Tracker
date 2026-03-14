@@ -46,6 +46,7 @@ function onOpen() {
     // Clear memoized caches so fresh config values are picked up
     if (typeof _systemNameCache_ !== 'undefined') _systemNameCache_ = null;
     createDashboardMenu();
+    if (typeof buildDevMenu === 'function') buildDevMenu();
   } catch (error) {
     console.error('Error in onOpen:', error);
   }

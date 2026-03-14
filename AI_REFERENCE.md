@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED-DDS-SCRIPT-ID]`
+**DDS Apps Script ID:** `REDACTED_DDS_SCRIPT_ID`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -3230,3 +3230,152 @@ Source: MA DOC Grievance Policy 270.03 for Bargaining Units 8 & 10 (July 2025).
 ### Action Required
 - [ ] **Re-seed Config sheet** with correct Article 23 deadline values (30, 10, 30, 30)
 - [ ] **Run `auditAndRemoveSatisfactionTrigger()`** once to clean stale trigger
+
+---
+
+## 🗓️ TIMELINE TAB — FULL REBUILD — 2026-03-13 (v4.26.0)
+
+### Context
+Timeline tab reviewed and rebuilt. Original implementation had hardcoded category arrays, no edit UI, no delete confirmation, no description expand, year filter capped at 5 years, and raw Drive ID input.
+
+### Architecture
+| File | Role |
+|------|------|
+| `src/27_TimelineService.gs` | Backend IIFE — CRUD, calendar import, Drive integration |
+| `src/member_view.html` | `renderTimelinePage()` — single definition, shared by both roles |
+| `src/styles.html` | CSS: `.timeline-container`, `.category-badge.*` |
+| Sheet: `_Timeline_Events` | 12-col event records (hidden) |
+| Sheet: `_Timeline_Categories` | 1-col steward-managed category list (hidden) |
+
+### Changes Applied
+
+| ID | Change | File |
+|----|--------|------|
+| TL-01 | Added `SHEETS.TIMELINE_CATEGORIES = '_Timeline_Categories'` | `01_Core.gs` L786 |
+| TL-02 | `_initCategorySheet()` — creates hidden sheet with 6 default categories | `27_TimelineService.gs` |
+| TL-03 | `getCategories()` — reads live from sheet, falls back to defaults | `27_TimelineService.gs` |
+| TL-04 | `addCategory(stewardEmail, category)` — validates, deduplicates, audits | `27_TimelineService.gs` |
+| TL-05 | `deleteCategory(stewardEmail, category)` — row delete + audit | `27_TimelineService.gs` |
+| TL-06 | `getTimelineYears()` — scans col C, returns distinct years descending, **no cap** | `27_TimelineService.gs` |
+| TL-07 | `addTimelineEvent` now validates category against sheet data dynamically | `27_TimelineService.gs` |
+| TL-08 | New global wrappers: `tlGetCategories`, `tlGetTimelineYears`, `tlAddCategory`, `tlDeleteCategory` | `27_TimelineService.gs` |
+| TL-09 | `renderTimelinePage`: year filter built from `tlGetTimelineYears` (all years) | `member_view.html` |
+| TL-10 | `renderTimelinePage`: category filter built from `tlGetCategories` (dynamic) | `member_view.html` |
+| TL-11 | Drive file input: `parseDriveIds()` regex accepts share URLs + raw IDs | `member_view.html` |
+| TL-12 | Inline Edit form per event card (steward only) — wires `tlUpdateTimelineEvent` | `member_view.html` |
+| TL-13 | Delete button requires `confirm()` dialog before firing | `member_view.html` |
+| TL-14 | Description truncated at 200 chars with Show more/less toggle | `member_view.html` |
+| TL-15 | Load More button with remaining count for pagination | `member_view.html` |
+| TL-16 | Categories management sub-tab (steward only): list, add, remove | `member_view.html` |
+| TL-17 | `cachedCategories` shared across sub-tabs to avoid duplicate server calls | `member_view.html` |
+
+### ⚠️ IMPORTANT: Run `tlInitSheets()` once after deploy
+This creates `_Timeline_Categories` on existing installations. Non-destructive.
+Can be triggered from Dev Tools → Initialize Sheets, or Admin menu.
+
+### Drive URL Parsing (TL-11)
+`parseDriveIds(raw)` handles:
+- `https://drive.google.com/file/d/FILE_ID/view`
+- `https://docs.google.com/document/d/FILE_ID/edit`
+- `https://docs.google.com/spreadsheets/d/FILE_ID/edit`
+- Raw file IDs (20+ alphanumeric chars)
+- Multiple entries (newline or comma separated)
+
+### Access Control
+- `tlGetCategories`, `tlGetTimelineYears`, `tlGetTimelineEvents` — any authenticated user (member or steward)
+- All write wrappers (`tlAddCategory`, `tlDeleteCategory`, `tlAddTimelineEvent`, `tlUpdateTimelineEvent`, `tlDeleteTimelineEvent`, `tlImportCalendarEvents`) — steward auth required via `_requireStewardAuth`
+
+### ⚠️ CORE RULES REMINDER (applies to all future timeline work)
+- Categories MUST be read from `_Timeline_Categories` sheet — NEVER hardcode them
+- Year filter MUST be built from actual event dates — NEVER cap at a fixed range
+- Event data validation MUST read valid categories from sheet dynamically
+
+---
+
+## 🔀 TIMELINE FUNCTION SPLIT — 2026-03-13 (v4.26.1)
+
+### Decision
+Per Q2 answer: steward timeline must have its own separate function definition.
+
+### Architecture (final)
+| Function | File | Role | Access |
+|----------|------|------|--------|
+| `renderStewardTimelinePage(appContainer)` | `steward_view.html` | Full write UI | Stewards only |
+| `renderMemberTimelinePage(appContainer)` | `member_view.html` | View-only | All members |
+
+### Routing (index.html)
+```
+steward switch → case 'timeline': renderStewardTimelinePage(app)
+member switch  → case 'timeline': renderMemberTimelinePage(app)
+```
+
+### Why load order matters
+`steward_view.html` is included BEFORE `member_view.html` in index.html.
+If both files define the same function name, the member_view version wins (last definition).
+Functions must use distinct names — never share a function name across both files.
+
+### ⚠️ RULE: Never define the same function name in both steward_view.html and member_view.html.
+
+---
+
+## 🗑️ WORKLOAD TRACKER REMOVED FROM STEWARD VIEW — 2026-03-13
+
+### Change
+Removed WorkloadTracker from the steward navigation and routing. Member view retains it.
+
+### Files modified
+| File | Lines changed | Action |
+|------|--------------|--------|
+| `src/index.html` | 1005, 1175 | Removed steward nav tab + steward switch case |
+
+### What was removed (steward only)
+- `_getSidebarTabs` steward array: `{ id: 'workload', icon: '📊', label: 'Workload Tracker' }`
+- Steward switch: `case 'workload': renderWorkloadTracker(app); break;`
+
+### What was NOT changed
+- Member sidebar still has workload tab (line ~1030)
+- Member switch still routes `case 'workload'` → `renderWorkloadTracker(app)` (line ~1144)
+- Color palette reference (`workload: '#f97316'`) retained — harmless
+- `src/25_WorkloadService.gs` and `renderWorkloadTracker()` function NOT deleted — still used by member view
+
+### ⚠️ RULE
+WorkloadTracker logic in `25_WorkloadService.gs` must NOT be deleted. It remains active for the member role. If adding typeof guards in UT repo, ensure they gate steward-only usage, not member usage.
+
+---
+
+## 🗑️ POMS REF + Q&A FORUM REMOVED FROM STEWARD VIEW — 2026-03-13
+
+### Change
+Removed POMS Ref and Q&A Forum from steward navigation and routing. Member view retains both.
+
+### Files modified
+| File | Change |
+|------|--------|
+| `src/index.html` | Steward nav: removed poms + qaforum tabs |
+| `src/index.html` | Shared POMS block: gated to `role === 'member'` only |
+| `src/index.html` | Steward switch: removed `case 'qaforum'` |
+
+### What was NOT changed
+- Member sidebar: poms + qaforum tabs intact
+- Member switch: both cases intact
+- `renderPOMSReference()` function untouched — still serves member role
+- `renderQAForum()` function untouched — still serves member role
+- Color palette refs (`poms`, `qaforum`) retained — harmless
+
+### ⚠️ NOTE: Bell count for Q&A
+`src/index.html` line ~876: steward bell count includes unanswered Q&A questions.
+If Q&A is fully retired from steward view, consider removing that count from the bell total.
+
+---
+
+## ↩️ Q&A FORUM RESTORED TO STEWARD VIEW — 2026-03-13
+
+### Change
+Q&A Forum was mistakenly removed from steward view and has been restored.
+
+### Current steward view state (as of this entry)
+| Feature | Steward | Member |
+|---------|---------|--------|
+| Workload Tracker | ❌ removed | ✅ |
+| POMS Ref | ❌ removed | ✅ |
+| Q&A Forum | ✅ restored | ✅ |

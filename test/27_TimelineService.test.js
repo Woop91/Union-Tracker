@@ -92,7 +92,9 @@ describe('TimelineService.initTimelineSheet', () => {
 
   test('does not recreate if sheet exists', () => {
     var existingSheet = buildTimelineSheet([]);
-    var ss = installSS(existingSheet);
+    var catSheet = createMockSheet(SHEETS.TIMELINE_CATEGORIES);
+    var ss = createMockSpreadsheet([existingSheet, catSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
     var result = TimelineService.initTimelineSheet();
 
     expect(ss.insertSheet).not.toHaveBeenCalled();
@@ -287,13 +289,13 @@ describe('TimelineService.addTimelineEvent', () => {
     expect(appendCall[4]).toBe('meeting');
   });
 
-  test('defaults invalid category to other', () => {
+  test('defaults invalid category to first valid category', () => {
     var sheet = buildTimelineSheet([]);
     installSS(sheet);
 
     TimelineService.addTimelineEvent('user@test.com', { title: 'Test', category: 'INVALID_CAT' });
     var appendCall = sheet.appendRow.mock.calls[0][0];
-    expect(appendCall[4]).toBe('other');
+    expect(appendCall[4]).toBe('meeting');
   });
 
   test('uses ScriptLock', () => {

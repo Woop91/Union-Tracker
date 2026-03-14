@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.27.1] - 2026-03-13
+
+### Changed
+- **Seed phase consolidation** — merged Phases 1+2 into single Phase 1 (Config + 500 members + 300 grievances + script owner); member count reduced from 1,000 to 500
+- Old Phase 3 (ancillary data) renumbered to Phase 2
+- `SEED_SAMPLE_DATA` orchestrator and confirmation dialogs updated for 3-phase layout
+
+### Added
+- **New Phase 3: Webapp extras** — seeds SPA features not covered by standard seed:
+  - `seedMemberTasksData()` — 8 sample member tasks (12-col schema, `Assignee Type = member`, `MT_SEED_` prefix)
+  - `seedCaseChecklistData()` — checklist items for up to 5 seeded grievances using `CHECKLIST_TEMPLATES`, with partial completion for realism
+  - `seedSurveyQuestionsData()` — delegates to existing `createSurveyQuestionsSheet()` (non-destructive on re-run)
+- Nuke cleanup for new seed data: member tasks (`MT_SEED_` prefix) and case checklist items (`CL-SEED-` prefix) removed during `NUKE_SEEDED_DATA`
+
+## [4.27.0] - 2026-03-13
+
+### Added
+- **Dev-Only Quick Deploy Menu** (`src/DevMenu.gs`) — consolidated "⚡ Dev Tools" top-level menu with 27 wrapped actions across 4 groups (Initialize, Refresh, Triggers, Scheduled) plus 4 master "run all" buttons with per-item error isolation and summary alerts
+- Build gating: `DevMenu.gs` added to `PROD_EXCLUDE` in `build.js`; `onOpen()` uses `typeof buildDevMenu === 'function'` guard so production builds are unaffected
+
+## [4.26.0] - 2026-03-13
+
+### Fixed
+- TestRunner controls card contrast — accent border, card background, stronger shadow for high visibility
+- Workload Archive sheet now detected by System Diagnostics (removed from skipKeys in DIAGNOSE_SETUP)
+- Repair Dashboard creates missing Workload Archive via existing setupHiddenSheets() path
+
+### Changed
+- Removed deprecated "Case Analytics" menu item (called deprecated showInteractiveDashboardTab → showStewardDashboard)
+
+### Added
+- **Quick Setup (All Init/Sync)** consolidated admin menu — groups all initialize, trigger, sync, refresh, and setup functions in one place for easy onboarding and system repair
+
+## [4.25.15] - 2026-03-13
+
+### Fixed
+- TestRunner controls card contrast in dark mode — replaced `--raised`/`--border` with `--surface`/`--muted`, increased shadow opacity
+
+### Changed
+- Survey Tracking default scope now 'location' (My Location) instead of 'assigned' (My Members) for proximity-first workflow
+- "Other Pending" survey section now collapsible (matches Completed section pattern)
+- Removed duplicate "Quick Setup & Sync" admin menu (~35 lines) — all items already exist in dedicated submenus
+- Removed duplicate "Force Global Refresh" from Automation menu (available in Appearance > Refresh All Visuals)
+- Survey member lists use Prev/Next pagination instead of "Show all" buttons
+
+### Added
+- "New Completed" stat card in survey participation stats — shows new member survey completion as fraction with color coding
+- "Declining" stat card now shows average participation rate of declining members
+- Proximity badge pills on nearby survey members: "Same Location", "Day Overlap", "Same Floor"
+- `_surveyPaginate()` helper for paginated survey member lists (20 per page)
+- `withdrawnCount` in `getGrievanceStats()` server-side — fixes missing count on Insights drill-down
+- `newMembersLast90` and `byHireMonth` in `getMembershipStats()` — enables new hire trend tracking
+- "OVERDUE CASES" insight card with due-this-week sub-text
+- "NEW MEMBERS" insight card (last 90 days) with monthly hire trend drill-down
+- Overtime average and employment mix (FT/PT ratio) cards in Workload Insights
+- Hash-based navigation for Insights detail views — browser back button returns to detail panel
+- `scrollIntoView` on insight detail open for mobile UX
+- Tests: `withdrawnCount` in grievance stats return shape contract, `getMembershipStats` return shape tests
+
 ## [4.25.13] - 2026-03-13
 
 ### Fixed

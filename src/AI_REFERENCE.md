@@ -36,7 +36,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED-DDS-SCRIPT-ID]`
+**DDS Apps Script ID:** `REDACTED_DDS_SCRIPT_ID`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -3057,4 +3057,62 @@ Priority: Member ID > Email > Name. Returns first high-confidence match. Does no
 
 ### ✅ CONFIRMED OK: Grievance ID sequence scanning is year-aware
 `getNextGrievanceId()` scans only current-year IDs (GRV-YYYY-NNNN format). Rolls over correctly on January 1.
+
+---
+
+## ⚡ DevMenu.gs — Dev-Only Quick Deploy Menu (v4.27.0)
+
+**File:** `src/DevMenu.gs` (dev build only, excluded from `--prod` via `PROD_EXCLUDE` in `build.js`)
+
+**Purpose:** Consolidated "⚡ Dev Tools" menu providing one-click access to all initialization, refresh, trigger, and setup functions. Adds a top-level menu to the spreadsheet UI in dev builds only.
+
+**Build Gating:**
+- `build.js` `PROD_EXCLUDE` array includes `DevMenu.gs`
+- `onOpen()` in `10_Main.gs` uses `typeof buildDevMenu === 'function'` guard
+- Production builds never reference or load this file
+
+**Architecture:**
+- `buildDevMenu()` — creates the menu (called from `onOpen`)
+- `runDevGroup_(groupName, items)` — shared helper for master group actions
+- `devRunAll_*()` — 4 master "run all" buttons
+- `devWrap_(label, fn)` — shared helper for individual wrappers
+- `devWrap_*()` — 27 named wrapper functions (required by GAS string-based menu refs)
+
+### Menu Item → Function Map
+
+| # | Menu Label | Grp | Underlying Function | Source File | Line |
+|---|-----------|-----|---------------------|-------------|------|
+| 1 | Initialize All Trigger Functions | 1 | `menuInstallSurveyTriggers` | `08e_SurveyEngine.gs` | 851 |
+| 2 | Initialize All Sync Functions | 1 | `syncAllData` | `09_Dashboards.gs` | 1921 |
+| 3 | Initialize All Install Functions | 1 | `initializeDashboard` | `10_Main.gs` | 1066 |
+| 4 | Initialize All Refresh Functions | 1 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
+| 5 | Initialize Survey Engine | 1 | `initSurveyEngine` | `08e_SurveyEngine.gs` | 21 |
+| 6 | Initialize Poll Sheets | 1 | `wqInitSheets` | `24_WeeklyQuestions.gs` | 553 |
+| 7 | Workload: Initialize Sheets | 1 | `initWorkloadTrackerSheets` | `25_WorkloadService.gs` | 1131 |
+| 8 | Sync All Data Now | 2 | `syncAllData` | `09_Dashboards.gs` | 1921 |
+| 9 | Run Bulk Validation | 2 | `runBulkValidation` | `07_DevTools.gs` | 3446 |
+| 10 | Force Global Refresh | 2 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
+| 11 | Refresh All Formulas | 2 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
+| 12 | Refresh All Member Data | 2 | `refreshMemberDirectoryFormulas` | `10c_FormHandlers.gs` | 210 |
+| 13 | Refresh View | 2 | `refreshMemberView` | `11_CommandHub.gs` | 315 |
+| 14 | Backfill Minutes | 2 | `BACKFILL_MINUTES_DRIVE_DOCS` | `21_WebDashDataService.gs` | 3255 |
+| 15 | Warm Up All Caches | 2 | `warmUpCaches` | `06_Maintenance.gs` | 741 |
+| 16 | Install All Survey Triggers | 3 | `menuInstallSurveyTriggers` | `08e_SurveyEngine.gs` | 851 |
+| 17 | Install Quarterly Trigger | 3 | `setupQuarterlyTrigger` | `08e_SurveyEngine.gs` | 455 |
+| 18 | Install Weekly Reminder Trigger | 3 | `setupWeeklyReminderTrigger` | `08e_SurveyEngine.gs` | 740 |
+| 19 | Install Community Poll Draw Trigger | 3 | `setupCommunityPollTrigger` | `24_WeeklyQuestions.gs` | 658 |
+| 20 | Workload: Setup Reminders | 3 | `setupWorkloadReminderSystem` | `25_WorkloadService.gs` | 1139 |
+| 21 | Install onOpen Deferred Trigger | 3 | `setupOpenDeferredTrigger` | `08e_SurveyEngine.gs` | 882 |
+| 22 | Enable Midnight Auto-Refresh | 4 | `setupMidnightTrigger` | `04d_ExecutiveDashboard.gs` | 342 |
+| 23 | Enable 1 AM Dashboard Refresh | 4 | `createAutomationTriggers` | `04d_ExecutiveDashboard.gs` | 318 |
+| 24 | Setup Weekly Backup | 4 | `setupWeeklySnapshotTrigger` | `06_Maintenance.gs` | 1794 |
+| 25 | Setup Union Events Calendar | 4 | `SETUP_CALENDAR` | `05_Integrations.gs` | 4001 |
+| 26 | Setup / Repair Drive | 4 | `SETUP_DRIVE_FOLDERS` | `05_Integrations.gs` | 3982 |
+| 27 | Create Meeting Check-In | 4 | `setupMeetingCheckInSheet` | `10a_SheetCreation.gs` | 1752 |
+
+**Master Buttons:** Each runs all items in its group sequentially with per-item try/catch and a single summary alert.
+- ⚙️ Initialize All → Group 1 (7 items)
+- 🔄 Refresh All → Group 2 (8 items)
+- 📦 Install All Triggers → Group 3 (6 items)
+- 🗓️ Setup All Scheduled → Group 4 (6 items)
 

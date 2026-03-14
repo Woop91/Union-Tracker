@@ -1530,7 +1530,7 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Messages and alerts', action: function() { renderMemberNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
       { icon: '\uD83E\uDD1D', label: 'My Meetings', desc: 'Your meeting attendance', action: function() { renderMeetingsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderMemberTimelinePage(document.getElementById('app')); } },
       { divider: true },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardContact(document.getElementById('app')); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
@@ -4952,78 +4952,70 @@ function renderQAForum(appContainer, role) {
 // TIMELINE PAGE (v4.17.0 — shared by both roles)
 // ═══════════════════════════════════════
 
-function renderTimelinePage(appContainer) {
-  var role = CURRENT_VIEW;
-  var isSteward = role === 'steward';
-  renderPageLayout(appContainer, role, 'timeline', function(container) {
-    if (!isSteward) _memberHeader(container, 'Timeline', 'Union events & milestones');
-    else container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Timeline')));
+function renderMemberTimelinePage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'timeline', function(container) {
+    _memberHeader(container, 'Timeline', 'Union events & milestones');
 
     var content = el('div', { className: 'content' });
-
-    var activeSubTab = 'timeline';
-    var subTabBar = el('div', { className: 'sub-tabs' });
-    var subContent = el('div');
     var filterYear = '';
     var filterCategory = '';
+    var currentPage = 1;
+    var PAGE_SIZE = 25;
+    var cachedCategories = [];
+    var cachedYears = [];
 
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      var tabs = [{ id: 'timeline', label: 'Timeline' }];
-      if (isSteward) {
-        tabs.push({ id: 'add', label: 'Add Event' });
-        tabs.push({ id: 'import', label: 'Import' });
-      }
-      tabs.forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
-          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderTLSubContent(); }
-        }, tab.label));
-      });
+    // ── Filter bar ────────────────────────────────────────────────────────
+    var filterBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' } });
+
+    var yearSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '100px' } });
+    yearSelect.appendChild(el('option', { value: '' }, 'All Years'));
+    yearSelect.addEventListener('change', function() { filterYear = yearSelect.value; currentPage = 1; _loadEvents(); });
+
+    var catSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '120px' } });
+    catSelect.appendChild(el('option', { value: '' }, 'All Categories'));
+    catSelect.addEventListener('change', function() { filterCategory = catSelect.value; currentPage = 1; _loadEvents(); });
+
+    filterBar.appendChild(yearSelect);
+    filterBar.appendChild(catSelect);
+
+    var listArea = el('div');
+    content.appendChild(filterBar);
+    content.appendChild(listArea);
+
+    // ── Load filter data then events ──────────────────────────────────────
+    function _initFilters(cb) {
+      var pending = 2;
+      serverCall().withSuccessHandler(function(cats) {
+        cachedCategories = cats || [];
+        catSelect.innerHTML = '';
+        catSelect.appendChild(el('option', { value: '' }, 'All Categories'));
+        cachedCategories.forEach(function(c) {
+          catSelect.appendChild(el('option', { value: c }, c.charAt(0).toUpperCase() + c.slice(1)));
+        });
+        if (--pending === 0) cb();
+      }).withFailureHandler(function() { if (--pending === 0) cb(); }).tlGetCategories(SESSION_TOKEN);
+
+      serverCall().withSuccessHandler(function(years) {
+        cachedYears = years || [];
+        yearSelect.innerHTML = '';
+        yearSelect.appendChild(el('option', { value: '' }, 'All Years'));
+        cachedYears.forEach(function(y) {
+          yearSelect.appendChild(el('option', { value: String(y) }, String(y)));
+        });
+        if (--pending === 0) cb();
+      }).withFailureHandler(function() { if (--pending === 0) cb(); }).tlGetTimelineYears(SESSION_TOKEN);
     }
 
-    function renderTLSubContent() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'add') { _renderAddEventForm(subContent); return; }
-      if (activeSubTab === 'import') { _renderImportForm(subContent); return; }
-      _renderTimeline(subContent);
-    }
-
-    function _renderTimeline(cont) {
-      // Filters
-      var filterBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' } });
-      var yearSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '100px' } });
-      yearSelect.appendChild(el('option', { value: '' }, 'All Years'));
-      var thisYear = new Date().getFullYear();
-      for (var y = thisYear; y >= thisYear - 5; y--) yearSelect.appendChild(el('option', { value: String(y) }, String(y)));
-      yearSelect.value = filterYear;
-      yearSelect.addEventListener('change', function() { filterYear = yearSelect.value; _renderTimeline(cont); });
-
-      var catSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '120px' } });
-      catSelect.appendChild(el('option', { value: '' }, 'All Categories'));
-      ['meeting', 'announcement', 'milestone', 'action', 'decision', 'other'].forEach(function(c) {
-        catSelect.appendChild(el('option', { value: c }, c.charAt(0).toUpperCase() + c.slice(1)));
-      });
-      catSelect.value = filterCategory;
-      catSelect.addEventListener('change', function() { filterCategory = catSelect.value; _renderTimeline(cont); });
-
-      filterBar.appendChild(yearSelect);
-      filterBar.appendChild(catSelect);
-      cont.innerHTML = '';
-      cont.appendChild(filterBar);
-
-      var listArea = el('div');
-      cont.appendChild(listArea);
+    function _loadEvents() {
       showLoading(listArea);
-
       serverCall().withSuccessHandler(function(result) {
         listArea.innerHTML = '';
         if (!result || !result.events || result.events.length === 0) {
-          var tlEmpty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
-          tlEmpty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
-          tlEmpty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
-          tlEmpty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward with admin access can add events here, or import from the union calendar.'));
-          listArea.appendChild(tlEmpty);
+          var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+          empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
+          empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
+          empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'A steward will add events here to keep members informed.'));
+          listArea.appendChild(empty);
           return;
         }
 
@@ -5036,34 +5028,40 @@ function renderTimelinePage(appContainer) {
           item.appendChild(el('div', { className: 'timeline-date' }, evt.eventDate));
 
           var card = el('div', { className: 'card', style: { padding: '12px 16px' } });
+
           var titleRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
           titleRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, evt.title));
-          titleRow.appendChild(el('span', { className: 'category-badge ' + evt.category }, evt.category));
+          titleRow.appendChild(el('span', { className: 'category-badge ' + (evt.category || 'other') }, evt.category || 'other'));
           card.appendChild(titleRow);
 
-          if (evt.description) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4', marginTop: '4px' } }, evt.description.substring(0, 300)));
-
-          // Drive file links
-          if (evt.driveFiles && evt.driveFiles.length > 0) {
-            var filesDiv = el('div', { style: { marginTop: '8px', fontSize: '11px' } });
-            filesDiv.appendChild(el('span', { style: { color: 'var(--muted)' } }, 'Files: '));
-            evt.driveFiles.forEach(function(f, idx) {
-              if (idx > 0) filesDiv.appendChild(document.createTextNode(', '));
-              var link = el('a', { href: 'https://drive.google.com/file/d/' + f.id + '/view', target: '_blank', style: { color: 'var(--accent)' } }, f.name);
-              filesDiv.appendChild(link);
-            });
-            card.appendChild(filesDiv);
+          if (evt.description) {
+            var TRUNCATE = 200;
+            var isLong = evt.description.length > TRUNCATE;
+            var descEl = el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '4px' } });
+            descEl.textContent = isLong ? evt.description.substring(0, TRUNCATE) + '\u2026' : evt.description;
+            card.appendChild(descEl);
+            if (isLong) {
+              var expanded = false;
+              var toggleBtn = el('button', {
+                style: { fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', marginTop: '2px' },
+                onClick: function() {
+                  expanded = !expanded;
+                  descEl.textContent = expanded ? evt.description : evt.description.substring(0, TRUNCATE) + '\u2026';
+                  toggleBtn.textContent = expanded ? 'Show less' : 'Show more';
+                }
+              }, 'Show more');
+              card.appendChild(toggleBtn);
+            }
           }
 
-          if (isSteward) {
-            var acts = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
-            acts.appendChild(el('button', {
-              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-              onClick: function() {
-                serverCall().withSuccessHandler(function() { _renderTimeline(cont); }).tlDeleteTimelineEvent(SESSION_TOKEN, evt.id);
-              }
-            }, 'Delete'));
-            card.appendChild(acts);
+          if (evt.driveFiles && evt.driveFiles.length > 0) {
+            var filesDiv = el('div', { style: { marginTop: '8px', fontSize: '11px' } });
+            filesDiv.appendChild(el('span', { style: { color: 'var(--muted)' } }, '\uD83D\uDCCE Files: '));
+            evt.driveFiles.forEach(function(f, idx) {
+              if (idx > 0) filesDiv.appendChild(document.createTextNode(', '));
+              filesDiv.appendChild(el('a', { href: 'https://drive.google.com/file/d/' + f.id + '/view', target: '_blank', style: { color: 'var(--accent)' } }, f.name));
+            });
+            card.appendChild(filesDiv);
           }
 
           item.appendChild(card);
@@ -5071,105 +5069,31 @@ function renderTimelinePage(appContainer) {
         });
 
         listArea.appendChild(tlContainer);
+
+        var total = result.total || 0;
+        var shown = (result.page || 1) * (result.pageSize || PAGE_SIZE);
+        if (shown < total) {
+          var moreBtn = el('button', {
+            className: 'btn',
+            style: { display: 'block', margin: '16px auto', fontSize: '13px' },
+            onClick: function() {
+              currentPage++;
+              moreBtn.textContent = 'Loading...';
+              moreBtn.disabled = true;
+              _loadEvents();
+            }
+          }, 'Load More (' + (total - shown) + ' remaining)');
+          listArea.appendChild(moreBtn);
+        }
+
       }).withFailureHandler(function() {
         listArea.innerHTML = '';
         listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
-      }).tlGetTimelineEvents(SESSION_TOKEN, 1, 50, filterYear || null, filterCategory || null);
+      }).tlGetTimelineEvents(SESSION_TOKEN, currentPage, PAGE_SIZE, filterYear || null, filterCategory || null);
     }
 
-    function _renderAddEventForm(cont) {
-      cont.appendChild(el('h3', { className: 'section-title' }, 'Add Event'));
-
-      var titleGroup = el('div', { className: 'form-group' });
-      titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
-      var titleInput = el('input', { className: 'form-input', placeholder: 'Event title' });
-      titleGroup.appendChild(titleInput);
-      cont.appendChild(titleGroup);
-
-      var dateGroup = el('div', { className: 'form-group' });
-      dateGroup.appendChild(el('label', { className: 'form-label' }, 'Event Date'));
-      var dateInput = el('input', { className: 'form-input', type: 'date' });
-      dateGroup.appendChild(dateInput);
-      cont.appendChild(dateGroup);
-
-      var descGroup = el('div', { className: 'form-group' });
-      descGroup.appendChild(el('label', { className: 'form-label' }, 'Description'));
-      var descInput = el('textarea', { className: 'msg-textarea', placeholder: 'Event details...', style: { minHeight: '60px' } });
-      descGroup.appendChild(descInput);
-      cont.appendChild(descGroup);
-
-      var catGroup = el('div', { className: 'form-group' });
-      catGroup.appendChild(el('label', { className: 'form-label' }, 'Category'));
-      var catSelect = el('select', { className: 'form-select' });
-      ['meeting', 'announcement', 'milestone', 'action', 'decision', 'other'].forEach(function(c) {
-        catSelect.appendChild(el('option', { value: c }, c.charAt(0).toUpperCase() + c.slice(1)));
-      });
-      catGroup.appendChild(catSelect);
-      cont.appendChild(catGroup);
-
-      var driveGroup = el('div', { className: 'form-group' });
-      driveGroup.appendChild(el('label', { className: 'form-label' }, 'Drive File IDs (optional, comma-separated)'));
-      var driveInput = el('input', { className: 'form-input', placeholder: 'file_id_1, file_id_2' });
-      driveGroup.appendChild(driveInput);
-      cont.appendChild(driveGroup);
-
-      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
-      cont.appendChild(statusMsg);
-
-      cont.appendChild(el('button', {
-        className: 'btn btn-primary',
-        onClick: function() {
-          var title = titleInput.value.trim();
-          if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
-          statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
-          var eventData = {
-            title: title, eventDate: dateInput.value || '', description: descInput.value.trim(),
-            category: catSelect.value, driveFileIds: driveInput.value.trim()
-          };
-          serverCall().withSuccessHandler(function(r) {
-            if (r && r.success) { activeSubTab = 'timeline'; refreshSubTabs(); renderTLSubContent(); }
-            else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
-          }).tlAddTimelineEvent(SESSION_TOKEN, eventData);
-        }
-      }, 'Create Event'));
-    }
-
-    function _renderImportForm(cont) {
-      cont.appendChild(el('h3', { className: 'section-title' }, 'Import from Google Calendar'));
-      cont.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Import events from your Google Calendar into the timeline.'));
-
-      var startGroup = el('div', { className: 'form-group' });
-      startGroup.appendChild(el('label', { className: 'form-label' }, 'Start Date'));
-      var startInput = el('input', { className: 'form-input', type: 'date' });
-      startGroup.appendChild(startInput);
-      cont.appendChild(startGroup);
-
-      var endGroup = el('div', { className: 'form-group' });
-      endGroup.appendChild(el('label', { className: 'form-label' }, 'End Date'));
-      var endInput = el('input', { className: 'form-input', type: 'date' });
-      endGroup.appendChild(endInput);
-      cont.appendChild(endGroup);
-
-      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
-      cont.appendChild(statusMsg);
-
-      cont.appendChild(el('button', {
-        className: 'btn btn-primary',
-        onClick: function() {
-          if (!startInput.value || !endInput.value) { statusMsg.textContent = 'Select both dates.'; statusMsg.style.color = 'var(--danger)'; return; }
-          statusMsg.textContent = 'Importing...'; statusMsg.style.color = 'var(--muted)';
-          serverCall().withSuccessHandler(function(r) {
-            if (r && r.success) { statusMsg.textContent = r.imported + ' events imported!'; statusMsg.style.color = 'var(--success)'; }
-            else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
-          }).tlImportCalendarEvents(SESSION_TOKEN, startInput.value, endInput.value);
-        }
-      }, 'Import Events'));
-    }
-
-    refreshSubTabs();
-    renderTLSubContent();
-    content.appendChild(subTabBar);
-    content.appendChild(subContent);
+    showLoading(listArea);
+    _initFilters(function() { _loadEvents(); });
     container.appendChild(content);
   });
 }

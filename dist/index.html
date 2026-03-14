@@ -1002,10 +1002,8 @@
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { group: 'Manage' },
         { id: 'tasks', icon: '\u2705', label: 'Tasks' },
-        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
         { group: 'Reference' },
-        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
         { group: 'Community' },
@@ -1129,8 +1127,8 @@
         _navProgressDone();
         return;
       }
-      // POMS Reference — shared across both roles
-      if (tabId === 'poms') {
+      // POMS Reference — member only
+      if (tabId === 'poms' && role === 'member') {
         renderPOMSReference(app, role);
         _navProgressDone();
         return;
@@ -1155,7 +1153,7 @@
           case 'feedback': renderFeedbackPage(app, 'member'); break;
           case 'mytasks': renderMemberTasks(app); break;
           case 'qaforum': renderQAForum(app, 'member'); break;
-          case 'timeline': renderTimelinePage(app); break;
+          case 'timeline': renderMemberTimelinePage(app); break;
           default: renderMemberHome(app);
         }
       } else {
@@ -1172,12 +1170,11 @@
           case 'surveytrack': renderSurveyTracking(app); break;
           case 'contactlog': renderContactLog(app); break;
           case 'tasks': renderStewardTasks(app); break;
-          case 'workload': renderWorkloadTracker(app); break;
           case 'events': renderEventsPage(app); break;
           case 'minutes': renderStewardMinutes(app); break;
           case 'feedback': renderFeedbackPage(app, 'steward'); break;
           case 'qaforum': renderQAForum(app, 'steward'); break;
-          case 'timeline': renderTimelinePage(app); break;
+          case 'timeline': renderStewardTimelinePage(app); break;
           case 'failsafe': renderFailsafePage(app); break;
           case 'testrunner': renderTestRunnerPage(app); break;
           default: renderStewardDashboard(app);

@@ -160,13 +160,15 @@ function SEED_SAMPLE_DATA() {
   response = ui.alert(
     '🚀 Seed Sample Data (3-Phase)',
     'This will seed in 3 phases:\n\n' +
-    'Phase 1: Config + 500 members + script owner (~2 min)\n' +
-    'Phase 2: 500 more members + 300 grievances (~2 min)\n' +
-    'Phase 3: All ancillary data (~2 min)\n' +
+    'Phase 1: Config + 500 members + 300 grievances (~3 min)\n' +
+    'Phase 2: All ancillary data (~2 min)\n' +
     '  - Contact log, surveys, feedback, events\n' +
     '  - Weekly questions, union stats, resources\n' +
-    '  - Notifications, workload, tasks, polls\n' +
-    '  - Minutes, check-ins, timeline\n\n' +
+    '  - Notifications, workload, tasks\n' +
+    '  - Minutes, check-ins, timeline, Q&A\n' +
+    'Phase 3: Webapp extras (~1 min)\n' +
+    '  - Member tasks, case checklists\n' +
+    '  - Survey questions sheet\n\n' +
     'If time runs out, you will be told which phase to resume.\n\n' +
     'Continue?',
     ui.ButtonSet.YES_NO
@@ -178,7 +180,7 @@ function SEED_SAMPLE_DATA() {
   var SAFE_LIMIT_MS = 300000; // 5 minutes (1 min buffer before 6-min hard limit)
 
   // Phase 1
-  ss.toast('Running Phase 1: Config + 500 members...', '🌱 Phase 1', 10);
+  ss.toast('Running Phase 1: Config + 500 members + grievances...', '🌱 Phase 1', 10);
   SEED_PHASE_1();
 
   if (Date.now() - startTime > SAFE_LIMIT_MS) {
@@ -187,7 +189,7 @@ function SEED_SAMPLE_DATA() {
   }
 
   // Phase 2
-  ss.toast('Running Phase 2: 500 more members + grievances...', '🌱 Phase 2', 10);
+  ss.toast('Running Phase 2: Ancillary data...', '🌱 Phase 2', 10);
   SEED_PHASE_2();
 
   if (Date.now() - startTime > SAFE_LIMIT_MS) {
@@ -196,26 +198,27 @@ function SEED_SAMPLE_DATA() {
   }
 
   // Phase 3
-  ss.toast('Running Phase 3: Ancillary data...', '🌱 Phase 3', 10);
+  ss.toast('Running Phase 3: Webapp extras...', '🌱 Phase 3', 10);
   SEED_PHASE_3();
 
   ss.toast('All phases complete!', '✅ Success', 5);
   ui.alert('✅ Success', 'All 3 phases seeded successfully!\n\n' +
     '• Config dropdowns populated\n' +
-    '• 1,000 members + 300 grievances\n' +
+    '• 500 members + 300 grievances\n' +
     '• Script owner as test steward\n' +
     '• Contact log, surveys, feedback\n' +
     '• Calendar events, weekly questions\n' +
     '• Union stats, resources, notifications\n' +
-    '• Workload, tasks, polls, minutes\n' +
-    '• Check-ins, timeline events\n' +
+    '• Workload, steward & member tasks\n' +
+    '• Minutes, check-ins, timeline\n' +
     '• Q&A Forum questions & answers\n' +
+    '• Case checklists, survey questions\n' +
     '• Auto-sync trigger installed\n\n' +
     'Member Directory auto-updates when Grievance Log changes.', ui.ButtonSet.OK);
 }
 
 /**
- * Phase 1: Config + 500 members + script owner (~2 min)
+ * Phase 1: Config + 500 members + 300 grievances + script owner (~3 min)
  * Can be run independently from Script Editor.
  */
 function SEED_PHASE_1() {
@@ -231,81 +234,88 @@ function SEED_PHASE_1() {
   ss.toast('Adding script owner as test member...', '🌱 Phase 1', 2);
   seedScriptOwnerMember_(ss);
 
+  ss.toast('Seeding 300 grievances...', '🌱 Phase 1', 10);
+  SEED_GRIEVANCES(300);
+
   ss.toast('Phase 1 complete!', '✅ Phase 1', 3);
 }
 
 /**
- * Phase 2: 500 more members + 300 grievances (~2 min)
+ * Phase 2: All ancillary seeders (~2 min)
  * Can be run independently from Script Editor.
  */
 function SEED_PHASE_2() {
   if (!isDemoSafeToRun_()) return;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  ss.toast('Seeding 500 more members...', '🌱 Phase 2', 10);
-  SEED_MEMBERS_ONLY(500);
+  ss.toast('Seeding contact log entries...', '🌱 Phase 2', 2);
+  seedContactLogData();
 
-  ss.toast('Seeding 300 grievances...', '🌱 Phase 2', 10);
-  SEED_GRIEVANCES(300);
+  ss.toast('Seeding survey responses...', '🌱 Phase 2', 2);
+  seedSatisfactionData();
+
+  ss.toast('Seeding feedback entries...', '🌱 Phase 2', 2);
+  seedFeedbackData();
+
+  ss.toast('Seeding survey tracking data...', '🌱 Phase 2', 2);
+  seedSurveyTrackingData();
+
+  ss.toast('Seeding calendar events...', '🌱 Phase 2', 2);
+  seedCalendarEvents();
+
+  ss.toast('Seeding weekly questions...', '🌱 Phase 2', 2);
+  seedWeeklyQuestions();
+
+  ss.toast('Seeding union stats data...', '🌱 Phase 2', 2);
+  seedUnionStatsData();
+
+  ss.toast('Seeding resources...', '🌱 Phase 2', 2);
+  seedResourcesData();
+
+  ss.toast('Seeding notifications...', '🌱 Phase 2', 2);
+  seedNotificationsData();
+
+  ss.toast('Seeding workload submissions...', '🌱 Phase 2', 2);
+  seedWorkloadData();
+
+  ss.toast('Seeding steward tasks...', '🌱 Phase 2', 2);
+  seedStewardTasksData();
+
+  ss.toast('Seeding meeting minutes...', '🌱 Phase 2', 2);
+  seedMinutesData();
+
+  ss.toast('Seeding meeting check-ins...', '🌱 Phase 2', 2);
+  seedMeetingCheckinData();
+
+  ss.toast('Seeding timeline events...', '🌱 Phase 2', 2);
+  seedTimelineData();
+
+  ss.toast('Seeding Q&A Forum...', '🌱 Phase 2', 2);
+  seedQAForumData();
+
+  ss.toast('Installing auto-sync trigger...', '🔧 Setup', 3);
+  installAutoSyncTriggerQuick();
 
   ss.toast('Phase 2 complete!', '✅ Phase 2', 3);
 }
 
 /**
- * Phase 3: All ancillary seeders (~2 min)
+ * Phase 3: Webapp extras — member tasks, case checklists, survey questions (~1 min)
+ * Seeds SPA features not covered by Phases 1-2.
  * Can be run independently from Script Editor.
  */
 function SEED_PHASE_3() {
   if (!isDemoSafeToRun_()) return;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  ss.toast('Seeding contact log entries...', '🌱 Phase 3', 2);
-  seedContactLogData();
+  ss.toast('Seeding member tasks...', '🌱 Phase 3', 2);
+  seedMemberTasksData();
 
-  ss.toast('Seeding survey responses...', '🌱 Phase 3', 2);
-  seedSatisfactionData();
+  ss.toast('Seeding case checklists...', '🌱 Phase 3', 2);
+  seedCaseChecklistData();
 
-  ss.toast('Seeding feedback entries...', '🌱 Phase 3', 2);
-  seedFeedbackData();
-
-  ss.toast('Seeding survey tracking data...', '🌱 Phase 3', 2);
-  seedSurveyTrackingData();
-
-  ss.toast('Seeding calendar events...', '🌱 Phase 3', 2);
-  seedCalendarEvents();
-
-  ss.toast('Seeding weekly questions...', '🌱 Phase 3', 2);
-  seedWeeklyQuestions();
-
-  ss.toast('Seeding union stats data...', '🌱 Phase 3', 2);
-  seedUnionStatsData();
-
-  ss.toast('Seeding resources...', '🌱 Phase 3', 2);
-  seedResourcesData();
-
-  ss.toast('Seeding notifications...', '🌱 Phase 3', 2);
-  seedNotificationsData();
-
-  ss.toast('Seeding workload submissions...', '🌱 Phase 3', 2);
-  seedWorkloadData();
-
-  ss.toast('Seeding steward tasks...', '🌱 Phase 3', 2);
-  seedStewardTasksData();
-
-  ss.toast('Seeding meeting minutes...', '🌱 Phase 3', 2);
-  seedMinutesData();
-
-  ss.toast('Seeding meeting check-ins...', '🌱 Phase 3', 2);
-  seedMeetingCheckinData();
-
-  ss.toast('Seeding timeline events...', '🌱 Phase 3', 2);
-  seedTimelineData();
-
-  ss.toast('Seeding Q&A Forum...', '🌱 Phase 3', 2);
-  seedQAForumData();
-
-  ss.toast('Installing auto-sync trigger...', '🔧 Setup', 3);
-  installAutoSyncTriggerQuick();
+  ss.toast('Seeding survey questions sheet...', '🌱 Phase 3', 2);
+  seedSurveyQuestionsData();
 
   ss.toast('Phase 3 complete!', '✅ Phase 3', 3);
 }
@@ -2741,7 +2751,196 @@ function seedQAForumData() {
 // SEED: MEMBER TASKS
 // ============================================================================
 
-// seedMemberTasksData removed — dead code cleanup v4.25.11
+/**
+ * Seeds sample member tasks into _Steward_Tasks sheet.
+ * Member tasks use the 12-column schema with Assignee Type = 'member'.
+ * References seeded member emails from Member Directory for realistic linking.
+ */
+function seedMemberTasksData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEETS.STEWARD_TASKS);
+    sheet.getRange(1, 1, 1, 12).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed', 'Assignee Type', 'Assigned By']]);
+    sheet.hideSheet();
+  }
+
+  // Ensure Assignee Type / Assigned By headers exist (may be missing on older 10-col sheets)
+  var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 12)).getValues()[0];
+  if (!headers[10] || String(headers[10]).trim() !== 'Assignee Type') {
+    sheet.getRange(1, 11).setValue('Assignee Type');
+    sheet.getRange(1, 12).setValue('Assigned By');
+  }
+
+  // Check if member tasks already exist
+  if (sheet.getLastRow() > 1) {
+    var existing = sheet.getRange(2, 11, sheet.getLastRow() - 1, 1).getValues();
+    for (var c = 0; c < existing.length; c++) {
+      if (String(existing[c][0]).toLowerCase().trim() === 'member') {
+        Logger.log('Member tasks already exist. Skipping seed.');
+        return;
+      }
+    }
+  }
+
+  var ownerEmail = '';
+  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
+  if (!ownerEmail) ownerEmail = 'steward@example.org';
+
+  // Pull a few seeded member emails for realistic task assignments
+  var memberEmails = [];
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var emailCol = MEMBER_COLS.EMAIL || 3;
+    var emails = memberSheet.getRange(2, emailCol, Math.min(memberSheet.getLastRow() - 1, 20), 1).getValues();
+    for (var e = 0; e < emails.length; e++) {
+      if (emails[e][0]) memberEmails.push(String(emails[e][0]).toLowerCase().trim());
+    }
+  }
+  if (memberEmails.length === 0) memberEmails = ['member1@example.org', 'member2@example.org', 'member3@example.org'];
+
+  var now = new Date();
+  var tasks = [
+    ['MT_SEED_1', ownerEmail, 'Complete new-hire orientation checklist', 'Review union orientation materials and sign acknowledgment form', memberEmails[0], 'high', 'open', new Date(now.getTime() + 5 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_2', ownerEmail, 'Submit workload documentation', 'Track and submit daily caseload numbers for the next two weeks', memberEmails[1 % memberEmails.length], 'medium', 'open', new Date(now.getTime() + 14 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_3', ownerEmail, 'Review updated safety procedures', 'Read the new Building B safety bulletin and confirm understanding', memberEmails[2 % memberEmails.length], 'medium', 'open', new Date(now.getTime() + 7 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_4', ownerEmail, 'Provide witness statement', 'Write a statement about the March 5 scheduling incident for the grievance file', memberEmails[3 % memberEmails.length], 'high', 'open', new Date(now.getTime() + 3 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_5', ownerEmail, 'Complete satisfaction survey', 'Fill out the annual member satisfaction survey before the deadline', memberEmails[4 % memberEmails.length], 'low', 'open', new Date(now.getTime() + 21 * 86400000), now, '', 'member', ownerEmail],
+    ['MT_SEED_6', ownerEmail, 'Gather pay stub copies', 'Collect last 4 pay stubs showing overtime discrepancy for grievance evidence', memberEmails[5 % memberEmails.length], 'high', 'completed', new Date(now.getTime() - 1 * 86400000), new Date(now.getTime() - 7 * 86400000), new Date(now.getTime() - 1 * 86400000), 'member', ownerEmail],
+    ['MT_SEED_7', ownerEmail, 'Attend Know Your Rights training', 'Attend the scheduled Weingarten rights training session', memberEmails[6 % memberEmails.length], 'low', 'completed', new Date(now.getTime() - 3 * 86400000), new Date(now.getTime() - 14 * 86400000), new Date(now.getTime() - 3 * 86400000), 'member', ownerEmail],
+    ['MT_SEED_8', ownerEmail, 'Sign grievance authorization form', 'Sign the authorization form so the steward can file on your behalf', memberEmails[7 % memberEmails.length], 'high', 'open', new Date(now.getTime() + 2 * 86400000), now, '', 'member', ownerEmail],
+  ];
+
+  sheet.getRange(sheet.getLastRow() + 1, 1, tasks.length, 12).setValues(tasks);
+  Logger.log('Seeded ' + tasks.length + ' member tasks');
+}
+
+// ============================================================================
+// SEED: CASE CHECKLIST
+// ============================================================================
+
+/**
+ * Seeds sample case checklist items for a few seeded grievances.
+ * Uses CHECKLIST_TEMPLATES for realistic checklist content tied to actual grievance types.
+ */
+function seedCaseChecklistData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
+  if (!sheet) {
+    if (typeof getOrCreateChecklistSheet === 'function') {
+      sheet = getOrCreateChecklistSheet();
+    } else {
+      sheet = ss.insertSheet(SHEETS.CASE_CHECKLIST);
+      var headers = getHeadersFromMap_(CHECKLIST_HEADER_MAP_);
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+  }
+
+  if (sheet.getLastRow() > 1) {
+    Logger.log('Case Checklist already has data. Skipping seed.');
+    return;
+  }
+
+  // Get a few seeded grievance IDs and their types from Grievance Log
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) {
+    Logger.log('No grievances to link checklists to. Skipping seed.');
+    return;
+  }
+
+  var gIdCol = GRIEVANCE_COLS.GRIEVANCE_ID;
+  var gTypeCol = GRIEVANCE_COLS.ISSUE_CATEGORY || GRIEVANCE_COLS.GRIEVANCE_TYPE;
+  var gData = grievanceSheet.getRange(2, 1, Math.min(grievanceSheet.getLastRow() - 1, 50), grievanceSheet.getLastColumn()).getValues();
+
+  // Pick up to 5 grievances to seed checklists for
+  var targets = [];
+  var seenTypes = {};
+  for (var i = 0; i < gData.length && targets.length < 5; i++) {
+    var caseId = String(gData[i][gIdCol - 1] || '');
+    var issueType = String(gData[i][gTypeCol - 1] || '');
+    if (!caseId) continue;
+    // Try to get variety in issue types
+    if (seenTypes[issueType] && targets.length >= 2) continue;
+    seenTypes[issueType] = true;
+    targets.push({ caseId: caseId, type: issueType });
+  }
+
+  if (targets.length === 0) {
+    Logger.log('No valid grievance IDs found. Skipping checklist seed.');
+    return;
+  }
+
+  var ownerEmail = '';
+  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
+  if (!ownerEmail) ownerEmail = 'steward@example.org';
+
+  var now = new Date();
+  var rows = [];
+  var idCounter = 1;
+
+  for (var t = 0; t < targets.length; t++) {
+    var target = targets[t];
+    // Look up template: try specific type under Grievance, then _default
+    var template = null;
+    if (typeof CHECKLIST_TEMPLATES !== 'undefined' && CHECKLIST_TEMPLATES.Grievance) {
+      template = CHECKLIST_TEMPLATES.Grievance[target.type] || CHECKLIST_TEMPLATES.Grievance._default;
+    }
+    if (!template) {
+      // Fallback: generic items
+      template = [
+        { text: 'Signed grievance form from member', category: 'Document', required: true },
+        { text: 'Copy of relevant contract articles', category: 'Document', required: true },
+        { text: 'Written statement from member', category: 'Evidence', required: true },
+        { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+        { text: 'Management response received', category: 'Document', required: true },
+        { text: 'Member notified of decision', category: 'Communication', required: true }
+      ];
+    }
+
+    for (var item = 0; item < template.length; item++) {
+      var tmpl = template[item];
+      var checklistId = 'CL-SEED-' + String(idCounter).padStart(4, '0');
+      // Mark some items as completed for realism (first 2-3 items of first 2 cases)
+      var isCompleted = (t < 2 && item < (t === 0 ? 3 : 2));
+      var completedDate = isCompleted ? new Date(now.getTime() - (template.length - item) * 86400000) : '';
+      rows.push([
+        checklistId,                                         // Checklist ID
+        target.caseId,                                       // Case ID
+        'Grievance',                                         // Action Type
+        tmpl.text,                                           // Item Text
+        tmpl.category,                                       // Category
+        tmpl.required ? 'Yes' : 'No',                       // Required
+        isCompleted,                                         // Completed (checkbox boolean)
+        isCompleted ? ownerEmail : '',                       // Completed By
+        completedDate,                                       // Completed Date
+        new Date(now.getTime() + (14 + item * 3) * 86400000), // Due Date
+        '',                                                  // Notes
+        item + 1                                             // Sort Order
+      ]);
+      idCounter++;
+    }
+  }
+
+  sheet.getRange(2, 1, rows.length, 12).setValues(rows);
+  Logger.log('Seeded ' + rows.length + ' checklist items for ' + targets.length + ' cases');
+}
+
+// ============================================================================
+// SEED: SURVEY QUESTIONS
+// ============================================================================
+
+/**
+ * Seeds the Survey Questions sheet via createSurveyQuestionsSheet().
+ * That function is non-destructive on re-run (skips if sheet exists with data).
+ */
+function seedSurveyQuestionsData() {
+  if (typeof createSurveyQuestionsSheet === 'function') {
+    createSurveyQuestionsSheet();
+    Logger.log('Survey Questions sheet seeded via createSurveyQuestionsSheet()');
+  } else {
+    Logger.log('createSurveyQuestionsSheet not available. Skipping.');
+  }
+}
 
 // ============================================================================
 // NUKE FUNCTIONS
@@ -3055,6 +3254,36 @@ function NUKE_SEEDED_DATA() {
       } catch (e) { Logger.log('Could not clear Workload Vault: ' + e.message); }
     }
 
+    // Clear seeded member tasks (rows with MT_SEED_ prefix) from _Steward_Tasks
+    var memberTasksCleared = false;
+    var tasksSheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
+    if (tasksSheet && tasksSheet.getLastRow() > 1) {
+      try {
+        var taskData = tasksSheet.getRange(2, 1, tasksSheet.getLastRow() - 1, 1).getValues();
+        for (var mt = taskData.length - 1; mt >= 0; mt--) {
+          if (String(taskData[mt][0]).indexOf('MT_SEED_') === 0) {
+            tasksSheet.deleteRow(mt + 2);
+            memberTasksCleared = true;
+          }
+        }
+      } catch (e) { Logger.log('Could not clear member tasks: ' + e.message); }
+    }
+
+    // Clear seeded case checklist items (rows with CL-SEED- prefix)
+    var checklistCleared = false;
+    var checklistSheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
+    if (checklistSheet && checklistSheet.getLastRow() > 1) {
+      try {
+        var clData = checklistSheet.getRange(2, 1, checklistSheet.getLastRow() - 1, 1).getValues();
+        for (var cl = clData.length - 1; cl >= 0; cl--) {
+          if (String(clData[cl][0]).indexOf('CL-SEED-') === 0) {
+            checklistSheet.deleteRow(cl + 2);
+            checklistCleared = true;
+          }
+        }
+      } catch (e) { Logger.log('Could not clear case checklist: ' + e.message); }
+    }
+
     // Clear tracked IDs from Script Properties
     var props = PropertiesService.getScriptProperties();
     props.deleteProperty('SEEDED_MEMBER_IDS');
@@ -3079,6 +3308,8 @@ function NUKE_SEEDED_DATA() {
       (resourcesCleared ? '• Resources data cleared\n' : '') +
       (notificationsCleared ? '• Notifications data cleared\n' : '') +
       (workloadCleared ? '• Workload vault data cleared\n' : '') +
+      (memberTasksCleared ? '• Member tasks cleared\n' : '') +
+      (checklistCleared ? '• Case checklist items cleared\n' : '') +
       '• Union stats data cleared\n' +
       '\nDemo mode has been permanently disabled.\n' +
       'Refresh the page to remove the Demo menu.\n\n' +
