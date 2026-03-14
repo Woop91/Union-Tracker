@@ -125,7 +125,12 @@ var WorkloadService = (function() {
 
   // ── Rate Limiting (private) ───────────────────────────────────────────────
 
-  function _checkRateLimit(key, maxAttempts, windowMinutes) {
+  /**
+   * Atomic rate-limit check-and-increment. Reads, checks, and increments the
+   * counter in one call so concurrent requests can't both pass the check before
+   * either records.
+   */
+  function _checkAndRecordRateLimit(key, maxAttempts, windowMinutes) {
     var cache = CacheService.getScriptCache();
     var cacheKey = 'WT_RATE_' + key;
     var cached = cache.get(cacheKey);
@@ -133,23 +138,13 @@ var WorkloadService = (function() {
     if (attempts >= maxAttempts) {
       return { allowed: false, attemptsRemaining: 0, waitMinutes: windowMinutes };
     }
-    return { allowed: true, attemptsRemaining: maxAttempts - attempts, waitMinutes: 0 };
-  }
-
-  function _recordRateLimitAttempt(key, windowMinutes) {
-    var cache = CacheService.getScriptCache();
-    var cacheKey = 'WT_RATE_' + key;
-    var cached = cache.get(cacheKey);
-    var attempts = (cached ? (parseInt(cached, 10) || 0) : 0) + 1;
-    cache.put(cacheKey, String(attempts), windowMinutes * 60);
+    // Immediately increment so the next concurrent caller sees updated count
+    cache.put(cacheKey, String(attempts + 1), windowMinutes * 60);
+    return { allowed: true, attemptsRemaining: maxAttempts - attempts - 1, waitMinutes: 0 };
   }
 
   function _checkSubmissionRateLimit(email) {
-    return _checkRateLimit('SUBMIT_' + email.toLowerCase().trim(), CONFIG.maxSubmissionsPerHour, 60);
-  }
-
-  function _recordSubmission(email) {
-    _recordRateLimitAttempt('SUBMIT_' + email.toLowerCase().trim(), 60);
+    return _checkAndRecordRateLimit('SUBMIT_' + email.toLowerCase().trim(), CONFIG.maxSubmissionsPerHour, 60);
   }
 
   // ── UserMeta / Sharing Start Date (private) ──────────────────────────────
@@ -280,16 +275,22 @@ var WorkloadService = (function() {
       ]);
     }
 
-    // Write to reporting sheet — clear + write in try/catch to avoid leaving sheet empty on error
+    // Write to reporting sheet — write new data first, then clear stale rows to prevent data loss on timeout
     try {
-      report.clearContents();
       if (reportRows.length > 0) {
+        // Write new data over existing content (overwrites, no clear needed for written range)
         report.getRange(1, 1, reportRows.length, header.length).setValues(reportRows);
         report.getRange(1, 1, 1, header.length)
           .setFontWeight('bold')
           .setBackground('#0d47a1')
           .setFontColor('#ffffff');
         report.setFrozenRows(1);
+
+        // Clear leftover rows beyond new data (if sheet previously had more rows)
+        var lastRow = report.getLastRow();
+        if (lastRow > reportRows.length) {
+          report.getRange(reportRows.length + 1, 1, lastRow - reportRows.length, header.length).clearContent();
+        }
 
         // Pastel color coding
         if (reportRows.length > 1) {
@@ -514,7 +515,7 @@ var WorkloadService = (function() {
       ];
 
       vault.appendRow(row);
-      _recordSubmission(emailLower);
+      // Rate limit already recorded atomically in _checkSubmissionRateLimit
 
       // Audit
       if (typeof logAuditEvent === 'function') {

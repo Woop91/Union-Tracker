@@ -4,6 +4,58 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.28.2] - 2026-03-14
+
+### Fixed
+- **dataAssignSteward auth mismatch** — member_view.html called steward-only `dataAssignSteward`; created `dataMemberAssignSteward` using `_resolveCallerEmail` (members can only assign steward to themselves, preventing privilege escalation)
+
+### Added
+- **8 new structural guard tests** (G17–G24) in `test/union-stats-guards.test.js`:
+  - G17: member_view.html must never call steward-only endpoints (auto-scans all `_requireStewardAuth` functions)
+  - G18: Stats renderers must use all non-reserved backend data fields
+  - G19: All stats pages must have client-side caching (AppState cache pattern)
+  - G20: Sub-tab renderers must separate fetch from content render (enables caching)
+  - G21: Member-safe endpoint pairs verified (steward version + member version both exist)
+  - G22: Untracked metrics conditionally displayed (no dead zero KPIs)
+  - G23: No redundant sheet reads in engagement stats
+  - G24: showLoading skeleton type consistency across sub-tabs
+
+## [4.28.1] - 2026-03-14
+
+### Fixed
+- **Polls: null sessionToken in 5 client calls** — `wqGetHistory`, `wqSubmitPoolQuestion` (member), `wqClosePoll`, `wqSetStewardQuestion`, `wqSetPollFrequency`, `wqGetHistory` (steward) now pass `SESSION_TOKEN` instead of `null`, fixing broken auth for magic-link users
+- **Polls: redundant page variable** in member and steward poll history pagination removed; nav buttons now call `loadPage()` directly
+- **POMS tab broken for stewards** — routing guard in `_handleTabNav` was `role === 'member'` only; stewards clicking POMS were silently redirected to dashboard. Now a shared tab for both roles.
+- **POMS description incorrect** — "Postal Operations Manual" corrected to "Program Operations Manual System" in both `steward_view.html` and `member_view.html`.
+- **Union Stats auth mismatch** — Grievances and Hot Spots sub-tabs were silently broken for non-steward members; created `dataGetMemberGrievanceStats` / `dataGetMemberGrievanceHotSpots` endpoints using `_resolveCallerEmail` (any authenticated member)
+- **Engagement KPI** — hidden Resource Downloads card when value is 0 (not currently tracked)
+- **Redundant sheet read** — `dataGetEngagementStats` no longer re-reads Member Directory for membership trends
+- **showLoading** — workload sub-tab now uses `showLoading(container, 'kpi')` for consistent skeleton
+- **Workload Tracker: crash-safe reporting refresh** — `_refreshReportingData()` now writes new data first, then clears stale rows (previously cleared all content before writing, risking empty sheet on timeout)
+- **Workload Tracker: atomic rate limiting** — `_checkAndRecordRateLimit()` replaces separate check+record functions, eliminating race condition where concurrent submissions could both pass the limit check
+- **Workload Tracker: bar chart dynamic scaling** — Stats tab category averages bar chart now scales to the actual data max instead of hardcoded 100 (values over 100 previously all showed 100% bars)
+- **Workload Tracker: sub-category label display** — History and Stats tabs now show human-readable labels (e.g., "Priority Cases") instead of raw keys (e.g., "priority") via `WT_CAT_KEY_LABELS` lookup
+
+### Added
+- **Server-side dues-paying gate** on `wqGetActiveQuestions`, `wqSubmitResponse`, `wqSubmitPoolQuestion` — non-paying members blocked server-side (previously client-only)
+- **Rate limiting on pool submissions** — max 3 per user per poll period via `POOL_SUBMIT_LIMIT`
+- **Confirmation dialog** on steward community poll draw button (prevents accidental replacement)
+- **30+ new tests** for `24_WeeklyQuestions`: closePoll, getPoolCount with pending/used filtering, getHistory pagination + pageSize cap, frequency settings validation, option validation (length/blank/duplicate), response dedup, selectRandomPoolQuestion empty/no-pending, all global wrapper existence
+- **Membership sub-tab enriched** — now renders Total Members & New (Last 90 Days) KPIs, By Unit chart, By Dues Status doughnut, and New Hires by Month bar chart (previously only showed By Location)
+- **Client-side caching** — Union Stats page mirrors steward Insights caching pattern (`AppState.unionStatsCache`, 5-min TTL); revisiting sub-tabs serves cached data instantly
+- **Monthly resolved trend** — grievance trend chart now shows both Filed and Resolved lines
+- **Workload Tracker: auto-save draft** — Form data is persisted to localStorage on every input change (400ms debounce) and restored on page reload; cleared on successful submission
+- **Workload Tracker: last submitted indicator** — Shows "Last submitted: [date]" banner at top of Submit tab, stored in localStorage
+- **Tests: 44 new workload tests** — Expanded from 19 to 63 tests covering rate limiting (atomic, per-email, case-insensitive), history shape/filtering/sorting, sub-category JSON parsing, CSV export, structural invariants
+- **Tests: G14 deploy guard** — Source-level checks ensuring crash-safe refresh pattern and atomic rate limiting are maintained
+- **Tests: G18 SPA integrity** — 10 frontend invariant tests: WT_CAT_KEY_LABELS definition, bar chart dynamic max, auto-save/draft/restore functions, last-submitted indicator, category alignment
+
+### Security
+- **Auth check added to `getPOMSReferenceHtml()`** — now verifies `Session.getActiveUser().getEmail()` before serving content.
+
+### Changed
+- Frequency button active-state update uses class toggle instead of re-applying inline styles
+
 ## [4.28.0] - 2026-03-14
 
 ### Added

@@ -57,6 +57,36 @@ function test_webapp_pomsReferenceHtmlExists() {
   TestRunner.assertEquals('function', typeof getPOMSReferenceHtml, 'getPOMSReferenceHtml exists');
 }
 
+function test_webapp_pomsReferenceHtmlReturnsContent() {
+  // getPOMSReferenceHtml should return HTML content (not an error fallback)
+  try {
+    var html = getPOMSReferenceHtml();
+    TestRunner.assertNotNull(html, 'getPOMSReferenceHtml returns non-null');
+    TestRunner.assertTrue(typeof html === 'string', 'getPOMSReferenceHtml returns string');
+    TestRunner.assertGreaterThan(html.length, 100, 'getPOMSReferenceHtml returns substantial content');
+    // Should contain the POMS root element
+    TestRunner.assertTrue(html.indexOf('poms-root') > -1, 'getPOMSReferenceHtml contains poms-root element');
+    // Should NOT be the auth-failure fallback
+    TestRunner.assertTrue(html.indexOf('Authentication required') === -1, 'getPOMSReferenceHtml did not return auth error');
+  } catch (e) {
+    TestRunner.assertTrue(false, 'getPOMSReferenceHtml threw: ' + e.message);
+  }
+}
+
+function test_webapp_orgChartHtmlReturnsContent() {
+  // getOrgChartHtml should return HTML content (not an error fallback)
+  try {
+    var html = getOrgChartHtml();
+    TestRunner.assertNotNull(html, 'getOrgChartHtml returns non-null');
+    TestRunner.assertTrue(typeof html === 'string', 'getOrgChartHtml returns string');
+    TestRunner.assertGreaterThan(html.length, 100, 'getOrgChartHtml returns substantial content');
+    // Should NOT be the auth-failure fallback
+    TestRunner.assertTrue(html.indexOf('Authentication required') === -1, 'getOrgChartHtml did not return auth error');
+  } catch (e) {
+    TestRunner.assertTrue(false, 'getOrgChartHtml threw: ' + e.message);
+  }
+}
+
 function test_webapp_diagnoseWebAppExists() {
   TestRunner.assertEquals('function', typeof diagnoseWebApp, 'diagnoseWebApp exists');
 }
@@ -664,7 +694,8 @@ function test_endpoints_thisBindingCanary() {
   // If this fails, TestRunner is calling test functions with wrong `this` binding
   // (e.g., test.fn() method call instead of indirect call), which breaks all
   // this[fnName] dynamic lookups in this suite.
-  TestRunner.assertEquals('function', typeof this['TestRunner'],
+  // TestRunner is an IIFE-returned object, so typeof is 'object', not 'function'.
+  TestRunner.assertEquals('object', typeof this['TestRunner'],
     'this references global scope (canary)');
 }
 

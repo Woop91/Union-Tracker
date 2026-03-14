@@ -181,6 +181,9 @@ describe('Auth denial: DataService wrappers return safe empty values', () => {
     { name: 'dataGetSurveyStatus', args: [INVALID_TOKEN] },
     { name: 'dataGetSurveyQuestions', args: [INVALID_TOKEN] },
     { name: 'dataGetMembershipStats', args: [INVALID_TOKEN] },
+    { name: 'dataGetMemberGrievanceStats', args: [INVALID_TOKEN] },
+    { name: 'dataGetMemberGrievanceHotSpots', args: [INVALID_TOKEN] },
+    { name: 'dataMemberAssignSteward', args: [INVALID_TOKEN, 'steward@test.com'] },
     { name: 'dataGetUpcomingEvents', args: [INVALID_TOKEN, 10] },
     { name: 'dataGetMemberTasks', args: [INVALID_TOKEN, null] },
     { name: 'dataGetMemberMeetings', args: [INVALID_TOKEN] },
@@ -456,5 +459,54 @@ describe('Build validation: syntax checking works', () => {
       }
     }
     expect(errors).toEqual([]);
+  });
+});
+
+
+// ============================================================================
+// Auth denial: Resource endpoints (05_Integrations.gs)
+// ============================================================================
+// Bug history: v4.25.10 — restoreWebAppResource checked auth.authorized (undefined)
+// instead of auth.isAuthorized, so it always returned unauthorized but never
+// actually threw. These tests verify all resource mutation functions return
+// safe denial values when auth is denied.
+
+describe('Auth denial: Resource mutation endpoints return safe values', () => {
+
+  // Steward-only mutation functions
+  const resourceMutations = [
+    { name: 'addWebAppResource', args: [INVALID_TOKEN, { title: 'Test' }] },
+    { name: 'updateWebAppResource', args: [INVALID_TOKEN, 'RES-001', { title: 'Updated' }] },
+    { name: 'deleteWebAppResource', args: [INVALID_TOKEN, 'RES-001'] },
+    { name: 'restoreWebAppResource', args: [INVALID_TOKEN, 'RES-001'] },
+  ];
+
+  resourceMutations.forEach(({ name, args }) => {
+    test(`${name}() returns { success: false } when auth denied`, () => {
+      const fn = global[name];
+      expect(typeof fn).toBe('function');
+      const result = fn(...args);
+      expect(result).toBeDefined();
+      expect(result.success).toBe(false);
+    });
+
+    test(`${name}() does not throw when auth denied`, () => {
+      const fn = global[name];
+      expect(() => fn(...args)).not.toThrow();
+    });
+  });
+
+  // Read-only steward function (returns hidden resources)
+  test('getWebAppResourcesListAll() returns [] when auth denied', () => {
+    const fn = global.getWebAppResourcesListAll;
+    expect(typeof fn).toBe('function');
+    const result = fn();
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+
+  test('getWebAppResourcesListAll() does not throw when auth denied', () => {
+    expect(() => global.getWebAppResourcesListAll()).not.toThrow();
   });
 });

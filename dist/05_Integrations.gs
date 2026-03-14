@@ -3148,6 +3148,10 @@ function getWebAppResourcesList(audience) {
  */
 function getWebAppResourcesListAll() {
   try {
+    // Steward-only: returns hidden resources + addedBy emails
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return [];
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.RESOURCES);
     if (!sheet) return [];
@@ -3327,7 +3331,7 @@ function deleteWebAppResource(sessionToken, resourceId) {
 function restoreWebAppResource(sessionToken, resourceId) {
   try {
     var auth = checkWebAppAuthorization('steward', sessionToken);
-    if (!auth.authorized) return { success: false, message: auth.message || 'Unauthorized' };
+    if (!auth.isAuthorized) return { success: false, message: auth.message || 'Unauthorized' };
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.RESOURCES);

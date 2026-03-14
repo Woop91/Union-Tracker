@@ -1,7 +1,7 @@
 <style>
 
 /* ─── RESET ───────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.madds-embed *, .madds-embed *::before, .madds-embed *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ─── TOKENS ─────────────────────────────────────────────────── */
 .madds-embed {
@@ -26,8 +26,8 @@
   font-family: var(--ff-body);
   font-size: 16px;
   line-height: 1.5;
-  min-height: 100vh;
-  overflow-x: auto;
+  min-height: auto;
+  overflow-x: hidden;
 }
 
 /* ─── LIGHT MODE — ELECTRIC ───────────────────────────────────── */
@@ -1134,7 +1134,7 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
 
   <div class="chapter-row">
 
-    <!-- ─── MASSABILITY (always visible, board expanded, sub-toggles collapsed) ─── -->
+    <!-- ─── MASSABILITY (always visible, all sub-sections collapsed by default) ─── -->
     <div class="chapter-branch" data-expand="true" style="max-width:none;">
       <div class="card tc ch-card" id="massability-card" >
         <span class="c-badge tc">MassAbility</span>
@@ -1153,8 +1153,8 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
         <div class="staff-list" style="width:230px;">
           <div class="sl-title">Executive Board</div>
 
-          <div class="sl-head sl-head-flex">JEB Members<button class="ma-sub-btn" onclick="maToggle('ma-jeb','▶ show','▼ hide',this)">▼ hide</button></div>
-          <div id="ma-jeb" style="display:flex;">
+          <div class="sl-head sl-head-flex">JEB Members<button class="ma-sub-btn" onclick="maToggle('ma-jeb','▶ show','▼ hide',this)">▶ show</button></div>
+          <div id="ma-jeb" style="display:none;">
             <div class="sl-item">Voc Rehab — Amy Cserny
               <span class="contact"><a href="mailto:csernygirl05@yahoo.com">csernygirl05@yahoo.com</a></span>
             </div>
@@ -1172,9 +1172,9 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
 
           <div class="sl-head sl-head-flex">
             CEB — Voc Rehab
-            <button class="ma-sub-btn" onclick="maToggle('ma-voc','▶ show','▼ hide',this)">▼ hide</button>
+            <button class="ma-sub-btn" onclick="maToggle('ma-voc','▶ show','▼ hide',this)">▶ show</button>
           </div>
-          <div id="ma-voc" style="display:flex;">
+          <div id="ma-voc" style="display:none;">
             <div class="sl-item">NE Region (1) — David Zbikowski
               <span class="contact"><a href="mailto:aclax16@gmail.com">aclax16@gmail.com</a></span>
             </div>
@@ -1197,8 +1197,8 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
           <div class="sl-item">At-Large (1) — Julie Pini<span class="contact"><a href="mailto:juliepini@ymail.com">juliepini@ymail.com</a></span></div>
           <div class="sl-item">At-Large (2) — Chrystal Bonner<span class="contact"><a href="mailto:itisjoy@comcast.net">itisjoy@comcast.net</a></span></div>
 
-          <div class="sl-head sl-head-flex">CEB — At-Large<button class="ma-sub-btn" onclick="maToggle('ma-atlarge','▶ show','▼ hide',this)">▼ hide</button></div>
-          <div id="ma-atlarge" style="display:flex;">
+          <div class="sl-head sl-head-flex">CEB — At-Large<button class="ma-sub-btn" onclick="maToggle('ma-atlarge','▶ show','▼ hide',this)">▶ show</button></div>
+          <div id="ma-atlarge" style="display:none;">
             <div class="sl-item">Admin — <em class="vac">vacant</em></div>
             <div class="sl-item">At-Large (1) — Ethan McCarthy
               <span class="contact"><a href="mailto:mccarthy.ethan@gmail.com">mccarthy.ethan@gmail.com</a></span>
@@ -1222,9 +1222,9 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
 
           <div class="sl-head sl-head-flex">
             Voc Rehab
-            <button class="ma-sub-btn" onclick="maToggle('ma-vr-stewards','▶ show','▼ hide',this)">▼ hide</button>
+            <button class="ma-sub-btn" onclick="maToggle('ma-vr-stewards','▶ show','▼ hide',this)">▶ show</button>
           </div>
-          <div id="ma-vr-stewards" style="display:flex;">
+          <div id="ma-vr-stewards" style="display:none;">
             <div class="sl-item">Allyson Blanchette
               <span class="contact"><a href="mailto:allysondianne@gmail.com">allysondianne@gmail.com</a></span>
             </div>
@@ -1263,11 +1263,11 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
           </div>
           <div class="sl-head sl-head-flex">
             Internal Organizers
-            <button class="ma-sub-btn" onclick="maToggle('ma-org','▶ show','▼ hide',this)">▼ hide</button>
+            <button class="ma-sub-btn" onclick="maToggle('ma-org','▶ show','▼ hide',this)">▶ show</button>
           </div>
           <div class="sl-item org-item"><span class="org-region">Boston</span><br><span class="org-name">Mara Maldonado</span></div>
           <div class="sl-item org-item"><span class="org-region">Fitchburg, Framingham, Milford, Springfield, Sturbridge, Worcester</span><br><span class="org-name">Mike Foster</span></div>
-          <div id="ma-org" style="display:flex;">
+          <div id="ma-org" style="display:none;">
             <div class="sl-item org-item"><span class="org-region">Greenfield, Holyoke, North Adams, Pittsfield</span><br><span class="org-name">Jerry Levinsky</span></div>
             <div class="sl-item org-item"><span class="org-region">Lawrence, Lowell, Malden, Salem, Somerville</span><br><span class="org-name">Mark Belzowski</span></div>
             <div class="sl-item org-item"><span class="org-region">Braintree, Brockton, Fall River, Hyannis, New Bedford, Plymouth, Taunton</span><br><span class="org-name">Khadeejah Ahmad</span></div>
@@ -3229,7 +3229,7 @@ function toggleOtherGroup(btn) {
 
 // Light/Dark mode toggle
 function maddstoggleMode() {
-  var _me = document.querySelector('.madds-embed'); if(_me) _me.classList.toggle('light');;
+  var _me = document.querySelector('.madds-embed'); if(_me) _me.classList.toggle('light');
   const btn = document.getElementById('madds-mode-toggle');
   btn.textContent = (_me && _me.classList.contains('light')) ? '🌙 Dark' : '☀ Light';
 }
@@ -3241,6 +3241,7 @@ function maddstoggleMode() {
     var lnk = document.createElement('link');
     lnk.rel = 'stylesheet';
     lnk.href = 'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700&display=swap';
+    lnk.onerror = function() { console.warn('Org chart: Google Fonts failed to load, using fallback fonts'); };
     document.head.appendChild(lnk);
   }
 })();

@@ -78,7 +78,7 @@ var QAForum = (function () {
   // Questions
   // ═══════════════════════════════════════
 
-  function getQuestions(email, page, pageSize, sort) {
+  function getQuestions(email, page, pageSize, sort, showResolved) {
     page = page || 1;
     pageSize = pageSize || 20;
     sort = sort || 'recent';
@@ -97,6 +97,7 @@ var QAForum = (function () {
     for (var i = 1; i < data.length; i++) {
       var status = String(data[i][5] || 'active').toLowerCase().trim();
       if (status === 'deleted') continue;
+      if (!showResolved && status === 'resolved') continue;
       questions.push({
         id: data[i][0],
         authorName: isTruthyValue(data[i][3]) ? 'Anonymous' : String(data[i][2] || 'Member'),
@@ -202,6 +203,7 @@ var QAForum = (function () {
         isAnonymous ? true : false, text,
         'active', 0, '', 0, now, now
       ]);
+      _invalidateCache(SHEETS.QA_FORUM);
       logAuditEvent('QA_QUESTION_SUBMITTED', 'Question ' + id + ' by ' + (isAnonymous ? 'anonymous' : maskEmail(email)));
 
       // Notify all stewards of the new unanswered question
@@ -276,6 +278,8 @@ var QAForum = (function () {
         }
       }
 
+      _invalidateCache(SHEETS.QA_FORUM);
+      _invalidateCache(SHEETS.QA_ANSWERS);
       logAuditEvent('QA_ANSWER_SUBMITTED', 'Answer ' + id + ' on question ' + questionId);
       return { success: true, answerId: id };
     } finally {
@@ -317,6 +321,7 @@ var QAForum = (function () {
 
           sheet.getRange(i + 1, 7).setValue(upvoterList.length);
           sheet.getRange(i + 1, 8).setValue(upvoterList.join(','));
+          _invalidateCache(SHEETS.QA_FORUM);
           return { success: true, upvoted: !alreadyVoted, newCount: upvoterList.length };
         }
       }
@@ -344,6 +349,7 @@ var QAForum = (function () {
         var newStatus = action === 'delete' ? 'deleted' : action === 'flag' ? 'flagged' : 'active';
         sheet.getRange(i + 1, 6).setValue(newStatus);
         sheet.getRange(i + 1, 11).setValue(new Date());
+        _invalidateCache(SHEETS.QA_FORUM);
         logAuditEvent('QA_QUESTION_MODERATED', 'Question ' + questionId + ' ' + action + 'd by ' + maskEmail(stewardEmail));
         return { success: true };
       }
@@ -362,8 +368,32 @@ var QAForum = (function () {
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] === answerId) {
+        var oldStatus = String(data[i][6] || 'active').toLowerCase().trim();
         var newStatus = action === 'delete' ? 'deleted' : action === 'flag' ? 'flagged' : 'active';
         sheet.getRange(i + 1, 7).setValue(newStatus);
+        _invalidateCache(SHEETS.QA_ANSWERS);
+
+        // Adjust answer count on parent question when visibility changes
+        var wasVisible = oldStatus !== 'deleted';
+        var isVisible = newStatus !== 'deleted';
+        if (wasVisible !== isVisible) {
+          var questionId = data[i][1];
+          var forumSheet = ss.getSheetByName(SHEETS.QA_FORUM);
+          if (forumSheet && forumSheet.getLastRow() > 1) {
+            var qData = forumSheet.getDataRange().getValues();
+            for (var j = 1; j < qData.length; j++) {
+              if (qData[j][0] === questionId) {
+                var currentCount = parseInt(qData[j][8], 10) || 0;
+                var delta = isVisible ? 1 : -1;
+                forumSheet.getRange(j + 1, 9).setValue(Math.max(0, currentCount + delta));
+                forumSheet.getRange(j + 1, 11).setValue(new Date());
+                _invalidateCache(SHEETS.QA_FORUM);
+                break;
+              }
+            }
+          }
+        }
+
         logAuditEvent('QA_ANSWER_MODERATED', 'Answer ' + answerId + ' ' + action + 'd by ' + maskEmail(stewardEmail));
         return { success: true };
       }
@@ -439,6 +469,7 @@ var QAForum = (function () {
         if (current === 'deleted') return { success: false, message: 'Question not found.' };
         sheet.getRange(i + 1, 6).setValue('resolved');
         sheet.getRange(i + 1, 11).setValue(new Date());
+        _invalidateCache(SHEETS.QA_FORUM);
         logAuditEvent('QA_QUESTION_RESOLVED', 'Question ' + questionId + ' resolved by ' + maskEmail(email));
         return { success: true };
       }
@@ -488,6 +519,13 @@ var QAForum = (function () {
     }
   }
 
+  function _invalidateCache(sheetName) {
+    try {
+      var cache = CacheService.getScriptCache();
+      cache.remove('qa_sheet_' + sheetName);
+    } catch (_e) { /* cache unavailable — ignore */ }
+  }
+
   // Delegate to shared helpers in 01_Core.gs (eliminates duplicate definitions)
   function _fmtDate(date) { return fmtDateShort_(date); }
   function _hashEmail(email) { return hashEmail_(email); }
@@ -521,7 +559,7 @@ var QAForum = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function qaGetQuestions(sessionToken, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getQuestions(e, page, pageSize, sort); }
+function qaGetQuestions(sessionToken, page, pageSize, sort, showResolved) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getQuestions(e, page, pageSize, sort, showResolved); }
 function qaGetQuestionDetail(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return QAForum.getQuestionDetail(e, questionId); }
 function qaSubmitQuestion(sessionToken, name, text, isAnonymous) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return QAForum.submitQuestion(e, name, text, isAnonymous); }
 function qaSubmitAnswer(sessionToken, name, questionId, text, isSteward) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.submitAnswer(e, name, questionId, text, true); }

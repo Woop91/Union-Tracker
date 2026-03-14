@@ -493,6 +493,16 @@ describe('Global wrappers', () => {
     expect(typeof result).toBe('object');
   });
 
+  test('dataGetMemberGrievanceStats uses _resolveCallerEmail and delegates to DataService.getGrievanceStats', () => {
+    const result = dataGetMemberGrievanceStats('test-session-token');
+    expect(typeof result).toBe('object');
+  });
+
+  test('dataGetMemberGrievanceHotSpots uses _resolveCallerEmail and delegates to DataService.getGrievanceHotSpots', () => {
+    const result = dataGetMemberGrievanceHotSpots('test-session-token');
+    expect(Array.isArray(result)).toBe(true);
+  });
+
   test('dataGetStewardDirectory delegates to DataService.getStewardDirectory', () => {
     const result = dataGetStewardDirectory('test-session-token');
     expect(Array.isArray(result)).toBe(true);
@@ -1067,5 +1077,139 @@ describe('getStewardKPIs return shape', () => {
     expect(kpis).toHaveProperty('resolved');
     expect(typeof kpis.totalCases).toBe('number');
     expect(kpis.totalCases).toBe(0);
+  });
+});
+
+// ============================================================================
+// _ensureStewardTasks schema parity (Fix #1 regression guard)
+// ============================================================================
+
+describe('_ensureStewardTasks schema parity', () => {
+  test('DataService _ensureStewardTasks creates 12-column header matching 08a_SheetSetup', () => {
+    // Read source and verify the inline setValues call uses 12 columns
+    const fs = require('fs');
+    const src = fs.readFileSync(require('path').join(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8');
+
+    // Find the _ensureStewardTasks function and verify it uses 12 columns
+    const funcMatch = src.match(/function _ensureStewardTasks\(\)[\s\S]*?return sheet;\s*\}/);
+    expect(funcMatch).not.toBeNull();
+    const funcBody = funcMatch[0];
+
+    // Must reference 12 columns in getRange call
+    expect(funcBody).toMatch(/getRange\(1,\s*1,\s*1,\s*12\)/);
+
+    // Must include Assignee Type and Assigned By headers
+    expect(funcBody).toContain('Assignee Type');
+    expect(funcBody).toContain('Assigned By');
+  });
+
+  test('both _ensureStewardTasks and _ensureStewardTasksSheet define same 12 headers', () => {
+    const fs = require('fs');
+    const dsrc = fs.readFileSync(require('path').join(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8');
+    const ssrc = fs.readFileSync(require('path').join(__dirname, '..', 'src', '08a_SheetSetup.gs'), 'utf8');
+
+    const expectedHeaders = ['ID', 'Steward Email', 'Title', 'Description', 'Member Email',
+      'Priority', 'Status', 'Due Date', 'Created', 'Completed', 'Assignee Type', 'Assigned By'];
+
+    // Check DataService version
+    for (const header of expectedHeaders) {
+      expect(dsrc).toContain(header);
+    }
+    // Check SheetSetup version
+    for (const header of expectedHeaders) {
+      expect(ssrc).toContain(header);
+    }
+  });
+});
+
+// ============================================================================
+// getMemberTasks status filtering (Fix #2 regression guard)
+// ============================================================================
+
+describe('DataService.getMemberTasks status filtering', () => {
+  let mockTaskSheet;
+
+  function makeTaskData() {
+    return [
+      ['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed', 'Assignee Type', 'Assigned By'],
+      ['MT_1', 'steward@test.com', 'Task Open', 'desc', 'member@test.com', 'high', 'open', new Date('2026-04-01'), new Date(), '', 'member', 'steward@test.com'],
+      ['MT_2', 'steward@test.com', 'Task Done', 'desc', 'member@test.com', 'medium', 'completed', new Date('2026-03-01'), new Date(), new Date(), 'member', 'steward@test.com'],
+      ['MT_3', 'steward@test.com', 'Task InProg', 'desc', 'member@test.com', 'low', 'in-progress', new Date('2026-05-01'), new Date(), '', 'member', 'steward@test.com'],
+      ['ST_4', 'steward@test.com', 'Steward Task', 'desc', '', 'high', 'open', '', new Date(), '', 'steward', ''],
+    ];
+  }
+
+  beforeEach(() => {
+    const taskData = makeTaskData();
+    mockTaskSheet = createMockSheet(SHEETS.STEWARD_TASKS || '_Steward_Tasks', taskData);
+
+    const memberData = makeMemberData();
+    const mockMemberSheet2 = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', memberData);
+    const mockSs = createMockSpreadsheet([mockMemberSheet2, mockTaskSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
+
+    if (typeof DataService !== 'undefined' && DataService._invalidateSheetCache) {
+      DataService._invalidateSheetCache(SHEETS.STEWARD_TASKS || '_Steward_Tasks');
+    }
+  });
+
+  test('not-completed filter returns only non-completed tasks', () => {
+    const tasks = DataService.getMemberTasks('member@test.com', 'not-completed');
+    expect(tasks.length).toBe(2);
+    tasks.forEach(t => expect(t.status).not.toBe('completed'));
+  });
+
+  test('completed filter returns only completed tasks', () => {
+    const tasks = DataService.getMemberTasks('member@test.com', 'completed');
+    expect(tasks.length).toBe(1);
+    expect(tasks[0].status).toBe('completed');
+  });
+
+  test('null filter returns all member tasks (no steward tasks)', () => {
+    const tasks = DataService.getMemberTasks('member@test.com', null);
+    expect(tasks.length).toBe(3);
+  });
+
+  test('does not include steward-type tasks', () => {
+    const tasks = DataService.getMemberTasks('steward@test.com', null);
+    // ST_4 has assignee type 'steward', not 'member' — should not appear
+    const stewardTasks = tasks.filter(t => t.id === 'ST_4');
+    expect(stewardTasks.length).toBe(0);
+  });
+
+  test('sorts by priority (high first) then by due date', () => {
+    const tasks = DataService.getMemberTasks('member@test.com', 'not-completed');
+    expect(tasks[0].priority).toBe('high');
+  });
+
+  test('returns expected fields on each task', () => {
+    const tasks = DataService.getMemberTasks('member@test.com', 'not-completed');
+    expect(tasks.length).toBeGreaterThan(0);
+    const t = tasks[0];
+    expect(t).toHaveProperty('id');
+    expect(t).toHaveProperty('title');
+    expect(t).toHaveProperty('description');
+    expect(t).toHaveProperty('priority');
+    expect(t).toHaveProperty('status');
+    expect(t).toHaveProperty('dueDate');
+    expect(t).toHaveProperty('dueDays');
+    expect(t).toHaveProperty('assignedBy');
+    expect(t).toHaveProperty('created');
+  });
+});
+
+// ============================================================================
+// _getMemberBatchData includes memberTaskCount (Fix #4 regression guard)
+// ============================================================================
+
+describe('_getMemberBatchData memberTaskCount', () => {
+  test('getBatchData for member role includes memberTaskCount key', () => {
+    const fs = require('fs');
+    const src = fs.readFileSync(require('path').join(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8');
+    expect(src).toMatch(/memberTaskCount/);
+    // Verify it's in the return object of _getMemberBatchData
+    const memberBatchMatch = src.match(/function _getMemberBatchData[\s\S]*?return \{[\s\S]*?\};/);
+    expect(memberBatchMatch).not.toBeNull();
+    expect(memberBatchMatch[0]).toContain('memberTaskCount');
   });
 });

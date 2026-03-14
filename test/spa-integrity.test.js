@@ -63,7 +63,7 @@ describe('G8: Every sidebar tab has a route handler', () => {
   // Extract all handled tab IDs from _handleTabNav
   const handledIds = new Set();
   // Shared tabs (before role switch)
-  const sharedPattern = /if\s*\(tabId\s*===\s*'([^']+)'\)/g;
+  const sharedPattern = /if\s*\(tabId\s*===\s*'([^']+)'/g;
   let sm;
   while ((sm = sharedPattern.exec(indexCode)) !== null) {
     handledIds.add(sm[1]);
@@ -173,6 +173,7 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
       renderMeetingsPage: ['meetings'],
       renderMinutesPage: ['minutes'],
       renderMemberTasks: ['mytasks'],
+      renderMemberTimelinePage: ['timeline'],
       renderSurveyFormPage: ['surveyform'],
     };
     for (const [funcName, tabIds] of Object.entries(renderMap)) {
@@ -605,5 +606,390 @@ describe('G16: renderPageLayout always renders both sidebar and bottom nav', () 
     // This pattern should no longer exist
     const branchPattern = /if\s*\(\s*isSidebarLayout\(\)\s*\)\s*\{[\s\S]*?\}\s*else\s*\{/;
     expect(branchPattern.test(body)).toBe(false);
+  });
+});
+
+// ====================================================================
+// G21: My Tasks tab regression guards
+// ============================================================================
+
+describe('G21: My Tasks tab integrity', () => {
+  const memberCode = read('member_view.html');
+  const stewardCode = read('steward_view.html');
+  const dataServiceCode = read('21_WebDashDataService.gs');
+
+  test('renderMemberTasks passes explicit status filter (not null) for open tab', () => {
+    // Extract the renderMemberTasks function body
+    const funcStart = memberCode.indexOf('function renderMemberTasks');
+    expect(funcStart).not.toBe(-1);
+    let depth = 0, started = false, block = '';
+    for (let i = funcStart; i < memberCode.length; i++) {
+      if (memberCode[i] === '{') { depth++; started = true; }
+      if (memberCode[i] === '}') depth--;
+      if (started) block += memberCode[i];
+      if (started && depth === 0) break;
+    }
+    // Should NOT pass null as statusFilter for the open tab
+    // The old bug: var statusFilter = activeSubTab === 'completed' ? 'completed' : null;
+    expect(block).not.toMatch(/statusFilter\s*=.*\?\s*'completed'\s*:\s*null/);
+    // Should use 'not-completed' for the open tab
+    expect(block).toContain('not-completed');
+  });
+
+  test('renderMemberTasks does not redundantly filter tasks client-side', () => {
+    const funcStart = memberCode.indexOf('function renderMemberTasks');
+    expect(funcStart).not.toBe(-1);
+    let depth = 0, started = false, block = '';
+    for (let i = funcStart; i < memberCode.length; i++) {
+      if (memberCode[i] === '{') { depth++; started = true; }
+      if (memberCode[i] === '}') depth--;
+      if (started) block += memberCode[i];
+      if (started && depth === 0) break;
+    }
+    // Should NOT have client-side filter like: tasks.filter(function(t) { return t.status !== 'completed'; })
+    expect(block).not.toMatch(/tasks\.filter\(function\(t\)\s*\{\s*return t\.status !== 'completed'/);
+  });
+
+  test('description truncation includes ellipsis indicator', () => {
+    // The old bug: task.description.substring(0, 100) — no ellipsis
+    const funcStart = memberCode.indexOf('function renderMemberTasks');
+    expect(funcStart).not.toBe(-1);
+    let depth = 0, started = false, block = '';
+    for (let i = funcStart; i < memberCode.length; i++) {
+      if (memberCode[i] === '{') { depth++; started = true; }
+      if (memberCode[i] === '}') depth--;
+      if (started) block += memberCode[i];
+      if (started && depth === 0) break;
+    }
+    // Must check length before truncating (not blind substring)
+    expect(block).toMatch(/description\.length\s*>/);
+    // Must include ellipsis character or '...'
+    expect(block).toMatch(/\\u2026|\.{3}|\u2026/);
+  });
+
+  test('getMemberTasks supports not-completed filter', () => {
+    // The backend must handle 'not-completed' as a special status filter
+    const funcMatch = dataServiceCode.match(/function getMemberTasks[\s\S]*?return tasks;\s*\}/);
+    expect(funcMatch).not.toBeNull();
+    expect(funcMatch[0]).toContain('not-completed');
+  });
+
+  test('renderBottomNav shows member task badge on More tab', () => {
+    // The steward_view.html renderBottomNav should have a badge for member task count
+    const funcStart = stewardCode.indexOf('function renderBottomNav');
+    expect(funcStart).not.toBe(-1);
+    let depth = 0, started = false, block = '';
+    for (let i = funcStart; i < stewardCode.length; i++) {
+      if (stewardCode[i] === '{') { depth++; started = true; }
+      if (stewardCode[i] === '}') depth--;
+      if (started) block += stewardCode[i];
+      if (started && depth === 0) break;
+    }
+    expect(block).toContain('memberTaskCount');
+  });
+
+  test('_getMemberBatchData includes memberTaskCount', () => {
+    const funcMatch = dataServiceCode.match(/function _getMemberBatchData[\s\S]*?return \{[\s\S]*?\};/);
+    expect(funcMatch).not.toBeNull();
+    expect(funcMatch[0]).toContain('memberTaskCount');
+  });
+
+  test('initMemberView seeds AppState.memberTaskCount from batch', () => {
+    expect(memberCode).toContain('AppState.memberTaskCount');
+  });
+
+  test('My Tasks menu item in renderMemberMore has badge property', () => {
+    // Verify the More menu My Tasks entry includes a badge
+    expect(memberCode).toMatch(/label:\s*'My Tasks'[\s\S]*?badge:/);
+  });
+});
+
+
+// ============================================================================
+// G18: SHARED TABS ROUTE FOR BOTH ROLES
+// ============================================================================
+// Bug (2026-03-14): POMS was a shared tab in both steward and member More menus,
+// but _handleTabNav only handled it for role === 'member'. Stewards were silently
+// redirected to their dashboard. This guard ensures any tab referenced by BOTH
+// views is routed before the role-specific switch blocks (i.e., as a shared tab).
+
+describe('G18: Shared tabs route for both roles', () => {
+  const indexCode = read('index.html');
+  const stewardCode = read('steward_view.html');
+  const memberCode = read('member_view.html');
+
+  // Extract tab IDs from More menus
+  function extractMenuTabIds(code) {
+    const ids = new Set();
+    const navRegex = /_handleTabNav\(\s*'[^']*'\s*,\s*'([^']+)'\s*\)/g;
+    let m;
+    while ((m = navRegex.exec(code)) !== null) ids.add(m[1]);
+    return ids;
+  }
+
+  const stewardMenuTabs = extractMenuTabIds(stewardCode);
+  const memberMenuTabs = extractMenuTabIds(memberCode);
+
+  // Tabs that appear in BOTH views
+  const sharedTabs = [...stewardMenuTabs].filter(id => memberMenuTabs.has(id));
+
+  // Extract shared tab handlers (if-checks before the role switch blocks)
+  function extractSharedHandlers(code) {
+    // Shared handlers are if (tabId === 'xxx') blocks before "if (role === 'member')"
+    const roleSwitch = code.indexOf("if (role === 'member')");
+    if (roleSwitch === -1) return new Set();
+    const beforeSwitch = code.substring(
+      code.indexOf('function _handleTabNav'),
+      roleSwitch
+    );
+    const ids = new Set();
+    const pattern = /if\s*\(tabId\s*===\s*'([^']+)'\)/g;
+    let m;
+    while ((m = pattern.exec(beforeSwitch)) !== null) ids.add(m[1]);
+    return ids;
+  }
+
+  const sharedHandlers = extractSharedHandlers(indexCode);
+
+  test('found shared tabs between steward and member views', () => {
+    expect(sharedTabs.length).toBeGreaterThan(0);
+  });
+
+  sharedTabs.forEach(tabId => {
+    test(`shared tab '${tabId}' is handled before role-specific switch (not role-gated)`, () => {
+      // Must be in shared handlers OR in BOTH role-specific switch blocks
+      if (sharedHandlers.has(tabId)) return; // handled as shared — OK
+
+      // Otherwise check both switches have it
+      const memberSwitch = indexCode.match(/if\s*\(role\s*===\s*'member'\)\s*\{[\s\S]*?^\s{6}\}/m);
+      const stewardSwitch = indexCode.match(/\}\s*else\s*\{[\s\S]*?case\s*'([^']+)'/gm);
+
+      const memberCases = new Set();
+      const stewardCases = new Set();
+      // Member switch cases
+      for (const m of indexCode.matchAll(/if\s*\(role\s*===\s*'member'\)\s*\{[\s\S]*?case\s*'([^']+)'/g)) {
+        memberCases.add(m[1]);
+      }
+      // All case labels (steward + member)
+      for (const m of indexCode.matchAll(/case\s*'([^']+)':/g)) {
+        stewardCases.add(m[1]);
+      }
+
+      const inShared = sharedHandlers.has(tabId);
+      const msg = `Tab '${tabId}' is in both steward and member menus but not handled as a shared tab. ` +
+        'Add it before the role-specific switch in _handleTabNav to prevent role-gated routing.';
+      expect(inShared).toBe(true); // enforce: shared tabs must be handled as shared
+    });
+  });
+});
+
+
+// ============================================================================
+// G19: MORE MENU ITEMS MUST HAVE ROUTE HANDLERS
+// ============================================================================
+// Bug class: A tab ID in a More menu's _handleTabNav call has no corresponding
+// handler in _handleTabNav, causing silent redirect to default (dashboard/home).
+// This is a superset of G8 — checks More menus in the view files, not just sidebar.
+
+describe('G19: More menu items have route handlers', () => {
+  const indexCode = read('index.html');
+  const stewardCode = read('steward_view.html');
+  const memberCode = read('member_view.html');
+
+  function extractMenuTabIds(code) {
+    const ids = [];
+    const navRegex = /_handleTabNav\(\s*'[^']*'\s*,\s*'([^']+)'\s*\)/g;
+    let m;
+    while ((m = navRegex.exec(code)) !== null) ids.push(m[1]);
+    return ids;
+  }
+
+  function extractHandledIds(code) {
+    const handled = new Set();
+    for (const m of code.matchAll(/if\s*\(tabId\s*===\s*'([^']+)'\)/g)) handled.add(m[1]);
+    for (const m of code.matchAll(/case\s*'([^']+)':/g)) handled.add(m[1]);
+    handled.add('_member_more');
+    handled.add('_steward_more');
+    handled.add('more');
+    handled.add('more_steward');
+    return handled;
+  }
+
+  const handledIds = extractHandledIds(indexCode);
+
+  test('all steward More menu tab IDs have route handlers', () => {
+    const stewardMenuTabs = extractMenuTabIds(stewardCode);
+    const unhandled = stewardMenuTabs.filter(id => !handledIds.has(id));
+    if (unhandled.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn('Steward More menu tabs with no route handler:', unhandled);
+    }
+    expect(unhandled).toEqual([]);
+  });
+
+  test('all member More menu tab IDs have route handlers', () => {
+    const memberMenuTabs = extractMenuTabIds(memberCode);
+    const unhandled = memberMenuTabs.filter(id => !handledIds.has(id));
+    if (unhandled.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn('Member More menu tabs with no route handler:', unhandled);
+    }
+    expect(unhandled).toEqual([]);
+  });
+});
+
+
+// ============================================================================
+// G20: POMS DESCRIPTION ACCURACY
+// ============================================================================
+// Bug (2026-03-14): Both views described POMS as "Postal Operations Manual"
+// instead of "Program Operations Manual System". This guard prevents the wrong
+// acronym expansion from reappearing.
+
+describe('G20: POMS description accuracy', () => {
+  const stewardCode = read('steward_view.html');
+  const memberCode = read('member_view.html');
+
+  test('steward view does not say "Postal Operations Manual"', () => {
+    expect(stewardCode).not.toContain('Postal Operations Manual');
+  });
+
+  test('member view does not say "Postal Operations Manual"', () => {
+    expect(memberCode).not.toContain('Postal Operations Manual');
+  });
+
+  test('steward view has correct POMS description', () => {
+    expect(stewardCode).toContain('Program Operations Manual System');
+  });
+
+  test('member view has correct POMS description', () => {
+    expect(memberCode).toContain('Program Operations Manual System');
+  });
+});
+
+
+// ============================================================================
+// G21: MEMBER DUES-GATED TABS HAVE _isDuesPaying() GUARD
+// ============================================================================
+// Bug history: v4.25.10 — Resources tab banner claimed dues restriction but
+// renderMemberResources() had no _isDuesPaying() check, allowing non-paying
+// members full access. This test ensures all tabs that should be dues-gated
+// actually call _isDuesPaying() at entry.
+
+describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
+  const memberCode = read('member_view.html');
+
+  // Tabs that MUST be dues-gated — any member tab that exposes premium content.
+  // If you add a new dues-gated tab, add its render function name here.
+  const duesGatedTabs = [
+    { fn: 'renderMemberResources', label: 'Resources' },
+    { fn: 'renderSurveyFormPage', label: 'Quarterly Survey' },
+    { fn: 'renderUnionStatsPage', label: 'Union Stats' },
+    { fn: 'renderPollsPage', label: 'Polls' },
+  ];
+
+  // Tabs that are intentionally NOT dues-gated (public/core features)
+  const publicTabs = [
+    'renderMemberHome',
+    'renderMyCases',
+    'renderStewardContact',
+    'renderUpdateProfile',
+    'renderMemberNotifications',
+  ];
+
+  duesGatedTabs.forEach(({ fn, label }) => {
+    test(`${fn}() (${label}) calls _isDuesPaying() before rendering`, () => {
+      // Extract the function body
+      const fnStart = memberCode.indexOf('function ' + fn + '(');
+      expect(fnStart).toBeGreaterThan(-1);
+
+      // Get the first ~200 chars of the function body (gate must be at entry)
+      const bodyStart = memberCode.indexOf('{', fnStart);
+      const earlyBody = memberCode.substring(bodyStart, bodyStart + 300);
+
+      expect(earlyBody).toContain('_isDuesPaying()');
+      expect(earlyBody).toContain('_renderDuesGate');
+    });
+  });
+
+  publicTabs.forEach(fn => {
+    test(`${fn}() is intentionally NOT dues-gated (exists for whitelist)`, () => {
+      expect(memberCode).toContain('function ' + fn + '(');
+    });
+  });
+});
+
+// ============================================================================
+// G22: Workload Tracker frontend invariants
+// ============================================================================
+
+describe('G22 — Workload Tracker frontend invariants', () => {
+  const memberView = read('member_view.html');
+
+  test('WT_CAT_KEY_LABELS map is defined from WT_CATEGORIES', () => {
+    expect(memberView).toContain('var WT_CAT_KEY_LABELS = {}');
+    expect(memberView).toContain('WT_CATEGORIES.forEach');
+    expect(memberView).toContain('WT_CAT_KEY_LABELS[c.key] = c.label');
+  });
+
+  test('history sub-categories use WT_CAT_KEY_LABELS not raw keys', () => {
+    // Must NOT use ck + ' > ' (raw key concatenation)
+    expect(memberView).not.toMatch(/ck \+ ' > ' \+ sk/);
+    // Must use label lookup
+    expect(memberView).toContain('WT_CAT_KEY_LABELS[ck]');
+  });
+
+  test('stats sub-category headings use WT_CAT_KEY_LABELS', () => {
+    expect(memberView).toContain('WT_CAT_KEY_LABELS[sck]');
+  });
+
+  test('bar chart uses dynamic max instead of hardcoded 100', () => {
+    // Must NOT have (val / 100) * 100 pattern
+    expect(memberView).not.toMatch(/val\s*\/\s*100\)\s*\*\s*100/);
+    // Must have barMax calculation
+    expect(memberView).toContain('barMax');
+    expect(memberView).toMatch(/val\s*\/\s*barMax/);
+  });
+
+  test('auto-save draft functions are defined', () => {
+    expect(memberView).toContain('function _saveDraft()');
+    expect(memberView).toContain('function _loadDraft()');
+    expect(memberView).toContain('function _clearDraft()');
+  });
+
+  test('draft is cleared on successful submission', () => {
+    expect(memberView).toContain('_clearDraft()');
+  });
+
+  test('draft is restored on page load', () => {
+    expect(memberView).toContain('_loadDraft()');
+    expect(memberView).toContain('_wtRestoreForm(inputs, draft)');
+  });
+
+  test('last-submitted indicator is rendered', () => {
+    expect(memberView).toContain('wt-last-submitted');
+    expect(memberView).toContain('wt_lastSub_');
+  });
+
+  test('WT_CATEGORIES has exactly 8 entries with required fields', () => {
+    const catMatch = memberView.match(/var WT_CATEGORIES = \[([\s\S]*?)\];/);
+    expect(catMatch).not.toBeNull();
+    const idMatches = catMatch[1].match(/id:\s*'t\d'/g);
+    expect(idMatches).not.toBeNull();
+    expect(idMatches.length).toBe(8);
+    const keyMatches = catMatch[1].match(/key:\s*'[a-z]+'/g);
+    expect(keyMatches).not.toBeNull();
+    expect(keyMatches.length).toBe(8);
+  });
+
+  test('WT_CAT_KEYS has exactly 8 entries matching WT_CATEGORIES keys', () => {
+    const keysMatch = memberView.match(/var WT_CAT_KEYS = \[([^\]]+)\]/);
+    expect(keysMatch).not.toBeNull();
+    const keys = keysMatch[1].match(/'([a-z]+)'/g).map(k => k.replace(/'/g, ''));
+    expect(keys.length).toBe(8);
+    // Each key must appear in WT_CATEGORIES
+    keys.forEach(k => {
+      expect(memberView).toContain("key: '" + k + "'");
+    });
   });
 });

@@ -198,6 +198,33 @@ describe('QAForum.getQuestions', () => {
     expect(result.total).toBe(2); // excludes deleted
   });
 
+  test('excludes resolved questions by default (showResolved=false)', () => {
+    var now = new Date('2026-03-01T12:00:00Z');
+    var forumData = makeForumData([
+      ['QA_1', 'a@test.com', 'A', false, 'Active', 'active', 0, '', 0, now, now],
+      ['QA_2', 'b@test.com', 'B', false, 'Resolved', 'resolved', 0, '', 0, now, now],
+    ]);
+    setupSheets({ forumData: forumData });
+
+    var result = QAForum.getQuestions('a@test.com', 1, 20, 'recent');
+    expect(result.questions.length).toBe(1);
+    expect(result.questions[0].id).toBe('QA_1');
+    expect(result.total).toBe(1);
+  });
+
+  test('includes resolved questions when showResolved=true', () => {
+    var now = new Date('2026-03-01T12:00:00Z');
+    var forumData = makeForumData([
+      ['QA_1', 'a@test.com', 'A', false, 'Active', 'active', 0, '', 0, now, now],
+      ['QA_2', 'b@test.com', 'B', false, 'Resolved', 'resolved', 0, '', 0, now, now],
+    ]);
+    setupSheets({ forumData: forumData });
+
+    var result = QAForum.getQuestions('a@test.com', 1, 20, 'recent', true);
+    expect(result.questions.length).toBe(2);
+    expect(result.total).toBe(2);
+  });
+
   test('sets isOwner correctly based on email', () => {
     var now = new Date('2026-03-01T12:00:00Z');
     var forumData = makeForumData([
@@ -789,19 +816,76 @@ describe('QAForum.moderateAnswer', () => {
     var answerData = makeAnswerData([
       ['ANS_1', 'QA_1', 's@test.com', 'Steward', true, 'Bad answer', 'active', now],
     ]);
+    var forumData = makeForumData([
+      ['QA_1', 'u@test.com', 'U', false, 'Question', 'active', 0, '', 1, now, now],
+    ]);
     var answerSheet = createMockSheet(SHEETS.QA_ANSWERS, answerData);
+    var forumSheet = createMockSheet(SHEETS.QA_FORUM, forumData);
     var mockRange = {
       setValue: jest.fn(), setValues: jest.fn(),
       getValue: jest.fn(() => ''), getValues: jest.fn(() => [['']])
     };
     answerSheet.getRange.mockReturnValue(mockRange);
-    var ss = createMockSpreadsheet([answerSheet]);
+    forumSheet.getRange.mockReturnValue(mockRange);
+    var ss = createMockSpreadsheet([answerSheet, forumSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
     var result = QAForum.moderateAnswer('steward@test.com', 'ANS_1', 'delete');
     expect(result.success).toBe(true);
     expect(answerSheet.getRange).toHaveBeenCalledWith(2, 7);
     expect(mockRange.setValue).toHaveBeenCalledWith('deleted');
+  });
+
+  test('decrements answer count on parent question when deleting an active answer', () => {
+    var now = new Date('2026-03-01T12:00:00Z');
+    var answerData = makeAnswerData([
+      ['ANS_1', 'QA_1', 's@test.com', 'Steward', true, 'Answer to delete', 'active', now],
+    ]);
+    var forumData = makeForumData([
+      ['QA_1', 'u@test.com', 'U', false, 'Question', 'active', 0, '', 2, now, now],
+    ]);
+    var answerSheet = createMockSheet(SHEETS.QA_ANSWERS, answerData);
+    var forumSheet = createMockSheet(SHEETS.QA_FORUM, forumData);
+    var setValueCalls = { answer: [], forum: [] };
+    answerSheet.getRange.mockReturnValue({
+      setValue: jest.fn(function(v) { setValueCalls.answer.push(v); }),
+      setValues: jest.fn(), getValue: jest.fn(() => ''), getValues: jest.fn(() => [['']])
+    });
+    forumSheet.getRange.mockReturnValue({
+      setValue: jest.fn(function(v) { setValueCalls.forum.push(v); }),
+      setValues: jest.fn(), getValue: jest.fn(() => ''), getValues: jest.fn(() => [['']])
+    });
+    var ss = createMockSpreadsheet([answerSheet, forumSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    QAForum.moderateAnswer('steward@test.com', 'ANS_1', 'delete');
+
+    // Answer count should be decremented from 2 to 1
+    expect(forumSheet.getRange).toHaveBeenCalledWith(2, 9);
+    expect(setValueCalls.forum).toContain(1);
+  });
+
+  test('does not change answer count when flagging (not deleting)', () => {
+    var now = new Date('2026-03-01T12:00:00Z');
+    var answerData = makeAnswerData([
+      ['ANS_1', 'QA_1', 's@test.com', 'S', false, 'Flaggable', 'active', now],
+    ]);
+    var forumData = makeForumData([
+      ['QA_1', 'u@test.com', 'U', false, 'Question', 'active', 0, '', 1, now, now],
+    ]);
+    var answerSheet = createMockSheet(SHEETS.QA_ANSWERS, answerData);
+    var forumSheet = createMockSheet(SHEETS.QA_FORUM, forumData);
+    answerSheet.getRange.mockReturnValue({
+      setValue: jest.fn(), setValues: jest.fn(),
+      getValue: jest.fn(() => ''), getValues: jest.fn(() => [['']])
+    });
+    var ss = createMockSpreadsheet([answerSheet, forumSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    QAForum.moderateAnswer('steward@test.com', 'ANS_1', 'flag');
+
+    // Forum sheet should NOT have getRange called for answer count update
+    expect(forumSheet.getRange).not.toHaveBeenCalled();
   });
 
   test('sets status to flagged on flag action', () => {
@@ -839,12 +923,18 @@ describe('QAForum.moderateAnswer', () => {
     var answerData = makeAnswerData([
       ['ANS_1', 'QA_1', 's@test.com', 'S', false, 'Answer', 'active', now],
     ]);
+    var forumData = makeForumData([
+      ['QA_1', 'u@test.com', 'U', false, 'Q', 'active', 0, '', 1, now, now],
+    ]);
     var answerSheet = createMockSheet(SHEETS.QA_ANSWERS, answerData);
-    answerSheet.getRange.mockReturnValue({
+    var forumSheet = createMockSheet(SHEETS.QA_FORUM, forumData);
+    var mockRange = {
       setValue: jest.fn(), setValues: jest.fn(),
       getValue: jest.fn(() => ''), getValues: jest.fn(() => [['']])
-    });
-    var ss = createMockSpreadsheet([answerSheet]);
+    };
+    answerSheet.getRange.mockReturnValue(mockRange);
+    forumSheet.getRange.mockReturnValue(mockRange);
+    var ss = createMockSpreadsheet([answerSheet, forumSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
     QAForum.moderateAnswer('steward@test.com', 'ANS_1', 'delete');
@@ -927,9 +1017,9 @@ describe('Global wrappers', () => {
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
     var spy = jest.spyOn(QAForum, 'getQuestions');
-    qaGetQuestions('test-session-token', 1, 10, 'recent');
-    // Wrapper resolves email via _resolveCallerEmail(sessionToken) — passes resolved email
-    expect(spy).toHaveBeenCalledWith('test@example.com', 1, 10, 'recent');
+    qaGetQuestions('test-session-token', 1, 10, 'recent', true);
+    // Wrapper resolves email via _resolveCallerEmail(sessionToken) — passes resolved email + showResolved
+    expect(spy).toHaveBeenCalledWith('test@example.com', 1, 10, 'recent', true);
     spy.mockRestore();
   });
 

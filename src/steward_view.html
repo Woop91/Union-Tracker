@@ -577,7 +577,7 @@ function renderBottomNav(container, role, activeTab) {
       }
     }
 
-    // Badge: unanswered Q&A count on More tab
+    // Badge: unanswered Q&A count on More tab (steward)
     if (tab.id === 'more_steward' && role === 'steward') {
       var qaUnans = AppState.qaUnansweredCount || 0;
       if (qaUnans > 0) {
@@ -589,6 +589,21 @@ function renderBottomNav(container, role, activeTab) {
             padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
           }
         }, qaUnans > 9 ? '9+' : String(qaUnans)));
+      }
+    }
+
+    // Badge: open member task count on More tab (member)
+    if (tab.id === 'more' && role !== 'steward') {
+      var mtCount = AppState.memberTaskCount || 0;
+      if (mtCount > 0) {
+        iconWrap.appendChild(el('span', {
+          style: {
+            position: 'absolute', top: '-4px', right: '-6px',
+            background: 'var(--accent)', color: '#fff',
+            fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+            padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+          }
+        }, mtCount > 9 ? '9+' : String(mtCount)));
       }
     }
 
@@ -2544,7 +2559,7 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
       { group: 'Reference' },
-      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Postal Operations Manual reference', action: function() { _handleTabNav('steward', 'poms'); } },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('steward', 'poms'); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
       { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
       { group: 'Community' },
@@ -4038,7 +4053,7 @@ function _renderLivePollsSteward(container) {
           serverCall().withSuccessHandler(function(result) {
             if (result && result.success) { _renderLivePollsSteward(container); }
             else { closeBtn.textContent = 'Close'; closeBtn.disabled = false; }
-          }).wqClosePoll(null, q.id);
+          }).wqClosePoll(SESSION_TOKEN, q.id);
         }
       }, 'Close');
       topRow.appendChild(closeBtn);
@@ -4103,7 +4118,7 @@ function _renderCreateStewardPoll(container) {
         if (result && result.success) questionInput.value = '';
       }).withFailureHandler(function() {
         statusMsg.textContent = 'Failed to create poll.'; statusMsg.style.color = 'var(--danger)';
-      }).wqSetStewardQuestion(null, text, opts);
+      }).wqSetStewardQuestion(SESSION_TOKEN, text, opts);
     }
   }, 'Post Poll'));
   container.appendChild(formCard);
@@ -4120,7 +4135,7 @@ function _renderCreateStewardPoll(container) {
     ['weekly', 'biweekly', 'monthly'].forEach(function(freq) {
       var labels = { weekly: '📅 Weekly', biweekly: '📆 Bi-weekly', monthly: '🗓️ Monthly' };
       var btn = el('button', {
-        className: 'btn' + (currentFreq === freq ? ' btn-primary' : ' btn-secondary'),
+        className: 'btn freq-btn' + (currentFreq === freq ? ' btn-primary' : ' btn-secondary'),
         style: { width: 'auto', padding: '8px 16px', fontSize: '12px' },
         onClick: function() {
           freqStatus.textContent = 'Saving…'; freqStatus.style.color = 'var(--muted)';
@@ -4130,16 +4145,14 @@ function _renderCreateStewardPoll(container) {
             freqStatus.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
             freqBtns.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
             if (result && result.success) {
-              // Update active state
               freqBtns.querySelectorAll('button').forEach(function(b) {
-                b.className = b.getAttribute('data-freq') === freq ? 'btn btn-primary' : 'btn btn-secondary';
-                b.style.width = 'auto'; b.style.padding = '8px 16px'; b.style.fontSize = '12px';
+                b.className = (b.getAttribute('data-freq') === freq ? 'btn btn-primary' : 'btn btn-secondary') + ' freq-btn';
               });
             }
           }).withFailureHandler(function() {
             freqStatus.textContent = 'Failed to save.'; freqStatus.style.color = 'var(--danger)';
             freqBtns.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
-          }).wqSetPollFrequency(null, freq);
+          }).wqSetPollFrequency(SESSION_TOKEN, freq);
         }
       }, labels[freq]);
       btn.setAttribute('data-freq', freq);
@@ -4170,6 +4183,7 @@ function _renderCreateStewardPoll(container) {
           drawStatus.style.color = 'var(--danger)';
           return;
         }
+        if (!confirm('Draw a random community poll now? This replaces any existing community poll for this period.')) return;
         drawBtn.textContent = 'Drawing…';
         drawBtn.disabled = true;
         drawStatus.textContent = '';
@@ -4205,7 +4219,6 @@ function _renderCreateStewardPoll(container) {
 
 function _renderPollHistorySteward(container) {
   showLoading(container, 'list');
-  var page = 1;
   function loadPage(p) {
     showLoading(container);
     serverCall().withSuccessHandler(function(data) {
@@ -4242,16 +4255,16 @@ function _renderPollHistorySteward(container) {
       });
       if (data.hasMore || p > 1) {
         var nav = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' } });
-        if (p > 1) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p - 1; loadPage(page); } }, '← Previous'));
-        if (data.hasMore) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p + 1; loadPage(page); } }, 'Next →'));
+        if (p > 1) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { loadPage(p - 1); } }, '← Previous'));
+        if (data.hasMore) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { loadPage(p + 1); } }, 'Next →'));
         container.appendChild(nav);
       }
     }).withFailureHandler(function() {
       container.innerHTML = '';
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load history.'));
-    }).wqGetHistory(null, p, 15);
+    }).wqGetHistory(SESSION_TOKEN, p, 15);
   }
-  loadPage(page);
+  loadPage(1);
 }
 
 
@@ -4305,18 +4318,37 @@ function _renderMinutesList(container) {
       return;
     }
 
+    var filtered = minutes;
     var currentPage = 0;
-    var totalPages = Math.ceil(minutes.length / _MINUTES_PAGE_SIZE);
+
+    var filterInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Search minutes...', style: { marginBottom: '10px', minHeight: '36px' } });
+    container.appendChild(filterInput);
+
     var listArea = el('div');
     var pagerArea = el('div', { style: { marginTop: '12px' } });
     container.appendChild(listArea);
     container.appendChild(pagerArea);
 
+    filterInput.addEventListener('input', function() {
+      var q = filterInput.value.toLowerCase();
+      filtered = q ? minutes.filter(function(m) {
+        return (m.title || '').toLowerCase().indexOf(q) !== -1 ||
+               (m.meetingDate || '').toLowerCase().indexOf(q) !== -1 ||
+               (m.bullets || '').toLowerCase().indexOf(q) !== -1;
+      }) : minutes;
+      renderPage(0);
+    });
+
     function renderPage(page) {
       currentPage = page;
       listArea.innerHTML = '';
+      var totalPages = Math.ceil(filtered.length / _MINUTES_PAGE_SIZE) || 1;
       var start = page * _MINUTES_PAGE_SIZE;
-      var slice = minutes.slice(start, start + _MINUTES_PAGE_SIZE);
+      var slice = filtered.slice(start, start + _MINUTES_PAGE_SIZE);
+
+      if (slice.length === 0) {
+        listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No matching minutes.'));
+      }
 
       slice.forEach(function(m) {
         var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
@@ -4377,11 +4409,20 @@ function _renderAddMinutes(container, onSaveSuccess) {
     ));
   }
 
+  var TITLE_MAX = 200, BULLETS_MAX = 2000, FULL_MAX = 5000;
+
   var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
   formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '12px' } }, 'Add Meeting Minutes'));
 
-  var titleInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Meeting title...', style: { marginBottom: '8px', minHeight: '36px' } });
+  var titleInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Meeting title...', maxLength: TITLE_MAX, style: { marginBottom: '2px', minHeight: '36px' } });
   formCard.appendChild(titleInput);
+  var titleCount = el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'right', marginBottom: '8px' } }, '0 / ' + TITLE_MAX);
+  formCard.appendChild(titleCount);
+  titleInput.addEventListener('input', function() {
+    var len = titleInput.value.length;
+    titleCount.textContent = len + ' / ' + TITLE_MAX;
+    titleCount.style.color = len >= TITLE_MAX ? 'var(--danger)' : 'var(--muted)';
+  });
 
   // Pre-fill today (v4.20.18)
   var today = new Date();
@@ -4392,12 +4433,26 @@ function _renderAddMinutes(container, onSaveSuccess) {
   formCard.appendChild(dateInput);
 
   formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Key points (bullet format)'));
-  var bulletsInput = el('textarea', { className: 'msg-textarea', placeholder: '- Point 1\n- Point 2\n- Point 3', style: { marginBottom: '8px', minHeight: '80px' } });
+  var bulletsInput = el('textarea', { className: 'msg-textarea', placeholder: '- Point 1\n- Point 2\n- Point 3', maxLength: BULLETS_MAX, style: { marginBottom: '2px', minHeight: '80px' } });
   formCard.appendChild(bulletsInput);
+  var bulletsCount = el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'right', marginBottom: '8px' } }, '0 / ' + BULLETS_MAX);
+  formCard.appendChild(bulletsCount);
+  bulletsInput.addEventListener('input', function() {
+    var len = bulletsInput.value.length;
+    bulletsCount.textContent = len + ' / ' + BULLETS_MAX;
+    bulletsCount.style.color = len >= BULLETS_MAX ? 'var(--danger)' : 'var(--muted)';
+  });
 
   formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Full minutes (optional)'));
-  var fullInput = el('textarea', { className: 'msg-textarea', placeholder: 'Detailed meeting notes...', style: { marginBottom: '10px', minHeight: '120px' } });
+  var fullInput = el('textarea', { className: 'msg-textarea', placeholder: 'Detailed meeting notes...', maxLength: FULL_MAX, style: { marginBottom: '2px', minHeight: '120px' } });
   formCard.appendChild(fullInput);
+  var fullCount = el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'right', marginBottom: '10px' } }, '0 / ' + FULL_MAX);
+  formCard.appendChild(fullCount);
+  fullInput.addEventListener('input', function() {
+    var len = fullInput.value.length;
+    fullCount.textContent = len + ' / ' + FULL_MAX;
+    fullCount.style.color = len >= FULL_MAX ? 'var(--danger)' : 'var(--muted)';
+  });
 
   var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '8px' } });
   formCard.appendChild(statusMsg);
@@ -4406,9 +4461,11 @@ function _renderAddMinutes(container, onSaveSuccess) {
     onClick: function() {
       var title = titleInput.value.trim();
       if (!title) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
+      if (!confirm('Save these meeting minutes? A Google Doc will also be created in Drive.')) return;
       statusMsg.textContent = 'Saving...'; statusMsg.style.color = 'var(--muted)';
       serverCall().withSuccessHandler(function(result) {
         if (result && result.success) {
+          if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
           // Auto-switch to Recent tab on success so steward sees the new entry (v4.20.18)
           if (typeof onSaveSuccess === 'function') { onSaveSuccess(); return; }
           statusMsg.textContent = 'Minutes saved!'; statusMsg.style.color = 'var(--success)';

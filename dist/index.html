@@ -1150,8 +1150,8 @@
         _navProgressDone();
         return;
       }
-      // POMS Reference — member only
-      if (tabId === 'poms' && role === 'member') {
+      // POMS Reference — shared tab (both roles)
+      if (tabId === 'poms') {
         renderPOMSReference(app, role);
         _navProgressDone();
         return;
@@ -1181,6 +1181,7 @@
         }
       } else {
         switch(tabId) {
+          case 'home': renderStewardDashboard(app); break;
           case 'cases': renderStewardDashboard(app); break;
           case 'members': renderStewardMembers(app); break;
           case 'insights': renderInsightsPage(app); break;

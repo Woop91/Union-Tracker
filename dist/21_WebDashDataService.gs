@@ -232,12 +232,14 @@ var DataService = (function () {
     var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
     if (memberCol === -1) return [];
 
+    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
     var grievances = [];
     for (var i = 1; i < data.length; i++) {
       var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
-      if (rowEmail === memberEmail) {
-        grievances.push(_buildGrievanceRecord(data[i], colMap));
-      }
+      if (rowEmail !== memberEmail) continue;
+      var rowStatus = String(_getVal(data[i], colMap, HEADERS.grievanceStatus, '')).trim().toLowerCase();
+      if (closedStatuses.indexOf(rowStatus) !== -1) continue;
+      grievances.push(_buildGrievanceRecord(data[i], colMap));
     }
 
     // Sort by filed date, most recent first
@@ -1658,7 +1660,11 @@ var DataService = (function () {
     var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
     if (!sheet) {
       sheet = ss.insertSheet(SHEETS.STEWARD_TASKS);
-      sheet.getRange(1, 1, 1, 10).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed']]);
+      sheet.getRange(1, 1, 1, 12).setValues([[
+        'ID', 'Steward Email', 'Title', 'Description', 'Member Email',
+        'Priority', 'Status', 'Due Date', 'Created', 'Completed',
+        'Assignee Type', 'Assigned By'
+      ]]);
       sheet.hideSheet();
     }
     return sheet;
@@ -1780,7 +1786,8 @@ var DataService = (function () {
       if (String(data[i][10]).toLowerCase().trim() !== 'member') continue;
       if (String(data[i][4]).toLowerCase().trim() !== mEmail) continue;
       var status = String(data[i][6]).toLowerCase().trim();
-      if (statusFilter && status !== statusFilter) continue;
+      if (statusFilter === 'not-completed' && status === 'completed') continue;
+      else if (statusFilter && statusFilter !== 'not-completed' && status !== statusFilter) continue;
       var dueDateRaw = data[i][7];
       var dueStr = dueDateRaw instanceof Date ? _formatDate(dueDateRaw) : String(dueDateRaw || '');
       var dueDays = null;
@@ -2265,6 +2272,12 @@ var DataService = (function () {
       }
     } catch (_e) { /* non-fatal */ }
 
+    var memberTaskCount = 0;
+    try {
+      var openTasks = getMemberTasks(email, 'not-completed');
+      memberTaskCount = openTasks.length;
+    } catch (_e) { /* non-fatal */ }
+
     return {
       grievances: grievances,
       history: history,
@@ -2272,6 +2285,7 @@ var DataService = (function () {
       surveyStatus: surveyStatus,
       events: events,
       notificationCount: notifCount,
+      memberTaskCount: memberTaskCount,
     };
   }
 
@@ -2505,7 +2519,11 @@ var DataService = (function () {
     if (!sheet) return { success: false, message: 'Minutes sheet unavailable.' };
 
     var id = 'MIN_' + Date.now().toString(36);
-    var meetingDate = minutesData.meetingDate ? new Date(minutesData.meetingDate) : new Date();
+    // Append T12:00:00 to YYYY-MM-DD strings to avoid UTC midnight → previous-day shift in America/New_York
+    var rawDate = minutesData.meetingDate;
+    var meetingDate = rawDate
+      ? new Date(typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate + 'T12:00:00' : rawDate)
+      : new Date();
     if (isNaN(meetingDate.getTime())) meetingDate = new Date();
 
     // ── Save Google Doc to Minutes/ Drive folder ─────────────────────────────
@@ -3090,7 +3108,7 @@ function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(session
 function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardKPIs(s) : {}; }
 function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberGrievances(e) : []; }
 function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberGrievanceHistory(e) : { success: false, message: 'Not authenticated.' }; }
-function dataGetStewardContact(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getStewardContact(e) : null; }
+function dataGetStewardContact(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return DataService.getStewardContact(stewardEmail || e); }
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 // Steward: view any member's full profile; Member: view own profile only
@@ -3121,6 +3139,8 @@ function dataUpdateProfile(sessionToken, updates) {
 function dataGetAssignedSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getAssignedStewardInfo(e) : null; }
 function dataGetAvailableStewards(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getAvailableStewards(e) : []; }
 function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.assignStewardToMember(memberEmail, stewardEmail); }
+// v4.28.2 — Member-safe self-assign: members can assign a steward to THEMSELVES only.
+function dataMemberAssignSteward(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return DataService.assignStewardToMember(e, stewardEmail); }
 function dataStartGrievanceDraft(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.startGrievanceDraft(e, data); }) : { success: false, message: 'Not authenticated.' }; }
 function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberSurveyStatus(e) : null; }
@@ -3230,6 +3250,12 @@ function dataGetStewardDirectory(sessionToken) {
 function dataGetGrievanceStats(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMembershipStats() : null; }
+
+// v4.28.1 — Member-safe grievance endpoints for Union Stats page.
+// Uses _resolveCallerEmail (any authenticated member) instead of _requireStewardAuth.
+// Data is already anonymized (aggregate counts only); hotspots require 3+ per location.
+function dataGetMemberGrievanceStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { available: false }; return DataService.getGrievanceStats(); }
+function dataGetMemberGrievanceHotSpots(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return DataService.getGrievanceHotSpots(); }
 function dataGetUpcomingEvents(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getUpcomingEvents(limit) : []; }
 // dataGetSurveyQuestions and dataSubmitSurveyResponse are defined in the v4.21.0 block above (single canonical definition)
 function dataIsChiefSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.isChiefSteward(e) : false; }
@@ -3667,9 +3693,8 @@ function dataGetEngagementStats(sessionToken) {
     // ── Membership trends (last 6 months, by hire date) ─────────────────────
     var membershipTrends = [];
     try {
-      if (memberSheet && hireIdx >= 0) {
+      if (memberSheet && hireIdx >= 0 && mData) {
         var now = new Date();
-        var mData2 = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
         var monthMap = {};
         for (var ti = 5; ti >= 0; ti--) {
           var d = new Date(now.getFullYear(), now.getMonth() - ti, 1);
@@ -3677,8 +3702,8 @@ function dataGetEngagementStats(sessionToken) {
           monthMap[key] = { month: key, total: 0, new: 0 };
         }
         var firstDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-        for (var ri = 0; ri < mData2.length; ri++) {
-          var hire = mData2[ri][hireIdx];
+        for (var ri = 0; ri < mData.length; ri++) {
+          var hire = mData[ri][hireIdx];
           if (!hire) continue;
           var hd = hire instanceof Date ? hire : new Date(hire);
           if (isNaN(hd.getTime())) continue;

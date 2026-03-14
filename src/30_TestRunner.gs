@@ -844,6 +844,8 @@ function _getTestRegistry() {
     { name: 'test_webapp_getWebAppUrlReturnsString',       fn: test_webapp_getWebAppUrlReturnsString },
     { name: 'test_webapp_orgChartHtmlExists',              fn: test_webapp_orgChartHtmlExists },
     { name: 'test_webapp_pomsReferenceHtmlExists',         fn: test_webapp_pomsReferenceHtmlExists },
+    { name: 'test_webapp_pomsReferenceHtmlReturnsContent', fn: test_webapp_pomsReferenceHtmlReturnsContent },
+    { name: 'test_webapp_orgChartHtmlReturnsContent',      fn: test_webapp_orgChartHtmlReturnsContent },
     { name: 'test_webapp_diagnoseWebAppExists',            fn: test_webapp_diagnoseWebAppExists },
     { name: 'test_webapp_diagnoseWebAppRunsClean',         fn: test_webapp_diagnoseWebAppRunsClean },
     { name: 'test_webapp_serveFatalErrorExists',           fn: test_webapp_serveFatalErrorExists },
@@ -1720,15 +1722,15 @@ function test_survey_trackingSheetExists() {
 //   4. Token & rate-limit infrastructure
 
 function test_emailsend_gmailAppAccessible() {
-  // GmailApp.getRemainingDailyQuota() is a read-only quota check.
-  // It throws if the gmail.send scope is NOT authorized in the current
+  // GmailApp.getAliases() is a lightweight read-only call that requires the
+  // gmail.send scope. It throws if the scope is NOT authorized in the current
   // execution context (deployment). This is the PRIMARY failure detector.
+  // Note: GmailApp does NOT have getRemainingDailyQuota() — only MailApp does.
   try {
-    var quota = GmailApp.getRemainingDailyQuota();
-    TestRunner.assertTrue(typeof quota === 'number', 'GmailApp quota is numeric');
-    TestRunner.assertTrue(quota >= 0, 'GmailApp quota is non-negative (' + quota + ' remaining)');
+    var aliases = GmailApp.getAliases();
+    TestRunner.assertTrue(Array.isArray(aliases), 'GmailApp.getAliases() returns array (gmail.send scope authorized)');
   } catch (e) {
-    TestRunner.fail('GmailApp.getRemainingDailyQuota() threw — gmail.send scope NOT authorized '
+    TestRunner.fail('GmailApp.getAliases() threw — gmail.send scope NOT authorized '
       + 'in deployment. Re-deploy web app and re-authorize scopes. Error: ' + e.message);
   }
 }

@@ -302,6 +302,8 @@ var WeeklyQuestions = (function () {
    * @param {string} text    - question text
    * @param {string[]} options - 2–5 answer strings
    */
+  var POOL_SUBMIT_LIMIT = 3; // max submissions per user per poll period
+
   function submitPoolQuestion(email, text, options) {
     if (!email || !text) return { success: false, message: 'Missing fields.' };
 
@@ -314,8 +316,25 @@ var WeeklyQuestions = (function () {
     var sheet = _getSheet(SHEETS.QUESTION_POOL);
     if (!sheet) return { success: false, message: 'System not initialized.' };
 
-    var id = _id();
     var emailHash = _hashEmail(email);
+
+    // Rate limit: max POOL_SUBMIT_LIMIT submissions per user per period
+    if (sheet.getLastRow() > 1) {
+      var poolData = sheet.getDataRange().getValues();
+      var periodStart = _getPeriodStart();
+      var userCount = 0;
+      for (var i = 1; i < poolData.length; i++) {
+        if (poolData[i][P_COLS.SUBMITTED_BY_HASH] === emailHash) {
+          var created = poolData[i][P_COLS.CREATED];
+          if (created instanceof Date && created >= periodStart) userCount++;
+        }
+      }
+      if (userCount >= POOL_SUBMIT_LIMIT) {
+        return { success: false, message: 'You can submit up to ' + POOL_SUBMIT_LIMIT + ' polls per period. Please wait for the next period.' };
+      }
+    }
+
+    var id = _id();
     sheet.appendRow([id, escapeForFormula(text), JSON.stringify(options), emailHash, 'pending', new Date()]);
 
     if (typeof logAuditEvent === 'function') {
@@ -518,12 +537,24 @@ var WeeklyQuestions = (function () {
 
 function wqGetActiveQuestions(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
-  return e ? WeeklyQuestions.getActiveQuestions(e) : { questions: [] };
+  if (!e) return { questions: [] };
+  // v4.28.1: server-side dues gate — non-paying members cannot view active polls
+  if (typeof DataService !== 'undefined') {
+    var rec = DataService.findUserByEmail(e);
+    if (rec && rec.duesPaying === false) return { questions: [] };
+  }
+  return WeeklyQuestions.getActiveQuestions(e);
 }
 
 function wqSubmitResponse(sessionToken, questionId, response) {
   var e = _resolveCallerEmail(sessionToken);
-  return e ? WeeklyQuestions.submitResponse(e, questionId, response) : { success: false, message: 'Not authenticated.' };
+  if (!e) return { success: false, message: 'Not authenticated.' };
+  // v4.28.1: server-side dues gate — non-paying members cannot vote
+  if (typeof DataService !== 'undefined') {
+    var rec = DataService.findUserByEmail(e);
+    if (rec && rec.duesPaying === false) return { success: false, message: 'Polls require active dues membership.' };
+  }
+  return WeeklyQuestions.submitResponse(e, questionId, response);
 }
 
 // v4.23.0: options param added (array of 2–5 strings)
@@ -535,7 +566,13 @@ function wqSetStewardQuestion(sessionToken, text, options) {
 
 function wqSubmitPoolQuestion(sessionToken, text, options) {
   var e = _resolveCallerEmail(sessionToken);
-  return e ? WeeklyQuestions.submitPoolQuestion(e, text, options) : { success: false, message: 'Not authenticated.' };
+  if (!e) return { success: false, message: 'Not authenticated.' };
+  // v4.28.1: server-side dues gate — non-paying members cannot submit to pool
+  if (typeof DataService !== 'undefined') {
+    var rec = DataService.findUserByEmail(e);
+    if (rec && rec.duesPaying === false) return { success: false, message: 'Polls require active dues membership.' };
+  }
+  return WeeklyQuestions.submitPoolQuestion(e, text, options);
 }
 
 function wqClosePoll(sessionToken, pollId) {

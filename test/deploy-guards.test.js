@@ -742,6 +742,35 @@ describe('G13: Module load order is safe', () => {
 });
 
 
+describe('G14: WorkloadService crash-safe patterns', () => {
+  const wsCode = fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8');
+
+  test('_refreshReportingData does NOT clearContents before writing', () => {
+    // Extract the _refreshReportingData function body
+    const funcStart = wsCode.indexOf('function _refreshReportingData()');
+    expect(funcStart).toBeGreaterThan(-1);
+    const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
+    const funcBody = wsCode.substring(funcStart, funcEnd);
+
+    // The old antipattern: report.clearContents() before setValues
+    // New pattern: setValues first, then clearContent only for stale rows
+    expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
+  });
+
+  test('rate limit uses atomic check-and-record pattern', () => {
+    // _checkAndRecordRateLimit should exist (replaces separate check + record)
+    expect(wsCode).toContain('function _checkAndRecordRateLimit');
+    // Old separate _recordRateLimitAttempt should NOT exist
+    expect(wsCode).not.toContain('function _recordRateLimitAttempt');
+    // No separate _recordSubmission call
+    expect(wsCode).not.toContain('function _recordSubmission');
+  });
+
+  test('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
+    expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
+  });
+});
+
 // ============================================================================
 // HELPERS
 // ============================================================================

@@ -253,6 +253,7 @@ function _sanitizeConfig(config) {
     grievancesFolderId: config.grievancesFolderId || '',
     // v4.20.18: insights cache TTL exposed so client can show staleness info
     insightsCacheTTLMin: config.insightsCacheTTLMin || 5,
+    issueCategories: (typeof DEFAULT_CONFIG !== 'undefined' && Array.isArray(DEFAULT_CONFIG.ISSUE_CATEGORY)) ? DEFAULT_CONFIG.ISSUE_CATEGORY : [],
   };
 }
 
@@ -318,10 +319,12 @@ function include(filename) {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .oc-wrap), or error message
+ * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
  */
 function getOrgChartHtml() {
   try {
+    var email = Session.getActiveUser().getEmail();
+    if (!email) return '<div class="empty-state">Authentication required.</div>';
     return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
   } catch (e) {
     Logger.log('getOrgChartHtml error: ' + e.message);
@@ -336,6 +339,8 @@ function getOrgChartHtml() {
  */
 function getPOMSReferenceHtml() {
   try {
+    var email = Session.getActiveUser().getEmail();
+    if (!email) return '<div class="empty-state">Authentication required.</div>';
     return HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
   } catch (e) {
     Logger.log('getPOMSReferenceHtml error: ' + e.message);

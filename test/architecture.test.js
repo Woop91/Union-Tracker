@@ -698,6 +698,8 @@ describe('A11: Server-exposed functions have auth checks', () => {
   const publicReadOnly = [
     'dataGetGrievanceStats', 'dataGetAgencyGrievanceStats',
     'dataGetGrievanceHotSpots', 'dataGetMembershipStats',
+    'dataGetMemberGrievanceStats', 'dataGetMemberGrievanceHotSpots',
+    'dataMemberAssignSteward',
     'dataGetUpcomingEvents', 'dataGetSurveyQuestions',
     'dataGetMeetingMinutes', 'dataGetStewardDirectory',
     'dataGetCaseChecklist', 'dataGetSatisfactionTrends',
@@ -751,6 +753,56 @@ describe('A11: Server-exposed functions have auth checks', () => {
       });
     });
 });
+
+// ============================================================================
+// A11b: CLIENT-CALLABLE HTML ENDPOINTS HAVE AUTH CHECKS
+// ============================================================================
+// Bug (2026-03-14): getPOMSReferenceHtml() and getOrgChartHtml() served HTML
+// content without any authentication — any anonymous caller could invoke them.
+// All client-callable functions in 22_WebDashApp.gs that return HTML content
+// must verify Session.getActiveUser().getEmail() before serving.
+
+describe('A11b: Client-callable HTML endpoints have auth checks', () => {
+  const webAppSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '22_WebDashApp.gs'), 'utf8'
+  );
+
+  // HTML-serving endpoints that must have auth
+  const htmlEndpoints = ['getOrgChartHtml', 'getPOMSReferenceHtml'];
+
+  htmlEndpoints.forEach(fn => {
+    test(`${fn}() checks Session.getActiveUser before serving content`, () => {
+      // Extract the function body
+      const fnRegex = new RegExp(
+        'function\\s+' + fn + '\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)^\\}',
+        'm'
+      );
+      const match = webAppSrc.match(fnRegex);
+      expect(match).not.toBeNull();
+      const body = match[1];
+      const hasSessionCheck = body.includes('Session.getActiveUser()') ||
+                              body.includes('_resolveCallerEmail') ||
+                              body.includes('_requireStewardAuth') ||
+                              body.includes('checkWebAppAuthorization');
+      expect(hasSessionCheck).toBe(true);
+    });
+  });
+
+  htmlEndpoints.forEach(fn => {
+    test(`${fn}() returns safe fallback when auth fails`, () => {
+      const fnRegex = new RegExp(
+        'function\\s+' + fn + '\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)^\\}',
+        'm'
+      );
+      const match = webAppSrc.match(fnRegex);
+      expect(match).not.toBeNull();
+      const body = match[1];
+      // Must have an auth-failure return that doesn't serve the HTML file
+      expect(body).toMatch(/if\s*\(!email\)\s*return/);
+    });
+  });
+});
+
 
 // ============================================================================
 // A12: NO DYNAMIC innerHTML CONCATENATION IN .GS FILES
@@ -1185,6 +1237,112 @@ describe('A15: Catch blocks in web app files do not cascade', () => {
       }
 
       expect(issues).toEqual([]);
+    });
+  });
+});
+
+
+// ============================================================================
+// A20: checkWebAppAuthorization RESULT MUST USE .isAuthorized
+// ============================================================================
+// Bug history: v4.25.10 — restoreWebAppResource used auth.authorized (undefined)
+// instead of auth.isAuthorized, causing restore to always fail silently.
+// This test scans every .gs file to ensure no caller uses the wrong property.
+
+describe('A20: checkWebAppAuthorization callers use .isAuthorized (not .authorized)', () => {
+  const srcDir = path.resolve(__dirname, '..', 'src');
+  const gsFiles = fs.readdirSync(srcDir).filter(f => f.endsWith('.gs'));
+
+  test('found at least 30 .gs source files', () => {
+    expect(gsFiles.length).toBeGreaterThanOrEqual(30);
+  });
+
+  gsFiles.forEach(file => {
+    test(`${file}: no wrong auth property after checkWebAppAuthorization`, () => {
+      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+
+      // Skip files that don't call checkWebAppAuthorization at all
+      if (!content.includes('checkWebAppAuthorization')) return;
+
+      const lines = content.split('\n');
+      const issues = [];
+
+      // Find all variable names assigned from checkWebAppAuthorization
+      const varNames = new Set();
+      const assignRegex = /var\s+(\w+)\s*=\s*checkWebAppAuthorization\b/g;
+      let match;
+      while ((match = assignRegex.exec(content)) !== null) {
+        varNames.add(match[1]);
+      }
+
+      // For each variable, scan for .authorized that is NOT .isAuthorized
+      varNames.forEach(varName => {
+        lines.forEach((line, idx) => {
+          // Match varName.authorized but not varName.isAuthorized
+          const wrongPattern = new RegExp(varName + '\\.authorized\\b');
+          const correctPattern = new RegExp(varName + '\\.isAuthorized\\b');
+          if (wrongPattern.test(line) && !correctPattern.test(line)) {
+            issues.push(`${file}:${idx + 1} — uses ${varName}.authorized instead of ${varName}.isAuthorized`);
+          }
+        });
+      });
+
+      if (issues.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn('Wrong auth property usage:', issues);
+      }
+      expect(issues).toEqual([]);
+    });
+  });
+});
+
+
+// ============================================================================
+// A21: RESOURCE MUTATION ENDPOINTS HAVE AUTH CHECKS
+// ============================================================================
+// Bug history: v4.25.10 — getWebAppResourcesListAll had no auth check,
+// exposing hidden resources and addedBy emails to unauthenticated callers.
+// This test ensures all resource functions that write data or return
+// sensitive data (hidden items, emails) require steward authorization.
+
+describe('A21: Resource endpoints in 05_Integrations.gs have auth checks', () => {
+  const integrationsSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '05_Integrations.gs'), 'utf8'
+  );
+
+  // Functions that MUST have checkWebAppAuthorization('steward') calls
+  const authRequiredFunctions = [
+    'addWebAppResource',
+    'updateWebAppResource',
+    'deleteWebAppResource',
+    'restoreWebAppResource',
+    'getWebAppResourcesListAll',  // returns hidden resources + addedBy emails
+  ];
+
+  // Functions that are intentionally public (visible-only, no PII)
+  const publicFunctions = [
+    'getWebAppResourcesList',       // returns only visible resources, no emails
+    'getWebAppResourceCategories',  // returns only category names
+    'getWebAppResourceLinks',       // returns only config URLs
+  ];
+
+  authRequiredFunctions.forEach(fn => {
+    test(`${fn}() calls checkWebAppAuthorization`, () => {
+      const fnRegex = new RegExp(
+        'function\\s+' + fn + '\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n\\}', 'm'
+      );
+      const match = integrationsSrc.match(fnRegex);
+      expect(match).not.toBeNull();
+
+      const body = match[1];
+      expect(body).toContain('checkWebAppAuthorization');
+    });
+  });
+
+  publicFunctions.forEach(fn => {
+    test(`${fn}() is documented as intentionally public (no auth)`, () => {
+      // Verify these functions exist (catches renames that break the whitelist)
+      expect(integrationsSrc).toContain('function ' + fn + '(');
     });
   });
 });

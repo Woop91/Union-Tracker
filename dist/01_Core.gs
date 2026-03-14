@@ -405,7 +405,7 @@ var API_VERSION = {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.28.0",
+  VERSION: "4.28.2",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -589,18 +589,18 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.27.2';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.28.1';
   var parts = ver.split('.');
   return {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
-    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 27,
-    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 2,
+    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 28,
+    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 1,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-14',
-    CODENAME: 'Webapp Reliability Hardening',
-    codename: 'Seed Phase Consolidation + Webapp Extras'
+    CODENAME: 'Union Stats + Tab Reviews',
+    codename: 'Union Stats + Tab Reviews'
   };
 })();
 
@@ -611,6 +611,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.28.2', date: '2026-03-14', codename: 'Union Stats + Tab Reviews', changes: 'Tab review merge: Polls — null sessionToken fixed in 5 client calls, server-side dues gate, rate limiting, confirmation dialog, 30+ new tests. POMS — steward routing fix, description correction, auth check on getPOMSReferenceHtml. Union Stats — member-safe grievance/hot-spots endpoints, membership sub-tab enrichment, client-side caching, engagement KPI fix, redundant sheet read fix, showLoading consistency, dataAssignSteward auth fix, 8 structural guard tests. Workload — crash-safe refresh, atomic rate limiting, dynamic bar chart scaling, WT_CAT_KEY_LABELS, auto-save draft, last-submitted indicator, 44 new tests.' },
   { version: '4.26.0', date: '2026-03-13', codename: 'Diagnostics + Quick Setup Menu + Contrast Fix', changes: 'Fix #5: TestRunner controls card contrast upgraded (accent border, card background, stronger shadow). Fix #7: Case Analytics deprecated menu item removed (showInteractiveDashboardTab). Fix #14: New Quick Setup (All Init/Sync) consolidated admin menu with all initialize, trigger install, sync, refresh, and setup functions in one place. Fix #15/#16: Workload Archive removed from DIAGNOSE_SETUP skipKeys so diagnostics detects it and repair creates it via setupHiddenSheets. Fix #17: TestRunner.fail already exists; MEMBER_COLS.ROLE (col 44) needs sheet column addition; remaining test failures are deployment-related — run clasp push.' },
   { version: '4.25.15', date: '2026-03-13', codename: 'Survey UX + Insights Enrichment + Menu Consolidation', changes: 'TestRunner dark-mode contrast fix. Survey default scope changed to location. Quick Setup & Sync duplicate menu removed (35 lines). Proximity badge pills on nearby survey members. Prev/Next pagination replaces Show All buttons. Enhanced participation stats (new member completion fraction, declining avg rate). withdrawnCount added to getGrievanceStats. newMembersLast90 + byHireMonth added to getMembershipStats. New insight cards: OVERDUE CASES, NEW MEMBERS, overtime averages, employment mix. Hash-based detail navigation with browser back-button support.' },
   { version: '4.25.12', date: '2026-03-12', codename: 'Function Cohesion Phase 2', changes: 'Inline lock patterns replaced with withScriptLock_() in 6 functions (addMember, updateMember, startNewGrievance, advanceGrievanceStep, bulkUpdateGrievanceStatus, resolveGrievance). Centralized ID validators isGrievanceId_()/isMemberId_() replace 10+ inline regex checks across 04c, 04d, 04e, 05, 09. Hardcoded grievance status strings replaced with GRIEVANCE_STATUS constants and GRIEVANCE_CLOSED_STATUSES across 03, 04e, 06, 07, 08b, 09, 11, 12, 17. onEdit() if/else chain replaced with EventBus dispatch via emitEditEvent() — all sheet-specific handlers now route through priority-ordered EventBus subscribers. ThemeEngine consolidated in auth_view.html and error_view.html. Dashboard entry points deprecated (showExecutiveDashboard → showStewardDashboard, showInteractiveDashboardTab → showStewardDashboard).' },
