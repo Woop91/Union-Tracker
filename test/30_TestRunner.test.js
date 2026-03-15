@@ -67,8 +67,8 @@ describe('TestRunner registry consistency', () => {
     const fnRefPattern = /fn:\s*(\w+)/g;
     let match;
     while ((match = fnRefPattern.exec(runnerSrc)) !== null) {
-      // Skip loop variable references like `fn: entry.fn` — not function names
-      if (match[1] === 'entry') continue;
+      // Skip non-function-name references (e.g., `fn: entry.fn`, `fn: typeof ...`)
+      if (match[1] === 'entry' || match[1] === 'typeof') continue;
       registryNames.push(match[1]);
     }
     // Also check 31_WebAppTests.gs

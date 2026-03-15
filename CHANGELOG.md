@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.29.1] - 2026-03-15
+
+### Fixed
+- Test registry consistency check now skips `typeof` guard patterns in `fn:` entries
+- `renderBottomNav` test updated to look in `index.html` after v4.26.1 consolidation
+
+## [4.29.0] - 2026-03-15
+
+### Added
+- **Split View (dual-panel tabs)** — On tablet and desktop, users can enable split-view mode from the sidebar to display two tabs side-by-side. Features include: pinnable primary/secondary panels, draggable resize divider (25%-75% range), panel target selector (Left/Right), close button on secondary panel, and persistent split ratio via localStorage. Automatically disabled on mobile. Sidebar shows L/R badges indicating which panel each tab occupies.
+
 ## [4.28.8] - 2026-03-15
 
 ### Added

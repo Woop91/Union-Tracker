@@ -27,6 +27,7 @@
   font-size: 16px;
   line-height: 1.5;
   min-height: auto;
+  max-width: 100%;
   overflow-x: hidden;
 }
 
@@ -74,7 +75,7 @@
 .madds-embed.light .card.peer      { border-top: 3px dashed rgba(109,40,217,0.5) !important; box-shadow: 0 6px 20px rgba(109,40,217,0.10); }
 .madds-embed.light .card.t2        { border-top-color: #e11d48 !important; box-shadow: 0 10px 40px rgba(225,29,72,0.18), 0 2px 6px rgba(0,0,0,0.05); }
 .madds-embed.light .card.t3        { border-top-color: #0284c7 !important; box-shadow: 0 10px 40px rgba(2,132,199,0.18), 0 2px 6px rgba(0,0,0,0.05); }
-.madds-embed.light .card.tc        { border-top-color: #d94800 !important; box-shadow: 0 10px 40px rgba(217,72,0,0.20), 0 2px 6px rgba(0,0,0,0.05); }
+.madds-embed.light .card.tc        { background: #fff7ed; border-top-color: #d94800 !important; box-shadow: 0 10px 40px rgba(217,72,0,0.20), 0 2px 6px rgba(0,0,0,0.05); }
 .madds-embed.light .panel,
 .madds-embed.light .panel-wrap     { background: #fff; border: none !important; border-radius: 12px; box-shadow: 0 10px 40px rgba(109,40,217,0.10), 0 2px 6px rgba(0,0,0,0.04); }
 .madds-embed.light .staff-list     { background: #fff; border: none !important; border-radius: 10px; box-shadow: 0 8px 30px rgba(217,72,0,0.12), 0 2px 6px rgba(0,0,0,0.04); }
@@ -118,7 +119,7 @@
 .madds-embed.light .pill-btn-teal:hover { background: #0284c7; color: #fff; }
 
 /* ── ORG + MISC CLASSES ── */
-.madds-embed.light .org-name       { color: #0284c7; font-weight: 700; }
+.madds-embed.light .org-name       { color: #1e3a5f; font-weight: 700; }
 .madds-embed.light .org-region     { color: #666; }
 .madds-embed.light .officer-label  { color: #666; }
 .madds-embed.light .person         { border-color: #f0ecff; }
@@ -152,11 +153,12 @@
    Every .tier inside is text-align:center so inline/inline-block
    children naturally cluster at the center axis. */
 .page {
-  width: max-content;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 48px 40px 80px;
   text-align: center; /* SINGLE SOURCE OF TRUTH for horizontal centering */
+  box-sizing: border-box;
 }
 
 /* ─── TIER ROWS ──────────────────────────────────────────────── */
@@ -180,9 +182,12 @@
 /* ─── INLINE GROUP (peer cards on same row) ───────────────────── */
 .inline-group {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   vertical-align: top;
+  max-width: 100%;
 }
 
 /* ─── NODE CARDS ─────────────────────────────────────────────── */
@@ -355,7 +360,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
-  max-width: 1200px;
+  max-width: 100%;
 }
 
 .chapter-branch {
@@ -530,6 +535,7 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
   align-items: start;
   gap: 14px;
   position: relative;
+  max-width: 100%;
 }
 /* Legal = col 1, Treasurer = col 2, RecSec = col 3 */
 #counsel-card   { grid-column: 1; text-align: center; }
@@ -545,7 +551,7 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
   justify-content: center;
   align-items: flex-start;
   gap: 10px;
-  max-width: 1200px;
+  max-width: 100%;
 }
 .card-row .card {
   min-width: 140px;
@@ -559,10 +565,11 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
 
 /* ─── DESKTOP: SPIDER TRAIL LAYOUT ───────────────────────────── */
 @media (min-width: 601px) {
-  /* Page — wider to let content spread outward */
+  /* Page — fill available space, never exceed viewport */
   .page {
     max-width: 1200px;
-    width: 95vw;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   /* Officers — horizontal row, all cards visible */
@@ -582,7 +589,7 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
 
   /* Card rows spread wide on desktop, single row */
   .card-row {
-    max-width: 1200px;
+    max-width: 100%;
     gap: 14px;
     flex-wrap: wrap;
     align-items: flex-start;
@@ -594,7 +601,7 @@ footer { margin-top: 36px; font-size: 0.62rem; color: var(--dim); letter-spacing
 
   /* Chapters — spread wide horizontally, wrap as needed */
   .chapter-row {
-    max-width: 1200px;
+    max-width: 100%;
     gap: 10px;
   }
   .chapter-branch {
@@ -3233,6 +3240,17 @@ function maddstoggleMode() {
   const btn = document.getElementById('madds-mode-toggle');
   btn.textContent = (_me && _me.classList.contains('light')) ? '🌙 Dark' : '☀ Light';
 }
+
+// Auto-detect system theme on load
+(function() {
+  var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  if (prefersLight) {
+    var _me = document.querySelector('.madds-embed');
+    if (_me) _me.classList.add('light');
+    var btn = document.getElementById('madds-mode-toggle');
+    if (btn) btn.textContent = '🌙 Dark';
+  }
+})();
 </script>
 </div>
 <script>

@@ -510,6 +510,12 @@ function seedFeedbackData() {
     return row;
   }
 
+  var twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+  var fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  var tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+  var fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  var twentyDaysAgo = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000);
+
   var sampleFeedback = [
     buildFeedbackRow(oneWeekAgo, 'John Smith', 'Dashboard', 'Bug', 'Medium',
       'Dashboard metrics not refreshing',
@@ -524,7 +530,29 @@ function seedFeedbackData() {
     buildFeedbackRow(now, 'Robert Williams', 'Reports', 'Improvement', 'Low',
       'Add PDF export for Dashboard',
       'It would be helpful to export the Dashboard as a PDF for sharing with chapter leadership during meetings.',
-      'New', '', '', '')
+      'New', '', '', ''),
+    buildFeedbackRow(twoDaysAgo, 'Linda Garcia', 'Grievance Log', 'Bug', 'High',
+      'Grievance step dates not saving correctly',
+      'When advancing a grievance from Step I to Step II, the date field sometimes reverts to the original filing date instead of the current date.',
+      'New', '', '', 'Reported by two stewards independently'),
+    buildFeedbackRow(fiveDaysAgo, 'James Brown', 'Calendar', 'Feature Request', 'Medium',
+      'Recurring event support for meetings',
+      'We have monthly membership meetings and weekly steward check-ins. Would be great to set these up once as recurring rather than creating each one individually.',
+      'In Review', 'Tech Team', '', 'Evaluating Google Calendar API recurrence support'),
+    buildFeedbackRow(tenDaysAgo, 'Patricia Davis', 'Member Directory', 'Improvement', 'Low',
+      'Color-code members by unit on directory',
+      'It would help stewards quickly identify members in their unit if rows were color-coded or filterable by organizational unit.',
+      'Resolved', 'Tech Team',
+      'Added unit filter dropdown to the Member Directory view.',
+      'Steward confirmed this is helpful'),
+    buildFeedbackRow(fourteenDaysAgo, 'Michael Wilson', 'Dashboard', 'Bug', 'Medium',
+      'Notification badge count off by one',
+      'The notification bell sometimes shows 3 unread but when I open it there are only 2 notifications. Seems like dismissed notifications are still being counted.',
+      'In Progress', 'Tech Team', '', 'Investigating badge refresh timing'),
+    buildFeedbackRow(twentyDaysAgo, 'Sarah Martinez', 'General', 'Feature Request', 'High',
+      'Mobile-friendly layout for stewards in the field',
+      'When I visit members at worksites I use my phone to look things up. The dashboard is hard to navigate on small screens. A responsive or mobile view would be very useful.',
+      'New', '', '', 'Multiple stewards have requested this')
   ];
 
   // Write sample data
@@ -1685,20 +1713,30 @@ function seedContactLogData() {
     'Addressed question about union dues.',
     'Provided update on ongoing negotiations.',
     'Checked in after return from leave.',
+    'Reviewed seniority roster discrepancy with member.',
+    'Coached member on how to request reasonable accommodation.',
+    'Discussed transfer request process and contract language.',
+    'Followed up on workplace harassment complaint next steps.',
+    'Helped member prepare for upcoming disciplinary meeting.',
+    'Explained Weingarten rights before investigatory interview.',
+    'Provided resources on EAP and counseling services.',
+    'Discussed job posting irregularities in member\'s unit.',
+    'Answered questions about probationary period requirements.',
+    'Checked in regarding denied vacation request appeal.',
   ];
-  var durations = ['5 min', '10 min', '15 min', '20 min', '30 min', '45 min'];
+  var durations = ['5 min', '10 min', '15 min', '20 min', '30 min', '45 min', '1 hr'];
 
   var now = new Date();
   var rows = [];
 
-  for (var c = 0; c < 25; c++) {
+  for (var c = 0; c < 40; c++) {
     var stewardEmail = randomChoice(stewardEmailList);
     var assignedMembers = membersByAssignment[stewardEmail];
     var memberEmail = (assignedMembers && assignedMembers.length > 0) ?
       randomChoice(assignedMembers) :
       randomChoice(stewardEmailList); // fallback to another steward
 
-    var daysAgo = Math.floor(Math.random() * 60); // within last 60 days
+    var daysAgo = Math.floor(Math.random() * 90); // within last 90 days
     var contactDate = new Date(now.getTime() - daysAgo * 86400000);
     contactDate.setHours(Math.floor(Math.random() * 8) + 9, Math.floor(Math.random() * 60), 0, 0); // 9am-5pm
 
@@ -2550,6 +2588,18 @@ function seedTimelineData() {
       'action', '', '', '', '', ownerEmail, now, ''],
     ['TL_SEED_6', 'Contract Ratification Vote Scheduled', new Date(now.getTime() + 30 * 86400000),
       'All bargaining unit members eligible to vote on the tentative agreement. Details to follow.',
+      'announcement', '', '', '', '', ownerEmail, now, ''],
+    ['TL_SEED_7', 'Steward Refresher Training', new Date(now.getTime() + 5 * 86400000),
+      'All stewards are required to attend the annual refresher on grievance handling updates and new contract language.',
+      'milestone', '', '', '', '', ownerEmail, now, ''],
+    ['TL_SEED_8', 'Monthly General Membership Meeting', new Date(now.getTime() + 14 * 86400000),
+      'Open to all members. Agenda: negotiations update, committee reports, and open floor Q&A.',
+      'meeting', '', '', '', '', ownerEmail, now, ''],
+    ['TL_SEED_9', 'Workplace Safety Walk-Through', new Date(now.getTime() + 21 * 86400000),
+      'Joint labor-management safety inspection of Building C. Stewards and safety committee members should attend.',
+      'action', '', '', '', '', ownerEmail, now, ''],
+    ['TL_SEED_10', 'New Member Welcome Social', new Date(now.getTime() + 45 * 86400000),
+      'Casual meet-and-greet for members who joined in the last quarter. Food and refreshments provided.',
       'announcement', '', '', '', '', ownerEmail, now, ''],
   ];
 

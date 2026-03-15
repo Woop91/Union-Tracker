@@ -618,6 +618,7 @@ describe('G16: renderPageLayout always renders both sidebar and bottom nav', () 
 describe('G21: My Tasks tab integrity', () => {
   const memberCode = read('member_view.html');
   const stewardCode = read('steward_view.html');
+  const indexCode = read('index.html');
   const dataServiceCode = read('21_WebDashDataService.gs');
 
   test('renderMemberTasks passes explicit status filter (not null) for open tab', () => {
@@ -677,14 +678,14 @@ describe('G21: My Tasks tab integrity', () => {
   });
 
   test('renderBottomNav shows member task badge on More tab', () => {
-    // The steward_view.html renderBottomNav should have a badge for member task count
-    const funcStart = stewardCode.indexOf('function renderBottomNav');
+    // renderBottomNav was consolidated into index.html in v4.26.1
+    const funcStart = indexCode.indexOf('function renderBottomNav');
     expect(funcStart).not.toBe(-1);
     let depth = 0, started = false, block = '';
-    for (let i = funcStart; i < stewardCode.length; i++) {
-      if (stewardCode[i] === '{') { depth++; started = true; }
-      if (stewardCode[i] === '}') depth--;
-      if (started) block += stewardCode[i];
+    for (let i = funcStart; i < indexCode.length; i++) {
+      if (indexCode[i] === '{') { depth++; started = true; }
+      if (indexCode[i] === '}') depth--;
+      if (started) block += indexCode[i];
       if (started && depth === 0) break;
     }
     expect(block).toContain('memberTaskCount');

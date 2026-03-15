@@ -589,18 +589,18 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.28.8';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.29.1';
   var parts = ver.split('.');
   return {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
-    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 28,
-    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 8,
+    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 29,
+    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-15',
-    CODENAME: 'Unified Theme System',
-    codename: 'Unified Theme System'
+    CODENAME: 'Split View',
+    codename: 'Split View'
   };
 })();
 

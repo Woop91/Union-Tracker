@@ -303,9 +303,9 @@
           mode: 'light',
         },
         comic: {
-          bg: '#fffbe6', surface: '#fff', surfaceAlt: '#fff8cc', raised: '#fff',
-          text: '#111', 'text-secondary': '#555', muted: '#888',
-          card: '#fff', 'bg-tertiary': '#fff3b0',
+          bg: '#fffbe6', surface: '#fffde7', surfaceAlt: '#fff8cc', raised: '#fffde7',
+          text: '#111', 'text-secondary': '#555', muted: '#666',
+          card: '#fffde7', 'bg-tertiary': '#fff3b0',
           success: '#2e7d32', warning: '#e65100', danger: '#c62828', info: '#1565c0',
           border: '#111', radius: '0px',
           accent: '#ff1744', accentDim: '#c4001d', accentGlow: 'rgba(255,23,68,0.2)',
@@ -804,6 +804,146 @@
     };
 
     // ═══════════════════════════════════════
+    // SPLIT VIEW — dual-panel tab support (tablet+)
+    // ═══════════════════════════════════════
+    var SplitView = (function() {
+      var _state = {
+        enabled: false,
+        primaryTab: null,     // tab ID pinned to left panel
+        secondaryTab: null,   // tab ID in right panel
+        targetPanel: 'primary', // which panel receives next tab click: 'primary' | 'secondary'
+        splitRatio: 0.5       // left panel width fraction (0.3–0.7)
+      };
+
+      // Secondary panel pane cache (mirrors _tabPanes for the right side)
+      var _secondaryPanes = {};
+      var _secondaryActivePane = null;
+
+      // Persist preference
+      function _save() {
+        try { localStorage.setItem('dds_splitView', JSON.stringify({ enabled: _state.enabled, splitRatio: _state.splitRatio })); } catch(e) {}
+      }
+      function _load() {
+        try {
+          var s = JSON.parse(localStorage.getItem('dds_splitView'));
+          if (s) {
+            _state.splitRatio = Math.max(0.3, Math.min(0.7, s.splitRatio || 0.5));
+            // Don't auto-enable on load — user must toggle
+          }
+        } catch(e) {}
+      }
+      _load();
+
+      function isEnabled() { return _state.enabled && isSidebarLayout(); }
+      function getState() { return _state; }
+
+      function toggle() {
+        _state.enabled = !_state.enabled;
+        if (!_state.enabled) {
+          _state.secondaryTab = null;
+          _state.targetPanel = 'primary';
+          _flushSecondaryPanes();
+        }
+        _save();
+        return _state.enabled;
+      }
+
+      function enable(primaryTabId, secondaryTabId) {
+        _state.enabled = true;
+        _state.primaryTab = primaryTabId || AppState.activeTab;
+        _state.secondaryTab = secondaryTabId || null;
+        _state.targetPanel = secondaryTabId ? 'primary' : 'secondary';
+        _save();
+      }
+
+      function disable() {
+        _state.enabled = false;
+        _state.secondaryTab = null;
+        _state.targetPanel = 'primary';
+        _flushSecondaryPanes();
+        _save();
+      }
+
+      function setTarget(panel) {
+        _state.targetPanel = panel === 'secondary' ? 'secondary' : 'primary';
+      }
+
+      function toggleTarget() {
+        _state.targetPanel = _state.targetPanel === 'primary' ? 'secondary' : 'primary';
+      }
+
+      function getTarget() { return _state.targetPanel; }
+      function getPrimaryTab() { return _state.primaryTab; }
+      function getSecondaryTab() { return _state.secondaryTab; }
+
+      function setPrimaryTab(tabId) { _state.primaryTab = tabId; }
+      function setSecondaryTab(tabId) { _state.secondaryTab = tabId; }
+
+      function closeSecondary() {
+        _state.secondaryTab = null;
+        _state.targetPanel = 'primary';
+        _flushSecondaryPanes();
+      }
+
+      // Secondary pane cache management
+      function getSecondaryPane(tabId) { return _secondaryPanes[tabId] || null; }
+      function setSecondaryPane(tabId, pane) { _secondaryPanes[tabId] = { pane: pane }; }
+      function getSecondaryActivePane() { return _secondaryActivePane; }
+      function setSecondaryActivePane(pane) { _secondaryActivePane = pane; }
+
+      function _flushSecondaryPanes() {
+        for (var k in _secondaryPanes) {
+          if (_secondaryPanes[k].pane && _secondaryPanes[k].pane.parentNode) {
+            _secondaryPanes[k].pane.parentNode.removeChild(_secondaryPanes[k].pane);
+          }
+        }
+        _secondaryPanes = {};
+        _secondaryActivePane = null;
+      }
+
+      function invalidateSecondaryCache(tabId) {
+        if (tabId) {
+          if (_secondaryPanes[tabId]) {
+            if (_secondaryPanes[tabId].pane.parentNode) _secondaryPanes[tabId].pane.parentNode.removeChild(_secondaryPanes[tabId].pane);
+            delete _secondaryPanes[tabId];
+          }
+        } else {
+          _flushSecondaryPanes();
+        }
+      }
+
+      // Resize support
+      function setSplitRatio(ratio) {
+        _state.splitRatio = Math.max(0.3, Math.min(0.7, ratio));
+        _save();
+      }
+      function getSplitRatio() { return _state.splitRatio; }
+
+      // Get tab info for header display
+      function getTabInfo(tabId, role) {
+        var tabs = _getSidebarTabs(role);
+        for (var i = 0; i < tabs.length; i++) {
+          if (tabs[i].id === tabId) return tabs[i];
+        }
+        return { icon: '', label: tabId };
+      }
+
+      return {
+        isEnabled: isEnabled, getState: getState,
+        toggle: toggle, enable: enable, disable: disable,
+        setTarget: setTarget, toggleTarget: toggleTarget, getTarget: getTarget,
+        getPrimaryTab: getPrimaryTab, getSecondaryTab: getSecondaryTab,
+        setPrimaryTab: setPrimaryTab, setSecondaryTab: setSecondaryTab,
+        closeSecondary: closeSecondary,
+        getSecondaryPane: getSecondaryPane, setSecondaryPane: setSecondaryPane,
+        getSecondaryActivePane: getSecondaryActivePane, setSecondaryActivePane: setSecondaryActivePane,
+        invalidateSecondaryCache: invalidateSecondaryCache,
+        setSplitRatio: setSplitRatio, getSplitRatio: getSplitRatio,
+        getTabInfo: getTabInfo
+      };
+    })();
+
+    // ═══════════════════════════════════════
     // ROUTER (with optional batch pre-fetch)
     // ═══════════════════════════════════════
     function initApp() {
@@ -1099,17 +1239,45 @@
 
       if (_layoutCache.container === container && _layoutCache.role === role && _layoutCache.layout) {
         // Same role, same container — preserve layout shell.
-        // Create a NEW content pane (don't destroy the old one — tab pane cache keeps it alive).
         _layoutCache.sidebar.innerHTML = '';
         renderSidebarItems(_layoutCache.sidebar, role, activeTab);
 
-        // Hide the old content pane (tab pane cache may re-show it later)
-        if (_layoutCache.content) _layoutCache.content.style.display = 'none';
+        // Determine which panel receives this content
+        var _isSecondaryRender = SplitView.isEnabled() && _splitRenderTarget === 'secondary';
 
-        var newContent = el('div', { className: 'page-layout-content' });
-        contentFn(newContent);
-        _layoutCache.layout.appendChild(newContent);
-        _layoutCache.content = newContent;
+        if (_isSecondaryRender && _layoutCache.splitContainer) {
+          // Rendering into secondary panel
+          var secPanel = _layoutCache.splitSecondary;
+          if (!secPanel) return;
+          // Hide old secondary content
+          var oldSecContent = secPanel.querySelector('.page-layout-content');
+          if (oldSecContent) oldSecContent.style.display = 'none';
+
+          var newSecContent = el('div', { className: 'page-layout-content' });
+          contentFn(newSecContent);
+          secPanel.appendChild(newSecContent);
+          _layoutCache.secondaryContent = newSecContent;
+
+          // Update secondary header
+          _updateSplitPanelHeader(_layoutCache.splitSecondaryHeader, SplitView.getSecondaryTab(), role, true);
+          _updateSplitPanelHeader(_layoutCache.splitPrimaryHeader, SplitView.getPrimaryTab(), role, false);
+        }
+
+        // Rendering into primary panel (default behavior)
+        if (!_isSecondaryRender || !_layoutCache.splitContainer) {
+          if (_layoutCache.content) _layoutCache.content.style.display = 'none';
+
+          var targetParent = _layoutCache.splitPrimary || _layoutCache.layout;
+          var newContent = el('div', { className: 'page-layout-content' });
+          contentFn(newContent);
+          targetParent.appendChild(newContent);
+          _layoutCache.content = newContent;
+
+          // Update primary header if split is active
+          if (_layoutCache.splitPrimaryHeader) {
+            _updateSplitPanelHeader(_layoutCache.splitPrimaryHeader, activeTab, role, false);
+          }
+        }
 
         // Swap bottom nav for active-state update
         var oldBottom = container.querySelector('.bottom-nav');
@@ -1121,19 +1289,166 @@
       // Full rebuild (first render or role change)
       container.innerHTML = '';
       var layout = el('div', { className: 'page-layout' });
-      var sidebar = el('nav', { className: 'sidebar-nav' });
+      var sidebar = el('nav', { className: 'sidebar-nav' + (SplitView.isEnabled() ? ' split-active' : '') });
       renderSidebarItems(sidebar, role, activeTab);
       layout.appendChild(sidebar);
 
       var content = el('div', { className: 'page-layout-content' });
       contentFn(content);
-      layout.appendChild(content);
-      container.appendChild(layout);
+
+      // Split-view mode: wrap content in dual-panel container
+      var _useSplit = SplitView.isEnabled();
+      if (_useSplit) {
+        _buildSplitLayout(layout, content, activeTab, role);
+      }
+
+      // Standard mode: content goes directly in layout
+      if (!_useSplit) {
+        layout.appendChild(content);
+        container.appendChild(layout);
+        _layoutCache = { container: container, role: role, layout: layout, sidebar: sidebar, content: content };
+      }
 
       // Bottom nav always added to DOM; CSS hides it at tablet+ (min-width: 640px)
       renderBottomNav(container, role, activeTab);
+    }
 
-      _layoutCache = { container: container, role: role, layout: layout, sidebar: sidebar, content: content };
+    /** Builds the split-view dual-panel layout inside the given layout element */
+    function _buildSplitLayout(layout, primaryContent, activeTab, role) {
+      var container = _layoutCache.container || layout.parentNode || document.getElementById('app');
+      var sidebar = _layoutCache.sidebar || layout.querySelector('.sidebar-nav');
+
+      var splitContainer = el('div', { className: 'split-view-container' });
+
+      // Primary panel
+      var primaryPanel = el('div', { className: 'split-panel split-panel-primary' });
+      var primaryHeader = _createSplitPanelHeader(activeTab, role, false);
+      primaryPanel.appendChild(primaryHeader);
+      primaryPanel.appendChild(primaryContent);
+      splitContainer.appendChild(primaryPanel);
+
+      // Resize divider
+      var divider = el('div', { className: 'split-divider' });
+      _initSplitDividerDrag(divider, splitContainer);
+      splitContainer.appendChild(divider);
+
+      // Secondary panel
+      var secondaryPanel = el('div', { className: 'split-panel split-panel-secondary' });
+      var secondaryHeader = _createSplitPanelHeader(SplitView.getSecondaryTab(), role, true);
+      secondaryPanel.appendChild(secondaryHeader);
+
+      // Secondary panel placeholder or loading state
+      var secPane = el('div', { className: 'page-layout-content' });
+      if (SplitView.getSecondaryTab()) {
+        var secInfo = el('div', { style: { padding: '40px 20px', textAlign: 'center', color: 'var(--muted)' } });
+        secInfo.textContent = 'Loading...';
+        secPane.appendChild(secInfo);
+      } else {
+        secPane.style.display = 'flex';
+        secPane.style.alignItems = 'center';
+        secPane.style.justifyContent = 'center';
+        secPane.style.minHeight = '60vh';
+        var hint = el('div', { style: { textAlign: 'center', color: 'var(--muted)', padding: '20px' } });
+        hint.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '12px' } }, '\u25A7'));
+        hint.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '4px' } }, 'Select a second tab'));
+        hint.appendChild(el('div', { style: { fontSize: '12px' } }, 'Click any tab in the sidebar to open it here'));
+        secPane.appendChild(hint);
+      }
+      secondaryPanel.appendChild(secPane);
+      splitContainer.appendChild(secondaryPanel);
+
+      // Apply split ratio
+      var ratio = SplitView.getSplitRatio();
+      primaryPanel.style.flex = '0 0 ' + (ratio * 100) + '%';
+      secondaryPanel.style.flex = '1';
+
+      layout.appendChild(splitContainer);
+      container.appendChild(layout);
+
+      _layoutCache = {
+        container: container, role: role, layout: layout, sidebar: sidebar, content: primaryContent,
+        splitContainer: splitContainer,
+        splitPrimary: primaryPanel, splitSecondary: secondaryPanel,
+        splitPrimaryHeader: primaryHeader, splitSecondaryHeader: secondaryHeader,
+        secondaryContent: null
+      };
+    }
+
+    // Track which panel the current render targets (set by _handleTabNav before calling render)
+    var _splitRenderTarget = 'primary';
+
+    /** Creates a panel header element for split view */
+    function _createSplitPanelHeader(tabId, role, isSecondary) {
+      var header = el('div', { className: 'split-panel-header' });
+      _updateSplitPanelHeader(header, tabId, role, isSecondary);
+      return header;
+    }
+
+    /** Updates a split panel header's content */
+    function _updateSplitPanelHeader(header, tabId, role, isSecondary) {
+      if (!header) return;
+      header.innerHTML = '';
+      var info = tabId ? SplitView.getTabInfo(tabId, role) : null;
+      header.appendChild(el('span', { className: 'split-panel-header-icon' }, info ? info.icon : ''));
+      header.appendChild(el('span', { className: 'split-panel-header-label' }, info ? info.label : (isSecondary ? 'Select a tab' : 'Primary')));
+
+      if (isSecondary && tabId) {
+        var closeBtn = el('span', {
+          className: 'split-panel-close',
+          title: 'Close this panel',
+          onClick: function() {
+            SplitView.closeSecondary();
+            // Re-render with single panel
+            _layoutCache = {}; // force full rebuild
+            _handleTabNav(AppState.activeRole || role, AppState.activeTab);
+          }
+        }, '\u00D7');
+        header.appendChild(closeBtn);
+      }
+
+      // Click header to set as target panel
+      header.style.cursor = 'pointer';
+      header.onclick = function() {
+        SplitView.setTarget(isSecondary ? 'secondary' : 'primary');
+        // Update sidebar to reflect target change
+        if (_layoutCache.sidebar) {
+          _layoutCache.sidebar.innerHTML = '';
+          renderSidebarItems(_layoutCache.sidebar, role, AppState.activeTab);
+        }
+      };
+    }
+
+    /** Initialize drag-to-resize on the split divider */
+    function _initSplitDividerDrag(divider, splitContainer) {
+      var startX, startRatio;
+      function onMouseDown(e) {
+        e.preventDefault();
+        startX = e.clientX || (e.touches && e.touches[0].clientX);
+        startRatio = SplitView.getSplitRatio();
+        divider.classList.add('dragging');
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('touchmove', onMouseMove, { passive: false });
+        document.addEventListener('touchend', onMouseUp);
+      }
+      function onMouseMove(e) {
+        var clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        var containerRect = splitContainer.getBoundingClientRect();
+        var newRatio = (clientX - containerRect.left) / containerRect.width;
+        newRatio = Math.max(0.25, Math.min(0.75, newRatio));
+        SplitView.setSplitRatio(newRatio);
+        var primary = splitContainer.querySelector('.split-panel-primary');
+        if (primary) primary.style.flex = '0 0 ' + (newRatio * 100) + '%';
+      }
+      function onMouseUp() {
+        divider.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('touchmove', onMouseMove);
+        document.removeEventListener('touchend', onMouseUp);
+      }
+      divider.addEventListener('mousedown', onMouseDown);
+      divider.addEventListener('touchstart', onMouseDown, { passive: false });
     }
 
     function renderSidebarItems(sidebar, role, activeTab) {
@@ -1156,6 +1471,10 @@
       header.appendChild(bellWrap);
       sidebar.appendChild(header);
 
+      var _splitEnabled = SplitView.isEnabled();
+      var _secondaryTab = _splitEnabled ? SplitView.getSecondaryTab() : null;
+      var _splitTarget = _splitEnabled ? SplitView.getTarget() : 'primary';
+
       var tabs = _getSidebarTabs(role);
       tabs.forEach(function(tab) {
         if (tab.divider) {
@@ -1166,21 +1485,90 @@
           sidebar.appendChild(el('div', { className: 'sidebar-group-label' }, tab.group));
           return;
         }
-        var item = el('div', {
-          className: 'sidebar-item' + (tab.id === activeTab ? ' active' : ''),
-          onClick: function() { _handleTabNav(role, tab.id); }
-        }, [
+        var isPrimary = tab.id === activeTab;
+        var isSecondary = _splitEnabled && tab.id === _secondaryTab;
+        var itemClass = 'sidebar-item' + (isPrimary ? ' active' : '') + (isSecondary ? ' active-secondary' : '');
+
+        var children = [
           el('span', { className: 'sidebar-item-icon' }, tab.icon),
           el('span', null, tab.label)
-        ]);
+        ];
+
+        // Add panel target badge when split-view is active
+        if (_splitEnabled) {
+          var badge = '';
+          if (isPrimary) badge = 'L';
+          else if (isSecondary) badge = 'R';
+          if (badge) {
+            children.push(el('span', { className: 'split-target-badge' }, badge));
+          }
+        }
+
+        var item = el('div', {
+          className: itemClass,
+          onClick: function() { _handleTabNav(role, tab.id); }
+        }, children);
         // Set per-tab accent color for themed nav styles
-        if (tab.id === activeTab && AppState.navTheme !== 'default') {
+        if (isPrimary && AppState.navTheme !== 'default') {
           var tabColor = NavThemes.getTabColor(tab.id);
           item.style.setProperty('--blob-color', tabColor);
           item.style.setProperty('--blob-glow', tabColor + '44');
         }
         sidebar.appendChild(item);
       });
+
+      // Split View toggle (tablet+ only — hidden on mobile via CSS)
+      if (isSidebarLayout()) {
+        sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
+        var splitSection = el('div', { className: 'sidebar-split-section' });
+        var splitToggle = el('div', {
+          className: 'sidebar-split-toggle' + (_splitEnabled ? ' active' : ''),
+          onClick: function() {
+            var nowEnabled = SplitView.toggle();
+            if (nowEnabled) {
+              SplitView.setPrimaryTab(activeTab);
+              SplitView.setTarget('secondary');
+            }
+            // Force full layout rebuild
+            _layoutCache = {};
+            _invalidateTabCache();
+            SplitView.invalidateSecondaryCache();
+            _handleTabNav(role, activeTab);
+          }
+        }, [
+          el('span', { className: 'sidebar-split-toggle-icon' }, _splitEnabled ? '\u25A7' : '\u25A1'),
+          el('span', null, _splitEnabled ? 'Close Split View' : 'Split View')
+        ]);
+        splitSection.appendChild(splitToggle);
+
+        // Target panel selector — only shown when split is active
+        if (_splitEnabled) {
+          var targetRow = el('div', { style: { display: 'flex', gap: '4px', marginTop: '6px' } });
+          var btnLeft = el('div', {
+            className: 'sidebar-split-toggle' + (_splitTarget === 'primary' ? ' active' : ''),
+            style: { flex: '1', justifyContent: 'center', fontSize: '11px', padding: '5px 8px' },
+            onClick: function() {
+              SplitView.setTarget('primary');
+              _layoutCache.sidebar.innerHTML = '';
+              renderSidebarItems(_layoutCache.sidebar, role, activeTab);
+            }
+          }, '\u25C0 Left');
+          var btnRight = el('div', {
+            className: 'sidebar-split-toggle' + (_splitTarget === 'secondary' ? ' active' : ''),
+            style: { flex: '1', justifyContent: 'center', fontSize: '11px', padding: '5px 8px' },
+            onClick: function() {
+              SplitView.setTarget('secondary');
+              _layoutCache.sidebar.innerHTML = '';
+              renderSidebarItems(_layoutCache.sidebar, role, activeTab);
+            }
+          }, 'Right \u25B6');
+          targetRow.appendChild(btnLeft);
+          targetRow.appendChild(btnRight);
+          splitSection.appendChild(targetRow);
+        }
+
+        sidebar.appendChild(splitSection);
+      }
 
       // Bottom utility items
       sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
@@ -1677,7 +2065,24 @@
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
       var switchId = ++_navSwitchId; // claim this switch; any older in-flight switch is now stale
-      AppState.activeTab = tabId;
+
+      // ── SPLIT VIEW ROUTING ──
+      // When split-view is active, determine which panel receives this navigation
+      var _isSplitSecondary = false;
+      if (SplitView.isEnabled()) {
+        var target = SplitView.getTarget();
+        if (target === 'secondary') {
+          _isSplitSecondary = true;
+          SplitView.setSecondaryTab(tabId);
+          // Keep AppState.activeTab as the primary tab for sidebar highlight
+          if (!SplitView.getPrimaryTab()) SplitView.setPrimaryTab(AppState.activeTab);
+        } else {
+          SplitView.setPrimaryTab(tabId);
+          AppState.activeTab = tabId;
+        }
+      } else {
+        AppState.activeTab = tabId;
+      }
 
       // Normalize tab aliases (steward home/cases both render the same dashboard)
       var cacheId = tabId;
@@ -1687,6 +2092,7 @@
       // On role change, flush all cached panes
       if (_tabPanesRole !== role) {
         _invalidateTabCache();
+        SplitView.invalidateSecondaryCache();
         _tabPanesRole = role;
         _activePane = null;
       }
@@ -1697,6 +2103,29 @@
       if (tabId === 'more' || tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
       if (tabId === 'more_steward' || tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
 
+      // ── SPLIT VIEW: secondary panel rendering ──
+      if (_isSplitSecondary && _layoutCache.splitSecondary) {
+        _splitRenderTarget = 'secondary';
+        var renderFn = _getTabRenderFn(role, tabId);
+        if (renderFn) {
+          renderFn(app);
+          // After renderPageLayout runs for secondary, it populates _layoutCache.secondaryContent
+          if (_layoutCache.secondaryContent && !_ALWAYS_FRESH_TABS[cacheId]) {
+            SplitView.setSecondaryPane(cacheId, _layoutCache.secondaryContent);
+          }
+          SplitView.setSecondaryActivePane(_layoutCache.secondaryContent);
+        }
+        _splitRenderTarget = 'primary';
+
+        // Update sidebar highlights
+        if (_layoutCache.sidebar) {
+          _layoutCache.sidebar.innerHTML = '';
+          renderSidebarItems(_layoutCache.sidebar, role, AppState.activeTab);
+        }
+        _navProgressDone();
+        return;
+      }
+
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
         if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
@@ -1706,12 +2135,14 @@
           _navProgressDone();
           return;
         }
+        _splitRenderTarget = 'primary';
         renderOrgChart(app, role);
         _activePane = _layoutCache.content;
         _navProgressDone();
         return;
       }
       if (tabId === 'poms') {
+        _splitRenderTarget = 'primary';
         renderPOMSReference(app, role);
         _activePane = _layoutCache.content;
         _navProgressDone();
@@ -1747,6 +2178,7 @@
       // Hide the currently active pane (don't destroy it)
       if (_activePane) _activePane.style.display = 'none';
 
+      _splitRenderTarget = 'primary';
       _renderTabFresh(app, role, tabId, cacheId);
 
       _navProgressDone();
@@ -1870,6 +2302,195 @@
         }
       }, 200);
     });
+
+    // ═══════════════════════════════════════
+    // MOBILE SCROLL-TAB NAVIGATION (v4.26.2)
+    // Scroll past the bottom of content → next tab
+    // Scroll past the top of content → previous tab
+    // Mobile only (<640px). Uses touch events for overscroll detection.
+    // ═══════════════════════════════════════
+    var _scrollNav = {
+      startY: 0,
+      startScrollTop: 0,
+      startScrollHeight: 0,
+      startClientHeight: 0,
+      pulling: false,
+      direction: null, // 'next' or 'prev'
+      indicator: null,
+      threshold: 90, // px of overscroll needed to trigger
+      cooldown: false
+    };
+
+    /** Get ordered navigable tab IDs for the current role (excludes groups/dividers) */
+    function _getNavTabOrder(role) {
+      var sidebar = _getSidebarTabs(role);
+      var ids = [];
+      for (var i = 0; i < sidebar.length; i++) {
+        if (sidebar[i].id) ids.push(sidebar[i].id);
+      }
+      return ids;
+    }
+
+    /** Find next/prev tab relative to current */
+    function _getAdjacentTab(role, direction) {
+      var tabs = _getNavTabOrder(role);
+      var current = AppState.activeTab;
+      // Normalize: steward home/cases are the same
+      if (role === 'steward' && current === 'home') current = 'cases';
+      var idx = tabs.indexOf(current);
+      if (idx === -1) return null;
+      var targetIdx = direction === 'next' ? idx + 1 : idx - 1;
+      if (targetIdx < 0 || targetIdx >= tabs.length) return null;
+      return { id: tabs[targetIdx], label: _getTabLabel(role, tabs[targetIdx]) };
+    }
+
+    /** Look up tab label from sidebar config */
+    function _getTabLabel(role, tabId) {
+      var sidebar = _getSidebarTabs(role);
+      for (var i = 0; i < sidebar.length; i++) {
+        if (sidebar[i].id === tabId) return sidebar[i].label;
+      }
+      return tabId;
+    }
+
+    /** Create or reuse the scroll-nav indicator element */
+    function _getScrollNavIndicator() {
+      if (_scrollNav.indicator) return _scrollNav.indicator;
+      var ind = document.createElement('div');
+      ind.className = 'scroll-nav-indicator';
+      ind.innerHTML = '<span class="scroll-nav-arrow"></span><span class="scroll-nav-label"></span>';
+      document.body.appendChild(ind);
+      _scrollNav.indicator = ind;
+      return ind;
+    }
+
+    /** Show the pull indicator with direction and label */
+    function _showScrollNavIndicator(direction, label, progress) {
+      var ind = _getScrollNavIndicator();
+      var arrow = ind.querySelector('.scroll-nav-arrow');
+      var lbl = ind.querySelector('.scroll-nav-label');
+      var ready = progress >= 1;
+      ind.classList.toggle('ready', ready);
+      ind.classList.toggle('top', direction === 'prev');
+      ind.classList.toggle('bottom', direction === 'next');
+      arrow.textContent = direction === 'next' ? '\u2193' : '\u2191';
+      lbl.textContent = ready ? 'Release for ' + label : label;
+      // Scale opacity/transform with pull progress
+      var opacity = Math.min(1, progress * 1.5);
+      ind.style.opacity = opacity;
+      ind.style.display = 'flex';
+    }
+
+    function _hideScrollNavIndicator() {
+      if (_scrollNav.indicator) {
+        _scrollNav.indicator.style.display = 'none';
+        _scrollNav.indicator.classList.remove('ready', 'top', 'bottom');
+      }
+    }
+
+    /** Find the scrollable content element */
+    function _getScrollContent() {
+      if (!_layoutCache.content) return null;
+      // The content pane itself or body/documentElement
+      return _layoutCache.content;
+    }
+
+    // Attach touch listeners to document (delegated, since content panes change)
+    document.addEventListener('touchstart', function(e) {
+      if (LayoutState.mode !== 'mobile' || _scrollNav.cooldown) return;
+      var role = AppState.activeRole;
+      if (!role) return;
+
+      // Don't interfere with horizontal scrolling or interactive elements
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      var content = _getScrollContent();
+      if (!content) return;
+
+      _scrollNav.startY = e.touches[0].clientY;
+      // Check scroll position of the content pane or window
+      _scrollNav.startScrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      _scrollNav.startScrollHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      _scrollNav.startClientHeight = window.innerHeight;
+      _scrollNav.pulling = false;
+      _scrollNav.direction = null;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (LayoutState.mode !== 'mobile' || _scrollNav.cooldown) return;
+      if (_scrollNav.startY === 0) return;
+
+      var role = AppState.activeRole;
+      if (!role) return;
+
+      var currentY = e.touches[0].clientY;
+      var deltaY = currentY - _scrollNav.startY;
+      var scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      var scrollHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      var clientHeight = window.innerHeight;
+      var atTop = scrollTop <= 1;
+      var atBottom = (scrollTop + clientHeight) >= (scrollHeight - 2);
+
+      // Pulling down while at top → go to previous tab
+      if (deltaY > 20 && atTop) {
+        var prev = _getAdjacentTab(role, 'prev');
+        if (prev) {
+          _scrollNav.pulling = true;
+          _scrollNav.direction = 'prev';
+          var progress = Math.min(1, (deltaY - 20) / _scrollNav.threshold);
+          _showScrollNavIndicator('prev', prev.label, progress);
+        }
+        return;
+      }
+
+      // Pulling up while at bottom → go to next tab
+      if (deltaY < -20 && atBottom) {
+        var next = _getAdjacentTab(role, 'next');
+        if (next) {
+          _scrollNav.pulling = true;
+          _scrollNav.direction = 'next';
+          var progressN = Math.min(1, (Math.abs(deltaY) - 20) / _scrollNav.threshold);
+          _showScrollNavIndicator('next', next.label, progressN);
+        }
+        return;
+      }
+
+      // If user scrolled away from the edge, cancel
+      if (_scrollNav.pulling) {
+        _scrollNav.pulling = false;
+        _scrollNav.direction = null;
+        _hideScrollNavIndicator();
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+      if (!_scrollNav.pulling || !_scrollNav.direction) {
+        _scrollNav.startY = 0;
+        _hideScrollNavIndicator();
+        return;
+      }
+
+      var role = AppState.activeRole;
+      var target = _getAdjacentTab(role, _scrollNav.direction);
+      var ind = _scrollNav.indicator;
+      var wasReady = ind && ind.classList.contains('ready');
+
+      _scrollNav.pulling = false;
+      _scrollNav.direction = null;
+      _scrollNav.startY = 0;
+      _hideScrollNavIndicator();
+
+      if (wasReady && target) {
+        // Cooldown to prevent rapid-fire navigation
+        _scrollNav.cooldown = true;
+        setTimeout(function() { _scrollNav.cooldown = false; }, 600);
+        // Navigate to the target tab
+        _handleTabNav(role, target.id);
+        // Scroll to top of new content
+        window.scrollTo(0, 0);
+      }
+    }, { passive: true });
 
     // ═══════════════════════════════════════
     // CHART HELPER — lazy-loads Chart.js on first use
