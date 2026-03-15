@@ -21,6 +21,9 @@
  *   configlive_ — Live sheet headers vs column constants
  *   survey_   — Survey engine integrity
  *   emailsend_ — Email delivery & scope authorization
+ *   loginlink_ — Login link flow, token lifecycle, resolveUser chain
+ *   contacts_  — Contact service functions, steward lookup
+ *   emailtypes_ — Email sender functions, broadcast, direct message
  *
  * Web app suites (defined in 31_WebAppTests.gs):
  *   webapp_   — doGet routing, templates, URL resolution
@@ -839,6 +842,45 @@ function _getTestRegistry() {
     { name: 'test_emailsend_rateLimitKeyFormat',           fn: test_emailsend_rateLimitKeyFormat },
     { name: 'test_emailsend_tokenPrefixNotConflicting',    fn: test_emailsend_tokenPrefixNotConflicting },
     { name: 'test_emailsend_sendMagicLinkBadEmailReturnsSafe', fn: test_emailsend_sendMagicLinkBadEmailReturnsSafe },
+
+    // ── loginlink suite (Login link flow, token lifecycle, resolveUser chain) ──
+    { name: 'test_loginlink_resolveUserExists',              fn: test_loginlink_resolveUserExists },
+    { name: 'test_loginlink_resolveUserNullOnEmpty',         fn: test_loginlink_resolveUserNullOnEmpty },
+    { name: 'test_loginlink_resolveUserLogoutOverride',      fn: test_loginlink_resolveUserLogoutOverride },
+    { name: 'test_loginlink_resolveEmailFromTokenCallable',  fn: test_loginlink_resolveEmailFromTokenCallable },
+    { name: 'test_loginlink_validateSessionTokenCallable',   fn: test_loginlink_validateSessionTokenCallable },
+    { name: 'test_loginlink_expiredTokenReturnsNull',        fn: test_loginlink_expiredTokenReturnsNull },
+    { name: 'test_loginlink_sessionTokenRoundTrip',          fn: test_loginlink_sessionTokenRoundTrip },
+    { name: 'test_loginlink_cleanupExpiredTokensCallable',   fn: test_loginlink_cleanupExpiredTokensCallable },
+    { name: 'test_loginlink_magicLinkRateLimitCacheKey',     fn: test_loginlink_magicLinkRateLimitCacheKey },
+    { name: 'test_loginlink_configHasMagicLinkExpiry',       fn: test_loginlink_configHasMagicLinkExpiry },
+
+    // ── contacts suite (Contact service functions, steward lookup) ──
+    { name: 'test_contacts_getStewardContactCallable',       fn: test_contacts_getStewardContactCallable },
+    { name: 'test_contacts_getStewardContactNullOnBadEmail', fn: test_contacts_getStewardContactNullOnBadEmail },
+    { name: 'test_contacts_getAssignedStewardInfoCallable',  fn: test_contacts_getAssignedStewardInfoCallable },
+    { name: 'test_contacts_getAvailableStewardsCallable',    fn: test_contacts_getAvailableStewardsCallable },
+    { name: 'test_contacts_getMemberContactHistoryCallable', fn: test_contacts_getMemberContactHistoryCallable },
+    { name: 'test_contacts_getStewardContactLogCallable',    fn: test_contacts_getStewardContactLogCallable },
+    { name: 'test_contacts_contactWrappersRejectNull',       fn: test_contacts_contactWrappersRejectNull },
+    { name: 'test_contacts_getMemberDataByIdCallable',       fn: test_contacts_getMemberDataByIdCallable },
+
+    // ── emailtypes suite (Email sender functions, broadcast, direct message) ──
+    { name: 'test_emailtypes_surveyEmailCallable',           fn: test_emailtypes_surveyEmailCallable },
+    { name: 'test_emailtypes_contactFormEmailCallable',      fn: test_emailtypes_contactFormEmailCallable },
+    { name: 'test_emailtypes_dashboardLinkEmailCallable',    fn: test_emailtypes_dashboardLinkEmailCallable },
+    { name: 'test_emailtypes_grievanceStatusEmailCallable',  fn: test_emailtypes_grievanceStatusEmailCallable },
+    { name: 'test_emailtypes_composeEmailCallable',          fn: test_emailtypes_composeEmailCallable },
+    { name: 'test_emailtypes_sendQuickEmailCallable',        fn: test_emailtypes_sendQuickEmailCallable },
+    { name: 'test_emailtypes_bulkEmailCallable',             fn: test_emailtypes_bulkEmailCallable },
+    { name: 'test_emailtypes_safeSendEmailCallable',         fn: test_emailtypes_safeSendEmailCallable },
+    { name: 'test_emailtypes_safeSendEmailValidation',       fn: test_emailtypes_safeSendEmailValidation },
+    { name: 'test_emailtypes_broadcastWrapperExists',        fn: test_emailtypes_broadcastWrapperExists },
+    { name: 'test_emailtypes_directMessageWrapperExists',    fn: test_emailtypes_directMessageWrapperExists },
+    { name: 'test_emailtypes_directMessageRejectsNull',      fn: test_emailtypes_directMessageRejectsNull },
+    { name: 'test_emailtypes_broadcastRejectsNull',          fn: test_emailtypes_broadcastRejectsNull },
+    { name: 'test_emailtypes_securityAlertEmailCallable',    fn: test_emailtypes_securityAlertEmailCallable },
+    { name: 'test_emailtypes_executivePDFEmailCallable',     fn: test_emailtypes_executivePDFEmailCallable },
 
     // ── webapp suite (doGet routing, templates, URL resolution) ──
     { name: 'test_webapp_doGetExists',                     fn: test_webapp_doGetExists },
@@ -1924,4 +1966,312 @@ function test_emailsend_sendMagicLinkBadEmailReturnsSafe() {
   // Security: must return success:true even for missing email (enumeration defense)
   TestRunner.assertTrue(result.success === true,
     'sendMagicLink returns success:true for unknown email (enumeration defense)');
+}
+
+
+
+/* ========================================================================
+ * LOGINLINK SUITE — Login link flow, token lifecycle, resolveUser chain
+ * ======================================================================== */
+
+function test_loginlink_resolveUserExists() {
+  TestRunner.assertType(Auth.resolveUser, 'function', 'Auth.resolveUser is function');
+}
+
+function test_loginlink_resolveUserNullOnEmpty() {
+  // resolveUser with no event object and no SSO should return either a
+  // user (if SSO is available in this execution context) or null.
+  // In the GAS editor SSO IS available, so we verify shape instead.
+  var result = Auth.resolveUser(null);
+  if (result !== null) {
+    TestRunner.assertNotNull(result.email, 'resolveUser result has email');
+    TestRunner.assertNotNull(result.method, 'resolveUser result has method');
+    TestRunner.assertTrue(
+      result.method === 'sso' || result.method === 'magic' || result.method === 'session',
+      'resolveUser method is valid enum (' + result.method + ')'
+    );
+  } else {
+    TestRunner.assertEquals(null, result, 'resolveUser returns null when no auth signals');
+  }
+}
+
+function test_loginlink_resolveUserLogoutOverride() {
+  // loggedout=1 parameter must force null return even if SSO is active.
+  var fakeEvent = { parameter: { loggedout: '1' } };
+  var result = Auth.resolveUser(fakeEvent);
+  TestRunner.assertEquals(null, result, 'resolveUser returns null when loggedout=1 (logout override)');
+}
+
+function test_loginlink_resolveEmailFromTokenCallable() {
+  TestRunner.assertType(Auth.resolveEmailFromToken, 'function',
+    'Auth.resolveEmailFromToken is exposed');
+  // Garbage token must return null
+  var result = Auth.resolveEmailFromToken('NOT_A_REAL_TOKEN_12345');
+  TestRunner.assertEquals(null, result, 'resolveEmailFromToken returns null for invalid token');
+}
+
+function test_loginlink_validateSessionTokenCallable() {
+  TestRunner.assertType(Auth.validateSessionToken, 'function',
+    'Auth.validateSessionToken is exposed');
+  // Garbage session token must return null
+  var result = Auth.validateSessionToken('FAKE_SESSION_XYZ_999');
+  TestRunner.assertEquals(null, result, 'validateSessionToken returns null for invalid session');
+}
+
+function test_loginlink_expiredTokenReturnsNull() {
+  // Write a token with an already-expired timestamp, then validate it.
+  // This tests the expiry check without needing to wait.
+  var props = PropertiesService.getScriptProperties();
+  var testToken = '_TEST_EXPIRED_' + Date.now();
+  var key = 'SESSION_' + testToken;
+  props.setProperty(key, JSON.stringify({
+    email: 'test@expired.invalid',
+    expiry: Date.now() - 10000, // 10 seconds ago
+    created: Date.now() - 60000,
+  }));
+
+  var result = Auth.validateSessionToken(testToken);
+  TestRunner.assertEquals(null, result, 'Expired session token returns null');
+
+  // Cleanup — token may have been auto-deleted by validation
+  try { props.deleteProperty(key); } catch (_e) { /* already cleaned */ }
+}
+
+function test_loginlink_sessionTokenRoundTrip() {
+  // Create a real session token, validate it, then clean up.
+  var testEmail = 'roundtrip-test@example.invalid';
+  var token = Auth.createSessionToken(testEmail);
+  TestRunner.assertNotNull(token, 'createSessionToken returns a token');
+  TestRunner.assertTrue(typeof token === 'string' && token.length > 10,
+    'Token is a non-trivial string (' + (token ? token.length : 0) + ' chars)');
+
+  // Validate the token we just created
+  var email = Auth.validateSessionToken(token);
+  TestRunner.assertEquals(testEmail, email, 'validateSessionToken returns original email');
+
+  // Cleanup
+  Auth.invalidateSession(token);
+  var afterInvalidation = Auth.validateSessionToken(token);
+  TestRunner.assertEquals(null, afterInvalidation,
+    'Token returns null after invalidateSession (cleanup confirmed)');
+}
+
+function test_loginlink_cleanupExpiredTokensCallable() {
+  TestRunner.assertType(Auth.cleanupExpiredTokens, 'function',
+    'Auth.cleanupExpiredTokens is function');
+  // Should return a number (count of cleaned tokens)
+  var result = Auth.cleanupExpiredTokens();
+  TestRunner.assertTrue(typeof result === 'number', 'cleanupExpiredTokens returns a number');
+  TestRunner.assertTrue(result >= 0, 'cleanupExpiredTokens result is non-negative');
+}
+
+function test_loginlink_magicLinkRateLimitCacheKey() {
+  // Verify the rate limit key format for various email addresses
+  var emails = [
+    'simple@example.com',
+    'user+tag@domain.org',
+    'first.last@sub.domain.co.uk'
+  ];
+  for (var i = 0; i < emails.length; i++) {
+    var key = 'MAGIC_RATE_' + emails[i];
+    TestRunner.assertTrue(key.length < 250,
+      'Rate key for ' + emails[i] + ' under 250 chars (' + key.length + ')');
+  }
+}
+
+function test_loginlink_configHasMagicLinkExpiry() {
+  // ConfigReader must supply magicLinkExpiryDays — used in email body text
+  // and magicLinkExpiryMs — used for token expiry timestamp
+  try {
+    var config = ConfigReader.getConfig();
+    TestRunner.assertNotNull(config, 'ConfigReader.getConfig() returns object');
+    TestRunner.assertTrue(typeof config.magicLinkExpiryDays === 'number',
+      'config.magicLinkExpiryDays is a number (' + config.magicLinkExpiryDays + ')');
+    TestRunner.assertTrue(config.magicLinkExpiryDays > 0,
+      'magicLinkExpiryDays is positive (' + config.magicLinkExpiryDays + ')');
+    TestRunner.assertTrue(typeof config.magicLinkExpiryMs === 'number',
+      'config.magicLinkExpiryMs is a number');
+    TestRunner.assertTrue(config.magicLinkExpiryMs > 0,
+      'magicLinkExpiryMs is positive');
+  } catch (e) {
+    TestRunner.fail('ConfigReader threw — magic link config unavailable: ' + e.message);
+  }
+}
+
+
+/* ========================================================================
+ * CONTACTS SUITE — Contact service functions, steward lookup
+ * ======================================================================== */
+
+function test_contacts_getStewardContactCallable() {
+  TestRunner.assertType(DataService.getStewardContact, 'function',
+    'DataService.getStewardContact is function');
+}
+
+function test_contacts_getStewardContactNullOnBadEmail() {
+  // Non-existent email must return null (not throw)
+  var result = DataService.getStewardContact('nonexistent-xyz@fake-domain.invalid');
+  TestRunner.assertEquals(null, result,
+    'getStewardContact returns null for unknown email');
+}
+
+function test_contacts_getAssignedStewardInfoCallable() {
+  TestRunner.assertType(DataService.getAssignedStewardInfo, 'function',
+    'DataService.getAssignedStewardInfo is function');
+  // Non-existent email must return null (not throw)
+  var result = DataService.getAssignedStewardInfo('nonexistent@fake.invalid');
+  TestRunner.assertEquals(null, result,
+    'getAssignedStewardInfo returns null for unknown member');
+}
+
+function test_contacts_getAvailableStewardsCallable() {
+  TestRunner.assertType(DataService.getAvailableStewards, 'function',
+    'DataService.getAvailableStewards is function');
+  // Should return an array (possibly empty if no stewards)
+  var result = DataService.getAvailableStewards('test@fake.invalid');
+  TestRunner.assertTrue(Array.isArray(result),
+    'getAvailableStewards returns an array');
+}
+
+function test_contacts_getMemberContactHistoryCallable() {
+  TestRunner.assertType(DataService.getMemberContactHistory, 'function',
+    'DataService.getMemberContactHistory is function');
+}
+
+function test_contacts_getStewardContactLogCallable() {
+  TestRunner.assertType(DataService.getStewardContactLog, 'function',
+    'DataService.getStewardContactLog is function');
+}
+
+function test_contacts_contactWrappersRejectNull() {
+  // Steward-gated contact wrappers must reject null session token
+  var wrappers = [
+    { name: 'dataGetMemberContactHistory', fn: typeof dataGetMemberContactHistory === 'function' ? dataGetMemberContactHistory : null },
+    { name: 'dataGetStewardContactLog',    fn: typeof dataGetStewardContactLog === 'function' ? dataGetStewardContactLog : null },
+  ];
+  for (var i = 0; i < wrappers.length; i++) {
+    TestRunner.assertNotNull(wrappers[i].fn, wrappers[i].name + ' global exists');
+    if (wrappers[i].fn) {
+      var result = wrappers[i].fn(null);
+      TestRunner.assertTrue(
+        Array.isArray(result) && result.length === 0,
+        wrappers[i].name + '(null) returns empty array (auth rejection)'
+      );
+    }
+  }
+}
+
+function test_contacts_getMemberDataByIdCallable() {
+  // getMemberDataById_ is a private helper but must exist for email functions
+  TestRunner.assertType(getMemberDataById_, 'function',
+    'getMemberDataById_ helper is defined');
+  // Non-existent ID should return null/undefined (not throw)
+  var result = getMemberDataById_('NONEXISTENT_ID_XYZ_999');
+  TestRunner.assertTrue(result == null, 'getMemberDataById_ returns null for bad ID');
+}
+
+
+/* ========================================================================
+ * EMAILTYPES SUITE — Email sender functions, broadcast, direct message
+ * ======================================================================== */
+
+function test_emailtypes_surveyEmailCallable() {
+  TestRunner.assertType(emailSurveyToMember, 'function',
+    'emailSurveyToMember is defined');
+}
+
+function test_emailtypes_contactFormEmailCallable() {
+  TestRunner.assertType(emailContactFormToMember, 'function',
+    'emailContactFormToMember is defined');
+}
+
+function test_emailtypes_dashboardLinkEmailCallable() {
+  TestRunner.assertType(emailDashboardLinkToMember, 'function',
+    'emailDashboardLinkToMember is defined');
+}
+
+function test_emailtypes_grievanceStatusEmailCallable() {
+  TestRunner.assertType(emailGrievanceStatusToMember, 'function',
+    'emailGrievanceStatusToMember is defined');
+}
+
+function test_emailtypes_composeEmailCallable() {
+  TestRunner.assertType(composeEmailForMember, 'function',
+    'composeEmailForMember is defined');
+}
+
+function test_emailtypes_sendQuickEmailCallable() {
+  TestRunner.assertType(sendQuickEmail, 'function',
+    'sendQuickEmail is defined');
+}
+
+function test_emailtypes_bulkEmailCallable() {
+  TestRunner.assertType(bulkEmailGrievanceMembers, 'function',
+    'bulkEmailGrievanceMembers is defined');
+}
+
+function test_emailtypes_safeSendEmailCallable() {
+  TestRunner.assertType(safeSendEmail_, 'function',
+    'safeSendEmail_ is defined');
+}
+
+function test_emailtypes_safeSendEmailValidation() {
+  // safeSendEmail_ must reject missing required fields without throwing
+  var result1 = safeSendEmail_(null);
+  TestRunner.assertNotNull(result1, 'safeSendEmail_(null) returns an object');
+  TestRunner.assertEquals(false, result1.success, 'safeSendEmail_(null) fails gracefully');
+
+  var result2 = safeSendEmail_({ to: 'a@b.com' }); // missing subject
+  TestRunner.assertEquals(false, result2.success, 'safeSendEmail_ without subject fails');
+
+  var result3 = safeSendEmail_({ subject: 'test' }); // missing to
+  TestRunner.assertEquals(false, result3.success, 'safeSendEmail_ without to fails');
+
+  // Invalid email format
+  var result4 = safeSendEmail_({ to: 'not-an-email', subject: 'test' });
+  TestRunner.assertEquals(false, result4.success, 'safeSendEmail_ rejects invalid email format');
+  TestRunner.assertTrue(result4.error.indexOf('Invalid') >= 0,
+    'safeSendEmail_ error mentions Invalid for bad format');
+}
+
+function test_emailtypes_broadcastWrapperExists() {
+  TestRunner.assertType(dataSendBroadcast, 'function',
+    'dataSendBroadcast global wrapper exists');
+  TestRunner.assertType(DataService.sendBroadcastMessage, 'function',
+    'DataService.sendBroadcastMessage is function');
+}
+
+function test_emailtypes_directMessageWrapperExists() {
+  TestRunner.assertType(dataSendDirectMessage, 'function',
+    'dataSendDirectMessage global wrapper exists');
+}
+
+function test_emailtypes_directMessageRejectsNull() {
+  // dataSendDirectMessage must reject null session token (steward-gated)
+  var result = dataSendDirectMessage(null, 'test@example.com', 'subject', 'body');
+  TestRunner.assertNotNull(result, 'dataSendDirectMessage(null) returns object');
+  TestRunner.assertEquals(false, result.success,
+    'dataSendDirectMessage rejects null token');
+  TestRunner.assertTrue(result.message.indexOf('Steward') >= 0,
+    'dataSendDirectMessage rejection mentions Steward access');
+}
+
+function test_emailtypes_broadcastRejectsNull() {
+  // dataSendBroadcast must reject null session token (steward-gated)
+  var result = dataSendBroadcast(null, {}, 'test message', 'test subject');
+  TestRunner.assertNotNull(result, 'dataSendBroadcast(null) returns object');
+  TestRunner.assertEquals(false, result.success,
+    'dataSendBroadcast rejects null token');
+}
+
+function test_emailtypes_securityAlertEmailCallable() {
+  TestRunner.assertType(sendSecurityAlertEmail_, 'function',
+    'sendSecurityAlertEmail_ is defined');
+  TestRunner.assertType(sendDailySecurityDigest, 'function',
+    'sendDailySecurityDigest is defined');
+}
+
+function test_emailtypes_executivePDFEmailCallable() {
+  TestRunner.assertType(emailExecutivePDF, 'function',
+    'emailExecutivePDF is defined');
 }
