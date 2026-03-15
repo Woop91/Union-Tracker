@@ -3138,3 +3138,103 @@ Priority: Member ID > Email > Name. Returns first high-confidence match. Does no
 - **Backend functions** (`05_Integrations.gs`): `getWebAppNotifications`, `getWebAppNotificationCount`, `dismissWebAppNotification`, `sendWebAppNotification`, `getAllWebAppNotifications`, `archiveWebAppNotification`, `getNotificationRecipientListFull` (steward-auth-gated)
 - **Bell badge**: Built from `AppState.notificationCount` (from batch preload) + `qaUnansweredCount` (steward only). Zeroed on notifications tab open.
 - **Priority sort**: Urgent always floats to top (reverse-then-sort, v4.22.0 fix).
+
+## v4.26.0 — Unified Theme Engine (2026-03-14)
+
+### What Changed
+- **Merged ThemeEngine + NavThemes into single `UnifiedTheme`** in `index.html`
+  - One IIFE controls: role themes, visual styles, accent palette, CRT overlays
+  - Backward-compat aliases: `var ThemeEngine = UnifiedTheme; var NavThemes = UnifiedTheme;`
+  - No changes needed in auth_view.html, error_view.html, member_view.html, steward_view.html — they use the aliases
+- **Full-page theme styles** replace nav-only CSS in `styles.html`
+  - `.theme-{name}` class on `<body>` affects sidebar, cards, tables, buttons, badges, backgrounds — everything
+  - Old `.nav-theme-{name}` class still applied for any legacy selectors
+- **5 visual styles** (all full-page now):
+  - `default` — clean, professional, no effects
+  - `blobLava` — molten morphing accents, heat wave background, floating KPI cards, lava gradient buttons
+  - `cyberpunk` — PIXEL TERMINAL: Press Start 2P / Silkscreen / Share Tech Mono fonts, CRT scanlines + vignette + pixel grid overlays (injected as DOM elements by `_manageCrtOverlay()`), red neon (#ff2a6d) forced palette, 0px border-radius, stepped transitions, pulsing borders
+  - `shatter` — angular clip-paths on all cards/buttons/badges, arrow-shaped active sidebar, crystalline glow
+  - `liquidPour` — 28px+ radius, pill buttons, floating animations, Righteous font, rounded sidebar
+- **Fonts added**: Press Start 2P, Silkscreen, Share Tech Mono, Orbitron, Righteous (all via Google Fonts with display=swap)
+- **Cyberpunk forces its own palette** regardless of role/mode/accent — hardcoded dark-only with red neon. Other themes respect accent hue picker.
+- **CRT overlay management**: `UnifiedTheme._manageCrtOverlay(show)` creates/removes three DOM elements (#crt-overlay, #crt-beam, #crt-grid) when entering/leaving cyberpunk theme
+- **`UnifiedTheme.apply()`** is the single entry point: applies role theme OR cyber palette, sets body class, manages CRT overlays
+
+### Key API (UnifiedTheme)
+- `apply()` — full theme application (call after any state change)
+- `setStyle(id)` — change visual style + persist to localStorage + apply
+- `getTheme(role, isDark)` — get role theme object
+- `applyTheme(t)` — low-level: set CSS vars from theme object
+- `updatePalette(hue)` — change accent hue + re-apply
+- `getTabColor(tabId)` — per-tab accent color for themed nav
+- `getAll()` — all style definitions
+- `getCurrent()` — current style definition
+
+### Files Modified
+- `src/index.html` + `dist/index.html`: UnifiedTheme replaces ThemeEngine + NavThemes, font link updated
+- `src/styles.html` + `dist/styles.html`: full-page theme CSS replaces nav-only CSS, CRT overlay styles added, reduced-motion updated
+
+## v4.26.1 — Consolidate renderBottomNav to index.html (2026-03-14)
+
+### What Changed
+- **Moved `renderBottomNav()` from `steward_view.html` → `index.html`** (line ~1278)
+  - Was in steward_view.html despite being used by both roles — code organization smell
+  - Now sits between `_getSidebarTabs()` and `renderOrgChart()` — all nav code in one file
+  - Updated `NavThemes.getTabColor()` calls → `UnifiedTheme.getTabColor()` in the moved function
+  - Removed blob indicator for cyberpunk (no longer needed — cyberpunk uses CSS-only bottom nav styling)
+  - Left comment in steward_view.html: `// renderBottomNav() — consolidated to index.html (v4.26.1)`
+- **steward_view.html callers (lines 470, 481)** still call `renderBottomNav()` — resolves from global scope since index.html is the SPA shell
+
+### Files Modified
+- `src/index.html` + `dist/index.html`: renderBottomNav added (~150 lines)
+- `src/steward_view.html` + `dist/steward_view.html`: renderBottomNav removed (~150 lines)
+
+## v4.26.2 — Cyberpunk Neon Color Picker (2026-03-14)
+
+### What Changed
+- **4 neon color options for cyberpunk theme**: Red (#ff2a6d), Green (#00ffaa), Blue (#00bbff), Purple (#bf5af2)
+- **CSS variable approach**: All 41 hardcoded neon references in `styles.html` replaced with `var(--neon-solid)` and `rgba(var(--neon-rgb), opacity)`. JS sets `--neon-solid` and `--neon-rgb` on `<html>` when applying cyberpunk.
+- **`CYBER_NEONS` map** in UnifiedTheme: each entry has `solid`, `rgb`, `dim`, `label`, `emoji`
+- **`_buildCyberPalette(neonKey)`**: dynamically generates the full cyberpunk palette from any neon color
+- **`UnifiedTheme.setCyberNeon(key)`**: changes neon color, persists to `localStorage('dds_cyberNeon')`, re-applies theme
+- **`AppState.cyberNeon`**: persisted via localStorage, default 'red'
+- **Sidebar neon picker**: when cyberpunk is the active theme, a row of 4 color swatches appears below the cyberpunk option in the Nav Style picker. Active swatch has white border + glow. Click swaps neon color live.
+
+### API Additions
+- `UnifiedTheme.CYBER_NEONS` — { red, green, blue, purple } neon color definitions
+- `UnifiedTheme.setCyberNeon(key)` — change neon color + persist + apply
+
+### Files Modified
+- `src/index.html` + `dist/index.html`: CYBER_NEONS, _buildCyberPalette(), setCyberNeon(), neon picker in sidebar
+- `src/styles.html` + `dist/styles.html`: 41 hardcoded #ff2a6d/rgba(255,42,109,...) → CSS vars
+
+## v4.26.3 — Multi-Neon Cyberpunk Mode (2026-03-14)
+
+### What Changed
+- **"Multi" added as 5th cyberpunk neon option** — rainbow icon in swatch picker
+- **Zone-specific neon colors**: sidebar=purple, title=red, buttons=cyan, table=green, KPI cards=red/cyan/green/yellow
+- **`MULTI_NEON_ZONES` map** defines per-zone colors (solid + rgb)
+- **`apply()` updated**: when `isMulti`, sets 8 pairs of CSS vars (`--neon-sidebar`, `--neon-sidebar-rgb`, etc.) and adds `cyber-multi` class to body
+- **CSS overrides**: `.cyber-multi` class targets each zone's selectors with zone-specific var references
+- **Rainbow effects**: scan beam uses multi-color gradient, info cards cycle border through all zone colors, HP bar shimmer
+- **Non-multi modes unaffected** — `cyber-multi` class removed when switching to single-color neon
+
+### Files Modified
+- `src/index.html`: CYBER_NEONS.multi, MULTI_NEON_ZONES, apply() multi logic
+- `src/styles.html`: .cyber-multi zone override CSS (~50 rules), multiRainbowBorder animation
+
+## v4.27.0 — Brutalist, Retro OS, Comic Themes (2026-03-15)
+
+### What Changed
+- **3 new full-page themes** added to UnifiedTheme:
+  - `brutalist` — Bebas Neue + Space Mono, cream bg, black 3px borders, 6px hard drop shadows, red accent, zero radius
+  - `retroOS` — Pixelify Sans, teal (#008080) desktop, Win95 beveled borders (white top-left, gray bottom-right), blue gradient title bars, navy highlight selection
+  - `comic` — Bangers + DM Sans, halftone dot bg, 4-5px black outlines, skewed buttons/cards, each KPI a different color (yellow/red/cyan/lime), text shadows
+- **FORCED_PALETTES map** — brutalist/retroOS/comic each override role theme entirely (like cyberpunk), setting their own bg, fonts, colors
+- **apply() updated** — checks `FORCED_PALETTES[styleId]` before falling back to role theme
+- **Fonts added**: Bebas Neue, Space Mono, Pixelify Sans, Bangers, DM Sans
+- **8 total themes**: Default, Blob Lava, Cyberpunk (5 neons), Shatter, Liquid Pour, Brutalist, Retro OS, Comic
+
+### Files Modified
+- `src/index.html`: font link, style defs, FORCED_PALETTES, apply() logic
+- `src/styles.html`: ~120 lines CSS per new theme (brutalist, retroOS, comic)

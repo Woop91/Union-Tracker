@@ -8,10 +8,10 @@
   <meta http-equiv="Expires" content="0">
   <title>Dashboard</title>
 
-  <!-- N1: Fonts — reduced to 3 families (dropped Sora, subset weights) to cut payload ~20% -->
+  <!-- N1: Fonts — core + theme-specific (pixel fonts lazy-load via display=swap) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Righteous&family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Pixelify+Sans:wght@400;700&family=Bangers&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 
   <?!= include('styles') ?>
 
@@ -169,10 +169,13 @@
     })();
 
     // ═══════════════════════════════════════
-    // THEME ENGINE
+    // UNIFIED THEME — single controller for role themes, visual styles, and accent palette
+    // Replaces former ThemeEngine + NavThemes (v4.26.0)
+    // Style themes now affect the ENTIRE page, not just nav.
     // ═══════════════════════════════════════
-    var ThemeEngine = (function() {
+    var UnifiedTheme = (function() {
 
+      // ── Accent Palette Generator ──
       function generatePalette(hue) {
         return {
           accent:       'hsl(' + hue + ', 70%, 68%)',
@@ -185,10 +188,11 @@
 
       var palette = generatePalette(CONFIG.accentHue || 250);
 
-      var themes = {
+      // ── Role × Mode Base Themes ──
+      var roleThemes = {
         steward: {
           dark: {
-bg: '#000000', surface: '#0a0a0a', surfaceAlt: 'rgba(255,255,255,0.06)', raised: '#111111',
+            bg: '#000000', surface: '#0a0a0a', surfaceAlt: 'rgba(255,255,255,0.06)', raised: '#111111',
             text: '#e0e0e0', 'text-secondary': '#999999', muted: '#6b6b6b',
             card: '#0a0a0a', 'bg-tertiary': '#111111',
             success: '#4ade80', warning: '#facc15', danger: '#ef4444', info: '#60a5fa',
@@ -198,7 +202,7 @@ bg: '#000000', surface: '#0a0a0a', surfaceAlt: 'rgba(255,255,255,0.06)', raised:
             mode: 'dark',
           },
           light: {
-bg: '#f2f2f5', surface: '#ffffff', surfaceAlt: '#f5f5f5', raised: '#f8f8fa',
+            bg: '#f2f2f5', surface: '#ffffff', surfaceAlt: '#f5f5f5', raised: '#f8f8fa',
             text: '#1a1a2e', 'text-secondary': '#5c5c7a', muted: '#8888a0',
             card: '#ffffff', 'bg-tertiary': '#e8e8ee',
             success: '#16a34a', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
@@ -210,7 +214,7 @@ bg: '#f2f2f5', surface: '#ffffff', surfaceAlt: '#f5f5f5', raised: '#f8f8fa',
         },
         member: {
           dark: {
-bg: '#000000', surface: 'rgba(255,255,255,0.04)', surfaceAlt: 'rgba(255,255,255,0.06)', raised: 'rgba(255,255,255,0.07)',
+            bg: '#000000', surface: 'rgba(255,255,255,0.04)', surfaceAlt: 'rgba(255,255,255,0.06)', raised: 'rgba(255,255,255,0.07)',
             text: '#eeedf5', 'text-secondary': '#a09db8', muted: '#7d7b96',
             card: 'rgba(255,255,255,0.04)', 'bg-tertiary': 'rgba(255,255,255,0.07)',
             success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
@@ -220,7 +224,7 @@ bg: '#000000', surface: 'rgba(255,255,255,0.04)', surfaceAlt: 'rgba(255,255,255,
             mode: 'dark',
           },
           light: {
-bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised: 'rgba(255,255,255,0.95)',
+            bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised: 'rgba(255,255,255,0.95)',
             text: '#1a1a2e', 'text-secondary': '#5c5c7a', muted: '#7d7b96',
             card: 'rgba(255,255,255,0.85)', 'bg-tertiary': 'rgba(0,0,0,0.04)',
             success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
@@ -232,16 +236,123 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
         }
       };
 
+      // ── Cyberpunk neon color options ──
+      var CYBER_NEONS = {
+        red:    { solid: '#ff2a6d', rgb: '255,42,109',  dim: '#cc1155', label: 'Red',    emoji: '\u2764\uFE0F' },
+        green:  { solid: '#00ffaa', rgb: '0,255,170',   dim: '#009966', label: 'Green',  emoji: '\uD83D\uDC9A' },
+        blue:   { solid: '#00bbff', rgb: '0,187,255',   dim: '#0088cc', label: 'Blue',   emoji: '\uD83D\uDC99' },
+        purple: { solid: '#bf5af2', rgb: '191,90,242',  dim: '#8833cc', label: 'Purple', emoji: '\uD83D\uDC9C' },
+        multi:  { solid: '#ff2a6d', rgb: '255,42,109',  dim: '#cc1155', label: 'Multi',  emoji: '\uD83C\uDF08', isMulti: true },
+      };
+
+      // Multi-neon zone colors — applied as extra CSS vars when multi is active
+      var MULTI_NEON_ZONES = {
+        sidebar: { solid: '#bf5af2', rgb: '191,90,242' },  // purple
+        title:   { solid: '#ff2a6d', rgb: '255,42,109' },  // red
+        buttons: { solid: '#00e5ff', rgb: '0,229,255' },    // cyan
+        table:   { solid: '#00ffaa', rgb: '0,255,170' },    // green
+        kpi1:    { solid: '#ff2a6d', rgb: '255,42,109' },  // red
+        kpi2:    { solid: '#00e5ff', rgb: '0,229,255' },    // cyan
+        kpi3:    { solid: '#00ffaa', rgb: '0,255,170' },    // green
+        kpi4:    { solid: '#ffe600', rgb: '255,230,0' },    // yellow
+      };
+
+      /** Build cyberpunk palette from a neon color key */
+      function _buildCyberPalette(neonKey) {
+        var n = CYBER_NEONS[neonKey] || CYBER_NEONS.red;
+        // Multi uses red as the base palette, zone colors applied via CSS vars
+        var base = n.isMulti ? CYBER_NEONS.red : n;
+        return {
+          bg: '#06060c', surface: '#0a0a12', surfaceAlt: '#12121e', raised: '#15152a',
+          text: base.solid, 'text-secondary': 'rgba(' + base.rgb + ',0.4)', muted: 'rgba(' + base.rgb + ',0.25)',
+          card: '#0a0a12', 'bg-tertiary': '#0f0f18',
+          success: '#00e5ff', warning: '#ffaa00', danger: '#ffaa00', info: '#00ccff',
+          border: 'rgba(' + base.rgb + ',0.12)', radius: '0px',
+          accent: base.solid, accentDim: base.dim, accentGlow: 'rgba(' + base.rgb + ',0.3)',
+          accentBg: 'rgba(' + base.rgb + ',0.06)', accentBorder: 'rgba(' + base.rgb + ',0.2)',
+          fontBody: "'Share Tech Mono', monospace",
+          fontDisplay: "'Press Start 2P', monospace",
+          mode: 'dark',
+        };
+      }
+
+      // ── Forced palettes for themes that override role colors ──
+      var FORCED_PALETTES = {
+        brutalist: {
+          bg: '#f5f0e8', surface: '#fff', surfaceAlt: '#f0ede4', raised: '#fff',
+          text: '#111', 'text-secondary': '#666', muted: '#888',
+          card: '#fff', 'bg-tertiary': '#eae6dc',
+          success: '#00aa44', warning: '#cc8800', danger: '#ff3333', info: '#2a5298',
+          border: '#111', radius: '0px',
+          accent: '#ff3333', accentDim: '#cc0000', accentGlow: 'rgba(255,51,51,0.2)',
+          accentBg: 'rgba(255,51,51,0.06)', accentBorder: 'rgba(255,51,51,0.3)',
+          fontBody: "'Space Mono', monospace",
+          fontDisplay: "'Bebas Neue', sans-serif",
+          mode: 'light',
+        },
+        retroOS: {
+          bg: '#008080', surface: '#c0c0c0', surfaceAlt: '#d0d0d0', raised: '#c0c0c0',
+          text: '#000', 'text-secondary': '#444', muted: '#808080',
+          card: '#c0c0c0', 'bg-tertiary': '#b0b0b0',
+          success: '#008000', warning: '#808000', danger: '#cc0000', info: '#000080',
+          border: '#808080', radius: '0px',
+          accent: '#000080', accentDim: '#000066', accentGlow: 'rgba(0,0,128,0.2)',
+          accentBg: 'rgba(0,0,128,0.08)', accentBorder: 'rgba(0,0,128,0.3)',
+          fontBody: "'Pixelify Sans', system-ui",
+          fontDisplay: "'Pixelify Sans', system-ui",
+          mode: 'light',
+        },
+        comic: {
+          bg: '#fffbe6', surface: '#fff', surfaceAlt: '#fff8cc', raised: '#fff',
+          text: '#111', 'text-secondary': '#555', muted: '#888',
+          card: '#fff', 'bg-tertiary': '#fff3b0',
+          success: '#2e7d32', warning: '#e65100', danger: '#c62828', info: '#1565c0',
+          border: '#111', radius: '0px',
+          accent: '#ff1744', accentDim: '#c4001d', accentGlow: 'rgba(255,23,68,0.2)',
+          accentBg: 'rgba(255,23,68,0.06)', accentBorder: 'rgba(255,23,68,0.3)',
+          fontBody: "'DM Sans', sans-serif",
+          fontDisplay: "'Bangers', cursive",
+          mode: 'light',
+        },
+      };
+
+      // ── Per-tab accent colors (used by blob/shatter/liquid themes) ──
+      var TAB_COLORS = {
+        cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
+        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
+        more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
+        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+        polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
+        events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
+        testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
+        stewarddirectory: '#8b5cf6', mytasks: '#f59e0b', unionstats: '#3b82f6', meetings: '#06d6a0',
+      };
+
+      // ── Visual Style Definitions ──
+      var styles = {
+        'default':    { tid: 'default',    label: 'Default',     emoji: '\u26A1', desc: 'Clean, professional — auto follows dark/light', type: 'default' },
+        'blobLava':   { tid: 'blobLava',   label: 'Blob Lava',   emoji: '\uD83C\uDF0B', desc: 'Molten morphing accents — organic, alive', type: 'default' },
+        'cyberpunk':  { tid: 'cyberpunk',  label: 'Cyberpunk',   emoji: '\uD83D\uDD32', desc: 'Pixel terminal — CRT scanlines, neon red', type: 'extra' },
+        'shatter':    { tid: 'shatter',    label: 'Shatter',     emoji: '\uD83D\uDC8E', desc: 'Angular crystalline — fractured geometry', type: 'extra' },
+        'liquidPour': { tid: 'liquidPour', label: 'Liquid Pour', emoji: '\uD83E\uDDEA', desc: 'Bubbly, fluid, bouncy — everything rounds', type: 'extra' },
+        'brutalist':  { tid: 'brutalist',  label: 'Brutalist',   emoji: '\uD83D\uDD28', desc: 'Raw newspaper punk — hard shadows, no mercy', type: 'extra' },
+        'retroOS':    { tid: 'retroOS',    label: 'Retro OS',    emoji: '\uD83D\uDDA5', desc: 'Windows 95 — beveled borders, teal desktop', type: 'extra' },
+        'comic':      { tid: 'comic',      label: 'Comic',       emoji: '\uD83D\uDCA5', desc: 'Pop art halftone — bold outlines, POW!', type: 'extra' },
+      };
+
+      function getTabColor(tabId) { return TAB_COLORS[tabId] || '#8b5cf6'; }
+
+      function getTabGradient(tabId) {
+        var c = getTabColor(tabId);
+        return 'linear-gradient(135deg, ' + c + ', ' + c + 'cc)';
+      }
+
       function getTheme(role, isDark) {
-        var base = themes[role] || themes.member;
-        // H-5 fix: Shallow copy to avoid mutating shared theme objects
+        var base = roleThemes[role] || roleThemes.member;
         var src = isDark ? base.dark : base.light;
         var t = {};
         for (var k in src) { if (src.hasOwnProperty(k)) t[k] = src[k]; }
-        // Merge accent colors
-        for (var key in palette) {
-          t[key] = palette[key];
-        }
+        for (var key in palette) { t[key] = palette[key]; }
         return t;
       }
 
@@ -255,109 +366,137 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
         document.body.style.background = t.bg;
         document.body.style.color = t.text;
         document.body.style.fontFamily = t.fontBody;
-        // Expose theme mode on root for CSS selectors (e.g. category badges)
         root.dataset.themeMode = t.mode || 'light';
-        // Invalidate chart color cache on theme change
         if (typeof ChartHelper !== 'undefined' && ChartHelper.invalidateColorCache) {
           ChartHelper.invalidateColorCache();
         }
       }
 
-      /** Update accent palette with a new hue and re-apply current theme */
+      /** Apply the full unified theme: role+mode base, style overlay, accent palette */
+      function apply() {
+        var styleId = AppState.navTheme || 'default';
+        var isCyber = styleId === 'cyberpunk';
+
+        // 1. Apply base role theme OR cyberpunk forced palette
+        if (isCyber) {
+          var neonKey = AppState.cyberNeon || 'red';
+          var cyberPalette = _buildCyberPalette(neonKey);
+          applyTheme(cyberPalette);
+          // Set CSS vars for neon colors (used by styles.html cyberpunk rules)
+          var n = CYBER_NEONS[neonKey] || CYBER_NEONS.red;
+          document.documentElement.style.setProperty('--neon-solid', n.isMulti ? CYBER_NEONS.red.solid : n.solid);
+          document.documentElement.style.setProperty('--neon-rgb', n.isMulti ? CYBER_NEONS.red.rgb : n.rgb);
+          // Multi-neon zone colors
+          if (n.isMulti) {
+            for (var zk in MULTI_NEON_ZONES) {
+              if (!MULTI_NEON_ZONES.hasOwnProperty(zk)) continue;
+              document.documentElement.style.setProperty('--neon-' + zk, MULTI_NEON_ZONES[zk].solid);
+              document.documentElement.style.setProperty('--neon-' + zk + '-rgb', MULTI_NEON_ZONES[zk].rgb);
+            }
+            document.body.classList.add('cyber-multi');
+          } else {
+            document.body.classList.remove('cyber-multi');
+          }
+        } else if (FORCED_PALETTES[styleId]) {
+          applyTheme(FORCED_PALETTES[styleId]);
+          document.body.classList.remove('cyber-multi');
+        } else {
+          var t = getTheme(AppState.activeRole || 'member', AppState.isDark);
+          applyTheme(t);
+          document.body.classList.remove('cyber-multi');
+        }
+
+        // 2. Set style class on body (CSS handles full-page styling)
+        document.body.className = document.body.className
+          .replace(/\btheme-\S+/g, '')
+          .replace(/\bnav-theme-\S+/g, '')
+          .trim() + ' theme-' + styleId + ' nav-theme-' + styleId;
+
+        // 3. Manage CRT overlay elements for cyberpunk
+        _manageCrtOverlay(isCyber);
+      }
+
+      /** Create or remove CRT overlay elements for cyberpunk theme */
+      function _manageCrtOverlay(show) {
+        var crt = document.getElementById('crt-overlay');
+        var beam = document.getElementById('crt-beam');
+        var grid = document.getElementById('crt-grid');
+        if (show) {
+          if (!crt) {
+            crt = document.createElement('div');
+            crt.id = 'crt-overlay';
+            crt.className = 'crt-overlay';
+            document.body.appendChild(crt);
+          }
+          if (!beam) {
+            beam = document.createElement('div');
+            beam.id = 'crt-beam';
+            beam.className = 'crt-scan-beam';
+            document.body.appendChild(beam);
+          }
+          if (!grid) {
+            grid = document.createElement('div');
+            grid.id = 'crt-grid';
+            grid.className = 'crt-pixel-grid';
+            document.body.appendChild(grid);
+          }
+        } else {
+          if (crt) crt.remove();
+          if (beam) beam.remove();
+          if (grid) grid.remove();
+        }
+      }
+
+      function setStyle(styleId) {
+        if (!styles[styleId]) styleId = 'default';
+        AppState.navTheme = styleId;
+        try { localStorage.setItem('dds_navTheme', styleId); } catch(e) {}
+        apply();
+      }
+
       function updatePalette(hue) {
         palette = generatePalette(hue);
-        var t = getTheme(AppState.activeRole || 'member', AppState.isDark);
-        applyTheme(t);
+        apply();
+      }
+
+      function getAll() { return styles; }
+      function getCurrent() { return styles[AppState.navTheme] || styles['default']; }
+      function init() { apply(); }
+
+      function setCyberNeon(neonKey) {
+        if (!CYBER_NEONS[neonKey]) neonKey = 'red';
+        AppState.cyberNeon = neonKey;
+        try { localStorage.setItem('dds_cyberNeon', neonKey); } catch(e) {}
+        apply();
       }
 
       return {
+        // Primary API
+        apply: apply,
+        setStyle: setStyle,
         getTheme: getTheme,
         applyTheme: applyTheme,
         updatePalette: updatePalette,
-        palette: palette,
-      };
-    })();
-
-    // ═══════════════════════════════════════
-    // NAV THEME ENGINE — 5 nav visual styles
-    // ═══════════════════════════════════════
-    var NavThemes = (function() {
-      // Per-tab accent colors for color-coded themes
-      var TAB_COLORS = {
-        cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
-        more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
-        polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
-        events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
-        testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
-        stewarddirectory: '#8b5cf6', mytasks: '#f59e0b', unionstats: '#3b82f6', meetings: '#06d6a0',
-      };
-
-      var themes = {
-        'default': {
-          tid: 'default', label: 'Default', emoji: '⚡',
-          desc: 'Standard nav — auto follows dark/light mode',
-          type: 'default',
-        },
-        'blobLava': {
-          tid: 'blobLava', label: 'Blob Lava', emoji: '🌋',
-          desc: 'Morphing lava blob tracks your active tab',
-          type: 'default',
-        },
-        'cyberpunk': {
-          tid: 'cyberpunk', label: 'Cyberpunk', emoji: '🔲',
-          desc: 'Grid lines, scanlines, hard neon glow',
-          type: 'extra',
-        },
-        'shatter': {
-          tid: 'shatter', label: 'Shatter', emoji: '💎',
-          desc: 'Color shards — tap to activate',
-          type: 'extra',
-        },
-        'liquidPour': {
-          tid: 'liquidPour', label: 'Liquid Pour', emoji: '🧪',
-          desc: 'Floating bubble nav with color fill',
-          type: 'extra',
-        },
-      };
-
-      function getTabColor(tabId) {
-        return TAB_COLORS[tabId] || '#8b5cf6';
-      }
-
-      function getTabGradient(tabId) {
-        var c = getTabColor(tabId);
-        // Shift hue slightly for gradient endpoint
-        return 'linear-gradient(135deg, ' + c + ', ' + c + 'cc)';
-      }
-
-      function setNavTheme(themeId) {
-        if (!themes[themeId]) themeId = 'default';
-        AppState.navTheme = themeId;
-        try { localStorage.setItem('dds_navTheme', themeId); } catch(e) {}
-        // Apply nav theme class to body
-        document.body.className = document.body.className
-          .replace(/\bnav-theme-\S+/g, '')
-          .trim() + ' nav-theme-' + themeId;
-      }
-
-      function getAll() { return themes; }
-      function getCurrent() { return themes[AppState.navTheme] || themes['default']; }
-
-      // Apply on load
-      function init() { setNavTheme(AppState.navTheme); }
-
-      return {
-        themes: themes,
+        generatePalette: generatePalette,
         getTabColor: getTabColor,
         getTabGradient: getTabGradient,
-        setNavTheme: setNavTheme,
         getAll: getAll,
         getCurrent: getCurrent,
         init: init,
+        palette: palette,
+        styles: styles,
+        // Cyberpunk neon API
+        CYBER_NEONS: CYBER_NEONS,
+        setCyberNeon: setCyberNeon,
+        // Legacy compat aliases
+        setNavTheme: function(id) { setStyle(id); },
+        themes: styles,
       };
     })();
+
+    // ── Backward-compat aliases (auth_view, error_view, member_view, steward_view reference these) ──
+    var ThemeEngine = UnifiedTheme;
+    var NavThemes = UnifiedTheme;
 
     // ═══════════════════════════════════════
     // SAFE TEXT — HTML escape for dynamic data in innerHTML
@@ -652,6 +791,7 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
       activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
       isDark: (function() { try { var v = localStorage.getItem('dds_isDark'); return v === null ? true : v === 'true'; } catch(e) { return true; } })(),
       navTheme: (function() { try { return localStorage.getItem('dds_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
+      cyberNeon: (function() { try { return localStorage.getItem('dds_cyberNeon') || 'red'; } catch(e) { return 'red'; } })(),
       colorTheme: (PAGE_DATA.colorTheme || 'default'),
       colorThemes: (PAGE_DATA.colorThemes || []),
       user: CURRENT_USER,
@@ -1065,15 +1205,14 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
         onClick: function() {
           AppState.isDark = !AppState.isDark;
           try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
-          var t = ThemeEngine.getTheme(AppState.activeRole || 'member', AppState.isDark);
-          ThemeEngine.applyTheme(t);
+          UnifiedTheme.apply();
           _handleTabNav(role, activeTab);
         }
       }, [
         el('span', { className: 'sidebar-item-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'),
         el('span', null, AppState.isDark ? 'Light Mode' : 'Dark Mode')
       ]));
-      // Nav Theme Picker — expandable in sidebar
+      // Nav Theme Picker — expandable in sidebar (with cyberpunk neon sub-picker)
       (function() {
         var currentTheme = NavThemes.getCurrent();
         var pickerWrap = el('div');
@@ -1102,6 +1241,7 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
               className: 'nav-theme-picker-item' + (isActive ? ' active' : ''),
               onClick: function() {
                 NavThemes.setNavTheme(themeObj.tid);
+                UnifiedTheme.apply();
                 _handleTabNav(role, activeTab);
               }
             });
@@ -1117,6 +1257,45 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
               item.appendChild(el('span', { className: 'ntp-check' }, '\u2713'));
             }
             pickerPanel.appendChild(item);
+
+            // Cyberpunk neon color sub-picker — shown when cyberpunk is active
+            if (themeObj.tid === 'cyberpunk' && isActive) {
+              var neonRow = el('div', { style: {
+                display: 'flex', gap: '6px', padding: '8px 12px 4px',
+                alignItems: 'center', flexWrap: 'wrap',
+              }});
+              neonRow.appendChild(el('span', { style: {
+                fontSize: '9px', fontWeight: '700', letterSpacing: '1px',
+                textTransform: 'uppercase', color: 'var(--muted)', marginRight: '4px',
+                fontFamily: "'Silkscreen', monospace",
+              }}, 'NEON:'));
+              var neons = UnifiedTheme.CYBER_NEONS;
+              for (var nk in neons) {
+                if (!neons.hasOwnProperty(nk)) continue;
+                (function(neonKey, neonObj) {
+                  var isNeonActive = AppState.cyberNeon === neonKey;
+                  var swatch = el('div', {
+                    onClick: function(e) {
+                      e.stopPropagation();
+                      UnifiedTheme.setCyberNeon(neonKey);
+                      _handleTabNav(role, activeTab);
+                    },
+                    style: {
+                      width: '28px', height: '28px', borderRadius: '4px',
+                      background: neonObj.solid, cursor: 'pointer',
+                      border: isNeonActive ? '3px solid #fff' : '2px solid rgba(255,255,255,0.15)',
+                      boxShadow: isNeonActive ? '0 0 12px ' + neonObj.solid + ', 0 0 24px ' + neonObj.solid : 'none',
+                      transition: 'all 0.15s',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '10px',
+                    }
+                  }, isNeonActive ? '\u2713' : '');
+                  swatch.title = neonObj.label;
+                  neonRow.appendChild(swatch);
+                })(nk, neons[nk]);
+              }
+              pickerPanel.appendChild(neonRow);
+            }
           })(th);
         }
         pickerWrap.appendChild(pickerPanel);
@@ -1230,6 +1409,158 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
+    }
+
+    // ═══════════════════════════════════════
+    // BOTTOM NAV (mobile) — consolidated from steward_view.html (v4.26.1)
+    // Shows 4 primary tabs per role + "More" overflow on mobile (<640px).
+    // ═══════════════════════════════════════
+    function renderBottomNav(container, role, activeTab) {
+      var nav = el('div', { className: 'bottom-nav' });
+      var tabs = role === 'steward' ? [
+        { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
+        { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+        { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
+        { id: 'more_steward', icon: '\u2630', label: 'More' },
+      ] : [
+        { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
+        { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
+        { id: 'stewarddirectory', icon: '\uD83D\uDCAC', label: 'Contact' },
+        { id: 'more', icon: '\u2630', label: 'More' },
+      ];
+
+      var navTheme = AppState.navTheme || 'default';
+      var activeColor = UnifiedTheme.getTabColor(activeTab);
+      var hasBlobIndicator = (navTheme === 'blobLava');
+
+      // Set per-tab color CSS custom properties on the nav
+      nav.style.setProperty('--blob-color', activeColor);
+      nav.style.setProperty('--blob-glow', activeColor + '44');
+      nav.style.setProperty('--blob-color-dim', activeColor + '18');
+      nav.style.setProperty('--blob-color-border', activeColor + '33');
+
+      // Add blob indicator element for blobLava theme
+      var blobEl = null;
+      if (hasBlobIndicator) {
+        blobEl = el('div', { className: 'nav-blob-indicator' });
+        nav.appendChild(blobEl);
+      }
+
+      var activeIndex = -1;
+      tabs.forEach(function(tab, idx) {
+        if (tab.id === activeTab) activeIndex = idx;
+
+        var item = el('div', {
+          className: 'nav-item' + (tab.id === activeTab ? ' active' : ''),
+          onClick: function() { _handleTabNav(role, tab.id === 'more_steward' ? '_steward_more' : tab.id === 'more' ? '_member_more' : tab.id); }
+        });
+
+        // For shatter theme, set per-item color
+        if (navTheme === 'shatter') {
+          var tabColor = UnifiedTheme.getTabColor(tab.id);
+          item.style.setProperty('--blob-color', tabColor);
+          item.style.setProperty('--blob-glow', tabColor + '55');
+          if (tab.id !== activeTab) {
+            item.style.borderColor = tabColor + '33';
+          }
+        }
+
+        // For liquid pour, set per-item color
+        if (navTheme === 'liquidPour') {
+          var lpColor = UnifiedTheme.getTabColor(tab.id);
+          item.style.setProperty('--blob-color', lpColor);
+          item.style.setProperty('--blob-glow', lpColor + '44');
+          item.style.setProperty('--blob-color-dim', lpColor + '18');
+          item.style.setProperty('--blob-color-border', lpColor + '33');
+        }
+
+        // Icon wrapper — allows badge positioning
+        var iconWrap = el('div', { style: { position: 'relative', display: 'inline-block' } });
+        iconWrap.appendChild(el('span', { className: 'nav-icon' }, tab.icon));
+
+        // Badge: overdue cases count on Cases tab
+        if (tab.id === 'cases' && role === 'steward') {
+          var overdueNav = (AppState.kpis && AppState.kpis.overdue) || 0;
+          if (overdueNav > 0) {
+            iconWrap.appendChild(el('span', {
+              style: {
+                position: 'absolute', top: '-4px', right: '-6px',
+                background: 'var(--danger)', color: '#fff',
+                fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+                padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+              }
+            }, overdueNav > 9 ? '9+' : String(overdueNav)));
+          }
+        }
+
+        // Badge: member count on Members tab
+        if (tab.id === 'members' && role === 'steward') {
+          var mc = AppState.memberCount || 0;
+          if (mc > 0) {
+            iconWrap.appendChild(el('span', {
+              style: {
+                position: 'absolute', top: '-4px', right: '-6px',
+                background: 'var(--accent)', color: '#fff',
+                fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+                padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+              }
+            }, mc > 99 ? '99+' : String(mc)));
+          }
+        }
+
+        // Badge: unanswered Q&A count on More tab (steward)
+        if (tab.id === 'more_steward' && role === 'steward') {
+          var qaUnans = AppState.qaUnansweredCount || 0;
+          if (qaUnans > 0) {
+            iconWrap.appendChild(el('span', {
+              style: {
+                position: 'absolute', top: '-4px', right: '-6px',
+                background: 'var(--warning, #f59e0b)', color: '#fff',
+                fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+                padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+              }
+            }, qaUnans > 9 ? '9+' : String(qaUnans)));
+          }
+        }
+
+        // Badge: open member task count on More tab (member)
+        if (tab.id === 'more' && role !== 'steward') {
+          var mtCount = AppState.memberTaskCount || 0;
+          if (mtCount > 0) {
+            iconWrap.appendChild(el('span', {
+              style: {
+                position: 'absolute', top: '-4px', right: '-6px',
+                background: 'var(--accent)', color: '#fff',
+                fontSize: '9px', fontWeight: '700', borderRadius: '8px',
+                padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
+              }
+            }, mtCount > 9 ? '9+' : String(mtCount)));
+          }
+        }
+
+        item.appendChild(iconWrap);
+        var label = el('span', { className: 'nav-label' }, tab.label);
+        if (tab.id === activeTab && navTheme === 'default') label.style.color = 'var(--accent)';
+        item.appendChild(label);
+        nav.appendChild(item);
+      });
+
+      container.appendChild(nav);
+
+      // Position blob indicator after DOM render
+      if (hasBlobIndicator && blobEl && activeIndex >= 0) {
+        requestAnimationFrame(function() {
+          var navItems = nav.querySelectorAll('.nav-item');
+          if (navItems[activeIndex]) {
+            var navRect = nav.getBoundingClientRect();
+            var itemRect = navItems[activeIndex].getBoundingClientRect();
+            var left = itemRect.left - navRect.left;
+            var width = itemRect.width;
+            blobEl.style.left = (left + 4) + 'px';
+            blobEl.style.width = (width - 8) + 'px';
+          }
+        });
+      }
     }
 
     function renderOrgChart(appContainer, role) {
@@ -1352,8 +1683,8 @@ bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised:
       _navProgressStart();
 
       // Handle "More" menus for both roles (mobile bottom-nav)
-      if (tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
-      if (tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
+      if (tabId === 'more' || tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
+      if (tabId === 'more_steward' || tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
 
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
