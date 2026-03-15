@@ -944,11 +944,19 @@
       getLayoutMode(); // keep LayoutState current for other callers (e.g. isSidebarLayout in headers)
 
       if (_layoutCache.container === container && _layoutCache.role === role && _layoutCache.layout) {
-        // Same role, same container — preserve layout shell, rebuild sidebar state + content only
+        // Same role, same container — preserve layout shell.
+        // Create a NEW content pane (don't destroy the old one — tab pane cache keeps it alive).
         _layoutCache.sidebar.innerHTML = '';
         renderSidebarItems(_layoutCache.sidebar, role, activeTab);
-        _layoutCache.content.innerHTML = '';
-        contentFn(_layoutCache.content);
+
+        // Hide the old content pane (tab pane cache may re-show it later)
+        if (_layoutCache.content) _layoutCache.content.style.display = 'none';
+
+        var newContent = el('div', { className: 'page-layout-content' });
+        contentFn(newContent);
+        _layoutCache.layout.appendChild(newContent);
+        _layoutCache.content = newContent;
+
         // Swap bottom nav for active-state update
         var oldBottom = container.querySelector('.bottom-nav');
         if (oldBottom) oldBottom.remove();
@@ -1228,34 +1236,58 @@
     }
 
     // ═══════════════════════════════════════
-    // TAB DOM CACHE — preserves rendered tab content for instant back-navigation
-    // Tabs that mutate data (notifications, feedback, profile) are excluded from caching.
+    // TAB PANE CACHE — keeps rendered tab panes alive in the DOM (display:none).
+    // On revisit, just show the pane — zero DOM rebuild, zero server calls.
+    // Tabs that mutate data are re-rendered fresh each time.
     // ═══════════════════════════════════════
-    var _tabDomCache = {};
-    var _tabDomCacheRole = null;
+    var _tabPanes = {};       // tabId → { pane: Element, role: string }
+    var _tabPanesRole = null;
+    var _activePane = null;   // currently visible pane element
 
-    // Tabs that should NOT be DOM-cached (contain forms, mutation state, or must be fresh)
-    var _NO_DOM_CACHE_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
+    // Tabs that must always re-render (forms, mutation state, must be fresh)
+    var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
 
-    /** Invalidate tab DOM cache (call after data mutations like case update, badge refresh, etc.) */
+    /** Invalidate cached tab pane(s) — call after data mutations */
     function _invalidateTabCache(tabId) {
-      if (tabId) { delete _tabDomCache[tabId]; } else { _tabDomCache = {}; }
+      if (tabId) {
+        if (_tabPanes[tabId]) {
+          // Remove from DOM if it exists
+          if (_tabPanes[tabId].pane.parentNode) _tabPanes[tabId].pane.parentNode.removeChild(_tabPanes[tabId].pane);
+          delete _tabPanes[tabId];
+        }
+      } else {
+        // Flush all
+        for (var k in _tabPanes) {
+          if (_tabPanes[k].pane.parentNode) _tabPanes[k].pane.parentNode.removeChild(_tabPanes[k].pane);
+        }
+        _tabPanes = {};
+      }
     }
 
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
-      AppState.activeTab = tabId; // track for badge refresh
+      AppState.activeTab = tabId;
 
-      // On role change, flush entire tab DOM cache
-      if (_tabDomCacheRole !== role) { _tabDomCache = {}; _tabDomCacheRole = role; }
+      // Normalize tab aliases (steward home/cases both render the same dashboard)
+      var cacheId = tabId;
+      if (role === 'steward' && (tabId === 'home' || tabId === 'cases')) cacheId = 'cases';
+      if (tabId === 'weeklyq') cacheId = 'polls'; // legacy alias
+
+      // On role change, flush all cached panes
+      if (_tabPanesRole !== role) {
+        _invalidateTabCache();
+        _tabPanesRole = role;
+        _activePane = null;
+      }
 
       _navProgressStart();
+
       // Handle "More" menus for both roles (mobile bottom-nav)
       if (tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
       if (tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); return; }
+
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
-        // Block non-dues-paying members from org chart; stewards always have access
         if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
           if (typeof _renderDuesGate === 'function') {
             _renderDuesGate(app, 'Org Chart', function() { _handleTabNav(role, 'home'); });
@@ -1267,18 +1299,23 @@
         _navProgressDone();
         return;
       }
-      // POMS Reference — shared tab (both roles)
       if (tabId === 'poms') {
         renderPOMSReference(app, role);
         _navProgressDone();
         return;
       }
 
-      // TAB DOM CACHE: If we have a cached DOM snapshot for this tab, restore it instantly
-      if (!_NO_DOM_CACHE_TABS[tabId] && _tabDomCache[tabId] && _layoutCache.content) {
-        _layoutCache.content.innerHTML = '';
-        _layoutCache.content.appendChild(_tabDomCache[tabId]);
-        // Update sidebar + bottom nav active states
+      // ── PANE CACHE: check if we already have a rendered pane for this tab ──
+      var isCacheable = !_ALWAYS_FRESH_TABS[cacheId];
+      var cached = isCacheable && _tabPanes[cacheId];
+
+      if (cached) {
+        // INSTANT: hide current pane, show cached pane, update nav chrome
+        if (_activePane && _activePane !== cached.pane) _activePane.style.display = 'none';
+        cached.pane.style.display = '';
+        _activePane = cached.pane;
+
+        // Update sidebar + bottom nav active highlights
         if (_layoutCache.sidebar) {
           _layoutCache.sidebar.innerHTML = '';
           renderSidebarItems(_layoutCache.sidebar, role, tabId);
@@ -1290,81 +1327,104 @@
         return;
       }
 
+      // ── FRESH RENDER: build new pane, cache it ──
+      // Hide the currently active pane (don't destroy it)
+      if (_activePane) _activePane.style.display = 'none';
+
+      _renderTabFresh(app, role, tabId, cacheId);
+
+      _navProgressDone();
+    }
+
+    /** Renders a tab fresh and caches the pane (if cacheable) */
+    function _renderTabFresh(app, role, tabId, cacheId) {
+      cacheId = cacheId || tabId;
+      var renderFn = _getTabRenderFn(role, tabId);
+      if (!renderFn) return;
+
+      // Call the render function — it will go through renderPageLayout
+      // which creates a new content pane inside the layout shell (hiding the old one).
+      renderFn(app);
+
+      // After renderPageLayout runs, _layoutCache.content holds the new content pane.
+      if (_layoutCache.content && !_ALWAYS_FRESH_TABS[cacheId]) {
+        _tabPanes[cacheId] = { pane: _layoutCache.content, role: role };
+      }
+      _activePane = _layoutCache.content;
+
+      // Clean up: remove hidden panes that aren't in the tab cache.
+      // This prevents always-fresh tabs from accumulating orphaned hidden divs.
+      _gcHiddenPanes();
+    }
+
+    /** Remove hidden page-layout-content nodes that aren't in the tab pane cache */
+    function _gcHiddenPanes() {
+      if (!_layoutCache.layout) return;
+      var kept = {};
+      for (var k in _tabPanes) {
+        if (_tabPanes[k] && _tabPanes[k].pane) kept[k] = _tabPanes[k].pane;
+      }
+      var panes = _layoutCache.layout.querySelectorAll('.page-layout-content');
+      for (var i = 0; i < panes.length; i++) {
+        var p = panes[i];
+        if (p === _activePane) continue; // currently visible
+        if (p.style.display !== 'none') continue; // visible for some other reason
+        // Check if this pane is in the cache
+        var isKept = false;
+        for (var key in kept) { if (kept[key] === p) { isKept = true; break; } }
+        if (!isKept) p.parentNode.removeChild(p);
+      }
+    }
+
+    /** Returns the render function for a given role + tabId */
+    function _getTabRenderFn(role, tabId) {
       if (role === 'member') {
         switch(tabId) {
-          case 'home': renderMemberHome(app); break;
-          case 'cases': renderMyCases(app); break;
-          case 'profile': renderUpdateProfile(app); break;
-          case 'resources': renderMemberResources(app); break;
-          case 'workload': renderWorkloadTracker(app); break;
-          case 'weeklyq': // legacy deep-link — redirect to polls
-          case 'polls': renderPollsPage(app); break;
-          case 'survey': renderSurveyResultsPage(app); break;
-          case 'unionstats': renderUnionStatsPage(app); break;
-          case 'events': renderEventsPage(app); break;
-          case 'stewarddirectory': renderStewardContact(app); break;
-          case 'notifications': renderMemberNotifications(app); break;
-          case 'meetings': renderMeetingsPage(app); break;
-          case 'minutes': renderMinutesPage(app); break;
-          case 'feedback': renderFeedbackPage(app, 'member'); break;
-          case 'mytasks': renderMemberTasks(app); break;
-          case 'qaforum': renderQAForum(app, 'member'); break;
-          case 'timeline': renderMemberTimelinePage(app); break;
-          default: renderMemberHome(app);
+          case 'home': return renderMemberHome;
+          case 'cases': return renderMyCases;
+          case 'profile': return renderUpdateProfile;
+          case 'resources': return renderMemberResources;
+          case 'workload': return renderWorkloadTracker;
+          case 'weeklyq': // legacy deep-link
+          case 'polls': return renderPollsPage;
+          case 'survey': return renderSurveyResultsPage;
+          case 'unionstats': return renderUnionStatsPage;
+          case 'events': return renderEventsPage;
+          case 'stewarddirectory': return renderStewardContact;
+          case 'notifications': return renderMemberNotifications;
+          case 'meetings': return renderMeetingsPage;
+          case 'minutes': return renderMinutesPage;
+          case 'feedback': return function(a) { renderFeedbackPage(a, 'member'); };
+          case 'mytasks': return renderMemberTasks;
+          case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
+          case 'timeline': return renderMemberTimelinePage;
+          default: return renderMemberHome;
         }
       } else {
         switch(tabId) {
-          case 'home': renderStewardDashboard(app); break;
-          case 'cases': renderStewardDashboard(app); break;
-          case 'members': renderStewardMembers(app); break;
-          case 'insights': renderInsightsPage(app); break;
-          case 'stewarddirectory': renderStewardDirectoryPage(app); break;
-          case 'broadcast': renderBroadcast(app); break;
-          case 'notifications': renderStewardNotifications(app); break;
-          case 'resources': renderStewardResources(app); break;
-          case 'weeklyq': // legacy deep-link — redirect to polls
-          case 'polls': renderManagePolls(app); break;
-          case 'surveytrack': renderSurveyTracking(app); break;
-          case 'contactlog': renderContactLog(app); break;
-          case 'tasks': renderStewardTasks(app); break;
-          case 'events': renderEventsPage(app); break;
-          case 'minutes': renderStewardMinutes(app); break;
-          case 'feedback': renderFeedbackPage(app, 'steward'); break;
-          case 'qaforum': renderQAForum(app, 'steward'); break;
-          case 'timeline': renderStewardTimelinePage(app); break;
-          case 'failsafe': renderFailsafePage(app); break;
-          case 'testrunner': renderTestRunnerPage(app); break;
-          default: renderStewardDashboard(app);
+          case 'home':
+          case 'cases': return renderStewardDashboard;
+          case 'members': return renderStewardMembers;
+          case 'insights': return renderInsightsPage;
+          case 'stewarddirectory': return renderStewardDirectoryPage;
+          case 'broadcast': return renderBroadcast;
+          case 'notifications': return renderStewardNotifications;
+          case 'resources': return renderStewardResources;
+          case 'weeklyq': // legacy deep-link
+          case 'polls': return renderManagePolls;
+          case 'surveytrack': return renderSurveyTracking;
+          case 'contactlog': return renderContactLog;
+          case 'tasks': return renderStewardTasks;
+          case 'events': return renderEventsPage;
+          case 'minutes': return renderStewardMinutes;
+          case 'feedback': return function(a) { renderFeedbackPage(a, 'steward'); };
+          case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
+          case 'timeline': return renderStewardTimelinePage;
+          case 'failsafe': return renderFailsafePage;
+          case 'testrunner': return renderTestRunnerPage;
+          default: return renderStewardDashboard;
         }
       }
-
-      // TAB DOM CACHE: After render, snapshot the content for instant restore on revisit
-      if (!_NO_DOM_CACHE_TABS[tabId] && _layoutCache.content) {
-        // Use requestIdleCallback (or setTimeout fallback) to snapshot after paint
-        var snapFn = function() {
-          if (_layoutCache.content && _layoutCache.content.firstChild && AppState.activeTab === tabId) {
-            // Only cache if the content is no longer showing a loading spinner
-            var spinner = _layoutCache.content.querySelector('.loading-spinner');
-            if (!spinner) {
-              _tabDomCache[tabId] = _layoutCache.content.firstChild;
-            } else {
-              // Data still loading — observe for when spinner is removed, then cache
-              var observer = new MutationObserver(function() {
-                if (_layoutCache.content && !_layoutCache.content.querySelector('.loading-spinner') && AppState.activeTab === tabId) {
-                  _tabDomCache[tabId] = _layoutCache.content.firstChild;
-                  observer.disconnect();
-                }
-              });
-              observer.observe(_layoutCache.content, { childList: true, subtree: true });
-              // Safety: disconnect after 30s to avoid leaks
-              setTimeout(function() { observer.disconnect(); }, 30000);
-            }
-          }
-        };
-        if (typeof requestIdleCallback === 'function') { requestIdleCallback(snapFn); } else { setTimeout(snapFn, 100); }
-      }
-
-      _navProgressDone();
     }
 
     /**

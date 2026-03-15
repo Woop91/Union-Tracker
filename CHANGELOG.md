@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.28.5] - 2026-03-14
+
+### Fixed
+- **Gmail scope test false failure** — `test_emailsend_gmailAppAccessible` used `GmailApp.getAliases()` which requires `gmail.readonly` or broader scope, but the project only has `gmail.send`. Replaced with `GmailApp.createDraft()` + immediate trash, which correctly tests the `gmail.send` scope.
+- **Tab switching now truly instant on revisit** — Replaced broken DOM snapshot cache (only saved firstChild, node got destroyed by innerHTML='') with a **show/hide pane system**. Each tab renders into its own `page-layout-content` div. On tab switch, the old pane is hidden (display:none) and the cached pane is shown — zero DOM rebuild, zero server calls, zero re-rendering. Tabs that contain forms/mutations (`notifications`, `feedback`, `profile`, `broadcast`, `failsafe`, `testrunner`) always render fresh. Hidden orphan panes from non-cached tabs are garbage-collected automatically. Steward `home`/`cases` share one pane; `weeklyq` normalizes to `polls`.
+- **renderPageLayout no longer destroys content on tab switch** — Instead of `innerHTML = ''` + `contentFn()` which destroyed the previous tab's DOM, now creates a new content pane and hides the old one, allowing the pane cache to restore it instantly.
+
 ## [4.28.4] - 2026-03-14
 
 ### Fixed

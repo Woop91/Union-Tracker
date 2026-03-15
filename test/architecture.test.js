@@ -583,16 +583,24 @@ describe('A9: UI tab routes have matching render functions', () => {
     path.resolve(__dirname, '..', 'src', 'index.html'), 'utf8'
   );
 
-  // Extract every function name referenced in _handleTabNav switch/case blocks
-  // Pattern: renderFoo(app), renderFoo(app, 'member'), initFoo(app)
+  // Extract every function name referenced in tab routing — either from inline
+  // case 'xxx': renderFoo(app) blocks OR from _getTabRenderFn's return renderFoo patterns.
   const routedFunctions = [];
+  // Pattern 1: case 'xxx': renderFoo(app)
   const routeRegex = /case\s+'[^']+'\s*:\s*(\w+)\s*\(/g;
   let m;
   while ((m = routeRegex.exec(indexHtml)) !== null) {
     if (!routedFunctions.includes(m[1])) routedFunctions.push(m[1]);
   }
-  // Also catch the orgchart handler called outside the switch
-  const directRouteRegex = /if\s*\(tabId\s*===\s*'[^']+'\)\s*\{\s*(\w+)\s*\(/g;
+  // Pattern 2: case 'xxx': return renderFoo; (in _getTabRenderFn)
+  const returnRouteRegex = /case\s+'[^']+'\s*:\s*return\s+(\w+)\s*;/g;
+  while ((m = returnRouteRegex.exec(indexHtml)) !== null) {
+    if (!routedFunctions.includes(m[1])) routedFunctions.push(m[1]);
+  }
+  // Also catch direct handlers like renderOrgChart, renderPOMSReference outside the switch.
+  // Match: if (tabId === 'xxx') { ... renderFoo(app — but only top-level render calls
+  // (not _renderDuesGate or other helpers that start with _)
+  const directRouteRegex = /if\s*\(tabId\s*===\s*'[^']+'\)\s*\{[^}]*?\b(render[A-Z]\w+)\s*\(/g;
   while ((m = directRouteRegex.exec(indexHtml)) !== null) {
     if (!routedFunctions.includes(m[1])) routedFunctions.push(m[1]);
   }

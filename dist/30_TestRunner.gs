@@ -1722,15 +1722,22 @@ function test_survey_trackingSheetExists() {
 //   4. Token & rate-limit infrastructure
 
 function test_emailsend_gmailAppAccessible() {
-  // GmailApp.getAliases() is a lightweight read-only call that requires the
-  // gmail.send scope. It throws if the scope is NOT authorized in the current
-  // execution context (deployment). This is the PRIMARY failure detector.
+  // Verify gmail.send scope is authorized by creating and immediately trashing
+  // a draft. GmailApp.getAliases() requires gmail.readonly or broader — it does
+  // NOT work with gmail.send alone. createDraft() + trash is the lightest
+  // side-effecting call that proves gmail.send is authorized.
   // Note: GmailApp does NOT have getRemainingDailyQuota() — only MailApp does.
   try {
-    var aliases = GmailApp.getAliases();
-    TestRunner.assertTrue(Array.isArray(aliases), 'GmailApp.getAliases() returns array (gmail.send scope authorized)');
+    var draft = GmailApp.createDraft(
+      Session.getEffectiveUser().getEmail(),
+      '[DDS-Dashboard] Scope Test — safe to delete',
+      'This draft was created by the TestRunner to verify gmail.send scope authorization. It was immediately trashed.'
+    );
+    // Immediately trash to clean up
+    try { draft.getMessage().moveToTrash(); } catch (_) { /* best-effort cleanup */ }
+    TestRunner.assertTrue(true, 'GmailApp.createDraft() succeeded (gmail.send scope authorized)');
   } catch (e) {
-    TestRunner.fail('GmailApp.getAliases() threw — gmail.send scope NOT authorized '
+    TestRunner.fail('GmailApp.createDraft() threw — gmail.send scope NOT authorized '
       + 'in deployment. Re-deploy web app and re-authorize scopes. Error: ' + e.message);
   }
 }
