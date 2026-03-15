@@ -162,7 +162,7 @@ var TimelineService = (function () {
     var cat = String(data.category || validCats[0] || 'other').toLowerCase().trim();
     if (validCats.indexOf(cat) === -1) cat = validCats[0] || 'other';
     var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    if (!lock.tryLock(10000)) return { success: false, message: 'System busy. Please try again in a moment.' };
     try {
       var id = 'TL_' + Date.now().toString(36);
       var now = new Date();
@@ -253,7 +253,7 @@ var TimelineService = (function () {
         }
       }
       var lock = LockService.getScriptLock();
-      lock.waitLock(30000);
+      if (!lock.tryLock(30000)) return { success: false, message: 'System busy. Please try again in a moment.', imported: 0 };
       try {
         for (var c = 0; c < calendars.length; c++) {
           var calEvents = calendars[c].getEvents(start, end);

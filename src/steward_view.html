@@ -437,54 +437,47 @@ function _refreshNavBadges() {
   if (_refreshNavBadgesTimer) clearTimeout(_refreshNavBadgesTimer);
   _refreshNavBadgesTimer = setTimeout(function() {
     _refreshNavBadgesTimer = null;
+    var guard = typeof _tabGuard === 'function' ? _tabGuard() : { stale: function() { return false; } };
 
     // Flush tab DOM cache so stale content isn't shown on next tab switch
     if (typeof _invalidateTabCache === 'function') _invalidateTabCache();
     // Re-fetch KPIs (case overdue count may have changed)
     serverCall().withSuccessHandler(function(kpis) {
+      if (guard.stale()) return;
       if (kpis) AppState.kpis = kpis;
     }).withFailureHandler(function() {}).dataGetStewardKPIs(SESSION_TOKEN);
 
     // Re-fetch open tasks, then swap nav
     serverCall().withSuccessHandler(function(tasks) {
+      if (guard.stale()) return;
       var open = (tasks || []).filter(function(t) { return t.status !== 'completed'; });
       AppState.taskCount = open.length;
       AppState.overdueTaskCount = open.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
 
-      // Re-fetch unanswered Q&A count in same callback chain to avoid extra round-trip
-      serverCall().withSuccessHandler(function(qaResult) {
-        var count = 0;
-        if (qaResult && qaResult.questions) {
-          for (var i = 0; i < qaResult.questions.length; i++) {
-            var q = qaResult.questions[i];
-            if (q.answerCount === 0 && q.status !== 'resolved' && q.status !== 'deleted') count++;
-          }
-        }
-        AppState.qaUnansweredCount = count;
-        var appRoot = document.getElementById('app') || document;
-        var existingNav = appRoot.querySelector('.bottom-nav');
-        if (existingNav && existingNav.parentNode) {
-          var parent = existingNav.parentNode;
-          var replacement = document.createElement('div');
-          parent.replaceChild(replacement, existingNav);
-          renderBottomNav(replacement, 'steward', AppState.activeTab || 'cases');
-          var newNav = replacement.querySelector('.bottom-nav');
-          if (newNav) parent.replaceChild(newNav, replacement);
-        }
+      // Use lightweight count endpoint instead of fetching all 999 questions
+      serverCall().withSuccessHandler(function(count) {
+        if (guard.stale()) return;
+        AppState.qaUnansweredCount = count || 0;
+        _swapBottomNav();
       }).withFailureHandler(function() {
-        var appRoot = document.getElementById('app') || document;
-        var existingNav = appRoot.querySelector('.bottom-nav');
-        if (existingNav && existingNav.parentNode) {
-          var parent = existingNav.parentNode;
-          var replacement = document.createElement('div');
-          parent.replaceChild(replacement, existingNav);
-          renderBottomNav(replacement, 'steward', AppState.activeTab || 'cases');
-          var newNav = replacement.querySelector('.bottom-nav');
-          if (newNav) parent.replaceChild(newNav, replacement);
-        }
-      }).qaGetQuestions(SESSION_TOKEN, 1, 999, 'recent');
+        _swapBottomNav();
+      }).qaGetUnansweredCount(SESSION_TOKEN);
     }).withFailureHandler(function() {}).dataGetTasks(SESSION_TOKEN, null);
   }, 600);
+}
+
+/** Replaces the bottom nav in place — extracted to avoid duplication */
+function _swapBottomNav() {
+  var appRoot = document.getElementById('app') || document;
+  var existingNav = appRoot.querySelector('.bottom-nav');
+  if (existingNav && existingNav.parentNode) {
+    var parent = existingNav.parentNode;
+    var replacement = document.createElement('div');
+    parent.replaceChild(replacement, existingNav);
+    renderBottomNav(replacement, 'steward', AppState.activeTab || 'cases');
+    var newNav = replacement.querySelector('.bottom-nav');
+    if (newNav) parent.replaceChild(newNav, replacement);
+  }
 }
 
 // renderBottomNav() — consolidated to index.html (v4.26.1)
@@ -2577,7 +2570,7 @@ function _renderContactForm(container) {
   memberGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
   var memberInput = el('input', { className: 'form-input', placeholder: 'Type name or email...' });
   memberGroup.appendChild(memberInput);
-  var acDropdown = el('div', { style: {
+  var acDropdown = el('div', { className: 'contact-log-ac-dropdown', style: {
     position: 'absolute', top: '100%', left: '0', right: '0', zIndex: '50',
     background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
     maxHeight: '200px', overflowY: 'auto', display: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
@@ -2621,9 +2614,17 @@ function _renderContactForm(container) {
       acDropdown.style.display = 'block';
     });
   });
-  document.addEventListener('click', function(e) {
-    if (!memberGroup.contains(e.target)) acDropdown.style.display = 'none';
-  });
+  // Use a named handler so duplicate listeners are automatically deduped by the browser
+  if (!window._contactLogAcDismiss) {
+    window._contactLogAcDismiss = function(e) {
+      var dd = document.querySelector('.contact-log-ac-dropdown');
+      if (dd && dd.style.display !== 'none') {
+        var grp = dd.parentNode;
+        if (grp && !grp.contains(e.target)) dd.style.display = 'none';
+      }
+    };
+    document.addEventListener('click', window._contactLogAcDismiss);
+  }
 
   var typeGroup = el('div', { className: 'form-group' });
   typeGroup.appendChild(el('label', { className: 'form-label' }, 'Contact Type'));
@@ -3181,15 +3182,19 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
     renderFn(detailPanel);
   }
 
-  // Listen for browser back button
-  window.addEventListener('hashchange', function() {
+  // Listen for browser back button — single global handler to prevent accumulation
+  if (window._insightsHashHandler) {
+    window.removeEventListener('hashchange', window._insightsHashHandler);
+  }
+  window._insightsHashHandler = function() {
     var hash = location.hash.replace('#', '');
     if (_detailRegistry[hash] && detailPanel.style.display === 'none') {
       showDetail(_detailRegistry[hash].title, _detailRegistry[hash].renderFn);
     } else if (!hash || hash.indexOf('insight-') !== 0) {
       if (detailPanel.style.display !== 'none') _closeDetail();
     }
-  });
+  };
+  window.addEventListener('hashchange', window._insightsHashHandler);
 
   if (!statsData || !statsData.available) {
     mainContent.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));

@@ -293,8 +293,9 @@ var Auth = (function () {
     Logger.log('Auth: Cleaned up ' + cleaned + ' expired tokens.');
 
     // Fix 2.9: Monitor PropertiesService quota (500KB limit)
-    var remaining = props.getProperties();
-    var totalSize = JSON.stringify(remaining).length;
+    // Reuse the already-loaded snapshot when no deletions occurred (avoids double getProperties call)
+    var sizeSource = cleaned > 0 ? props.getProperties() : all;
+    var totalSize = JSON.stringify(sizeSource).length;
     if (totalSize > 400000) {
       Logger.log('WARNING: ScriptProperties usage at ' + Math.round(totalSize / 1024) + 'KB / 500KB');
     }

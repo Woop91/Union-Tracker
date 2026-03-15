@@ -466,12 +466,12 @@ describe('QAForum.submitQuestion', () => {
     var ss = createMockSpreadsheet([forumSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
-    var mockLock = { waitLock: jest.fn(), releaseLock: jest.fn() };
+    var mockLock = { tryLock: jest.fn(() => true), releaseLock: jest.fn() };
     LockService.getScriptLock.mockReturnValue(mockLock);
 
     QAForum.submitQuestion('user@test.com', 'Name', 'Question text?');
 
-    expect(mockLock.waitLock).toHaveBeenCalledWith(10000);
+    expect(mockLock.tryLock).toHaveBeenCalledWith(10000);
     expect(mockLock.releaseLock).toHaveBeenCalled();
   });
 
@@ -574,12 +574,12 @@ describe('QAForum.submitAnswer', () => {
     var ss = createMockSpreadsheet([forumSheet, answerSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
-    var mockLock = { waitLock: jest.fn(), releaseLock: jest.fn() };
+    var mockLock = { tryLock: jest.fn(() => true), releaseLock: jest.fn() };
     LockService.getScriptLock.mockReturnValue(mockLock);
 
     QAForum.submitAnswer('u@test.com', 'U', 'QA_1', 'Answer text', true);
 
-    expect(mockLock.waitLock).toHaveBeenCalledWith(10000);
+    expect(mockLock.tryLock).toHaveBeenCalledWith(10000);
     expect(mockLock.releaseLock).toHaveBeenCalled();
   });
 

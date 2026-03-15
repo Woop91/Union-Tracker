@@ -2449,13 +2449,7 @@ var DataService = (function () {
     if (role === 'steward') {
       try {
         if (typeof QAForum !== 'undefined') {
-          var qaResult = QAForum.getQuestions(email, 1, 999, 'recent');
-          if (qaResult && qaResult.questions) {
-            for (var q = 0; q < qaResult.questions.length; q++) {
-              var qq = qaResult.questions[q];
-              if (qq.answerCount === 0 && qq.status !== 'resolved' && qq.status !== 'deleted') qaUnansweredCount++;
-            }
-          }
+          qaUnansweredCount = QAForum.getUnansweredCount();
         }
       } catch (_e) { /* non-fatal */ }
     }

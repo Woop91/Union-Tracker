@@ -194,7 +194,7 @@ var QAForum = (function () {
     cache.put(cacheKey, String(count + 1), 3600);
 
     var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    if (!lock.tryLock(10000)) return { success: false, message: 'System busy. Please try again in a moment.' };
     try {
       var id = 'QA_' + Date.now().toString(36);
       var now = new Date();
@@ -237,7 +237,7 @@ var QAForum = (function () {
     if (!ansSheet) { initQAForumSheets(); ansSheet = ss.getSheetByName(SHEETS.QA_ANSWERS); }
 
     var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    if (!lock.tryLock(10000)) return { success: false, message: 'System busy. Please try again in a moment.' };
     try {
       var id = 'ANS_' + Date.now().toString(36);
       ansSheet.appendRow([
@@ -303,7 +303,7 @@ var QAForum = (function () {
     var emailHash = _hashEmail(email);
 
     var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    if (!lock.tryLock(10000)) return { success: false, message: 'System busy. Please try again in a moment.' };
     try {
       var data = sheet.getDataRange().getValues();
       for (var i = 1; i < data.length; i++) {
@@ -590,4 +590,5 @@ function qaModerateQuestion(sessionToken, questionId, action) { var e = _require
 function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateAnswer(e, answerId, action); }
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
 function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch(_) {} return QAForum.resolveQuestion(e, questionId, isSteward); }
+function qaGetUnansweredCount(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return 0; return QAForum.getUnansweredCount(); }
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

@@ -609,7 +609,7 @@
       var DEFAULT_TTL = 120000; // 2 minutes
       // C6: Longer TTLs for stable data (member directory, config rarely change)
       var STABLE_TTL = 300000; // 5 minutes — for member directory, steward directory
-      var CONFIG_TTL = 1800000; // 30 minutes — for config data
+      var CONFIG_TTL = 300000; // 5 minutes — for config data (reduced from 30m to avoid stale feature gates)
 
       function get(key) {
         var entry = _cache[key];
@@ -703,7 +703,7 @@
             var delay = _RETRY_BASE_MS * Math.pow(2, attempt);
             console.warn('Retrying ' + fnName + ' (attempt ' + (attempt + 2) + '/' + (_MAX_RETRIES + 1) + ') in ' + delay + 'ms');
             setTimeout(function() {
-              _throttledServerCall(fnName, args, onSuccess, onFailure);
+              _serverCallWithRetry(fnName, args, onSuccess, onFailure, attempt + 1);
             }, delay);
           } else {
             _drainQueue();
@@ -1662,6 +1662,17 @@
     }
 
     var _navSwitchId = 0; // monotonic counter to discard stale tab switches
+
+    /**
+     * Returns a snapshot of the current switch ID. Call at render time, then
+     * pass the returned value into async callbacks to detect stale responses.
+     * Usage:  var guard = _tabGuard();
+     *         serverCall().withSuccessHandler(function(r) { if (guard.stale()) return; ... })
+     */
+    function _tabGuard() {
+      var id = _navSwitchId;
+      return { stale: function() { return id !== _navSwitchId; } };
+    }
 
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
