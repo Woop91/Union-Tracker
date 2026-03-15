@@ -595,7 +595,7 @@ var VERSION_INFO = (function() {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
     MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 29,
-    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
+    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 1,
     BUILD: 'v' + ver,
     CURRENT: ver,
     BUILD_DATE: '2026-03-15',

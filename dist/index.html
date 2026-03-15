@@ -1249,9 +1249,11 @@
           // Rendering into secondary panel
           var secPanel = _layoutCache.splitSecondary;
           if (!secPanel) return;
-          // Hide old secondary content
-          var oldSecContent = secPanel.querySelector('.page-layout-content');
-          if (oldSecContent) oldSecContent.style.display = 'none';
+          // Remove ALL old secondary content panes (prevent stacking)
+          var oldSecPanes = secPanel.querySelectorAll('.page-layout-content');
+          for (var _si = 0; _si < oldSecPanes.length; _si++) {
+            oldSecPanes[_si].parentNode.removeChild(oldSecPanes[_si]);
+          }
 
           var newSecContent = el('div', { className: 'page-layout-content' });
           contentFn(newSecContent);
@@ -2212,7 +2214,9 @@
       for (var k in _tabPanes) {
         if (_tabPanes[k] && _tabPanes[k].pane) kept[k] = _tabPanes[k].pane;
       }
-      var panes = _layoutCache.layout.querySelectorAll('.page-layout-content');
+      // Only GC from the primary panel (or layout root if no split), not from the secondary panel
+      var gcRoot = _layoutCache.splitPrimary || _layoutCache.layout;
+      var panes = gcRoot.querySelectorAll('.page-layout-content');
       for (var i = 0; i < panes.length; i++) {
         var p = panes[i];
         if (p === _activePane) continue; // currently visible

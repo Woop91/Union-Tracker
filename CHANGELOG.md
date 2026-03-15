@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Test registry consistency check now skips `typeof` guard patterns in `fn:` entries
 - `renderBottomNav` test updated to look in `index.html` after v4.26.1 consolidation
+- **Split View: secondary panel content stacking** — Switching tabs in the right panel now properly replaces content instead of appending below. Old panes are removed from DOM instead of just hidden, preventing scroll accumulation.
+- **Split View: GC safety** — Tab pane garbage collection now scopes to the primary panel only, preventing accidental removal of secondary panel content.
 
 ## [4.29.0] - 2026-03-15
 
