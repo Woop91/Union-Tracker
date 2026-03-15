@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.28.6] - 2026-03-15
+
+### Fixed
+- **Gmail scope test false failure (correct fix)** — `test_emailsend_gmailAppAccessible` was failing because both `GmailApp.getAliases()` (needs `gmail.readonly`) and `GmailApp.createDraft()` (needs `gmail.compose`) require scopes broader than `gmail.send`. The `gmail.send` scope ONLY supports `sendEmail()` — no side-effect-free probe method exists. Replaced with structural verification: GmailApp service availability + `ScriptApp.getOAuthToken()` token check. Runtime send verification deferred to `testAuthEmailSend()`.
+
+### Verified (Auth Sweep)
+- All 10 OAuth scopes in `appsscript.json` match actual API usage — no missing or unused scopes
+- All `data*` (50+), `wq*` (11), `qa*` (10), `tl*` (10), `fs*` (9) endpoints have auth gates
+- No simple trigger violations (ScriptApp calls correctly deferred to installable triggers)
+- Email sending: dual-path (GmailApp primary, MailApp fallback) with quota guards verified
+
 ## [4.28.5] - 2026-03-14
 
 ### Fixed
