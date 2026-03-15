@@ -63,12 +63,12 @@ function createSurveyQuestionsSheet(ss) {
     ['q1','1','WORK_CONTEXT','Work Context','What is your worksite / program / region?','dropdown','Y','Y','[Config: Office Locations]','','','','','','','Options from Config → Office Locations'],
     ['q2','1','WORK_CONTEXT','Work Context','What is your role / job group?','dropdown','Y','Y','[Config: Job Titles]','','','','','','','Options from Config → Job Titles'],
     ['q3','1','WORK_CONTEXT','Work Context','What shift do you work?','radio','Y','Y','Day|Evening|Night|Rotating/Variable','','','','','','',''],
-    ['q4','1','WORK_CONTEXT','Work Context','How long have you been in your current role?','radio','Y','Y','Less than 1 year|1–3 years|4–7 years|8–15 years|15+ years','','','','','','',''],
-    ['q5','1','WORK_CONTEXT','Work Context','Have you had contact with a steward in the past 12 months?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 3A, No → 3B'],
+    ['q4','1','WORK_CONTEXT','Work Context','How long have you been in your current role at this employer?','radio','Y','Y','Less than 1 year|1–3 years|4–7 years|8–15 years|15+ years','','','','','','',''],
+    ['q5','1','WORK_CONTEXT','Work Context','Have you contacted a steward for help with a work-related issue in the past 12 months?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 3A, No → 3B'],
     // ── Section 2: Overall Satisfaction ──────────────────────────────────
     ['q6','2','OVERALL_SAT','Overall Satisfaction','I am satisfied with my union representation.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q7','2','OVERALL_SAT','Overall Satisfaction',"I trust the union to act in members' best interests.",'slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q8','2','OVERALL_SAT','Overall Satisfaction','I feel more protected at work because of my union.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q8','2','OVERALL_SAT','Overall Satisfaction','I feel more protected from unfair treatment at work because of my union.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q9','2','OVERALL_SAT','Overall Satisfaction','I would recommend union membership to a coworker.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     // ── Section 3A: Steward Experience (Q5=Yes) ───────────────────────────
     ['q10','3A','STEWARD_3A','Steward Experience','My steward responded to me in a timely manner.','slider-10','Y','Y','','q5','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q5=Yes'],
@@ -84,24 +84,27 @@ function createSurveyQuestionsSheet(ss) {
     ['q19','3B','STEWARD_3B','Steward Access','I am confident I would get help if I needed it.','slider-10','Y','Y','','q5','No','','','Strongly Disagree','Strongly Agree','Only shown if Q5=No'],
     ['q20','3B','STEWARD_3B','Steward Access','It is easy to figure out who to contact.','slider-10','Y','Y','','q5','No','','','Strongly Disagree','Strongly Agree','Only shown if Q5=No'],
     // ── Section 4: Chapter Effectiveness ─────────────────────────────────
-    ['q21','4','CHAPTER','Chapter Effectiveness','Union reps understand my workplace issues.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q22','4','CHAPTER','Chapter Effectiveness','Chapter communication is regular and clear.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q23','4','CHAPTER','Chapter Effectiveness','The chapter organizes members effectively.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q21','4','CHAPTER','Chapter Effectiveness','Union reps understand the day-to-day challenges of my job.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q22','4','CHAPTER','Chapter Effectiveness','I receive regular and clear communication from the chapter.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q23','4','CHAPTER','Chapter Effectiveness','The chapter brings members together effectively around shared concerns.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q24','4','CHAPTER','Chapter Effectiveness','I know how to reach my chapter contact.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q25','4','CHAPTER','Chapter Effectiveness','Representation is fair across roles and shifts.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     // ── Section 5: Local Leadership ───────────────────────────────────────
     ['q26','5','LEADERSHIP','Local Leadership','Leadership communicates decisions clearly.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q27','5','LEADERSHIP','Local Leadership','I understand how decisions are made.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q28','5','LEADERSHIP','Local Leadership','The union is transparent about its finances.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q28','5','LEADERSHIP','Local Leadership','The union provides clear information about how dues money is spent.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q29','5','LEADERSHIP','Local Leadership','Leadership is accountable to member feedback.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q30','5','LEADERSHIP','Local Leadership','Internal union processes feel fair.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q31','5','LEADERSHIP','Local Leadership','The union welcomes differing opinions.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q77','5','LEADERSHIP','Local Leadership','The union has a clear strategy for addressing members\' most important issues.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q78','5','LEADERSHIP','Local Leadership','Union leadership communicates its strategy and goals to members.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q79','5','LEADERSHIP','Local Leadership','I understand what the union is working toward over the next 6–12 months.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     // ── Section 6: Contract Enforcement ──────────────────────────────────
     ['q32','6','CONTRACT','Contract Enforcement','The union enforces our contract effectively.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q33','6','CONTRACT','Contract Enforcement','The union communicates realistic timelines.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q34','6','CONTRACT','Contract Enforcement','The union provides clear updates on issues.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q35','6','CONTRACT','Contract Enforcement','The union prioritizes frontline working conditions.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q36','6','CONTRACT','Contract Enforcement','Have you filed a grievance in the past 24 months?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 6A, No → Section 7'],
+    ['q35','6','CONTRACT','Contract Enforcement','The union prioritizes the working conditions that matter most to members.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q36','6','CONTRACT','Contract Enforcement','Have you filed or been involved in a grievance in the past 24 months?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 6A, No → Section 7'],
     // ── Section 6A: Representation Process (Q36=Yes) ──────────────────────
     ['q37','6A','REPRESENTATION','Representation Process','I understood the steps and timeline of my grievance.','slider-10','Y','Y','','q36','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q36=Yes'],
     ['q38','6A','REPRESENTATION','Representation Process','I felt supported throughout the grievance process.','slider-10','Y','Y','','q36','Yes','','','Strongly Disagree','Strongly Agree','Only shown if Q36=Yes'],
@@ -111,7 +114,7 @@ function createSurveyQuestionsSheet(ss) {
     ['q41','7','COMMUNICATION','Communication Quality','Union communications are clear and actionable.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q42','7','COMMUNICATION','Communication Quality','I receive enough information from the union.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q43','7','COMMUNICATION','Communication Quality','I can find information from the union easily.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q44','7','COMMUNICATION','Communication Quality','Communications reach members on all shifts and locations.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q44','7','COMMUNICATION','Communication Quality','I receive union communications regardless of my shift or location.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q45','7','COMMUNICATION','Communication Quality','Union meetings are worth attending.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     // ── Section 8: Member Voice & Culture ────────────────────────────────
     ['q46','8','MEMBER_VOICE','Member Voice & Culture','My voice matters in this union.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
@@ -122,15 +125,15 @@ function createSurveyQuestionsSheet(ss) {
     // ── Section 9: Value & Collective Action ──────────────────────────────
     ['q51','9','VALUE_ACTION','Value & Collective Action','Union membership provides good value for my dues.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q52','9','VALUE_ACTION','Value & Collective Action',"The union's priorities reflect member needs.",'slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q53','9','VALUE_ACTION','Value & Collective Action','The union is prepared to mobilize when needed.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q53','9','VALUE_ACTION','Value & Collective Action','The union is ready to take collective action when needed.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q54','9','VALUE_ACTION','Value & Collective Action','I understand how to get more involved.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q55','9','VALUE_ACTION','Value & Collective Action','Acting together, we can win real improvements.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q55','9','VALUE_ACTION','Value & Collective Action','I believe that acting together, we can win real improvements.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     // ── Section 10: Scheduling & Office Days ──────────────────────────────
     ['q56','10','SCHEDULING','Scheduling & Office Days','I understand proposed scheduling/office day changes.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q57','10','SCHEDULING','Scheduling & Office Days','I am adequately informed about scheduling decisions.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q58','10','SCHEDULING','Scheduling & Office Days','Scheduling decisions use clear and fair criteria.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q59','10','SCHEDULING','Scheduling & Office Days','My work can reasonably be done under current expectations.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q60','10','SCHEDULING','Scheduling & Office Days','The current scheduling approach supports effective outcomes.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q60','10','SCHEDULING','Scheduling & Office Days','The current scheduling approach allows me to do my job effectively.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q61','10','SCHEDULING','Scheduling & Office Days','The scheduling approach supports my wellbeing.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q62','10','SCHEDULING','Scheduling & Office Days','My scheduling concerns would be taken seriously.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q63','10','SCHEDULING','Scheduling & Office Days','What is your biggest scheduling challenge? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
@@ -138,7 +141,17 @@ function createSurveyQuestionsSheet(ss) {
     ['q64','11','PRIORITIES','Priorities & Closing Thoughts','Select your top 3 union priorities for the next 6–12 months.','checkbox','Y','Y','[Config: Survey Priority Options]','','','','3','','','Options from Config → Survey Priority Options. Max 3 selections.'],
     ['q65','11','PRIORITIES','Priorities & Closing Thoughts','The #1 change you want the union to make.','paragraph','Y','Y','','','','','','','',''],
     ['q66','11','PRIORITIES','Priorities & Closing Thoughts','One thing the union should keep doing.','paragraph','Y','Y','','','','','','','',''],
-    ['q67','11','PRIORITIES','Priorities & Closing Thoughts','Additional comments — please do not include names.','paragraph','N','Y','','','','','','','','Optional']
+    ['q67','11','PRIORITIES','Priorities & Closing Thoughts','Additional comments — please do not include names.','paragraph','N','Y','','','','','','','','Optional'],
+    // ── Section 12: Return-to-Office Change ─────────────────────────────
+    ['q68','12','RTO_CHANGE','Return-to-Office Change','I was given adequate notice about the change from 2 to 3 required office days.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree','RTO section — toggle via menu after first period ends'],
+    ['q69','12','RTO_CHANGE','Return-to-Office Change','The reasons for increasing required office days were clearly explained.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q70','12','RTO_CHANGE','Return-to-Office Change','The union fought to protect our interests during the return-to-office change.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q71','12','RTO_CHANGE','Return-to-Office Change','My steward kept me informed about what the union was doing to address the office day increase.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q72','12','RTO_CHANGE','Return-to-Office Change','I had a meaningful opportunity to share my concerns about the change before it was finalized.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q73','12','RTO_CHANGE','Return-to-Office Change','The union negotiated the best outcome it could on the office day requirement.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q74','12','RTO_CHANGE','Return-to-Office Change','The transition from 2 to 3 office days has negatively impacted my work-life balance.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree','Reverse-sentiment question'],
+    ['q75','12','RTO_CHANGE','Return-to-Office Change','I am confident the union will continue to advocate on office day requirements going forward.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q76','12','RTO_CHANGE','Return-to-Office Change','What could the union or stewards have done differently regarding the office day change? (optional)','paragraph','N','Y','','','','','','','','Optional open text']
   ];
 
   // Build set of existing question IDs so we don't overwrite user edits
@@ -165,7 +178,7 @@ function createSurveyQuestionsSheet(ss) {
       CONTRACT:       '#e0f2f1', REPRESENTATION:'#e0f7fa',
       COMMUNICATION:  '#e8eaf6', MEMBER_VOICE: '#fbe9e7',
       VALUE_ACTION:   '#f9fbe7', SCHEDULING:   '#efebe9',
-      PRIORITIES:     '#f5f5f5'
+      PRIORITIES:     '#f5f5f5', RTO_CHANGE:   '#fff8e1'
     };
     toAdd.forEach(function(row, i) {
       var color = sectionColors[String(row[2]).trim()] || '#ffffff';

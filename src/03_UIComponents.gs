@@ -122,6 +122,8 @@ function createDashboardMenu() {
       .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
       .addItem('🔔 Send Survey Reminders Now', 'sendSurveyCompletionReminders')
       .addSeparator()
+      .addItem('🏢 Toggle Return-to-Office Questions', 'menuToggleRTOSection')
+      .addSeparator()
       .addItem('🔄 Draw Community Poll Now', 'autoSelectCommunityPoll'))
 
     .addSeparator()

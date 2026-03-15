@@ -873,6 +873,150 @@ function menuInstallSurveyTriggers() {
   }
 }
 
+// ── RTO Section Toggle ──────────────────────────────────────────────────────
+
+/**
+ * Menu: Surveys & Polls → Toggle Return-to-Office Questions
+ *
+ * Enables or disables the RTO_CHANGE section (q68–q76) on the
+ * Survey Questions sheet by flipping the Active column (Y↔N).
+ *
+ * LOCK RULE: The toggle is locked (deactivation blocked) until at least
+ * one survey period that included these questions has been Closed.
+ * This ensures the RTO section runs for a full survey cycle before
+ * it can be turned off.
+ */
+function menuToggleRTOSection() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // ── Read Survey Questions sheet ──────────────────────────────────────
+  var qSheet = ss.getSheetByName(SHEETS.SURVEY_QUESTIONS);
+  if (!qSheet || qSheet.getLastRow() < 2) {
+    ui.alert('Error', 'Survey Questions sheet not found. Run Initialize Survey Engine first.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var QC = SURVEY_QUESTIONS_COLS;
+  var data = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, 16).getValues();
+
+  // Find all RTO_CHANGE rows
+  var rtoRows = []; // { rowIndex (1-indexed sheet row), active }
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][QC.SECTION_KEY - 1]).trim() === 'RTO_CHANGE') {
+      rtoRows.push({
+        rowIndex: i + 2,
+        active: String(data[i][QC.ACTIVE - 1]).trim().toUpperCase() === 'Y'
+      });
+    }
+  }
+
+  if (rtoRows.length === 0) {
+    ui.alert('Not Found', 'No RTO questions (Section Key = RTO_CHANGE) found on the Survey Questions sheet.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var currentlyActive = rtoRows[0].active;
+
+  // ── If turning OFF: check the period-end lock ────────────────────────
+  if (currentlyActive) {
+    var locked = isRTOToggleLocked_(ss);
+    if (locked) {
+      ui.alert(
+        '🔒 Toggle Locked',
+        'The Return-to-Office questions cannot be deactivated yet.\n\n' +
+        'At least one full survey period that includes these questions must be completed (Closed) ' +
+        'before the toggle becomes available.\n\n' +
+        'This ensures every member gets a chance to respond to the RTO questions at least once.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
+
+    // Confirm deactivation
+    var resp = ui.alert(
+      'Deactivate RTO Questions?',
+      'This will hide the Return-to-Office section (' + rtoRows.length + ' questions) from future surveys.\n\n' +
+      'Existing responses are preserved. You can re-activate them later from this same menu.',
+      ui.ButtonSet.YES_NO
+    );
+    if (resp !== ui.Button.YES) return;
+  }
+
+  // ── Toggle Active column ─────────────────────────────────────────────
+  var newValue = currentlyActive ? 'N' : 'Y';
+  for (var j = 0; j < rtoRows.length; j++) {
+    qSheet.getRange(rtoRows[j].rowIndex, QC.ACTIVE, 1, 1).setValue(newValue);
+  }
+
+  // Clear cache so changes take effect immediately
+  try {
+    var cache = CacheService.getScriptCache();
+    cache.remove('surveyQuestions_v1');
+    cache.remove('satisfactionColMap_v1');
+  } catch(_c) {}
+
+  var action = currentlyActive ? 'deactivated (hidden)' : 'activated (visible)';
+  ui.alert(
+    '✅ RTO Section ' + (currentlyActive ? 'Deactivated' : 'Activated'),
+    rtoRows.length + ' Return-to-Office questions have been ' + action + '.\n\n' +
+    'Changes take effect immediately on the next survey load.',
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Checks whether the RTO toggle is still locked.
+ * The lock is released once at least one Closed survey period exists
+ * whose start date is on or after the date the RTO questions were added
+ * (i.e., the period must have included RTO questions).
+ *
+ * Heuristic: if ANY Closed period exists whose start date >= the earliest
+ * Timestamp row in Satisfaction that contains an RTO question answer, the
+ * lock is released. As a simpler fallback: if any Closed period exists
+ * and the RTO questions are present in the Satisfaction sheet headers,
+ * the lock is released.
+ *
+ * @param {Spreadsheet} ss
+ * @returns {boolean} true = locked (cannot deactivate)
+ * @private
+ */
+function isRTOToggleLocked_(ss) {
+  try {
+    var periodsSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_PERIODS);
+    if (!periodsSheet || periodsSheet.getLastRow() < 2) return true; // No periods at all
+
+    var pData = periodsSheet.getRange(2, 1, periodsSheet.getLastRow() - 1, 8).getValues();
+    var C = SURVEY_PERIODS_COLS;
+
+    // Check if RTO question columns exist in Satisfaction sheet headers
+    var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+    var rtoInHeaders = false;
+    if (satSheet && satSheet.getLastRow() >= 1) {
+      var headers = satSheet.getRange(1, 1, 1, satSheet.getLastColumn()).getValues()[0];
+      rtoInHeaders = headers.some(function(h) {
+        var id = String(h).trim();
+        return id.indexOf('q6') === 0 && parseInt(id.replace('q', ''), 10) >= 68 &&
+               parseInt(id.replace('q', ''), 10) <= 76;
+      });
+    }
+
+    // If RTO columns aren't even in the Satisfaction sheet yet, no period has included them
+    if (!rtoInHeaders) return true;
+
+    // Look for any Closed period
+    for (var i = 0; i < pData.length; i++) {
+      var status = String(pData[i][C.STATUS - 1]).trim();
+      if (status === 'Closed') return false; // At least one period completed — unlock
+    }
+
+    return true; // No closed periods yet
+  } catch(e) {
+    Logger.log('isRTOToggleLocked_ error: ' + e.message);
+    return true; // Default to locked on error
+  }
+}
+
 /**
  * Installs onOpenDeferred_ as an installable onOpen trigger.
  * FIX v4.25.7: onOpen (simple trigger) cannot call ScriptApp — this installable
