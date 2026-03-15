@@ -2111,6 +2111,11 @@ input { font: inherit; }
 .notif-type-announcement { background: #f0fdf4; color: #16a34a; }
 .notif-type-steward { background: #eff6ff; color: #2563eb; }
 .notif-type-deadline { background: #fef2f2; color: #dc2626; }
+/* Dark mode overrides — OLED-safe notification type badges */
+[data-theme-mode="dark"] .notif-type-system { background: rgba(124,58,237,0.15); color: #c4b5fd; }
+[data-theme-mode="dark"] .notif-type-announcement { background: rgba(22,163,74,0.15); color: #86efac; }
+[data-theme-mode="dark"] .notif-type-steward { background: rgba(37,99,235,0.15); color: #93c5fd; }
+[data-theme-mode="dark"] .notif-type-deadline { background: rgba(220,38,38,0.15); color: #fca5a5; }
 .notif-urgent-border { border-left: 3px solid var(--danger); }
 .notif-card { padding: 14px 16px; margin-bottom: 8px; position: relative; }
 .notif-dismiss {

@@ -995,3 +995,94 @@ describe('G22 — Workload Tracker frontend invariants', () => {
     });
   });
 });
+
+
+// ============================================================================
+// G23: TAB NAVIGATION RACE CONDITION GUARD
+// ============================================================================
+// Bug (2026-03-15): Rapid tab switching caused two tabs to display simultaneously.
+// Two root causes:
+//   1. orgchart/poms/more early-return paths did not update _activePane, so switching
+//      away from them to a cached tab left their pane visible.
+//   2. No guard against stale async tab switches (rapid clicks fire concurrent
+//      _handleTabNav calls; late-arriving google.script.run callbacks paint over
+//      the tab the user already navigated to).
+// Fix: monotonic _navSwitchId counter discards stale switches; _activePane set
+// after every render path including orgchart/poms/more.
+
+describe('G23: Tab navigation race condition guard', () => {
+  const indexCode = read('index.html');
+
+  test('_navSwitchId counter is declared', () => {
+    expect(indexCode).toMatch(/var _navSwitchId\s*=\s*0/);
+  });
+
+  test('_handleTabNav increments _navSwitchId on each call', () => {
+    // Must see ++_navSwitchId or _navSwitchId++ or _navSwitchId += 1
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    expect(fnBody).toMatch(/\+\+_navSwitchId|_navSwitchId\s*\+\+|_navSwitchId\s*\+=\s*1/);
+  });
+
+  test('stale-switch guard checks switchId before cached/fresh render', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    // Must compare the local switchId against the global _navSwitchId
+    expect(fnBody).toMatch(/switchId\s*!==\s*_navSwitchId/);
+  });
+
+  // orgchart, poms, and "more" early-return paths must update _activePane
+  test('orgchart early-return path updates _activePane', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    // After renderOrgChart, _activePane must be set before return
+    const orgchartBlock = fnBody.match(/renderOrgChart\([\s\S]*?return;/);
+    expect(orgchartBlock).not.toBeNull();
+    expect(orgchartBlock[0]).toContain('_activePane');
+  });
+
+  test('poms early-return path updates _activePane', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const pomsBlock = fnBody.match(/renderPOMSReference\([\s\S]*?return;/);
+    expect(pomsBlock).not.toBeNull();
+    expect(pomsBlock[0]).toContain('_activePane');
+  });
+
+  test('_member_more early-return path updates _activePane', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const moreBlock = fnBody.match(/_member_more[\s\S]*?return;\s*\}/);
+    expect(moreBlock).not.toBeNull();
+    expect(moreBlock[0]).toContain('_activePane');
+  });
+
+  test('_steward_more early-return path updates _activePane', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const moreBlock = fnBody.match(/_steward_more[\s\S]*?return;\s*\}/);
+    expect(moreBlock).not.toBeNull();
+    expect(moreBlock[0]).toContain('_activePane');
+  });
+
+  // Async callbacks must check for stale switches
+  test('renderOrgChart async callback checks _navSwitchId', () => {
+    const fnBody = extractFnBody(indexCode, 'renderOrgChart');
+    expect(fnBody).toMatch(/_navSwitchId/);
+  });
+
+  test('renderPOMSReference async callback checks _navSwitchId', () => {
+    const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
+    expect(fnBody).toMatch(/_navSwitchId/);
+  });
+});
+
+// Helper: extract a function body by name (brace-counting)
+function extractFnBody(code, funcName) {
+  const start = code.indexOf('function ' + funcName);
+  if (start === -1) return '';
+  let depth = 0;
+  let started = false;
+  let body = '';
+  for (let i = start; i < code.length; i++) {
+    if (code[i] === '{') { depth++; started = true; }
+    if (code[i] === '}') { depth--; }
+    if (started) body += code[i];
+    if (started && depth === 0) break;
+  }
+  return body;
+}

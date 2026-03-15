@@ -74,6 +74,7 @@ function _stewardHeader(container, title, subtitle) {
     }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
       AppState.isDark = !AppState.isDark;
+      try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
       ThemeEngine.applyTheme(ThemeEngine.getTheme('steward', AppState.isDark));
       renderStewardDashboard(document.getElementById('app'));
     }}, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
@@ -571,7 +572,7 @@ function renderBottomNav(container, role, activeTab) {
         iconWrap.appendChild(el('span', {
           style: {
             position: 'absolute', top: '-4px', right: '-6px',
-            background: 'var(--accent)', color: '#000',
+            background: 'var(--accent)', color: '#fff',
             fontSize: '9px', fontWeight: '700', borderRadius: '8px',
             padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
           }
@@ -586,7 +587,7 @@ function renderBottomNav(container, role, activeTab) {
         iconWrap.appendChild(el('span', {
           style: {
             position: 'absolute', top: '-4px', right: '-6px',
-            background: 'var(--warning, #f59e0b)', color: '#000',
+            background: 'var(--warning, #f59e0b)', color: '#fff',
             fontSize: '9px', fontWeight: '700', borderRadius: '8px',
             padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
           }
@@ -2236,13 +2237,13 @@ function renderSurveyTracking(appContainer) {
           kpiWrap.innerHTML = '';
           if (!summary || !summary.sections) return;
           var sections = summary.sections;
-          var topSections = ['OVERALL_SAT','STEWARD_3A','CHAPTER','LEADERSHIP','CONTRACT'];
-          var hasAny = topSections.some(function(k) { return sections[k] && sections[k].avg !== null; });
+          var sectionKeys = Object.keys(sections);
+          var hasAny = sectionKeys.some(function(k) { return sections[k] && sections[k].avg !== null; });
           if (!hasAny || summary.responseCount < 5) return;
 
           kpiWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Section Averages (1\u201310)'));
           var kpiRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-          topSections.forEach(function(key) {
+          sectionKeys.forEach(function(key) {
             var s = sections[key];
             if (!s || s.avg === null) return;
             var color = s.avg < 4 ? 'var(--danger)' : s.avg < 6 ? 'var(--warning)' : 'var(--success)';
@@ -2643,7 +2644,7 @@ function renderStewardMore(appContainer) {
         } else if (tc > 0) {
           item.appendChild(el('span', {
             style: {
-              background: 'var(--accent)', color: '#000',
+              background: 'var(--accent)', color: '#fff',
               fontSize: '10px', fontWeight: '700', borderRadius: '10px',
               padding: '2px 7px', whiteSpace: 'nowrap', alignSelf: 'center',
             }
@@ -2656,7 +2657,7 @@ function renderStewardMore(appContainer) {
         if (qaU > 0) {
           item.appendChild(el('span', {
             style: {
-              background: 'var(--warning, #f59e0b)', color: '#000',
+              background: 'var(--warning, #f59e0b)', color: '#fff',
               fontSize: '10px', fontWeight: '700', borderRadius: '10px',
               padding: '2px 7px', whiteSpace: 'nowrap', alignSelf: 'center',
             }

@@ -78,6 +78,7 @@ function _memberHeader(container, title, subtitle) {
     }
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
       AppState.isDark = !AppState.isDark;
+      try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
       ThemeEngine.applyTheme(ThemeEngine.getTheme('member', AppState.isDark));
       renderMemberHome(document.getElementById('app'));
     }}, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));

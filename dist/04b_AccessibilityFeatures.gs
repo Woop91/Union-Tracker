@@ -184,15 +184,17 @@ var COMFORT_VIEW_CONFIG = {
   PASTEL: { background: '#fef9e7', header: '#85929e', accent: '#7fb3d5' }
 };
 
-// Theme Configuration
+// Theme Configuration — delegates to THEME_PRESETS (03_UIComponents.gs) for unified keys
 var THEME_CONFIG = {
   THEMES: {
-    LIGHT: { name: 'Light', icon: '☀️', background: '#ffffff', headerBackground: '#1a73e8', headerText: '#ffffff', evenRow: '#f8f9fa', oddRow: '#ffffff', text: '#202124', accent: '#1a73e8' },
-    DARK: { name: 'Dark', icon: '🌙', background: '#202124', headerBackground: '#35363a', headerText: '#e8eaed', evenRow: '#292a2d', oddRow: '#202124', text: '#e8eaed', accent: '#8ab4f8' },
-    PURPLE: { name: 'Purple', icon: '💜', background: '#ffffff', headerBackground: '#5B4B9E', headerText: '#ffffff', evenRow: '#E8E3F3', oddRow: '#ffffff', text: '#1F2937', accent: '#6B5CA5' },
-    GREEN: { name: 'Union Green', icon: '💚', background: '#ffffff', headerBackground: '#059669', headerText: '#ffffff', evenRow: '#D1FAE5', oddRow: '#ffffff', text: '#1F2937', accent: '#10B981' }
+    'default': { name: 'Dark Slate', icon: '🌑', headerBackground: '#1e293b' },
+    'union-blue': { name: 'Union Blue', icon: '💙', headerBackground: '#1e40af' },
+    'forest': { name: 'Forest Green', icon: '💚', headerBackground: '#166534' },
+    'midnight': { name: 'Midnight Purple', icon: '💜', headerBackground: '#581c87' },
+    'crimson': { name: 'Crimson', icon: '❤️', headerBackground: '#991b1b' },
+    'ocean': { name: 'Ocean Teal', icon: '🌊', headerBackground: '#115e59' }
   },
-  DEFAULT_THEME: 'LIGHT'
+  DEFAULT_THEME: 'default'
 };
 
 // ==================== COMFORT VIEW SETTINGS ====================
@@ -678,7 +680,7 @@ function showThemeManager() {
       '<div style="height:20px;background:' + t.headerBackground + ';border-radius:4px;margin-top:10px"></div></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;margin:5px}button.sec{background:#6c757d}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0}</style></head><body><div class="container"><h2>🎨 Theme Manager</h2><div class="grid">' + themeCards + '</div><button onclick="apply()">✅ Apply Theme</button><button class="sec" onclick="google.script.host.close()">Close</button></div><script>var sel="' + current + '";function select(k){sel=k;document.querySelectorAll(".grid>div").forEach(function(d){d.style.border="3px solid transparent"});event.currentTarget.style.border="3px solid #1a73e8"}function apply(){google.script.run.withSuccessHandler(function(){alert("Theme applied!");google.script.host.close()}).applyTheme(sel,"all")}</script></body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;margin:5px}button.sec{background:#6c757d}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0}</style></head><body><div class="container"><h2>🎨 Theme Manager</h2><div class="grid">' + themeCards + '</div><button onclick="apply()">✅ Apply Theme</button><button class="sec" onclick="google.script.host.close()">Close</button></div><script>var sel="' + current + '";function select(k){sel=k;document.querySelectorAll(".grid>div").forEach(function(d){d.style.border="3px solid transparent"});event.currentTarget.style.border="3px solid #1a73e8"}function apply(){google.script.run.withSuccessHandler(function(){alert("Theme applied!");google.script.host.close()}).applyThemePreset(sel)}</script></body></html>'
   ).setWidth(450).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, '🎨 Theme Manager');
 }

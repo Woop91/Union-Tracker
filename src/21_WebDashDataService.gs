@@ -2951,14 +2951,9 @@ var DataService = (function () {
         overall = secs['OVERALL_SAT'].avg;
       }
 
-      // Categories in display order — skip sections with no data
-      var ORDER = [
-        'OVERALL_SAT', 'STEWARD_3A', 'STEWARD_3B', 'CHAPTER',
-        'LEADERSHIP', 'CONTRACT', 'REPRESENTATION',
-        'COMMUNICATION', 'MEMBER_VOICE', 'VALUE_ACTION', 'SCHEDULING'
-      ];
+      // Categories dynamically from summary — skip sections with no data
       var categories = [];
-      ORDER.forEach(function(key) {
+      Object.keys(secs).forEach(function(key) {
         var s = secs[key];
         if (s && s.avg !== null && s.count > 0) {
           categories.push({ name: s.name, avg: s.avg });
@@ -3967,6 +3962,22 @@ function dataMarkWelcomeDismissed(sessionToken) {
  * Simple hash of email for property key (avoids special chars in key names).
  * @private
  */
+/**
+ * Webapp endpoint: apply a color theme (updates both sheets and webapp accent).
+ * Any authenticated user can set their own theme.
+ */
+function dataApplyColorTheme(sessionToken, themeKey) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { success: false, message: 'Not authenticated.' };
+  if (!THEME_PRESETS || !THEME_PRESETS[themeKey]) return { success: false, message: 'Unknown theme.' };
+  var preset = THEME_PRESETS[themeKey];
+  saveVisualSetting('theme', themeKey);
+  if (preset.accentHue !== undefined) {
+    saveVisualSetting('accentHue', preset.accentHue);
+  }
+  return { success: true, themeKey: themeKey, accentHue: preset.accentHue || 250 };
+}
+
 function _welcomeEmailHash(email) {
   var hash = 0;
   var str = String(email).toLowerCase();

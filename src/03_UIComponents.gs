@@ -599,7 +599,9 @@ var THEME_PRESETS = {
     altRow: '#f8fafc',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 215,
+    emoji: '🌑'
   },
   'union-blue': {
     name: 'Union Blue',
@@ -608,7 +610,9 @@ var THEME_PRESETS = {
     altRow: '#eff6ff',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 225,
+    emoji: '💙'
   },
   'forest': {
     name: 'Forest Green',
@@ -617,7 +621,9 @@ var THEME_PRESETS = {
     altRow: '#f0fdf4',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 148,
+    emoji: '💚'
   },
   'charcoal': {
     name: 'Charcoal',
@@ -626,7 +632,9 @@ var THEME_PRESETS = {
     altRow: '#f3f4f6',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 218,
+    emoji: '⬛'
   },
   'midnight': {
     name: 'Midnight Purple',
@@ -635,7 +643,9 @@ var THEME_PRESETS = {
     altRow: '#faf5ff',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 271,
+    emoji: '💜'
   },
   'crimson': {
     name: 'Crimson',
@@ -644,7 +654,9 @@ var THEME_PRESETS = {
     altRow: '#fef2f2',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 0,
+    emoji: '❤️'
   },
   'steel': {
     name: 'Steel Gray',
@@ -653,7 +665,9 @@ var THEME_PRESETS = {
     altRow: '#f1f5f9',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 215,
+    emoji: '🩶'
   },
   'ocean': {
     name: 'Ocean Teal',
@@ -662,7 +676,9 @@ var THEME_PRESETS = {
     altRow: '#f0fdfa',
     font: 'Roboto',
     fontSize: 10,
-    headerSize: 11
+    headerSize: 11,
+    accentHue: 175,
+    emoji: '🌊'
   }
 };
 
@@ -734,8 +750,36 @@ function applyThemePreset(presetKey) {
   }
 
   saveVisualSetting('theme', presetKey);
+  // Persist accentHue so the webapp picks it up on next load
+  var preset = THEME_PRESETS[presetKey];
+  if (preset.accentHue !== undefined) {
+    saveVisualSetting('accentHue', preset.accentHue);
+  }
   APPLY_SYSTEM_THEME();
-  SpreadsheetApp.getActiveSpreadsheet().toast('Applied "' + THEME_PRESETS[presetKey].name + '" theme to all tabs!', 'Theme', 3);
+  SpreadsheetApp.getActiveSpreadsheet().toast('Applied "' + preset.name + '" theme to all tabs!', 'Theme', 3);
+}
+
+/**
+ * Returns the user's saved color theme key and accentHue.
+ * Used by the webapp to sync sheet theme ↔ webapp accent.
+ * @returns {{ themeKey: string, accentHue: number }}
+ */
+function getUserColorTheme() {
+  var themeKey = getCurrentTheme();
+  var preset = THEME_PRESETS[themeKey] || THEME_PRESETS['default'];
+  return { themeKey: themeKey, accentHue: preset.accentHue || 250 };
+}
+
+/**
+ * Returns THEME_PRESETS metadata for the webapp color theme picker.
+ * @returns {Array<{ key: string, name: string, emoji: string, headerBg: string, accentHue: number }>}
+ */
+function getColorThemeList() {
+  var keys = Object.keys(THEME_PRESETS);
+  return keys.map(function(key) {
+    var p = THEME_PRESETS[key];
+    return { key: key, name: p.name, emoji: p.emoji || '', headerBg: p.headerBg, accentHue: p.accentHue };
+  });
 }
 
 /**
@@ -774,6 +818,7 @@ function saveVisualSetting(setting, value) {
  */
 function applyDashboardTheme(theme) {
   saveVisualSetting('theme', theme);
+  APPLY_SYSTEM_THEME();
   SpreadsheetApp.getActiveSpreadsheet().toast('Theme changed to ' + theme, 'Theme', 2);
 }
 

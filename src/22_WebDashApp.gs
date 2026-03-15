@@ -180,6 +180,10 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     sharePhone: userRecord.sharePhone === true,  // steward phone opt-in; false if column absent
   };
 
+  // Fetch user's color theme for unified sheet↔webapp theming
+  var colorThemeData = {};
+  try { colorThemeData = getUserColorTheme(); } catch (_e) { colorThemeData = { themeKey: 'default', accentHue: 250 }; }
+
   template.pageData = JSON.stringify({
     view: role === 'steward' || role === 'both' ? 'steward' : 'member',
     config: _sanitizeConfig(config),
@@ -188,6 +192,8 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     sessionToken: sessionToken || null,
     initialTab: initialTab || null,
     webAppUrl: _getWebAppUrlSafe(),
+    colorTheme: colorThemeData.themeKey || 'default',
+    colorThemes: (typeof getColorThemeList === 'function') ? getColorThemeList() : [],
   });
 
   return template.evaluate()
@@ -233,11 +239,20 @@ function _serveError(config, type, detail) {
  * Strips internal-only fields from config before sending to client.
  */
 function _sanitizeConfig(config) {
+  // Override accentHue with user's saved color theme preference if set
+  var userHue = config.accentHue;
+  try {
+    var savedHue = PropertiesService.getUserProperties().getProperty('visual_accentHue');
+    if (savedHue) {
+      var parsed = JSON.parse(savedHue);
+      if (typeof parsed === 'number' && parsed >= 0 && parsed <= 360) userHue = parsed;
+    }
+  } catch (_e) { /* keep default */ }
   return {
     orgName: config.orgName,
     orgAbbrev: config.orgAbbrev,
     logoInitials: config.logoInitials,
-    accentHue: config.accentHue,
+    accentHue: userHue,
     stewardLabel: config.stewardLabel,
     memberLabel: config.memberLabel,
     magicLinkExpiryDays: config.magicLinkExpiryDays,

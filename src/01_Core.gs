@@ -589,18 +589,18 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.28.6';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.28.8';
   var parts = ver.split('.');
   return {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
     MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 28,
-    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 1,
+    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 8,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-14',
-    CODENAME: 'Union Stats + Tab Reviews',
-    codename: 'Union Stats + Tab Reviews'
+    BUILD_DATE: '2026-03-15',
+    CODENAME: 'Unified Theme System',
+    codename: 'Unified Theme System'
   };
 })();
 
@@ -611,7 +611,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
-  { version: '4.28.6', date: '2026-03-15', codename: 'Gmail Scope Test + Auth Sweep', changes: 'Fix test_emailsend_gmailAppAccessible: gmail.send scope has no side-effect-free probe method (getAliases needs gmail.readonly, createDraft needs gmail.compose). Replaced with structural check: GmailApp service availability + ScriptApp.getOAuthToken() validation. Full auth sweep: all 100+ web endpoints verified, all 10 OAuth scopes confirmed correct, no missing auth gates.' },
+  { version: '4.28.7', date: '2026-03-15', codename: 'Gmail Scope Test + Auth Sweep', changes: 'Fix gmailAppAccessible test (gmail.send has no side-effect-free probe). Fix testRunnerEndpointsGated false failure (SSO bypasses null-token rejection). 4 new authsweep tests for wq/qa/tl/fs endpoints. Full auth sweep: 100+ endpoints verified, 10 scopes confirmed, no auth gaps.' },
   { version: '4.28.2', date: '2026-03-14', codename: 'Union Stats + Tab Reviews', changes: 'Tab review merge: Polls — null sessionToken fixed in 5 client calls, server-side dues gate, rate limiting, confirmation dialog, 30+ new tests. POMS — steward routing fix, description correction, auth check on getPOMSReferenceHtml. Union Stats — member-safe grievance/hot-spots endpoints, membership sub-tab enrichment, client-side caching, engagement KPI fix, redundant sheet read fix, showLoading consistency, dataAssignSteward auth fix, 8 structural guard tests. Workload — crash-safe refresh, atomic rate limiting, dynamic bar chart scaling, WT_CAT_KEY_LABELS, auto-save draft, last-submitted indicator, 44 new tests.' },
   { version: '4.26.0', date: '2026-03-13', codename: 'Diagnostics + Quick Setup Menu + Contrast Fix', changes: 'Fix #5: TestRunner controls card contrast upgraded (accent border, card background, stronger shadow). Fix #7: Case Analytics deprecated menu item removed (showInteractiveDashboardTab). Fix #14: New Quick Setup (All Init/Sync) consolidated admin menu with all initialize, trigger install, sync, refresh, and setup functions in one place. Fix #15/#16: Workload Archive removed from DIAGNOSE_SETUP skipKeys so diagnostics detects it and repair creates it via setupHiddenSheets. Fix #17: TestRunner.fail already exists; MEMBER_COLS.ROLE (col 44) needs sheet column addition; remaining test failures are deployment-related — run clasp push.' },
   { version: '4.25.15', date: '2026-03-13', codename: 'Survey UX + Insights Enrichment + Menu Consolidation', changes: 'TestRunner dark-mode contrast fix. Survey default scope changed to location. Quick Setup & Sync duplicate menu removed (35 lines). Proximity badge pills on nearby survey members. Prev/Next pagination replaces Show All buttons. Enhanced participation stats (new member completion fraction, declining avg rate). withdrawnCount added to getGrievanceStats. newMembersLast90 + byHireMonth added to getMembershipStats. New insight cards: OVERDUE CASES, NEW MEMBERS, overtime averages, employment mix. Hash-based detail navigation with browser back-button support.' },

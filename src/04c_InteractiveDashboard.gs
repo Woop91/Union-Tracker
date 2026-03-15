@@ -1557,8 +1557,7 @@ function getInteractiveAnalyticsData() {
           if (overallSection && overallSection.avg !== null) {
             data.surveyResults.avgSatisfaction = overallSection.avg.toFixed(1);
           }
-          var sectionOrder = ['OVERALL_SAT','STEWARD_3A','CHAPTER','LEADERSHIP','CONTRACT','COMMUNICATION','MEMBER_VOICE','VALUE_ACTION'];
-          sectionOrder.forEach(function(key) {
+          Object.keys(summary.sections).forEach(function(key) {
             var sec = summary.sections[key];
             if (sec) {
               data.surveyResults.bySection.push({ name: sec.name, avg: sec.avg !== null ? parseFloat(sec.avg) : 0 });

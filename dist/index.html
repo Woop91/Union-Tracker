@@ -188,17 +188,19 @@
       var themes = {
         steward: {
           dark: {
-            bg: '#141414', surface: '#1e1e1e', raised: '#262626',
-            text: '#e0e0e0', muted: '#6b6b6b',
+bg: '#000000', surface: '#0a0a0a', surfaceAlt: 'rgba(255,255,255,0.06)', raised: '#111111',
+            text: '#e0e0e0', 'text-secondary': '#999999', muted: '#6b6b6b',
+            card: '#0a0a0a', 'bg-tertiary': '#111111',
             success: '#4ade80', warning: '#facc15', danger: '#ef4444', info: '#60a5fa',
-            border: '#2a2a2a', radius: '10px',
+            border: '#1a1a1a', radius: '10px',
             fontBody: "'JetBrains Mono', monospace",
             fontDisplay: "'Space Grotesk', sans-serif",
             mode: 'dark',
           },
           light: {
-            bg: '#f2f2f5', surface: '#ffffff', raised: '#f8f8fa',
-            text: '#1a1a2e', muted: '#8888a0',
+bg: '#f2f2f5', surface: '#ffffff', surfaceAlt: '#f5f5f5', raised: '#f8f8fa',
+            text: '#1a1a2e', 'text-secondary': '#5c5c7a', muted: '#8888a0',
+            card: '#ffffff', 'bg-tertiary': '#e8e8ee',
             success: '#16a34a', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
             border: '#e2e2ea', radius: '10px',
             fontBody: "'JetBrains Mono', monospace",
@@ -208,8 +210,9 @@
         },
         member: {
           dark: {
-            bg: '#0c0c1d', surface: 'rgba(255,255,255,0.05)', raised: 'rgba(255,255,255,0.08)',
-            text: '#eeedf5', muted: '#7d7b96',
+bg: '#000000', surface: 'rgba(255,255,255,0.04)', surfaceAlt: 'rgba(255,255,255,0.06)', raised: 'rgba(255,255,255,0.07)',
+            text: '#eeedf5', 'text-secondary': '#a09db8', muted: '#7d7b96',
+            card: 'rgba(255,255,255,0.04)', 'bg-tertiary': 'rgba(255,255,255,0.07)',
             success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
             border: 'rgba(255,255,255,0.08)', radius: '20px',
             fontBody: "'Plus Jakarta Sans', sans-serif",
@@ -217,8 +220,9 @@
             mode: 'dark',
           },
           light: {
-            bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', raised: 'rgba(255,255,255,0.95)',
-            text: '#1a1a2e', muted: '#7d7b96',
+bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#f0f0f0', raised: 'rgba(255,255,255,0.95)',
+            text: '#1a1a2e', 'text-secondary': '#5c5c7a', muted: '#7d7b96',
+            card: 'rgba(255,255,255,0.85)', 'bg-tertiary': 'rgba(0,0,0,0.04)',
             success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
             border: 'rgba(0,0,0,0.08)', radius: '20px',
             fontBody: "'Plus Jakarta Sans', sans-serif",
@@ -259,9 +263,17 @@
         }
       }
 
+      /** Update accent palette with a new hue and re-apply current theme */
+      function updatePalette(hue) {
+        palette = generatePalette(hue);
+        var t = getTheme(AppState.activeRole || 'member', AppState.isDark);
+        applyTheme(t);
+      }
+
       return {
         getTheme: getTheme,
         applyTheme: applyTheme,
+        updatePalette: updatePalette,
         palette: palette,
       };
     })();
@@ -638,8 +650,10 @@
       view: CURRENT_VIEW,
       role: CURRENT_USER ? CURRENT_USER.role : null,
       activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
-      isDark: true,
+      isDark: (function() { try { var v = localStorage.getItem('dds_isDark'); return v === null ? true : v === 'true'; } catch(e) { return true; } })(),
       navTheme: (function() { try { return localStorage.getItem('dds_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
+      colorTheme: (PAGE_DATA.colorTheme || 'default'),
+      colorThemes: (PAGE_DATA.colorThemes || []),
       user: CURRENT_USER,
       cases: [],
       kpis: null,
@@ -1050,6 +1064,7 @@
         className: 'sidebar-item',
         onClick: function() {
           AppState.isDark = !AppState.isDark;
+          try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
           var t = ThemeEngine.getTheme(AppState.activeRole || 'member', AppState.isDark);
           ThemeEngine.applyTheme(t);
           _handleTabNav(role, activeTab);
@@ -1106,6 +1121,53 @@
         }
         pickerWrap.appendChild(pickerPanel);
         sidebar.appendChild(pickerWrap);
+      })();
+      // Color Theme Picker — unified sheet + webapp accent color
+      (function() {
+        if (!AppState.colorThemes || !AppState.colorThemes.length) return;
+        var ctWrap = el('div');
+        var currentCT = AppState.colorThemes.filter(function(ct) { return ct.key === AppState.colorTheme; })[0];
+        var ctToggle = el('div', {
+          className: 'sidebar-item',
+          onClick: function() {
+            var panel = ctWrap.querySelector('.nav-theme-picker');
+            if (panel) panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+          }
+        }, [
+          el('span', { className: 'sidebar-item-icon' }, '\uD83C\uDF08'),
+          el('span', null, 'Color: ' + (currentCT ? currentCT.emoji : ''))
+        ]);
+        ctWrap.appendChild(ctToggle);
+        var ctPanel = el('div', { className: 'nav-theme-picker', style: { display: 'none', padding: '4px 12px 8px' } });
+        AppState.colorThemes.forEach(function(ct) {
+          var isActive = AppState.colorTheme === ct.key;
+          var item = el('div', {
+            className: 'nav-theme-picker-item' + (isActive ? ' active' : ''),
+            onClick: function() {
+              // Update accent palette instantly
+              ThemeEngine.updatePalette(ct.accentHue);
+              AppState.colorTheme = ct.key;
+              // Persist to server (applies to sheets too)
+              serverCall()
+                .withSuccessHandler(function() {})
+                .withFailureHandler(function() {})
+                .dataApplyColorTheme(SESSION_TOKEN, ct.key);
+              _handleTabNav(role, activeTab);
+            }
+          });
+          item.appendChild(el('span', { className: 'ntp-emoji' }, ct.emoji));
+          var info = el('div');
+          info.appendChild(el('div', { className: 'ntp-label' }, ct.name));
+          var hueDesc = 'Hue ' + ct.accentHue + '\u00B0';
+          info.appendChild(el('div', { className: 'ntp-desc' }, hueDesc));
+          item.appendChild(info);
+          var swatch = el('span', { style: { marginLeft: 'auto', width: '16px', height: '16px', borderRadius: '50%', background: ct.headerBg, flexShrink: '0' } });
+          item.appendChild(swatch);
+          if (isActive) item.appendChild(el('span', { className: 'ntp-check' }, '\u2713'));
+          ctPanel.appendChild(item);
+        });
+        ctWrap.appendChild(ctPanel);
+        sidebar.appendChild(ctWrap);
       })();
       sidebar.appendChild(el('div', {
         className: 'sidebar-item',
@@ -1171,10 +1233,12 @@
     }
 
     function renderOrgChart(appContainer, role) {
+      var mySwitch = _navSwitchId;
       renderPageLayout(appContainer, role, 'orgchart', function(container) {
         showLoading(container);
         google.script.run
           .withSuccessHandler(function(html) {
+            if (_navSwitchId !== mySwitch) return; // user already navigated away
             container.innerHTML = '';
             var wrap = el('div');
             wrap.innerHTML = html;
@@ -1203,6 +1267,7 @@
      * Contains 78 POMS sections, 17 flowcharts, search, ratings, bookmarks, notes.
      */
     function renderPOMSReference(appContainer, role) {
+      var mySwitch = _navSwitchId;
       renderPageLayout(appContainer, role, 'poms', function(container) {
         showLoading(container);
         // Set container to fill height for POMS app shell
@@ -1211,6 +1276,7 @@
         container.style.overflow = 'hidden';
         google.script.run
           .withSuccessHandler(function(html) {
+            if (_navSwitchId !== mySwitch) return; // user already navigated away
             container.innerHTML = '';
             var wrap = el('div');
             wrap.style.height = '100%';
@@ -1264,8 +1330,11 @@
       }
     }
 
+    var _navSwitchId = 0; // monotonic counter to discard stale tab switches
+
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
+      var switchId = ++_navSwitchId; // claim this switch; any older in-flight switch is now stale
       AppState.activeTab = tabId;
 
       // Normalize tab aliases (steward home/cases both render the same dashboard)
@@ -1283,8 +1352,8 @@
       _navProgressStart();
 
       // Handle "More" menus for both roles (mobile bottom-nav)
-      if (tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
-      if (tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); return; }
+      if (tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
+      if (tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
 
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
@@ -1296,14 +1365,19 @@
           return;
         }
         renderOrgChart(app, role);
+        _activePane = _layoutCache.content;
         _navProgressDone();
         return;
       }
       if (tabId === 'poms') {
         renderPOMSReference(app, role);
+        _activePane = _layoutCache.content;
         _navProgressDone();
         return;
       }
+
+      // ── Stale-switch guard: a newer click already fired, bail out ──
+      if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 
       // ── PANE CACHE: check if we already have a rendered pane for this tab ──
       var isCacheable = !_ALWAYS_FRESH_TABS[cacheId];

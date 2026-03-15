@@ -4,10 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.28.8] - 2026-03-15
+
+### Added
+- **Unified color theme system** — Sheet themes and webapp accent colors now linked. Each `THEME_PRESETS` entry carries an `accentHue` (and emoji). Selecting a color theme from the webapp sidebar updates both the webapp accent palette instantly and persists the sheet theme server-side via `dataApplyColorTheme()`. On next page load, `_sanitizeConfig()` reads the user's saved `accentHue` from UserProperties to override the default.
+- **Color Theme picker in webapp sidebar** — New expandable panel (rainbow icon) lists all 8 color themes with name, hue, and header color swatch. Clicking applies instantly (no reload) and saves to server.
+- **`ThemeEngine.updatePalette(hue)`** — New method regenerates accent palette from a hue value and re-applies the current theme. Used by the color theme picker for instant visual feedback.
+- **`getUserColorTheme()` / `getColorThemeList()`** — Server functions to retrieve the user's current color theme and list of available themes. Theme list passed in page data for sidebar rendering.
+- **`dataApplyColorTheme(sessionToken, themeKey)`** — Auth-gated webapp endpoint for persisting color theme selection.
+
+## [4.28.7] - 2026-03-15
+
+### Fixed
+- **OLED dark mode** — Dark mode backgrounds changed to pure black (`#000000`) for both steward and member roles for true OLED compatibility (saves battery, deeper blacks)
+- **Dark mode text contrast** — Eliminated all `#000` (black) text in dark mode contexts: badge notification counts on accent/warning backgrounds now use `#fff`
+- **Notification type badges** — Added dark mode overrides for system/announcement/steward/deadline notification badges (were using light backgrounds with dark text, now use translucent colored backgrounds with light text)
+- **Missing CSS variables** — Added `--text-secondary`, `--card`, and `--bg-tertiary` to ThemeEngine for all 4 theme variants (steward/member × dark/light), eliminating poor-contrast fallback values
+- **Dark mode not persisted** — `AppState.isDark` toggle now saved/read from `localStorage` across all three views (index, steward, member). Previously reset to dark on every page reload.
+- **`applyDashboardTheme()` didn't apply** — Menu dialog theme selector saved preference but never called `APPLY_SYSTEM_THEME()`. Sheets kept old styling until manual re-apply.
+- **Two conflicting sheet theme systems** — `THEME_CONFIG.THEMES` (04b) used uppercase keys (`LIGHT`/`DARK`/`PURPLE`/`GREEN`) that conflicted with `THEME_PRESETS` (03) lowercase keys. Unified `THEME_CONFIG` to use `THEME_PRESETS` keys; `showThemeManager()` now calls `applyThemePreset()` for consistent behavior.
+- **`--surfaceAlt` CSS variable never set** — Added `surfaceAlt` to all 4 ThemeEngine theme definitions (steward dark/light, member dark/light). Previously relied on CSS fallback values.
+
 ## [4.28.6] - 2026-03-15
 
 ### Fixed
 - **Gmail scope test false failure (correct fix)** — `test_emailsend_gmailAppAccessible` was failing because both `GmailApp.getAliases()` (needs `gmail.readonly`) and `GmailApp.createDraft()` (needs `gmail.compose`) require scopes broader than `gmail.send`. The `gmail.send` scope ONLY supports `sendEmail()` — no side-effect-free probe method exists. Replaced with structural verification: GmailApp service availability + `ScriptApp.getOAuthToken()` token check. Runtime send verification deferred to `testAuthEmailSend()`.
+- **Authsweep testRunnerEndpointsGated false failure** — `test_authsweep_testRunnerEndpointsGated` expected `dataRunTests(null)` to reject with `success:false`, but SSO via `Session.getActiveUser().getEmail()` is active when the TestRunner runs in the web app, so `_resolveCallerEmail(null)` returns the steward's email via SSO, bypassing the null token. Rewritten to verify auth gate existence structurally instead of testing null-token rejection (impossible when SSO is active).
+
+### Added
+- **4 new authsweep tests** — `test_authsweep_wqEndpointsGated` (WeeklyQuestions: 8 gated + 2 utility), `test_authsweep_qaEndpointsGated` (QA Forum: 9 gated), `test_authsweep_tlEndpointsGated` (Timeline: 10 gated), `test_authsweep_fsEndpointsGated` (Failsafe: 9 gated + 1 trigger-only). Total authsweep coverage: 10 tests, ~100 endpoints verified.
 
 ### Verified (Auth Sweep)
 - All 10 OAuth scopes in `appsscript.json` match actual API usage — no missing or unused scopes

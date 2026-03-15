@@ -1140,6 +1140,7 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataGetWorkloadSummaryStats',     // reads live sheet data directly
     'dataSendDirectMessage',           // sends email + Drive log directly (calls DataService helpers deeper than 12-line window)
     'dataEnsureSheetsIfNeeded',        // calls _ensureAllSheetsInternal() + PropertiesService directly (fire-and-forget init)
+    'dataApplyColorTheme',             // saves theme to UserProperties directly (unified theme system)
   ];
 
   wrappers
