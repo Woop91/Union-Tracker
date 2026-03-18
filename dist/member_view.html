@@ -18,13 +18,15 @@ renderMemberHome(container);
 _checkDeepLink('member');
 return;
 }
-DataCache.cachedCall('memberBadgeCounts', 'dataGetBadgeCounts', [SESSION_TOKEN], function(counts) {
-AppState.notificationCount = (counts && counts.notificationCount) || 0;
-}, function() {
-AppState.notificationCount = 0;
-});
-DataCache.cachedCall('memberGrievances', 'dataGetMemberGrievances', [SESSION_TOKEN], function(grievances) {
-AppState.grievances = grievances || [];
+DataCache.cachedCall('memberBatch', 'dataGetMemberBatchData', [SESSION_TOKEN], function(mb) {
+mb = mb || {};
+AppState.grievances = mb.grievances || [];
+AppState.notificationCount = mb.notificationCount || 0;
+AppState.memberTaskCount = mb.memberTaskCount || 0;
+if (mb.history) DataCache.set('memberHistory_' + CURRENT_USER.email, mb.history);
+if (mb.stewardInfo) DataCache.set('stewardInfo_' + CURRENT_USER.email, mb.stewardInfo);
+if (mb.surveyStatus) DataCache.set('surveyStatus_' + CURRENT_USER.email, mb.surveyStatus);
+if (mb.events && Array.isArray(mb.events)) DataCache.set('events', mb.events);
 AppState.loading = false;
 renderMemberHome(container);
 _checkDeepLink('member');
@@ -3154,7 +3156,7 @@ container.appendChild(calMgmtBar);
 var content = el('div', { className: 'content' });
 showLoading(content, 'list');
 container.appendChild(content);
-serverCall().withSuccessHandler(function(events) {
+DataCache.cachedCall('eventsFull', 'dataGetUpcomingEvents', [SESSION_TOKEN, 20], function(events) {
 content.innerHTML = '';
 if (events && events._notConfigured) {
 var cfgCard = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
@@ -3203,10 +3205,10 @@ style: { display: 'inline-block', fontSize: '12px', color: 'var(--accent)', font
 }, '\uD83D\uDCC5 Add to My Calendar'));
 content.appendChild(card);
 });
-}).withFailureHandler(function() {
+}, function() {
 content.innerHTML = '';
 content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load events.'));
-}).dataGetUpcomingEvents(SESSION_TOKEN, 20);
+});
 });
 }
 function renderUnionStatsPage(appContainer) {

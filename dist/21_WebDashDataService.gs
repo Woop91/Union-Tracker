@@ -3485,6 +3485,17 @@ function dataGetBatchData(sessionToken) {
 }
 
 /**
+ * v4.31.1 — Returns member batch data for dual-role users switching to member view.
+ * dataGetBatchData always returns steward data for role=both users, so this endpoint
+ * forces member batch data regardless of server-side role.
+ */
+function dataGetMemberBatchData(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return {};
+  return DataService.getBatchData(e, 'member');
+}
+
+/**
  * Lightweight check + auto-init of missing sheets.
  * Called fire-and-forget from client AFTER view renders — never blocks initial load.
  * Version-keyed Script Property prevents re-running on every page load.
