@@ -18,25 +18,22 @@ renderMemberHome(container);
 _checkDeepLink('member');
 return;
 }
-serverCall().withSuccessHandler(function(counts) {
+DataCache.cachedCall('memberBadgeCounts', 'dataGetBadgeCounts', [SESSION_TOKEN], function(counts) {
 AppState.notificationCount = (counts && counts.notificationCount) || 0;
-}).withFailureHandler(function() {
+}, function() {
 AppState.notificationCount = 0;
-}).dataGetBadgeCounts(SESSION_TOKEN);
-serverCall()
-.withSuccessHandler(function(grievances) {
+});
+DataCache.cachedCall('memberGrievances', 'dataGetMemberGrievances', [SESSION_TOKEN], function(grievances) {
 AppState.grievances = grievances || [];
 AppState.loading = false;
 renderMemberHome(container);
 _checkDeepLink('member');
-})
-.withFailureHandler(function() {
+}, function() {
 AppState.grievances = [];
 AppState.loading = false;
 renderMemberHome(container);
 _checkDeepLink('member');
-})
-.dataGetMemberGrievances(SESSION_TOKEN);
+});
 }
 function _memberHeader(container, title, subtitle) {
 var header = el('div', { className: 'page-header' });
@@ -3700,6 +3697,7 @@ onClick: function() {
 btn.disabled = true; btn.textContent = 'Voting…';
 serverCall().withSuccessHandler(function(result) {
 if (result && result.success) {
+DataCache.invalidate('pollData'); // v4.31.1: bust cache after vote
 q.hasResponded = true;
 q.stats = result.stats;
 qCard.innerHTML = '';
@@ -3750,11 +3748,11 @@ container.appendChild(content);
 }
 function _renderThisWeekPolls(target) {
 showLoading(target);
-serverCall().withSuccessHandler(function(freq) {
+DataCache.cachedCall('pollData', 'wqGetPollData', [SESSION_TOKEN], function(data) {
+target.innerHTML = '';
+var freq = (data && data.frequency) || 'weekly';
 var freqLabels = { weekly: 'each Monday', biweekly: 'every other Monday', monthly: 'on the 1st of each month' };
 var nextLabel = freqLabels[freq] || 'each Monday';
-serverCall().withSuccessHandler(function(data) {
-target.innerHTML = '';
 if (!data || !data.questions || data.questions.length === 0) {
 var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
 empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '🗳️'));
@@ -3771,26 +3769,10 @@ qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
 _renderPollVoteUI(qCard, q);
 target.appendChild(qCard);
 });
-}).withFailureHandler(function() {
+}, function() {
 target.innerHTML = '';
 target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
-}).wqGetActiveQuestions(SESSION_TOKEN);
-}).withFailureHandler(function() {
-serverCall().withSuccessHandler(function(data) {
-target.innerHTML = '';
-if (!data || !data.questions || data.questions.length === 0) {
-target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No polls this period.'));
-return;
-}
-target.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '🔒 All votes are fully anonymous'));
-data.questions.forEach(function(q) {
-var qCard = el('div', { className: 'wq-card', style: { marginBottom: '14px' } });
-qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
-_renderPollVoteUI(qCard, q);
-target.appendChild(qCard);
 });
-}).wqGetActiveQuestions(SESSION_TOKEN);
-}).wqGetPollFrequency();
 }
 function _renderPastPolls(target) {
 showLoading(target);
@@ -4069,7 +4051,8 @@ cont.appendChild(sortBar);
 var listArea = el('div');
 cont.appendChild(listArea);
 showLoading(listArea);
-serverCall().withSuccessHandler(function(result) {
+var qaCacheKey = 'qa_browse_' + currentPage + '_' + currentSort + '_' + showResolved;
+DataCache.cachedCall(qaCacheKey, 'qaGetQuestions', [SESSION_TOKEN, currentPage, 20, currentSort, showResolved], function(result) {
 listArea.innerHTML = '';
 var questions = result ? result.questions || [] : [];
 if (questions.length === 0) {
@@ -4102,10 +4085,10 @@ pageBar.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)
 if (currentPage < totalPages) pageBar.appendChild(el('button', { className: 'sub-tab', onClick: function() { currentPage++; _renderQABrowse(cont); } }, 'Next'));
 listArea.appendChild(pageBar);
 }
-}).withFailureHandler(function() {
+}, function() {
 listArea.innerHTML = '';
 listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load questions.'));
-}).qaGetQuestions(SESSION_TOKEN, currentPage, 20, currentSort, showResolved);
+});
 }
 function _renderQuestionDetail(cont, questionId) {
 cont.innerHTML = '';
@@ -4127,14 +4110,14 @@ actions.appendChild(el('button', {
 style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
 onClick: function() {
 serverCall().withSuccessHandler(function(r) {
-if (r && r.success) _renderQuestionDetail(cont, questionId);
+if (r && r.success) { DataCache.invalidatePrefix('qa_browse_'); _renderQuestionDetail(cont, questionId); }
 }).withFailureHandler(function(e) { console.error(e.message); }).qaUpvoteQuestion(SESSION_TOKEN, questionId);
 }
 }, '\u25B2 ' + q.upvoteCount));
 if (isSteward && q.status !== 'flagged') {
 actions.appendChild(el('button', {
 style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, questionId, 'flag'); }
+onClick: function() { serverCall().withSuccessHandler(function() { DataCache.invalidatePrefix('qa_browse_'); _renderQuestionDetail(cont, questionId); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, questionId, 'flag'); }
 }, 'Flag'));
 }
 if (q.status !== 'resolved' && q.status !== 'deleted' && (q.isOwner || isSteward)) {
@@ -4143,6 +4126,7 @@ style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background:
 onClick: function() {
 serverCall().withSuccessHandler(function(r) {
 if (r && r.success) {
+DataCache.invalidatePrefix('qa_browse_');
 _renderQuestionDetail(cont, questionId);
 if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
 }
@@ -4185,6 +4169,7 @@ if (!text) { ansStatus.textContent = 'Write an answer first.'; ansStatus.style.c
 ansStatus.textContent = 'Posting...'; ansStatus.style.color = 'var(--muted)';
 serverCall().withSuccessHandler(function(r) {
 if (r && r.success) {
+DataCache.invalidatePrefix('qa_browse_');
 _renderQuestionDetail(cont, questionId);
 if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
 } else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
@@ -4215,7 +4200,7 @@ var text = textInput.value.trim();
 if (!text) { statusMsg.textContent = 'Write your question first.'; statusMsg.style.color = 'var(--danger)'; return; }
 statusMsg.textContent = 'Posting...'; statusMsg.style.color = 'var(--muted)';
 serverCall().withSuccessHandler(function(r) {
-if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
+if (r && r.success) { DataCache.invalidatePrefix('qa_browse_'); if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
 else { statusMsg.textContent = r ? r.message : 'Error posting.'; statusMsg.style.color = 'var(--danger)'; }
 }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitQuestion(SESSION_TOKEN, CURRENT_USER.name || '', text, anonCheck.checked);
 }
@@ -4238,11 +4223,11 @@ card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', m
 var acts = el('div', { style: { display: 'flex', gap: '6px' } });
 acts.appendChild(el('button', {
 style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'approve'); }
+onClick: function() { serverCall().withSuccessHandler(function() { DataCache.invalidatePrefix('qa_browse_'); _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'approve'); }
 }, 'Approve'));
 acts.appendChild(el('button', {
 style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'delete'); }
+onClick: function() { serverCall().withSuccessHandler(function() { DataCache.invalidatePrefix('qa_browse_'); _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'delete'); }
 }, 'Delete'));
 card.appendChild(acts);
 cont.appendChild(card);
@@ -4257,11 +4242,11 @@ card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', m
 var acts = el('div', { style: { display: 'flex', gap: '6px' } });
 acts.appendChild(el('button', {
 style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'approve'); }
+onClick: function() { serverCall().withSuccessHandler(function() { DataCache.invalidatePrefix('qa_browse_'); _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'approve'); }
 }, 'Approve'));
 acts.appendChild(el('button', {
 style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'delete'); }
+onClick: function() { serverCall().withSuccessHandler(function() { DataCache.invalidatePrefix('qa_browse_'); _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'delete'); }
 }, 'Delete'));
 card.appendChild(acts);
 cont.appendChild(card);

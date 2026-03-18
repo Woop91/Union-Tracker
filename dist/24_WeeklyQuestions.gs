@@ -589,6 +589,23 @@ function wqGetHistory(sessionToken, page, pageSize) {
 function wqGetPoolCount() { return WeeklyQuestions.getPoolCount(); }
 function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
 function wqGetPollFrequency() { return WeeklyQuestions.getPollFrequency(); }
+
+/**
+ * v4.31.1 — Batch endpoint: returns frequency + active questions in one round-trip.
+ * Eliminates the sequential waterfall on the Polls tab.
+ */
+function wqGetPollData(sessionToken) {
+  var freq = WeeklyQuestions.getPollFrequency();
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { frequency: freq, questions: [] };
+  if (typeof DataService !== 'undefined') {
+    var rec = DataService.findUserByEmail(e);
+    if (rec && rec.duesPaying === false) return { frequency: freq, questions: [] };
+  }
+  var result = WeeklyQuestions.getActiveQuestions(e);
+  result.frequency = freq;
+  return result;
+}
 function wqSetPollFrequency(sessionToken, freq) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };

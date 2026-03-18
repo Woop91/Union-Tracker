@@ -415,7 +415,7 @@ describe('G12: All client server calls have matching server functions', () => {
           if (JS_BUILTINS.has(name)) continue;
           if (serverFunctions.has(name)) continue;
           // Skip if it looks like a client-side function (starts lowercase, common patterns)
-          if (['serverCall', 'showLoading', 'showToast', 'el', 'escHtml_'].includes(name)) continue;
+          if (['serverCall', 'showLoading', 'showToast', 'el', 'escHtml_', 'invalidate', 'invalidatePrefix', 'cachedCall'].includes(name)) continue;
 
           missing.push(`${file}:${i + 1} calls .${name}() — no matching server function`);
         }

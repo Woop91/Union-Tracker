@@ -3920,7 +3920,8 @@ function renderManagePolls(appContainer) {
 
 function _renderLivePollsSteward(container) {
   showLoading(container, 'list');
-  serverCall().withSuccessHandler(function(data) {
+  // v4.31.1: DataCache wrapping — avoids redundant server call on tab revisit
+  DataCache.cachedCall('pollData', 'wqGetPollData', [SESSION_TOKEN], function(data) {
     container.innerHTML = '';
     if (!data || !data.questions || data.questions.length === 0) {
       container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls this week. Create one in the "Create Poll" tab.'));
@@ -3939,7 +3940,7 @@ function _renderLivePollsSteward(container) {
         onClick: function() {
           closeBtn.textContent = 'Closing…'; closeBtn.disabled = true;
           serverCall().withSuccessHandler(function(result) {
-            if (result && result.success) { _renderLivePollsSteward(container); }
+            if (result && result.success) { DataCache.invalidate('pollData'); _renderLivePollsSteward(container); }
             else { closeBtn.textContent = 'Close'; closeBtn.disabled = false; }
           }).wqClosePoll(SESSION_TOKEN, q.id);
         }
@@ -3968,10 +3969,10 @@ function _renderLivePollsSteward(container) {
       card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, total + ' anonymous vote' + (total !== 1 ? 's' : '')));
       container.appendChild(card);
     });
-  }).withFailureHandler(function() {
+  }, function() {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
-  }).wqGetActiveQuestions(SESSION_TOKEN);
+  });
 }
 
 function _renderCreateStewardPoll(container) {
@@ -4003,7 +4004,7 @@ function _renderCreateStewardPoll(container) {
       serverCall().withSuccessHandler(function(result) {
         statusMsg.textContent = result && result.success ? '✅ ' + result.message : (result && result.message) || 'Error creating poll.';
         statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
-        if (result && result.success) questionInput.value = '';
+        if (result && result.success) { DataCache.invalidate('pollData'); questionInput.value = ''; }
       }).withFailureHandler(function() {
         statusMsg.textContent = 'Failed to create poll.'; statusMsg.style.color = 'var(--danger)';
       }).wqSetStewardQuestion(SESSION_TOKEN, text, opts);

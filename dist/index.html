@@ -472,6 +472,9 @@ function set(key, value, ttlMs) {
 _cache[key] = { value: value, expires: Date.now() + (ttlMs || DEFAULT_TTL) };
 }
 function invalidate(key) { if (key) delete _cache[key]; else _cache = {}; }
+function invalidatePrefix(prefix) {
+for (var k in _cache) { if (k.indexOf(prefix) === 0) delete _cache[k]; }
+}
 function has(key) { return get(key) !== undefined; }
 function cachedCall(cacheKey, fnName, args, onSuccess, onFailure, ttlMs) {
 var cached = get(cacheKey);
@@ -486,7 +489,7 @@ onSuccess(result);
 console.error('cachedCall(' + fnName + ') failed:', err);
 });
 }
-return { get: get, set: set, has: has, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
+return { get: get, set: set, has: has, invalidate: invalidate, invalidatePrefix: invalidatePrefix, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
 })();
 var _MAX_RETRIES = 2; // up to 2 retries (3 attempts total)
 var _RETRY_BASE_MS = 1500; // 1.5s, 3s backoff

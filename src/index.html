@@ -624,6 +624,11 @@
 
       function invalidate(key) { if (key) delete _cache[key]; else _cache = {}; }
 
+      /** v4.31.1: Invalidate all cache entries whose key starts with prefix */
+      function invalidatePrefix(prefix) {
+        for (var k in _cache) { if (k.indexOf(prefix) === 0) delete _cache[k]; }
+      }
+
       /** Check if a cache key has a valid (non-expired) entry */
       function has(key) { return get(key) !== undefined; }
 
@@ -650,7 +655,7 @@
         });
       }
 
-      return { get: get, set: set, has: has, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
+      return { get: get, set: set, has: has, invalidate: invalidate, invalidatePrefix: invalidatePrefix, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
     })();
 
     // ═══════════════════════════════════════
