@@ -290,12 +290,20 @@ const args = process.argv.slice(2);
 const shouldClean = args.includes('--clean');
 const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
+const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs'];
 
 if (shouldClean) {
   clean();
+} else if (validateOnly) {
+  // --validate-only: check syntax of all source files without touching dist/
+  // Used by pre-commit hook to verify code compiles without overwriting prod build.
+  const fileList = BUILD_ORDER;
+  console.log('Validate-only mode: checking syntax (dist/ unchanged)...\n');
+  validate(fileList, HTML_FILES);
+  console.log('Validation passed.\n');
 } else {
   const fileList = isProd
     ? BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f))
