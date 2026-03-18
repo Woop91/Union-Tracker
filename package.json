@@ -5,7 +5,7 @@
   "main": "build.js",
   "scripts": {
     "build": "node build.js",
-    "build:prod": "node build.js --prod",
+    "build:prod": "node build.js --prod --minify",
     "lint": "eslint \"src/**/*.gs\"",
     "lint:fix": "eslint \"src/**/*.gs\" --fix",
     "test": "npm run lint && npm run build && jest --verbose",

@@ -171,7 +171,7 @@ function build(fileList) {
     console.log(`  Copied: ${file} (${lineCount} lines)`);
   }
 
-  // Copy each .html file to dist/
+  // Copy each .html file to dist/ (with optional minification)
   for (const file of HTML_FILES) {
     const src = path.join(SRC_DIR, file);
     const dest = path.join(DIST_DIR, file);
@@ -181,11 +181,24 @@ function build(fileList) {
       continue;
     }
 
-    fs.copyFileSync(src, dest);
-    const lineCount = fs.readFileSync(src, 'utf8').split('\n').length;
-    totalLines += lineCount;
-    copiedHtml++;
-    console.log(`  Copied: ${file} (${lineCount} lines)`);
+    if (shouldMinify) {
+      const content = fs.readFileSync(src, 'utf8');
+      const minified = minifyHtml(content);
+      fs.writeFileSync(dest, minified, 'utf8');
+      const origSize = Buffer.byteLength(content, 'utf8');
+      const newSize = Buffer.byteLength(minified, 'utf8');
+      const pct = ((1 - newSize / origSize) * 100).toFixed(1);
+      const lineCount = minified.split('\n').length;
+      totalLines += lineCount;
+      copiedHtml++;
+      console.log(`  Minified: ${file} (${lineCount} lines, -${pct}%)`);
+    } else {
+      fs.copyFileSync(src, dest);
+      const lineCount = fs.readFileSync(src, 'utf8').split('\n').length;
+      totalLines += lineCount;
+      copiedHtml++;
+      console.log(`  Copied: ${file} (${lineCount} lines)`);
+    }
   }
 
   const elapsed = Date.now() - startTime;
@@ -214,10 +227,69 @@ function clean() {
   }
 }
 
+/**
+ * Minifies an HTML file (with embedded <script>/<style>) by stripping
+ * blank lines, comment-only lines, and leading whitespace.
+ * Preserves GAS template tags (<?...?>) and string contents.
+ * @param {string} content - File content
+ * @returns {string} Minified content
+ */
+function minifyHtml(content) {
+  const lines = content.split('\n');
+  const out = [];
+  let inBlockComment = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const trimmed = line.trimStart();
+
+    // Skip blank lines
+    if (trimmed === '') continue;
+
+    // Track block comments (/* ... */)
+    if (inBlockComment) {
+      if (trimmed.includes('*/')) {
+        inBlockComment = false;
+        // Keep any code after the closing */
+        const afterComment = trimmed.substring(trimmed.indexOf('*/') + 2).trim();
+        if (afterComment) out.push(afterComment);
+      }
+      // Skip lines inside block comments
+      continue;
+    }
+
+    // Block comment start on its own line (no code before it)
+    if (trimmed.startsWith('/*') || trimmed.startsWith('* ') || trimmed === '*' || trimmed === '*/') {
+      if (trimmed.startsWith('/*') && !trimmed.includes('*/')) {
+        inBlockComment = true;
+        continue;
+      }
+      if (trimmed.startsWith('/*') && trimmed.includes('*/')) {
+        // Single-line block comment — skip it
+        const afterComment = trimmed.substring(trimmed.indexOf('*/') + 2).trim();
+        if (afterComment) out.push(afterComment);
+        continue;
+      }
+      // Lines starting with * (JSDoc continuation) or ending */
+      if (trimmed === '*/' || trimmed.startsWith('* ') || trimmed === '*') continue;
+    }
+
+    // Single-line comment on its own line (// ...)
+    // Only strip if the ENTIRE line is a comment (no code before //)
+    if (trimmed.startsWith('//')) continue;
+
+    // Strip leading whitespace (safe for JS/CSS — indentation is cosmetic)
+    out.push(trimmed);
+  }
+
+  return out.join('\n');
+}
+
 // Parse command line arguments
 const args = process.argv.slice(2);
 const shouldClean = args.includes('--clean');
 const isProd = args.includes('--prod') || args.includes('--production');
+const shouldMinify = args.includes('--minify');
 
 // Files to exclude in production builds
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs'];

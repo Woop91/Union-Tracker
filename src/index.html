@@ -2699,8 +2699,12 @@
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>
   <? } else if (view === 'steward' || view === 'member' || view === 'both') { ?>
-    <?!= include('steward_view') ?>
-    <?!= include('member_view') ?>
+    <? if (view === 'steward' || view === 'both') { ?>
+      <?!= include('steward_view') ?>
+    <? } ?>
+    <? if (view === 'member' || view === 'both') { ?>
+      <?!= include('member_view') ?>
+    <? } ?>
   <? } else { ?>
     <?!= include('error_view') ?>
   <? } ?>

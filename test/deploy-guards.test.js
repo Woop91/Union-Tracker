@@ -392,7 +392,7 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 describe('G6: dist/ files are in sync with src/', () => {
 
   test('every src .gs file has identical copy in dist', () => {
-    const PROD_EXCLUDED = ['07_DevTools.gs']; // excluded by --prod build
+    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs']; // excluded by --prod build
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
 
@@ -415,7 +415,7 @@ describe('G6: dist/ files are in sync with src/', () => {
     expect(stale).toEqual([]);
   });
 
-  test('every src .html file has identical copy in dist', () => {
+  test('every src .html file exists in dist and preserves all function definitions', () => {
     const htmlFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html'));
     const stale = [];
 
@@ -430,8 +430,23 @@ describe('G6: dist/ files are in sync with src/', () => {
 
       const srcContent = fs.readFileSync(srcPath, 'utf8');
       const distContent = fs.readFileSync(distPath, 'utf8');
-      if (srcContent !== distContent) {
-        stale.push(`${f}: dist/ differs from src/ — run "node build.js"`);
+
+      // dist/ may be minified, so allow size reduction.
+      // But dist/ must never be LARGER than src/ (that would indicate corruption)
+      // and must never lose function definitions.
+      if (distContent.length > srcContent.length) {
+        stale.push(`${f}: dist/ is larger than src/ — possible corruption`);
+        continue;
+      }
+
+      // Verify all function definitions from src/ exist in dist/
+      const fnRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+      let match;
+      while ((match = fnRegex.exec(srcContent)) !== null) {
+        const fnName = match[1];
+        if (!distContent.includes('function ' + fnName)) {
+          stale.push(`${f}: function ${fnName} missing from dist/`);
+        }
       }
     }
 
