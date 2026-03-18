@@ -1030,34 +1030,65 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/switchId\s*!==\s*_navSwitchId/);
   });
 
-  // orgchart, poms, and "more" early-return paths must update _activePane
-  test('orgchart early-return path updates _activePane', () => {
+  // orgchart, poms, and "more" early-return paths delegate to _activatePane
+  // (via renderPageLayout) — no direct _activePane assignment needed
+  test('orgchart early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    // After renderOrgChart, _activePane must be set before return
     const orgchartBlock = fnBody.match(/renderOrgChart\([\s\S]*?return;/);
     expect(orgchartBlock).not.toBeNull();
-    expect(orgchartBlock[0]).toContain('_activePane');
+    // Must NOT have direct _activePane assignment (handled by _activatePane inside renderPageLayout)
+    expect(orgchartBlock[0]).not.toMatch(/_activePane\s*=/);
   });
 
-  test('poms early-return path updates _activePane', () => {
+  test('poms early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const pomsBlock = fnBody.match(/renderPOMSReference\([\s\S]*?return;/);
     expect(pomsBlock).not.toBeNull();
-    expect(pomsBlock[0]).toContain('_activePane');
+    expect(pomsBlock[0]).not.toMatch(/_activePane\s*=/);
   });
 
-  test('_member_more early-return path updates _activePane', () => {
+  test('_member_more early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const moreBlock = fnBody.match(/_member_more[\s\S]*?return;\s*\}/);
     expect(moreBlock).not.toBeNull();
-    expect(moreBlock[0]).toContain('_activePane');
+    expect(moreBlock[0]).not.toMatch(/_activePane\s*=/);
   });
 
-  test('_steward_more early-return path updates _activePane', () => {
+  test('_steward_more early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const moreBlock = fnBody.match(/_steward_more[\s\S]*?return;\s*\}/);
     expect(moreBlock).not.toBeNull();
-    expect(moreBlock[0]).toContain('_activePane');
+    expect(moreBlock[0]).not.toMatch(/_activePane\s*=/);
+  });
+
+  // G24: _activatePane is the single source of truth for pane state
+  test('_activatePane function exists and syncs both _activePane and _layoutCache.content', () => {
+    const fnBody = extractFnBody(indexCode, '_activatePane');
+    expect(fnBody).not.toBe('');
+    expect(fnBody).toContain('_activePane');
+    expect(fnBody).toContain('_layoutCache.content');
+  });
+
+  test('renderPageLayout primary path uses _activatePane (not direct _layoutCache.content assignment)', () => {
+    const fnBody = extractFnBody(indexCode, 'renderPageLayout');
+    // The primary panel render should call _activatePane, not manually set _layoutCache.content
+    expect(fnBody).toContain('_activatePane(newContent)');
+  });
+
+  test('_handleTabNav cache-hit path uses _activatePane (not direct _activePane assignment)', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    // The cached-pane code should use _activatePane(cached.pane)
+    expect(fnBody).toContain('_activatePane(cached.pane)');
+  });
+
+  test('_activePane is never directly assigned in _handleTabNav or _renderTabFresh', () => {
+    // Direct _activePane = ... assignments in these functions would bypass _activatePane
+    // and risk desynchronizing _activePane from _layoutCache.content (ghost-pane bug).
+    const navBody = extractFnBody(indexCode, '_handleTabNav');
+    const freshBody = extractFnBody(indexCode, '_renderTabFresh');
+    // Only _activatePane calls allowed — no direct assignments
+    const directAssignments = (navBody + freshBody).match(/_activePane\s*=(?!=)/g) || [];
+    expect(directAssignments).toEqual([]);
   });
 
   // Async callbacks must check for stale switches
@@ -1069,6 +1100,28 @@ describe('G23: Tab navigation race condition guard', () => {
   test('renderPOMSReference async callback checks _navSwitchId', () => {
     const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
     expect(fnBody).toMatch(/_navSwitchId/);
+  });
+
+  // G25: _invalidateTabCache always invalidates secondary pane cache too
+  test('_invalidateTabCache flushes secondary pane cache for specific tabId', () => {
+    const fnBody = extractFnBody(indexCode, '_invalidateTabCache');
+    // Per-tab branch must call SplitView.invalidateSecondaryCache(tabId)
+    expect(fnBody).toMatch(/SplitView\.invalidateSecondaryCache\(tabId\)/);
+  });
+
+  test('_invalidateTabCache flushes secondary pane cache on full flush', () => {
+    const fnBody = extractFnBody(indexCode, '_invalidateTabCache');
+    // Full-flush branch must call SplitView.invalidateSecondaryCache()
+    expect(fnBody).toMatch(/SplitView\.invalidateSecondaryCache\(\)/);
+  });
+
+  test('callers of _invalidateTabCache do not redundantly call SplitView.invalidateSecondaryCache', () => {
+    // _invalidateTabCache now handles secondary internally.
+    // No caller should need to call SplitView.invalidateSecondaryCache separately.
+    const navBody = extractFnBody(indexCode, '_handleTabNav');
+    // Count SplitView.invalidateSecondaryCache calls in _handleTabNav — should be 0
+    const directCalls = (navBody.match(/SplitView\.invalidateSecondaryCache/g) || []);
+    expect(directCalls.length).toBe(0);
   });
 });
 

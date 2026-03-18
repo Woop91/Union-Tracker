@@ -960,12 +960,11 @@ _updateSplitPanelHeader(_layoutCache.splitSecondaryHeader, SplitView.getSecondar
 _updateSplitPanelHeader(_layoutCache.splitPrimaryHeader, SplitView.getPrimaryTab(), role, false);
 }
 if (!_isSecondaryRender || !_layoutCache.splitContainer) {
-if (_layoutCache.content) _layoutCache.content.style.display = 'none';
 var targetParent = _layoutCache.splitPrimary || _layoutCache.layout;
 var newContent = el('div', { className: 'page-layout-content' });
 contentFn(newContent);
 targetParent.appendChild(newContent);
-_layoutCache.content = newContent;
+_activatePane(newContent); // hides old pane, syncs _activePane + _layoutCache.content
 if (_layoutCache.splitPrimaryHeader) {
 _updateSplitPanelHeader(_layoutCache.splitPrimaryHeader, activeTab, role, false);
 }
@@ -990,6 +989,7 @@ if (!_useSplit) {
 layout.appendChild(content);
 container.appendChild(layout);
 _layoutCache = { container: container, role: role, layout: layout, sidebar: sidebar, content: content };
+_activePane = content; // sync with _layoutCache.content (old pane destroyed by innerHTML='')
 }
 renderBottomNav(container, role, activeTab);
 }
@@ -1172,8 +1172,7 @@ SplitView.setPrimaryTab(activeTab);
 SplitView.setTarget('secondary');
 }
 _layoutCache = {};
-_invalidateTabCache();
-SplitView.invalidateSecondaryCache();
+_invalidateTabCache(); // flushes both primary + secondary pane caches
 _handleTabNav(role, activeTab);
 }
 }, [
@@ -1611,6 +1610,12 @@ container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load PO
 var _tabPanes = {};       // tabId → { pane: Element, role: string }
 var _tabPanesRole = null;
 var _activePane = null;   // currently visible pane element
+function _activatePane(newPane) {
+if (_activePane && _activePane !== newPane) _activePane.style.display = 'none';
+if (newPane) newPane.style.display = '';
+_activePane = newPane;
+_layoutCache.content = newPane;
+}
 var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
 function _invalidateTabCache(tabId) {
 if (tabId) {
@@ -1618,11 +1623,13 @@ if (_tabPanes[tabId]) {
 if (_tabPanes[tabId].pane.parentNode) _tabPanes[tabId].pane.parentNode.removeChild(_tabPanes[tabId].pane);
 delete _tabPanes[tabId];
 }
+SplitView.invalidateSecondaryCache(tabId); // keep secondary in sync
 } else {
 for (var k in _tabPanes) {
 if (_tabPanes[k].pane.parentNode) _tabPanes[k].pane.parentNode.removeChild(_tabPanes[k].pane);
 }
 _tabPanes = {};
+SplitView.invalidateSecondaryCache(); // flush secondary too
 }
 }
 var _navSwitchId = 0; // monotonic counter to discard stale tab switches
@@ -1651,14 +1658,13 @@ var cacheId = tabId;
 if (role === 'steward' && (tabId === 'home' || tabId === 'cases')) cacheId = 'cases';
 if (tabId === 'weeklyq') cacheId = 'polls'; // legacy alias
 if (_tabPanesRole !== role) {
-_invalidateTabCache();
-SplitView.invalidateSecondaryCache();
+_invalidateTabCache(); // flushes both primary + secondary pane caches
 _tabPanesRole = role;
-_activePane = null;
+_activatePane(null);
 }
 _navProgressStart();
-if (tabId === 'more' || tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
-if (tabId === 'more_steward' || tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
+if (tabId === 'more' || tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
+if (tabId === 'more_steward' || tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); return; }
 if (_isSplitSecondary && _layoutCache.splitSecondary) {
 _splitRenderTarget = 'secondary';
 var renderFn = _getTabRenderFn(role, tabId);
@@ -1687,14 +1693,12 @@ return;
 }
 _splitRenderTarget = 'primary';
 renderOrgChart(app, role);
-_activePane = _layoutCache.content;
 _navProgressDone();
 return;
 }
 if (tabId === 'poms') {
 _splitRenderTarget = 'primary';
 renderPOMSReference(app, role);
-_activePane = _layoutCache.content;
 _navProgressDone();
 return;
 }
@@ -1702,9 +1706,7 @@ if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 var isCacheable = !_ALWAYS_FRESH_TABS[cacheId];
 var cached = isCacheable && _tabPanes[cacheId];
 if (cached) {
-if (_activePane && _activePane !== cached.pane) _activePane.style.display = 'none';
-cached.pane.style.display = '';
-_activePane = cached.pane;
+_activatePane(cached.pane);
 if (_layoutCache.sidebar) {
 _layoutCache.sidebar.innerHTML = '';
 renderSidebarItems(_layoutCache.sidebar, role, tabId);
@@ -1715,7 +1717,6 @@ renderBottomNav(app, role, tabId);
 _navProgressDone();
 return;
 }
-if (_activePane) _activePane.style.display = 'none';
 _splitRenderTarget = 'primary';
 _renderTabFresh(app, role, tabId, cacheId);
 _navProgressDone();
@@ -1728,7 +1729,6 @@ renderFn(app);
 if (_layoutCache.content && !_ALWAYS_FRESH_TABS[cacheId]) {
 _tabPanes[cacheId] = { pane: _layoutCache.content, role: role };
 }
-_activePane = _layoutCache.content;
 _gcHiddenPanes();
 }
 function _gcHiddenPanes() {

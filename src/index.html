@@ -1270,13 +1270,11 @@
 
         // Rendering into primary panel (default behavior)
         if (!_isSecondaryRender || !_layoutCache.splitContainer) {
-          if (_layoutCache.content) _layoutCache.content.style.display = 'none';
-
           var targetParent = _layoutCache.splitPrimary || _layoutCache.layout;
           var newContent = el('div', { className: 'page-layout-content' });
           contentFn(newContent);
           targetParent.appendChild(newContent);
-          _layoutCache.content = newContent;
+          _activatePane(newContent); // hides old pane, syncs _activePane + _layoutCache.content
 
           // Update primary header if split is active
           if (_layoutCache.splitPrimaryHeader) {
@@ -1312,6 +1310,7 @@
         layout.appendChild(content);
         container.appendChild(layout);
         _layoutCache = { container: container, role: role, layout: layout, sidebar: sidebar, content: content };
+        _activePane = content; // sync with _layoutCache.content (old pane destroyed by innerHTML='')
       }
 
       // Bottom nav always added to DOM; CSS hides it at tablet+ (min-width: 640px)
@@ -1536,8 +1535,7 @@
             }
             // Force full layout rebuild
             _layoutCache = {};
-            _invalidateTabCache();
-            SplitView.invalidateSecondaryCache();
+            _invalidateTabCache(); // flushes both primary + secondary pane caches
             _handleTabNav(role, activeTab);
           }
         }, [
@@ -2034,23 +2032,38 @@
     var _tabPanesRole = null;
     var _activePane = null;   // currently visible pane element
 
+    /**
+     * Centralized pane activation — the ONLY way to change the active pane.
+     * Hides old pane, shows new pane, keeps _activePane + _layoutCache.content
+     * in sync. Prevents the ghost-pane bug where two panes are visible at once.
+     */
+    function _activatePane(newPane) {
+      if (_activePane && _activePane !== newPane) _activePane.style.display = 'none';
+      if (newPane) newPane.style.display = '';
+      _activePane = newPane;
+      _layoutCache.content = newPane;
+    }
+
     // Tabs that must always re-render (forms, mutation state, must be fresh)
     var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
 
-    /** Invalidate cached tab pane(s) — call after data mutations */
+    /** Invalidate cached tab pane(s) — call after data mutations.
+     *  Always invalidates BOTH primary and secondary (split-view) caches
+     *  for the same tabId to prevent stale-pane desync. */
     function _invalidateTabCache(tabId) {
       if (tabId) {
         if (_tabPanes[tabId]) {
-          // Remove from DOM if it exists
           if (_tabPanes[tabId].pane.parentNode) _tabPanes[tabId].pane.parentNode.removeChild(_tabPanes[tabId].pane);
           delete _tabPanes[tabId];
         }
+        SplitView.invalidateSecondaryCache(tabId); // keep secondary in sync
       } else {
         // Flush all
         for (var k in _tabPanes) {
           if (_tabPanes[k].pane.parentNode) _tabPanes[k].pane.parentNode.removeChild(_tabPanes[k].pane);
         }
         _tabPanes = {};
+        SplitView.invalidateSecondaryCache(); // flush secondary too
       }
     }
 
@@ -2096,17 +2109,17 @@
 
       // On role change, flush all cached panes
       if (_tabPanesRole !== role) {
-        _invalidateTabCache();
-        SplitView.invalidateSecondaryCache();
+        _invalidateTabCache(); // flushes both primary + secondary pane caches
         _tabPanesRole = role;
-        _activePane = null;
+        _activatePane(null);
       }
 
       _navProgressStart();
 
       // Handle "More" menus for both roles (mobile bottom-nav)
-      if (tabId === 'more' || tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
-      if (tabId === 'more_steward' || tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
+      // Note: renderPageLayout inside these calls _activatePane automatically
+      if (tabId === 'more' || tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
+      if (tabId === 'more_steward' || tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); return; }
 
       // ── SPLIT VIEW: secondary panel rendering ──
       if (_isSplitSecondary && _layoutCache.splitSecondary) {
@@ -2140,16 +2153,16 @@
           _navProgressDone();
           return;
         }
+        // renderPageLayout inside renderOrgChart calls _activatePane automatically
         _splitRenderTarget = 'primary';
         renderOrgChart(app, role);
-        _activePane = _layoutCache.content;
         _navProgressDone();
         return;
       }
       if (tabId === 'poms') {
+        // renderPageLayout inside renderPOMSReference calls _activatePane automatically
         _splitRenderTarget = 'primary';
         renderPOMSReference(app, role);
-        _activePane = _layoutCache.content;
         _navProgressDone();
         return;
       }
@@ -2163,9 +2176,7 @@
 
       if (cached) {
         // INSTANT: hide current pane, show cached pane, update nav chrome
-        if (_activePane && _activePane !== cached.pane) _activePane.style.display = 'none';
-        cached.pane.style.display = '';
-        _activePane = cached.pane;
+        _activatePane(cached.pane);
 
         // Update sidebar + bottom nav active highlights
         if (_layoutCache.sidebar) {
@@ -2180,9 +2191,7 @@
       }
 
       // ── FRESH RENDER: build new pane, cache it ──
-      // Hide the currently active pane (don't destroy it)
-      if (_activePane) _activePane.style.display = 'none';
-
+      // _activatePane inside renderPageLayout handles hiding the old pane
       _splitRenderTarget = 'primary';
       _renderTabFresh(app, role, tabId, cacheId);
 
@@ -2199,11 +2208,10 @@
       // which creates a new content pane inside the layout shell (hiding the old one).
       renderFn(app);
 
-      // After renderPageLayout runs, _layoutCache.content holds the new content pane.
+      // After renderPageLayout runs, _activatePane has already synced _activePane.
       if (_layoutCache.content && !_ALWAYS_FRESH_TABS[cacheId]) {
         _tabPanes[cacheId] = { pane: _layoutCache.content, role: role };
       }
-      _activePane = _layoutCache.content;
 
       // Clean up: remove hidden panes that aren't in the tab cache.
       // This prevents always-fresh tabs from accumulating orphaned hidden divs.
