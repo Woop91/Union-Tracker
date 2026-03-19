@@ -290,8 +290,11 @@ function _serveFatalError(detail) {
     + '<style>'
     + 'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
     + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#141414;color:#e0e0e0}'
+    + 'body.light{background:#f5f5f5;color:#1a1a1a}'
     + '.card{max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center}'
+    + 'body.light .card{background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.08)}'
     + 'h1{font-size:20px;margin:0 0 12px}p{color:#888;font-size:14px;line-height:1.6;margin:0 0 20px}'
+    + 'body.light p{color:#666}'
     + 'a{display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;'
     + 'border-radius:8px;text-decoration:none;font-weight:600}'
     + '</style></head><body><div class="card">'
@@ -299,7 +302,8 @@ function _serveFatalError(detail) {
     + '<p>The dashboard could not load. This is usually temporary &mdash; '
     + 'please wait a moment and try again.</p>'
     + '<a href="javascript:location.reload()">Reload</a>'
-    + '</div></body></html>';
+    + '</div><script>try{if(localStorage.getItem("dds_isDark")==="false")document.body.classList.add("light")}catch(e){}</script>'
+    + '</body></html>';
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Dashboard — Error')

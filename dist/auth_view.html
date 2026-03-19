@@ -1,6 +1,8 @@
 <script>
 function renderAuth(container) {
-if (typeof ThemeEngine !== 'undefined') {
+if (typeof UnifiedTheme !== 'undefined') {
+UnifiedTheme.apply();
+} else if (typeof ThemeEngine !== 'undefined') {
 ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
 }
 showAuthChoose(container);
@@ -83,7 +85,7 @@ var rememberMe = { value: false };
 var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' } });
 var track = el('div', {
 className: 'auth-toggle-track',
-style: { background: '#333' }
+style: { background: 'var(--border, #333)' }
 });
 var thumb = el('div', {
 className: 'auth-toggle-thumb',
@@ -94,7 +96,7 @@ toggleContainer.appendChild(track);
 toggleContainer.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'Remember this device (' + CONFIG.cookieDurationDays + ' days)'));
 toggleContainer.addEventListener('click', function() {
 rememberMe.value = !rememberMe.value;
-track.style.background = rememberMe.value ? 'var(--accent)' : '#333';
+track.style.background = rememberMe.value ? 'var(--accent)' : 'var(--border, #333)';
 thumb.style.left = rememberMe.value ? '18px' : '2px';
 });
 wrapper.appendChild(toggleContainer);

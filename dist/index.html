@@ -212,6 +212,7 @@ mode: 'dark',
 }
 var FORCED_PALETTES = {
 brutalist: {
+light: {
 bg: '#f5f0e8', surface: '#fff', surfaceAlt: '#f0ede4', raised: '#fff',
 text: '#111', 'text-secondary': '#666', muted: '#888',
 card: '#fff', 'bg-tertiary': '#eae6dc',
@@ -223,7 +224,21 @@ fontBody: "'Space Mono', monospace",
 fontDisplay: "'Bebas Neue', sans-serif",
 mode: 'light',
 },
+dark: {
+bg: '#1a1a1a', surface: '#222', surfaceAlt: '#2a2a2a', raised: '#2e2e2e',
+text: '#e0e0e0', 'text-secondary': '#aaa', muted: '#777',
+card: '#222', 'bg-tertiary': '#2a2a2a',
+success: '#00cc55', warning: '#ddaa00', danger: '#ff4444', info: '#4488cc',
+border: '#e0e0e0', radius: '0px',
+accent: '#ff4444', accentDim: '#dd2222', accentGlow: 'rgba(255,68,68,0.25)',
+accentBg: 'rgba(255,68,68,0.08)', accentBorder: 'rgba(255,68,68,0.35)',
+fontBody: "'Space Mono', monospace",
+fontDisplay: "'Bebas Neue', sans-serif",
+mode: 'dark',
+},
+},
 retroOS: {
+light: {
 bg: '#008080', surface: '#c0c0c0', surfaceAlt: '#d0d0d0', raised: '#c0c0c0',
 text: '#000', 'text-secondary': '#444', muted: '#808080',
 card: '#c0c0c0', 'bg-tertiary': '#b0b0b0',
@@ -235,7 +250,21 @@ fontBody: "'Pixelify Sans', system-ui",
 fontDisplay: "'Pixelify Sans', system-ui",
 mode: 'light',
 },
+dark: {
+bg: '#003838', surface: '#2a2a3a', surfaceAlt: '#333344', raised: '#2e2e3e',
+text: '#d0d0e0', 'text-secondary': '#9999aa', muted: '#777788',
+card: '#2a2a3a', 'bg-tertiary': '#252535',
+success: '#00aa44', warning: '#aaaa00', danger: '#dd3333', info: '#4466cc',
+border: '#555566', radius: '0px',
+accent: '#4466cc', accentDim: '#3355bb', accentGlow: 'rgba(68,102,204,0.25)',
+accentBg: 'rgba(68,102,204,0.1)', accentBorder: 'rgba(68,102,204,0.35)',
+fontBody: "'Pixelify Sans', system-ui",
+fontDisplay: "'Pixelify Sans', system-ui",
+mode: 'dark',
+},
+},
 comic: {
+light: {
 bg: '#fffbe6', surface: '#fffde7', surfaceAlt: '#fff8cc', raised: '#fffde7',
 text: '#111', 'text-secondary': '#555', muted: '#666',
 card: '#fffde7', 'bg-tertiary': '#fff3b0',
@@ -246,6 +275,19 @@ accentBg: 'rgba(255,23,68,0.06)', accentBorder: 'rgba(255,23,68,0.3)',
 fontBody: "'DM Sans', sans-serif",
 fontDisplay: "'Bangers', cursive",
 mode: 'light',
+},
+dark: {
+bg: '#1a1028', surface: '#231838', surfaceAlt: '#2a1e40', raised: '#2e2248',
+text: '#e8e0f0', 'text-secondary': '#b0a0c0', muted: '#887799',
+card: '#231838', 'bg-tertiary': '#2a1e40',
+success: '#44cc66', warning: '#ff8800', danger: '#ff4466', info: '#4488ff',
+border: '#e8e0f0', radius: '0px',
+accent: '#ff4477', accentDim: '#dd2255', accentGlow: 'rgba(255,68,119,0.25)',
+accentBg: 'rgba(255,68,119,0.08)', accentBorder: 'rgba(255,68,119,0.35)',
+fontBody: "'DM Sans', sans-serif",
+fontDisplay: "'Bangers', cursive",
+mode: 'dark',
+},
 },
 };
 var TAB_COLORS = {
@@ -317,7 +359,8 @@ document.body.classList.add('cyber-multi');
 document.body.classList.remove('cyber-multi');
 }
 } else if (FORCED_PALETTES[styleId]) {
-applyTheme(FORCED_PALETTES[styleId]);
+var fp = FORCED_PALETTES[styleId];
+applyTheme(AppState.isDark ? fp.dark : fp.light);
 document.body.classList.remove('cyber-multi');
 } else {
 var t = getTheme(AppState.activeRole || 'member', AppState.isDark);
@@ -1229,6 +1272,15 @@ onClick: function() {
 AppState.isDark = !AppState.isDark;
 try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
 UnifiedTheme.apply();
+if (typeof _pomsSyncTheme === 'function') _pomsSyncTheme();
+if (typeof maddstoggleMode !== 'function') {
+} else {
+var ocEmbed = document.querySelector('.madds-embed');
+if (ocEmbed) {
+var ocIsLight = ocEmbed.classList.contains('light');
+if (AppState.isDark === ocIsLight) maddstoggleMode();
+}
+}
 _handleTabNav(role, activeTab);
 }
 }, [

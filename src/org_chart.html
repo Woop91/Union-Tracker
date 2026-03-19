@@ -3234,17 +3234,31 @@ function toggleOtherGroup(btn) {
   btn.textContent = hidden ? '▼ Hide Other Chapters' : '▶ Show all 4 Other Chapters';
 }
 
-// Light/Dark mode toggle
+// Light/Dark mode toggle — syncs with global AppState
 function maddstoggleMode() {
   var _me = document.querySelector('.madds-embed'); if(_me) _me.classList.toggle('light');
-  const btn = document.getElementById('madds-mode-toggle');
-  btn.textContent = (_me && _me.classList.contains('light')) ? '🌙 Dark' : '☀ Light';
+  var isLight = _me && _me.classList.contains('light');
+  var btn = document.getElementById('madds-mode-toggle');
+  btn.textContent = isLight ? '🌙 Dark' : '☀ Light';
+  // Write back to AppState + localStorage so other views stay in sync
+  if (typeof AppState !== 'undefined') { AppState.isDark = !isLight; }
+  try { localStorage.setItem('dds_isDark', String(!isLight)); } catch(e) {}
+  if (typeof UnifiedTheme !== 'undefined') { UnifiedTheme.apply(); }
 }
 
-// Auto-detect system theme on load
+// Sync with global dark/light state on load (AppState > localStorage > prefers-color-scheme)
 (function() {
-  var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-  if (prefersLight) {
+  var wantLight = false;
+  if (typeof AppState !== 'undefined' && AppState.isDark !== undefined) {
+    wantLight = !AppState.isDark;
+  } else {
+    try {
+      var stored = localStorage.getItem('dds_isDark');
+      if (stored !== null) { wantLight = stored === 'false'; }
+      else { wantLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches; }
+    } catch(e) { wantLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches; }
+  }
+  if (wantLight) {
     var _me = document.querySelector('.madds-embed');
     if (_me) _me.classList.add('light');
     var btn = document.getElementById('madds-mode-toggle');

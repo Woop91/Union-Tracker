@@ -1,6 +1,8 @@
 <script>
 function renderError(container, error) {
-if (typeof ThemeEngine !== 'undefined') {
+if (typeof UnifiedTheme !== 'undefined') {
+UnifiedTheme.apply();
+} else if (typeof ThemeEngine !== 'undefined') {
 ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
 }
 container.innerHTML = '';

@@ -5,8 +5,10 @@
  * States: choose → email → sending → sent → error
  */
 function renderAuth(container) {
-  // Apply member dark theme via ThemeEngine (single source of truth for colors)
-  if (typeof ThemeEngine !== 'undefined') {
+  // Inherit user's saved theme (dark/light + visual style) via UnifiedTheme
+  if (typeof UnifiedTheme !== 'undefined') {
+    UnifiedTheme.apply();
+  } else if (typeof ThemeEngine !== 'undefined') {
     ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
   }
 
@@ -123,7 +125,7 @@ function showAuthEmail(container) {
 
   var track = el('div', {
     className: 'auth-toggle-track',
-    style: { background: '#333' }
+    style: { background: 'var(--border, #333)' }
   });
   var thumb = el('div', {
     className: 'auth-toggle-thumb',
@@ -135,7 +137,7 @@ function showAuthEmail(container) {
 
   toggleContainer.addEventListener('click', function() {
     rememberMe.value = !rememberMe.value;
-    track.style.background = rememberMe.value ? 'var(--accent)' : '#333';
+    track.style.background = rememberMe.value ? 'var(--accent)' : 'var(--border, #333)';
     thumb.style.left = rememberMe.value ? '18px' : '2px';
   });
   wrapper.appendChild(toggleContainer);
