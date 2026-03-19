@@ -188,8 +188,8 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
     const untested = [...dataFns].filter(fn => !testedFns.has(fn));
 
     // Allow a threshold for wrappers tested indirectly via other suites
-    // (e.g., workload SSO, broadcast filters, badge counts, task delegation)
-    expect(untested.length).toBeLessThanOrEqual(14);
+    // (e.g., workload SSO, broadcast filters, badge counts, task delegation, member batch)
+    expect(untested.length).toBeLessThanOrEqual(15);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {
