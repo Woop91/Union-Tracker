@@ -1329,7 +1329,7 @@ function exportUndoHistoryToSheet() {
   sheet.getRange(1, 1, 1, headers.length)
     .setValues([headers])
     .setFontWeight('bold')
-    .setBackground('#7c3aed')
+    .setBackground(SHEET_COLORS.STATUS_PURPLE)
     .setFontColor('#fff');
 
   if (history.actions.length > 0) {
@@ -2316,7 +2316,7 @@ function validateMemberIdOnEdit(e) {
     );
 
     // Optionally highlight the cell
-    range.setBackground('#FFCDD2'); // Light red
+    range.setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT); // Light red
 
     // Revert to old value if available
     if (e.oldValue) {
@@ -2398,7 +2398,7 @@ function highlightOrphanedGrievances() {
   // Highlight orphaned rows
   orphaned.forEach(function(item) {
     grievanceSheet.getRange(item.row, 1, 1, grievanceSheet.getLastColumn())
-      .setBackground('#FFCDD2'); // Light red
+      .setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT); // Light red
   });
 
   // Report findings
@@ -2885,8 +2885,8 @@ function archiveClosedGrievances(daysOld) {
     var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues();
     archiveSheet.getRange(1, 1, 1, headers[0].length).setValues(headers)
       .setFontWeight('bold')
-      .setBackground('#6B7280')
-      .setFontColor('#FFFFFF');
+      .setBackground(SHEET_COLORS.STATUS_DISABLED)
+      .setFontColor(SHEET_COLORS.BG_WHITE);
   }
 
   // Find rows to archive
@@ -3056,8 +3056,8 @@ function applyDeadlineHeatmap() {
   // Overdue (negative or "Overdue" text)
   var overdueRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberLessThanOrEqualTo(0)
-    .setBackground('#DC2626')  // Bright red
-    .setFontColor('#FFFFFF')
+    .setBackground(SHEET_COLORS.STATUS_ERROR)  // Bright red
+    .setFontColor(SHEET_COLORS.BG_WHITE)
     .setBold(true)
     .setRanges([deadlineRange])
     .build();
@@ -3066,7 +3066,7 @@ function applyDeadlineHeatmap() {
   var criticalRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberBetween(1, 3)
     .setBackground('#F87171')  // Light red
-    .setFontColor('#7F1D1D')
+    .setFontColor(SHEET_COLORS.HEADER_DARK_RED)
     .setBold(true)
     .setRanges([deadlineRange])
     .build();
@@ -3074,24 +3074,24 @@ function applyDeadlineHeatmap() {
   // Warning (4-7 days)
   var warningRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberBetween(4, 7)
-    .setBackground('#FBBF24')  // Yellow/orange
-    .setFontColor('#78350F')
+    .setBackground(SHEET_COLORS.STATUS_WARNING)  // Yellow/orange
+    .setFontColor(SHEET_COLORS.TEXT_BROWN)
     .setRanges([deadlineRange])
     .build();
 
   // Caution (8-14 days)
   var cautionRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberBetween(8, 14)
-    .setBackground('#FEF3C7')  // Light yellow
-    .setFontColor('#92400E')
+    .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)  // Light yellow
+    .setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE)
     .setRanges([deadlineRange])
     .build();
 
   // Safe (15+ days)
   var safeRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberGreaterThan(14)
-    .setBackground('#D1FAE5')  // Light green
-    .setFontColor('#065F46')
+    .setBackground(SHEET_COLORS.BG_PALE_GREEN)  // Light green
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN)
     .setRanges([deadlineRange])
     .build();
 
@@ -3103,23 +3103,23 @@ function applyDeadlineHeatmap() {
 
   var wonRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Won')
-    .setBackground('#059669')  // Green
-    .setFontColor('#FFFFFF')
+    .setBackground(SHEET_COLORS.STATUS_SUCCESS)  // Green
+    .setFontColor(SHEET_COLORS.BG_WHITE)
     .setBold(true)
     .setRanges([statusRange])
     .build();
 
   var deniedRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Denied')
-    .setBackground('#DC2626')  // Red
-    .setFontColor('#FFFFFF')
+    .setBackground(SHEET_COLORS.STATUS_ERROR)  // Red
+    .setFontColor(SHEET_COLORS.BG_WHITE)
     .setRanges([statusRange])
     .build();
 
   var settledRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Settled')
-    .setBackground('#7C3AED')  // Purple
-    .setFontColor('#FFFFFF')
+    .setBackground(SHEET_COLORS.STATUS_PURPLE)  // Purple
+    .setFontColor(SHEET_COLORS.BG_WHITE)
     .setRanges([statusRange])
     .build();
 
@@ -3174,26 +3174,26 @@ function createMobileStewardPortal() {
   portalSheet.getRange('A1').setValue('📱 STEWARD PORTAL')
     .setFontSize(18)
     .setFontWeight('bold')
-    .setFontColor('#7C3AED');
+    .setFontColor(SHEET_COLORS.STATUS_PURPLE);
   portalSheet.getRange('A1:E1').merge();
 
   portalSheet.getRange('A2').setValue('Quick access to your active cases. Updated: ' + new Date().toLocaleString())
     .setFontStyle('italic')
-    .setFontColor('#6B7280');
+    .setFontColor(SHEET_COLORS.STATUS_DISABLED);
   portalSheet.getRange('A2:E2').merge();
 
   // Section: Urgent Cases (deadline <= 7 days)
   portalSheet.getRange('A4').setValue('🚨 URGENT CASES')
     .setFontWeight('bold')
-    .setBackground('#DC2626')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.STATUS_ERROR)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   portalSheet.getRange('A4:E4').merge();
 
   // Headers for mobile view
   var headers = ['ID', 'Member', 'Status', 'Deadline', 'Steward'];
   portalSheet.getRange('A5:E5').setValues([headers])
     .setFontWeight('bold')
-    .setBackground('#F3F4F6');
+    .setBackground(SHEET_COLORS.BG_VERY_LIGHT_GRAY);
 
   // Get grievance data and filter
   var grievanceData = grievanceSheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.STEWARD).getValues();
@@ -3231,26 +3231,26 @@ function createMobileStewardPortal() {
   // Write urgent cases
   if (urgentCases.length > 0) {
     portalSheet.getRange(currentRow, 1, urgentCases.length, 5).setValues(urgentCases)
-      .setBackground('#FEE2E2');
+      .setBackground(SHEET_COLORS.BG_LIGHT_RED);
     currentRow += urgentCases.length + 1;
   } else {
     portalSheet.getRange(currentRow, 1).setValue('No urgent cases!')
-      .setFontColor('#059669');
+      .setFontColor(SHEET_COLORS.STATUS_SUCCESS);
     currentRow += 2;
   }
 
   // Section: All Active Cases
   portalSheet.getRange(currentRow, 1).setValue('📋 ALL ACTIVE CASES')
     .setFontWeight('bold')
-    .setBackground('#7C3AED')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.STATUS_PURPLE)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   portalSheet.getRange(currentRow, 1, 1, 5).merge();
   currentRow++;
 
   // Headers
   portalSheet.getRange(currentRow, 1, 1, 5).setValues([headers])
     .setFontWeight('bold')
-    .setBackground('#F3F4F6');
+    .setBackground(SHEET_COLORS.BG_VERY_LIGHT_GRAY);
   currentRow++;
 
   // Write normal cases

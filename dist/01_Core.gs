@@ -405,7 +405,7 @@ var API_VERSION = {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.30.1",
+  VERSION: "4.30.2",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -589,7 +589,7 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.30.1';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.30.2';
   var parts = ver.split('.');
   return {
     version: ver,
@@ -3303,6 +3303,77 @@ function getMobileOptimizedHead() {
 var GRIEVANCE_ID_PATTERN = /^G/i;
 /** @const {RegExp} Member IDs start with 'M' (case-insensitive) */
 var MEMBER_ID_PATTERN = /^M/i;
+
+/**
+ * Centralized sheet styling colors — single source of truth for all setBackground/setFontColor calls.
+ * Google Sheets API doesn't support CSS variables, but centralizing here makes branding changes a single-file edit.
+ */
+var SHEET_COLORS = {
+  // Header backgrounds (dark)
+  HEADER_NAVY: '#1a1a2e',
+  HEADER_BLUE: '#0d47a1',
+  HEADER_SLATE: '#1e293b',
+  HEADER_SLATE_MED: '#334155',
+  HEADER_DARK_BLUE: '#1a365d',
+  HEADER_DARK_RED: '#7F1D1D',
+  HEADER_DARK_PURPLE: '#5B21B6',
+  HEADER_DARK_BLUE_ALT: '#1E40AF',
+
+  // Status indicators
+  STATUS_SUCCESS: '#059669',
+  STATUS_WARNING: '#FBBF24',
+  STATUS_ERROR: '#DC2626',
+  STATUS_ERROR_DARK: '#C62828',
+  STATUS_INFO: '#3B82F6',
+  STATUS_DISABLED: '#6B7280',
+  STATUS_PURPLE: '#7C3AED',
+
+  // Light backgrounds (pastel/tinted)
+  BG_WHITE: '#ffffff',
+  BG_LIGHT_GRAY: '#F9FAFB',
+  BG_VERY_LIGHT_GRAY: '#F3F4F6',
+  BG_OFF_WHITE: '#f8fafc',
+  BG_LIGHT_BLUE: '#E0E7FF',
+  BG_LIGHT_BLUE_ALT: '#e3f2fd',
+  BG_PALE_BLUE: '#F0F9FF',
+  BG_EXTRA_PALE_BLUE: '#EFF6FF',
+  BG_LINK_BLUE: '#e8f0fe',
+  BG_LIGHT_GREEN: '#E8F5E9',
+  BG_PALE_GREEN: '#D1FAE5',
+  BG_GREEN_ALT: '#C8E6C9',
+  BG_MINT: '#ECFDF5',
+  BG_LIGHT_RED: '#FEE2E2',
+  BG_LIGHT_RED_ALT: '#FFCDD2',
+  BG_PINK: '#FFE2E2',
+  BG_LIGHT_YELLOW: '#FEF3C7',
+  BG_PALE_YELLOW: '#FFF9C4',
+  BG_EXTRA_PALE_YELLOW: '#fffde7',
+  BG_CREAM: '#fff8e1',
+  BG_LIGHT_ORANGE: '#FFE0B2',
+  BG_WARM: '#FFF3E0',
+  BG_LIGHT_PURPLE: '#FAF5FF',
+  BG_SLATE_LIGHT: '#F1F5F9',
+
+  // Text colors
+  TEXT_WHITE: '#ffffff',
+  TEXT_GRAY: '#6B7280',
+  TEXT_LIGHT_GRAY: '#9CA3AF',
+  TEXT_DARK_GREEN: '#065F46',
+  TEXT_GREEN: '#2e7d32',
+  TEXT_GREEN_ALT: '#166534',
+  TEXT_GREEN_DARK: '#1B5E20',
+  TEXT_DARK_RED: '#B71C1C',
+  TEXT_RED: '#c62828',
+  TEXT_DARK_ORANGE: '#92400E',
+  TEXT_ORANGE: '#E65100',
+  TEXT_YELLOW_DARK: '#F57F17',
+  TEXT_BROWN: '#78350F',
+  TEXT_MED_GRAY: '#666666',
+
+  // Link colors
+  LINK_PRIMARY: '#1a73e8',
+  LINK_SECONDARY: '#1155cc'
+};
 
 /**
  * Returns true if the value looks like a valid Grievance ID.

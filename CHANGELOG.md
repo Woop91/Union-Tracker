@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.30.2] - 2026-03-19
+
+### Fixed
+- **Theme: fatal error fallback** — hardcoded dark colors unreadable in light mode; now uses `prefers-color-scheme` media query with both light/dark variants
+- **Theme: button text** — 4 nav badge buttons used `color: '#fff'`; now `var(--accent-contrast, #fff)` for theme-aware contrast
+- **Theme: auth toggle** — fallback `#333` replaced with `rgba(128,128,128,0.3)` (works on both light/dark)
+- **Theme: success message** — hardcoded rgba replaced with `var(--success-bg)` / `var(--success-border)` CSS variables
+
+### Added
+- **SHEET_COLORS constant** — centralized 54 hex colors for Google Sheets styling in `01_Core.gs`; eliminates ~160 hardcoded values across 15 .gs files. Future branding changes are now a single-file edit.
+
 ## [4.30.1] - 2026-03-19
 
 ### Fixed

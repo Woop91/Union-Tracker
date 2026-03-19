@@ -1530,8 +1530,8 @@ var DataService = (function () {
       var headers = ['Date', 'Steward', 'Contact Type', 'Notes', 'Duration'];
       sheet.getRange(1, 1, 1, headers.length).setValues([headers])
            .setFontWeight('bold')
-           .setBackground('#1a365d')
-           .setFontColor('#FFFFFF');
+           .setBackground(SHEET_COLORS.HEADER_DARK_BLUE)
+           .setFontColor(SHEET_COLORS.BG_WHITE);
       sheet.setFrozenRows(1);
       sheet.setColumnWidth(1, 130); // Date
       sheet.setColumnWidth(2, 180); // Steward

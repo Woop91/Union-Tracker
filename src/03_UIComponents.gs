@@ -579,7 +579,7 @@ function applyThemeToSheet_(sheet, themeKey) {
     // F23b: Apply alternating row colors in single setBackgrounds call
     var backgrounds = [];
     for (var row = 2; row <= lastRow; row++) {
-      var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
+      var color = (row % 2 === 0) ? theme.altRow : SHEET_COLORS.BG_WHITE;
       backgrounds.push(new Array(lastCol).fill(color));
     }
     dataRange.setBackgrounds(backgrounds);
@@ -596,9 +596,9 @@ function applyThemeToSheet_(sheet, themeKey) {
 var THEME_PRESETS = {
   'default': {
     name: 'Default (Dark Slate)',
-    headerBg: '#1e293b',
-    headerText: '#ffffff',
-    altRow: '#f8fafc',
+    headerBg: SHEET_COLORS.HEADER_SLATE,
+    headerText: SHEET_COLORS.BG_WHITE,
+    altRow: SHEET_COLORS.BG_OFF_WHITE,
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -607,9 +607,9 @@ var THEME_PRESETS = {
   },
   'union-blue': {
     name: 'Union Blue',
-    headerBg: '#1e40af',
-    headerText: '#ffffff',
-    altRow: '#eff6ff',
+    headerBg: SHEET_COLORS.HEADER_DARK_BLUE_ALT,
+    headerText: SHEET_COLORS.BG_WHITE,
+    altRow: SHEET_COLORS.BG_EXTRA_PALE_BLUE,
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -618,8 +618,8 @@ var THEME_PRESETS = {
   },
   'forest': {
     name: 'Forest Green',
-    headerBg: '#166534',
-    headerText: '#ffffff',
+    headerBg: SHEET_COLORS.TEXT_GREEN_ALT,
+    headerText: SHEET_COLORS.BG_WHITE,
     altRow: '#f0fdf4',
     font: 'Roboto',
     fontSize: 10,
@@ -630,8 +630,8 @@ var THEME_PRESETS = {
   'charcoal': {
     name: 'Charcoal',
     headerBg: '#374151',
-    headerText: '#f9fafb',
-    altRow: '#f3f4f6',
+    headerText: SHEET_COLORS.BG_LIGHT_GRAY,
+    altRow: SHEET_COLORS.BG_VERY_LIGHT_GRAY,
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -641,8 +641,8 @@ var THEME_PRESETS = {
   'midnight': {
     name: 'Midnight Purple',
     headerBg: '#581c87',
-    headerText: '#ffffff',
-    altRow: '#faf5ff',
+    headerText: SHEET_COLORS.BG_WHITE,
+    altRow: SHEET_COLORS.BG_LIGHT_PURPLE,
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -652,7 +652,7 @@ var THEME_PRESETS = {
   'crimson': {
     name: 'Crimson',
     headerBg: '#991b1b',
-    headerText: '#ffffff',
+    headerText: SHEET_COLORS.BG_WHITE,
     altRow: '#fef2f2',
     font: 'Roboto',
     fontSize: 10,
@@ -663,8 +663,8 @@ var THEME_PRESETS = {
   'steel': {
     name: 'Steel Gray',
     headerBg: '#475569',
-    headerText: '#ffffff',
-    altRow: '#f1f5f9',
+    headerText: SHEET_COLORS.BG_WHITE,
+    altRow: SHEET_COLORS.BG_SLATE_LIGHT,
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -674,7 +674,7 @@ var THEME_PRESETS = {
   'ocean': {
     name: 'Ocean Teal',
     headerBg: '#115e59',
-    headerText: '#ffffff',
+    headerText: SHEET_COLORS.BG_WHITE,
     altRow: '#f0fdfa',
     font: 'Roboto',
     fontSize: 10,
@@ -943,7 +943,7 @@ function applyZebraStripes(sheet) {
   // F23b: Build backgrounds array and apply in single setBackgrounds call
   var backgrounds = [];
   for (var row = 2; row <= lastRow; row++) {
-    var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
+    var color = (row % 2 === 0) ? SHEET_COLORS.BG_SLATE_LIGHT : SHEET_COLORS.BG_WHITE;
     var rowColors = new Array(lastCol).fill(color);
     backgrounds.push(rowColors);
   }
@@ -977,7 +977,7 @@ function removeZebraStripes(sheet) {
   if (lastRow < 2 || lastCol < 1) return;
 
   var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-  dataRange.setBackground('#ffffff');
+  dataRange.setBackground(SHEET_COLORS.BG_WHITE);
 }
 
 /**

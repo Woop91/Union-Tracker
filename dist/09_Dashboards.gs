@@ -2692,26 +2692,26 @@ function writeDashboardValues_(sheet, metrics) {
   var changeCell44 = sheet.getRange(L.TREND_START_ROW, 4);
   var change44Val = grievanceChange;
   if (change44Val < 0) {
-    changeCell44.setFontColor('#059669'); // Green - grievances down is good
+    changeCell44.setFontColor(SHEET_COLORS.STATUS_SUCCESS); // Green - grievances down is good
   } else if (change44Val > 0) {
-    changeCell44.setFontColor('#DC2626'); // Red - grievances up is bad
+    changeCell44.setFontColor(SHEET_COLORS.STATUS_ERROR); // Red - grievances up is bad
   } else {
-    changeCell44.setFontColor('#6B7280'); // Gray - no change
+    changeCell44.setFontColor(SHEET_COLORS.STATUS_DISABLED); // Gray - no change
   }
 
   // For members: positive change = green (good), negative = red (bad)
   var changeCell45 = sheet.getRange(L.TREND_START_ROW + 1, 4);
   if (memberChange > 0) {
-    changeCell45.setFontColor('#059669'); // Green - members up is good
+    changeCell45.setFontColor(SHEET_COLORS.STATUS_SUCCESS); // Green - members up is good
   } else if (memberChange < 0) {
-    changeCell45.setFontColor('#DC2626'); // Red - members down is bad
+    changeCell45.setFontColor(SHEET_COLORS.STATUS_ERROR); // Red - members down is bad
   } else {
-    changeCell45.setFontColor('#6B7280'); // Gray
+    changeCell45.setFontColor(SHEET_COLORS.STATUS_DISABLED); // Gray
   }
 
   // For cases filed: neutral coloring (blue)
   var changeCell46 = sheet.getRange(L.TREND_START_ROW + 2, 4);
-  changeCell46.setFontColor('#3B82F6'); // Blue - neutral
+  changeCell46.setFontColor(SHEET_COLORS.STATUS_INFO); // Blue - neutral
 
   // ══════════════════════════════════════════════════════════════════════
   // STEWARD SUMMARY - Card layout
@@ -2784,21 +2784,21 @@ function writeDashboardValues_(sheet, metrics) {
  */
 function applyDashboardGradients_(sheet) {
   // Define gradient color scale (Green -> Yellow -> Red)
-  var _greenColor = '#D1FAE5';  // Low values (good for some metrics)
-  var _yellowColor = '#FEF3C7'; // Mid values
+  var _greenColor = SHEET_COLORS.BG_PALE_GREEN;  // Low values (good for some metrics)
+  var _yellowColor = SHEET_COLORS.BG_LIGHT_YELLOW; // Mid values
   var _redColor = '#FCA5A5';    // High values (bad for some metrics)
 
   // Reverse scale (Red -> Yellow -> Green) for positive metrics
   var redToGreen = {
     minColor: '#FCA5A5',
-    midColor: '#FEF3C7',
-    maxColor: '#D1FAE5'
+    midColor: SHEET_COLORS.BG_LIGHT_YELLOW,
+    maxColor: SHEET_COLORS.BG_PALE_GREEN
   };
 
   // Standard scale (Green -> Yellow -> Red) for negative metrics
   var greenToRed = {
-    minColor: '#D1FAE5',
-    midColor: '#FEF3C7',
+    minColor: SHEET_COLORS.BG_PALE_GREEN,
+    midColor: SHEET_COLORS.BG_LIGHT_YELLOW,
     maxColor: '#FCA5A5'
   };
 

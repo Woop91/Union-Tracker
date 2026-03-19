@@ -2136,8 +2136,8 @@ function initializeLookerGrievancesSheet_() {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length)
     .setFontWeight('bold')
-    .setBackground('#1E293B')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.HEADER_SLATE)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   sheet.setFrozenRows(1);
 }
 
@@ -2164,8 +2164,8 @@ function initializeLookerMembersSheet_() {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length)
     .setFontWeight('bold')
-    .setBackground('#1E293B')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.HEADER_SLATE)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   sheet.setFrozenRows(1);
 }
 
@@ -2193,8 +2193,8 @@ function initializeLookerSatisfactionSheet_() {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length)
     .setFontWeight('bold')
-    .setBackground('#1E293B')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.HEADER_SLATE)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   sheet.setFrozenRows(1);
 }
 
@@ -2569,8 +2569,8 @@ function initializeLookerAnonGrievancesSheet_() {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length)
     .setFontWeight('bold')
-    .setBackground('#334155')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.HEADER_SLATE_MED)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   sheet.setFrozenRows(1);
 }
 
@@ -2596,8 +2596,8 @@ function initializeLookerAnonMembersSheet_() {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length)
     .setFontWeight('bold')
-    .setBackground('#334155')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.HEADER_SLATE_MED)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   sheet.setFrozenRows(1);
 }
 
@@ -2627,8 +2627,8 @@ function initializeLookerAnonSatisfactionSheet_() {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length)
     .setFontWeight('bold')
-    .setBackground('#334155')
-    .setFontColor('#FFFFFF');
+    .setBackground(SHEET_COLORS.HEADER_SLATE_MED)
+    .setFontColor(SHEET_COLORS.BG_WHITE);
   sheet.setFrozenRows(1);
 }
 

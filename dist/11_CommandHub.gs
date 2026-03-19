@@ -513,7 +513,7 @@ function addRepoLinkToFAQ_(ss) {
     var repoUrl = getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '';
     faqSheet.getRange(linkRow + 2, 1).setValue(repoUrl);
     faqSheet.getRange(linkRow + 2, 1)
-      .setFontColor('#1a73e8')
+      .setFontColor(SHEET_COLORS.LINK_PRIMARY)
       .setFontWeight('bold');
 
     // Add instructions

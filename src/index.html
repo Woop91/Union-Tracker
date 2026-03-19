@@ -1930,7 +1930,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--danger)', color: '#fff',
+                background: 'var(--danger)', color: 'var(--accent-contrast, #fff)',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -1945,7 +1945,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--accent)', color: '#fff',
+                background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -1960,7 +1960,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--warning, #f59e0b)', color: '#fff',
+                background: 'var(--warning, #f59e0b)', color: 'var(--accent-contrast, #fff)',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -1975,7 +1975,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--accent)', color: '#fff',
+                background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -2765,12 +2765,27 @@
         var app = document.getElementById('app');
         if (app) {
           var errDetail = bootErr && bootErr.message ? bootErr.message : String(bootErr);
-          app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,sans-serif;background:#141414;color:#e0e0e0">'
-            + '<div style="max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center">'
-            + '<h1 style="font-size:20px;margin:0 0 12px">Something went wrong</h1>'
-            + '<p style="color:#888;font-size:14px;line-height:1.6;margin:0 0 20px">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
-            + '<p style="color:#555;font-size:11px;line-height:1.4;margin:0 0 20px;font-family:monospace;word-break:break-all">' + errDetail + '</p>'
-            + '<a href="javascript:localStorage.removeItem(\'dashboardSessionToken\');location.reload()" style="display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px">Clear &amp; Reload</a>'
+          app.innerHTML = '<style>'
+            + '.fatal-bg{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,sans-serif;background:#f5f5f5;color:#1a1a1a}'
+            + '.fatal-card{max-width:440px;padding:40px 32px;background:#fff;border-radius:16px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.1)}'
+            + '.fatal-title{font-size:20px;margin:0 0 12px}'
+            + '.fatal-msg{color:#555;font-size:14px;line-height:1.6;margin:0 0 20px}'
+            + '.fatal-detail{color:#888;font-size:11px;line-height:1.4;margin:0 0 20px;font-family:monospace;word-break:break-all}'
+            + '.fatal-btn{display:inline-block;padding:10px 24px;background:hsl(250,70%,58%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px}'
+            + '@media(prefers-color-scheme:dark){'
+            + '.fatal-bg{background:#141414;color:#e0e0e0}'
+            + '.fatal-card{background:#1e1e1e;box-shadow:0 2px 12px rgba(0,0,0,0.4)}'
+            + '.fatal-msg{color:#888}'
+            + '.fatal-detail{color:#555}'
+            + '.fatal-btn{background:hsl(250,70%,68%)}'
+            + '}'
+            + '</style>'
+            + '<div class="fatal-bg">'
+            + '<div class="fatal-card">'
+            + '<h1 class="fatal-title">Something went wrong</h1>'
+            + '<p class="fatal-msg">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
+            + '<p class="fatal-detail">' + errDetail + '</p>'
+            + '<a href="javascript:localStorage.removeItem(\'dashboardSessionToken\');location.reload()" class="fatal-btn">Clear &amp; Reload</a>'
             + '</div></div>';
         }
       }

@@ -57,7 +57,7 @@ function showAuthChoose(container) {
   // Show signed-out success message
   if (ssoError === 'loggedout') {
     var logoutMsg = el('div', {
-      style: { fontSize: '13px', color: 'var(--success)', marginTop: '8px', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(52, 211, 153, 0.1)', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.2)' }
+      style: { fontSize: '13px', color: 'var(--success)', marginTop: '8px', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'var(--success-bg, rgba(52, 211, 153, 0.1))', borderRadius: '8px', border: '1px solid var(--success-border, rgba(52, 211, 153, 0.2))' }
     }, 'Signed out successfully.');
     wrapper.appendChild(logoutMsg);
   }
@@ -125,7 +125,7 @@ function showAuthEmail(container) {
 
   var track = el('div', {
     className: 'auth-toggle-track',
-    style: { background: 'var(--border, #333)' }
+    style: { background: 'var(--border, rgba(128,128,128,0.3))' }
   });
   var thumb = el('div', {
     className: 'auth-toggle-thumb',
@@ -137,7 +137,7 @@ function showAuthEmail(container) {
 
   toggleContainer.addEventListener('click', function() {
     rememberMe.value = !rememberMe.value;
-    track.style.background = rememberMe.value ? 'var(--accent)' : 'var(--border, #333)';
+    track.style.background = rememberMe.value ? 'var(--accent)' : 'var(--border, rgba(128,128,128,0.3))';
     thumb.style.left = rememberMe.value ? '18px' : '2px';
   });
   wrapper.appendChild(toggleContainer);

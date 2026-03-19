@@ -31,8 +31,8 @@ function createSurveyQuestionsSheet(ss) {
   sheet.getRange(1, 1, 1, NUM_COLS)
     .setValues([headers])
     .setFontWeight('bold')
-    .setBackground('#1a73e8')
-    .setFontColor('#ffffff')
+    .setBackground(SHEET_COLORS.LINK_PRIMARY)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
     .setWrap(true);
   sheet.setFrozenRows(1);
 
@@ -172,16 +172,16 @@ function createSurveyQuestionsSheet(ss) {
 
     // Color rows by section
     var sectionColors = {
-      WORK_CONTEXT:   '#e3f2fd', OVERALL_SAT:  '#e8f5e9',
+      WORK_CONTEXT:   SHEET_COLORS.BG_LIGHT_BLUE_ALT, OVERALL_SAT:  SHEET_COLORS.BG_LIGHT_GREEN,
       STEWARD_3A:     '#f3e5f5', STEWARD_3B:   '#fce4ec',
-      CHAPTER:        '#fff3e0', LEADERSHIP:   '#fffde7',
+      CHAPTER:        SHEET_COLORS.BG_WARM, LEADERSHIP:   SHEET_COLORS.BG_EXTRA_PALE_YELLOW,
       CONTRACT:       '#e0f2f1', REPRESENTATION:'#e0f7fa',
       COMMUNICATION:  '#e8eaf6', MEMBER_VOICE: '#fbe9e7',
       VALUE_ACTION:   '#f9fbe7', SCHEDULING:   '#efebe9',
-      PRIORITIES:     '#f5f5f5', RTO_CHANGE:   '#fff8e1'
+      PRIORITIES:     '#f5f5f5', RTO_CHANGE:   SHEET_COLORS.BG_CREAM
     };
     toAdd.forEach(function(row, i) {
-      var color = sectionColors[String(row[2]).trim()] || '#ffffff';
+      var color = sectionColors[String(row[2]).trim()] || SHEET_COLORS.BG_WHITE;
       sheet.getRange(startRow + i, 1, 1, NUM_COLS).setBackground(color);
     });
   }
@@ -289,8 +289,8 @@ function createSatisfactionSheet(ss) {
     sheet.getRange(1, 1, 1, headers.length)
       .setValues([headers])
       .setFontWeight('bold')
-      .setBackground('#1a73e8')
-      .setFontColor('#ffffff')
+      .setBackground(SHEET_COLORS.LINK_PRIMARY)
+      .setFontColor(SHEET_COLORS.TEXT_WHITE)
       .setWrap(false);
 
     // Column widths
@@ -363,32 +363,32 @@ function createFeedbackSheet(ss) {
   // Critical = Red
   var criticalRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Critical')
-    .setBackground('#FFCDD2')
-    .setFontColor('#B71C1C')
+    .setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT)
+    .setFontColor(SHEET_COLORS.TEXT_DARK_RED)
     .setRanges([priorityRange])
     .build();
 
   // High = Orange
   var highRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('High')
-    .setBackground('#FFE0B2')
-    .setFontColor('#E65100')
+    .setBackground(SHEET_COLORS.BG_LIGHT_ORANGE)
+    .setFontColor(SHEET_COLORS.TEXT_ORANGE)
     .setRanges([priorityRange])
     .build();
 
   // Medium = Yellow
   var mediumRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Medium')
-    .setBackground('#FFF9C4')
-    .setFontColor('#F57F17')
+    .setBackground(SHEET_COLORS.BG_PALE_YELLOW)
+    .setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
     .setRanges([priorityRange])
     .build();
 
   // Low = Green
   var lowRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Low')
-    .setBackground('#C8E6C9')
-    .setFontColor('#1B5E20')
+    .setBackground(SHEET_COLORS.BG_GREEN_ALT)
+    .setFontColor(SHEET_COLORS.TEXT_GREEN_DARK)
     .setRanges([priorityRange])
     .build();
 
@@ -398,8 +398,8 @@ function createFeedbackSheet(ss) {
   // Resolved = Green
   var resolvedRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Resolved')
-    .setBackground('#C8E6C9')
-    .setFontColor('#1B5E20')
+    .setBackground(SHEET_COLORS.BG_GREEN_ALT)
+    .setFontColor(SHEET_COLORS.TEXT_GREEN_DARK)
     .setRanges([statusRange])
     .build();
 
@@ -407,7 +407,7 @@ function createFeedbackSheet(ss) {
   var inProgressRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('In Progress')
     .setBackground('#BBDEFB')
-    .setFontColor('#0D47A1')
+    .setFontColor(SHEET_COLORS.HEADER_BLUE)
     .setRanges([statusRange])
     .build();
 
@@ -956,14 +956,14 @@ function createFunctionChecklistSheet_() {
   // Alternating colors
   for (var r = 2; r <= rows.length; r++) {
     if (r % 2 === 0) {
-      sheet.getRange(r, 1, 1, 7).setBackground('#F9FAFB');
+      sheet.getRange(r, 1, 1, 7).setBackground(SHEET_COLORS.BG_LIGHT_GRAY);
     }
   }
 
   // Conditional formatting for checked items
   var rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$A2=TRUE')
-    .setBackground('#E8F5E9')
+    .setBackground(SHEET_COLORS.BG_LIGHT_GREEN)
     .setRanges([sheet.getRange(2, 1, rows.length - 1, 7)])
     .build();
   sheet.setConditionalFormatRules([rule]);
@@ -1001,7 +1001,7 @@ function createGettingStartedSheet(ss) {
   var stepBg = COLORS.ROW_ALT_GREEN;       // Light green for steps
   var tipBg = COLORS.GRADIENT_MID_LOW;     // Light yellow for tips
   var textColor = '#1F2937';
-  var white = '#FFFFFF';
+  var white = SHEET_COLORS.TEXT_WHITE;
 
   var row = 1;
 
@@ -1020,7 +1020,7 @@ function createGettingStartedSheet(ss) {
   sheet.getRange(row, 1, 1, 6).merge()
     .setValue('Welcome! This guide will help you set up and use the Dashboard effectively.')
     .setFontSize(12)
-    .setFontColor('#6B7280')
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
     .setHorizontalAlignment('center');
 
   // ═══ SECTION 1: FIRST-TIME SETUP ═══
@@ -1172,7 +1172,7 @@ function createGettingStartedSheet(ss) {
     .setBackground(tipBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#92400E');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE);
   sheet.setRowHeight(row, 35);
 
   var tips = [
@@ -1186,14 +1186,14 @@ function createGettingStartedSheet(ss) {
 
   for (var p = 0; p < tips.length; p++) {
     row++;
-    sheet.getRange(row, 1, 1, 6).merge().setValue(tips[p]).setFontColor('#92400E').setBackground(tipBg);
+    sheet.getRange(row, 1, 1, 6).merge().setValue(tips[p]).setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE).setBackground(tipBg);
   }
 
   // ═══ FOOTER ═══
   row += 2;
   sheet.getRange(row, 1, 1, 6).merge()
     .setValue('Need more help? Check the ❓ FAQ tab or the Config tab\'s User Guide section.')
-    .setFontColor('#6B7280')
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
     .setFontStyle('italic')
     .setHorizontalAlignment('center');
 
@@ -1235,7 +1235,7 @@ function createFAQSheet(ss) {
   // Define colors
   var headerBg = COLORS.UNION_GREEN;       // Green header
   var questionBg = COLORS.ROW_ALT_GREEN;  // Light green for questions
-  var answerBg = '#FFFFFF';       // White for answers
+  var answerBg = SHEET_COLORS.BG_WHITE;       // White for answers
   var categoryBg = COLORS.GRADIENT_LOW;   // Medium green for categories
   var textColor = COLORS.TEXT_DARK;
   var white = COLORS.WHITE;
@@ -1257,7 +1257,7 @@ function createFAQSheet(ss) {
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Find answers to common questions about using the Dashboard')
     .setFontSize(12)
-    .setFontColor('#6B7280')
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
     .setHorizontalAlignment('center');
 
   // ═══ CATEGORY: GETTING STARTED ═══
@@ -1267,7 +1267,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   var gettingStartedFAQs = [
@@ -1282,7 +1282,7 @@ function createFAQSheet(ss) {
   for (var i = 0; i < gettingStartedFAQs.length; i++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(gettingStartedFAQs[i][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(gettingStartedFAQs[i][1])
@@ -1297,7 +1297,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   var memberFAQs = [
@@ -1316,7 +1316,7 @@ function createFAQSheet(ss) {
   for (var j = 0; j < memberFAQs.length; j++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(memberFAQs[j][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(memberFAQs[j][1])
@@ -1331,7 +1331,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   var grievanceFAQs = [
@@ -1352,7 +1352,7 @@ function createFAQSheet(ss) {
   for (var k = 0; k < grievanceFAQs.length; k++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(grievanceFAQs[k][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(grievanceFAQs[k][1])
@@ -1367,7 +1367,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   var troubleshootingFAQs = [
@@ -1386,7 +1386,7 @@ function createFAQSheet(ss) {
   for (var m = 0; m < troubleshootingFAQs.length; m++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(troubleshootingFAQs[m][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(troubleshootingFAQs[m][1])
@@ -1401,7 +1401,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   var engagementFAQs = [
@@ -1426,7 +1426,7 @@ function createFAQSheet(ss) {
   for (var eng = 0; eng < engagementFAQs.length; eng++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][1])
@@ -1441,7 +1441,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   var surveyTrackingFAQs = [
@@ -1466,7 +1466,7 @@ function createFAQSheet(ss) {
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(surveyTrackingFAQs[st][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(surveyTrackingFAQs[st][1])
@@ -1481,7 +1481,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   var advancedFAQs = [
@@ -1496,7 +1496,7 @@ function createFAQSheet(ss) {
   for (var n = 0; n < advancedFAQs.length; n++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(advancedFAQs[n][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(advancedFAQs[n][1])
@@ -1512,18 +1512,18 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#065F46');
+    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
   sheet.setRowHeight(row, 35);
 
   // Version history header row
   row++;
   var versionHeaders = ['Version', 'Codename', 'Key Changes'];
   sheet.getRange(row, 1).setValue(versionHeaders[0])
-    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
+    .setBackground(SHEET_COLORS.TEXT_DARK_GREEN).setFontColor(SHEET_COLORS.TEXT_WHITE).setFontWeight('bold');
   sheet.getRange(row, 2).setValue(versionHeaders[1])
-    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
+    .setBackground(SHEET_COLORS.TEXT_DARK_GREEN).setFontColor(SHEET_COLORS.TEXT_WHITE).setFontWeight('bold');
   sheet.getRange(row, 3, 1, 3).merge().setValue(versionHeaders[2])
-    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
+    .setBackground(SHEET_COLORS.TEXT_DARK_GREEN).setFontColor(SHEET_COLORS.TEXT_WHITE).setFontWeight('bold');
   sheet.setRowHeight(row, 28);
 
   var versionHistory = VERSION_HISTORY.map(function(entry) {
@@ -1534,7 +1534,7 @@ function createFAQSheet(ss) {
     row++;
     var vRowBg = (v % 2 === 0) ? versionBg : answerBg;
     sheet.getRange(row, 1).setValue(versionHistory[v][0])
-      .setBackground(vRowBg).setFontWeight('bold').setFontColor('#5B21B6');
+      .setBackground(vRowBg).setFontWeight('bold').setFontColor(SHEET_COLORS.HEADER_DARK_PURPLE);
     sheet.getRange(row, 2).setValue(versionHistory[v][1])
       .setBackground(vRowBg).setFontColor(textColor).setFontStyle('italic');
     sheet.getRange(row, 3, 1, 3).merge().setValue(versionHistory[v][2])
@@ -1546,7 +1546,7 @@ function createFAQSheet(ss) {
   row += 2;
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Can\'t find your answer? Check the 📚 Getting Started tab or ask your administrator.')
-    .setFontColor('#6B7280')
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
     .setFontStyle('italic')
     .setHorizontalAlignment('center');
 
@@ -1589,11 +1589,11 @@ function createFeaturesReferenceSheet(ss) {
   }
 
   // Define colors
-  var headerBg = '#3B82F6';       // Blue header
-  var categoryBg = '#DBEAFE';     // Light blue for categories
-  var featureBg = '#FFFFFF';      // White for features
-  var menuPathBg = '#F3F4F6';     // Light gray for menu paths
-  var white = '#FFFFFF';
+  var headerBg = SHEET_COLORS.STATUS_INFO;       // Blue header
+  var categoryBg = '#DBEAFE';     // Light blue for categories (no exact SHEET_COLORS match)
+  var featureBg = SHEET_COLORS.BG_WHITE;      // White for features
+  var menuPathBg = SHEET_COLORS.BG_VERY_LIGHT_GRAY;     // Light gray for menu paths
+  var white = SHEET_COLORS.TEXT_WHITE;
 
   var row = 1;
 
@@ -1612,7 +1612,7 @@ function createFeaturesReferenceSheet(ss) {
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Complete searchable reference of all features. Use Ctrl+F (Cmd+F on Mac) to search. See FEATURES.md for detailed documentation.')
     .setFontSize(11)
-    .setFontColor('#6B7280')
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
     .setHorizontalAlignment('center')
     .setWrap(true);
 
@@ -1620,7 +1620,7 @@ function createFeaturesReferenceSheet(ss) {
   row += 2;
   var headers = ['Category', 'Feature', 'Description', 'Menu Path', 'Keywords'];
   sheet.getRange(row, 1, 1, 5).setValues([headers])
-    .setBackground('#1E40AF')
+    .setBackground(SHEET_COLORS.HEADER_DARK_BLUE_ALT)
     .setFontColor(white)
     .setFontWeight('bold')
     .setFontSize(11)
@@ -1745,10 +1745,10 @@ function createFeaturesReferenceSheet(ss) {
   row += 1;
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Total Features: ' + features.length + ' | Use Ctrl+F to search | See FEATURES.md for complete documentation')
-    .setFontColor('#6B7280')
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
     .setFontStyle('italic')
     .setHorizontalAlignment('center')
-    .setBackground('#F9FAFB');
+    .setBackground(SHEET_COLORS.BG_LIGHT_GRAY);
 
   // Set column widths
   sheet.setColumnWidth(1, 160);  // Category
@@ -1813,8 +1813,8 @@ function createResourcesSheet(ss) {
 
   // Header formatting
   sheet.getRange(headerRow, 1, 1, headers.length)
-    .setBackground(COLORS.HEADER_BG || '#1e293b')
-    .setFontColor('#ffffff')
+    .setBackground(COLORS.HEADER_BG || SHEET_COLORS.HEADER_SLATE)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');
@@ -1888,7 +1888,7 @@ function createResourcesSheet(ss) {
   sheet.setFrozenRows(1);
 
   // Tab color
-  sheet.setTabColor('#3B82F6');
+  sheet.setTabColor(SHEET_COLORS.STATUS_INFO);
 
   // Apply filter
   var dataRange = sheet.getRange(1, 1, starterRows.length + 1, headers.length);
@@ -1927,8 +1927,8 @@ function createNotificationsSheet(ss) {
 
   // Header formatting
   sheet.getRange(headerRow, 1, 1, headers.length)
-    .setBackground(COLORS.HEADER_BG || '#1e293b')
-    .setFontColor('#ffffff')
+    .setBackground(COLORS.HEADER_BG || SHEET_COLORS.HEADER_SLATE)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');
@@ -2072,8 +2072,8 @@ function createResourceConfigSheet(ss) {
 
   // Header formatting
   sheet.getRange(1, 1, 1, headers.length)
-    .setBackground(COLORS.HEADER_BG || '#1e293b')
-    .setFontColor('#ffffff')
+    .setBackground(COLORS.HEADER_BG || SHEET_COLORS.HEADER_SLATE)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');
