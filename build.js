@@ -235,7 +235,8 @@ function clean() {
  * @returns {string} Minified content
  */
 function minifyHtml(content) {
-  const lines = content.split('\n');
+  // Normalize line endings (CRLF→LF) so output is identical on Windows and Linux
+  const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const out = [];
   let inBlockComment = false;
 
