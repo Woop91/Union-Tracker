@@ -1,26 +1,24 @@
 <!-- POMS Smart Search v4.1 — DDS Resource (SPA-embedded) -->
 <style>
-/* ── POMS THEME TOKENS ── */
 .poms-root{
-  --pr-bg:#f5f6f8;--pr-surface:#fff;--pr-surfaceAlt:#fafafa;--pr-text:#1a1a2e;--pr-textSec:#666;
-  --pr-muted:#888;--pr-border:#eee;--pr-borderStrong:#ddd;--pr-cardShadow:rgba(0,0,0,.05);
-  --pr-hdrBg:linear-gradient(135deg,#0a0a1a,#1a1a2e 50%,#0f3460);
-  --pr-alertBg:#FFF3CD;--pr-alertBorder:#FFCA2C;--pr-alertText:#664D03;
-  --pr-rmBg:linear-gradient(to bottom,#fffdf7,#fef9f0);--pr-rmBorder:#f0e0c0;
-  --pr-relBg:#eef2f7;--pr-relText:#2c3e50;--pr-chipBg:#fff;--pr-chipText:#333;--pr-chipBorder:#ddd;
-  --pr-flowBg:#f5f6f8;--pr-flowDesc:#333;--pr-starActive:#BF8F00;--pr-notesBorder:#ddd;
-  --pr-active:#f0f0f0;--pr-emptyText:#bbb;
+--pr-bg:#f5f6f8;--pr-surface:#fff;--pr-surfaceAlt:#fafafa;--pr-text:#1a1a2e;--pr-textSec:#666;
+--pr-muted:#888;--pr-border:#eee;--pr-borderStrong:#ddd;--pr-cardShadow:rgba(0,0,0,.05);
+--pr-hdrBg:linear-gradient(135deg,#0a0a1a,#1a1a2e 50%,#0f3460);
+--pr-alertBg:#FFF3CD;--pr-alertBorder:#FFCA2C;--pr-alertText:#664D03;
+--pr-rmBg:linear-gradient(to bottom,#fffdf7,#fef9f0);--pr-rmBorder:#f0e0c0;
+--pr-relBg:#eef2f7;--pr-relText:#2c3e50;--pr-chipBg:#fff;--pr-chipText:#333;--pr-chipBorder:#ddd;
+--pr-flowBg:#f5f6f8;--pr-flowDesc:#333;--pr-starActive:#BF8F00;--pr-notesBorder:#ddd;
+--pr-active:#f0f0f0;--pr-emptyText:#bbb;
 }
-/* ── POMS DARK MODE ── */
 .poms-root.poms-dark{
-  --pr-bg:#141418;--pr-surface:#1e1e24;--pr-surfaceAlt:#26262e;--pr-text:#e0e0e8;--pr-textSec:#aaa;
-  --pr-muted:#777;--pr-border:#2a2a34;--pr-borderStrong:#3a3a44;--pr-cardShadow:rgba(0,0,0,.2);
-  --pr-hdrBg:linear-gradient(135deg,#0a0a14,#141420 50%,#0a2040);
-  --pr-alertBg:#3a2e10;--pr-alertBorder:#665520;--pr-alertText:#ddbb44;
-  --pr-rmBg:linear-gradient(to bottom,#1e1a12,#1c1810);--pr-rmBorder:#3a3020;
-  --pr-relBg:#1e2030;--pr-relText:#a0b0c8;--pr-chipBg:#1e1e24;--pr-chipText:#ccc;--pr-chipBorder:#3a3a44;
-  --pr-flowBg:#1a1a22;--pr-flowDesc:#ccc;--pr-starActive:#d4a800;--pr-notesBorder:#3a3a44;
-  --pr-active:#2a2a34;--pr-emptyText:#666;
+--pr-bg:#141418;--pr-surface:#1e1e24;--pr-surfaceAlt:#26262e;--pr-text:#e0e0e8;--pr-textSec:#aaa;
+--pr-muted:#777;--pr-border:#2a2a34;--pr-borderStrong:#3a3a44;--pr-cardShadow:rgba(0,0,0,.2);
+--pr-hdrBg:linear-gradient(135deg,#0a0a14,#141420 50%,#0a2040);
+--pr-alertBg:#3a2e10;--pr-alertBorder:#665520;--pr-alertText:#ddbb44;
+--pr-rmBg:linear-gradient(to bottom,#1e1a12,#1c1810);--pr-rmBorder:#3a3020;
+--pr-relBg:#1e2030;--pr-relText:#a0b0c8;--pr-chipBg:#1e1e24;--pr-chipText:#ccc;--pr-chipBorder:#3a3a44;
+--pr-flowBg:#1a1a22;--pr-flowDesc:#ccc;--pr-starActive:#d4a800;--pr-notesBorder:#3a3a44;
+--pr-active:#2a2a34;--pr-emptyText:#666;
 }
 .poms-root{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;background:var(--pr-bg);color:var(--pr-text);height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden}
 .poms-root *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -51,7 +49,6 @@
 .p-cdesc{font-size:12px;color:var(--pr-textSec);margin-top:4px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .p-calert{background:var(--pr-alertBg);border-radius:5px;padding:4px 8px;margin-top:4px;font-size:10px;color:var(--pr-alertText);font-weight:600}
 .p-stars{color:var(--pr-starActive);font-size:10px;flex-shrink:0;padding-top:2px}
-/* Detail overlay */
 .p-detail{position:absolute;inset:0;background:var(--pr-bg);z-index:20;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
 .p-detail.open{transform:translateX(0)}
 .p-det-hdr{display:flex;align-items:center;padding:10px 12px;background:var(--pr-surface);border-bottom:1px solid var(--pr-border);flex-shrink:0;min-height:48px;gap:10px}
@@ -101,806 +98,717 @@
 .p-empty{text-align:center;padding:40px 20px;color:var(--pr-emptyText)}
 .p-count{font-size:10px;color:var(--pr-muted);margin-bottom:6px;padding-left:2px}
 </style>
-
 <div class="poms-root" id="poms-root">
-  <div class="poms-hdr" id="poms-hdr"></div>
-  <div class="poms-body" id="poms-body"></div>
-  <div class="p-detail" id="poms-detail">
-    <div class="p-det-hdr" id="poms-det-hdr"></div>
-    <div class="p-det-body" id="poms-det-body"></div>
-  </div>
+<div class="poms-hdr" id="poms-hdr"></div>
+<div class="poms-body" id="poms-body"></div>
+<div class="p-detail" id="poms-detail">
+<div class="p-det-hdr" id="poms-det-hdr"></div>
+<div class="p-det-body" id="poms-det-body"></div>
 </div>
-
+</div>
 <script>
 (function(){
 const FLOWS = {
-  "sequential-eval": {title:"5-Step Sequential Evaluation",steps:[
-    {label:"Step 1",desc:"Is claimant engaged in SGA?",yes:"Deny",no:"→ Step 2",color:"#2E75B6"},
-    {label:"Step 2",desc:"Severe impairment?",yes:"→ Step 3",no:"Deny",color:"#2E75B6"},
-    {label:"Step 3",desc:"Meets/equals a Listing?",yes:"Allow",no:"→ Step 4",color:"#2E75B6"},
-    {label:"Step 4",desc:"Can do past relevant work?",yes:"Deny",no:"→ Step 5",color:"#2E75B6"},
-    {label:"Step 5",desc:"Can adjust to other work?",yes:"Deny",no:"Allow",color:"#2E75B6"}]},
-  "ce-workflow": {title:"CE Lifecycle",steps:[
-    {label:"1. MER First",desc:"Exhaust medical evidence of record",color:"#0f3460"},
-    {label:"2. CE Needed?",desc:"Insufficient/conflicting evidence? MC/PC approves",color:"#0f3460"},
-    {label:"3. Source",desc:"Treating source preferred → independent qualified",color:"#16213e"},
-    {label:"4. Schedule",desc:"Phone → explain consequences → written notice",color:"#16213e"},
-    {label:"5. Follow Up",desc:"Reminder. Special handling for vulnerable populations",color:"#1a1a2e"},
-    {label:"6. Exam",desc:"Source conducts exam, submits report",color:"#1a1a2e"},
-    {label:"7. Review",desc:"Check adequacy. Corrections if deficient",color:"#333"}]},
-  "missed-ce": {title:"Missed CE Decision Tree",steps:[
-    {label:"CE Missed",desc:"Claimant did not attend",color:"#8B0000"},
-    {label:"Short Notice?",desc:"≤10 days? → NOT FTC. Must reschedule.",color:"#B22222"},
-    {label:"Refusal?",desc:"Said won't attend? → DI 23007.009",color:"#B22222"},
-    {label:"Good Reason?",desc:"Illness, transport, weather? → Reschedule",color:"#CD5C5C"},
-    {label:"Special?",desc:"<18, ≥65, homeless, MI, LEP? → Third party",color:"#CD5C5C"},
-    {label:"Contact",desc:"Phone → 10d → letter → 10d",color:"#DC143C"},
-    {label:"Determine",desc:"On evidence in file. PDN required.",color:"#8B0000"}]},
-  "ftc-process": {title:"FTC Contact Sequence",steps:[
-    {label:"Phone",desc:"Reach claimant. 10 calendar days.",color:"#663399"},
-    {label:"No Answer",desc:"Try twice. → call-in letter.",color:"#7B4BB5"},
-    {label:"Letter",desc:"Explain consequences. 10 days.",color:"#7B4BB5"},
-    {label:"Third Party",desc:"Special handling: contact simultaneously.",color:"#9370DB"},
-    {label:"Determine",desc:"Document all attempts. Determine on file.",color:"#9370DB"}]},
-  "child-eval": {title:"Child Disability Evaluation",steps:[
-    {label:"Steps 1-2",desc:"SGA + Severity (same as adults)",color:"#548235"},
-    {label:"Step 3A",desc:"Meets/equals childhood Listing (Part B)?",color:"#6B8E23"},
-    {label:"Step 3B",desc:"Functionally equals? (6 domains)",color:"#6B8E23"},
-    {label:"Domains",desc:"Acquiring info · Attending tasks · Interacting · Moving · Self-care · Health",color:"#808000"},
-    {label:"Standard",desc:"Marked in 2 OR extreme in 1 = disabled",color:"#548235"}]},
-  "daa-eval": {title:"DAA Materiality",steps:[
-    {label:"1. Disabled?",desc:"With ALL impairments including DAA?",color:"#BF8F00"},
-    {label:"2. Without DAA?",desc:"Would remaining limitations be disabling?",color:"#D4A017"},
-    {label:"3a. Yes",desc:"Not material → allowed",color:"#2d8a4e"},
-    {label:"3b. No",desc:"Material → denied",color:"#c0392b"},
-    {label:"If Allowed",desc:"Mandatory rep payee + treatment referral",color:"#DAA520"}]},
-  "listing-1": {title:"1.00 Musculoskeletal (Adult)",steps:[
-    {label:"1.15",desc:"Disorders of skeletal spine — compromise of nerve root or spinal cord",color:"#8B4513"},
-    {label:"1.16",desc:"Lumbar spinal stenosis — narrowing of spinal canal",color:"#8B4513"},
-    {label:"1.17",desc:"Reconstructive surgery of weight-bearing joint — inability to ambulate",color:"#A0522D"},
-    {label:"1.18",desc:"Pathologic fractures due to any cause",color:"#A0522D"},
-    {label:"1.20",desc:"Soft tissue injury (burns) requiring continuing treatment",color:"#CD853F"},
-    {label:"Key",desc:"Most require inability to ambulate effectively OR inability to fine/gross movements with both upper extremities",color:"#8B4513"}]},
-  "listing-12": {title:"12.00 Mental Disorders",steps:[
-    {label:"Category",desc:"12.02 Neurocognitive · 12.03 Schizophrenia · 12.04 Depressive/Bipolar · 12.06 Anxiety · 12.07 Somatic · 12.08 Personality · 12.10 Autism · 12.11 Neurodevelopmental · 12.13 Eating · 12.15 Trauma",color:"#4B0082"},
-    {label:"Paragraph A",desc:"Medical documentation of the disorder (specific criteria per listing)",color:"#6A0DAD"},
-    {label:"Paragraph B",desc:"Extreme in 1 OR marked in 2: understand/remember, interact, concentrate/persist, adapt",color:"#7B2FBE"},
-    {label:"Paragraph C",desc:"Alternative: serious/persistent (2+ yrs) + marginal adjustment",color:"#9B59B6"},
-    {label:"Key",desc:"PRT documents B/C ratings. If neither B nor C met → assess mental RFC for Steps 4-5",color:"#4B0082"}]},
-  "listing-3": {title:"3.00 Respiratory",steps:[
-    {label:"3.02",desc:"Chronic respiratory disorders — FEV1 or DLCO values",color:"#2C6E49"},
-    {label:"3.03",desc:"Asthma — exacerbations requiring inpatient hospitalization",color:"#2C6E49"},
-    {label:"3.04",desc:"Cystic fibrosis — FEV1 or exacerbations",color:"#3D8B60"},
-    {label:"3.09",desc:"Chronic pulmonary hypertension — mean PA pressure",color:"#3D8B60"},
-    {label:"3.11",desc:"Lung transplant — considered disabled for 1 year",color:"#4EA87A"},
-    {label:"Key",desc:"Most require specific spirometry or blood gas values. Check Part A tables.",color:"#2C6E49"}]},
-  "listing-4": {title:"4.00 Cardiovascular",steps:[
-    {label:"4.02",desc:"Chronic heart failure — systolic or diastolic, with specific findings",color:"#C0392B"},
-    {label:"4.04",desc:"Ischemic heart disease — exercise tolerance test or angiography",color:"#C0392B"},
-    {label:"4.05",desc:"Recurrent arrhythmias — syncope or near-syncope",color:"#E74C3C"},
-    {label:"4.06",desc:"Symptomatic congenital heart disease",color:"#E74C3C"},
-    {label:"4.09",desc:"Heart transplant — considered disabled for 1 year",color:"#FF6B6B"},
-    {label:"Key",desc:"Most require specific test results (EF, ETT, cath). NYHA class alone is insufficient.",color:"#C0392B"}]},
-  "listing-11": {title:"11.00 Neurological",steps:[
-    {label:"11.02",desc:"Epilepsy — generalized tonic-clonic OR dyscognitive seizures despite treatment",color:"#1F618D"},
-    {label:"11.04",desc:"Vascular insult to brain (stroke) — disorganization of motor function",color:"#1F618D"},
-    {label:"11.06",desc:"Parkinsonian syndrome — disorganization of motor function",color:"#2E86C1"},
-    {label:"11.09",desc:"Multiple sclerosis — disorganization of motor function or marked limitation in physical/mental functioning",color:"#2E86C1"},
-    {label:"11.14",desc:"Peripheral neuropathy — disorganization of motor function in 2 extremities",color:"#3498DB"},
-    {label:"Key",desc:"Most require 'extreme limitation' in ability to stand/walk, use hands, OR marked limitation in physical + mental functioning",color:"#1F618D"}]},
-  "listing-13": {title:"13.00 Cancer (Malignant Neoplastic)",steps:[
-    {label:"Approach",desc:"Look up cancer type → specific listing → check criteria",color:"#8E44AD"},
-    {label:"13.05",desc:"Soft tissue cancers — head/neck, all sites with mets",color:"#8E44AD"},
-    {label:"13.09",desc:"Breast — locally advanced, inflammatory, or with mets despite treatment",color:"#9B59B6"},
-    {label:"13.14",desc:"Lung — non-small cell III+, small cell, mesothelioma",color:"#9B59B6"},
-    {label:"13.22",desc:"Liver — not controlled by prescribed treatment",color:"#AF7AC5"},
-    {label:"13.28",desc:"Cancer treated by bone marrow/stem cell transplant — disabled 12 months post-transplant",color:"#AF7AC5"},
-    {label:"Key",desc:"Check specific tumor type listing. Many auto-allowed. Post-treatment residuals evaluated separately.",color:"#8E44AD"}]},
-  "listing-2": {title:"2.00 Special Senses & Speech",steps:[
-    {label:"2.02",desc:"Loss of central visual acuity — remaining vision in better eye 20/200 or less with correction",color:"#5B2C6F"},
-    {label:"2.03",desc:"Contraction of visual field — widest diameter subtending 20 degrees or less in better eye",color:"#5B2C6F"},
-    {label:"2.04",desc:"Loss of visual efficiency — visual efficiency of 20% or less in better eye after correction",color:"#7D3C98"},
-    {label:"2.07",desc:"Disturbance of labyrinthine-vestibular function — disturbed balance, documented by specific tests",color:"#7D3C98"},
-    {label:"2.09",desc:"Loss of speech — inability to produce speech by any means (including non-oral)",color:"#9B59B6"},
-    {label:"2.10",desc:"Hearing loss not treated with cochlear implant — air/bone conduction averages",color:"#9B59B6"},
-    {label:"2.11",desc:"Hearing loss treated with cochlear implant — considered disabled for 1 year post-implant",color:"#AF7AC5"},
-    {label:"Key",desc:"Vision listings use BEST corrected acuity. Hearing requires audiometry meeting SSA standards. Cochlear implant = 1 year automatic.",color:"#5B2C6F"}]},
-  "listing-9": {title:"9.00 Endocrine Disorders",steps:[
-    {label:"Approach",desc:"No specific endocrine listings exist. Evaluate endocrine disorders under the body system AFFECTED by the disorder.",color:"#B7950B"},
-    {label:"Diabetes",desc:"Evaluate under: 2.00 (diabetic retinopathy), 4.00 (cardiovascular), 6.00 (nephropathy), 11.00 (neuropathy), 1.00 (Charcot arthropathy)",color:"#B7950B"},
-    {label:"Thyroid",desc:"Hypothyroid → evaluate fatigue/cognitive under 12.00 or cardiovascular under 4.00. Thyroid cancer → 13.00.",color:"#D4AC0D"},
-    {label:"Adrenal",desc:"Adrenal insufficiency → evaluate under affected system. Cushing's → musculoskeletal (1.00), cardiovascular (4.00).",color:"#D4AC0D"},
-    {label:"Pituitary",desc:"Growth hormone, prolactin disorders → evaluate under affected body system (vision 2.00, neurological 11.00)",color:"#F1C40F"},
-    {label:"Key",desc:"ALWAYS cross-reference to the body system with the most severe manifestation. Multiple listings may apply for complications.",color:"#B7950B"}]},
-  "listing-5": {title:"5.00 Digestive System",steps:[
-    {label:"5.02",desc:"GI hemorrhaging — transfusion 2+ units blood, 3+ times/12mo, 30+ days apart",color:"#8B6914"},
-    {label:"5.05",desc:"Chronic liver disease — esophageal/gastric varices hemorrhaging OR ascites",color:"#8B6914"},
-    {label:"5.06",desc:"IBD (Crohn's/UC) — obstruction, 2+ hospitalizations, or specific complications",color:"#A67B2A"},
-    {label:"5.07",desc:"Short bowel syndrome — surgical resection, nutritional status dependent",color:"#A67B2A"},
-    {label:"5.08",desc:"Weight loss due to digestive disorder — BMI < 17.50 on 2+ occasions 60 days apart",color:"#C4923F"},
-    {label:"5.09",desc:"Liver transplant — disabled 1 year post-transplant",color:"#C4923F"},
-    {label:"Key",desc:"Most require specific labs, hospitalization frequency, or objective findings. Liver may overlap with 14.11 (HIV).",color:"#8B6914"}]},
-  "listing-6": {title:"6.00 Genitourinary",steps:[
-    {label:"6.02",desc:"Nephrotic syndrome — persistent 3+ months despite treatment, specific lab values",color:"#2471A3"},
-    {label:"6.03",desc:"CKD with chronic hemodialysis or peritoneal dialysis",color:"#2471A3"},
-    {label:"6.04",desc:"CKD with kidney transplant — disabled 1 year post-transplant",color:"#2E86C1"},
-    {label:"6.06",desc:"Nephrogenic systemic fibrosis — documented by clinical/lab or tissue biopsy",color:"#2E86C1"},
-    {label:"Key",desc:"Dialysis (6.03) and post-transplant (6.04) are straightforward. Verify dialysis is chronic, not temporary.",color:"#2471A3"}]},
-  "listing-7": {title:"7.00 Hematological",steps:[
-    {label:"7.02",desc:"Sickle cell — painful crises 3+/5mo, each 2+ days, requiring narcotics",color:"#922B21"},
-    {label:"7.05",desc:"Hemolytic anemias — Hgb ≤ 7.0 on 2+ evals 3+ months apart despite treatment",color:"#922B21"},
-    {label:"7.06",desc:"Thrombosis/hemostasis — spontaneous bleeding requiring transfusion 3+/5mo",color:"#C0392B"},
-    {label:"7.07",desc:"Aplastic anemia/MDS — bone marrow failure with specific blood counts",color:"#C0392B"},
-    {label:"7.08",desc:"Bone marrow/stem cell transplant — disabled 12 months post-transplant",color:"#E74C3C"},
-    {label:"Key",desc:"Sickle cell needs hospital records with dates/duration/treatment. Post-transplant = 12mo auto.",color:"#922B21"}]},
-  "listing-8": {title:"8.00 Skin Disorders",steps:[
-    {label:"8.02",desc:"Ichthyosis — extensive lesions 3+ months despite treatment",color:"#6C3483"},
-    {label:"8.03",desc:"Bullous disease — extensive lesions 3+ months despite treatment",color:"#6C3483"},
-    {label:"8.04",desc:"Chronic skin/mucous membrane infections — 3+ months despite treatment",color:"#7D3C98"},
-    {label:"8.05",desc:"Dermatitis (contact/atopic/exfoliative) — extensive involvement 3+ months",color:"#7D3C98"},
-    {label:"8.06",desc:"Hidradenitis suppurativa — bilateral axillae, inguinal, or perineal",color:"#9B59B6"},
-    {label:"8.07",desc:"Genetic photosensitivity — inability to function outside protective environment",color:"#9B59B6"},
-    {label:"Key",desc:"Most require 3+ months despite treatment. 'Extensive' = multiple body sites or critical areas. Burns → 1.00.",color:"#6C3483"}]},
-  "listing-10": {title:"10.00 Congenital (Adults)",steps:[
-    {label:"10.01",desc:"Non-mosaic Down syndrome — confirmed by karyotype or molecular testing",color:"#117A65"},
-    {label:"Approach",desc:"Other congenital disorders evaluated under AFFECTED body system, not 10.00",color:"#117A65"},
-    {label:"Examples",desc:"Heart defect→4.06 · Spina bifida→11.00 · Cleft palate→2.00 · PKU→12.00",color:"#1ABC9C"},
-    {label:"Children",desc:"Part B: low birth weight (100.04), catastrophic congenital disorders",color:"#1ABC9C"},
-    {label:"Key",desc:"Only Down syndrome has specific adult listing. All others → evaluate under affected body system.",color:"#117A65"}]},
-  "listing-14": {title:"14.00 Immune System",steps:[
-    {label:"14.02",desc:"Systemic lupus erythematosus — involvement of 2+ organs/body systems",color:"#D35400"},
-    {label:"14.04",desc:"Systemic vasculitis — involvement of 2+ organs",color:"#D35400"},
-    {label:"14.06",desc:"Undifferentiated/mixed connective tissue disease",color:"#E67E22"},
-    {label:"14.07",desc:"Inflammatory arthritis — persistent joint inflammation OR deformity",color:"#E67E22"},
-    {label:"14.09",desc:"Sjögren syndrome — involvement of 2+ organs",color:"#F39C12"},
-    {label:"14.11",desc:"HIV infection — specific complications or CD4 counts",color:"#F39C12"},
-    {label:"Key",desc:"Most require involvement of 2+ body systems with specified severity. Check repeated manifestations criteria.",color:"#D35400"}]},
-  "cdr-mirs": {title:"CDR: Medical Improvement Review Standard (8 Steps)",steps:[
-    {label:"Step 1",desc:"Is claimant engaged in SGA?",yes:"Cessation",no:"→ Step 2",color:"#1B4F72"},
-    {label:"Step 2",desc:"Medical improvement (MI) since CPD?",yes:"→ Step 3",no:"→ Step 4 (exceptions)",color:"#1B4F72"},
-    {label:"Step 3",desc:"Is MI related to ability to work?",yes:"→ Step 5",no:"→ Step 4 (exceptions)",color:"#21618C"},
-    {label:"Step 4",desc:"Does an exception apply?",yes:"Group I → cessation. Group II → Step 5.",no:"Continuance (still disabled)",color:"#2874A6"},
-    {label:"Step 5",desc:"Are current impairments severe?",yes:"→ Step 6",no:"Cessation",color:"#2E86C1"},
-    {label:"Step 6",desc:"Do impairments meet/equal Listings?",yes:"Continuance",no:"→ Step 7",color:"#3498DB"},
-    {label:"Step 7",desc:"Can claimant do past relevant work (current RFC)?",yes:"Cessation",no:"→ Step 8",color:"#5DADE2"},
-    {label:"Step 8",desc:"Can claimant do other work? (Grid rules, current RFC + vocational)",yes:"Cessation",no:"Continuance (still disabled)",color:"#85C1E9"}]},
-  "cdr-ftc": {title:"CDR FTC → Cessation Path",steps:[
-    {label:"CDR Notice",desc:"Claimant notified of CDR. Required to submit evidence / attend CE.",color:"#922B21"},
-    {label:"Non-Cooperation",desc:"Claimant fails to provide evidence, attend CE, or respond to contacts.",color:"#C0392B"},
-    {label:"Contact",desc:"Phone → 10 days → letter → 10 days. Special handling same as initial.",color:"#E74C3C"},
-    {label:"Aware?",desc:"Was claimant aware of obligation AND consequences of non-cooperation?",yes:"→ next",no:"Continue efforts. Document.",color:"#E74C3C"},
-    {label:"Good Cause?",desc:"Physical/mental limits, transport, weather, family emergency?",yes:"Reschedule / extend",no:"→ cessation",color:"#CB4335"},
-    {label:"Cessation",desc:"Benefits STOP. Cessation month = first month aware + knew repercussions + failed without good cause.",color:"#922B21"},
-    {label:"Key",desc:"CDR FTC is MORE serious than initial FTC — results in LOSS of existing benefits, not just denial.",color:"#641E16"}]},
+"sequential-eval": {title:"5-Step Sequential Evaluation",steps:[
+{label:"Step 1",desc:"Is claimant engaged in SGA?",yes:"Deny",no:"→ Step 2",color:"#2E75B6"},
+{label:"Step 2",desc:"Severe impairment?",yes:"→ Step 3",no:"Deny",color:"#2E75B6"},
+{label:"Step 3",desc:"Meets/equals a Listing?",yes:"Allow",no:"→ Step 4",color:"#2E75B6"},
+{label:"Step 4",desc:"Can do past relevant work?",yes:"Deny",no:"→ Step 5",color:"#2E75B6"},
+{label:"Step 5",desc:"Can adjust to other work?",yes:"Deny",no:"Allow",color:"#2E75B6"}]},
+"ce-workflow": {title:"CE Lifecycle",steps:[
+{label:"1. MER First",desc:"Exhaust medical evidence of record",color:"#0f3460"},
+{label:"2. CE Needed?",desc:"Insufficient/conflicting evidence? MC/PC approves",color:"#0f3460"},
+{label:"3. Source",desc:"Treating source preferred → independent qualified",color:"#16213e"},
+{label:"4. Schedule",desc:"Phone → explain consequences → written notice",color:"#16213e"},
+{label:"5. Follow Up",desc:"Reminder. Special handling for vulnerable populations",color:"#1a1a2e"},
+{label:"6. Exam",desc:"Source conducts exam, submits report",color:"#1a1a2e"},
+{label:"7. Review",desc:"Check adequacy. Corrections if deficient",color:"#333"}]},
+"missed-ce": {title:"Missed CE Decision Tree",steps:[
+{label:"CE Missed",desc:"Claimant did not attend",color:"#8B0000"},
+{label:"Short Notice?",desc:"≤10 days? → NOT FTC. Must reschedule.",color:"#B22222"},
+{label:"Refusal?",desc:"Said won't attend? → DI 23007.009",color:"#B22222"},
+{label:"Good Reason?",desc:"Illness, transport, weather? → Reschedule",color:"#CD5C5C"},
+{label:"Special?",desc:"<18, ≥65, homeless, MI, LEP? → Third party",color:"#CD5C5C"},
+{label:"Contact",desc:"Phone → 10d → letter → 10d",color:"#DC143C"},
+{label:"Determine",desc:"On evidence in file. PDN required.",color:"#8B0000"}]},
+"ftc-process": {title:"FTC Contact Sequence",steps:[
+{label:"Phone",desc:"Reach claimant. 10 calendar days.",color:"#663399"},
+{label:"No Answer",desc:"Try twice. → call-in letter.",color:"#7B4BB5"},
+{label:"Letter",desc:"Explain consequences. 10 days.",color:"#7B4BB5"},
+{label:"Third Party",desc:"Special handling: contact simultaneously.",color:"#9370DB"},
+{label:"Determine",desc:"Document all attempts. Determine on file.",color:"#9370DB"}]},
+"child-eval": {title:"Child Disability Evaluation",steps:[
+{label:"Steps 1-2",desc:"SGA + Severity (same as adults)",color:"#548235"},
+{label:"Step 3A",desc:"Meets/equals childhood Listing (Part B)?",color:"#6B8E23"},
+{label:"Step 3B",desc:"Functionally equals? (6 domains)",color:"#6B8E23"},
+{label:"Domains",desc:"Acquiring info · Attending tasks · Interacting · Moving · Self-care · Health",color:"#808000"},
+{label:"Standard",desc:"Marked in 2 OR extreme in 1 = disabled",color:"#548235"}]},
+"daa-eval": {title:"DAA Materiality",steps:[
+{label:"1. Disabled?",desc:"With ALL impairments including DAA?",color:"#BF8F00"},
+{label:"2. Without DAA?",desc:"Would remaining limitations be disabling?",color:"#D4A017"},
+{label:"3a. Yes",desc:"Not material → allowed",color:"#2d8a4e"},
+{label:"3b. No",desc:"Material → denied",color:"#c0392b"},
+{label:"If Allowed",desc:"Mandatory rep payee + treatment referral",color:"#DAA520"}]},
+"listing-1": {title:"1.00 Musculoskeletal (Adult)",steps:[
+{label:"1.15",desc:"Disorders of skeletal spine — compromise of nerve root or spinal cord",color:"#8B4513"},
+{label:"1.16",desc:"Lumbar spinal stenosis — narrowing of spinal canal",color:"#8B4513"},
+{label:"1.17",desc:"Reconstructive surgery of weight-bearing joint — inability to ambulate",color:"#A0522D"},
+{label:"1.18",desc:"Pathologic fractures due to any cause",color:"#A0522D"},
+{label:"1.20",desc:"Soft tissue injury (burns) requiring continuing treatment",color:"#CD853F"},
+{label:"Key",desc:"Most require inability to ambulate effectively OR inability to fine/gross movements with both upper extremities",color:"#8B4513"}]},
+"listing-12": {title:"12.00 Mental Disorders",steps:[
+{label:"Category",desc:"12.02 Neurocognitive · 12.03 Schizophrenia · 12.04 Depressive/Bipolar · 12.06 Anxiety · 12.07 Somatic · 12.08 Personality · 12.10 Autism · 12.11 Neurodevelopmental · 12.13 Eating · 12.15 Trauma",color:"#4B0082"},
+{label:"Paragraph A",desc:"Medical documentation of the disorder (specific criteria per listing)",color:"#6A0DAD"},
+{label:"Paragraph B",desc:"Extreme in 1 OR marked in 2: understand/remember, interact, concentrate/persist, adapt",color:"#7B2FBE"},
+{label:"Paragraph C",desc:"Alternative: serious/persistent (2+ yrs) + marginal adjustment",color:"#9B59B6"},
+{label:"Key",desc:"PRT documents B/C ratings. If neither B nor C met → assess mental RFC for Steps 4-5",color:"#4B0082"}]},
+"listing-3": {title:"3.00 Respiratory",steps:[
+{label:"3.02",desc:"Chronic respiratory disorders — FEV1 or DLCO values",color:"#2C6E49"},
+{label:"3.03",desc:"Asthma — exacerbations requiring inpatient hospitalization",color:"#2C6E49"},
+{label:"3.04",desc:"Cystic fibrosis — FEV1 or exacerbations",color:"#3D8B60"},
+{label:"3.09",desc:"Chronic pulmonary hypertension — mean PA pressure",color:"#3D8B60"},
+{label:"3.11",desc:"Lung transplant — considered disabled for 1 year",color:"#4EA87A"},
+{label:"Key",desc:"Most require specific spirometry or blood gas values. Check Part A tables.",color:"#2C6E49"}]},
+"listing-4": {title:"4.00 Cardiovascular",steps:[
+{label:"4.02",desc:"Chronic heart failure — systolic or diastolic, with specific findings",color:"#C0392B"},
+{label:"4.04",desc:"Ischemic heart disease — exercise tolerance test or angiography",color:"#C0392B"},
+{label:"4.05",desc:"Recurrent arrhythmias — syncope or near-syncope",color:"#E74C3C"},
+{label:"4.06",desc:"Symptomatic congenital heart disease",color:"#E74C3C"},
+{label:"4.09",desc:"Heart transplant — considered disabled for 1 year",color:"#FF6B6B"},
+{label:"Key",desc:"Most require specific test results (EF, ETT, cath). NYHA class alone is insufficient.",color:"#C0392B"}]},
+"listing-11": {title:"11.00 Neurological",steps:[
+{label:"11.02",desc:"Epilepsy — generalized tonic-clonic OR dyscognitive seizures despite treatment",color:"#1F618D"},
+{label:"11.04",desc:"Vascular insult to brain (stroke) — disorganization of motor function",color:"#1F618D"},
+{label:"11.06",desc:"Parkinsonian syndrome — disorganization of motor function",color:"#2E86C1"},
+{label:"11.09",desc:"Multiple sclerosis — disorganization of motor function or marked limitation in physical/mental functioning",color:"#2E86C1"},
+{label:"11.14",desc:"Peripheral neuropathy — disorganization of motor function in 2 extremities",color:"#3498DB"},
+{label:"Key",desc:"Most require 'extreme limitation' in ability to stand/walk, use hands, OR marked limitation in physical + mental functioning",color:"#1F618D"}]},
+"listing-13": {title:"13.00 Cancer (Malignant Neoplastic)",steps:[
+{label:"Approach",desc:"Look up cancer type → specific listing → check criteria",color:"#8E44AD"},
+{label:"13.05",desc:"Soft tissue cancers — head/neck, all sites with mets",color:"#8E44AD"},
+{label:"13.09",desc:"Breast — locally advanced, inflammatory, or with mets despite treatment",color:"#9B59B6"},
+{label:"13.14",desc:"Lung — non-small cell III+, small cell, mesothelioma",color:"#9B59B6"},
+{label:"13.22",desc:"Liver — not controlled by prescribed treatment",color:"#AF7AC5"},
+{label:"13.28",desc:"Cancer treated by bone marrow/stem cell transplant — disabled 12 months post-transplant",color:"#AF7AC5"},
+{label:"Key",desc:"Check specific tumor type listing. Many auto-allowed. Post-treatment residuals evaluated separately.",color:"#8E44AD"}]},
+"listing-2": {title:"2.00 Special Senses & Speech",steps:[
+{label:"2.02",desc:"Loss of central visual acuity — remaining vision in better eye 20/200 or less with correction",color:"#5B2C6F"},
+{label:"2.03",desc:"Contraction of visual field — widest diameter subtending 20 degrees or less in better eye",color:"#5B2C6F"},
+{label:"2.04",desc:"Loss of visual efficiency — visual efficiency of 20% or less in better eye after correction",color:"#7D3C98"},
+{label:"2.07",desc:"Disturbance of labyrinthine-vestibular function — disturbed balance, documented by specific tests",color:"#7D3C98"},
+{label:"2.09",desc:"Loss of speech — inability to produce speech by any means (including non-oral)",color:"#9B59B6"},
+{label:"2.10",desc:"Hearing loss not treated with cochlear implant — air/bone conduction averages",color:"#9B59B6"},
+{label:"2.11",desc:"Hearing loss treated with cochlear implant — considered disabled for 1 year post-implant",color:"#AF7AC5"},
+{label:"Key",desc:"Vision listings use BEST corrected acuity. Hearing requires audiometry meeting SSA standards. Cochlear implant = 1 year automatic.",color:"#5B2C6F"}]},
+"listing-9": {title:"9.00 Endocrine Disorders",steps:[
+{label:"Approach",desc:"No specific endocrine listings exist. Evaluate endocrine disorders under the body system AFFECTED by the disorder.",color:"#B7950B"},
+{label:"Diabetes",desc:"Evaluate under: 2.00 (diabetic retinopathy), 4.00 (cardiovascular), 6.00 (nephropathy), 11.00 (neuropathy), 1.00 (Charcot arthropathy)",color:"#B7950B"},
+{label:"Thyroid",desc:"Hypothyroid → evaluate fatigue/cognitive under 12.00 or cardiovascular under 4.00. Thyroid cancer → 13.00.",color:"#D4AC0D"},
+{label:"Adrenal",desc:"Adrenal insufficiency → evaluate under affected system. Cushing's → musculoskeletal (1.00), cardiovascular (4.00).",color:"#D4AC0D"},
+{label:"Pituitary",desc:"Growth hormone, prolactin disorders → evaluate under affected body system (vision 2.00, neurological 11.00)",color:"#F1C40F"},
+{label:"Key",desc:"ALWAYS cross-reference to the body system with the most severe manifestation. Multiple listings may apply for complications.",color:"#B7950B"}]},
+"listing-5": {title:"5.00 Digestive System",steps:[
+{label:"5.02",desc:"GI hemorrhaging — transfusion 2+ units blood, 3+ times/12mo, 30+ days apart",color:"#8B6914"},
+{label:"5.05",desc:"Chronic liver disease — esophageal/gastric varices hemorrhaging OR ascites",color:"#8B6914"},
+{label:"5.06",desc:"IBD (Crohn's/UC) — obstruction, 2+ hospitalizations, or specific complications",color:"#A67B2A"},
+{label:"5.07",desc:"Short bowel syndrome — surgical resection, nutritional status dependent",color:"#A67B2A"},
+{label:"5.08",desc:"Weight loss due to digestive disorder — BMI < 17.50 on 2+ occasions 60 days apart",color:"#C4923F"},
+{label:"5.09",desc:"Liver transplant — disabled 1 year post-transplant",color:"#C4923F"},
+{label:"Key",desc:"Most require specific labs, hospitalization frequency, or objective findings. Liver may overlap with 14.11 (HIV).",color:"#8B6914"}]},
+"listing-6": {title:"6.00 Genitourinary",steps:[
+{label:"6.02",desc:"Nephrotic syndrome — persistent 3+ months despite treatment, specific lab values",color:"#2471A3"},
+{label:"6.03",desc:"CKD with chronic hemodialysis or peritoneal dialysis",color:"#2471A3"},
+{label:"6.04",desc:"CKD with kidney transplant — disabled 1 year post-transplant",color:"#2E86C1"},
+{label:"6.06",desc:"Nephrogenic systemic fibrosis — documented by clinical/lab or tissue biopsy",color:"#2E86C1"},
+{label:"Key",desc:"Dialysis (6.03) and post-transplant (6.04) are straightforward. Verify dialysis is chronic, not temporary.",color:"#2471A3"}]},
+"listing-7": {title:"7.00 Hematological",steps:[
+{label:"7.02",desc:"Sickle cell — painful crises 3+/5mo, each 2+ days, requiring narcotics",color:"#922B21"},
+{label:"7.05",desc:"Hemolytic anemias — Hgb ≤ 7.0 on 2+ evals 3+ months apart despite treatment",color:"#922B21"},
+{label:"7.06",desc:"Thrombosis/hemostasis — spontaneous bleeding requiring transfusion 3+/5mo",color:"#C0392B"},
+{label:"7.07",desc:"Aplastic anemia/MDS — bone marrow failure with specific blood counts",color:"#C0392B"},
+{label:"7.08",desc:"Bone marrow/stem cell transplant — disabled 12 months post-transplant",color:"#E74C3C"},
+{label:"Key",desc:"Sickle cell needs hospital records with dates/duration/treatment. Post-transplant = 12mo auto.",color:"#922B21"}]},
+"listing-8": {title:"8.00 Skin Disorders",steps:[
+{label:"8.02",desc:"Ichthyosis — extensive lesions 3+ months despite treatment",color:"#6C3483"},
+{label:"8.03",desc:"Bullous disease — extensive lesions 3+ months despite treatment",color:"#6C3483"},
+{label:"8.04",desc:"Chronic skin/mucous membrane infections — 3+ months despite treatment",color:"#7D3C98"},
+{label:"8.05",desc:"Dermatitis (contact/atopic/exfoliative) — extensive involvement 3+ months",color:"#7D3C98"},
+{label:"8.06",desc:"Hidradenitis suppurativa — bilateral axillae, inguinal, or perineal",color:"#9B59B6"},
+{label:"8.07",desc:"Genetic photosensitivity — inability to function outside protective environment",color:"#9B59B6"},
+{label:"Key",desc:"Most require 3+ months despite treatment. 'Extensive' = multiple body sites or critical areas. Burns → 1.00.",color:"#6C3483"}]},
+"listing-10": {title:"10.00 Congenital (Adults)",steps:[
+{label:"10.01",desc:"Non-mosaic Down syndrome — confirmed by karyotype or molecular testing",color:"#117A65"},
+{label:"Approach",desc:"Other congenital disorders evaluated under AFFECTED body system, not 10.00",color:"#117A65"},
+{label:"Examples",desc:"Heart defect→4.06 · Spina bifida→11.00 · Cleft palate→2.00 · PKU→12.00",color:"#1ABC9C"},
+{label:"Children",desc:"Part B: low birth weight (100.04), catastrophic congenital disorders",color:"#1ABC9C"},
+{label:"Key",desc:"Only Down syndrome has specific adult listing. All others → evaluate under affected body system.",color:"#117A65"}]},
+"listing-14": {title:"14.00 Immune System",steps:[
+{label:"14.02",desc:"Systemic lupus erythematosus — involvement of 2+ organs/body systems",color:"#D35400"},
+{label:"14.04",desc:"Systemic vasculitis — involvement of 2+ organs",color:"#D35400"},
+{label:"14.06",desc:"Undifferentiated/mixed connective tissue disease",color:"#E67E22"},
+{label:"14.07",desc:"Inflammatory arthritis — persistent joint inflammation OR deformity",color:"#E67E22"},
+{label:"14.09",desc:"Sjögren syndrome — involvement of 2+ organs",color:"#F39C12"},
+{label:"14.11",desc:"HIV infection — specific complications or CD4 counts",color:"#F39C12"},
+{label:"Key",desc:"Most require involvement of 2+ body systems with specified severity. Check repeated manifestations criteria.",color:"#D35400"}]},
+"cdr-mirs": {title:"CDR: Medical Improvement Review Standard (8 Steps)",steps:[
+{label:"Step 1",desc:"Is claimant engaged in SGA?",yes:"Cessation",no:"→ Step 2",color:"#1B4F72"},
+{label:"Step 2",desc:"Medical improvement (MI) since CPD?",yes:"→ Step 3",no:"→ Step 4 (exceptions)",color:"#1B4F72"},
+{label:"Step 3",desc:"Is MI related to ability to work?",yes:"→ Step 5",no:"→ Step 4 (exceptions)",color:"#21618C"},
+{label:"Step 4",desc:"Does an exception apply?",yes:"Group I → cessation. Group II → Step 5.",no:"Continuance (still disabled)",color:"#2874A6"},
+{label:"Step 5",desc:"Are current impairments severe?",yes:"→ Step 6",no:"Cessation",color:"#2E86C1"},
+{label:"Step 6",desc:"Do impairments meet/equal Listings?",yes:"Continuance",no:"→ Step 7",color:"#3498DB"},
+{label:"Step 7",desc:"Can claimant do past relevant work (current RFC)?",yes:"Cessation",no:"→ Step 8",color:"#5DADE2"},
+{label:"Step 8",desc:"Can claimant do other work? (Grid rules, current RFC + vocational)",yes:"Cessation",no:"Continuance (still disabled)",color:"#85C1E9"}]},
+"cdr-ftc": {title:"CDR FTC → Cessation Path",steps:[
+{label:"CDR Notice",desc:"Claimant notified of CDR. Required to submit evidence / attend CE.",color:"#922B21"},
+{label:"Non-Cooperation",desc:"Claimant fails to provide evidence, attend CE, or respond to contacts.",color:"#C0392B"},
+{label:"Contact",desc:"Phone → 10 days → letter → 10 days. Special handling same as initial.",color:"#E74C3C"},
+{label:"Aware?",desc:"Was claimant aware of obligation AND consequences of non-cooperation?",yes:"→ next",no:"Continue efforts. Document.",color:"#E74C3C"},
+{label:"Good Cause?",desc:"Physical/mental limits, transport, weather, family emergency?",yes:"Reschedule / extend",no:"→ cessation",color:"#CB4335"},
+{label:"Cessation",desc:"Benefits STOP. Cessation month = first month aware + knew repercussions + failed without good cause.",color:"#922B21"},
+{label:"Key",desc:"CDR FTC is MORE serious than initial FTC — results in LOSS of existing benefits, not just denial.",color:"#641E16"}]},
 };
-
 const POMS_DATA = [
-  // ── SEQUENTIAL EVAL ──
-  {id:"di-11",s:"DI 22001",t:"Sequential Evaluation - Overview",c:"Sequential Eval",sh:"DI",r:3,tp:"5 step process evaluation framework sequential disability determination",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422001000",fl:"sequential-eval",
-    ex:"THE core framework. All adult claims follow 5 steps in order — cannot skip. If determinable at any step, stop. Step 1=SGA, 2=Severity, 3=Listings, 4=Past Work, 5=Other Work. Children: Steps 1-3 then functional equivalence.",
-    rm:["Never skip a step","Favorable at Step 3 → stop, no RFC","Steps 4-5 adults only","Document rationale at each step"],rl:["DI 22005","DI 22010","DI 22015","DI 22020","DI 22025"]},
-  {id:"di-12",s:"DI 22005",t:"Step 1 - SGA",c:"Sequential Eval",sh:"DI",r:3,tp:"step 1 SGA substantial gainful activity earnings",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422005000",
-    ex:"Working at SGA? If yes → deny at Step 1. SGA = monthly earnings threshold, updated annually. Blind SGA higher. Subsidies/IRWEs reduce earnings. Usually verified by FO.",
-    rm:["SGA changes annually","Blind SGA higher","IRWEs/subsidies reduce earnings","Self-employment: 3 tests"],rl:["DI 10501.015","DI 10505","DI 10520"]},
-  {id:"di-13",s:"DI 22010",t:"Step 2 - Severity",c:"Sequential Eval",sh:"DI",r:3,tp:"step 2 severe impairment severity basic work activities de minimis",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422010000",
-    ex:"Severe = significantly limits basic work activities. LOW bar (de minimis). More than minimal effect = severe. Consider ALL impairments combined. Step 2 denial rare.",
-    rm:["LOW bar — more than minimal = severe","ALL impairments combined","Step 2 denial rare","Duration (12mo) also here"],rl:["DI 25505"]},
-  {id:"di-14",s:"DI 22015",t:"Step 3 - Listings",c:"Sequential Eval",sh:"DI",r:3,tp:"step 3 meets equals listings impairment medical equivalence",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422015000",
-    ex:"Meets = every criterion satisfied. Equals = findings at least equal severity. MC/PC makes equivalence determination. If met → allow without RFC. Part A adults, Part B children.",
-    rm:["Check BOTH meets AND equals","MC/PC signature for equivalence","Meets → ALLOW, skip Steps 4-5","Mental: check B AND C criteria"],rl:["DI 34001","DI 34002","DI 24505"]},
-  {id:"di-15",s:"DI 22020",t:"Step 4 - Past Relevant Work",c:"Sequential Eval",sh:"DI",r:3,tp:"step 4 PRW past relevant work RFC job demands",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0422020000",
-    ex:"Can claimant do past work given RFC? PRW = last 15 years, long enough to learn, at SGA. Compare RFC to demands as actually AND generally performed (DOT). If either works → deny.",
-    rm:["PRW: 15 years, learned it, SGA","Compare BOTH ways","Complete RFC before Step 4","Not for children"],rl:["DI 24510","DI 24515","DI 25001"]},
-  {id:"di-16",s:"DI 22025",t:"Step 5 - Other Work (Grid Rules)",c:"Sequential Eval",sh:"DI",r:3,tp:"step 5 grid rules vocational age education skill other work",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0422025000",fl:"sequential-eval",
-    ex:"Grid tables combine RFC + age + education + experience → disabled/not disabled. Three tables: sedentary, light, medium. Exertional-only → directs. Nonexertional → framework. Burden shifts to SSA.",
-    rm:["Grids: sedentary, light, medium","Nonexertional = framework only","55+ sedentary unskilled = usually disabled","Burden on SSA at Step 5"],rl:["DI 25001","DI 25005","DI 25015"]},
-
-  // ── SGA ──
-  {id:"di-2",s:"DI 10501.015",t:"SGA General",c:"SGA",sh:"DI",r:3,tp:"SGA definition earnings substantial gainful activity monthly threshold",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410501015",
-    ex:"SGA = earnings threshold. Above SGA → not disabled at Step 1. Updated annually. Separate blind threshold. Applies differently during TWP and EPE.",
-    rm:["Changes annually","Blind SGA higher","Gross earnings","Subsidies/IRWEs reduce countable"],rl:["DI 10505","DI 10520"]},
-  {id:"di-3",s:"DI 10505",t:"SGA Earnings Guidelines",c:"SGA",sh:"DI",r:3,tp:"monthly SGA amounts blind trial work period TWP EPE",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410505000",
-    ex:"Contains actual SGA dollar amounts by year, TWP service month amounts, and blind SGA thresholds. Reference this for current year figures.",
-    rm:["Verify current year amounts","TWP threshold different from SGA","Blind threshold higher","Updated each January"],rl:["DI 10501.015"]},
-  {id:"di-4",s:"DI 10520",t:"SGA Deductions (IRWEs/Subsidies)",c:"SGA",sh:"DI",r:3,tp:"IRWEs subsidies impairment related work expenses deductions",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410520000",
-    ex:"IRWEs = impairment-related costs needed to work. Subsidies = difference between pay and actual work value. Both reduce countable earnings, potentially below SGA.",
-    rm:["IRWEs: related to impairment AND needed for work","Subsidies need employer docs","Self-employment separate rules","Also SSI: SI 00820.545"],rl:["DI 10501.015","SI 00820.545"]},
-  {id:"di-10515",s:"DI 10515",t:"SGA - Self-Employment",c:"SGA",sh:"DI",r:2,tp:"self employment SGA three tests significant services comparable earnings worth",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410515000",
-    ex:"Self-employment SGA uses 3 tests: Test One (significant services + substantial income), Test Two (comparable to non-disabled), Test Three (work worth SGA in terms of value). Applied in order.",
-    rm:["Three tests applied in order","'Significant services' = substantial involvement","Different from wage-earner SGA analysis","IRWEs and unincurred expenses apply"],rl:["DI 10501.015","DI 10520"]},
-
-  // ── MEDICAL EVAL ──
-  {id:"di-22",s:"DI 24501",t:"Medical Evaluation - General",c:"Medical Eval",sh:"DI",r:3,tp:"RFC assessment symptoms pain MC PC medical consultant role",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0424501000",
-    ex:"Master section for MC/PC role. MC (physician) handles physical; PC (psychologist/psychiatrist) handles mental. Every case requires MC/PC involvement: evaluate evidence, review CE requests, assess RFC, check listings.",
-    rm:["MC = physical. PC = mental.","MC/PC signs EVERY determination","MC/PC reviews CE requests","SDM authority ended 12/28/2018"],rl:["DI 24505","DI 24510","DI 24515"]},
-  {id:"di-23",s:"DI 24505",t:"Mental Impairments (PRT)",c:"Medical Eval",sh:"DI",r:3,tp:"PRT psychiatric review technique B criteria C criteria mental disorders",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0424505000",fl:"listing-12",
-    ex:"PRT documents: MDI exists, B criteria ratings (4 areas: understand/remember, interact, concentrate/persist, adapt — none→extreme). 2 marked OR 1 extreme = meets B. C criteria: serious/persistent + marginal adjustment.",
-    rm:["PRT REQUIRED for mental cases","B: 4 areas, need 2 marked OR 1 extreme","C: alternative to B","MRFC separate from PRT"],rl:["DI 24515","DI 34001"]},
-  {id:"di-24",s:"DI 24510",t:"Physical RFC Assessment",c:"Medical Eval",sh:"DI",r:3,tp:"physical RFC exertional nonexertional limitations residual functional capacity",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0424510000",
-    ex:"Physical RFC = maximum still doable. Exertional: sit/stand/walk/lift/carry/push/pull. Nonexertional: postural, manipulative, visual, communicative, environmental. Expressed as exertional level (sedentary→very heavy). Only at Step 4+.",
-    rm:["RFC = what they CAN do","Sedentary <10 lbs → very heavy 100+","Nonexertional erodes occupational base","Not needed if Step 3 allow"],rl:["DI 25001","DI 25005"]},
-  {id:"di-25",s:"DI 24515",t:"Mental RFC Assessment",c:"Medical Eval",sh:"DI",r:3,tp:"mental RFC MRFC work functions psychological limitations",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0424515000",
-    ex:"MRFC = function-by-function mental assessment for Steps 4-5. Areas: understanding/memory, concentration/persistence, social interaction, adaptation. Different from PRT. Both required for mental cases.",
-    rm:["MRFC ≠ PRT — both needed","Function-by-function","Moderate PRT ≠ same RFC limitation","Must be consistent with PRT"],rl:["DI 24505"]},
-
-  // ── MED-VOC ──
-  {id:"di-26",s:"DI 25001",t:"Medical-Vocational (Grid Rules)",c:"Med-Voc",sh:"DI",r:3,tp:"grid rules RFC vocational factors tables framework directing",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425001000",
-    ex:"Grid combines RFC level + age + education + experience. Three tables: sedentary, light, medium. Exertional-only → directs. Nonexertional → framework. No grids for heavy/very heavy.",
-    rm:["Three tables: sedentary, light, medium","Exertional-only → directs","Nonexertional → framework","Advanced age + sedentary + unskilled = disabled"],rl:["DI 25005","DI 25010","DI 25015"]},
-  {id:"di-27",s:"DI 25005",t:"Exertional Levels",c:"Med-Voc",sh:"DI",r:3,tp:"sedentary light medium heavy very heavy exertional definitions lifting",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425005000",
-    ex:"Sedentary: lift max 10 lbs, mostly sitting. Light: lift max 20 lbs, frequent 10 lbs, standing/walking 6hrs. Medium: lift max 50 lbs, frequent 25 lbs. Heavy: lift max 100 lbs. Very Heavy: 100+ lbs.",
-    rm:["Sedentary ≠ desk job — still lifting up to 10 lbs","Light requires 6 hrs standing/walking","These are SSA definitions, not DOL","RFC must specify exertional level"],rl:["DI 25001","DI 24510"]},
-  {id:"di-28",s:"DI 25010",t:"Transferability of Skills",c:"Med-Voc",sh:"DI",r:3,tp:"skill analysis transferability vocational semi-skilled skilled SVP",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425010000",
-    ex:"Skills from past work that can transfer to other jobs within the RFC. Unskilled (SVP 1-2), semi-skilled (SVP 3-4), skilled (SVP 5-9). Transfer requires: similar tools/processes, same industry, minimal vocational adjustment. Advanced age + no transfer = favorable.",
-    rm:["SVP 1-2 = unskilled, no transferable skills","Transfer requires similar tools/processes","Advanced age narrows transferability","Very closely related = same/similar industry"],rl:["DI 25001","DI 25015"]},
-  {id:"di-29",s:"DI 25015",t:"Age Categories",c:"Med-Voc",sh:"DI",r:3,tp:"younger closely approaching advanced age 50 55 borderline",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425015000",
-    ex:"<50 = younger. 50-54 = closely approaching. 55+ = advanced age. Borderline (within months) may use higher category. Age + RFC + education interact heavily.",
-    rm:["<50 younger, 50-54 closely approaching, 55+ advanced","Borderline → consider higher category","60+ sedentary no skills = almost always disabled","Age is vocational, not medical"],rl:["DI 25001","DI 25010"]},
-  {id:"di-25020",s:"DI 25020",t:"Education Categories",c:"Med-Voc",sh:"DI",r:2,tp:"education illiterate marginal limited high school college vocational",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425020000",
-    ex:"Illiteracy, marginal education (6th grade or less), limited education (7th-11th), high school+ (GED counts). Education interacts with age and skills. Lower education = more favorable for Grid rules.",
-    rm:["Illiterate = cannot read/write simple message","Marginal = 6th grade or less","Limited = 7th-11th grade","GED = high school equivalent"],rl:["DI 25001","DI 25015"]},
-
-  // ── ONSET/DURATION ──
-  {id:"di-33",s:"DI 25501",t:"Onset Date",c:"Onset/Duration",sh:"DI",r:3,tp:"EOD establishment AOD alleged onset established onset date",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425501000",
-    ex:"EOD = when disability began per evidence. AOD = claimant's claim. EOD can equal or be later than AOD. Cannot be earlier without consent. Title II: determines waiting period. SSI: benefits from filing month only.",
-    rm:["EOD ≤ AOD without consent prohibited","SSI: no retroactivity beyond filing","Title II: 5-month waiting period","Amendment requires SSA-831"],rl:["DI 25505"]},
-  {id:"di-34",s:"DI 25505",t:"Duration Requirement",c:"Onset/Duration",sh:"DI",r:3,tp:"12 month duration closed periods continuous impairment",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425505000",
-    ex:"Impairment must last or be expected to last 12+ continuous months or result in death. Closed periods (disability began and ended) are possible. Duration is evaluated at Step 2.",
-    rm:["12 months continuous OR expected to result in death","Closed periods allowed","Evaluated at Step 2","Consider combined effect of all impairments"],rl:["DI 25501","DI 22010"]},
-
-  // ── CHILD CLAIMS ──
-  {id:"di-30",s:"DI 25201",t:"Title XVI Child Claims",c:"Child Claims",sh:"DI",r:3,tp:"childhood disability functional equivalence child SSI under 18",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425201000",fl:"child-eval",
-    ex:"Different eval than adults. Steps 1-3, then functional equivalence (not RFC/vocational). Disabled if marked in 2 of 6 domains OR extreme in 1. Under 18. Age-18 redetermination uses adult standards.",
-    rm:["No RFC or vocational analysis","6 domains evaluated","Marked 2 OR extreme 1","Age-18 → adult standards"],rl:["DI 25205","DI 25210","DI 34002"]},
-  {id:"di-31",s:"DI 25205",t:"Functional Equivalence - 6 Domains",c:"Child Claims",sh:"DI",r:3,tp:"six domains acquiring attending interacting moving caring health marked extreme",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425205000",fl:"child-eval",
-    ex:"(1) Acquiring/Using Info (2) Attending/Completing Tasks (3) Interacting (4) Moving/Manipulating (5) Caring for Self (6) Health/Well-Being. Rated: none → extreme. Need marked in 2 OR extreme in 1.",
-    rm:["All impairments combined across domains","Age-appropriate peer comparison","Teachers/parents key evidence","Rated: none, less than marked, marked, extreme"],rl:["DI 25201","DI 25210"]},
-  {id:"di-32",s:"DI 25210",t:"Age-18 Redetermination",c:"Child Claims",sh:"DI",r:3,tp:"transition adult standard 18 redetermination child to adult",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425210000",
-    ex:"When SSI child turns 18, disability is redetermined using adult standards (5-step sequential evaluation). No longer uses functional equivalence. This is a new determination, not a CDR.",
-    rm:["New determination, not a CDR","Adult standards apply","Functional equivalence no longer used","Must be completed within 1 year of 18th birthday"],rl:["DI 25201","DI 22001"]},
-
-  // ── CDR ──
-  {id:"di-35",s:"DI 28001",t:"CDR Overview",c:"CDR",sh:"DI",r:3,tp:"medical improvement CDR continuing disability review MIRS diary",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0428001000",fl:"cdr-mirs",
-    ex:"CDR asks: medical improvement related to work ability? Uses MIRS (different from initial). Diary: MIE (6-18mo), MIP (3yr), MINE (5-7yr). CPD = prior favorable decision.",
-    rm:["MIRS ≠ initial eval standard","Must show improvement related to work","CPD = comparison point","MIE/MIP/MINE set at allowance"],rl:["DI 28005","DI 28075.005"]},
-  {id:"di-36",s:"DI 28005",t:"Medical Improvement Review Standard",c:"CDR",sh:"DI",r:3,tp:"MIRS comparison point exceptions medical improvement standard groups 8 step CDR process",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0428005000",fl:"cdr-mirs",
-    ex:"MIRS has 8 steps. Compare current medical condition to CPD. If improved AND improvement related to work ability → evaluate RFC. Exceptions exist (e.g., fraud, new medical evidence, technical improvement). Two groups of exceptions.",
-    rm:["8-step CDR process","Compare to CPD","Group I exceptions: benefits cease","Group II exceptions: continue benefits review"],rl:["DI 28001"]},
-
-  // ── LISTINGS ──
-  {id:"di-37",s:"DI 34001",t:"Listing of Impairments - Adult (Part A)",c:"Listings",sh:"DI",r:3,tp:"adult listings body systems musculoskeletal respiratory cardiovascular mental neurological cancer",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",
-    ex:"Part A = adult Listings by body system: 1.00 Musculoskeletal, 2.00 Senses/Speech, 3.00 Respiratory, 4.00 Cardiovascular, 5.00 Digestive, 6.00 Genitourinary, 7.00 Hematological, 8.00 Skin, 9.00 Endocrine, 10.00 Congenital, 11.00 Neurological, 12.00 Mental, 13.00 Cancer, 14.00 Immune.",
-    rm:["Body systems 1.00-14.00","Check meets AND equals","Updated periodically","Some require specific test results"],rl:["DI 22015","DI 34002"]},
-  {id:"di-38",s:"DI 34002",t:"Listing of Impairments - Child (Part B)",c:"Listings",sh:"DI",r:3,tp:"childhood listings Part B body systems child impairments",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434002000",
-    ex:"Part B = childhood Listings. Similar body system structure to Part A but with age-appropriate criteria. Some listings reference Part A with modifications. Low birth weight listings unique to Part B.",
-    rm:["Age-appropriate criteria","Some reference Part A","Low birth weight unique to Part B","If doesn't meet listing → functional equivalence"],rl:["DI 34001","DI 25201"]},
-
-  // ── DAA ──
-  {id:"di-39",s:"DI 90070",t:"DAA Evaluation Steps",c:"DAA",sh:"DI",r:3,tp:"drug addiction alcoholism DAA materiality substance abuse",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0490070000",fl:"daa-eval",
-    ex:"First: disabled with ALL impairments (incl DAA)? If yes: would remaining limitations disable WITHOUT DAA? Yes → not material (allowed). No → material (denied). If allowed with DAA → mandatory rep payee + treatment referral.",
-    rm:["Evaluated AFTER finding disability","Key: disabled WITHOUT DAA?","Material → denied","Allowed w/DAA → rep payee"],rl:[]},
-
-  // ── SPECIAL ISSUES ──
-  {id:"di-20",s:"DI 23007",t:"Failure to Cooperate - Overview",c:"Special Issues",sh:"DI",r:3,tp:"FTC failure cooperate insufficient evidence",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007000",fl:"ftc-process",
-    ex:"FTC: claimant won't cooperate with evidence/CE. Purpose: ENCOURAGE cooperation. Special handling for vulnerable populations. Document all contacts. After exhausting procedures → determine on file.",
-    rm:["Purpose: ENCOURAGE, not punish","Special: <18, ≥65, homeless, MI, LEP","Phone → letter → third party","PDN must explain"],rl:["DI 23007.001","DI 23007.005","DI 23007.009","DI 23007.010"]},
-  {id:"di-21b",s:"DI 23022",t:"Terminal Illness (TERI)",c:"Special Issues",sh:"DI",r:3,tp:"TERI terminal illness expedited processing flag priority",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0423022000",
-    ex:"TERI = expected to result in death. Process ASAP. Don't wait for evidence if allowance supportable. Prioritize above all other work.",
-    rm:["Process ASAP — top priority","Don't wait if allowable","CAL often overlaps with TERI","FO or DDS can set TERI flag"],rl:[]},
-  {id:"di-cal",s:"DI 23020",t:"Compassionate Allowances (CAL)",c:"Special Issues",sh:"DI",r:3,tp:"CAL compassionate allowances expedited conditions list",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0423020000",
-    ex:"CAL conditions are so severe they obviously meet disability standard with minimal objective medical evidence. Over 260 conditions (rare diseases, cancers, brain disorders). Identified by system flag or DDS. Process quickly — usually allow at Step 3.",
-    rm:["260+ conditions on CAL list","Minimal evidence needed","Usually allow at Step 3","Check SSA CAL list online"],rl:["DI 23022"]},
-  {id:"di-qdd",s:"DI 11011",t:"Quick Disability Determination (QDD)",c:"Initial Claims",sh:"DI",r:3,tp:"QDD predictive model expedited fast track quick",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411011000",
-    ex:"QDD uses a predictive model to identify claims with high probability of allowance. Flagged cases should be processed within 20 days if possible. DDS still makes full determination — QDD is just prioritization, not a predetermined outcome.",
-    rm:["Predictive model — not predetermined","Target 20 days processing","DDS still does full evaluation","Flag doesn't guarantee allowance"],rl:["DI 23020"]},
-
-  // ── INITIAL CLAIMS ──
-  {id:"di-5",s:"DI 11005",t:"Disability Interviews",c:"Initial Claims",sh:"DI",r:2,tp:"interview procedures forms documentation field office",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411005000",
-    ex:"FO conducts disability interviews, collects forms (SSA-3368, SSA-3369, SSA-827, etc.), documents work history, and routes case to DDS. Quality of interview affects DDS development needs.",
-    rm:["SSA-3368 = Function Report","SSA-3369 = Work History","SSA-827 = Authorization for Source","Quality intake → less DDS development"],rl:["DI 11010"]},
-  {id:"di-8",s:"DI 11015",t:"Presumptive Disability/Blindness",c:"Initial Claims",sh:"DI",r:3,tp:"PD PB presumptive categories emergency advance SSI",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411015000",
-    ex:"PD/PB allows immediate SSI payments before formal determination if the impairment is likely to be found disabling. Categories include: total blindness, total deafness, amputation of leg at hip, bed-bound/immobile, allegation of HIV with specific findings. Up to 6 months of presumptive payments.",
-    rm:["SSI only — not Title II","Up to 6 months payments","Specific categories qualify","Still need formal determination"],rl:["SI 00501"]},
-  {id:"di-9",s:"DI 11055",t:"SSI Disability Cases",c:"Initial Claims",sh:"DI",r:2,tp:"SSI specific processing concurrent claims title XVI",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411055000",
-    ex:"SSI-specific disability processing rules. Concurrent claims (Title II + XVI filed together) follow specific routing. SSI has no 5-month waiting period, no retroactive benefits beyond filing month.",
-    rm:["No waiting period for SSI","No retroactivity beyond filing month","Concurrent = both Title II + XVI","Special routing rules"],rl:["SI 00501"]},
-
-  // ── DDS PROCEDURES ──
-  {id:"di-10",s:"DI 20101",t:"DDS Jurisdiction",c:"DDS Procedures",sh:"DI",r:3,tp:"DDS authority jurisdiction transfers state agency",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0420101000",
-    ex:"DDS has jurisdiction over initial disability determinations and most CDRs within its state. Cases can be transferred between DDSs when claimant moves. Federal components (ODAR, OQR) handle certain cases.",
-    rm:["State DDS handles initials + most CDRs","Transfers when claimant moves","Federal components for appeals","Jurisdiction based on claimant residence"],rl:[]},
-  {id:"di-22505",s:"DI 22505",t:"Case Development - General",c:"Case Development",sh:"DI",r:3,tp:"evidence gathering MER medical evidence CE ordering development sufficiency",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422505000",
-    ex:"Master section for evidence development. Priority: (1) MER from treating sources, (2) Other medical sources, (3) CE only if needed. Sufficiency = enough evidence to determine. Document all development efforts. 12-month lookback for MER.",
-    rm:["MER first, always","12-month lookback for MER","Document all development efforts","CE is last resort"],rl:["DI 22510.001","DI 22515"]},
-
-  // ── APPEALS ──
-  {id:"di-recon",s:"DI 12015",t:"Reconsideration",c:"Appeals",sh:"DI",r:2,tp:"reconsideration recon appeal first level disability hearing",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0412015000",
-    ex:"First level of appeal. New examiner and MC/PC at DDS review entire case de novo. Claimant can submit new evidence. Some states have disability hearing (face-to-face) at recon level. 60-day filing deadline from initial determination.",
-    rm:["New examiner + MC/PC review","De novo — fresh look at everything","60-day filing deadline","Some states: disability hearing at recon"],rl:[]},
-
-  // ═══ CE SECTIONS ═══
-  {id:"ce-1",s:"DI 22510.001",t:"Introduction to CEs",c:"CE Overview",sh:"CE",r:3,tp:"CE definition purchased exam SSA telehealth THCE",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510001",wf:"1-Before ordering",fl:"ce-workflow",
-    ex:"CE = purchased exam when MER insufficient. In-person, telehealth, video. Source: licensed, no sanctions. SSA pays. LAST RESORT after MER.",
-    rm:["Last resort — MER first","SSA pays, free to claimant","Licensed, no sanctions","Telehealth = claimant agreement"],rl:["DI 22510.005","DI 22505"]},
-  {id:"ce-2",s:"DI 22510.005",t:"When to Purchase a CE",c:"CE Overview",sh:"CE",r:3,tp:"order CE insufficient conflict ambiguity MER first",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510005",wf:"1-Before ordering",
-    ex:"Two grounds: insufficient evidence OR conflict/ambiguity. Exhaust MER. MC/PC approves. Don't order if decidable on current evidence.",
-    rm:["Insufficient OR conflict","MER first, document efforts","MC/PC approves","Don't order if decidable"],rl:["DI 22510.001","DI 22510.006"]},
-  {id:"ce-3",s:"DI 22510.006",t:"When NOT to Purchase a CE",c:"CE Overview",sh:"CE",r:3,tp:"do not order sufficient evidence claimant refuses DLI favorable",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510006",wf:"1-Before ordering",
-    ex:"Don't order if: sufficient evidence exists, claimant refuses (see 23007.009), DLI passed with no retroactive possibility, or favorable possible on current evidence.",
-    rm:["Sufficient evidence = no CE","Refusal → DI 23007.009","Past DLI + no retroactive = don't","Favorable possible = don't"],rl:["DI 22510.005","DI 23007.009"]},
-  {id:"ce-4",s:"DI 22510.010",t:"Selecting CE Source",c:"Source Selection",sh:"CE",r:3,tp:"treating source preferred independent licensed qualified provider",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510010",wf:"2-Source selection",
-    ex:"Preference order: (1) Treating source (preferred — knows the claimant), (2) Independent qualified source. Source must be qualified for the specific exam type. Cannot use sources with disqualification or exclusion from SSA programs.",
-    rm:["Treating source preferred","Must be qualified for specific exam","No disqualified/excluded sources","Check SSA provider list"],rl:["DI 22510.013"]},
-  {id:"ce-5",s:"DI 22510.013",t:"Telehealth CE (THCE)",c:"Source Selection",sh:"CE",r:2,tp:"telehealth THCE audio video remote CE agreement",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510013",wf:"2-Source selection",
-    ex:"THCE = audio-video CE conducted remotely. Requires claimant agreement. Some exams not feasible via telehealth (those requiring physical contact). DDS determines if THCE is appropriate for the specific exam type.",
-    rm:["Requires claimant agreement","Not all exams feasible remotely","DDS determines appropriateness","Physical contact exams = in-person only"],rl:["DI 22510.010"]},
-  {id:"ce-6",s:"DI 22510.016",t:"CE Notice & Confirmation",c:"CE Scheduling",sh:"CE",r:3,tp:"phone first consequences written notice third party special handling interpreter",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510016",wf:"3-Scheduling",fl:"ce-workflow",
-    ex:"(1) Phone first (2) Explain consequences (3) Written notice (4) Special handling: third party, free interpreter, accommodations (5) Notify rep.",
-    rm:["ALWAYS phone first","Must explain consequences","Free interpreter for LEP","Special handling: proactive third party"],rl:["DI 22510.019"],al:"Must explain consequences of non-attendance"},
-  {id:"ce-7",s:"DI 22510.016 (Alt)",t:"Short-Notice CE (≤10 days)",c:"CE Scheduling",sh:"CE",r:3,tp:"short notice 10 days not FTC must reschedule",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510016",wf:"3-Scheduling",
-    ex:"≤10 days notice: standard follow-up rules don't apply. CRITICAL: no-show is NOT FTC per DI 23007.010B. MUST reschedule. Protects claimants.",
-    rm:["≤10 days = short notice","Follow-up rules don't apply","No-show is NOT FTC","MUST reschedule"],rl:["DI 23007.010"],al:"Short-notice CE (≤10 days): no-show is NOT FTC — MUST reschedule"},
-  {id:"ce-9",s:"DI 22510.019",t:"CE Follow-Up & Reminder",c:"CE Follow-Up",sh:"CE",r:3,tp:"follow up reminder third party homeless mental immediately",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510019",wf:"4-Follow-up",
-    ex:"After notice: confirm call, reminder. Homeless/MI → third party IMMEDIATELY. Assist homeless with travel. Document all follow-up.",
-    rm:["Homeless/MI: third party NOW","Assist with travel","Reminder before CE","Document everything"],rl:["DI 22510.016","DI 23007.010"],al:"Homeless/MI: involve third party IMMEDIATELY"},
-  {id:"ce-10",s:"DI 23007.001",t:"FTC Definitions",c:"Missed CE",sh:"CE",r:3,tp:"failure cooperate definition special handling under 18 over 65 homeless MI LEP third party good reason",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007001",wf:"5-Missed CE",fl:"missed-ce",
-    ex:"FTC = won't cooperate. Special handling: ALL <18, ≥65 w/o rep, homeless, MI, LEP. Third party: SSA-3368 §2 or SSA-3441 §1.D. Good reasons: illness, transport, weather, death, limitations.",
-    rm:["Special: <18, ≥65, homeless, MI, LEP","Third party: SSA-3368/3441","Don't reuse prior third parties","Good reasons: illness, transport, weather"],rl:["DI 23007.005","DI 23007.009","DI 23007.010"]},
-  {id:"ce-11",s:"DI 23007.005",t:"Contacting Claimant for FTC",c:"Missed CE",sh:"CE",r:3,tp:"phone 10 days call-in letter representative third party document",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007005",wf:"5-Missed CE",
-    ex:"Phone → explain consequences → 10 calendar days. If unreachable → call-in letter → 10 more days. Contact rep if appointed. For special handling: third party simultaneously. Document every attempt.",
-    rm:["Phone first, always","10 calendar days each round","Document EVERY attempt","Special handling: simultaneous third party"],rl:["DI 23007.001","DI 23007.009"],al:"10 calendar days to comply after each contact"},
-  {id:"ce-12",s:"DI 23007.009",t:"Refusal to Attend CE",c:"Missed CE",sh:"CE",r:3,tp:"refusal will not attend good reason treating source reschedule PDN",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007009",wf:"5-Missed CE",fl:"missed-ce",
-    ex:"REFUSAL = explicit 'I will not attend' without good reason. ≠ no-show. Good reason → reschedule. Treating source says no → STOP CE entirely. No good reason → determine on file.",
-    rm:["Refusal ≠ no-show","Good reason → reschedule","TS advised no → STOP development","No reason → determine on file"],rl:["DI 23007.010","DI 23007.015"],al:"Good reason = reschedule. TS no = STOP CE."},
-  {id:"ce-13",s:"DI 23007.010",t:"Failure to Attend CE",c:"Missed CE",sh:"CE",r:3,tp:"no show failure attend different refusal third party reschedule short notice",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007010",wf:"5-Missed CE",fl:"missed-ce",
-    ex:"No-show ≠ refusal. Phone → 10d → letter → 10d. Special handling → third party simultaneously. Good reason → reschedule. ≤10-day CE no-show = NOT FTC, must reschedule.",
-    rm:["No-show ≠ refusal","Phone → 10d → letter → 10d","≤10-day no-show = NOT FTC","Special: third party simultaneous"],rl:["DI 23007.009","DI 23007.015"],al:"No-show ≠ refusal. ≤10-day = NOT FTC."},
-  {id:"ce-14",s:"DI 23007.015",t:"Determining on Evidence in File",c:"Missed CE",sh:"CE",r:3,tp:"FTC exhausted determine evidence file PDN favorable unfavorable",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007015",wf:"6-Determination",
-    ex:"After ALL procedures exhausted → determine on available evidence. NOT automatic denial. Normal sequential eval. PDN must explain: what requested, FTC, basis of determination.",
-    rm:["Not automatic denial","PDN explains FTC","Exhaust ALL procedures first","Normal sequential eval"],rl:["DI 23007.009","DI 23007.010"]},
-  {id:"ce-15",s:"DI 28075.005",t:"CDR FTC/WU",c:"CDR FTC",sh:"CE",r:3,tp:"CDR FTC cessation benefits stopped first month aware whereabouts unknown",url:"https://secure.ssa.gov/poms.nsf/lnx/0428075005",wf:"CDR context",fl:"cdr-ftc",
-    ex:"CDR FTC → cessation. Cessation month = first month aware + knew repercussions + failed. Benefits STOP. Different from initial FTC.",
-    rm:["CDR FTC → CESSATION","First month aware + knew + failed","Different from initial","Document everything"],rl:["DI 28001"],al:"CDR FTC → cessation of benefits"},
-  {id:"ce-16",s:"DI 22510.020",t:"Reviewing CE Reports",c:"CE Quality",sh:"CE",r:3,tp:"CE report review adequacy deficient correction completeness",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510020",wf:"7-Post-CE",
-    ex:"Check: completeness, clinical findings (objective), consistency, supported diagnoses. Deficient → corrections. Don't accept inadequate reports.",
-    rm:["Completeness, findings, consistency","Deficient → request corrections","Don't accept inadequate reports","Delays case if redo"],rl:["DI 22510.070"]},
-  {id:"ce-17",s:"DI 22510.070",t:"Life-Threatening CE Finding",c:"CE Quality",sh:"CE",r:3,tp:"life threatening immediate notification emergency",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510070",wf:"7-Post-CE",
-    ex:"CE reveals life-threatening condition → IMMEDIATE notification. CE source should notify. If not, DDS ensures it. Safety obligation.",
-    rm:["IMMEDIATE — no delay","Source notifies claimant","DDS ensures if source didn't","Document in file"],rl:["DI 22510.020"],al:"IMMEDIATE action — life-threatening"},
-  {id:"ce-18",s:"DI 39545.275",t:"Missed CE Payment",c:"CE Fiscal",sh:"CE",r:2,tp:"no pay missed CE nominal fee record review",url:"https://secure.ssa.gov/poms.nsf/lnx/0439545275",wf:"Admin",
-    ex:"No-pay for missed CEs. Nominal fee possible for record review time only.",
-    rm:["No-pay policy","Nominal fee: record review only","State fee schedule","Administrative matter"],rl:[]},
-  {id:"ce-19",s:"DI 11018.005",t:"FTC at Field Office",c:"FO FTC",sh:"CE",r:2,tp:"FO denial codes 000M5 000M6 field office DLI closeout",url:"https://secure.ssa.gov/poms.nsf/lnx/0411018005",wf:"FO context",
-    ex:"FO handles certain FTC situations (failure to file, whereabouts unknown). Denial codes 000M5 (FTC) and 000M6 (whereabouts unknown). FO does the closeout, not DDS.",
-    rm:["FO jurisdiction, not DDS","000M5 = FTC at FO","000M6 = whereabouts unknown","Check DLI before closeout"],rl:[]},
-  {id:"ce-20",s:"DI 25205.020",t:"Child Claim FTC",c:"Child CE",sh:"CE",r:3,tp:"child under 18 special efforts FTC childhood additional steps",url:"https://secure.ssa.gov/poms.nsf/lnx/0425205020",wf:"Special populations",
-    ex:"ALL child claims (<18) require special FTC efforts. Additional steps beyond standard FTC. Must contact parents/guardians. Document additional efforts for children.",
-    rm:["ALL <18 = special handling","Contact parents/guardians","Additional steps required","Document extra efforts"],rl:["DI 23007.001"],al:"ALL <18 require special FTC handling"},
-
-  // ═══ SI SECTIONS ═══
-  {id:"si-1",s:"SI 00501",t:"SSI Eligibility Overview",c:"Eligibility",sh:"SI",r:3,tp:"age blindness disability requirements residency citizenship SSI",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500501000",
-    ex:"SSI: age 65+ OR blind OR disabled + income limits + resources ($2K/$3K) + US resident + citizen/qualified alien. Needs-based, no work history. General revenue funded.",
-    rm:["Needs-based — no work history","$2K/$3K resources","US resident + citizen/alien","Benefits: month after filing"],rl:["SI 00810","SI 01110"]},
-  {id:"si-2",s:"SI 00510",t:"Living Arrangements",c:"Eligibility",sh:"SI",r:2,tp:"FLA codes household ISM living arrangement in-kind",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500510000",
-    ex:"Living arrangement codes affect SSI payment amount. Determines if ISM (In-Kind Support and Maintenance) rules apply. Own household vs. another's household vs. institution. FLA code set by FO.",
-    rm:["FLA affects payment amount","Own household vs. another's","Institutional rules different","FO determines FLA code"],rl:["SI 00835"]},
-  {id:"si-3",s:"SI 00520",t:"Institutionalization",c:"Eligibility",sh:"SI",r:2,tp:"public institutions $30 payment Medicaid institutionalized",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500520000",
-    ex:"Public institution residents generally ineligible for SSI. Exception: $30 payment limit for Medicaid-eligible institutionalized individuals. Temporary absences may maintain eligibility.",
-    rm:["Public institution = generally ineligible","$30 payment exception","Medicaid-eligible exception","Temporary absences may maintain"],rl:["SI 00501"]},
-  {id:"si-4",s:"SI 00810",t:"Income Rules - General",c:"Income",sh:"SI",r:3,tp:"income definition types earned unearned in-kind deemed",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500810000",
-    ex:"Income = cash/in-kind for food/shelter. Earned (wages, self-employment) + unearned (pensions, SS, gifts). Exclusions: $20 general + $65 earned + 50% remaining earned.",
-    rm:["Two types: earned + unearned","$20 + $65 + ½ exclusions","ISM is also income","See SI 00815 for exclusions"],rl:["SI 00815","SI 00820","SI 00835"]},
-  {id:"si-5",s:"SI 00815",t:"What Is Not Income",c:"Income",sh:"SI",r:2,tp:"medical social services exclusions not income",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500815000",
-    ex:"Items that are NOT income for SSI: medical care/services, social services, receipts from sale of resources, income tax refunds, weatherization assistance, and many others.",
-    rm:["Medical care not income","Tax refunds not income","Replacement of lost resource not income","Check full list"],rl:["SI 00810"]},
-  {id:"si-6",s:"SI 00820",t:"Earned Income",c:"Income",sh:"SI",r:3,tp:"wages self-employment sheltered workshop earned income",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500820000",
-    ex:"Earned income = wages, net earnings from self-employment, payments from sheltered workshops, royalties (active), and certain other forms. $65 exclusion + ½ remaining earned income before reducing SSI payment.",
-    rm:["$65 exclusion + ½ remaining","Sheltered workshop = earned","Self-employment = net earnings","Applied after $20 general exclusion"],rl:["SI 00810","SI 00820.545"]},
-  {id:"si-7",s:"SI 00830",t:"Unearned Income",c:"Income",sh:"SI",r:3,tp:"unearned income pension annuity Social Security deemed",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500830000",
-    ex:"Unearned income: pensions, SS benefits, annuities, gifts, prizes, interest, dividends, rents, deemed income from spouse/parent/sponsor. $20 general exclusion applied first.",
-    rm:["SS benefits = unearned income","$20 general exclusion applies","Deemed income counted here","In-kind = unearned"],rl:["SI 00810","SI 00835"]},
-  {id:"si-9",s:"SI 00835",t:"In-Kind Support & Maintenance",c:"ISM",sh:"SI",r:2,tp:"ISM PMV presumed maximum value VTR third party",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500835000",
-    ex:"ISM = food/shelter provided by someone else. Valued using PMV (Presumed Maximum Value) rule or actual value (if less). PMV = ⅓ FBR + $20. Can be rebutted with actual value evidence.",
-    rm:["ISM = food/shelter from others","PMV = ⅓ FBR + $20","Can rebut PMV with actual value","Living arrangement affects ISM"],rl:["SI 00510","SI 00810"]},
-  {id:"si-10",s:"SI 01110",t:"Resources - General",c:"Resources",sh:"SI",r:3,tp:"resource $2000 $3000 limits countable assets",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501110000",
-    ex:"Resources = things owned convertible to cash. $2K individual / $3K couple. Counted on 1st of month. Excluded: home, vehicle (usually), household goods, burial $1,500, life insurance ≤$1,500.",
-    rm:["$2K/$3K on 1st of month","Home excluded","One vehicle usually excluded","Many exclusions — SI 01130"],rl:["SI 01130","SI 01140"]},
-  {id:"si-11",s:"SI 01130",t:"Resource Exclusions",c:"Resources",sh:"SI",r:3,tp:"home vehicle burial PASS life insurance excluded resources",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501130000",
-    ex:"Excluded resources: home (regardless of value), one vehicle (with exceptions), household goods/personal effects, burial fund up to $1,500, life insurance ≤$1,500 face value, PASS resources, property for self-support.",
-    rm:["Home always excluded","Vehicle rules have exceptions","Burial + life insurance limits","PASS resources excluded"],rl:["SI 01110","SI 01140"]},
-  {id:"si-12",s:"SI 01140",t:"Trusts",c:"Resources",sh:"SI",r:3,tp:"trust evaluation special needs SNT countable resource rules",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501140000",
-    ex:"Trust evaluation for SSI resources: revocable trusts = countable resource. Irrevocable trusts: depends on circumstances. Special Needs Trusts (SNTs): certain types excluded (d)(4)(A) self-settled, (d)(4)(C) pooled trusts. POMS SI 01120.200+ covers exceptions.",
-    rm:["Revocable = countable","(d)(4)(A) = self-settled SNT excluded","(d)(4)(C) = pooled trust excluded","Complex rules — check SI 01120.200"],rl:["SI 01110","SI 01130"]},
-  {id:"si-13",s:"SI 01310",t:"Deeming - General",c:"Deeming",sh:"SI",r:3,tp:"spouse parent child sponsor deeming income resources",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501310000",
-    ex:"Deeming: non-SSI person's income/resources counted for SSI claimant. Types: spouse-to-spouse, parent-to-child (<18), sponsor-to-alien. Allocations for others reduce deemed amount. Stops when relationship ends.",
-    rm:["Three types","Allocations reduce","Stops at separation/age 18","Complex — SI 01320 for calcs"],rl:["SI 01320"]},
-  {id:"si-14",s:"SI 02302",t:"Section 1619(a) and (b)",c:"Work Incentives",sh:"SI",r:3,tp:"continued SSI Medicaid working 1619 thresholds",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0502302000",
-    ex:"1619(a) = SSI continues (reduced) above SGA. 1619(b) = Medicaid continues even at $0 SSI. State-specific thresholds. Removes Medicaid loss fear.",
-    rm:["1619(a) = SSI cash continues","1619(b) = Medicaid at $0 SSI","State thresholds for 1619(b)","Critical work incentive"],rl:["SI 00870","SI 00820.545"]},
-  {id:"si-15",s:"SI 00870",t:"PASS Plans",c:"Work Incentives",sh:"SI",r:3,tp:"PASS plan self-support excludable resources income",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500870000",
-    ex:"Plan to Achieve Self-Support: allows SSI recipients to set aside income/resources for a work goal without affecting SSI eligibility. PASS must have specific occupational goal, be approved by SSA, and be regularly reviewed.",
-    rm:["Excludes income AND resources","Must have specific work goal","SSA must approve","Reviewed periodically"],rl:["SI 02302"]},
-  {id:"si-16",s:"SI 00820.545",t:"IRWEs for SSI",c:"Work Incentives",sh:"SI",r:3,tp:"IRWE impairment related work expenses SSI deductions",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500820545",
-    ex:"IRWEs deducted from earned income for SSI payment calculation. Must be: directly related to impairment, necessary for work, paid by claimant, reasonable cost, not reimbursed. Same concept as DI 10520 but applied to SSI income rules.",
-    rm:["Deducted from earned income","Must relate to impairment + work","Not reimbursed","Same concept as DI 10520"],rl:["DI 10520","SI 00820"]},
-
-  // ── GN CROSS-REFS ──
-  {id:"gn-1",s:"GN 00201",t:"Applications - General",c:"GN Cross-Ref",sh:"DI",r:2,tp:"applications filing date protective filing Title II XVI",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0200201000",
-    ex:"Application rules: filing date vs protective filing date, which applications to use, deemed filing (filing for one title may be deemed filing for both). Protective filing preserves earliest possible entitlement date.",
-    rm:["Filing date matters for benefits","Protective filing = earliest date","Deemed filing for concurrent","FO handles applications"],rl:[]},
-  {id:"gn-2",s:"GN 00301",t:"Evidence Requirements",c:"GN Cross-Ref",sh:"DI",r:2,tp:"evidence standards proof identity age citizenship documentation",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0200301000",
-    ex:"General evidence requirements for all claims: proof of identity, age, citizenship/alien status, SSN, and other non-disability factors. Standards for what constitutes acceptable evidence.",
-    rm:["Non-disability evidence rules","Identity + age + citizenship","FO primarily handles","Standards for acceptability"],rl:[]},
-  {id:"gn-3",s:"GN 03101",t:"Authorized Representatives",c:"GN Cross-Ref",sh:"DI",r:2,tp:"authorized representative appointed rep claimant advocate attorney",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0203101000",
-    ex:"Rules for appointed representatives (attorneys and non-attorneys). Must have SSA Form SSA-1696. Rep can act on claimant's behalf, receive notices, submit evidence. DDS must recognize and communicate with appointed reps.",
-    rm:["SSA-1696 = appointment form","Rep acts on claimant's behalf","Must send copies of notices to rep","Can be attorney or non-attorney"],rl:[]},
-
-  // ── BODY SYSTEM LISTING ENTRIES ──
-  {id:"di-ls2",s:"Listing 2.00",t:"Special Senses & Speech Listings",c:"Listings",sh:"DI",r:2,tp:"vision hearing speech blindness acuity visual field audiometry cochlear implant labyrinthine vestibular",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-2",
-    ex:"Body system 2.00 covers vision loss (central acuity, visual field contraction, visual efficiency), hearing loss (with and without cochlear implant), vestibular/balance disorders, and loss of speech. Vision uses BEST corrected acuity. Hearing requires audiometry meeting SSA standards. Cochlear implant recipients are considered disabled for 1 year post-implant, then re-evaluated. Statutory blindness (20/200 or less in better eye) has special SGA and benefit rules.",
-    rm:["Vision = best CORRECTED acuity","20/200 or less = statutory blindness","Cochlear implant = 1 year automatic","Audiometry must meet SSA standards","Statutory blindness has different SGA threshold"],rl:["DI 34001","DI 10501.015"]},
-  {id:"di-ls9",s:"Listing 9.00",t:"Endocrine Disorders Listings",c:"Listings",sh:"DI",r:2,tp:"endocrine diabetes thyroid adrenal pituitary hormonal no specific listing cross-reference affected system",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-9",
-    ex:"CRITICAL: There are NO specific endocrine listings. Endocrine disorders are evaluated under the body system most affected. Diabetes → evaluate retinopathy (2.00), cardiovascular (4.00), nephropathy (6.00), neuropathy (11.00), Charcot arthropathy (1.00). Thyroid → cognitive/fatigue (12.00), cardiovascular (4.00), cancer (13.00). Adrenal → affected system. This is a common adjudicator error — looking for an endocrine listing that doesn't exist.",
-    rm:["NO specific endocrine listings exist","Evaluate under AFFECTED body system","Diabetes complications → multiple possible listings","Common error: looking for endocrine listing"],rl:["DI 34001"],al:"No endocrine listings exist — evaluate under affected body system"},
-  {id:"di-ls5",s:"Listing 5.00",t:"Digestive System Listings",c:"Listings",sh:"DI",r:2,tp:"digestive GI liver IBD Crohn ulcerative colitis hemorrhage transplant weight loss BMI bowel",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-5",
-    ex:"Covers GI hemorrhaging, chronic liver disease, IBD (Crohn's/UC), short bowel syndrome, weight loss (BMI < 17.50), and liver transplant (1 year automatic). Most require specific lab values, hospitalization records, or objective clinical findings.",
-    rm:["GI hemorrhage: need transfusion records","IBD: obstruction or 2+ hospitalizations","BMI < 17.50 on 2+ occasions 60 days apart","Liver transplant = 1 year automatic"],rl:["DI 34001"]},
-  {id:"di-ls6",s:"Listing 6.00",t:"Genitourinary Listings",c:"Listings",sh:"DI",r:2,tp:"kidney CKD dialysis hemodialysis transplant nephrotic nephropathy genitourinary renal",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-6",
-    ex:"Covers nephrotic syndrome, CKD on chronic dialysis, kidney transplant (1 year automatic), and nephrogenic systemic fibrosis. Dialysis and transplant listings are among the most straightforward — verify dialysis is chronic, not temporary.",
-    rm:["Dialysis must be chronic, not temporary","Kidney transplant = 1 year automatic","Nephrotic syndrome: 3+ months persistent","Diabetes nephropathy often evaluated here"],rl:["DI 34001"]},
-  {id:"di-ls7",s:"Listing 7.00",t:"Hematological Disorder Listings",c:"Listings",sh:"DI",r:2,tp:"sickle cell anemia hemolytic thrombosis aplastic bone marrow stem cell transplant hematological blood",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-7",
-    ex:"Covers sickle cell disease (painful crises 3+ in 5 months), hemolytic anemias (Hgb ≤ 7.0), thrombosis/hemostasis disorders, aplastic anemia/MDS, and bone marrow/stem cell transplant (12 months automatic). Sickle cell requires detailed hospital documentation.",
-    rm:["Sickle cell: need dates, duration, treatment records","Hgb ≤ 7.0 on 2+ evals 3+ months apart","Bone marrow transplant = 12 months","Aplastic anemia: specific blood count criteria"],rl:["DI 34001"]},
-  {id:"di-ls8",s:"Listing 8.00",t:"Skin Disorder Listings",c:"Listings",sh:"DI",r:2,tp:"skin dermatitis ichthyosis bullous hidradenitis photosensitivity chronic infection lesions",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-8",
-    ex:"Covers ichthyosis, bullous disease, chronic skin infections, dermatitis, hidradenitis suppurativa, and genetic photosensitivity. Most require 3+ months duration despite prescribed treatment. 'Extensive' means multiple body sites or critical areas. Burns are evaluated under 1.00 Musculoskeletal.",
-    rm:["3+ months despite treatment required","'Extensive' = multiple sites or critical areas","Burns → evaluate under 1.00, not 8.00","Photosensitivity: must show inability to function outside"],rl:["DI 34001"],al:"Burns evaluated under 1.00, NOT 8.00"},
-  {id:"di-ls10",s:"Listing 10.00",t:"Congenital Disorder Listings (Adult)",c:"Listings",sh:"DI",r:2,tp:"congenital Down syndrome karyotype birth defect genetic chromosomal",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-10",
-    ex:"ONLY non-mosaic Down syndrome (10.01) has a specific adult listing — confirmed by karyotype or molecular testing. All other congenital disorders are evaluated under the affected body system (heart defects → 4.06, spina bifida → 11.00, cleft palate → 2.00). Part B (children) has additional congenital listings including low birth weight.",
-    rm:["Only Down syndrome has specific adult listing","All other congenital → affected body system","Must be non-mosaic (confirmed by testing)","Children: Part B has additional listings"],rl:["DI 34001","DI 34002"]},
+{id:"di-11",s:"DI 22001",t:"Sequential Evaluation - Overview",c:"Sequential Eval",sh:"DI",r:3,tp:"5 step process evaluation framework sequential disability determination",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422001000",fl:"sequential-eval",
+ex:"THE core framework. All adult claims follow 5 steps in order — cannot skip. If determinable at any step, stop. Step 1=SGA, 2=Severity, 3=Listings, 4=Past Work, 5=Other Work. Children: Steps 1-3 then functional equivalence.",
+rm:["Never skip a step","Favorable at Step 3 → stop, no RFC","Steps 4-5 adults only","Document rationale at each step"],rl:["DI 22005","DI 22010","DI 22015","DI 22020","DI 22025"]},
+{id:"di-12",s:"DI 22005",t:"Step 1 - SGA",c:"Sequential Eval",sh:"DI",r:3,tp:"step 1 SGA substantial gainful activity earnings",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422005000",
+ex:"Working at SGA? If yes → deny at Step 1. SGA = monthly earnings threshold, updated annually. Blind SGA higher. Subsidies/IRWEs reduce earnings. Usually verified by FO.",
+rm:["SGA changes annually","Blind SGA higher","IRWEs/subsidies reduce earnings","Self-employment: 3 tests"],rl:["DI 10501.015","DI 10505","DI 10520"]},
+{id:"di-13",s:"DI 22010",t:"Step 2 - Severity",c:"Sequential Eval",sh:"DI",r:3,tp:"step 2 severe impairment severity basic work activities de minimis",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422010000",
+ex:"Severe = significantly limits basic work activities. LOW bar (de minimis). More than minimal effect = severe. Consider ALL impairments combined. Step 2 denial rare.",
+rm:["LOW bar — more than minimal = severe","ALL impairments combined","Step 2 denial rare","Duration (12mo) also here"],rl:["DI 25505"]},
+{id:"di-14",s:"DI 22015",t:"Step 3 - Listings",c:"Sequential Eval",sh:"DI",r:3,tp:"step 3 meets equals listings impairment medical equivalence",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422015000",
+ex:"Meets = every criterion satisfied. Equals = findings at least equal severity. MC/PC makes equivalence determination. If met → allow without RFC. Part A adults, Part B children.",
+rm:["Check BOTH meets AND equals","MC/PC signature for equivalence","Meets → ALLOW, skip Steps 4-5","Mental: check B AND C criteria"],rl:["DI 34001","DI 34002","DI 24505"]},
+{id:"di-15",s:"DI 22020",t:"Step 4 - Past Relevant Work",c:"Sequential Eval",sh:"DI",r:3,tp:"step 4 PRW past relevant work RFC job demands",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0422020000",
+ex:"Can claimant do past work given RFC? PRW = last 15 years, long enough to learn, at SGA. Compare RFC to demands as actually AND generally performed (DOT). If either works → deny.",
+rm:["PRW: 15 years, learned it, SGA","Compare BOTH ways","Complete RFC before Step 4","Not for children"],rl:["DI 24510","DI 24515","DI 25001"]},
+{id:"di-16",s:"DI 22025",t:"Step 5 - Other Work (Grid Rules)",c:"Sequential Eval",sh:"DI",r:3,tp:"step 5 grid rules vocational age education skill other work",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0422025000",fl:"sequential-eval",
+ex:"Grid tables combine RFC + age + education + experience → disabled/not disabled. Three tables: sedentary, light, medium. Exertional-only → directs. Nonexertional → framework. Burden shifts to SSA.",
+rm:["Grids: sedentary, light, medium","Nonexertional = framework only","55+ sedentary unskilled = usually disabled","Burden on SSA at Step 5"],rl:["DI 25001","DI 25005","DI 25015"]},
+{id:"di-2",s:"DI 10501.015",t:"SGA General",c:"SGA",sh:"DI",r:3,tp:"SGA definition earnings substantial gainful activity monthly threshold",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410501015",
+ex:"SGA = earnings threshold. Above SGA → not disabled at Step 1. Updated annually. Separate blind threshold. Applies differently during TWP and EPE.",
+rm:["Changes annually","Blind SGA higher","Gross earnings","Subsidies/IRWEs reduce countable"],rl:["DI 10505","DI 10520"]},
+{id:"di-3",s:"DI 10505",t:"SGA Earnings Guidelines",c:"SGA",sh:"DI",r:3,tp:"monthly SGA amounts blind trial work period TWP EPE",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410505000",
+ex:"Contains actual SGA dollar amounts by year, TWP service month amounts, and blind SGA thresholds. Reference this for current year figures.",
+rm:["Verify current year amounts","TWP threshold different from SGA","Blind threshold higher","Updated each January"],rl:["DI 10501.015"]},
+{id:"di-4",s:"DI 10520",t:"SGA Deductions (IRWEs/Subsidies)",c:"SGA",sh:"DI",r:3,tp:"IRWEs subsidies impairment related work expenses deductions",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410520000",
+ex:"IRWEs = impairment-related costs needed to work. Subsidies = difference between pay and actual work value. Both reduce countable earnings, potentially below SGA.",
+rm:["IRWEs: related to impairment AND needed for work","Subsidies need employer docs","Self-employment separate rules","Also SSI: SI 00820.545"],rl:["DI 10501.015","SI 00820.545"]},
+{id:"di-10515",s:"DI 10515",t:"SGA - Self-Employment",c:"SGA",sh:"DI",r:2,tp:"self employment SGA three tests significant services comparable earnings worth",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0410515000",
+ex:"Self-employment SGA uses 3 tests: Test One (significant services + substantial income), Test Two (comparable to non-disabled), Test Three (work worth SGA in terms of value). Applied in order.",
+rm:["Three tests applied in order","'Significant services' = substantial involvement","Different from wage-earner SGA analysis","IRWEs and unincurred expenses apply"],rl:["DI 10501.015","DI 10520"]},
+{id:"di-22",s:"DI 24501",t:"Medical Evaluation - General",c:"Medical Eval",sh:"DI",r:3,tp:"RFC assessment symptoms pain MC PC medical consultant role",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0424501000",
+ex:"Master section for MC/PC role. MC (physician) handles physical; PC (psychologist/psychiatrist) handles mental. Every case requires MC/PC involvement: evaluate evidence, review CE requests, assess RFC, check listings.",
+rm:["MC = physical. PC = mental.","MC/PC signs EVERY determination","MC/PC reviews CE requests","SDM authority ended 12/28/2018"],rl:["DI 24505","DI 24510","DI 24515"]},
+{id:"di-23",s:"DI 24505",t:"Mental Impairments (PRT)",c:"Medical Eval",sh:"DI",r:3,tp:"PRT psychiatric review technique B criteria C criteria mental disorders",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0424505000",fl:"listing-12",
+ex:"PRT documents: MDI exists, B criteria ratings (4 areas: understand/remember, interact, concentrate/persist, adapt — none→extreme). 2 marked OR 1 extreme = meets B. C criteria: serious/persistent + marginal adjustment.",
+rm:["PRT REQUIRED for mental cases","B: 4 areas, need 2 marked OR 1 extreme","C: alternative to B","MRFC separate from PRT"],rl:["DI 24515","DI 34001"]},
+{id:"di-24",s:"DI 24510",t:"Physical RFC Assessment",c:"Medical Eval",sh:"DI",r:3,tp:"physical RFC exertional nonexertional limitations residual functional capacity",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0424510000",
+ex:"Physical RFC = maximum still doable. Exertional: sit/stand/walk/lift/carry/push/pull. Nonexertional: postural, manipulative, visual, communicative, environmental. Expressed as exertional level (sedentary→very heavy). Only at Step 4+.",
+rm:["RFC = what they CAN do","Sedentary <10 lbs → very heavy 100+","Nonexertional erodes occupational base","Not needed if Step 3 allow"],rl:["DI 25001","DI 25005"]},
+{id:"di-25",s:"DI 24515",t:"Mental RFC Assessment",c:"Medical Eval",sh:"DI",r:3,tp:"mental RFC MRFC work functions psychological limitations",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0424515000",
+ex:"MRFC = function-by-function mental assessment for Steps 4-5. Areas: understanding/memory, concentration/persistence, social interaction, adaptation. Different from PRT. Both required for mental cases.",
+rm:["MRFC ≠ PRT — both needed","Function-by-function","Moderate PRT ≠ same RFC limitation","Must be consistent with PRT"],rl:["DI 24505"]},
+{id:"di-26",s:"DI 25001",t:"Medical-Vocational (Grid Rules)",c:"Med-Voc",sh:"DI",r:3,tp:"grid rules RFC vocational factors tables framework directing",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425001000",
+ex:"Grid combines RFC level + age + education + experience. Three tables: sedentary, light, medium. Exertional-only → directs. Nonexertional → framework. No grids for heavy/very heavy.",
+rm:["Three tables: sedentary, light, medium","Exertional-only → directs","Nonexertional → framework","Advanced age + sedentary + unskilled = disabled"],rl:["DI 25005","DI 25010","DI 25015"]},
+{id:"di-27",s:"DI 25005",t:"Exertional Levels",c:"Med-Voc",sh:"DI",r:3,tp:"sedentary light medium heavy very heavy exertional definitions lifting",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425005000",
+ex:"Sedentary: lift max 10 lbs, mostly sitting. Light: lift max 20 lbs, frequent 10 lbs, standing/walking 6hrs. Medium: lift max 50 lbs, frequent 25 lbs. Heavy: lift max 100 lbs. Very Heavy: 100+ lbs.",
+rm:["Sedentary ≠ desk job — still lifting up to 10 lbs","Light requires 6 hrs standing/walking","These are SSA definitions, not DOL","RFC must specify exertional level"],rl:["DI 25001","DI 24510"]},
+{id:"di-28",s:"DI 25010",t:"Transferability of Skills",c:"Med-Voc",sh:"DI",r:3,tp:"skill analysis transferability vocational semi-skilled skilled SVP",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425010000",
+ex:"Skills from past work that can transfer to other jobs within the RFC. Unskilled (SVP 1-2), semi-skilled (SVP 3-4), skilled (SVP 5-9). Transfer requires: similar tools/processes, same industry, minimal vocational adjustment. Advanced age + no transfer = favorable.",
+rm:["SVP 1-2 = unskilled, no transferable skills","Transfer requires similar tools/processes","Advanced age narrows transferability","Very closely related = same/similar industry"],rl:["DI 25001","DI 25015"]},
+{id:"di-29",s:"DI 25015",t:"Age Categories",c:"Med-Voc",sh:"DI",r:3,tp:"younger closely approaching advanced age 50 55 borderline",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425015000",
+ex:"<50 = younger. 50-54 = closely approaching. 55+ = advanced age. Borderline (within months) may use higher category. Age + RFC + education interact heavily.",
+rm:["<50 younger, 50-54 closely approaching, 55+ advanced","Borderline → consider higher category","60+ sedentary no skills = almost always disabled","Age is vocational, not medical"],rl:["DI 25001","DI 25010"]},
+{id:"di-25020",s:"DI 25020",t:"Education Categories",c:"Med-Voc",sh:"DI",r:2,tp:"education illiterate marginal limited high school college vocational",ct:"DI/DIB",url:"https://secure.ssa.gov/poms.nsf/lnx/0425020000",
+ex:"Illiteracy, marginal education (6th grade or less), limited education (7th-11th), high school+ (GED counts). Education interacts with age and skills. Lower education = more favorable for Grid rules.",
+rm:["Illiterate = cannot read/write simple message","Marginal = 6th grade or less","Limited = 7th-11th grade","GED = high school equivalent"],rl:["DI 25001","DI 25015"]},
+{id:"di-33",s:"DI 25501",t:"Onset Date",c:"Onset/Duration",sh:"DI",r:3,tp:"EOD establishment AOD alleged onset established onset date",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425501000",
+ex:"EOD = when disability began per evidence. AOD = claimant's claim. EOD can equal or be later than AOD. Cannot be earlier without consent. Title II: determines waiting period. SSI: benefits from filing month only.",
+rm:["EOD ≤ AOD without consent prohibited","SSI: no retroactivity beyond filing","Title II: 5-month waiting period","Amendment requires SSA-831"],rl:["DI 25505"]},
+{id:"di-34",s:"DI 25505",t:"Duration Requirement",c:"Onset/Duration",sh:"DI",r:3,tp:"12 month duration closed periods continuous impairment",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425505000",
+ex:"Impairment must last or be expected to last 12+ continuous months or result in death. Closed periods (disability began and ended) are possible. Duration is evaluated at Step 2.",
+rm:["12 months continuous OR expected to result in death","Closed periods allowed","Evaluated at Step 2","Consider combined effect of all impairments"],rl:["DI 25501","DI 22010"]},
+{id:"di-30",s:"DI 25201",t:"Title XVI Child Claims",c:"Child Claims",sh:"DI",r:3,tp:"childhood disability functional equivalence child SSI under 18",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425201000",fl:"child-eval",
+ex:"Different eval than adults. Steps 1-3, then functional equivalence (not RFC/vocational). Disabled if marked in 2 of 6 domains OR extreme in 1. Under 18. Age-18 redetermination uses adult standards.",
+rm:["No RFC or vocational analysis","6 domains evaluated","Marked 2 OR extreme 1","Age-18 → adult standards"],rl:["DI 25205","DI 25210","DI 34002"]},
+{id:"di-31",s:"DI 25205",t:"Functional Equivalence - 6 Domains",c:"Child Claims",sh:"DI",r:3,tp:"six domains acquiring attending interacting moving caring health marked extreme",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425205000",fl:"child-eval",
+ex:"(1) Acquiring/Using Info (2) Attending/Completing Tasks (3) Interacting (4) Moving/Manipulating (5) Caring for Self (6) Health/Well-Being. Rated: none → extreme. Need marked in 2 OR extreme in 1.",
+rm:["All impairments combined across domains","Age-appropriate peer comparison","Teachers/parents key evidence","Rated: none, less than marked, marked, extreme"],rl:["DI 25201","DI 25210"]},
+{id:"di-32",s:"DI 25210",t:"Age-18 Redetermination",c:"Child Claims",sh:"DI",r:3,tp:"transition adult standard 18 redetermination child to adult",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0425210000",
+ex:"When SSI child turns 18, disability is redetermined using adult standards (5-step sequential evaluation). No longer uses functional equivalence. This is a new determination, not a CDR.",
+rm:["New determination, not a CDR","Adult standards apply","Functional equivalence no longer used","Must be completed within 1 year of 18th birthday"],rl:["DI 25201","DI 22001"]},
+{id:"di-35",s:"DI 28001",t:"CDR Overview",c:"CDR",sh:"DI",r:3,tp:"medical improvement CDR continuing disability review MIRS diary",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0428001000",fl:"cdr-mirs",
+ex:"CDR asks: medical improvement related to work ability? Uses MIRS (different from initial). Diary: MIE (6-18mo), MIP (3yr), MINE (5-7yr). CPD = prior favorable decision.",
+rm:["MIRS ≠ initial eval standard","Must show improvement related to work","CPD = comparison point","MIE/MIP/MINE set at allowance"],rl:["DI 28005","DI 28075.005"]},
+{id:"di-36",s:"DI 28005",t:"Medical Improvement Review Standard",c:"CDR",sh:"DI",r:3,tp:"MIRS comparison point exceptions medical improvement standard groups 8 step CDR process",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0428005000",fl:"cdr-mirs",
+ex:"MIRS has 8 steps. Compare current medical condition to CPD. If improved AND improvement related to work ability → evaluate RFC. Exceptions exist (e.g., fraud, new medical evidence, technical improvement). Two groups of exceptions.",
+rm:["8-step CDR process","Compare to CPD","Group I exceptions: benefits cease","Group II exceptions: continue benefits review"],rl:["DI 28001"]},
+{id:"di-37",s:"DI 34001",t:"Listing of Impairments - Adult (Part A)",c:"Listings",sh:"DI",r:3,tp:"adult listings body systems musculoskeletal respiratory cardiovascular mental neurological cancer",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",
+ex:"Part A = adult Listings by body system: 1.00 Musculoskeletal, 2.00 Senses/Speech, 3.00 Respiratory, 4.00 Cardiovascular, 5.00 Digestive, 6.00 Genitourinary, 7.00 Hematological, 8.00 Skin, 9.00 Endocrine, 10.00 Congenital, 11.00 Neurological, 12.00 Mental, 13.00 Cancer, 14.00 Immune.",
+rm:["Body systems 1.00-14.00","Check meets AND equals","Updated periodically","Some require specific test results"],rl:["DI 22015","DI 34002"]},
+{id:"di-38",s:"DI 34002",t:"Listing of Impairments - Child (Part B)",c:"Listings",sh:"DI",r:3,tp:"childhood listings Part B body systems child impairments",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434002000",
+ex:"Part B = childhood Listings. Similar body system structure to Part A but with age-appropriate criteria. Some listings reference Part A with modifications. Low birth weight listings unique to Part B.",
+rm:["Age-appropriate criteria","Some reference Part A","Low birth weight unique to Part B","If doesn't meet listing → functional equivalence"],rl:["DI 34001","DI 25201"]},
+{id:"di-39",s:"DI 90070",t:"DAA Evaluation Steps",c:"DAA",sh:"DI",r:3,tp:"drug addiction alcoholism DAA materiality substance abuse",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0490070000",fl:"daa-eval",
+ex:"First: disabled with ALL impairments (incl DAA)? If yes: would remaining limitations disable WITHOUT DAA? Yes → not material (allowed). No → material (denied). If allowed with DAA → mandatory rep payee + treatment referral.",
+rm:["Evaluated AFTER finding disability","Key: disabled WITHOUT DAA?","Material → denied","Allowed w/DAA → rep payee"],rl:[]},
+{id:"di-20",s:"DI 23007",t:"Failure to Cooperate - Overview",c:"Special Issues",sh:"DI",r:3,tp:"FTC failure cooperate insufficient evidence",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007000",fl:"ftc-process",
+ex:"FTC: claimant won't cooperate with evidence/CE. Purpose: ENCOURAGE cooperation. Special handling for vulnerable populations. Document all contacts. After exhausting procedures → determine on file.",
+rm:["Purpose: ENCOURAGE, not punish","Special: <18, ≥65, homeless, MI, LEP","Phone → letter → third party","PDN must explain"],rl:["DI 23007.001","DI 23007.005","DI 23007.009","DI 23007.010"]},
+{id:"di-21b",s:"DI 23022",t:"Terminal Illness (TERI)",c:"Special Issues",sh:"DI",r:3,tp:"TERI terminal illness expedited processing flag priority",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0423022000",
+ex:"TERI = expected to result in death. Process ASAP. Don't wait for evidence if allowance supportable. Prioritize above all other work.",
+rm:["Process ASAP — top priority","Don't wait if allowable","CAL often overlaps with TERI","FO or DDS can set TERI flag"],rl:[]},
+{id:"di-cal",s:"DI 23020",t:"Compassionate Allowances (CAL)",c:"Special Issues",sh:"DI",r:3,tp:"CAL compassionate allowances expedited conditions list",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0423020000",
+ex:"CAL conditions are so severe they obviously meet disability standard with minimal objective medical evidence. Over 260 conditions (rare diseases, cancers, brain disorders). Identified by system flag or DDS. Process quickly — usually allow at Step 3.",
+rm:["260+ conditions on CAL list","Minimal evidence needed","Usually allow at Step 3","Check SSA CAL list online"],rl:["DI 23022"]},
+{id:"di-qdd",s:"DI 11011",t:"Quick Disability Determination (QDD)",c:"Initial Claims",sh:"DI",r:3,tp:"QDD predictive model expedited fast track quick",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411011000",
+ex:"QDD uses a predictive model to identify claims with high probability of allowance. Flagged cases should be processed within 20 days if possible. DDS still makes full determination — QDD is just prioritization, not a predetermined outcome.",
+rm:["Predictive model — not predetermined","Target 20 days processing","DDS still does full evaluation","Flag doesn't guarantee allowance"],rl:["DI 23020"]},
+{id:"di-5",s:"DI 11005",t:"Disability Interviews",c:"Initial Claims",sh:"DI",r:2,tp:"interview procedures forms documentation field office",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411005000",
+ex:"FO conducts disability interviews, collects forms (SSA-3368, SSA-3369, SSA-827, etc.), documents work history, and routes case to DDS. Quality of interview affects DDS development needs.",
+rm:["SSA-3368 = Function Report","SSA-3369 = Work History","SSA-827 = Authorization for Source","Quality intake → less DDS development"],rl:["DI 11010"]},
+{id:"di-8",s:"DI 11015",t:"Presumptive Disability/Blindness",c:"Initial Claims",sh:"DI",r:3,tp:"PD PB presumptive categories emergency advance SSI",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411015000",
+ex:"PD/PB allows immediate SSI payments before formal determination if the impairment is likely to be found disabling. Categories include: total blindness, total deafness, amputation of leg at hip, bed-bound/immobile, allegation of HIV with specific findings. Up to 6 months of presumptive payments.",
+rm:["SSI only — not Title II","Up to 6 months payments","Specific categories qualify","Still need formal determination"],rl:["SI 00501"]},
+{id:"di-9",s:"DI 11055",t:"SSI Disability Cases",c:"Initial Claims",sh:"DI",r:2,tp:"SSI specific processing concurrent claims title XVI",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0411055000",
+ex:"SSI-specific disability processing rules. Concurrent claims (Title II + XVI filed together) follow specific routing. SSI has no 5-month waiting period, no retroactive benefits beyond filing month.",
+rm:["No waiting period for SSI","No retroactivity beyond filing month","Concurrent = both Title II + XVI","Special routing rules"],rl:["SI 00501"]},
+{id:"di-10",s:"DI 20101",t:"DDS Jurisdiction",c:"DDS Procedures",sh:"DI",r:3,tp:"DDS authority jurisdiction transfers state agency",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0420101000",
+ex:"DDS has jurisdiction over initial disability determinations and most CDRs within its state. Cases can be transferred between DDSs when claimant moves. Federal components (ODAR, OQR) handle certain cases.",
+rm:["State DDS handles initials + most CDRs","Transfers when claimant moves","Federal components for appeals","Jurisdiction based on claimant residence"],rl:[]},
+{id:"di-22505",s:"DI 22505",t:"Case Development - General",c:"Case Development",sh:"DI",r:3,tp:"evidence gathering MER medical evidence CE ordering development sufficiency",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0422505000",
+ex:"Master section for evidence development. Priority: (1) MER from treating sources, (2) Other medical sources, (3) CE only if needed. Sufficiency = enough evidence to determine. Document all development efforts. 12-month lookback for MER.",
+rm:["MER first, always","12-month lookback for MER","Document all development efforts","CE is last resort"],rl:["DI 22510.001","DI 22515"]},
+{id:"di-recon",s:"DI 12015",t:"Reconsideration",c:"Appeals",sh:"DI",r:2,tp:"reconsideration recon appeal first level disability hearing",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0412015000",
+ex:"First level of appeal. New examiner and MC/PC at DDS review entire case de novo. Claimant can submit new evidence. Some states have disability hearing (face-to-face) at recon level. 60-day filing deadline from initial determination.",
+rm:["New examiner + MC/PC review","De novo — fresh look at everything","60-day filing deadline","Some states: disability hearing at recon"],rl:[]},
+{id:"ce-1",s:"DI 22510.001",t:"Introduction to CEs",c:"CE Overview",sh:"CE",r:3,tp:"CE definition purchased exam SSA telehealth THCE",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510001",wf:"1-Before ordering",fl:"ce-workflow",
+ex:"CE = purchased exam when MER insufficient. In-person, telehealth, video. Source: licensed, no sanctions. SSA pays. LAST RESORT after MER.",
+rm:["Last resort — MER first","SSA pays, free to claimant","Licensed, no sanctions","Telehealth = claimant agreement"],rl:["DI 22510.005","DI 22505"]},
+{id:"ce-2",s:"DI 22510.005",t:"When to Purchase a CE",c:"CE Overview",sh:"CE",r:3,tp:"order CE insufficient conflict ambiguity MER first",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510005",wf:"1-Before ordering",
+ex:"Two grounds: insufficient evidence OR conflict/ambiguity. Exhaust MER. MC/PC approves. Don't order if decidable on current evidence.",
+rm:["Insufficient OR conflict","MER first, document efforts","MC/PC approves","Don't order if decidable"],rl:["DI 22510.001","DI 22510.006"]},
+{id:"ce-3",s:"DI 22510.006",t:"When NOT to Purchase a CE",c:"CE Overview",sh:"CE",r:3,tp:"do not order sufficient evidence claimant refuses DLI favorable",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510006",wf:"1-Before ordering",
+ex:"Don't order if: sufficient evidence exists, claimant refuses (see 23007.009), DLI passed with no retroactive possibility, or favorable possible on current evidence.",
+rm:["Sufficient evidence = no CE","Refusal → DI 23007.009","Past DLI + no retroactive = don't","Favorable possible = don't"],rl:["DI 22510.005","DI 23007.009"]},
+{id:"ce-4",s:"DI 22510.010",t:"Selecting CE Source",c:"Source Selection",sh:"CE",r:3,tp:"treating source preferred independent licensed qualified provider",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510010",wf:"2-Source selection",
+ex:"Preference order: (1) Treating source (preferred — knows the claimant), (2) Independent qualified source. Source must be qualified for the specific exam type. Cannot use sources with disqualification or exclusion from SSA programs.",
+rm:["Treating source preferred","Must be qualified for specific exam","No disqualified/excluded sources","Check SSA provider list"],rl:["DI 22510.013"]},
+{id:"ce-5",s:"DI 22510.013",t:"Telehealth CE (THCE)",c:"Source Selection",sh:"CE",r:2,tp:"telehealth THCE audio video remote CE agreement",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510013",wf:"2-Source selection",
+ex:"THCE = audio-video CE conducted remotely. Requires claimant agreement. Some exams not feasible via telehealth (those requiring physical contact). DDS determines if THCE is appropriate for the specific exam type.",
+rm:["Requires claimant agreement","Not all exams feasible remotely","DDS determines appropriateness","Physical contact exams = in-person only"],rl:["DI 22510.010"]},
+{id:"ce-6",s:"DI 22510.016",t:"CE Notice & Confirmation",c:"CE Scheduling",sh:"CE",r:3,tp:"phone first consequences written notice third party special handling interpreter",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510016",wf:"3-Scheduling",fl:"ce-workflow",
+ex:"(1) Phone first (2) Explain consequences (3) Written notice (4) Special handling: third party, free interpreter, accommodations (5) Notify rep.",
+rm:["ALWAYS phone first","Must explain consequences","Free interpreter for LEP","Special handling: proactive third party"],rl:["DI 22510.019"],al:"Must explain consequences of non-attendance"},
+{id:"ce-7",s:"DI 22510.016 (Alt)",t:"Short-Notice CE (≤10 days)",c:"CE Scheduling",sh:"CE",r:3,tp:"short notice 10 days not FTC must reschedule",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510016",wf:"3-Scheduling",
+ex:"≤10 days notice: standard follow-up rules don't apply. CRITICAL: no-show is NOT FTC per DI 23007.010B. MUST reschedule. Protects claimants.",
+rm:["≤10 days = short notice","Follow-up rules don't apply","No-show is NOT FTC","MUST reschedule"],rl:["DI 23007.010"],al:"Short-notice CE (≤10 days): no-show is NOT FTC — MUST reschedule"},
+{id:"ce-9",s:"DI 22510.019",t:"CE Follow-Up & Reminder",c:"CE Follow-Up",sh:"CE",r:3,tp:"follow up reminder third party homeless mental immediately",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510019",wf:"4-Follow-up",
+ex:"After notice: confirm call, reminder. Homeless/MI → third party IMMEDIATELY. Assist homeless with travel. Document all follow-up.",
+rm:["Homeless/MI: third party NOW","Assist with travel","Reminder before CE","Document everything"],rl:["DI 22510.016","DI 23007.010"],al:"Homeless/MI: involve third party IMMEDIATELY"},
+{id:"ce-10",s:"DI 23007.001",t:"FTC Definitions",c:"Missed CE",sh:"CE",r:3,tp:"failure cooperate definition special handling under 18 over 65 homeless MI LEP third party good reason",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007001",wf:"5-Missed CE",fl:"missed-ce",
+ex:"FTC = won't cooperate. Special handling: ALL <18, ≥65 w/o rep, homeless, MI, LEP. Third party: SSA-3368 §2 or SSA-3441 §1.D. Good reasons: illness, transport, weather, death, limitations.",
+rm:["Special: <18, ≥65, homeless, MI, LEP","Third party: SSA-3368/3441","Don't reuse prior third parties","Good reasons: illness, transport, weather"],rl:["DI 23007.005","DI 23007.009","DI 23007.010"]},
+{id:"ce-11",s:"DI 23007.005",t:"Contacting Claimant for FTC",c:"Missed CE",sh:"CE",r:3,tp:"phone 10 days call-in letter representative third party document",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007005",wf:"5-Missed CE",
+ex:"Phone → explain consequences → 10 calendar days. If unreachable → call-in letter → 10 more days. Contact rep if appointed. For special handling: third party simultaneously. Document every attempt.",
+rm:["Phone first, always","10 calendar days each round","Document EVERY attempt","Special handling: simultaneous third party"],rl:["DI 23007.001","DI 23007.009"],al:"10 calendar days to comply after each contact"},
+{id:"ce-12",s:"DI 23007.009",t:"Refusal to Attend CE",c:"Missed CE",sh:"CE",r:3,tp:"refusal will not attend good reason treating source reschedule PDN",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007009",wf:"5-Missed CE",fl:"missed-ce",
+ex:"REFUSAL = explicit 'I will not attend' without good reason. ≠ no-show. Good reason → reschedule. Treating source says no → STOP CE entirely. No good reason → determine on file.",
+rm:["Refusal ≠ no-show","Good reason → reschedule","TS advised no → STOP development","No reason → determine on file"],rl:["DI 23007.010","DI 23007.015"],al:"Good reason = reschedule. TS no = STOP CE."},
+{id:"ce-13",s:"DI 23007.010",t:"Failure to Attend CE",c:"Missed CE",sh:"CE",r:3,tp:"no show failure attend different refusal third party reschedule short notice",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007010",wf:"5-Missed CE",fl:"missed-ce",
+ex:"No-show ≠ refusal. Phone → 10d → letter → 10d. Special handling → third party simultaneously. Good reason → reschedule. ≤10-day CE no-show = NOT FTC, must reschedule.",
+rm:["No-show ≠ refusal","Phone → 10d → letter → 10d","≤10-day no-show = NOT FTC","Special: third party simultaneous"],rl:["DI 23007.009","DI 23007.015"],al:"No-show ≠ refusal. ≤10-day = NOT FTC."},
+{id:"ce-14",s:"DI 23007.015",t:"Determining on Evidence in File",c:"Missed CE",sh:"CE",r:3,tp:"FTC exhausted determine evidence file PDN favorable unfavorable",url:"https://secure.ssa.gov/poms.nsf/lnx/0423007015",wf:"6-Determination",
+ex:"After ALL procedures exhausted → determine on available evidence. NOT automatic denial. Normal sequential eval. PDN must explain: what requested, FTC, basis of determination.",
+rm:["Not automatic denial","PDN explains FTC","Exhaust ALL procedures first","Normal sequential eval"],rl:["DI 23007.009","DI 23007.010"]},
+{id:"ce-15",s:"DI 28075.005",t:"CDR FTC/WU",c:"CDR FTC",sh:"CE",r:3,tp:"CDR FTC cessation benefits stopped first month aware whereabouts unknown",url:"https://secure.ssa.gov/poms.nsf/lnx/0428075005",wf:"CDR context",fl:"cdr-ftc",
+ex:"CDR FTC → cessation. Cessation month = first month aware + knew repercussions + failed. Benefits STOP. Different from initial FTC.",
+rm:["CDR FTC → CESSATION","First month aware + knew + failed","Different from initial","Document everything"],rl:["DI 28001"],al:"CDR FTC → cessation of benefits"},
+{id:"ce-16",s:"DI 22510.020",t:"Reviewing CE Reports",c:"CE Quality",sh:"CE",r:3,tp:"CE report review adequacy deficient correction completeness",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510020",wf:"7-Post-CE",
+ex:"Check: completeness, clinical findings (objective), consistency, supported diagnoses. Deficient → corrections. Don't accept inadequate reports.",
+rm:["Completeness, findings, consistency","Deficient → request corrections","Don't accept inadequate reports","Delays case if redo"],rl:["DI 22510.070"]},
+{id:"ce-17",s:"DI 22510.070",t:"Life-Threatening CE Finding",c:"CE Quality",sh:"CE",r:3,tp:"life threatening immediate notification emergency",url:"https://secure.ssa.gov/poms.nsf/lnx/0422510070",wf:"7-Post-CE",
+ex:"CE reveals life-threatening condition → IMMEDIATE notification. CE source should notify. If not, DDS ensures it. Safety obligation.",
+rm:["IMMEDIATE — no delay","Source notifies claimant","DDS ensures if source didn't","Document in file"],rl:["DI 22510.020"],al:"IMMEDIATE action — life-threatening"},
+{id:"ce-18",s:"DI 39545.275",t:"Missed CE Payment",c:"CE Fiscal",sh:"CE",r:2,tp:"no pay missed CE nominal fee record review",url:"https://secure.ssa.gov/poms.nsf/lnx/0439545275",wf:"Admin",
+ex:"No-pay for missed CEs. Nominal fee possible for record review time only.",
+rm:["No-pay policy","Nominal fee: record review only","State fee schedule","Administrative matter"],rl:[]},
+{id:"ce-19",s:"DI 11018.005",t:"FTC at Field Office",c:"FO FTC",sh:"CE",r:2,tp:"FO denial codes 000M5 000M6 field office DLI closeout",url:"https://secure.ssa.gov/poms.nsf/lnx/0411018005",wf:"FO context",
+ex:"FO handles certain FTC situations (failure to file, whereabouts unknown). Denial codes 000M5 (FTC) and 000M6 (whereabouts unknown). FO does the closeout, not DDS.",
+rm:["FO jurisdiction, not DDS","000M5 = FTC at FO","000M6 = whereabouts unknown","Check DLI before closeout"],rl:[]},
+{id:"ce-20",s:"DI 25205.020",t:"Child Claim FTC",c:"Child CE",sh:"CE",r:3,tp:"child under 18 special efforts FTC childhood additional steps",url:"https://secure.ssa.gov/poms.nsf/lnx/0425205020",wf:"Special populations",
+ex:"ALL child claims (<18) require special FTC efforts. Additional steps beyond standard FTC. Must contact parents/guardians. Document additional efforts for children.",
+rm:["ALL <18 = special handling","Contact parents/guardians","Additional steps required","Document extra efforts"],rl:["DI 23007.001"],al:"ALL <18 require special FTC handling"},
+{id:"si-1",s:"SI 00501",t:"SSI Eligibility Overview",c:"Eligibility",sh:"SI",r:3,tp:"age blindness disability requirements residency citizenship SSI",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500501000",
+ex:"SSI: age 65+ OR blind OR disabled + income limits + resources ($2K/$3K) + US resident + citizen/qualified alien. Needs-based, no work history. General revenue funded.",
+rm:["Needs-based — no work history","$2K/$3K resources","US resident + citizen/alien","Benefits: month after filing"],rl:["SI 00810","SI 01110"]},
+{id:"si-2",s:"SI 00510",t:"Living Arrangements",c:"Eligibility",sh:"SI",r:2,tp:"FLA codes household ISM living arrangement in-kind",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500510000",
+ex:"Living arrangement codes affect SSI payment amount. Determines if ISM (In-Kind Support and Maintenance) rules apply. Own household vs. another's household vs. institution. FLA code set by FO.",
+rm:["FLA affects payment amount","Own household vs. another's","Institutional rules different","FO determines FLA code"],rl:["SI 00835"]},
+{id:"si-3",s:"SI 00520",t:"Institutionalization",c:"Eligibility",sh:"SI",r:2,tp:"public institutions $30 payment Medicaid institutionalized",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500520000",
+ex:"Public institution residents generally ineligible for SSI. Exception: $30 payment limit for Medicaid-eligible institutionalized individuals. Temporary absences may maintain eligibility.",
+rm:["Public institution = generally ineligible","$30 payment exception","Medicaid-eligible exception","Temporary absences may maintain"],rl:["SI 00501"]},
+{id:"si-4",s:"SI 00810",t:"Income Rules - General",c:"Income",sh:"SI",r:3,tp:"income definition types earned unearned in-kind deemed",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500810000",
+ex:"Income = cash/in-kind for food/shelter. Earned (wages, self-employment) + unearned (pensions, SS, gifts). Exclusions: $20 general + $65 earned + 50% remaining earned.",
+rm:["Two types: earned + unearned","$20 + $65 + ½ exclusions","ISM is also income","See SI 00815 for exclusions"],rl:["SI 00815","SI 00820","SI 00835"]},
+{id:"si-5",s:"SI 00815",t:"What Is Not Income",c:"Income",sh:"SI",r:2,tp:"medical social services exclusions not income",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500815000",
+ex:"Items that are NOT income for SSI: medical care/services, social services, receipts from sale of resources, income tax refunds, weatherization assistance, and many others.",
+rm:["Medical care not income","Tax refunds not income","Replacement of lost resource not income","Check full list"],rl:["SI 00810"]},
+{id:"si-6",s:"SI 00820",t:"Earned Income",c:"Income",sh:"SI",r:3,tp:"wages self-employment sheltered workshop earned income",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500820000",
+ex:"Earned income = wages, net earnings from self-employment, payments from sheltered workshops, royalties (active), and certain other forms. $65 exclusion + ½ remaining earned income before reducing SSI payment.",
+rm:["$65 exclusion + ½ remaining","Sheltered workshop = earned","Self-employment = net earnings","Applied after $20 general exclusion"],rl:["SI 00810","SI 00820.545"]},
+{id:"si-7",s:"SI 00830",t:"Unearned Income",c:"Income",sh:"SI",r:3,tp:"unearned income pension annuity Social Security deemed",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500830000",
+ex:"Unearned income: pensions, SS benefits, annuities, gifts, prizes, interest, dividends, rents, deemed income from spouse/parent/sponsor. $20 general exclusion applied first.",
+rm:["SS benefits = unearned income","$20 general exclusion applies","Deemed income counted here","In-kind = unearned"],rl:["SI 00810","SI 00835"]},
+{id:"si-9",s:"SI 00835",t:"In-Kind Support & Maintenance",c:"ISM",sh:"SI",r:2,tp:"ISM PMV presumed maximum value VTR third party",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500835000",
+ex:"ISM = food/shelter provided by someone else. Valued using PMV (Presumed Maximum Value) rule or actual value (if less). PMV = ⅓ FBR + $20. Can be rebutted with actual value evidence.",
+rm:["ISM = food/shelter from others","PMV = ⅓ FBR + $20","Can rebut PMV with actual value","Living arrangement affects ISM"],rl:["SI 00510","SI 00810"]},
+{id:"si-10",s:"SI 01110",t:"Resources - General",c:"Resources",sh:"SI",r:3,tp:"resource $2000 $3000 limits countable assets",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501110000",
+ex:"Resources = things owned convertible to cash. $2K individual / $3K couple. Counted on 1st of month. Excluded: home, vehicle (usually), household goods, burial $1,500, life insurance ≤$1,500.",
+rm:["$2K/$3K on 1st of month","Home excluded","One vehicle usually excluded","Many exclusions — SI 01130"],rl:["SI 01130","SI 01140"]},
+{id:"si-11",s:"SI 01130",t:"Resource Exclusions",c:"Resources",sh:"SI",r:3,tp:"home vehicle burial PASS life insurance excluded resources",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501130000",
+ex:"Excluded resources: home (regardless of value), one vehicle (with exceptions), household goods/personal effects, burial fund up to $1,500, life insurance ≤$1,500 face value, PASS resources, property for self-support.",
+rm:["Home always excluded","Vehicle rules have exceptions","Burial + life insurance limits","PASS resources excluded"],rl:["SI 01110","SI 01140"]},
+{id:"si-12",s:"SI 01140",t:"Trusts",c:"Resources",sh:"SI",r:3,tp:"trust evaluation special needs SNT countable resource rules",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501140000",
+ex:"Trust evaluation for SSI resources: revocable trusts = countable resource. Irrevocable trusts: depends on circumstances. Special Needs Trusts (SNTs): certain types excluded (d)(4)(A) self-settled, (d)(4)(C) pooled trusts. POMS SI 01120.200+ covers exceptions.",
+rm:["Revocable = countable","(d)(4)(A) = self-settled SNT excluded","(d)(4)(C) = pooled trust excluded","Complex rules — check SI 01120.200"],rl:["SI 01110","SI 01130"]},
+{id:"si-13",s:"SI 01310",t:"Deeming - General",c:"Deeming",sh:"SI",r:3,tp:"spouse parent child sponsor deeming income resources",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0501310000",
+ex:"Deeming: non-SSI person's income/resources counted for SSI claimant. Types: spouse-to-spouse, parent-to-child (<18), sponsor-to-alien. Allocations for others reduce deemed amount. Stops when relationship ends.",
+rm:["Three types","Allocations reduce","Stops at separation/age 18","Complex — SI 01320 for calcs"],rl:["SI 01320"]},
+{id:"si-14",s:"SI 02302",t:"Section 1619(a) and (b)",c:"Work Incentives",sh:"SI",r:3,tp:"continued SSI Medicaid working 1619 thresholds",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0502302000",
+ex:"1619(a) = SSI continues (reduced) above SGA. 1619(b) = Medicaid continues even at $0 SSI. State-specific thresholds. Removes Medicaid loss fear.",
+rm:["1619(a) = SSI cash continues","1619(b) = Medicaid at $0 SSI","State thresholds for 1619(b)","Critical work incentive"],rl:["SI 00870","SI 00820.545"]},
+{id:"si-15",s:"SI 00870",t:"PASS Plans",c:"Work Incentives",sh:"SI",r:3,tp:"PASS plan self-support excludable resources income",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500870000",
+ex:"Plan to Achieve Self-Support: allows SSI recipients to set aside income/resources for a work goal without affecting SSI eligibility. PASS must have specific occupational goal, be approved by SSA, and be regularly reviewed.",
+rm:["Excludes income AND resources","Must have specific work goal","SSA must approve","Reviewed periodically"],rl:["SI 02302"]},
+{id:"si-16",s:"SI 00820.545",t:"IRWEs for SSI",c:"Work Incentives",sh:"SI",r:3,tp:"IRWE impairment related work expenses SSI deductions",ct:"SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0500820545",
+ex:"IRWEs deducted from earned income for SSI payment calculation. Must be: directly related to impairment, necessary for work, paid by claimant, reasonable cost, not reimbursed. Same concept as DI 10520 but applied to SSI income rules.",
+rm:["Deducted from earned income","Must relate to impairment + work","Not reimbursed","Same concept as DI 10520"],rl:["DI 10520","SI 00820"]},
+{id:"gn-1",s:"GN 00201",t:"Applications - General",c:"GN Cross-Ref",sh:"DI",r:2,tp:"applications filing date protective filing Title II XVI",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0200201000",
+ex:"Application rules: filing date vs protective filing date, which applications to use, deemed filing (filing for one title may be deemed filing for both). Protective filing preserves earliest possible entitlement date.",
+rm:["Filing date matters for benefits","Protective filing = earliest date","Deemed filing for concurrent","FO handles applications"],rl:[]},
+{id:"gn-2",s:"GN 00301",t:"Evidence Requirements",c:"GN Cross-Ref",sh:"DI",r:2,tp:"evidence standards proof identity age citizenship documentation",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0200301000",
+ex:"General evidence requirements for all claims: proof of identity, age, citizenship/alien status, SSN, and other non-disability factors. Standards for what constitutes acceptable evidence.",
+rm:["Non-disability evidence rules","Identity + age + citizenship","FO primarily handles","Standards for acceptability"],rl:[]},
+{id:"gn-3",s:"GN 03101",t:"Authorized Representatives",c:"GN Cross-Ref",sh:"DI",r:2,tp:"authorized representative appointed rep claimant advocate attorney",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0203101000",
+ex:"Rules for appointed representatives (attorneys and non-attorneys). Must have SSA Form SSA-1696. Rep can act on claimant's behalf, receive notices, submit evidence. DDS must recognize and communicate with appointed reps.",
+rm:["SSA-1696 = appointment form","Rep acts on claimant's behalf","Must send copies of notices to rep","Can be attorney or non-attorney"],rl:[]},
+{id:"di-ls2",s:"Listing 2.00",t:"Special Senses & Speech Listings",c:"Listings",sh:"DI",r:2,tp:"vision hearing speech blindness acuity visual field audiometry cochlear implant labyrinthine vestibular",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-2",
+ex:"Body system 2.00 covers vision loss (central acuity, visual field contraction, visual efficiency), hearing loss (with and without cochlear implant), vestibular/balance disorders, and loss of speech. Vision uses BEST corrected acuity. Hearing requires audiometry meeting SSA standards. Cochlear implant recipients are considered disabled for 1 year post-implant, then re-evaluated. Statutory blindness (20/200 or less in better eye) has special SGA and benefit rules.",
+rm:["Vision = best CORRECTED acuity","20/200 or less = statutory blindness","Cochlear implant = 1 year automatic","Audiometry must meet SSA standards","Statutory blindness has different SGA threshold"],rl:["DI 34001","DI 10501.015"]},
+{id:"di-ls9",s:"Listing 9.00",t:"Endocrine Disorders Listings",c:"Listings",sh:"DI",r:2,tp:"endocrine diabetes thyroid adrenal pituitary hormonal no specific listing cross-reference affected system",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-9",
+ex:"CRITICAL: There are NO specific endocrine listings. Endocrine disorders are evaluated under the body system most affected. Diabetes → evaluate retinopathy (2.00), cardiovascular (4.00), nephropathy (6.00), neuropathy (11.00), Charcot arthropathy (1.00). Thyroid → cognitive/fatigue (12.00), cardiovascular (4.00), cancer (13.00). Adrenal → affected system. This is a common adjudicator error — looking for an endocrine listing that doesn't exist.",
+rm:["NO specific endocrine listings exist","Evaluate under AFFECTED body system","Diabetes complications → multiple possible listings","Common error: looking for endocrine listing"],rl:["DI 34001"],al:"No endocrine listings exist — evaluate under affected body system"},
+{id:"di-ls5",s:"Listing 5.00",t:"Digestive System Listings",c:"Listings",sh:"DI",r:2,tp:"digestive GI liver IBD Crohn ulcerative colitis hemorrhage transplant weight loss BMI bowel",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-5",
+ex:"Covers GI hemorrhaging, chronic liver disease, IBD (Crohn's/UC), short bowel syndrome, weight loss (BMI < 17.50), and liver transplant (1 year automatic). Most require specific lab values, hospitalization records, or objective clinical findings.",
+rm:["GI hemorrhage: need transfusion records","IBD: obstruction or 2+ hospitalizations","BMI < 17.50 on 2+ occasions 60 days apart","Liver transplant = 1 year automatic"],rl:["DI 34001"]},
+{id:"di-ls6",s:"Listing 6.00",t:"Genitourinary Listings",c:"Listings",sh:"DI",r:2,tp:"kidney CKD dialysis hemodialysis transplant nephrotic nephropathy genitourinary renal",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-6",
+ex:"Covers nephrotic syndrome, CKD on chronic dialysis, kidney transplant (1 year automatic), and nephrogenic systemic fibrosis. Dialysis and transplant listings are among the most straightforward — verify dialysis is chronic, not temporary.",
+rm:["Dialysis must be chronic, not temporary","Kidney transplant = 1 year automatic","Nephrotic syndrome: 3+ months persistent","Diabetes nephropathy often evaluated here"],rl:["DI 34001"]},
+{id:"di-ls7",s:"Listing 7.00",t:"Hematological Disorder Listings",c:"Listings",sh:"DI",r:2,tp:"sickle cell anemia hemolytic thrombosis aplastic bone marrow stem cell transplant hematological blood",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-7",
+ex:"Covers sickle cell disease (painful crises 3+ in 5 months), hemolytic anemias (Hgb ≤ 7.0), thrombosis/hemostasis disorders, aplastic anemia/MDS, and bone marrow/stem cell transplant (12 months automatic). Sickle cell requires detailed hospital documentation.",
+rm:["Sickle cell: need dates, duration, treatment records","Hgb ≤ 7.0 on 2+ evals 3+ months apart","Bone marrow transplant = 12 months","Aplastic anemia: specific blood count criteria"],rl:["DI 34001"]},
+{id:"di-ls8",s:"Listing 8.00",t:"Skin Disorder Listings",c:"Listings",sh:"DI",r:2,tp:"skin dermatitis ichthyosis bullous hidradenitis photosensitivity chronic infection lesions",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-8",
+ex:"Covers ichthyosis, bullous disease, chronic skin infections, dermatitis, hidradenitis suppurativa, and genetic photosensitivity. Most require 3+ months duration despite prescribed treatment. 'Extensive' means multiple body sites or critical areas. Burns are evaluated under 1.00 Musculoskeletal.",
+rm:["3+ months despite treatment required","'Extensive' = multiple sites or critical areas","Burns → evaluate under 1.00, not 8.00","Photosensitivity: must show inability to function outside"],rl:["DI 34001"],al:"Burns evaluated under 1.00, NOT 8.00"},
+{id:"di-ls10",s:"Listing 10.00",t:"Congenital Disorder Listings (Adult)",c:"Listings",sh:"DI",r:2,tp:"congenital Down syndrome karyotype birth defect genetic chromosomal",ct:"DI/DIB/SSI",url:"https://secure.ssa.gov/poms.nsf/lnx/0434001000",fl:"listing-10",
+ex:"ONLY non-mosaic Down syndrome (10.01) has a specific adult listing — confirmed by karyotype or molecular testing. All other congenital disorders are evaluated under the affected body system (heart defects → 4.06, spina bifida → 11.00, cleft palate → 2.00). Part B (children) has additional congenital listings including low birth weight.",
+rm:["Only Down syndrome has specific adult listing","All other congenital → affected body system","Must be non-mosaic (confirmed by testing)","Children: Part B has additional listings"],rl:["DI 34001","DI 34002"]},
 ];
-
 const QL=[
-  {q:"5-step sequential evaluation",ids:["di-11"]},{q:"SGA amounts",ids:["di-2","di-3"]},{q:"Claimant missed CE",ids:["ce-13"]},
-  {q:"Claimant refused CE",ids:["ce-12"]},{q:"Physical RFC",ids:["di-24"]},{q:"Mental RFC / PRT",ids:["di-23","di-25"]},
-  {q:"Adult listings",ids:["di-37"]},{q:"Child disability",ids:["di-30","di-31"]},{q:"When to order CE",ids:["ce-2"]},
-  {q:"Grid rules",ids:["di-26"]},{q:"Onset date",ids:["di-33"]},{q:"SSI resources",ids:["si-10"]},
-  {q:"Deeming",ids:["si-13"]},{q:"DAA materiality",ids:["di-39"]},{q:"CDR overview",ids:["di-35"]},
-  {q:"Short-notice CE",ids:["ce-7"]},{q:"TERI/CAL",ids:["di-21b","di-cal"]},{q:"Work incentives 1619",ids:["si-14"]},
-  {q:"Vision/Hearing listings",ids:["di-ls2"]},{q:"Endocrine (no listings!)",ids:["di-ls9"]},
-  {q:"CDR 8-step MIRS",ids:["di-36"]},{q:"CDR FTC → cessation",ids:["ce-15"]},
-  {q:"Digestive/Liver listings",ids:["di-ls5"]},{q:"Kidney/Dialysis listings",ids:["di-ls6"]},
-  {q:"Sickle cell/Blood listings",ids:["di-ls7"]},{q:"Skin disorder listings",ids:["di-ls8"]},
-  {q:"Down syndrome/Congenital",ids:["di-ls10"]},
+{q:"5-step sequential evaluation",ids:["di-11"]},{q:"SGA amounts",ids:["di-2","di-3"]},{q:"Claimant missed CE",ids:["ce-13"]},
+{q:"Claimant refused CE",ids:["ce-12"]},{q:"Physical RFC",ids:["di-24"]},{q:"Mental RFC / PRT",ids:["di-23","di-25"]},
+{q:"Adult listings",ids:["di-37"]},{q:"Child disability",ids:["di-30","di-31"]},{q:"When to order CE",ids:["ce-2"]},
+{q:"Grid rules",ids:["di-26"]},{q:"Onset date",ids:["di-33"]},{q:"SSI resources",ids:["si-10"]},
+{q:"Deeming",ids:["si-13"]},{q:"DAA materiality",ids:["di-39"]},{q:"CDR overview",ids:["di-35"]},
+{q:"Short-notice CE",ids:["ce-7"]},{q:"TERI/CAL",ids:["di-21b","di-cal"]},{q:"Work incentives 1619",ids:["si-14"]},
+{q:"Vision/Hearing listings",ids:["di-ls2"]},{q:"Endocrine (no listings!)",ids:["di-ls9"]},
+{q:"CDR 8-step MIRS",ids:["di-36"]},{q:"CDR FTC → cessation",ids:["ce-15"]},
+{q:"Digestive/Liver listings",ids:["di-ls5"]},{q:"Kidney/Dialysis listings",ids:["di-ls6"]},
+{q:"Sickle cell/Blood listings",ids:["di-ls7"]},{q:"Skin disorder listings",ids:["di-ls8"]},
+{q:"Down syndrome/Congenital",ids:["di-ls10"]},
 ];
-
 var SHEETS=["All","DI","SI","CE"];
 var CATS=[];POMS_DATA.forEach(function(d){if(CATS.indexOf(d.c)===-1)CATS.push(d.c);});CATS.sort();
 var P={q:"",sh:"All",ca:"",tab:"search",sel:null,ratings:{},notes:{},bookmarks:[],_results:[],searchHistory:[],viewHistory:{}};
 var $=function(id){return document.getElementById(id);};
-
-// Storage
 function pld(k,d){try{var v=localStorage.getItem('poms-'+k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function psv(k,v){try{localStorage.setItem('poms-'+k,JSON.stringify(v));}catch(e){}}
-
-// Search
 function psc(item,terms){var s=0;var all=(item.s+' '+item.t+' '+item.c+' '+item.tp+' '+(item.ct||'')+' '+(item.al||'')+' '+(item.ex||'')).toLowerCase();
-  for(var i=0;i<terms.length;i++){var t=terms[i].toLowerCase();if(item.s.toLowerCase()===t)s+=100;if(item.s.toLowerCase().indexOf(t)>-1)s+=50;
-    if(item.t.toLowerCase().indexOf(t)>-1)s+=40;if((item.al||'').toLowerCase().indexOf(t)>-1)s+=30;
-    if(item.c.toLowerCase().indexOf(t)>-1)s+=20;if(item.tp.toLowerCase().indexOf(t)>-1)s+=15;
-    if((item.ex||'').toLowerCase().indexOf(t)>-1)s+=8;if(all.indexOf(t)>-1)s+=3;}return s;}
-
+for(var i=0;i<terms.length;i++){var t=terms[i].toLowerCase();if(item.s.toLowerCase()===t)s+=100;if(item.s.toLowerCase().indexOf(t)>-1)s+=50;
+if(item.t.toLowerCase().indexOf(t)>-1)s+=40;if((item.al||'').toLowerCase().indexOf(t)>-1)s+=30;
+if(item.c.toLowerCase().indexOf(t)>-1)s+=20;if(item.tp.toLowerCase().indexOf(t)>-1)s+=15;
+if((item.ex||'').toLowerCase().indexOf(t)>-1)s+=8;if(all.indexOf(t)>-1)s+=3;}return s;}
 function psearch(){var r=POMS_DATA.slice();if(P.sh!=='All')r=r.filter(function(x){return x.sh===P.sh;});
-  if(P.ca)r=r.filter(function(x){return x.c===P.ca;});if(!P.q.trim())return r;
-  var t=P.q.trim().split(/\s+/);return r.map(function(x){x._sc=psc(x,t);return x;}).filter(function(x){return x._sc>0;}).sort(function(a,b){return b._sc-a._sc;});}
-
+if(P.ca)r=r.filter(function(x){return x.c===P.ca;});if(!P.q.trim())return r;
+var t=P.q.trim().split(/\s+/);return r.map(function(x){x._sc=psc(x,t);return x;}).filter(function(x){return x._sc>0;}).sort(function(a,b){return b._sc-a._sc;});}
 function pel(tag,cls,html){var e=document.createElement(tag);if(cls)e.className=cls;if(html!==undefined)e.innerHTML=html;return e;}
 function pcol(sh){return{DI:'#2E75B6',SI:'#548235',CE:'#8B0000'}[sh]||'#333';}
-
-// Export CSV
 function pexportCSV(){
-  var rows=[["Section","Title","Category","Sheet","ExRating","FlowRating","Bookmarked","Notes"]];
-  POMS_DATA.forEach(function(d){var er=P.ratings['ex:'+d.id]||0;var fr=d.fl?(P.ratings['flow:'+d.fl]||0):"";
-    var bm=P.bookmarks.indexOf(d.id)>-1?"Yes":"";var n=P.notes[d.id]||"";
-    if(er||fr||bm||n)rows.push([d.s,d.t,d.c,d.sh,er||"",fr,bm,'"'+(n||"").replace(/"/g,'""')+'"']);});
-  var blob=new Blob([rows.map(function(r){return r.join(",");}).join("\n")],{type:"text/csv"});
-  var a=document.createElement("a");a.href=URL.createObjectURL(blob);
-  a.download="POMS_Ratings_"+new Date().toISOString().slice(0,10)+".csv";a.click();}
-
-// Header
+var rows=[["Section","Title","Category","Sheet","ExRating","FlowRating","Bookmarked","Notes"]];
+POMS_DATA.forEach(function(d){var er=P.ratings['ex:'+d.id]||0;var fr=d.fl?(P.ratings['flow:'+d.fl]||0):"";
+var bm=P.bookmarks.indexOf(d.id)>-1?"Yes":"";var n=P.notes[d.id]||"";
+if(er||fr||bm||n)rows.push([d.s,d.t,d.c,d.sh,er||"",fr,bm,'"'+(n||"").replace(/"/g,'""')+'"']);});
+var blob=new Blob([rows.map(function(r){return r.join(",");}).join("\n")],{type:"text/csv"});
+var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+a.download="POMS_Ratings_"+new Date().toISOString().slice(0,10)+".csv";a.click();}
 function prenderHdr(){
-  var h=$('poms-hdr');h.innerHTML='';
-  var row=pel('div','','');row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px';
-  row.innerHTML='<span style="font-size:20px">📘</span><div style="flex:1"><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div><a href="https://github.com/Woop91/509D/raw/main/dds-resources/POMS_Flowcharts_Desk_Reference.pdf" target="_blank" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap;min-height:32px">📥 PDF</a>';
-  h.appendChild(row);
-
-  // Tab pills
-  var tabRow=pel('div','p-pills');tabRow.style.marginBottom='8px';
-  var tabs=[['search','🔍 Search'],['bookmarks','♥ Saved ('+P.bookmarks.length+')'],['rated','⭐ Ratings'],['stats','📊 Stats']];
-  tabs.forEach(function(t){
-    var btn=pel('button','p-pill'+(P.tab===t[0]?' on':''),t[1]);
-    btn.onclick=function(){P.tab=t[0];prender();};
-    tabRow.appendChild(btn);});
-  h.appendChild(tabRow);
-
-  // Search controls only on search tab
-  if(P.tab==='search'){
-    var wrap=pel('div','p-swrap');wrap.innerHTML='<span class="p-sicon">🔍</span>';
-    var inp=document.createElement('input');inp.className='p-search';inp.placeholder='Section, topic, keyword...';inp.value=P.q;inp.type='search';
-    inp.addEventListener('input',function(e){P.q=e.target.value;prenderBody();
-      var cb=wrap.querySelector('.p-clear');if(cb)cb.classList.toggle('vis',!!P.q);
-      clearTimeout(window._pst);window._pst=setTimeout(function(){
-        if(P.q.trim().length>=2){var q=P.q.trim().toLowerCase();
-          var idx=-1;for(var i=0;i<P.searchHistory.length;i++){if(P.searchHistory[i].q===q){idx=i;break;}}
-          if(idx>-1){P.searchHistory[idx].n++;P.searchHistory[idx].d=Date.now();}
-          else{P.searchHistory.unshift({q:q,n:1,d:Date.now()});}
-          if(P.searchHistory.length>50)P.searchHistory.length=50;
-          psv('searches',P.searchHistory);}
-      },1500);});
-    wrap.appendChild(inp);
-    var clr=pel('button','p-clear'+(P.q?' vis':''),'✕');clr.onclick=function(){P.q='';inp.value='';prenderBody();clr.classList.remove('vis');};
-    wrap.appendChild(clr);h.appendChild(wrap);
-    var fRow=pel('div','p-pills');
-    SHEETS.forEach(function(s){var p=pel('button','p-pill'+(P.sh===s?' on':''),s);p.onclick=function(){P.sh=s;prenderBody();prenderHdr();};fRow.appendChild(p);});
-    var sel=document.createElement('select');sel.className='p-pill';sel.style.cssText='background:rgba(255,255,255,.06);padding:0 8px';
-    sel.innerHTML='<option value="" style="color:#333">All Categories</option>'+CATS.map(function(c){return '<option value="'+c+'" style="color:#333"'+(P.ca===c?' selected':'')+'>'+c+'</option>';}).join('');
-    sel.onchange=function(e){P.ca=e.target.value;prenderBody();};fRow.appendChild(sel);
-    h.appendChild(fRow);
-  }
+var h=$('poms-hdr');h.innerHTML='';
+var row=pel('div','','');row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px';
+row.innerHTML='<span style="font-size:20px">📘</span><div style="flex:1"><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div><a href="https://github.com/Woop91/509D/raw/main/dds-resources/POMS_Flowcharts_Desk_Reference.pdf" target="_blank" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap;min-height:32px">📥 PDF</a>';
+h.appendChild(row);
+var tabRow=pel('div','p-pills');tabRow.style.marginBottom='8px';
+var tabs=[['search','🔍 Search'],['bookmarks','♥ Saved ('+P.bookmarks.length+')'],['rated','⭐ Ratings'],['stats','📊 Stats']];
+tabs.forEach(function(t){
+var btn=pel('button','p-pill'+(P.tab===t[0]?' on':''),t[1]);
+btn.onclick=function(){P.tab=t[0];prender();};
+tabRow.appendChild(btn);});
+h.appendChild(tabRow);
+if(P.tab==='search'){
+var wrap=pel('div','p-swrap');wrap.innerHTML='<span class="p-sicon">🔍</span>';
+var inp=document.createElement('input');inp.className='p-search';inp.placeholder='Section, topic, keyword...';inp.value=P.q;inp.type='search';
+inp.addEventListener('input',function(e){P.q=e.target.value;prenderBody();
+var cb=wrap.querySelector('.p-clear');if(cb)cb.classList.toggle('vis',!!P.q);
+clearTimeout(window._pst);window._pst=setTimeout(function(){
+if(P.q.trim().length>=2){var q=P.q.trim().toLowerCase();
+var idx=-1;for(var i=0;i<P.searchHistory.length;i++){if(P.searchHistory[i].q===q){idx=i;break;}}
+if(idx>-1){P.searchHistory[idx].n++;P.searchHistory[idx].d=Date.now();}
+else{P.searchHistory.unshift({q:q,n:1,d:Date.now()});}
+if(P.searchHistory.length>50)P.searchHistory.length=50;
+psv('searches',P.searchHistory);}
+},1500);});
+wrap.appendChild(inp);
+var clr=pel('button','p-clear'+(P.q?' vis':''),'✕');clr.onclick=function(){P.q='';inp.value='';prenderBody();clr.classList.remove('vis');};
+wrap.appendChild(clr);h.appendChild(wrap);
+var fRow=pel('div','p-pills');
+SHEETS.forEach(function(s){var p=pel('button','p-pill'+(P.sh===s?' on':''),s);p.onclick=function(){P.sh=s;prenderBody();prenderHdr();};fRow.appendChild(p);});
+var sel=document.createElement('select');sel.className='p-pill';sel.style.cssText='background:rgba(255,255,255,.06);padding:0 8px';
+sel.innerHTML='<option value="" style="color:#333">All Categories</option>'+CATS.map(function(c){return '<option value="'+c+'" style="color:#333"'+(P.ca===c?' selected':'')+'>'+c+'</option>';}).join('');
+sel.onchange=function(e){P.ca=e.target.value;prenderBody();};fRow.appendChild(sel);
+h.appendChild(fRow);
 }
-
-// Card
+}
 function prenderCard(item){
-  var card=pel('div','p-card'+(item.sh==='SI'?' p-si':item.sh==='CE'?' p-ce':''));
-  var body=pel('div','p-card-body');
-  var meta=pel('div','p-meta');
-  meta.innerHTML='<span class="p-badge p-b-'+item.sh.toLowerCase()+'">'+item.sh+'</span><span class="p-sec">'+item.s+'</span>'
-    +(item.fl?'<span style="font-size:9px">📊</span>':'')
-    +(P.bookmarks.indexOf(item.id)>-1?'<span style="font-size:10px;color:#e94560">♥</span>':'')
-    +(P.notes[item.id]?'<span style="font-size:9px;color:#16a085">📝</span>':'');
-  body.appendChild(meta);
-  body.appendChild(pel('div','p-ctitle',item.t));
-  body.appendChild(pel('div','p-ccat',item.c+(item.ct?' · '+item.ct:'')));
-  if(item.ex)body.appendChild(pel('div','p-cdesc',item.ex));
-  if(item.al)body.appendChild(pel('div','p-calert','⚠️ '+item.al));
-  card.appendChild(body);
-  card.appendChild(pel('span','p-stars','★'.repeat(item.r||0)));
-  card.onclick=function(){popenDetail(item);};
-  return card;
+var card=pel('div','p-card'+(item.sh==='SI'?' p-si':item.sh==='CE'?' p-ce':''));
+var body=pel('div','p-card-body');
+var meta=pel('div','p-meta');
+meta.innerHTML='<span class="p-badge p-b-'+item.sh.toLowerCase()+'">'+item.sh+'</span><span class="p-sec">'+item.s+'</span>'
++(item.fl?'<span style="font-size:9px">📊</span>':'')
++(P.bookmarks.indexOf(item.id)>-1?'<span style="font-size:10px;color:#e94560">♥</span>':'')
++(P.notes[item.id]?'<span style="font-size:9px;color:#16a085">📝</span>':'');
+body.appendChild(meta);
+body.appendChild(pel('div','p-ctitle',item.t));
+body.appendChild(pel('div','p-ccat',item.c+(item.ct?' · '+item.ct:'')));
+if(item.ex)body.appendChild(pel('div','p-cdesc',item.ex));
+if(item.al)body.appendChild(pel('div','p-calert','⚠️ '+item.al));
+card.appendChild(body);
+card.appendChild(pel('span','p-stars','★'.repeat(item.r||0)));
+card.onclick=function(){popenDetail(item);};
+return card;
 }
-
-// Body
 function prenderBody(){
-  var main=$('poms-body');main.innerHTML='';
-  var results;
-
-  // ═══ BOOKMARKS TAB ═══
-  if(P.tab==='bookmarks'){
-    results=POMS_DATA.filter(function(d){return P.bookmarks.indexOf(d.id)>-1;});
-    if(!results.length){main.innerHTML='<div class="p-empty"><div style="font-size:36px">♡</div><div style="font-size:13px;margin-top:8px">No bookmarks yet.<br>Tap ♥ on any section to save it.</div></div>';return;}
-    main.appendChild(pel('div','p-count',results.length+' bookmarked section'+(results.length!==1?'s':'')));
-    P._results=results;
-    results.forEach(function(item){main.appendChild(prenderCard(item));});
-    return;
-  }
-
-  // ═══ RATINGS TAB ═══
-  if(P.tab==='rated'){
-    results=POMS_DATA.filter(function(d){return P.ratings['ex:'+d.id]>0;}).sort(function(a,b){return(P.ratings['ex:'+b.id]||0)-(P.ratings['ex:'+a.id]||0);});
-    if(results.length){
-      var row=pel('div','');row.style.cssText='display:flex;gap:8px;margin-bottom:10px';
-      var expBtn=pel('button','','📥 Export CSV');expBtn.style.cssText='padding:10px 16px;border-radius:10px;border:1px solid #e94560;background:var(--pr-surface);color:#e94560;font-size:12px;font-weight:600;flex:1;min-height:44px;cursor:pointer';
-      expBtn.onclick=pexportCSV;row.appendChild(expBtn);
-      var rstBtn=pel('button','','🗑 Reset All');rstBtn.style.cssText='padding:10px 16px;border-radius:10px;border:1px solid var(--pr-borderStrong);background:var(--pr-surface);color:var(--pr-muted);font-size:12px;flex:1;min-height:44px;cursor:pointer';
-      rstBtn.onclick=function(){if(confirm('Clear ALL ratings, notes, bookmarks?')){P.ratings={};P.notes={};P.bookmarks=[];psv('ratings',{});psv('notes',{});psv('bookmarks',[]);prender();}};
-      row.appendChild(rstBtn);main.appendChild(row);
-    }
-    if(!results.length){main.innerHTML='<div class="p-empty"><div style="font-size:36px">⭐</div><div style="font-size:13px;margin-top:8px">No ratings yet.<br>Rate explanations in any section.</div></div>';return;}
-    main.appendChild(pel('div','p-count',results.length+' rated section'+(results.length!==1?'s':'')));
-    P._results=results;
-    results.forEach(function(item){
-      var card=prenderCard(item);
-      var starSpan=card.querySelector('.p-stars');
-      if(starSpan)starSpan.innerHTML='<span style="color:#f39c12">'+'★'.repeat(P.ratings['ex:'+item.id])+'</span>'+'☆'.repeat(5-P.ratings['ex:'+item.id]);
-      main.appendChild(card);
-    });
-    return;
-  }
-
-  // ═══ STATS TAB ═══
-  if(P.tab==='stats'){
-    var topViewed=[];var vhKeys=Object.keys(P.viewHistory);
-    for(var i=0;i<vhKeys.length;i++)topViewed.push([vhKeys[i],P.viewHistory[vhKeys[i]]]);
-    topViewed.sort(function(a,b){return b[1]-a[1];});topViewed=topViewed.slice(0,10);
-    var topSearched=P.searchHistory.slice().sort(function(a,b){return b.n-a.n;}).slice(0,10);
-    var recentSearches=P.searchHistory.slice().sort(function(a,b){return b.d-a.d;}).slice(0,10);
-    var totalViews=0;for(var k in P.viewHistory)totalViews+=P.viewHistory[k];
-    var totalSearches=0;for(var j=0;j<P.searchHistory.length;j++)totalSearches+=P.searchHistory[j].n;
-
-    // Summary cards
-    var sumRow=pel('div','');sumRow.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px';
-    [{n:totalSearches,l:'Searches'},{n:totalViews,l:'Views'},{n:vhKeys.length,l:'Sections Seen'}].forEach(function(s){
-      var c=pel('div','');c.style.cssText='background:var(--pr-surface);border-radius:10px;padding:14px;text-align:center;box-shadow:0 1px 3px var(--pr-cardShadow)';
-      c.innerHTML='<div style="font-size:22px;font-weight:700;color:var(--pr-text)">'+s.n+'</div><div style="font-size:10px;color:var(--pr-muted);margin-top:2px">'+s.l+'</div>';
-      sumRow.appendChild(c);});
-    main.appendChild(sumRow);
-
-    // Most viewed
-    if(topViewed.length){
-      main.appendChild(pel('div','p-ql-label','📊 Most Viewed Sections'));
-      topViewed.forEach(function(pair){
-        var item=null;for(var m=0;m<POMS_DATA.length;m++){if(POMS_DATA[m].id===pair[0]){item=POMS_DATA[m];break;}}
-        if(!item)return;
-        var r=pel('div','');r.style.cssText='display:flex;align-items:center;gap:10px;background:var(--pr-surface);border-radius:10px;padding:10px 14px;margin-bottom:4px;cursor:pointer;box-shadow:0 1px 2px var(--pr-cardShadow)';
-        r.innerHTML='<div style="font-size:18px;font-weight:700;color:#e94560;min-width:32px;text-align:center">'+pair[1]+'</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--pr-text)">'+item.s+'</div><div style="font-size:11px;color:var(--pr-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+item.t+'</div></div>';
-        r.onclick=function(){popenDetail(item);};
-        main.appendChild(r);
-      });
-    }
-
-    // Most searched
-    if(topSearched.length){
-      var lbl=pel('div','p-ql-label','🔍 Most Searched');lbl.style.marginTop='16px';main.appendChild(lbl);
-      var scroll=pel('div','p-ql-scroll');
-      topSearched.forEach(function(h){
-        var chip=pel('button','p-ql-chip',h.q+' <span style="color:#e94560;font-weight:700;margin-left:4px">'+h.n+'</span>');
-        chip.onclick=function(){P.q=h.q;P.tab='search';prender();};
-        scroll.appendChild(chip);});
-      main.appendChild(scroll);
-    }
-
-    // Recent searches
-    if(recentSearches.length){
-      var lbl2=pel('div','p-ql-label','🕐 Recent Searches');lbl2.style.marginTop='16px';main.appendChild(lbl2);
-      recentSearches.forEach(function(h){
-        var r=pel('div','');r.style.cssText='display:flex;align-items:center;gap:10px;background:var(--pr-surface);border-radius:8px;padding:8px 12px;margin-bottom:3px;cursor:pointer';
-        var ago=Math.round((Date.now()-h.d)/60000);
-        var ts=ago<60?ago+'m ago':ago<1440?Math.round(ago/60)+'h ago':Math.round(ago/1440)+'d ago';
-        r.innerHTML='<span style="font-size:14px;opacity:.3">🔍</span><span style="flex:1;font-size:13px;color:var(--pr-text)">'+h.q+'</span><span style="font-size:10px;color:var(--pr-muted)">'+ts+'</span>';
-        r.onclick=function(){P.q=h.q;P.tab='search';prender();};
-        main.appendChild(r);
-      });
-    }
-
-    // Clear history
-    if(totalSearches||totalViews){
-      var clrBtn=pel('button','','🗑 Clear History');
-      clrBtn.style.cssText='margin-top:16px;padding:12px;border-radius:10px;border:1px solid var(--pr-borderStrong);background:var(--pr-surface);color:var(--pr-muted);font-size:12px;width:100%;min-height:44px;cursor:pointer';
-      clrBtn.onclick=function(){if(confirm('Clear all search/view history?')){P.searchHistory=[];P.viewHistory={};psv('searches',[]);psv('views',{});prender();}};
-      main.appendChild(clrBtn);
-    }
-
-    if(!totalSearches&&!totalViews)main.innerHTML='<div class="p-empty"><div style="font-size:36px">📊</div><div style="font-size:13px;margin-top:8px">No usage data yet.<br>Search and view sections to see stats.</div></div>';
-    return;
-  }
-
-  // ═══ SEARCH TAB ═══
-  results=psearch();
-  // Quick lookups
-  if(!P.q&&!P.ca&&P.sh==='All'){
-    var qlDiv=pel('div','p-ql');qlDiv.appendChild(pel('div','p-ql-label','Quick Lookups'));
-    var scroll=pel('div','p-ql-scroll');
-    QL.forEach(function(x){var chip=pel('button','p-ql-chip',x.q);
-      chip.onclick=function(){var items=POMS_DATA.filter(function(d){return x.ids.indexOf(d.id)>-1;});
-        if(items.length===1)popenDetail(items[0]);else{P.q=x.q;prender();}};
-      scroll.appendChild(chip);});
-    qlDiv.appendChild(scroll);main.appendChild(qlDiv);
-  }
-  main.appendChild(pel('div','p-count',P.q?results.length+' result'+(results.length!==1?'s':''):(results.length+' sections')+(P.sh!=='All'?' in '+P.sh:'')+(P.ca?' → '+P.ca:'')));
-  P._results=results;
-  results.forEach(function(item){main.appendChild(prenderCard(item));});
-  if(!results.length&&P.q)main.innerHTML+='<div class="p-empty"><div style="font-size:36px">🔍</div><div style="font-size:13px;margin-top:8px">No results for "'+P.q+'"</div></div>';
+var main=$('poms-body');main.innerHTML='';
+var results;
+if(P.tab==='bookmarks'){
+results=POMS_DATA.filter(function(d){return P.bookmarks.indexOf(d.id)>-1;});
+if(!results.length){main.innerHTML='<div class="p-empty"><div style="font-size:36px">♡</div><div style="font-size:13px;margin-top:8px">No bookmarks yet.<br>Tap ♥ on any section to save it.</div></div>';return;}
+main.appendChild(pel('div','p-count',results.length+' bookmarked section'+(results.length!==1?'s':'')));
+P._results=results;
+results.forEach(function(item){main.appendChild(prenderCard(item));});
+return;
 }
-
-// Flowchart
+if(P.tab==='rated'){
+results=POMS_DATA.filter(function(d){return P.ratings['ex:'+d.id]>0;}).sort(function(a,b){return(P.ratings['ex:'+b.id]||0)-(P.ratings['ex:'+a.id]||0);});
+if(results.length){
+var row=pel('div','');row.style.cssText='display:flex;gap:8px;margin-bottom:10px';
+var expBtn=pel('button','','📥 Export CSV');expBtn.style.cssText='padding:10px 16px;border-radius:10px;border:1px solid #e94560;background:var(--pr-surface);color:#e94560;font-size:12px;font-weight:600;flex:1;min-height:44px;cursor:pointer';
+expBtn.onclick=pexportCSV;row.appendChild(expBtn);
+var rstBtn=pel('button','','🗑 Reset All');rstBtn.style.cssText='padding:10px 16px;border-radius:10px;border:1px solid var(--pr-borderStrong);background:var(--pr-surface);color:var(--pr-muted);font-size:12px;flex:1;min-height:44px;cursor:pointer';
+rstBtn.onclick=function(){if(confirm('Clear ALL ratings, notes, bookmarks?')){P.ratings={};P.notes={};P.bookmarks=[];psv('ratings',{});psv('notes',{});psv('bookmarks',[]);prender();}};
+row.appendChild(rstBtn);main.appendChild(row);
+}
+if(!results.length){main.innerHTML='<div class="p-empty"><div style="font-size:36px">⭐</div><div style="font-size:13px;margin-top:8px">No ratings yet.<br>Rate explanations in any section.</div></div>';return;}
+main.appendChild(pel('div','p-count',results.length+' rated section'+(results.length!==1?'s':'')));
+P._results=results;
+results.forEach(function(item){
+var card=prenderCard(item);
+var starSpan=card.querySelector('.p-stars');
+if(starSpan)starSpan.innerHTML='<span style="color:#f39c12">'+'★'.repeat(P.ratings['ex:'+item.id])+'</span>'+'☆'.repeat(5-P.ratings['ex:'+item.id]);
+main.appendChild(card);
+});
+return;
+}
+if(P.tab==='stats'){
+var topViewed=[];var vhKeys=Object.keys(P.viewHistory);
+for(var i=0;i<vhKeys.length;i++)topViewed.push([vhKeys[i],P.viewHistory[vhKeys[i]]]);
+topViewed.sort(function(a,b){return b[1]-a[1];});topViewed=topViewed.slice(0,10);
+var topSearched=P.searchHistory.slice().sort(function(a,b){return b.n-a.n;}).slice(0,10);
+var recentSearches=P.searchHistory.slice().sort(function(a,b){return b.d-a.d;}).slice(0,10);
+var totalViews=0;for(var k in P.viewHistory)totalViews+=P.viewHistory[k];
+var totalSearches=0;for(var j=0;j<P.searchHistory.length;j++)totalSearches+=P.searchHistory[j].n;
+var sumRow=pel('div','');sumRow.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px';
+[{n:totalSearches,l:'Searches'},{n:totalViews,l:'Views'},{n:vhKeys.length,l:'Sections Seen'}].forEach(function(s){
+var c=pel('div','');c.style.cssText='background:var(--pr-surface);border-radius:10px;padding:14px;text-align:center;box-shadow:0 1px 3px var(--pr-cardShadow)';
+c.innerHTML='<div style="font-size:22px;font-weight:700;color:var(--pr-text)">'+s.n+'</div><div style="font-size:10px;color:var(--pr-muted);margin-top:2px">'+s.l+'</div>';
+sumRow.appendChild(c);});
+main.appendChild(sumRow);
+if(topViewed.length){
+main.appendChild(pel('div','p-ql-label','📊 Most Viewed Sections'));
+topViewed.forEach(function(pair){
+var item=null;for(var m=0;m<POMS_DATA.length;m++){if(POMS_DATA[m].id===pair[0]){item=POMS_DATA[m];break;}}
+if(!item)return;
+var r=pel('div','');r.style.cssText='display:flex;align-items:center;gap:10px;background:var(--pr-surface);border-radius:10px;padding:10px 14px;margin-bottom:4px;cursor:pointer;box-shadow:0 1px 2px var(--pr-cardShadow)';
+r.innerHTML='<div style="font-size:18px;font-weight:700;color:#e94560;min-width:32px;text-align:center">'+pair[1]+'</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--pr-text)">'+item.s+'</div><div style="font-size:11px;color:var(--pr-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+item.t+'</div></div>';
+r.onclick=function(){popenDetail(item);};
+main.appendChild(r);
+});
+}
+if(topSearched.length){
+var lbl=pel('div','p-ql-label','🔍 Most Searched');lbl.style.marginTop='16px';main.appendChild(lbl);
+var scroll=pel('div','p-ql-scroll');
+topSearched.forEach(function(h){
+var chip=pel('button','p-ql-chip',h.q+' <span style="color:#e94560;font-weight:700;margin-left:4px">'+h.n+'</span>');
+chip.onclick=function(){P.q=h.q;P.tab='search';prender();};
+scroll.appendChild(chip);});
+main.appendChild(scroll);
+}
+if(recentSearches.length){
+var lbl2=pel('div','p-ql-label','🕐 Recent Searches');lbl2.style.marginTop='16px';main.appendChild(lbl2);
+recentSearches.forEach(function(h){
+var r=pel('div','');r.style.cssText='display:flex;align-items:center;gap:10px;background:var(--pr-surface);border-radius:8px;padding:8px 12px;margin-bottom:3px;cursor:pointer';
+var ago=Math.round((Date.now()-h.d)/60000);
+var ts=ago<60?ago+'m ago':ago<1440?Math.round(ago/60)+'h ago':Math.round(ago/1440)+'d ago';
+r.innerHTML='<span style="font-size:14px;opacity:.3">🔍</span><span style="flex:1;font-size:13px;color:var(--pr-text)">'+h.q+'</span><span style="font-size:10px;color:var(--pr-muted)">'+ts+'</span>';
+r.onclick=function(){P.q=h.q;P.tab='search';prender();};
+main.appendChild(r);
+});
+}
+if(totalSearches||totalViews){
+var clrBtn=pel('button','','🗑 Clear History');
+clrBtn.style.cssText='margin-top:16px;padding:12px;border-radius:10px;border:1px solid var(--pr-borderStrong);background:var(--pr-surface);color:var(--pr-muted);font-size:12px;width:100%;min-height:44px;cursor:pointer';
+clrBtn.onclick=function(){if(confirm('Clear all search/view history?')){P.searchHistory=[];P.viewHistory={};psv('searches',[]);psv('views',{});prender();}};
+main.appendChild(clrBtn);
+}
+if(!totalSearches&&!totalViews)main.innerHTML='<div class="p-empty"><div style="font-size:36px">📊</div><div style="font-size:13px;margin-top:8px">No usage data yet.<br>Search and view sections to see stats.</div></div>';
+return;
+}
+results=psearch();
+if(!P.q&&!P.ca&&P.sh==='All'){
+var qlDiv=pel('div','p-ql');qlDiv.appendChild(pel('div','p-ql-label','Quick Lookups'));
+var scroll=pel('div','p-ql-scroll');
+QL.forEach(function(x){var chip=pel('button','p-ql-chip',x.q);
+chip.onclick=function(){var items=POMS_DATA.filter(function(d){return x.ids.indexOf(d.id)>-1;});
+if(items.length===1)popenDetail(items[0]);else{P.q=x.q;prender();}};
+scroll.appendChild(chip);});
+qlDiv.appendChild(scroll);main.appendChild(qlDiv);
+}
+main.appendChild(pel('div','p-count',P.q?results.length+' result'+(results.length!==1?'s':''):(results.length+' sections')+(P.sh!=='All'?' in '+P.sh:'')+(P.ca?' → '+P.ca:'')));
+P._results=results;
+results.forEach(function(item){main.appendChild(prenderCard(item));});
+if(!results.length&&P.q)main.innerHTML+='<div class="p-empty"><div style="font-size:36px">🔍</div><div style="font-size:13px;margin-top:8px">No results for "'+P.q+'"</div></div>';
+}
 function prenderFlow(key,container){
-  var f=FLOWS[key];if(!f)return;
-  var div=pel('div','p-flow');
-  var hdr=pel('div','');hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
-  hdr.appendChild(pel('span','p-flow-title','📊 '+f.title));
-  var rr=pel('div','p-rate');rr.appendChild(pel('span','lbl','Rate:'));
-  var myR=P.ratings['flow:'+key]||0;
-  for(var n=1;n<=5;n++){(function(n){var btn=pel('button','p-rstar'+(n<=myR?' fon':''),'★');
-    btn.onclick=function(){P.ratings['flow:'+key]=P.ratings['flow:'+key]===n?0:n;psv('ratings',P.ratings);popenDetail(P._detItem);};
-    rr.appendChild(btn);})(n);}
-  hdr.appendChild(rr);div.appendChild(hdr);
-  f.steps.forEach(function(s,i){
-    var row=pel('div','p-fstep');
-    var bar=pel('div','p-fbar');bar.style.background=s.color;
-    if(i===0)bar.style.borderRadius='3px 0 0 0';if(i===f.steps.length-1)bar.style.borderRadius='0 0 0 3px';
-    row.appendChild(bar);
-    var c=pel('div','p-fc');
-    c.appendChild(pel('div','p-flbl',s.label));c.firstChild.style.color=s.color;
-    c.appendChild(pel('div','p-fdesc',s.desc));
-    if(s.yes)c.appendChild(pel('div','p-fbranch','<span class="p-fyes">Yes→</span> '+s.yes+' <span class="p-fno" style="margin-left:8px">No→</span> '+s.no));
-    row.appendChild(c);div.appendChild(row);
-  });
-  container.appendChild(div);
+var f=FLOWS[key];if(!f)return;
+var div=pel('div','p-flow');
+var hdr=pel('div','');hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
+hdr.appendChild(pel('span','p-flow-title','📊 '+f.title));
+var rr=pel('div','p-rate');rr.appendChild(pel('span','lbl','Rate:'));
+var myR=P.ratings['flow:'+key]||0;
+for(var n=1;n<=5;n++){(function(n){var btn=pel('button','p-rstar'+(n<=myR?' fon':''),'★');
+btn.onclick=function(){P.ratings['flow:'+key]=P.ratings['flow:'+key]===n?0:n;psv('ratings',P.ratings);popenDetail(P._detItem);};
+rr.appendChild(btn);})(n);}
+hdr.appendChild(rr);div.appendChild(hdr);
+f.steps.forEach(function(s,i){
+var row=pel('div','p-fstep');
+var bar=pel('div','p-fbar');bar.style.background=s.color;
+if(i===0)bar.style.borderRadius='3px 0 0 0';if(i===f.steps.length-1)bar.style.borderRadius='0 0 0 3px';
+row.appendChild(bar);
+var c=pel('div','p-fc');
+c.appendChild(pel('div','p-flbl',s.label));c.firstChild.style.color=s.color;
+c.appendChild(pel('div','p-fdesc',s.desc));
+if(s.yes)c.appendChild(pel('div','p-fbranch','<span class="p-fyes">Yes→</span> '+s.yes+' <span class="p-fno" style="margin-left:8px">No→</span> '+s.no));
+row.appendChild(c);div.appendChild(row);
+});
+container.appendChild(div);
 }
-
-// Detail
 function popenDetail(item){
-  P.viewHistory[item.id]=(P.viewHistory[item.id]||0)+1;psv('views',P.viewHistory);
-  P._detItem=item;var col=pcol(item.sh);
-  var hdr=$('poms-det-hdr');hdr.innerHTML='';
-  var back=pel('button','p-det-back','←');back.onclick=pcloseDetail;hdr.appendChild(back);
-  var td=pel('div','p-det-hdr-t');td.innerHTML='<div class="p-det-sec">'+item.s+'</div><div class="p-det-name">'+item.t+'</div>';hdr.appendChild(td);
-  var bm=pel('button','p-det-bm'+(P.bookmarks.indexOf(item.id)>-1?' on':''),P.bookmarks.indexOf(item.id)>-1?'♥':'♡');
-  bm.onclick=function(){var i=P.bookmarks.indexOf(item.id);if(i>-1)P.bookmarks.splice(i,1);else P.bookmarks.push(item.id);
-    psv('bookmarks',P.bookmarks);bm.className='p-det-bm'+(P.bookmarks.indexOf(item.id)>-1?' on':'');bm.textContent=P.bookmarks.indexOf(item.id)>-1?'♥':'♡';};
-  hdr.appendChild(bm);
-  var body=$('poms-det-body');body.innerHTML='';body.scrollTop=0;
-  body.appendChild(pel('div','p-det-sf',item.s));
-  body.appendChild(pel('div','p-det-tf',item.t));
-  var meta=pel('div','p-meta');meta.style.marginBottom='10px';
-  meta.innerHTML='<span class="p-badge p-b-'+item.sh.toLowerCase()+'">'+item.sh+'</span>'
-    +(item.wf?'<span style="background:var(--pr-surfaceAlt);padding:3px 8px;border-radius:6px;font-size:10px;color:var(--pr-muted)">'+item.wf+'</span>':'')
-    +'<span style="color:#BF8F00;font-size:12px">'+'★'.repeat(item.r||0)+'</span>'
-    +'<span style="font-size:10px;color:var(--pr-muted)">'+item.c+(item.ct?' · '+item.ct:'')+'</span>';
-  body.appendChild(meta);
-  if(item.al)body.appendChild(pel('div','p-det-alert','⚠️ '+item.al));
-  // Explanation + rating
-  if(item.ex){
-    var block=pel('div','p-block');
-    var lr=pel('div','');lr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px';
-    var lbl=pel('div','p-block-lbl','📖 Explanation');lbl.style.color=col;
-    var rr=pel('div','p-rate');rr.appendChild(pel('span','lbl','Rate:'));
-    var exR=P.ratings['ex:'+item.id]||0;
-    for(var n=1;n<=5;n++){(function(n){var btn=pel('button','p-rstar'+(n<=exR?' on':''),'★');
-      btn.onclick=function(){P.ratings['ex:'+item.id]=P.ratings['ex:'+item.id]===n?0:n;psv('ratings',P.ratings);
-        rr.querySelectorAll('.p-rstar').forEach(function(b,j){b.className='p-rstar'+(j+1<=P.ratings['ex:'+item.id]?' on':'');});};
-      rr.appendChild(btn);})(n);}
-    lr.appendChild(lbl);lr.appendChild(rr);block.appendChild(lr);
-    block.appendChild(pel('div','p-ex',item.ex));body.appendChild(block);
-  }
-  if(item.fl)prenderFlow(item.fl,body);
-  if(item.rm&&item.rm.length){
-    var block=pel('div','p-block');
-    var lbl=pel('div','p-block-lbl','🔔 Reminders');lbl.style.color='#e94560';block.appendChild(lbl);
-    var box=pel('div','p-rm');
-    item.rm.forEach(function(r){var row=pel('div','p-rmi');row.innerHTML='<span style="color:#e67e22;flex-shrink:0;margin-top:2px">●</span><span>'+r+'</span>';box.appendChild(row);});
-    block.appendChild(box);body.appendChild(block);
-  }
-  if(item.rl&&item.rl.length){
-    var block=pel('div','p-block');block.appendChild(pel('div','p-block-lbl','🔗 Related'));block.lastChild.style.color='var(--pr-muted)';
-    var row=pel('div','p-related');
-    item.rl.forEach(function(r){var tag=pel('span','p-rel',r);tag.onclick=function(){pcloseDetail();P.q=r;prender();};row.appendChild(tag);});
-    block.appendChild(row);body.appendChild(block);
-  }
-  // Notes
-  var nb=pel('div','p-block p-notes');nb.appendChild(pel('div','p-block-lbl','📝 My Notes'));nb.lastChild.style.color='var(--pr-muted)';
-  var ta=document.createElement('textarea');ta.value=P.notes[item.id]||'';ta.placeholder='Add personal notes...';
-  ta.addEventListener('input',function(e){P.notes[item.id]=e.target.value;psv('notes',P.notes);});
-  nb.appendChild(ta);body.appendChild(nb);
-  // Keywords
-  var kb=pel('div','p-block');kb.appendChild(pel('div','p-block-lbl','🏷️ Keywords'));kb.lastChild.style.color='var(--pr-muted)';
-  kb.appendChild(pel('div','',item.tp));kb.lastChild.style.cssText='font-size:12px;color:var(--pr-muted);line-height:1.4';body.appendChild(kb);
-  var link=pel('a','p-plink','Open in POMS →');link.href=item.url;link.target='_blank';link.style.background=col;body.appendChild(link);
-  $('poms-detail').classList.add('open');
+P.viewHistory[item.id]=(P.viewHistory[item.id]||0)+1;psv('views',P.viewHistory);
+P._detItem=item;var col=pcol(item.sh);
+var hdr=$('poms-det-hdr');hdr.innerHTML='';
+var back=pel('button','p-det-back','←');back.onclick=pcloseDetail;hdr.appendChild(back);
+var td=pel('div','p-det-hdr-t');td.innerHTML='<div class="p-det-sec">'+item.s+'</div><div class="p-det-name">'+item.t+'</div>';hdr.appendChild(td);
+var bm=pel('button','p-det-bm'+(P.bookmarks.indexOf(item.id)>-1?' on':''),P.bookmarks.indexOf(item.id)>-1?'♥':'♡');
+bm.onclick=function(){var i=P.bookmarks.indexOf(item.id);if(i>-1)P.bookmarks.splice(i,1);else P.bookmarks.push(item.id);
+psv('bookmarks',P.bookmarks);bm.className='p-det-bm'+(P.bookmarks.indexOf(item.id)>-1?' on':'');bm.textContent=P.bookmarks.indexOf(item.id)>-1?'♥':'♡';};
+hdr.appendChild(bm);
+var body=$('poms-det-body');body.innerHTML='';body.scrollTop=0;
+body.appendChild(pel('div','p-det-sf',item.s));
+body.appendChild(pel('div','p-det-tf',item.t));
+var meta=pel('div','p-meta');meta.style.marginBottom='10px';
+meta.innerHTML='<span class="p-badge p-b-'+item.sh.toLowerCase()+'">'+item.sh+'</span>'
++(item.wf?'<span style="background:var(--pr-surfaceAlt);padding:3px 8px;border-radius:6px;font-size:10px;color:var(--pr-muted)">'+item.wf+'</span>':'')
++'<span style="color:#BF8F00;font-size:12px">'+'★'.repeat(item.r||0)+'</span>'
++'<span style="font-size:10px;color:var(--pr-muted)">'+item.c+(item.ct?' · '+item.ct:'')+'</span>';
+body.appendChild(meta);
+if(item.al)body.appendChild(pel('div','p-det-alert','⚠️ '+item.al));
+if(item.ex){
+var block=pel('div','p-block');
+var lr=pel('div','');lr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px';
+var lbl=pel('div','p-block-lbl','📖 Explanation');lbl.style.color=col;
+var rr=pel('div','p-rate');rr.appendChild(pel('span','lbl','Rate:'));
+var exR=P.ratings['ex:'+item.id]||0;
+for(var n=1;n<=5;n++){(function(n){var btn=pel('button','p-rstar'+(n<=exR?' on':''),'★');
+btn.onclick=function(){P.ratings['ex:'+item.id]=P.ratings['ex:'+item.id]===n?0:n;psv('ratings',P.ratings);
+rr.querySelectorAll('.p-rstar').forEach(function(b,j){b.className='p-rstar'+(j+1<=P.ratings['ex:'+item.id]?' on':'');});};
+rr.appendChild(btn);})(n);}
+lr.appendChild(lbl);lr.appendChild(rr);block.appendChild(lr);
+block.appendChild(pel('div','p-ex',item.ex));body.appendChild(block);
+}
+if(item.fl)prenderFlow(item.fl,body);
+if(item.rm&&item.rm.length){
+var block=pel('div','p-block');
+var lbl=pel('div','p-block-lbl','🔔 Reminders');lbl.style.color='#e94560';block.appendChild(lbl);
+var box=pel('div','p-rm');
+item.rm.forEach(function(r){var row=pel('div','p-rmi');row.innerHTML='<span style="color:#e67e22;flex-shrink:0;margin-top:2px">●</span><span>'+r+'</span>';box.appendChild(row);});
+block.appendChild(box);body.appendChild(block);
+}
+if(item.rl&&item.rl.length){
+var block=pel('div','p-block');block.appendChild(pel('div','p-block-lbl','🔗 Related'));block.lastChild.style.color='var(--pr-muted)';
+var row=pel('div','p-related');
+item.rl.forEach(function(r){var tag=pel('span','p-rel',r);tag.onclick=function(){pcloseDetail();P.q=r;prender();};row.appendChild(tag);});
+block.appendChild(row);body.appendChild(block);
+}
+var nb=pel('div','p-block p-notes');nb.appendChild(pel('div','p-block-lbl','📝 My Notes'));nb.lastChild.style.color='var(--pr-muted)';
+var ta=document.createElement('textarea');ta.value=P.notes[item.id]||'';ta.placeholder='Add personal notes...';
+ta.addEventListener('input',function(e){P.notes[item.id]=e.target.value;psv('notes',P.notes);});
+nb.appendChild(ta);body.appendChild(nb);
+var kb=pel('div','p-block');kb.appendChild(pel('div','p-block-lbl','🏷️ Keywords'));kb.lastChild.style.color='var(--pr-muted)';
+kb.appendChild(pel('div','',item.tp));kb.lastChild.style.cssText='font-size:12px;color:var(--pr-muted);line-height:1.4';body.appendChild(kb);
+var link=pel('a','p-plink','Open in POMS →');link.href=item.url;link.target='_blank';link.style.background=col;body.appendChild(link);
+$('poms-detail').classList.add('open');
 }
 function pcloseDetail(){$('poms-detail').classList.remove('open');P._detItem=null;}
 function prender(){prenderHdr();prenderBody();}
-
-// Swipe back
 var ptsx=0;
 $('poms-detail').addEventListener('touchstart',function(e){ptsx=e.touches[0].clientX;},{passive:true});
 $('poms-detail').addEventListener('touchend',function(e){if(e.changedTouches[0].clientX-ptsx>80&&ptsx<50)pcloseDetail();},{passive:true});
-
-// Init
 P.ratings=pld('ratings',{});P.notes=pld('notes',{});P.bookmarks=pld('bookmarks',[]);
 P.searchHistory=pld('searches',[]);P.viewHistory=pld('views',{});
 prender();
-
-// ── Sync dark/light with global AppState ──
 function _pomsSyncTheme() {
-  var root = document.getElementById('poms-root');
-  if (!root) return;
-  var isDark = false;
-  if (typeof AppState !== 'undefined' && AppState.isDark !== undefined) {
-    isDark = AppState.isDark;
-  } else {
-    try { isDark = localStorage.getItem('dds_isDark') !== 'false'; } catch(e) { isDark = true; }
-  }
-  root.classList.toggle('poms-dark', isDark);
+var root = document.getElementById('poms-root');
+if (!root) return;
+var isDark = false;
+if (typeof AppState !== 'undefined' && AppState.isDark !== undefined) {
+isDark = AppState.isDark;
+} else {
+try { isDark = localStorage.getItem('dds_isDark') !== 'false'; } catch(e) { isDark = true; }
+}
+root.classList.toggle('poms-dark', isDark);
 }
 _pomsSyncTheme();
 })();
