@@ -622,6 +622,7 @@ var DataService = (function () {
       var colCategory    = _findColumn(gColMap, HEADERS.grievanceIssueCategory);
       var colResolution  = _findColumn(gColMap, HEADERS.grievanceResolution);
       var colEmail       = _findColumn(gColMap, HEADERS.grievanceMemberEmail);
+      var colSteward     = _findColumn(gColMap, HEADERS.grievanceSteward);
 
       if (colGrievanceId !== -1) row[colGrievanceId] = 'DRAFT-' + Utilities.getUuid().substring(0, 8);
       if (colMemberId    !== -1) row[colMemberId]    = escapeForFormula(memberId);
@@ -630,6 +631,7 @@ var DataService = (function () {
       if (colStatus      !== -1) row[colStatus]      = 'Draft';
       if (colFiled       !== -1) row[colFiled]       = new Date();
       if (colUpdated     !== -1) row[colUpdated]     = new Date();
+      if (colSteward     !== -1 && data.stewardEmail) row[colSteward] = escapeForFormula(data.stewardEmail);
       if (colCategory    !== -1) row[colCategory]    = escapeForFormula(data.category || '');
       if (colResolution  !== -1) row[colResolution]  = escapeForFormula('[Draft] ' + data.title + ': ' + data.description);
       if (colEmail       !== -1) row[colEmail]       = escapeForFormula(email.toLowerCase().trim());
@@ -3175,6 +3177,7 @@ function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _r
 // v4.28.2 — Member-safe self-assign: members can assign a steward to THEMSELVES only.
 function dataMemberAssignSteward(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return DataService.assignStewardToMember(e, stewardEmail); }
 function dataStartGrievanceDraft(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.startGrievanceDraft(e, data); }) : { success: false, message: 'Not authenticated.' }; }
+function dataStartGrievanceDraftForMember(sessionToken, memberEmail, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; data = data || {}; data.stewardEmail = s; return withScriptLock_(function() { return DataService.startGrievanceDraft(memberEmail, data); }); }
 function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberSurveyStatus(e) : null; }
 function dataGetAllMembers(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getAllMembers(); }

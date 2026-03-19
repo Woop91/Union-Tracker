@@ -1009,10 +1009,76 @@ function _showMemberDetail(container, itemEl, member) {
     }
   }, '\uD83D\uDCC2 Case Folder');
 
+  // ── Start Grievance ──────────────────────────────────────────────────────
+  var grievanceBtn = el('button', {
+    style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: '600', cursor: 'pointer' },
+    onClick: function() {
+      actionArea.innerHTML = '';
+      var form = el('div', { style: { borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' } });
+      form.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '\u270D Start Grievance \u2014 ' + (member.name || member.email)));
+
+      var fields = {};
+      var titleInput = el('input', { type: 'text', style: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)', boxSizing: 'border-box', marginBottom: '8px' }, placeholder: 'Brief description of the issue' });
+      form.appendChild(el('label', { style: { display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '4px' } }, 'Title'));
+      form.appendChild(titleInput);
+      fields.title = titleInput;
+
+      var catSelect = el('select', { style: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)', marginBottom: '8px' } });
+      catSelect.appendChild(el('option', { value: '' }, '-- Select --'));
+      var cats = (CONFIG.issueCategories && CONFIG.issueCategories.length > 0) ? CONFIG.issueCategories : ['Contract Violation', 'Discipline', 'Safety/Health', 'Discrimination', 'Workload', 'Other'];
+      cats.forEach(function(c) { catSelect.appendChild(el('option', { value: c }, c)); });
+      form.appendChild(el('label', { style: { display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '4px' } }, 'Category'));
+      form.appendChild(catSelect);
+      fields.category = catSelect;
+
+      var descInput = el('textarea', { style: { width: '100%', minHeight: '80px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)', resize: 'vertical', boxSizing: 'border-box', marginBottom: '8px' }, placeholder: 'Describe what happened, when, and who was involved' });
+      form.appendChild(el('label', { style: { display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '4px' } }, 'Description'));
+      form.appendChild(descInput);
+      fields.description = descInput;
+
+      var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
+      form.appendChild(statusMsg);
+
+      var btnRowInner = el('div', { style: { display: 'flex', gap: '6px' } });
+      var submitBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px' },
+        onClick: function() {
+          var title = fields.title.value.trim();
+          var description = fields.description.value.trim();
+          if (!title) { statusMsg.textContent = 'Please enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+          if (!description) { statusMsg.textContent = 'Please enter a description.'; statusMsg.style.color = 'var(--danger)'; return; }
+          submitBtn.textContent = 'Submitting...'; submitBtn.disabled = true;
+          serverCall()
+            .withSuccessHandler(function(r) {
+              if (r && r.success) {
+                actionArea.innerHTML = '';
+                actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--success)', marginTop: '6px' } }, '\u2713 Grievance draft created for ' + (member.name || member.email) + '.'));
+              } else {
+                statusMsg.textContent = (r && r.message) || 'Error creating draft.';
+                statusMsg.style.color = 'var(--danger)';
+                submitBtn.textContent = 'Submit Draft'; submitBtn.disabled = false;
+              }
+            })
+            .withFailureHandler(function() {
+              statusMsg.textContent = 'Failed. Try again.';
+              statusMsg.style.color = 'var(--danger)';
+              submitBtn.textContent = 'Submit Draft'; submitBtn.disabled = false;
+            })
+            .dataStartGrievanceDraftForMember(SESSION_TOKEN, member.email, { title: title, category: fields.category.value, description: description });
+        }
+      }, 'Submit Draft');
+      var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
+      btnRowInner.appendChild(submitBtn);
+      btnRowInner.appendChild(cancelBtn);
+      form.appendChild(btnRowInner);
+      actionArea.appendChild(form);
+    }
+  }, '\u270D Start Grievance');
+
   btnRow.appendChild(profileBtn);
   btnRow.appendChild(logContactBtn);
   btnRow.appendChild(notifBtn);
   btnRow.appendChild(caseFolderBtn);
+  btnRow.appendChild(grievanceBtn);
   panel.appendChild(btnRow);
   panel.appendChild(actionArea);
 

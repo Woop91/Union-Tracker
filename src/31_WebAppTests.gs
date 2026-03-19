@@ -828,7 +828,7 @@ function test_endpoints_notificationCountExists() {
 
 function test_endpoints_grievanceDraftFnsExist() {
   // Grievance draft/drive functions
-  var fns = ['dataStartGrievanceDraft', 'dataCreateGrievanceDrive'];
+  var fns = ['dataStartGrievanceDraft', 'dataStartGrievanceDraftForMember', 'dataCreateGrievanceDrive'];
   for (var i = 0; i < fns.length; i++) {
     if (typeof this[fns[i]] !== 'undefined') {
       TestRunner.assertEquals('function', typeof this[fns[i]], fns[i] + ' exists');

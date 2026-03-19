@@ -158,7 +158,7 @@ function _serveAuth(config, e, authError) {
  */
 function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
-  template.view = role; // 'steward', 'member', or 'both'
+  template.view = (role === 'steward') ? 'both' : role; // stewards always get both views
 
   // Sanitize user record — strip sensitive fields
   var safeUser = {
