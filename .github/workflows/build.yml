@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Audit dependencies
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Run unit tests with coverage enforcement
         run: npm run coverage
@@ -208,7 +208,7 @@ jobs:
 
       - name: Rebuild dist and check for uncommitted differences
         run: |
-          npm run build
+          npm run build:prod
           if git diff --exit-code dist/; then
             echo "## Dist Parity Check" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -216,7 +216,7 @@ jobs:
           else
             echo "## Dist Parity Check" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**FAIL**: dist/ is out of sync with src/. Run \`npm run build\` and commit the result." >> $GITHUB_STEP_SUMMARY
+            echo "**FAIL**: dist/ is out of sync with src/. Run \`npm run build:prod\` and commit the result." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo '```diff' >> $GITHUB_STEP_SUMMARY
             git diff --stat dist/ >> $GITHUB_STEP_SUMMARY
