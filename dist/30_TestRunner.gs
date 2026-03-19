@@ -174,7 +174,7 @@ var TestRunner = (function () {
    */
   function _discoverTests() {
     var suites = {};
-    var globalScope = this;
+    var _globalScope = this;
 
     // GAS globals — iterate known test function names
     // We use a registry approach since GAS doesn't support Object.keys(this) reliably
@@ -341,7 +341,7 @@ var TestRunner = (function () {
     try {
       var raw = PropertiesService.getScriptProperties().getProperty(RESULTS_KEY);
       return raw ? JSON.parse(raw) : null;
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   }
@@ -1486,7 +1486,7 @@ function test_authsweep_stewardEndpointsRejectNull() {
       var safeType = Array.isArray(ep.safeEmpty) ? 'array' : typeof ep.safeEmpty;
       TestRunner.assertEquals(safeType, resultType,
         ep.fn + ' returns safe-empty type on null token');
-    } catch (e) {
+    } catch (_e) {
       // Throwing is also acceptable — it means the endpoint rejected
     }
   }
@@ -1513,7 +1513,7 @@ function test_authsweep_memberEndpointsRejectNull() {
         TestRunner.assertTrue(Array.isArray(result) && result.length === 0,
           ep.fn + ' returns empty array on null token');
       }
-    } catch (e) {
+    } catch (_e) {
       // Throwing is acceptable
     }
   }
@@ -1530,7 +1530,7 @@ function test_authsweep_noDataLeakOnNullToken() {
       TestRunner.assertFalsy(hasMemberData,
         'dataGetBatchData(null) must not leak member data');
     }
-  } catch (e) {
+  } catch (_e) {
     // Throwing is acceptable
   }
 }
@@ -1776,7 +1776,7 @@ function test_survey_getSurveyPeriodCallable() {
     if (period !== null) {
       TestRunner.assertType(period, 'object', 'period is object');
     }
-  } catch (e) {
+  } catch (_e) {
     // If sheet doesn't exist yet, that's okay — function should handle gracefully
   }
 }

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.30.1] - 2026-03-19
+
+### Fixed
+- **Test side effect**: `auth-denial.test.js` ran `node build.js` (dev build) during tests, overwriting minified dist HTML and re-adding DevTools/DevMenu — changed to `--validate-only`
+- **Lint warnings**: Renamed 6 unused vars/catch params in `30_TestRunner.gs` to `_`-prefixed (0 errors, 0 warnings)
+- **Version drift**: `COMMAND_CONFIG.VERSION` was stuck at `4.28.4` — synced to `4.30.1`
+- **Dist cleanup**: Removed `07_DevTools.gs` and `DevMenu.gs` from prod dist (should never have been committed)
+
 ## [4.30.0] - 2026-03-19
 
 ### Fixed
