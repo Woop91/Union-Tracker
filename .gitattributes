@@ -1,0 +1,9 @@
+# Force LF line endings in dist/ to prevent autocrlf corruption
+# during lint-staged stash/restore cycles on Windows.
+# Without this, lint-staged + core.autocrlf=true can silently
+# revert minified dist HTML to unminified source content.
+dist/*.html text eol=lf
+dist/*.gs text eol=lf
+src/*.html text eol=lf
+src/*.gs text eol=lf
+build.js text eol=lf

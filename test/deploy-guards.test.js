@@ -827,3 +827,57 @@ function countTopLevelArgs(str) {
 
   return count;
 }
+
+
+// ============================================================================
+// G24: HTML SIZE BUDGET — GAS HtmlOutput ~820KB LIMIT
+// ============================================================================
+// Reason: GAS silently truncates HtmlOutput beyond ~820KB. When steward users
+// get view='both' (steward_view + member_view), the total must stay under limit.
+// An unminified build or oversized view file can push past this, causing tabs to
+// fail with no error message.
+describe('G24: HTML size budget (GAS ~820KB limit)', () => {
+  const GAS_LIMIT_KB = 820;
+  const DIST = path.join(__dirname, '..', 'dist');
+
+  function fileSize(name) {
+    return fs.statSync(path.join(DIST, name)).size;
+  }
+
+  test('steward-only payload under GAS limit', () => {
+    const total = fileSize('index.html') + fileSize('styles.html') + fileSize('steward_view.html');
+    expect(total).toBeLessThan(GAS_LIMIT_KB * 1024);
+  });
+
+  test('member-only payload under GAS limit', () => {
+    const total = fileSize('index.html') + fileSize('styles.html') + fileSize('member_view.html');
+    expect(total).toBeLessThan(GAS_LIMIT_KB * 1024);
+  });
+
+  test('dual-role (both views) payload under GAS limit', () => {
+    const total = fileSize('index.html') + fileSize('styles.html')
+      + fileSize('steward_view.html') + fileSize('member_view.html');
+    expect(total).toBeLessThan(GAS_LIMIT_KB * 1024);
+  });
+});
+
+
+// ============================================================================
+// G25: DIST HTML MINIFICATION VERIFICATION
+// ============================================================================
+// Reason: lint-staged stash/restore with core.autocrlf=true can silently revert
+// minified dist HTML to unminified source content. This guard catches it by
+// verifying dist HTML files are smaller than their source counterparts.
+describe('G25: dist HTML files are minified', () => {
+  const SRC = path.join(__dirname, '..', 'src');
+  const DIST = path.join(__dirname, '..', 'dist');
+  const htmlFiles = ['index.html', 'styles.html', 'steward_view.html', 'member_view.html'];
+
+  htmlFiles.forEach(file => {
+    test(`${file} dist is smaller than src (minified)`, () => {
+      const srcSize = fs.statSync(path.join(SRC, file)).size;
+      const distSize = fs.statSync(path.join(DIST, file)).size;
+      expect(distSize).toBeLessThan(srcSize);
+    });
+  });
+});
