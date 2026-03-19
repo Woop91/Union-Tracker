@@ -2382,7 +2382,7 @@ function seedStewardTasksData() {
   var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
   if (!sheet) {
     sheet = ss.insertSheet(SHEETS.STEWARD_TASKS);
-    sheet.getRange(1, 1, 1, 10).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed']]);
+    sheet.getRange(1, 1, 1, 12).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed', 'Assignee Type', 'Assigned By']]);
     sheet.hideSheet();
   }
 
@@ -2397,17 +2397,17 @@ function seedStewardTasksData() {
 
   var now = new Date();
   var tasks = [
-    ['ST_SEED_1', ownerEmail, 'Follow up on scheduling grievance', 'Check if the Step I response has been received', '', 'high', 'open', new Date(now.getTime() + 3 * 86400000), now, ''],
-    ['ST_SEED_2', ownerEmail, 'Prepare for bargaining meeting', 'Compile member feedback and workload data for negotiation prep', '', 'high', 'open', new Date(now.getTime() + 7 * 86400000), now, ''],
-    ['ST_SEED_3', ownerEmail, 'Contact new members', 'Reach out to 5 new members who joined this month', '', 'medium', 'open', new Date(now.getTime() + 5 * 86400000), now, ''],
-    ['ST_SEED_4', ownerEmail, 'Submit weekly workload report', 'Compile and submit caseload numbers to the workload committee', '', 'medium', 'open', new Date(now.getTime() + 2 * 86400000), now, ''],
-    ['ST_SEED_5', ownerEmail, 'Review contract language on overtime', 'Research Articles 12 and 15 for upcoming overtime dispute', '', 'low', 'open', new Date(now.getTime() + 14 * 86400000), now, ''],
-    ['ST_SEED_6', ownerEmail, 'Organize Know Your Rights session', 'Book room and prepare materials for next month Weingarten rights training', '', 'medium', 'open', new Date(now.getTime() + 21 * 86400000), now, ''],
-    ['ST_SEED_7', ownerEmail, 'Update member contact info', 'Three members reported new phone numbers — update directory', '', 'low', 'completed', new Date(now.getTime() - 2 * 86400000), new Date(now.getTime() - 5 * 86400000), new Date(now.getTime() - 2 * 86400000)],
-    ['ST_SEED_8', ownerEmail, 'File safety complaint for Building B', 'Document the HVAC issues and file with Health & Safety Committee', '', 'high', 'completed', new Date(now.getTime() - 1 * 86400000), new Date(now.getTime() - 7 * 86400000), new Date(now.getTime() - 1 * 86400000)],
+    ['ST_SEED_1', ownerEmail, 'Follow up on scheduling grievance', 'Check if the Step I response has been received', '', 'high', 'open', new Date(now.getTime() + 3 * 86400000), now, '', 'steward', ''],
+    ['ST_SEED_2', ownerEmail, 'Prepare for bargaining meeting', 'Compile member feedback and workload data for negotiation prep', '', 'high', 'open', new Date(now.getTime() + 7 * 86400000), now, '', 'steward', ''],
+    ['ST_SEED_3', ownerEmail, 'Contact new members', 'Reach out to 5 new members who joined this month', '', 'medium', 'open', new Date(now.getTime() + 5 * 86400000), now, '', 'steward', ''],
+    ['ST_SEED_4', ownerEmail, 'Submit weekly workload report', 'Compile and submit caseload numbers to the workload committee', '', 'medium', 'open', new Date(now.getTime() + 2 * 86400000), now, '', 'steward', ''],
+    ['ST_SEED_5', ownerEmail, 'Review contract language on overtime', 'Research Articles 12 and 15 for upcoming overtime dispute', '', 'low', 'open', new Date(now.getTime() + 14 * 86400000), now, '', 'steward', ''],
+    ['ST_SEED_6', ownerEmail, 'Organize Know Your Rights session', 'Book room and prepare materials for next month Weingarten rights training', '', 'medium', 'open', new Date(now.getTime() + 21 * 86400000), now, '', 'steward', ''],
+    ['ST_SEED_7', ownerEmail, 'Update member contact info', 'Three members reported new phone numbers — update directory', '', 'low', 'completed', new Date(now.getTime() - 2 * 86400000), new Date(now.getTime() - 5 * 86400000), new Date(now.getTime() - 2 * 86400000), 'steward', ''],
+    ['ST_SEED_8', ownerEmail, 'File safety complaint for Building B', 'Document the HVAC issues and file with Health & Safety Committee', '', 'high', 'completed', new Date(now.getTime() - 1 * 86400000), new Date(now.getTime() - 7 * 86400000), new Date(now.getTime() - 1 * 86400000), 'steward', ''],
   ];
 
-  sheet.getRange(2, 1, tasks.length, 10).setValues(tasks);
+  sheet.getRange(2, 1, tasks.length, 12).setValues(tasks);
   Logger.log('Seeded ' + tasks.length + ' steward tasks');
 }
 

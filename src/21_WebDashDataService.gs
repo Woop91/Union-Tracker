@@ -56,6 +56,8 @@ var DataService = (function () {
     memberEmployeeId:    ['employee id', 'employee number', 'emp id', 'emp no'],
     memberHireDate:      ['hire date', 'date hired', 'start date'],
     memberOpenRate:      ['open rate %', 'open rate', 'email open rate'],
+    memberLastVirtualMtg:  ['last virtual mtg', 'last virtual meeting'],
+    memberLastInPersonMtg: ['last in-person mtg', 'last in-person meeting'],
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -380,6 +382,8 @@ var DataService = (function () {
       employeeId: user.employeeId || '',
       hireDate: user.hireDate || '',
       openRate: user.openRate || '',
+      lastVirtualMtg: user.lastVirtualMtg || '',
+      lastInPersonMtg: user.lastInPersonMtg || '',
     };
   }
 
@@ -582,25 +586,28 @@ var DataService = (function () {
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet) return { success: false, message: 'Grievance sheet not found.' };
 
-      // Resolve member identity dynamically from directory
+      // Resolve member identity + assigned steward from directory
       var memberId = '';
       var memberFirstName = '';
       var memberLastName = '';
+      var assignedStewardEmail = '';
       var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberDir && memberDir.getLastRow() > 1) {
         var mData = memberDir.getDataRange().getValues();
         var mColMap = _buildColumnMap(mData[0]);
-        var mEmailCol = _findColumn(mColMap, HEADERS.memberEmail);
-        var mIdCol    = _findColumn(mColMap, HEADERS.memberId);
-        var mFirstCol = _findColumn(mColMap, HEADERS.memberFirstName);
-        var mLastCol  = _findColumn(mColMap, HEADERS.memberLastName);
+        var mEmailCol   = _findColumn(mColMap, HEADERS.memberEmail);
+        var mIdCol      = _findColumn(mColMap, HEADERS.memberId);
+        var mFirstCol   = _findColumn(mColMap, HEADERS.memberFirstName);
+        var mLastCol    = _findColumn(mColMap, HEADERS.memberLastName);
+        var mStewardCol = _findColumn(mColMap, HEADERS.memberAssignedSteward);
         var emailLower = email.toLowerCase().trim();
         for (var i = 1; i < mData.length; i++) {
           if (mEmailCol === -1) break;
           if (String(mData[i][mEmailCol] || '').toLowerCase().trim() === emailLower) {
-            memberId       = mIdCol    !== -1 ? String(mData[i][mIdCol]    || '').trim() : '';
-            memberFirstName = mFirstCol !== -1 ? String(mData[i][mFirstCol] || '').trim() : '';
-            memberLastName  = mLastCol  !== -1 ? String(mData[i][mLastCol]  || '').trim() : '';
+            memberId           = mIdCol      !== -1 ? String(mData[i][mIdCol]      || '').trim() : '';
+            memberFirstName    = mFirstCol   !== -1 ? String(mData[i][mFirstCol]   || '').trim() : '';
+            memberLastName     = mLastCol    !== -1 ? String(mData[i][mLastCol]    || '').trim() : '';
+            assignedStewardEmail = mStewardCol !== -1 ? String(mData[i][mStewardCol] || '').trim() : '';
             break;
           }
         }
@@ -631,12 +638,15 @@ var DataService = (function () {
       if (colStatus      !== -1) row[colStatus]      = 'Draft';
       if (colFiled       !== -1) row[colFiled]       = new Date();
       if (colUpdated     !== -1) row[colUpdated]     = new Date();
-      if (colSteward     !== -1 && data.stewardEmail) row[colSteward] = escapeForFormula(data.stewardEmail);
+      // Auto-assign steward: use provided steward email or the member's assigned steward
+      var stewardEmail = data.stewardEmail || assignedStewardEmail;
+      if (colSteward !== -1 && stewardEmail) row[colSteward] = escapeForFormula(stewardEmail);
       if (colCategory    !== -1) row[colCategory]    = escapeForFormula(data.category || '');
       if (colResolution  !== -1) row[colResolution]  = escapeForFormula('[Draft] ' + data.title + ': ' + data.description);
       if (colEmail       !== -1) row[colEmail]       = escapeForFormula(email.toLowerCase().trim());
 
       sheet.appendRow(row);
+      _invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
       return { success: true, message: 'Draft submitted.' };
     } catch (e) {
       Logger.log('DataService.startGrievanceDraft error: ' + e.message);
@@ -1325,6 +1335,16 @@ var DataService = (function () {
         return String(raw || '').trim();
       })(),
       openRate: String(_getVal(row, colMap, HEADERS.memberOpenRate, '')).trim(),
+      lastVirtualMtg: (function() {
+        var raw = _getVal(row, colMap, HEADERS.memberLastVirtualMtg, '');
+        if (raw instanceof Date) return _formatDate(raw);
+        return String(raw || '').trim();
+      })(),
+      lastInPersonMtg: (function() {
+        var raw = _getVal(row, colMap, HEADERS.memberLastInPersonMtg, '');
+        if (raw instanceof Date) return _formatDate(raw);
+        return String(raw || '').trim();
+      })(),
     };
   }
 
@@ -1684,7 +1704,7 @@ var DataService = (function () {
     }
     var sheet = _ensureStewardTasks();
     var id = 'ST_' + Date.now().toString(36);
-    sheet.appendRow([id, ownerEmail, title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
+    sheet.appendRow([id, ownerEmail, title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '', 'steward', '']);
     _invalidateSheetCache(SHEETS.STEWARD_TASKS);
     return { success: true, message: 'Task created.', taskId: id };
   }
@@ -3010,6 +3030,95 @@ var DataService = (function () {
     }
   }
 
+  // ═══════════════════════════════════════
+  // MEETINGS — Steward meeting creation + scheduled meeting retrieval (v4.30.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Creates a scheduled meeting. Stewards fill out meeting info; members can view and save to calendar.
+   * @param {string} stewardEmail - The steward creating the meeting
+   * @param {Object} data - { meetingName, meetingDate, meetingTime, meetingType, duration, meetingLink, notes }
+   * @returns {Object} { success, message, meetingId }
+   */
+  function createScheduledMeeting(stewardEmail, data) {
+    if (!stewardEmail || !data || !data.meetingName || !data.meetingDate) {
+      return { success: false, message: 'Meeting name and date are required.' };
+    }
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+      var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+      if (!sheet) {
+        sheet = ss.insertSheet(SHEETS.MEETING_CHECKIN_LOG);
+        var headers = MEETING_CHECKIN_HEADER_MAP_.map(function(h) { return h.header; });
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      }
+      var meetingId = 'MTG_' + Date.now().toString(36);
+      var row = new Array(MEETING_CHECKIN_HEADER_MAP_.length).fill('');
+      row[MEETING_CHECKIN_COLS.MEETING_ID - 1]       = meetingId;
+      row[MEETING_CHECKIN_COLS.MEETING_NAME - 1]      = escapeForFormula(data.meetingName.substring(0, 200));
+      row[MEETING_CHECKIN_COLS.MEETING_DATE - 1]      = new Date(data.meetingDate);
+      row[MEETING_CHECKIN_COLS.MEETING_TYPE - 1]      = escapeForFormula(data.meetingType || 'General');
+      row[MEETING_CHECKIN_COLS.MEETING_TIME - 1]      = escapeForFormula(data.meetingTime || '');
+      row[MEETING_CHECKIN_COLS.MEETING_DURATION - 1]  = escapeForFormula(data.duration || '');
+      row[MEETING_CHECKIN_COLS.EVENT_STATUS - 1]      = 'scheduled';
+      row[MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1]     = data.meetingLink && /^https?:\/\//i.test(data.meetingLink) ? data.meetingLink : '';
+      row[MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1]   = escapeForFormula(stewardEmail);
+      row[MEETING_CHECKIN_COLS.EMAIL - 1]             = escapeForFormula(stewardEmail); // creator
+      row[MEETING_CHECKIN_COLS.MEMBER_NAME - 1]       = '(Scheduled)';
+
+      sheet.appendRow(row);
+      _invalidateSheetCache(SHEETS.MEETING_CHECKIN_LOG);
+      return { success: true, message: 'Meeting scheduled.', meetingId: meetingId };
+    } catch (e) {
+      Logger.log('createScheduledMeeting error: ' + e.message);
+      return { success: false, message: 'Failed to create meeting.' };
+    }
+  }
+
+  /**
+   * Returns upcoming scheduled meetings (EVENT_STATUS = 'scheduled', future date).
+   * Available to all authenticated members.
+   * @returns {Object[]} Array of meeting objects with meetingId, meetingName, meetingDate, meetingType, meetingTime, duration, meetingLink, createdBy
+   */
+  function getScheduledMeetings() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (!ss) return [];
+      var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+      if (!sheet || sheet.getLastRow() <= 1) return [];
+
+      var data = sheet.getDataRange().getValues();
+      var meetings = [];
+      var now = new Date();
+      for (var i = 1; i < data.length; i++) {
+        var status = String(data[i][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '').trim().toLowerCase();
+        if (status !== 'scheduled') continue;
+        var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+        // Include meetings from today onward (not past)
+        if (meetingDate instanceof Date && meetingDate.getTime() < now.getTime() - 86400000) continue;
+        meetings.push({
+          meetingId: String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || ''),
+          meetingName: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
+          meetingDate: meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || ''),
+          meetingDateRaw: meetingDate instanceof Date ? meetingDate.toISOString() : '',
+          meetingType: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
+          meetingTime: String(data[i][MEETING_CHECKIN_COLS.MEETING_TIME - 1] || ''),
+          duration: String(data[i][MEETING_CHECKIN_COLS.MEETING_DURATION - 1] || ''),
+          meetingLink: String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || ''),
+          createdBy: String(data[i][MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] || ''),
+        });
+      }
+      meetings.sort(function(a, b) {
+        return (a.meetingDateRaw || '').localeCompare(b.meetingDateRaw || '');
+      });
+      return meetings;
+    } catch (e) {
+      Logger.log('getScheduledMeetings error: ' + e.message);
+      return [];
+    }
+  }
+
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -3073,6 +3182,8 @@ var DataService = (function () {
     toggleChecklistItem: toggleChecklistItem,
     getMemberMeetings: getMemberMeetings,
     getMeetingStats: getMeetingStats,
+    createScheduledMeeting: createScheduledMeeting,
+    getScheduledMeetings: getScheduledMeetings,
     getSatisfactionTrends: getSatisfactionTrends,
     submitFeedback: submitFeedback,
     // Perf: batch + cache
@@ -3311,6 +3422,8 @@ function dataGetAllStewardPerformance(sessionToken) { var s = _requireStewardAut
 function dataGetCaseChecklist(sessionToken, caseId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getCaseChecklist(caseId) : []; }
 function dataToggleChecklistItem(sessionToken, checklistId, completed) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMemberMeetings(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberMeetings(e) : []; }
+function dataCreateScheduledMeeting(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.createScheduledMeeting(s, data); }); }
+function dataGetScheduledMeetings(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getScheduledMeetings() : []; }
 function dataGetSatisfactionTrends(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { categories: [] }; return DataService.getSatisfactionTrends(); }
 function dataSubmitFeedback(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMyFeedback(e) : []; }

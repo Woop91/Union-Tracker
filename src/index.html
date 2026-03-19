@@ -2198,6 +2198,9 @@
         return;
       }
 
+      // ── Stale-switch guard (shared tabs) — bail if a newer click already fired ──
+      if (switchId !== _navSwitchId) { _navProgressDone(); return; }
+
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
         if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
@@ -2210,6 +2213,7 @@
         // renderPageLayout inside renderOrgChart calls _activatePane automatically
         _splitRenderTarget = 'primary';
         renderOrgChart(app, role);
+        _gcHiddenPanes(); // clean up orphaned hidden panes (orgchart/poms are not cached)
         _navProgressDone();
         return;
       }
@@ -2217,6 +2221,7 @@
         // renderPageLayout inside renderPOMSReference calls _activatePane automatically
         _splitRenderTarget = 'primary';
         renderPOMSReference(app, role);
+        _gcHiddenPanes(); // clean up orphaned hidden panes
         _navProgressDone();
         return;
       }
@@ -2609,11 +2614,19 @@
 
       function invalidateColorCache() { _cachedColors = null; }
 
+      /** Convert any CSS color (hex, hsl, rgb) to a hex string for chart fills */
+      function _toHex(color) {
+        if (!color || color.charAt(0) === '#') return color;
+        var ctx = document.createElement('canvas').getContext('2d');
+        ctx.fillStyle = color;
+        return ctx.fillStyle; // browser resolves to #rrggbb
+      }
+
       function _palette(count) {
         var c = _getColors();
         var pool = [c.accent, c.success, c.warning, c.info, c.danger, '#a78bfa', '#f472b6', '#38bdf8'];
         var out = [];
-        for (var i = 0; i < count; i++) out.push(pool[i % pool.length]);
+        for (var i = 0; i < count; i++) out.push(_toHex(pool[i % pool.length]));
         return out;
       }
 
@@ -2700,9 +2713,10 @@
         _ensureChartJs(function() {
           var c = _getColors();
           var dsList = datasets.map(function(ds, i) {
+            var hex = _toHex(ds.color || _palette(datasets.length)[i]);
             return Object.assign({
-              borderColor: ds.color || _palette(datasets.length)[i],
-              backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
+              borderColor: hex,
+              backgroundColor: hex + '20',
               fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
             }, ds);
           });

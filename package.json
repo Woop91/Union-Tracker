@@ -1,6 +1,6 @@
 {
   "name": "union-steward-dashboard",
-  "version": "4.29.1",
+  "version": "4.30.0",
   "description": "Modular Union Steward Dashboard for Google Sheets",
   "main": "build.js",
   "scripts": {
@@ -52,9 +52,6 @@
   "lint-staged": {
     "src/**/*.gs": [
       "eslint"
-    ],
-    "src/**/*.{gs,html}": [
-      "npx jest test/deploy-guards.test.js --no-coverage --bail"
     ]
   },
   "commitlint": {

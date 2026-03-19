@@ -595,16 +595,23 @@ function wqGetPollFrequency() { return WeeklyQuestions.getPollFrequency(); }
  * Eliminates the sequential waterfall on the Polls tab.
  */
 function wqGetPollData(sessionToken) {
-  var freq = WeeklyQuestions.getPollFrequency();
+  var freq = 'weekly';
+  try { freq = WeeklyQuestions.getPollFrequency(); } catch (_) {}
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { frequency: freq, questions: [] };
   if (typeof DataService !== 'undefined') {
     var rec = DataService.findUserByEmail(e);
     if (rec && rec.duesPaying === false) return { frequency: freq, questions: [] };
   }
-  var result = WeeklyQuestions.getActiveQuestions(e);
-  result.frequency = freq;
-  return result;
+  try {
+    var result = WeeklyQuestions.getActiveQuestions(e);
+    if (!result) return { frequency: freq, questions: [] };
+    result.frequency = freq;
+    return result;
+  } catch (err) {
+    Logger.log('wqGetPollData error: ' + err.message + '\n' + (err.stack || ''));
+    return { frequency: freq, questions: [] };
+  }
 }
 function wqSetPollFrequency(sessionToken, freq) {
   var e = _requireStewardAuth(sessionToken);

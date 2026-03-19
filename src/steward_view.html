@@ -2107,7 +2107,7 @@ function renderSurveyTracking(appContainer) {
             if (m.totalCompleted === 0 && m.totalMissed === 0) firstTimers++;
           });
 
-          var sGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' } });
+          var sGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: '8px' } });
           // New member completion: of newMembers, how many completed this survey
           var newMemberCompleted = 0;
           members.forEach(function(m) {
@@ -2160,7 +2160,7 @@ function renderSurveyTracking(appContainer) {
             var s = sections[key];
             if (!s || s.avg === null) return;
             var color = s.avg < 4 ? 'var(--danger)' : s.avg < 6 ? 'var(--warning)' : 'var(--success)';
-            var kpi = el('div', { className: 'card', style: { flex: '1', minWidth: '80px', padding: '10px 8px', textAlign: 'center', background: 'var(--surface)' } });
+            var kpi = el('div', { className: 'card', style: { flex: '1 1 90px', minWidth: '90px', padding: '10px 8px', textAlign: 'center', background: 'var(--surface)', boxSizing: 'border-box', overflow: 'hidden' } });
             kpi.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: color } }, s.avg.toFixed(1)));
             kpi.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', marginTop: '2px', lineHeight: '1.3' } }, s.name));
             kpiRow.appendChild(kpi);
@@ -3823,21 +3823,26 @@ function renderStewardDirectoryPage(appContainer) {
             style: { fontSize: '11px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', fontWeight: '600', marginTop: '4px' },
             onClick: function(e) {
               e.stopPropagation();
-              var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (s.name || '') + '\n';
-              if (s.email) vcf += 'EMAIL:' + s.email + '\n';
-              if (s.phone) vcf += 'TEL:' + s.phone + '\n';
-              if (s.workLocation) vcf += 'ORG:' + (CONFIG.orgName || '') + ';' + s.workLocation + '\n';
-              if (s.unit) vcf += 'TITLE:' + CONFIG.stewardLabel + ' - ' + s.unit + '\n';
-              vcf += 'END:VCARD';
-              var blob = new Blob([vcf], { type: 'text/vcard' });
-              var url = URL.createObjectURL(blob);
-              var a = document.createElement('a');
-              a.href = url;
-              a.download = (s.name || 'contact').replace(/\s+/g, '_') + '.vcf';
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
+              try {
+                var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (s.name || '') + '\n';
+                if (s.email) vcf += 'EMAIL:' + s.email + '\n';
+                if (s.phone) vcf += 'TEL:' + s.phone + '\n';
+                if (s.workLocation) vcf += 'ORG:' + (CONFIG.orgName || '') + ';' + s.workLocation + '\n';
+                if (s.unit) vcf += 'TITLE:' + CONFIG.stewardLabel + ' - ' + s.unit + '\n';
+                vcf += 'END:VCARD';
+                var blob = new Blob([vcf], { type: 'text/vcard' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = (s.name || 'contact').replace(/\s+/g, '_') + '.vcf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } catch (err) {
+                console.warn('vCard download failed:', err);
+                alert('Contact download not supported in this browser. Email: ' + (s.email || 'N/A'));
+              }
             },
           }, '\uD83D\uDCBE Save Contact'));
           card.appendChild(details);
@@ -3851,7 +3856,14 @@ function renderStewardDirectoryPage(appContainer) {
       renderList('', '');
     }).withFailureHandler(function() {
       content.innerHTML = '';
-      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load directory.'));
+      var errWrap = el('div', { style: { textAlign: 'center', padding: '30px 0' } });
+      errWrap.appendChild(el('div', { style: { color: 'var(--danger)', marginBottom: '12px' } }, 'Failed to load directory.'));
+      errWrap.appendChild(el('button', {
+        className: 'btn btn-secondary',
+        style: { fontSize: '12px', padding: '8px 16px' },
+        onClick: function() { renderStewardDirectoryPage(appContainer); }
+      }, 'Retry'));
+      content.appendChild(errWrap);
     }).dataGetStewardDirectory(SESSION_TOKEN);
   });
 }
@@ -4228,7 +4240,7 @@ function _renderPollHistorySteward(container) {
 
 function renderStewardMinutes(appContainer) {
   renderPageLayout(appContainer, 'steward', 'minutes', function(container) {
-    _stewardHeader(container, 'Meeting Minutes', 'Post and manage meeting notes');
+    _stewardHeader(container, 'Meetings & Minutes', 'Schedule meetings and post notes');
     var content = el('div', { className: 'content' });
 
     var activeSubTab = 'recent';
@@ -4239,17 +4251,18 @@ function renderStewardMinutes(appContainer) {
 
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
-      ['recent', 'add'].forEach(function(tab) {
+      [{ id: 'recent', label: 'Minutes' }, { id: 'schedule', label: 'Schedule' }, { id: 'add', label: 'Add Notes' }].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
-          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSub(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderSub(); }
+        }, tab.label));
       });
     }
 
     function renderSub() {
       subContent.innerHTML = '';
       if (activeSubTab === 'recent') _renderMinutesList(subContent);
+      else if (activeSubTab === 'schedule') _renderScheduleMeeting(subContent, switchToRecent);
       else _renderAddMinutes(subContent, switchToRecent);
     }
 
@@ -4259,6 +4272,76 @@ function renderStewardMinutes(appContainer) {
     content.appendChild(subContent);
     container.appendChild(content);
   });
+}
+
+// ── Schedule Meeting (steward form) ──────────────────────────────────────────
+function _renderScheduleMeeting(container, onDone) {
+  var form = el('div', { className: 'card card-glass', style: { padding: '18px' } });
+  form.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)', marginBottom: '14px' } }, '📅 Schedule a Meeting'));
+
+  var fields = {};
+  var fieldDefs = [
+    { key: 'meetingName', label: 'Meeting Name', type: 'text', placeholder: 'e.g. Grievance Step I Hearing', required: true },
+    { key: 'meetingDate', label: 'Date', type: 'date', required: true },
+    { key: 'meetingTime', label: 'Time', type: 'text', placeholder: 'e.g. 2:00 PM EST' },
+    { key: 'meetingType', label: 'Type', type: 'select', options: ['General', 'Grievance Hearing', 'Bargaining', 'Training', 'Town Hall', 'Committee', 'Other'] },
+    { key: 'duration', label: 'Duration', type: 'text', placeholder: 'e.g. 1 hour' },
+    { key: 'meetingLink', label: 'Meeting Link (Teams/Zoom)', type: 'text', placeholder: 'https://...' },
+  ];
+
+  fieldDefs.forEach(function(f) {
+    form.appendChild(el('label', { style: { display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', marginTop: '10px' } }, f.label + (f.required ? ' *' : '')));
+    var input;
+    if (f.type === 'select') {
+      input = el('select', { style: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)' } });
+      f.options.forEach(function(opt) { input.appendChild(el('option', { value: opt }, opt)); });
+    } else {
+      input = el('input', { type: f.type === 'date' ? 'date' : 'text', style: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)', boxSizing: 'border-box' }, placeholder: f.placeholder || '' });
+    }
+    fields[f.key] = input;
+    form.appendChild(input);
+  });
+
+  var statusMsg = el('div', { style: { fontSize: '12px', marginTop: '8px', minHeight: '16px' } });
+  form.appendChild(statusMsg);
+
+  // TODO(human): implement meeting form validation and submission logic
+  var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '14px' } });
+  var submitBtn = el('button', { className: 'btn btn-primary', style: { flex: '1' }, onClick: function() {
+    var name = fields.meetingName.value.trim();
+    var date = fields.meetingDate.value;
+    if (!name) { statusMsg.textContent = 'Please enter a meeting name.'; statusMsg.style.color = 'var(--danger)'; return; }
+    if (!date) { statusMsg.textContent = 'Please select a date.'; statusMsg.style.color = 'var(--danger)'; return; }
+    submitBtn.textContent = 'Scheduling...'; submitBtn.disabled = true;
+    serverCall().withSuccessHandler(function(r) {
+      if (r && r.success) {
+        container.innerHTML = '';
+        var done = el('div', { className: 'card card-glass', style: { padding: '24px', textAlign: 'center' } });
+        done.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '✅'));
+        done.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)' } }, 'Meeting Scheduled'));
+        done.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px' } }, 'Members can now see this meeting and save it to their calendar.'));
+        done.appendChild(el('button', { className: 'btn btn-secondary', style: { marginTop: '14px' }, onClick: function() { _renderScheduleMeeting(container, onDone); } }, 'Schedule Another'));
+        container.appendChild(done);
+      } else {
+        statusMsg.textContent = (r && r.message) || 'Error scheduling meeting.'; statusMsg.style.color = 'var(--danger)';
+        submitBtn.textContent = 'Schedule Meeting'; submitBtn.disabled = false;
+      }
+    }).withFailureHandler(function() {
+      statusMsg.textContent = 'Error. Please try again.'; statusMsg.style.color = 'var(--danger)';
+      submitBtn.textContent = 'Schedule Meeting'; submitBtn.disabled = false;
+    }).dataCreateScheduledMeeting(SESSION_TOKEN, {
+      meetingName: name,
+      meetingDate: date,
+      meetingTime: fields.meetingTime.value.trim(),
+      meetingType: fields.meetingType.value,
+      duration: fields.duration.value.trim(),
+      meetingLink: fields.meetingLink.value.trim(),
+    });
+  } }, 'Schedule Meeting');
+  btnRow.appendChild(submitBtn);
+  form.appendChild(btnRow);
+
+  container.appendChild(form);
 }
 
 // Pagination: 10 per page, load 100 records (v4.20.18)

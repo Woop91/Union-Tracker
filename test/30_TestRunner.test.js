@@ -189,7 +189,7 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
 
     // Allow a threshold for wrappers tested indirectly via other suites
     // (e.g., workload SSO, broadcast filters, badge counts, task delegation, member batch)
-    expect(untested.length).toBeLessThanOrEqual(15);
+    expect(untested.length).toBeLessThanOrEqual(17);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {

@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.30.0] - 2026-03-19
+
+### Fixed
+- **Workload tracker**: `WT_CATEGORIES.forEach()` ran before `WT_CATEGORIES` was defined — reordered declarations to fix crash
+- **Union Stats chart**: HSL palette colors + '20' hex alpha created invalid CSS — added `_toHex()` converter
+- **Ghost-pane bug**: Added stale-switch guard and `_gcHiddenPanes()` to orgchart/poms tab paths
+- **Polls**: Added null guard and try-catch to `wqGetPollData` to prevent silent failures
+- **Steward directory**: Wrapped vCard Blob/URL.createObjectURL in try-catch; added retry button on failure
+- **Grievance draft**: Auto-assigns member's steward to draft; invalidates cache so stewards see it immediately
+- **Task schema**: `seedStewardTasksData` and `createTask` now write full 12-column schema (matching getMemberTasks expectations)
+- **Survey tracking mobile**: Score boxes use responsive sizing to prevent content overflow
+
+### Added
+- **Steward meeting scheduling**: Stewards can schedule meetings via Minutes → Schedule tab (name, date, time, type, link)
+- **Member upcoming meetings**: My Meetings shows Upcoming + Attended sub-tabs; scheduled meetings visible to all members
+- **Save to Calendar**: Members can save scheduled meetings to Google Calendar via deep link
+- **Profile engagement section**: Highlighted email open rate (color-coded KPI), last virtual/in-person meeting dates
+
 ## [4.29.1] - 2026-03-15
 
 ### Fixed
