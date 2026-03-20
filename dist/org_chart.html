@@ -738,13 +738,7 @@ flex-direction: column;
 <div class="leg-item"><div class="leg-dot" style="background:var(--teal)"></div>Coordinators</div>
 <div class="leg-item"><div class="leg-dot" style="background:var(--gold)"></div>Chapters</div>
 </div>
-<!-- ══════════════════════════════════════════
-CLICKABLE HINT
-══════════════════════════════════════════ -->
 <div class="pill-hint">💡 Click <strong style="color:var(--blue);">pill buttons</strong> to expand sections · Scroll down for in-depth union info</div>
-<!-- ══════════════════════════════════════════
-PRESIDENT (collapsed pill)
-══════════════════════════════════════════ -->
 <div class="tier">
 <button class="pill-btn pill-btn-blue" onclick="pillToggle('president-detail',this)" style="margin:0 auto;display:block;">👔 President — Dave Foley ▸</button>
 <div id="president-detail" style="display:none;">
@@ -757,12 +751,8 @@ PRESIDENT (collapsed pill)
 </div>
 </div>
 <div class="connector"></div>
-<!-- ══════════════════════════════════════════
-PEER OFFICERS (Legal, Treasurer, Rec. Secretary)
-══════════════════════════════════════════ -->
 <div class="tier">
 <div class="officer-grid">
-<!-- LEGAL pill (own grid child, absolutely placed on desktop) -->
 <div id="counsel-card">
 <button class="pill-btn pill-btn-blue-dim" onclick="pillToggle('counsel-detail',this)">⚖ Legal ▸</button>
 <div id="counsel-detail" style="display:none;margin-top:4px;">
@@ -773,7 +763,6 @@ PEER OFFICERS (Legal, Treasurer, Rec. Secretary)
 </div>
 </div>
 </div>
-<!-- LEFT: Treasurer pill -->
 <div id="treasurer-col">
 <div id="treasurer-card" style="text-align:center;">
 <button class="pill-btn pill-btn-blue" onclick="pillToggle('treasurer-detail',this)">💰 Treasurer ▸</button>
@@ -787,7 +776,6 @@ PEER OFFICERS (Legal, Treasurer, Rec. Secretary)
 </div>
 </div>
 </div>
-<!-- RIGHT: Recording Secretary pill -->
 <div id="recsec-col">
 <div style="text-align:center;">
 <button class="pill-btn pill-btn-blue" onclick="pillToggle('recsec-detail',this)">📋 Rec. Secretary ▸</button>
@@ -801,12 +789,9 @@ PEER OFFICERS (Legal, Treasurer, Rec. Secretary)
 </div>
 </div>
 </div>
-</div><!-- /.officer-grid -->
+</div>
 </div>
 <div class="mini-connector"></div>
-<!-- ══════════════════════════════════════════
-CHIEF OF STAFF (collapsed pill, below Treasurer/RecSec)
-══════════════════════════════════════════ -->
 <div class="tier">
 <button class="pill-btn pill-btn-blue" onclick="pillToggle('cos-detail',this)" style="margin:0 auto;display:block;">🗂 Chief of Staff — Maddie Conway ▸</button>
 <div id="cos-detail" style="display:none;">
@@ -819,11 +804,7 @@ CHIEF OF STAFF (collapsed pill, below Treasurer/RecSec)
 </div>
 </div>
 <div class="mini-connector"></div>
-<!-- ══════════════════════════════════════════
-DIRECTORS + COORDINATORS PANEL
-══════════════════════════════════════════ -->
 <div class="tier">
-<!-- DIRECTORS SECTION -->
 <div style="text-align:center;display:block;margin-bottom:8px;">
 <button class="pill-btn pill-btn-purple" onclick="pillToggle('dir-detail',this)">🎯 Directors ▸</button>
 <div id="dir-detail" style="display:none;margin-top:8px;">
@@ -876,7 +857,6 @@ DIRECTORS + COORDINATORS PANEL
 </div>
 </div>
 <div class="connector"></div>
-<!-- COORDINATORS SECTION -->
 <div style="text-align:center;display:block;">
 <button class="pill-btn pill-btn-teal" onclick="pillToggle('coord-detail',this)">🗂 Coordinators ▸</button>
 <div id="coord-detail" style="display:none;margin-top:8px;">
@@ -928,14 +908,10 @@ DIRECTORS + COORDINATORS PANEL
 </div>
 </div>
 </div>
-<!-- ══════════════════════════════════════════
-CHAPTERS
-══════════════════════════════════════════ -->
 <div class="tier" style="margin-top:32px;">
 <div class="reports-label">↑ Reports directly to President</div>
 <span class="sec-label">Public Sector Chapters</span><br>
 <div class="chapter-row">
-<!-- ─── MASSABILITY (always visible, all sub-sections collapsed by default) ─── -->
 <div class="chapter-branch" data-expand="true" style="max-width:none;">
 <div class="card tc ch-card" id="massability-card" >
 <span class="c-badge tc">MassAbility</span>
@@ -946,9 +922,7 @@ CHAPTERS
 <a class="c-email" href="mailto:mrc@seiu509.org" style="margin-top:2px;">mrc@seiu509.org</a>
 </div>
 <div class="ch-vline"></div>
-<!-- Two columns: Executive Board | Stewards -->
 <div style="display:flex;gap:8px;align-items:flex-start;">
-<!-- LEFT: Executive Board -->
 <div class="staff-list" style="width:230px;">
 <div class="sl-title">Executive Board</div>
 <div class="sl-head sl-head-flex">JEB Members<button class="ma-sub-btn" onclick="maToggle('ma-jeb','▶ show','▼ hide',this)">▶ show</button></div>
@@ -956,7 +930,7 @@ CHAPTERS
 <div class="sl-item">Voc Rehab — Amy Cserny
 <span class="contact"><a href="mailto:csernygirl05@yahoo.com">csernygirl05@yahoo.com</a></span>
 </div>
-</div><!-- /ma-jeb -->
+</div>
 <div class="sl-item">Disability Determination — Catherine Sunkett
 <span class="contact"><a href="mailto:c.sunkett83@outlook.com">c.sunkett83@outlook.com</a></span>
 </div>
@@ -998,12 +972,11 @@ CEB — Voc Rehab
 <span class="contact"><a href="mailto:mccarthy.ethan@gmail.com">mccarthy.ethan@gmail.com</a></span>
 </div>
 <div class="sl-item">At-Large (3) — <em class="vac">vacant</em></div>
-</div><!-- /ma-atlarge -->
+</div>
 <div class="sl-item">At-Large (2) — Christine Emile
 <span class="contact"><a href="mailto:Christina9862@gmail.com">Christina9862@gmail.com</a></span>
 </div>
 </div>
-<!-- RIGHT: Stewards -->
 <div class="staff-list" style="width:190px;">
 <div class="sl-title">Stewards</div>
 <div class="sl-head">DDS</div>
@@ -1066,15 +1039,12 @@ Internal Organizers
 </div>
 </div>
 </div>
-<!-- Toggle buttons -->
 <div style="width:100%;display:flex;justify-content:center;gap:10px;margin:10px 0;flex-wrap:wrap;">
 <button class="grp-btn" id="ps-group-toggle" onclick="togglePSGroup(this)">▶ Show all 12 Public Sector Chapters</button>
 <button class="grp-btn" id="other-group-toggle" onclick="toggleOtherGroup(this)">▶ Show all 4 Other Chapters</button>
 </div>
-<!-- 12 Hidden Public Sector chapters -->
 <div id="ps-group" style="display:none;width:100%;">
 <div class="chapter-row">
-<!-- IST -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">IST</span>
@@ -1107,7 +1077,6 @@ Internal Organizers
 <div class="sl-item org-name">(see chart)</div>
 </div>
 </div>
-<!-- DEEC -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">DEEC</span>
@@ -1134,7 +1103,6 @@ Internal Organizers
 <div class="sl-item org-item"><span class="org-region">Springfield, Worcester</span><br><span class="org-name">Mike Foster</span></div>
 </div>
 </div>
-<!-- DPH -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">DPH</span>
@@ -1159,7 +1127,6 @@ Internal Organizers
 <div class="sl-item">At-Large (6) — Debbie Scrivano</div>
 </div>
 </div>
-<!-- MCB + MCDHH -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">MCB + MCDHH</span>
@@ -1180,7 +1147,6 @@ Internal Organizers
 <div class="sl-item">At-Large (3) — Maria Garrido</div>
 </div>
 </div>
-<!-- MassHealth -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">MassHealth</span>
@@ -1205,7 +1171,6 @@ Internal Organizers
 <div class="sl-item">At-Large (6) — <em class="vac">vacant</em></div>
 </div>
 </div>
-<!-- CCJ -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">CCJ</span>
@@ -1226,7 +1191,6 @@ Internal Organizers
 <div class="sl-item">At-Large (2) — <em class="vac">vacant</em></div>
 </div>
 </div>
-<!-- PROEDDESE -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">PROEDDESE</span>
@@ -1248,7 +1212,6 @@ Internal Organizers
 <div class="sl-item">At-Large (3) — Sheryl Couture</div>
 </div>
 </div>
-<!-- DOR -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">DOR</span>
@@ -1269,7 +1232,6 @@ Internal Organizers
 <div class="sl-item">At-Large (2) — Faye Santos</div>
 </div>
 </div>
-<!-- DMH -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">DMH</span>
@@ -1292,7 +1254,6 @@ Internal Organizers
 <div class="sl-item">At-Large (4) — Shannon Petrelis</div>
 </div>
 </div>
-<!-- DDS -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">DDS</span>
@@ -1314,7 +1275,6 @@ Internal Organizers
 <div class="sl-item">At-Large (3) — Tammy Langlois</div>
 </div>
 </div>
-<!-- DTA + EOHLC -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">DTA + EOHLC</span>
@@ -1335,7 +1295,6 @@ Internal Organizers
 <div class="sl-item">At-Large (2) — Diane McKenna</div>
 </div>
 </div>
-<!-- DCF -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">DCF</span>
@@ -1357,13 +1316,11 @@ Internal Organizers
 <div class="sl-item">At-Large (3) — <em class="vac">vacant</em></div>
 </div>
 </div>
-</div><!-- /inner chapter-row -->
-</div><!-- /ps-group -->
-</div><!-- /chapter-row outer -->
-<!-- Other Chapters -->
+</div>
+</div>
+</div>
 <div id="other-group" style="display:none;margin-top:8px;">
 <div class="chapter-row">
-<!-- Elder Services -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">Elder Services</span>
@@ -1384,7 +1341,6 @@ Internal Organizers
 <div class="sl-item">At-Large (2) — Sandra Lach</div>
 </div>
 </div>
-<!-- Higher Ed -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">Higher Ed</span>
@@ -1405,7 +1361,6 @@ Internal Organizers
 <div class="sl-item">At-Large (2) — <em class="vac">vacant</em></div>
 </div>
 </div>
-<!-- FCC -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">FCC</span>
@@ -1425,7 +1380,6 @@ Internal Organizers
 <div class="sl-item">At-Large (1) — <em class="vac">vacant</em></div>
 </div>
 </div>
-<!-- PSHS -->
 <div class="chapter-branch">
 <div class="card tc ch-card">
 <span class="c-badge tc">PSHS</span>
@@ -1446,15 +1400,11 @@ Internal Organizers
 </div>
 </div>
 </div>
-</div><!-- /other-group -->
-</div><!-- /chapters tier -->
-<!-- ══════════════════════════════════════════
-ROLE DESCRIPTIONS
-══════════════════════════════════════════ -->
+</div>
+</div>
 <div class="tier" style="margin-top:56px;">
 <div class="tier-label" style="background:var(--blue);cursor:pointer;" onclick="document.getElementById('role-desc-panel').style.display=document.getElementById('role-desc-panel').style.display==='none'?'block':'none';this.querySelector('.arr').textContent=document.getElementById('role-desc-panel').style.display==='none'?'▶':'▼'">📋 Roles, Job Descriptions &amp; How to Get Involved <span class="arr" style="font-size:0.65rem;margin-left:6px;">▶</span></div>
 <div id="role-desc-panel" style="display:none;">
-<!-- ═══ ELECTION TIMELINE SUMMARY ═══ -->
 <div style="background:linear-gradient(135deg,var(--surf2),var(--surf));border:2px solid var(--gold);border-radius:10px;padding:16px;margin-bottom:18px;text-align:center;">
 <div style="font-family:var(--ff-disp);font-size:1rem;color:var(--gold);margin-bottom:6px;">🗳 Election Cycle at a Glance</div>
 <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:10px;">
@@ -1479,9 +1429,7 @@ ROLE DESCRIPTIONS
 <strong>Source:</strong> Constitution Art. V &amp; IX. Officers elected every 3rd year. Nominations from the floor at the October General Membership Meeting in election years. 3-week campaign period follows. Secret ballot, no write-ins. Stewards elected annually at each work location, overseen by an Officer or Field Rep.
 </div>
 </div>
-<!-- ═══ HOW TO RUN / HOW TO BECOME ═══ -->
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-<!-- HOW TO RUN FOR ELECTED OFFICE -->
 <div style="flex:1;min-width:300px;background:var(--surf);border:1px solid var(--bdr);border-left:4px solid var(--gold);border-radius:8px;padding:14px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--gold);margin-bottom:6px;">🗳 How to Run for Elected Office</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -1494,7 +1442,6 @@ ROLE DESCRIPTIONS
 <em style="color:var(--dim);">Source: Constitution Art. V, Sections 1–14</em>
 </div>
 </div>
-<!-- HOW TO BECOME A STEWARD -->
 <div style="flex:1;min-width:300px;background:var(--surf);border:1px solid var(--bdr);border-left:4px solid var(--purple);border-radius:8px;padding:14px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--purple);margin-bottom:6px;">🛡 How to Become a Steward</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -1509,9 +1456,7 @@ ROLE DESCRIPTIONS
 </div>
 </div>
 </div>
-<!-- ═══ ELECTED POSITIONS — LOCAL-WIDE ═══ -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--blue);margin:24px 0 10px;border-bottom:1px solid var(--bdr);padding-bottom:4px;">🏛 Elected Positions — Local-Wide Officers</div>
-<!-- PRESIDENT -->
 <div class="card desc" style="border-top-color:var(--blue);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1539,7 +1484,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Be nominated from the floor at October General Membership Meeting in election year. Must have 6 months continuous good standing. Elected by secret ballot of entire Local membership.</div>
 <div class="duty-src">Source: Constitution Art. VIII §1, Art. V §§1,5,7</div>
 </div>
-<!-- TREASURER -->
 <div class="card desc" style="border-top-color:var(--blue);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1568,7 +1512,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Same as President — nominated at October General Membership Meeting, 6 months good standing, secret ballot of entire Local membership.</div>
 <div class="duty-src">Source: Constitution Art. VIII §2</div>
 </div>
-<!-- RECORDING SECRETARY -->
 <div class="card desc" style="border-top-color:var(--blue);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1593,7 +1536,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Nominated at October General Membership Meeting, 6 months good standing, elected by secret ballot of entire Local.</div>
 <div class="duty-src">Source: Constitution Art. VIII §3</div>
 </div>
-<!-- TRUSTEE -->
 <div class="card desc" style="border-top-color:var(--blue);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1618,9 +1560,7 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Nominated at October General Membership Meeting, 6 months good standing, elected by secret ballot of entire Local.</div>
 <div class="duty-src">Source: Constitution Art. VIII §4</div>
 </div>
-<!-- ═══ ELECTED POSITIONS — CHAPTER LEVEL ═══ -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--gold);margin:24px 0 10px;border-bottom:1px solid var(--bdr);padding-bottom:4px;">🏢 Elected Positions — Chapter Officers</div>
-<!-- CHAPTER PRESIDENT -->
 <div class="card desc" style="border-top-color:var(--gold);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1651,7 +1591,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Nominated at October General Membership Meeting by a member of your chapter. Must have 6 months good standing. Elected by members of the chapter at large by secret ballot.</div>
 <div class="duty-src">Source: Constitution Art. VIII §5–6; Union Job Descriptions</div>
 </div>
-<!-- JEB MEMBER -->
 <div class="card desc" style="border-top-color:var(--gold);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1680,7 +1619,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Nominated within your chapter. Election method varies by chapter (see chapter bylaws). Must have 6 months good standing.</div>
 <div class="duty-src">Source: Constitution Art. IV, VII §1; Union Job Descriptions</div>
 </div>
-<!-- CHAPTER SECRETARY OF GRIEVANCES -->
 <div class="card desc" style="border-top-color:var(--gold);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1702,7 +1640,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Nominated within your chapter at October General Membership Meeting. Must be a chapter member with 6 months good standing.</div>
 <div class="duty-src">Source: Constitution Art. VIII §6</div>
 </div>
-<!-- CHAPTER RECORDING SECRETARY -->
 <div class="card desc" style="border-top-color:var(--gold);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1725,7 +1662,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Nominated within your chapter at October General Membership Meeting. Must be a chapter member with 6 months good standing.</div>
 <div class="duty-src">Source: Constitution Art. VIII §7</div>
 </div>
-<!-- CEB MEMBER -->
 <div class="card desc" style="border-top-color:var(--gold);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1752,7 +1688,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Election method determined by each chapter's approved proposal. Nominated within your chapter. Must have 6 months good standing.</div>
 <div class="duty-src">Source: Constitution Art. IV; Union Job Descriptions</div>
 </div>
-<!-- PUBLIC SECTOR VP / AREA REPS -->
 <div class="card desc" style="border-top-color:var(--gold);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
 <div>
@@ -1778,7 +1713,6 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Elected within your chapter. Structure varies — some chapters elect VPs by region (e.g., DCF Western Regional VP), others at-large. Check your chapter bylaws.</div>
 <div class="duty-src">Source: Union Job Descriptions; Constitution Appendix A</div>
 </div>
-<!-- ═══ STEWARD ═══ -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--purple);margin:24px 0 10px;border-bottom:1px solid var(--bdr);padding-bottom:4px;">🛡 Steward — Elected at Work Location</div>
 <div class="card desc" style="border-top-color:var(--purple);">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
@@ -1818,14 +1752,12 @@ Last elected: Fall 2025 · Next: Fall 2028<br>
 </div>
 <div class="duty-src">Source: Constitution Art. IX §§1–5; Union Job Descriptions</div>
 </div>
-<!-- ═══ STAFF POSITIONS (HIRED, NOT ELECTED) ═══ -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--teal);margin:24px 0 10px;border-bottom:1px solid var(--bdr);padding-bottom:4px;">💼 Staff Positions — Hired (Not Elected)</div>
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:14px;font-size:0.6rem;color:var(--mute);line-height:1.7;margin-bottom:12px;">
 Staff positions are <strong>not elected</strong> — they are hired by the President, subject to confirmation by the JEB. The JEB establishes job descriptions for each staff position. Staff hired specifically for a chapter are additionally confirmed by that Chapter's Executive Board. There are no term limits; staff serve at will.
 <br><br><strong>Career pipeline:</strong> Many current staff started as stewards or chapter officers. The JEB Member → Organizer path is the most common route into a paid staff role (see Career Paths section below).
 <br><em style="color:var(--dim);">Source: Constitution Art. VIII §1</em>
 </div>
-<!-- CHAPTER ADVISOR -->
 <div class="card desc" style="border-top-color:var(--teal);">
 <span class="c-badge t3">Staff — Hired</span>
 <div class="c-role" style="margin-top:4px;">Chapter Advisor</div>
@@ -1840,7 +1772,6 @@ Staff positions are <strong>not elected</strong> — they are hired by the Presi
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> Assigned by the President/Director of Field Services. To become one: build experience as an Internal Organizer and develop relationships with chapter leadership.</div>
 <div class="duty-src">Source: Chapter Advisors &amp; Internal Organizers PDF</div>
 </div>
-<!-- INTERNAL ORGANIZER -->
 <div class="card desc" style="border-top-color:var(--teal);">
 <span class="c-badge t3">Staff — Hired</span>
 <div class="c-role" style="margin-top:4px;">Internal Organizer</div>
@@ -1856,7 +1787,6 @@ Staff positions are <strong>not elected</strong> — they are hired by the Presi
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> Hired by the President with JEB confirmation. Common path: Steward → JEB Member/Chapter Officer → Temp Organizer → Internal Organizer.</div>
 <div class="duty-src">Source: Chapter Advisors &amp; Internal Organizers PDF; Union Job Descriptions</div>
 </div>
-<!-- EXTERNAL ORGANIZER -->
 <div class="card desc" style="border-top-color:var(--teal);">
 <span class="c-badge t3">Staff — Hired</span>
 <div class="c-role" style="margin-top:4px;">External Organizer</div>
@@ -1870,7 +1800,6 @@ Staff positions are <strong>not elected</strong> — they are hired by the Presi
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> Hired by the President with JEB confirmation. Focused on growth — bringing new workers into the union.</div>
 <div class="duty-src">Source: Union Job Descriptions; seiu509.org</div>
 </div>
-<!-- DIRECTORS & COORDINATORS -->
 <div class="card desc" style="border-top-color:var(--teal);">
 <span class="c-badge t3">Staff — Hired</span>
 <div class="c-role" style="margin-top:4px;">Directors &amp; Coordinators</div>
@@ -1883,7 +1812,6 @@ Staff positions are <strong>not elected</strong> — they are hired by the Presi
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> Hired/promoted by the President with JEB confirmation. Career progression typically: Organizer → Lead Organizer → Coordinator → Director.</div>
 <div class="duty-src">Source: Constitution Art. VIII §1; 509 Org Chart</div>
 </div>
-<!-- MARC (MEMBER ASSISTANCE RESOURCE CENTER) -->
 <div class="card desc" style="border-top-color:var(--teal);">
 <span class="c-badge t3">Staff — Hired</span>
 <div class="c-role" style="margin-top:4px;">MARC (Member Assistance Resource Center)</div>
@@ -1897,11 +1825,8 @@ Staff positions are <strong>not elected</strong> — they are hired by the Presi
 <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> MARC staff hired by President with JEB confirmation. Typically senior organizers or specialists with deep grievance/arbitration experience.</div>
 <div class="duty-src">Source: Chapter Advisors &amp; Internal Organizers PDF</div>
 </div>
-</div><!-- /role-desc-panel -->
 </div>
-<!-- ══════════════════════════════════════════
-FINANCIAL OVERVIEW & MEMBERSHIP (LM FILINGS)
-══════════════════════════════════════════ -->
+</div>
 <div class="tier" style="margin-top:56px;">
 <div class="tier-label" style="background:var(--gold);color:#1a1a1a;cursor:pointer;" onclick="document.getElementById('fin-panel').style.display=document.getElementById('fin-panel').style.display==='none'?'block':'none';this.querySelector('.arr').textContent=document.getElementById('fin-panel').style.display==='none'?'▶':'▼'">📊 Financial Overview &amp; Membership (2024 LM Filings) <span class="arr" style="font-size:0.65rem;margin-left:6px;">▶</span></div>
 <div id="fin-panel" style="display:none;text-align:left;max-width:1100px;margin:16px auto 0;">
@@ -1909,7 +1834,6 @@ FINANCIAL OVERVIEW & MEMBERSHIP (LM FILINGS)
 <strong style="color:var(--txt);">Source:</strong> Office of Labor-Management Standards · Year Covered: 2024 · Last Updated: May 12, 2025<br>
 <strong style="color:var(--txt);">Dues:</strong> 1.5% per pay period
 </div>
-<!-- TOP-LINE STATS -->
 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:12px 16px;flex:1;min-width:130px;text-align:center;">
 <div style="font-size:1.2rem;color:var(--gold);font-family:var(--ff-disp);">20,573</div>
@@ -1933,12 +1857,10 @@ FINANCIAL OVERVIEW & MEMBERSHIP (LM FILINGS)
 <div style="font-size:0.52rem;color:var(--mute);text-transform:uppercase;">Net Surplus (2024)</div>
 </div>
 </div>
-<!-- MEMBERSHIP GROWTH -->
 <div style="margin-bottom:20px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--gold);margin-bottom:4px;">📈 Membership Growth (2002–2024)</div>
 <div style="font-size:0.52rem;color:var(--dim);margin-bottom:8px;">As of 3/5/26: 20,573 members · 74.8% density</div>
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:14px;overflow-x:auto;">
-<!-- Bar chart using CSS -->
 <div style="display:flex;align-items:flex-end;gap:3px;height:120px;padding-bottom:20px;position:relative;">
 <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
 <div style="width:100%;background:rgba(79,142,247,0.3);border-radius:2px 2px 0 0;height:51%;"></div>
@@ -2039,7 +1961,6 @@ FINANCIAL OVERVIEW & MEMBERSHIP (LM FILINGS)
 </div>
 </div>
 </div>
-<!-- INCOME & SPENDING -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:14px;">
 <div style="font-family:var(--ff-disp);font-size:0.8rem;color:var(--teal);margin-bottom:8px;">💰 Income Breakdown (2024)</div>
@@ -2074,7 +1995,6 @@ FINANCIAL OVERVIEW & MEMBERSHIP (LM FILINGS)
 </table>
 </div>
 </div>
-<!-- FINANCIAL TRENDS TABLE -->
 <div style="margin-bottom:16px;cursor:pointer;" onclick="var p=document.getElementById('fin-trends');p.style.display=p.style.display==='none'?'block':'none';this.querySelector('.arr3').textContent=p.style.display==='none'?'▶':'▼'">
 <div style="padding:8px 12px;background:var(--surf);border:1px solid var(--bdr);border-radius:6px;font-size:0.72rem;color:var(--txt);">
 <span class="arr3">▶</span> Full Financial Trends (2002–2024)
@@ -2108,11 +2028,8 @@ FINANCIAL OVERVIEW & MEMBERSHIP (LM FILINGS)
 </tbody>
 </table>
 </div>
-</div><!-- /fin-panel -->
 </div>
-<!-- ══════════════════════════════════════════
-STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
-══════════════════════════════════════════ -->
+</div>
 <div class="tier" style="margin-top:56px;">
 <div class="tier-label" style="background:var(--purple);cursor:pointer;" onclick="document.getElementById('staff-dir-panel').style.display=document.getElementById('staff-dir-panel').style.display==='none'?'block':'none';this.querySelector('.arr').textContent=document.getElementById('staff-dir-panel').style.display==='none'?'▶':'▼'">💼 Staff Directory &amp; Compensation (2024 LM Filings) <span class="arr" style="font-size:0.65rem;margin-left:6px;">▶</span></div>
 <div id="staff-dir-panel" style="display:none;text-align:left;max-width:1100px;margin:16px auto 0;">
@@ -2120,7 +2037,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 <strong style="color:var(--txt);">Source:</strong> Office of Labor-Management Standards · Year Covered: 2024 · Last Updated: May 12, 2025<br>
 <strong style="color:var(--txt);">⚠️ Note:</strong> 2024 data — some positions have changed since (e.g. Treasurer now Kara Goodier, CoS now Maddie Conway). 172 total employees; top 100 shown by compensation. Remaining 72 employees earned &lt;$963 total compensation (minimal stipends).
 </div>
-<!-- LEADERSHIP -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--blue);margin-bottom:8px;">🏛️ Elected Officers &amp; Senior Leadership</div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2140,7 +2056,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- DIRECTORS & COORDINATORS -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--teal);margin-bottom:8px;">📂 Directors &amp; Coordinators</div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2167,7 +2082,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- INTERNAL ORGANIZERS -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--teal);margin-bottom:8px;">🔧 Internal Organizers</div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2195,7 +2109,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- EXTERNAL ORGANIZERS -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--teal);margin-bottom:8px;">📢 External Organizers</div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2212,7 +2125,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- MARC STAFF -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--purple);margin-bottom:8px;">📞 MARC (Member Action &amp; Resource Center)</div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2232,7 +2144,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- OPERATIONS & SUPPORT -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--mute);margin-bottom:8px;">⚙️ Operations, Support &amp; Specialists</div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2256,7 +2167,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- ADDITIONAL INTERNAL ORGANIZERS (partial year / lower comp) -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--teal);margin-bottom:8px;">🔧 Additional Internal &amp; External Organizers (incl. partial-year)</div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2279,7 +2189,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- ELECTED CHAPTER OFFICERS (STIPENDS) -->
 <div style="margin-bottom:16px;">
 <div style="font-family:var(--ff-disp);font-size:0.85rem;color:var(--gold);margin-bottom:8px;">🏅 Elected Chapter Officers &amp; JEB Members <span style="font-size:0.6rem;color:var(--dim);font-weight:400;">(stipends, not full-time salaries)</span></div>
 <table style="width:100%;border-collapse:collapse;font-size:0.62rem;">
@@ -2330,7 +2239,6 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 </tbody>
 </table>
 </div>
-<!-- SUMMARY STATS -->
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:10px 16px;flex:1;min-width:150px;text-align:center;">
 <div style="font-size:1.1rem;color:var(--blue);font-family:var(--ff-disp);">172</div>
@@ -2345,20 +2253,15 @@ STAFF DIRECTORY & COMPENSATION (LM FILINGS 2024)
 <div style="font-size:0.55rem;color:var(--mute);text-transform:uppercase;">Employees Over $75K</div>
 </div>
 </div>
-</div><!-- /staff-dir-panel -->
 </div>
-<!-- ══════════════════════════════════════════
-CAREER PATHS & SALARY HISTORY
-══════════════════════════════════════════ -->
+</div>
 <div class="tier" style="margin-top:56px;">
 <div class="tier-label" style="background:linear-gradient(135deg,var(--teal),var(--blue));cursor:pointer;" onclick="document.getElementById('career-panel').style.display=document.getElementById('career-panel').style.display==='none'?'block':'none';this.querySelector('.arr').textContent=document.getElementById('career-panel').style.display==='none'?'▶':'▼'">🚀 Career Paths &amp; Salary History (All Staff, Multi-Year) <span class="arr" style="font-size:0.65rem;margin-left:6px;">▶</span></div>
 <div id="career-panel" style="display:none;text-align:left;max-width:1100px;margin:16px auto 0;">
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:14px;font-size:0.68rem;color:var(--mute);line-height:1.6;margin-bottom:14px;">
 <strong style="color:var(--txt);">Source:</strong> Union Facts / Office of Labor-Management Standards LM filings, 2002–2024. Click any row to expand full history.
 </div>
-<!-- NOTABLE CAREER TRAJECTORIES -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--gold);margin-bottom:12px;">⭐ Notable Career Trajectories</div>
-<!-- FOLEY -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">David Foley — DOR JEB Member → President</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">10 years at Local 509 · $533 → $135,441 · Chapter officer to top elected leader</div>
@@ -2371,7 +2274,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- GRAIR -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--teal);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--teal);">Marcelle Grair — Community Liaison → Chief of Staff</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">10 years at Local 509 · $19,837 → $123,457 · Rose through 4 distinct roles</div>
@@ -2385,7 +2287,6 @@ CAREER PATHS & SALARY HISTORY
 </table>
 <div style="font-size:0.5rem;color:var(--dim);margin-top:4px;font-style:italic;">Replaced by Maddie Conway as CoS in 2025</div>
 </div>
-<!-- GROSSMAN -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--purple);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--purple);">Jonathan Grossman — 6 Roles in 19 Years</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2006–2024 · $57,903 → $105,678 · Field Rep → Director → MARC Lead → Interim CoS → Steward Training</div>
@@ -2400,7 +2301,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- PENA -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--blue);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--blue);">Orlando Pena — PSHS Chapter VP → Full-Time Chapter Leader</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2012–2024 · $895 → $109,057 · Grew a part-time JEB role into a full-time salaried position</div>
@@ -2415,10 +2315,8 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- MASSABILITY PATHS -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--gold);margin:18px 0 4px;">★ MassAbility-Connected Career Paths</div>
 <div style="font-size:0.52rem;color:var(--dim);margin-bottom:10px;">MassAbility chapter: 383 members · 93% density · DDS ≈ 149 of 383 (39% of chapter)</div>
-<!-- FREEMAN -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Heidi Freeman — MRC JEB → Chapter President <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility</span></div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2019–2024 · $0 → $4,701 · Volunteer JEB member → elected chapter leader</div>
@@ -2430,7 +2328,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- GOODIER -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Kara Goodier — JEB Rec Sec/MRC JEB → Treasurer <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility connection</span></div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2019–present · $8,622 → $15,331 → now Treasurer · Dual MRC JEB + JEB Rec Sec role</div>
@@ -2442,7 +2339,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- MARTINEZ-PENA -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Denisse Martinez-Pena — MRC JEB Member <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility</span></div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2021–2024 · $0 → $17,814 · Increasing engagement year-over-year</div>
@@ -2454,7 +2350,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- MALDONADO -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Marangely "Mara" Maldonado — Temp IO → IO <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility</span></div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2021–2024 · $42,587 → $96,634 · Converted from temporary to permanent organizer</div>
@@ -2466,7 +2361,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- LEVINSKY -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Jerrold Levinsky — 14-Year Field Veteran <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility Advisor</span></div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2011–2024 · $55,404 → $101,323 · Public &amp; Private sector, now MassAbility advisor</div>
@@ -2479,9 +2373,7 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- OTHER NOTABLE TRANSITIONS -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--teal);margin:18px 0 12px;">🔄 Notable Role Transitions</div>
-<!-- MECENE-OLIVIER -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--purple);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--purple);">Cynthia Mecene-Olivier — Chapter President → MARC Staff</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2019–2024 · $2,494 → $88,994 · DMA JEB → MassHealth Chapter Pres → became a paid MARC organizer</div>
@@ -2493,7 +2385,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- ARTHUR -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--teal);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--teal);">Tara Arthur — DDS JEB Member → Internal Organizer</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2017–2024 · $1,467 → $90,433 · Chapter volunteer to full-time staff</div>
@@ -2504,7 +2395,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- KENNEY -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--teal);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--teal);">Courtney Kenney — Trustee → Internal Organizer</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2018–2024 · $4,522 → $99,265 · Elected trustee transitioned to full-time staff</div>
@@ -2516,7 +2406,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- MPANGA -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--teal);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--teal);">Godfrey Mpanga — PSHS JEB → Internal Organizer</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2021–2024 · $0 → $93,632 · Unpaid JEB member became a full-time organizer</div>
@@ -2527,9 +2416,7 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- LONGEST-SERVING -->
 <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--blue);margin:18px 0 12px;">🏆 Longest-Tenured Staff</div>
-<!-- HILL -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--blue);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--blue);">Sherice Hill — 22 Years, Receptionist → Member Specialist</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2002–2024 · $33,194 → $81,695 · Longest continuous tenure in LM data</div>
@@ -2541,7 +2428,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- PAGE -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--blue);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--blue);">Richard Page — 21 Years, Field Rep → Private Sector IO</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2003–2024 · $20,121 → $114,914 · Longest-serving organizer</div>
@@ -2553,7 +2439,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- NINFA BRETON -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--blue);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--blue);">Ninfa Breton — 22 Years, Organizer → MARC</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2002–2024 · $49,620 → $102,038 · Through childcare, field rep, to MARC</div>
@@ -2567,7 +2452,6 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-<!-- BAUER -->
 <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--blue);">
 <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--blue);">Jennifer Bauer — 12 Years, Director of Admin</div>
 <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2013–2024 · $51,957 → $115,795 · Same role, steady growth. Longest-tenured director.</div>
@@ -2579,18 +2463,14 @@ CAREER PATHS & SALARY HISTORY
 </tbody>
 </table>
 </div>
-</div><!-- /career-panel -->
 </div>
-<!-- ══════════════════════════════════════════
-CHAPTER ADVISORS & INTERNAL ORGANIZERS
-══════════════════════════════════════════ -->
+</div>
 <div class="tier" style="margin-top:56px;">
 <div class="tier-label" style="background:var(--teal);cursor:pointer;" onclick="document.getElementById('ca-io-panel').style.display=document.getElementById('ca-io-panel').style.display==='none'?'block':'none';this.querySelector('.arr').textContent=document.getElementById('ca-io-panel').style.display==='none'?'▶':'▼'">📍 Chapter Advisors &amp; Internal Organizers — All Departments <span class="arr" style="font-size:0.65rem;margin-left:6px;">▶</span></div>
 <div id="ca-io-panel" style="display:none;text-align:left;max-width:1100px;margin:0 auto;">
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:14px;margin-top:16px;font-size:0.68rem;color:var(--mute);line-height:1.6;">
 <strong style="color:var(--txt);">How this works:</strong> Grievances → call <a href="tel:8006328079" style="color:var(--blue);">MARC (800) 632-8079</a> or <a href="/cdn-cgi/l/email-protection#7b161a09183b081e120e4e4b425514091c" style="color:var(--blue);"><span class="__cf_email__" data-cfemail="8be6eaf9e8cbf8eee2febebbb2a5e4f9ec">[email&#160;protected]</span></a>. Organizing, contracts, labor-management → contact your <span style="color:var(--teal);">Internal Organizer</span> below.
 </div>
-<!-- CHAPTER ADVISORS TABLE -->
 <div style="margin-top:18px;overflow-x:auto;">
 <table style="width:100%;border-collapse:collapse;font-size:0.68rem;">
 <thead>
@@ -2616,7 +2496,6 @@ CHAPTER ADVISORS & INTERNAL ORGANIZERS
 </tbody>
 </table>
 </div>
-<!-- MASSABILITY INTERNAL ORGANIZERS — HIGHLIGHTED -->
 <div style="margin-top:24px;background:rgba(240,192,64,0.04);border:1px solid rgba(240,192,64,0.15);border-radius:8px;padding:16px;">
 <div style="font-family:var(--ff-disp);font-size:1rem;color:var(--gold);margin-bottom:10px;">⭐ MassAbility — Internal Organizers by Office</div>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">
@@ -2642,14 +2521,12 @@ CHAPTER ADVISORS & INTERNAL ORGANIZERS
 </div>
 </div>
 </div>
-<!-- OTHER DEPARTMENTS — COLLAPSIBLE -->
 <div style="margin-top:18px;">
 <div style="cursor:pointer;padding:8px 12px;background:var(--surf);border:1px solid var(--bdr);border-radius:6px;font-size:0.72rem;color:var(--txt);" onclick="var p=document.getElementById('other-dept-io');p.style.display=p.style.display==='none'?'block':'none';this.querySelector('.arr2').textContent=p.style.display==='none'?'▶':'▼'">
 <span class="arr2">▶</span> Other Departments — Internal Organizers by Region
 </div>
 <div id="other-dept-io" style="display:none;margin-top:8px;">
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;">
-<!-- DCF -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Children &amp; Families (DCF)</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2661,7 +2538,6 @@ Central (Worcester, Leominster, Whitinsville) → <span style="color:var(--teal)
 Western (Springfield, Pittsfield, Holyoke, Greenfield, Athol, N Adams) → <span style="color:var(--teal);">Jerry Levinsky</span>
 </div>
 </div>
-<!-- DTA/DHCD -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">DTA &amp; Housing (DHCD)</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2673,7 +2549,6 @@ Central (Worcester, Fitchburg, Southbridge) → <span style="color:var(--teal);"
 Western (Springfield, Holyoke, Pittsfield) → <span style="color:var(--teal);">Jerry Levinsky</span>
 </div>
 </div>
-<!-- DDS -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Developmental Services (DDS)</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2684,7 +2559,6 @@ C/W (Northampton, Pittsfield, Holyoke + res.) → <span style="color:var(--teal)
 C/W (Springfield, Worcester, Fitchburg, Southbridge, Milford + res.) → <span style="color:var(--teal);">Mike Foster</span>
 </div>
 </div>
-<!-- DMH -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Mental Health (DMH)</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2696,7 +2570,6 @@ Western (Pittsfield, Greenfield, Northampton) → <span style="color:var(--teal)
 Western (Springfield) → <span style="color:var(--teal);">Mike Foster</span>
 </div>
 </div>
-<!-- MassHealth -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">MassHealth</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2706,7 +2579,6 @@ Springfield → <span style="color:var(--teal);">Mike Foster</span><br>
 Tewksbury → <span style="color:var(--teal);">Mark Belzowski</span>
 </div>
 </div>
-<!-- Public Safety -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Public Safety (DOC, DYS, Parole)</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2715,7 +2587,6 @@ Bridgewater, Carver, NB, Norfolk, Plymouth, Taunton, Walpole → <span style="co
 Framingham, Gardner, Ludlow, Milford, Millis, Natick, Northborough, Shirley, Springfield, W Boylston, Westborough, Westfield, Worcester → <span style="color:var(--teal);">Mike Foster</span>
 </div>
 </div>
-<!-- MCB/MCDHH/DIA -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Comm. for the Blind, Deaf &amp; Hard of Hearing, DIA</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2726,7 +2597,6 @@ Pittsfield → <span style="color:var(--teal);">Jerry Levinsky</span><br>
 Springfield, Worcester → <span style="color:var(--teal);">Mike Foster</span>
 </div>
 </div>
-<!-- DOR/CSE -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Revenue / Child Support Enforcement</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2738,7 +2608,6 @@ Taunton → <span style="color:var(--teal);">Khadeejah Ahmad</span><br>
 Woburn → <span style="color:var(--teal);">Mark Belzowski</span>
 </div>
 </div>
-<!-- DESE + EEC + DPH + Misc -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">DESE · Early Ed · Public Health · Misc</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2748,7 +2617,6 @@ Woburn → <span style="color:var(--teal);">Mark Belzowski</span>
 <strong>Misc:</strong> Chelsea Soldiers' Home, Dept Employment &amp; Training → <span style="color:var(--teal);">Doe</span> · Holyoke Soldiers' Home → <span style="color:var(--teal);">Levinsky</span>
 </div>
 </div>
-<!-- IST -->
 <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
 <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Institutional School Teachers</div>
 <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
@@ -2757,12 +2625,11 @@ Bridgewater, Norfolk → <span style="color:var(--teal);">Khadeejah Ahmad</span>
 Canton, Framingham, Gardner, Milford, Shirley, Springfield → <span style="color:var(--teal);">Mike Foster</span>
 </div>
 </div>
-</div><!-- /grid -->
-</div><!-- /other-dept-io -->
 </div>
-</div><!-- /ca-io-panel -->
 </div>
-<!-- FOOTER CONTACT CARDS -->
+</div>
+</div>
+</div>
 <div class="footer-grid">
 <div class="fcard fc-blue">
 <div class="fc-label">Union Headquarters</div>
@@ -2791,7 +2658,7 @@ Canton, Framingham, Gardner, Milford, Shirley, Springfield → <span style="colo
 </div>
 </div>
 <footer>Local 509 &mdash; Main Internal Breakout Chart &mdash; Personal Use Only</footer>
-</div><!-- /page -->
+</div>
 <script>
 document.querySelectorAll('.chapter-branch').forEach(branch => {
 if (branch.dataset.expand === 'true') return;

@@ -239,6 +239,7 @@ function minifyHtml(content) {
   const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const out = [];
   let inBlockComment = false;
+  let inHtmlComment = false;
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
@@ -246,6 +247,16 @@ function minifyHtml(content) {
 
     // Skip blank lines
     if (trimmed === '') continue;
+
+    // Track HTML comments (<!-- ... -->)
+    if (inHtmlComment) {
+      if (trimmed.includes('-->')) {
+        inHtmlComment = false;
+        const afterComment = trimmed.substring(trimmed.indexOf('-->') + 3).trim();
+        if (afterComment) out.push(afterComment);
+      }
+      continue;
+    }
 
     // Track block comments (/* ... */)
     if (inBlockComment) {
@@ -256,6 +267,30 @@ function minifyHtml(content) {
         if (afterComment) out.push(afterComment);
       }
       // Skip lines inside block comments
+      continue;
+    }
+
+    // HTML comment — entire line is <!-- ... --> (single-line)
+    if (trimmed.startsWith('<!--') && trimmed.includes('-->')) {
+      const afterComment = trimmed.substring(trimmed.indexOf('-->') + 3).trim();
+      if (afterComment) out.push(afterComment);
+      continue;
+    }
+
+    // HTML comment — multi-line start (<!-- without closing -->)
+    if (trimmed.startsWith('<!--')) {
+      inHtmlComment = true;
+      continue;
+    }
+
+    // Inline HTML comments: strip <!-- ... --> from lines that have code before/after
+    // e.g. </div><!-- /.officer-grid --> → </div>
+    if (trimmed.includes('<!--') && trimmed.includes('-->')) {
+      const stripped = trimmed.replace(/<!--[\s\S]*?-->/g, '').trim();
+      if (stripped) {
+        out.push(stripped);
+        continue;
+      }
       continue;
     }
 
