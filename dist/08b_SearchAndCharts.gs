@@ -670,7 +670,7 @@ function createScorecardChart_(sheet) {
     .setFontSize(14)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
-    .setBackground('#FEF3C7');
+    .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW);
   sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
@@ -770,7 +770,7 @@ function createSummaryTableChart_(sheet) {
     .setFontSize(12)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
-    .setBackground('#F3F4F6');
+    .setBackground(SHEET_COLORS.BG_VERY_LIGHT_GRAY);
   sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
@@ -848,7 +848,7 @@ function createStewardLeaderboardChart_(sheet) {
     .setFontSize(11)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
-    .setBackground('#EFF6FF');
+    .setBackground(SHEET_COLORS.BG_EXTRA_PALE_BLUE);
   sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 

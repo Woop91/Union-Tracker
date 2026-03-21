@@ -138,8 +138,8 @@ function saveFormUrlsToConfig_silent(ss) {
   configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
   configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
 
-  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
-  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor(SHEET_COLORS.LINK_SECONDARY).setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor(SHEET_COLORS.LINK_SECONDARY).setFontLine('underline');
 }
 
 // ============================================================================
@@ -1890,8 +1890,8 @@ function syncSatisfactionSheetColumns_(activeQuestions) {
       satSheet.getRange(1, nextCol)
         .setValue(q.id)
         .setFontWeight('bold')
-        .setBackground('#1a73e8')
-        .setFontColor('#ffffff');
+        .setBackground(SHEET_COLORS.LINK_PRIMARY)
+        .setFontColor(SHEET_COLORS.BG_WHITE);
       satSheet.setColumnWidth(nextCol, 55);
       colMap[q.id] = nextCol;
       nextCol++;

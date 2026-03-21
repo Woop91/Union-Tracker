@@ -115,8 +115,8 @@ function portalGetOrCreateSheet_(name, headers, hidden) {
     sheet.appendRow(headers);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
-      .setBackground('#1a1a2e')
-      .setFontColor('#ffffff');
+      .setBackground(SHEET_COLORS.HEADER_NAVY)
+      .setFontColor(SHEET_COLORS.BG_WHITE);
     sheet.setFrozenRows(1);
     if (hidden) sheet.hideSheet();
   }
@@ -151,8 +151,8 @@ function getOrCreateMinutesSheet() {
     if (!headerRange.getValue()) {
       headerRange.setValue('DriveDocUrl')
         .setFontWeight('bold')
-        .setBackground('#1a1a2e')
-        .setFontColor('#ffffff');
+        .setBackground(SHEET_COLORS.HEADER_NAVY)
+        .setFontColor(SHEET_COLORS.BG_WHITE);
       Logger.log('getOrCreateMinutesSheet: migrated — added DriveDocUrl header to col 8');
     }
   } catch (migErr) {

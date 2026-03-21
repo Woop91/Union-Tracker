@@ -2308,8 +2308,8 @@ function addMobileDashboardLinkToConfig() {
   linkCell.setFormula('=HYPERLINK(' + JSON.stringify(url) + ', "📱 Tap to Open Dashboard")');
   linkCell.setFontSize(14);
   linkCell.setFontWeight('bold');
-  linkCell.setFontColor('#1a73e8');
-  linkCell.setBackground('#e8f0fe');
+  linkCell.setFontColor(SHEET_COLORS.LINK_PRIMARY);
+  linkCell.setBackground(SHEET_COLORS.BG_LINK_BLUE);
 
   // Also add plain URL below for copying
   var urlCell = configSheet.getRange(4, targetCol);
@@ -2321,7 +2321,7 @@ function addMobileDashboardLinkToConfig() {
   var instructionCell = configSheet.getRange(5, targetCol);
   instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
   instructionCell.setFontSize(9);
-  instructionCell.setFontColor('#666666');
+  instructionCell.setFontColor(SHEET_COLORS.TEXT_MED_GRAY);
   instructionCell.setWrap(true);
 
   // Set column width
@@ -3881,7 +3881,7 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
   var headerCell = sheet.getRange(1, newColIndex);
   headerCell.setValue('Dismiss_Mode')
     .setBackground(COLORS.HEADER_BG || '#1e293b')
-    .setFontColor('#ffffff')
+    .setFontColor(SHEET_COLORS.BG_WHITE)
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');

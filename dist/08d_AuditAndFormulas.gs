@@ -1532,8 +1532,8 @@ function setupSurveyVaultSheet() {
     var headers = getHeadersFromMap_(SURVEY_VAULT_HEADER_MAP_);
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setFontWeight('bold')
-      .setBackground('#7F1D1D')
-      .setFontColor('#FFFFFF');
+      .setBackground(SHEET_COLORS.HEADER_DARK_RED)
+      .setFontColor(SHEET_COLORS.BG_WHITE);
     sheet.setFrozenRows(1);
   }
 

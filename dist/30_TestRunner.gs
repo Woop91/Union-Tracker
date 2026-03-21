@@ -1,47 +1,40 @@
 /**
- * 30_TestRunner.gs
- * GAS-Native Test Framework — runs inside the Apps Script runtime.
+ * ============================================================================
+ * 30_TestRunner.gs - GAS-Native Test Framework
+ * ============================================================================
  *
- * Provides:
- *   - Lightweight assertion library (assertEquals, assertTrue, etc.)
- *   - Test discovery via naming convention (test_SUITE_description)
- *   - Suite runner with timing, pass/fail, error capture
- *   - Results stored in ScriptProperties for SPA dashboard panel
- *   - Manual trigger (Sheets menu) + timed trigger (daily)
+ * WHAT THIS FILE DOES:
+ *   GAS-native test framework that runs inside the Apps Script runtime.
+ *   Provides: lightweight assertion library (assertEquals, assertTrue,
+ *   assertNotNull, assertType, etc.), test discovery by naming convention
+ *   (test_SUITE_description), suite runner with timing/pass/fail/error
+ *   capture, results stored in ScriptProperties for the SPA TestRunner
+ *   dashboard. 14 core test suites covering config, column mapping, auth,
+ *   grievance logic, security, system integrity, data service, auth sweep,
+ *   config live headers, survey, email, login links, contacts, and email
+ *   types.
  *
- * Test suites (core — defined in this file):
- *   config_   — Config tab reads, CONFIG_COLS, ConfigReader shape
- *   colmap_   — Column mapping (GRIEVANCE_COLS, MEMBER_COLS) integrity
- *   auth_     — Auth resolution, role checks, steward auth
- *   grievance_ — Deadline rules, status constants, ID validation
- *   security_ — escapeHtml, escapeForFormula, XSS prevention
- *   system_   — Sheet existence, version info, build integrity
- *   dataservice_ — DataService CRUD operations
- *   authsweep_ — Endpoint auth rejection
- *   configlive_ — Live sheet headers vs column constants
- *   survey_   — Survey engine integrity
- *   emailsend_ — Email delivery & scope authorization
- *   loginlink_ — Login link flow, token lifecycle, resolveUser chain
- *   contacts_  — Contact service functions, steward lookup
- *   emailtypes_ — Email sender functions, broadcast, direct message
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Jest tests (in test/) run in Node.js with mocks — they can't verify
+ *   actual GAS service behavior. These GAS-native tests run in the real
+ *   Apps Script environment with real SpreadsheetApp, CacheService, etc.
+ *   This catches issues that mocks hide (e.g., sheet headers don't match
+ *   column constants). ALL tests are READ-ONLY — they never write to
+ *   sheets, so they're safe to run in production. Results go to
+ *   ScriptProperties so the SPA dashboard can display test health.
  *
- * Web app suites (defined in 31_WebAppTests.gs):
- *   webapp_   — doGet routing, templates, URL resolution
- *   configrd_ — ConfigReader module completeness
- *   portal_   — PortalSheets column constants, 0-indexed validation
- *   weeklyq_  — WeeklyQuestions module API
- *   workload_ — WorkloadService module, categories
- *   qaforum_  — QAForum module, question retrieval
- *   timeline_ — TimelineService module, events, categories
- *   failsafe_ — FailsafeService module, digest config
- *   endpoints_ — All data, wq, qa, tl, fs wrapper existence & auth
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   GAS-native testing is unavailable. The SPA TestRunner tab shows no
+ *   results. Production functionality is unaffected — tests are diagnostic
+ *   only. Developers must use Jest tests (Node.js) exclusively for
+ *   verification.
  *
- * IMPORTANT: All tests are READ-ONLY. They never write to sheets.
- * Tests interact with real GAS services (SpreadsheetApp, CacheService, etc.)
- * to verify actual system state — this is the point of GAS-native testing.
+ * DEPENDENCIES:
+ *   Depends on ScriptProperties (GAS built-in), 01_Core.gs (column
+ *   constants for verification). Used by menu items (Admin > Run Tests),
+ *   daily trigger, and the SPA TestRunner tab.
  *
- * @fileoverview GAS-native test runner for DDS-Dashboard
- * @version 1.0.0
+ * @version 4.31.0
  */
 
 /* ========================================================================
@@ -697,9 +690,6 @@ function dataGetTestResults(sessionToken) {
   var status = TestRunner.getStatus();
   return { success: true, results: results, status: status };
 }
-
-// dataGetTestErrorSummary removed — dead code cleanup v4.25.11
-
 /**
  * SPA endpoint: Manage test trigger (steward-only).
  * @param {string} sessionToken
@@ -714,8 +704,6 @@ function dataManageTestTrigger(sessionToken, action) {
   if (action === 'remove') return TestRunner.removeTrigger();
   return { success: false, error: 'Unknown action: ' + action };
 }
-
-
 /* ========================================================================
  * TEST REGISTRY — All test functions listed here for discovery
  * ========================================================================
@@ -982,8 +970,6 @@ function _getTestRegistry() {
     { name: 'test_endpoints_grievanceDraftFnsExist',       fn: test_endpoints_grievanceDraftFnsExist },
   ];
 }
-
-
 /* ========================================================================
  * TEST SUITES
  * ========================================================================
@@ -1535,14 +1521,11 @@ function test_authsweep_noDataLeakOnNullToken() {
   }
 }
 
-function test_authsweep_pollStubsSafe() {
-  // Legacy poll stubs should be safe (no auth needed, return empty/failure)
-  var polls = dataGetActivePolls();
-  TestRunner.assertTrue(Array.isArray(polls) && polls.length === 0,
-    'dataGetActivePolls returns empty array');
-  var vote = dataSubmitPollVote();
-  TestRunner.assertHasKey(vote, 'success', 'dataSubmitPollVote has success key');
-  TestRunner.assertEquals(false, vote.success, 'dataSubmitPollVote returns failure');
+function test_authsweep_pollStubsRemoved() {
+  // v4.25.11: Legacy poll stubs removed — verify they no longer exist
+  TestRunner.assertEquals('undefined', typeof dataGetActivePolls, 'dataGetActivePolls removed');
+  TestRunner.assertEquals('undefined', typeof dataSubmitPollVote, 'dataSubmitPollVote removed');
+  TestRunner.assertEquals('undefined', typeof dataAddPoll, 'dataAddPoll removed');
 }
 
 function test_authsweep_testRunnerEndpointsGated() {
@@ -1809,8 +1792,6 @@ function test_survey_trackingSheetExists() {
       'Survey tracking sheet has a header in A1');
   }
 }
-
-
 // ── EMAILSEND SUITE ───────────────────────────────────────────────────
 // Tests that catch the v4.25.8 bug class: scope authorization gaps in
 // the deployed web app causing email sends to silently fail.
@@ -1968,8 +1949,6 @@ function test_emailsend_sendMagicLinkBadEmailReturnsSafe() {
     'sendMagicLink returns success:true for unknown email (enumeration defense)');
 }
 
-
-
 /* ========================================================================
  * LOGINLINK SUITE — Login link flow, token lifecycle, resolveUser chain
  * ======================================================================== */
@@ -2097,8 +2076,6 @@ function test_loginlink_configHasMagicLinkExpiry() {
     TestRunner.fail('ConfigReader threw — magic link config unavailable: ' + e.message);
   }
 }
-
-
 /* ========================================================================
  * CONTACTS SUITE — Contact service functions, steward lookup
  * ======================================================================== */
@@ -2169,8 +2146,6 @@ function test_contacts_getMemberDataByIdCallable() {
   var result = getMemberDataById_('NONEXISTENT_ID_XYZ_999');
   TestRunner.assertTrue(result == null, 'getMemberDataById_ returns null for bad ID');
 }
-
-
 /* ========================================================================
  * EMAILTYPES SUITE — Email sender functions, broadcast, direct message
  * ======================================================================== */

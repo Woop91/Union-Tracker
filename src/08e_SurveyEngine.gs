@@ -186,7 +186,7 @@ function setupSurveyPeriodsSheet() {
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
-    .setBackground('#E0E7FF');
+    .setBackground(SHEET_COLORS.BG_LIGHT_BLUE);
 
   sheet.setFrozenRows(1);
 

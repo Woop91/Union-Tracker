@@ -296,8 +296,8 @@ var WorkloadService = (function() {
         report.getRange(1, 1, reportRows.length, header.length).setValues(reportRows);
         report.getRange(1, 1, 1, header.length)
           .setFontWeight('bold')
-          .setBackground('#0d47a1')
-          .setFontColor('#ffffff');
+          .setBackground(SHEET_COLORS.HEADER_BLUE)
+          .setFontColor(SHEET_COLORS.BG_WHITE);
         report.setFrozenRows(1);
 
         // Clear leftover rows beyond new data (if sheet previously had more rows)
@@ -309,11 +309,11 @@ var WorkloadService = (function() {
         // Pastel color coding
         if (reportRows.length > 1) {
           var numData = reportRows.length - 1;
-          report.getRange(2, 1, numData, 2).setBackground('#F1F5F9');
-          report.getRange(2, 3, numData, 8).setBackground('#ECFDF5');
-          report.getRange(2, 11, numData, 2).setBackground('#FEF3C7');
-          report.getRange(2, 13, numData, 2).setBackground('#FAF5FF');
-          report.getRange(2, 15, numData, 2).setBackground('#FEE2E2');
+          report.getRange(2, 1, numData, 2).setBackground(SHEET_COLORS.BG_SLATE_LIGHT);
+          report.getRange(2, 3, numData, 8).setBackground(SHEET_COLORS.BG_MINT);
+          report.getRange(2, 11, numData, 2).setBackground(SHEET_COLORS.BG_LIGHT_YELLOW);
+          report.getRange(2, 13, numData, 2).setBackground(SHEET_COLORS.BG_LIGHT_PURPLE);
+          report.getRange(2, 15, numData, 2).setBackground(SHEET_COLORS.BG_LIGHT_RED);
         }
       }
     } catch (writeErr) {
@@ -369,7 +369,7 @@ var WorkloadService = (function() {
         'Privacy', 'On Plan', 'Overtime Hours'
       ]);
       vault.getRange(1, 1, 1, VAULT_COL_COUNT)
-        .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
+        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_NAVY).setFontColor(SHEET_COLORS.BG_WHITE);
       vault.setFrozenRows(1);
     } else {
       // Existing sheet — expand headers if needed (handles migration from 12-col)
@@ -405,7 +405,7 @@ var WorkloadService = (function() {
         'Anon Level', 'Workflow'
       ]);
       report.getRange(1, 1, 1, 16)
-        .setFontWeight('bold').setBackground('#0d47a1').setFontColor('#ffffff');
+        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_BLUE).setFontColor(SHEET_COLORS.BG_WHITE);
       report.setFrozenRows(1);
     }
 
@@ -415,7 +415,7 @@ var WorkloadService = (function() {
       reminders = ss.insertSheet(SHEETS.WORKLOAD_REMINDERS);
       reminders.appendRow(['Email', 'Enabled', 'Frequency', 'Day', 'Time', 'Last Sent']);
       reminders.getRange(1, 1, 1, 6)
-        .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
+        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_NAVY).setFontColor(SHEET_COLORS.BG_WHITE);
       reminders.setFrozenRows(1);
       setSheetVeryHidden_(reminders); // H-12: API-level hide
     }
@@ -426,7 +426,7 @@ var WorkloadService = (function() {
       userMeta = ss.insertSheet(SHEETS.WORKLOAD_USERMETA);
       userMeta.appendRow(['Email', 'Sharing Start Date', 'Created Date']);
       userMeta.getRange(1, 1, 1, 3)
-        .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
+        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_NAVY).setFontColor(SHEET_COLORS.BG_WHITE);
       userMeta.setFrozenRows(1);
       setSheetVeryHidden_(userMeta); // H-12: API-level hide
     }

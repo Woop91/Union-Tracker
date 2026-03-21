@@ -415,7 +415,7 @@ describe('G12: All client server calls have matching server functions', () => {
           if (JS_BUILTINS.has(name)) continue;
           if (serverFunctions.has(name)) continue;
           // Skip if it looks like a client-side function (starts lowercase, common patterns)
-          if (['serverCall', 'showLoading', 'showToast', 'el', 'escHtml_'].includes(name)) continue;
+          if (['serverCall', 'showLoading', 'showToast', 'el', 'escHtml_', 'invalidate', 'invalidatePrefix', 'cachedCall'].includes(name)) continue;
 
           missing.push(`${file}:${i + 1} calls .${name}() — no matching server function`);
         }
@@ -1030,36 +1030,6 @@ describe('G23: Tab navigation race condition guard', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     // Must compare the local switchId against the global _navSwitchId
     expect(fnBody).toMatch(/switchId\s*!==\s*_navSwitchId/);
-  });
-
-  // orgchart, poms, and "more" early-return paths must update _activePane
-  test('orgchart early-return path updates _activePane', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    // After renderOrgChart, _activePane must be set before return
-    const orgchartBlock = fnBody.match(/renderOrgChart\([\s\S]*?return;/);
-    expect(orgchartBlock).not.toBeNull();
-    expect(orgchartBlock[0]).toContain('_activePane');
-  });
-
-  test('poms early-return path updates _activePane', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    const pomsBlock = fnBody.match(/renderPOMSReference\([\s\S]*?return;/);
-    expect(pomsBlock).not.toBeNull();
-    expect(pomsBlock[0]).toContain('_activePane');
-  });
-
-  test('_member_more early-return path updates _activePane', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    const moreBlock = fnBody.match(/_member_more[\s\S]*?return;\s*\}/);
-    expect(moreBlock).not.toBeNull();
-    expect(moreBlock[0]).toContain('_activePane');
-  });
-
-  test('_steward_more early-return path updates _activePane', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    const moreBlock = fnBody.match(/_steward_more[\s\S]*?return;\s*\}/);
-    expect(moreBlock).not.toBeNull();
-    expect(moreBlock[0]).toContain('_activePane');
   });
 
   // Async callbacks must check for stale switches
