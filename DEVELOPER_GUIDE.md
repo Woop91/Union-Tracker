@@ -169,6 +169,7 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 | `22_WebDashApp.gs` | SPA entry point and routing | `doGetWebDashboard`, `PAGE_DATA` |
 | `23_PortalSheets.gs` | Hidden sheet management for SPA | `getPortalSheetData`, `updatePortalSheet` |
 | `24_WeeklyQuestions.gs` | Weekly check-in questions | `getWeeklyQuestions`, `submitWeeklyResponse` |
+
 ### Extended Services
 
 | File | Purpose | Key Functions |
@@ -470,6 +471,7 @@ test/
 ├── 22_WebDashApp.test.js
 ├── 23_PortalSheets.test.js
 ├── 24_WeeklyQuestions.test.js
+├── 25_WorkloadService.test.js
 ├── 26_QAForum.test.js
 ├── 27_TimelineService.test.js
 └── 28_FailsafeService.test.js

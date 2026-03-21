@@ -35,17 +35,18 @@ This document provides a comprehensive, searchable reference of all features in 
 22. [Meeting Check-In & Document Automation](#22-meeting-check-in--document-automation)
 23. [Member Drive Folders](#23-member-drive-folders)
 24. [Constant Contact Integration](#24-constant-contact-integration)
-25. [Resources Hub](#25-resources-hub)
-26. [Notifications System](#26-notifications-system)
-27. [SPA Web Dashboard](#27-spa-web-dashboard)
-28. [Notification Bell & EventBus Alerts](#28-notification-bell--eventbus-alerts)
-29. [Q&A Forum](#29-qa-forum)
-30. [Timeline Service](#30-timeline-service)
-31. [Dynamic Survey Engine](#31-dynamic-survey-engine)
-32. [Share Phone](#32-share-phone)
-33. [FailsafeService](#33-failsafeservice)
-34. [Migrations](#34-migrations)
-35. [Org Chart](#35-org-chart)
+25. [Workload Tracker](#25-workload-tracker) *(not included in SolidBase)*
+26. [Resources Hub](#26-resources-hub)
+27. [Notifications System](#27-notifications-system)
+28. [SPA Web Dashboard](#28-spa-web-dashboard)
+29. [Notification Bell & EventBus Alerts](#29-notification-bell--eventbus-alerts)
+30. [Q&A Forum](#30-qa-forum)
+31. [Timeline Service](#31-timeline-service)
+32. [Dynamic Survey Engine](#32-dynamic-survey-engine)
+33. [Share Phone](#33-share-phone)
+34. [FailsafeService](#34-failsafeservice)
+35. [Migrations](#35-migrations)
+36. [Org Chart](#36-org-chart)
 
 ---
 
@@ -55,7 +56,7 @@ This document provides a comprehensive, searchable reference of all features in 
 
 | Feature | Description | Menu Path | Keywords |
 |---------|-------------|-----------|----------|
-| **Steward Dashboard** | Internal dashboard with 10 tabs: Overview, My Cases, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes. Contains member names and PII - for steward use only. | Strategic Ops > Command Center > Steward Dashboard | internal, analytics, PII |
+| **Steward Dashboard** | Internal dashboard with 11 tabs: Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes. Contains member names and PII - for steward use only. | Strategic Ops > Command Center > Steward Dashboard | internal, analytics, PII, workload |
 | **Member Dashboard** | PII-safe dashboard for sharing with members. Shows aggregate stats, steward directory, and satisfaction scores without personal information. | Strategic Ops > Command Center > Member Dashboard | public, aggregate, safe, sharing |
 | **Executive Command Dashboard** | Legacy 5-tab modal with Overview, My Cases, Grievances, Members, and Analytics tabs. | Union Hub > Dashboards > Dashboard | executive, overview, legacy |
 | **Interactive Dashboard** | Customizable dashboard with 20+ metrics and 7 chart types. | See INTERACTIVE_DASHBOARD_GUIDE.md | charts, metrics, customizable |
@@ -66,6 +67,7 @@ This document provides a comprehensive, searchable reference of all features in 
 |-----|-------------|-------------|
 | **Overview** | High-level organization health metrics with Quick Insights panel | Active grievances, win rate, member count, morale score, engagement summary, bargaining position |
 | **My Cases** | Steward's assigned grievances (PII mode only) | Active cases, urgent count, avg days open, filtering by status |
+| **Workload** | Steward case distribution and capacity | Cases per steward, overload warnings (8+ cases), top performers |
 | **Analytics** | Grievance trends and patterns | Status breakdown, engagement metrics, volunteer hours |
 | **Directory** | Member contact trends and data quality | Recent updates, stale contacts, missing email/phone |
 | **Hot Spots** | Problem areas with 4 hot spot types | Grievance clusters, dissatisfaction areas, low engagement zones, overdue concentrations |
@@ -379,7 +381,7 @@ This document provides a comprehensive, searchable reference of all features in 
 - Command Center (Steward Dashboard, Member Dashboard, Performance)
 - Cases (New, Edit, Advance)
 - Strategic Intelligence (Hot Zones, Rising Stars, Hostility, Bargaining)
-- Analytics (Treemap, Sentiment, Steward Caseload)
+- Analytics (Treemap, Sentiment, Workload)
 - ID Engines (Generate IDs, Check Duplicates, PDF)
 - Steward Management (Promote, Demote, Contact)
 
@@ -684,7 +686,13 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ---
 
-## 25. Resources Hub
+## 25. Workload Tracker
+
+> **Note:** The Workload Tracker (`25_WorkloadService.gs`) is not included in SolidBase. It is an org-specific feature available in the DDS-Dashboard source.
+
+---
+
+## 26. Resources Hub
 
 > **File:** `08a_SheetSetup.gs`, SPA routes | **Version:** 4.11.0
 
@@ -714,7 +722,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ---
 
-## 26. Notifications System
+## 27. Notifications System
 
 > **File:** `08a_SheetSetup.gs`, SPA routes | **Version:** 4.12.0
 >
@@ -744,9 +752,9 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ---
 
-## 27. SPA Web Dashboard
+## 28. SPA Web Dashboard
 
-> **Files:** `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`, `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`, `29_Migrations.gs` | **Version:** 4.25.5
+> **Files:** `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`, `25_WorkloadService.gs`, `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`, `29_Migrations.gs` | **Version:** 4.25.5
 >
 > 11 SPA modules (19-29). Routes include Q&A Forum, Timeline, FailsafeService, and Migrations.
 
@@ -781,7 +789,7 @@ Home, My Cases, My Tasks, Union Stats, Resources, Org. Chart, Q&A Forum, Polls, 
 
 ---
 
-## 28. Notification Bell & EventBus Alerts
+## 29. Notification Bell & EventBus Alerts
 
 > **Files:** `15_EventBus.gs`, SPA views | **Version:** 4.13.0
 
@@ -794,7 +802,7 @@ Home, My Cases, My Tasks, Union Stats, Resources, Org. Chart, Q&A Forum, Polls, 
 
 ---
 
-## 29. Q&A Forum
+## 30. Q&A Forum
 
 > **File:** `26_QAForum.gs` | **Version:** 4.22.6+
 
@@ -810,7 +818,7 @@ Features for steward-member Q&A communication within the SPA web dashboard.
 
 ---
 
-## 30. Timeline Service
+## 31. Timeline Service
 
 > **File:** `27_TimelineService.gs` | **Version:** 4.22.9+
 
@@ -828,7 +836,7 @@ Activity feed and timeline features within the SPA web dashboard.
 
 ---
 
-## 31. Dynamic Survey Engine
+## 32. Dynamic Survey Engine
 
 > **File:** `08e_SurveyEngine.gs` | **Version:** 4.23.0
 
@@ -842,7 +850,7 @@ Fully dynamic survey schema driven by configuration rather than hardcoded values
 
 ---
 
-## 32. Share Phone
+## 33. Share Phone
 
 > **Version:** 4.23.4+
 
@@ -858,7 +866,7 @@ Steward phone sharing opt-in feature for the member directory and web dashboard.
 
 ---
 
-## 33. FailsafeService
+## 34. FailsafeService
 
 > **File:** `28_FailsafeService.gs` | **Version:** 4.22.8+
 
@@ -873,7 +881,7 @@ Critical operation wrapper providing retry logic and graceful degradation for un
 
 ---
 
-## 34. Migrations
+## 35. Migrations
 
 > **File:** `29_Migrations.gs` | **Version:** 4.20.26+
 
@@ -889,7 +897,7 @@ One-time data migration service for schema changes and column auto-migration.
 
 ---
 
-## 35. Org Chart
+## 36. Org Chart
 
 > **Files:** `org_chart.html`, `scripts/sync-org-chart.js` | **Version:** 4.22.6
 
@@ -925,10 +933,11 @@ Organization chart visualization for the MADDS org chart.
 | **4.22.0** | Notification overhaul |
 | **4.20.26** | Migrations service -- column auto-migration for Member Directory, Grievance Log, minutes |
 | **4.20.18** | Minutes schema fix, pagination, auto-share, folder warning |
-| **4.13.0** | Notification bell with unread badge, EventBus auto-notifications |
+| **4.13.0** | Notification bell with unread badge, EventBus auto-notifications, WorkloadService SPA module |
 | **4.12.2** | SPA web dashboard -- SSO + magic link auth, steward/member views, deep-link routing |
 | **4.12.0** | Notifications system -- sheet, API, dual-role page, steward compose |
 | **4.11.0** | Resources hub, meeting check-in route, design refresh (DM Sans + Fraunces) |
+| **4.10.0** | Workload Tracker (not included in SolidBase -- org-specific feature) |
 | **4.9.0** | Constant Contact v3 API integration -- read-only email engagement metrics sync (OPEN_RATE, RECENT_CONTACT_DATE) |
 | **4.8.2** | State field added to member contact update (self-service portal, contact form, profile) |
 | **4.6.0** | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override |

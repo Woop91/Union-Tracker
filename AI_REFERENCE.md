@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | Sync flow, sync history |
+| 3 | **SYNC-LOG.md** | SolidBase sync history and exclusion rules |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -35,7 +35,7 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 45 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`. Production build excludes DevTools + DevMenu (43 .gs + 8 .html).
 **Current build:** 43 `.gs` + 8 `.html` files in `dist/` production (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**Apps Script ID:** `[REDACTED — see .clasp.json]`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -121,7 +121,7 @@ doGet(e)
 - **Auth config:** `ScriptProperties` (no manual setup required — `initWebDashboardAuth()` handles first-time)
 
 ### HTML Serving Method
-As of v4.13.0, the build outputs individual `.html` files to `dist/`, enabling both `HtmlService.createHtmlOutput()` (inline strings) and `createTemplateFromFile()`/`createHtmlOutputFromFile()` (file-based). The SPA modules (19-25) use file-based HTML. Legacy modules (04-13) still use inline HTML strings.
+As of v4.13.0, the build outputs individual `.html` files to `dist/`, enabling both `HtmlService.createHtmlOutput()` (inline strings) and `createTemplateFromFile()`/`createHtmlOutputFromFile()` (file-based). The SPA modules (19-24, 26-29) use file-based HTML. Legacy modules (04-13) still use inline HTML strings.
 
 ---
 
@@ -201,7 +201,7 @@ Features: Material Design UI, Weingarten Rights, live steward search, PII scrubb
 | 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
 | 2026-02-23 | GitHub token `ghp_FTE8...` expired | Token rotated | User generated new token | ✅ |
 | 2026-02-23 | Token `ghp_q3Zd...` lacked `repo` scope | Wrong scope selected | User generated third token with correct scope | ✅ |
-| 2026-02-25 | Memory had default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
+| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
 | 2026-02-25 | Expired token `ghp_FTE8...` still in memory | Token rotated but memory stale | Updated memory to `ghp_7MY0...` | ✅ |
 
 ---
@@ -228,6 +228,7 @@ Records **why** architectural choices were made, so future LLMs don't undo them.
 | 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
 | 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
 | 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
+| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ was SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). Both removed from SolidBase (org-specific feature). |
 
 ---
 
@@ -267,7 +268,7 @@ See `PHASE2_PLAN.md` for details.
 
 1. **Read CLAUDE.md first** — it has the most critical rules including column constant patterns, config write paths, and security patterns.
 2. **Read this file second** — it has architecture context, error history, and protected code.
-3. **Read SYNC-LOG.md if touching UT** — full exclusion registry with line numbers.
+3. **Read SYNC-LOG.md** — SolidBase sync history and exclusion rules.
 4. **The `web-dashboard/` folder is dead code.** Do not deploy or integrate it.
 5. **Never edit `dist/` files directly.** Edit `src/*.gs` and run `npm run build` (copies individual files to dist).
 6. **Test with `npm run ci`** before pushing.

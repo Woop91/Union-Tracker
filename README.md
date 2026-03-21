@@ -1,6 +1,6 @@
-# SolidBase
+# Strategic Command Center
 
-**Version 4.30.0** | SolidBase — Built for the collective.
+**Version 4.30.0** | Union Steward Dashboard for Google Sheets
 
 A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 43-file modular architecture, 8 HTML templates, and a full SPA web dashboard. 2,900+ automated tests across 58 suites.
 
@@ -33,11 +33,12 @@ The Dashboard gives union stewards and leadership a centralized place to:
 - **Track grievances** from filing through resolution with automatic deadline calculations
 - **Manage member records** with contact info, job metadata, and steward assignments
 - **Monitor deadlines** with color-coded urgency and Google Calendar sync
-- **Run dashboards** for executive analytics, member-facing stats, and steward caseload
+- **Run dashboards** for executive analytics, member-facing stats, and steward workload
 - **Automate meetings** with auto-generated Google Docs for notes and agendas
 - **Generate PDFs** for grievance forms with digital signature blocks
 - **Send notifications** for overdue cases, escalation alerts, and reminders
 - **Run a web dashboard** with SPA interface, Google SSO + magic link auth, and role-based views
+- **Track steward workload** with case distribution and capacity analysis
 - **Protect privacy** with PII masking on all public-facing dashboards
 
 The system runs entirely inside Google Sheets with no external servers required.
@@ -105,7 +106,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 
    ```bash
    clasp login
-   clasp create --type sheets --title "SolidBase Directory"
+   clasp create --type sheets --title "Union Dashboard"
    ```
 
 3. **Build and deploy:**
@@ -174,7 +175,7 @@ After that, you have **43 production `.gs` files + 8 `.html` files** and a clean
 - Centralized member directory with contact info and job metadata
 - Auto-generated Member IDs (format: M + name initials + 3 digits, e.g., MJASM472)
 - Expanded contact fields: Hire Date, Employee ID, Street Address, City, Zip Code, State
-- Steward assignments and caseload tracking
+- Steward assignments and workload tracking
 - Import/export capabilities
 - Self-service portal with PIN authentication (5 editable fields: Email, Phone, Preferred Contact, Best Time, State)
 
@@ -186,11 +187,11 @@ After that, you have **43 production `.gs` files + 8 `.html` files** and a clean
 - Google Calendar integration for scheduling
 
 ### Dashboards & Analytics
-- **Steward Dashboard**: Internal view with 10 tabs -- Overview, My Cases, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes
+- **Steward Dashboard**: Internal view with 11 tabs -- Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes
 - **Member Dashboard**: PII-safe view with Home, My Cases, My Tasks, Union Stats, Steward Directory, Resources, Q&A Forum, Polls, Feedback, Minutes, Notifications, Events, Meetings, Timeline, Profile, and Survey Results
 - **Executive Dashboard**: High-level metrics with Chart.js visualizations
 - **Interactive Dashboard**: Customizable metrics and chart types
-- Hot spot detection, sentiment analysis, and caseload balancing
+- Hot spot detection, sentiment analysis, and workload balancing
 - Count-first loading with server-side pagination for 5K+ member lists
 
 ### Drive & Calendar Integration
@@ -252,6 +253,9 @@ After that, you have **43 production `.gs` files + 8 `.html` files** and a clean
 - All column references use dynamic `CONFIG_COLS` and `MEMBER_COLS` constants
 - Multi-select dropdown editor for Grievance Log with checkbox UI
 
+### Workload Tracker (v4.10.0)
+> **Note:** The Workload Tracker is not included in SolidBase. It is an org-specific feature available in the DDS-Dashboard source.
+
 ### Resources Hub (v4.11.0)
 - Educational content hub with search, category pills, and expandable cards (`?page=resources`)
 - 12-column Resources sheet with audience filtering and data validation
@@ -284,8 +288,7 @@ After that, you have **43 production `.gs` files + 8 `.html` files** and a clean
 - Member notification view with dismiss functionality
 
 ### Org Chart (v4.22.6)
-- MADDS org chart as default view
-- `scripts/sync-org-chart.js` script for syncing org chart data
+- Organizational chart as default view
 - Dedicated `org_chart.html` template
 
 ### Q&A Forum (v4.22.6+)
@@ -411,7 +414,7 @@ The dashboard provides 4 top-level menus:
 |---------|--------------|
 | Command Center | Steward/Member dashboards, steward performance |
 | Strategic Intelligence | Hot zones, rising stars, hostility report |
-| Analytics & Charts | Treemap, sentiment trends, steward caseload report |
+| Analytics & Charts | Treemap, sentiment trends, workload report |
 | ID & Data Engines | ID generation, duplicate check, PDF creation |
 | Steward Management | Promote/demote, contact forms, surveys |
 
@@ -535,7 +538,7 @@ npm run deploy         # Deploy to Google Apps Script (requires clasp)
 
 ### Scripts
 
-- `scripts/sync-org-chart.js` -- Syncs org chart data for the MADDS org chart view
+- `scripts/sync-org-chart.js` -- Syncs org chart data for the org chart view
 - `scripts/check-scope-change.js` -- Pre-push hook: detects OAuth scope changes that require re-authorization
 - `scripts/rollback.sh` -- Git-based GAS deployment rollback (checkout prior commit's dist/ + clasp push)
 
@@ -579,7 +582,7 @@ The codebase uses a 43-file modular architecture (+ 8 HTML templates) with numbe
 | 30-31 | Testing | `30_TestRunner.gs`, `31_WebAppTests.gs` (GAS-native test runner, 210 tests) |
 | -- | HTML | `index.html`, `styles.html`, `auth_view.html`, `steward_view.html`, `member_view.html`, `error_view.html`, `org_chart.html` |
 
-NOTE: No prefix 18 or 25 exists in this repo. `doGet()` is in `22_WebDashApp.gs`.
+NOTE: No prefix 18 or 25 exists in this repo (org-specific features removed). `doGet()` is in `22_WebDashApp.gs`.
 
 ### Design Principles
 
@@ -699,6 +702,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 | **4.12.2** | 2026-02-25 | SPA web dashboard, SSO + magic link auth, deep-link routing, hidden sheets |
 | **4.12.0** | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
 | **4.11.0** | 2026-02-24 | Resources hub, meeting check-in route, design refresh |
+| **4.10.0** | 2026-02-23 | Workload Tracker (not included in SolidBase -- org-specific feature) |
 | **4.9.1** | 2026-02-23 | Security vulnerability fix pass -- 22 findings fixed, XSS hardening, formula injection protection |
 | **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 1300+ tests across 21 suites |
 | **4.8.2** | 2026-02-16 | State field added to member contact surfaces |

@@ -282,7 +282,8 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
-      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger'))
+      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
+      )
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')

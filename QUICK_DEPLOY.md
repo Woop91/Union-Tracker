@@ -17,7 +17,6 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 - Steward Dashboard, Member Dashboard, and Executive Dashboard
 - Meeting management with auto-generated Google Docs
 - Mobile-optimized quick actions and web app portal
-- Standalone workload tracker portal with PIN authentication
 - Comfort View accessibility features
 
 ---
@@ -91,7 +90,6 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 | `22_WebDashApp` | `src/22_WebDashApp.gs` |
 | `23_PortalSheets` | `src/23_PortalSheets.gs` |
 | `24_WeeklyQuestions` | `src/24_WeeklyQuestions.gs` |
-| `25_WorkloadService` | `src/25_WorkloadService.gs` |
 | `26_QAForum` | `src/26_QAForum.gs` |
 | `27_TimelineService` | `src/27_TimelineService.gs` |
 | `28_FailsafeService` | `src/28_FailsafeService.gs` |
@@ -163,7 +161,7 @@ If you prefer automated deployment:
 cd SolidBase
 npm install
 clasp login
-clasp create --type sheets --title "SolidBase"
+clasp create --type sheets --title "Union Dashboard"
 clasp push
 ```
 

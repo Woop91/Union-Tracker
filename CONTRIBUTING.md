@@ -30,8 +30,8 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Woop91/Union-Tracker.git
-   cd Union-Tracker
+   git clone https://github.com/Woop91/SolidBase.git
+   cd SolidBase
    ```
 
 2. **Install dependencies**
@@ -48,6 +48,10 @@ Please be respectful and constructive in all interactions. We're all working tow
    ```bash
    npm run build
    ```
+
+### Environment Variables
+
+No environment variables are required for building, testing, or deploying.
 
 ## Project Structure
 
@@ -97,7 +101,7 @@ Please be respectful and constructive in all interactions. We're all working tow
 │   ├── 30_TestRunner.gs             # GAS-native test runner (210 tests)
 │   ├── 31_WebAppTests.gs           # GAS-native web app tests
 │   ├── DevMenu.gs                  # Dev menu (excluded from prod build)
-│   └── (7 .html files)             # SPA templates + org_chart
+│   └── (8 .html files)             # SPA templates
 ├── test/                   # Jest unit tests
 │   ├── gas-mock.js         # GAS environment mocks
 │   ├── load-source.js      # Source file loader

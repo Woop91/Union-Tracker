@@ -3313,16 +3313,12 @@ function renderSurveyResultsPage(appContainer) {
   });
 }
 
-
-// WORKLOAD TRACKER removed v4.33.x
-
 // ═══════════════════════════════════════
 // WEEKLY QUESTIONS (member side)
 // ═══════════════════════════════════════
 
 // EVENTS PAGE (shared member+steward) (v4.12.0)
 // ═══════════════════════════════════════
-
 
 function renderEventsPage(appContainer) {
   var role = AppState.activeRole || 'member';
@@ -3430,7 +3426,7 @@ function renderUnionStatsPage(appContainer) {
     if (!AppState.unionStatsCache) AppState.unionStatsCache = {};
     var cache = AppState.unionStatsCache;
 
-    var statTabs = ['grievances', 'hot spots', 'membership', 'engagement', 'resources', 'usage'];
+    var statTabs = ['grievances', 'hot spots', 'membership', 'engagement', 'resources', 'usage', 'workload'];
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
       statTabs.forEach(function(tab) {
@@ -3457,6 +3453,7 @@ function renderUnionStatsPage(appContainer) {
       else if (activeSubTab === 'engagement') _renderEngagementStats(subContent, _getCached, _setCache);
       else if (activeSubTab === 'resources') _renderResourceStats(subContent, _getCached, _setCache);
       else if (activeSubTab === 'usage') _renderUsageStats(subContent, _getCached, _setCache);
+      else if (activeSubTab === 'workload') _renderWorkloadSummaryStats(subContent, _getCached, _setCache);
       else _renderMembershipStats(subContent, _getCached, _setCache);
     }
 
@@ -4005,6 +4002,29 @@ function _renderEngagementStatsContent(container, data) {
       container.appendChild(scCard);
     }
 
+    // Workload equity (v4.31.5)
+    if (data.workloadEquity) {
+      var weq = data.workloadEquity;
+      var weCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+      weCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Workload Distribution'));
+      var weGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' } });
+      var eqColor = weq.gini < 0.2 ? 'var(--success)' : weq.gini < 0.35 ? '#f59e0b' : 'var(--danger)';
+      [
+        { label: 'Equity', value: weq.equityLabel, color: eqColor },
+        { label: 'Avg Caseload', value: String(weq.avgCaseload), color: 'var(--accent)' },
+        { label: 'Max Caseload', value: String(weq.maxCaseload), color: 'var(--danger)' },
+        { label: 'Min Caseload', value: String(weq.minCaseload), color: 'var(--success)' }
+      ].forEach(function(m) {
+        var c = el('div', { style: { textAlign: 'center', padding: '8px' } });
+        c.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: m.color } }, m.value));
+        c.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', marginTop: '2px' } }, m.label));
+        weGrid.appendChild(c);
+      });
+      weCard.appendChild(weGrid);
+      weCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'center', marginTop: '6px' } }, weq.stewardCount + ' stewards — Gini: ' + weq.gini));
+      container.appendChild(weCard);
+    }
+
     // Personal Engagement Score (v4.31.5) — rendered from data._engagementScore (fetched in parallel)
     if (data._engagementScore) {
       _renderEngagementScoreCard(container, data._engagementScore);
@@ -4265,6 +4285,44 @@ function _renderUsageStatsContent(container, data) {
     });
     container.appendChild(listCard);
   }
+}
+
+function _renderWorkloadSummaryStats(container, getCached, setCache) {
+  var cached = getCached && getCached('workloadStats');
+  if (cached) { _renderWorkloadStatsContent(container, cached); return; }
+  showLoading(container, 'kpi');
+  serverCall().withSuccessHandler(function(data) {
+    if (setCache) setCache('workloadStats', data);
+    _renderWorkloadStatsContent(container, data);
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load workload stats.'));
+  }).dataGetWorkloadSummaryStats(SESSION_TOKEN);
+}
+
+function _renderWorkloadStatsContent(container, data) {
+    container.innerHTML = '';
+    if (!data) {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'Workload summary unavailable.'));
+      return;
+    }
+
+    container.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '\uD83D\uDD12 Anonymized workload aggregate'));
+
+    var items = [
+      { label: 'Avg Caseload', value: (data.avgCaseload || 0).toFixed(1), color: 'var(--text)' },
+      { label: 'High Caseload %', value: (data.highCaseloadPct || 0) + '%', color: data.highCaseloadPct > 20 ? 'var(--danger)' : 'var(--success)' },
+      { label: 'Submission Rate', value: (data.submissionRate || 0) + '%', color: 'var(--accent)' },
+      { label: 'Trend', value: (data.trendDirection || 'stable').charAt(0).toUpperCase() + (data.trendDirection || 'stable').slice(1), color: data.trendDirection === 'increasing' ? 'var(--danger)' : 'var(--success)' },
+    ];
+    var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' } });
+    items.forEach(function(m) {
+      var card = el('div', { className: 'card card-glass', style: { padding: '16px', textAlign: 'center' } });
+      card.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '24px', fontWeight: '700', color: m.color } }, m.value));
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, m.label));
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
 }
 
 // ═══════════════════════════════════════
@@ -5406,7 +5464,7 @@ function _renderDigestSettings(container) {
 
   serverCall().withSuccessHandler(function(config) {
     formArea.innerHTML = '';
-    if (!config) config = { enabled: false, frequency: 'weekly', includeGrievances: true, includeTasks: true };
+    if (!config) config = { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
 
     var enableGroup = el('div', { className: 'form-group', style: { display: 'flex', alignItems: 'center', gap: '8px' } });
     var enableCheck = el('input', { type: 'checkbox' });
@@ -5431,9 +5489,10 @@ function _renderDigestSettings(container) {
     formArea.appendChild(includeLabel);
 
     var grievCheck = el('input', { type: 'checkbox' }); grievCheck.checked = config.includeGrievances;
+    var workCheck = el('input', { type: 'checkbox' }); workCheck.checked = config.includeWorkload;
     var taskCheck = el('input', { type: 'checkbox' }); taskCheck.checked = config.includeTasks;
 
-    [{ check: grievCheck, label: 'Grievances' }, { check: taskCheck, label: 'Tasks' }].forEach(function(item) {
+    [{ check: grievCheck, label: 'Grievances' }, { check: workCheck, label: 'Workload' }, { check: taskCheck, label: 'Tasks' }].forEach(function(item) {
       var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
       row.appendChild(item.check);
       row.appendChild(el('label', { style: { fontSize: '13px', color: 'var(--text)' } }, item.label));
@@ -5451,6 +5510,7 @@ function _renderDigestSettings(container) {
           enabled: enableCheck.checked,
           frequency: monthlyRadio.checked ? 'monthly' : 'weekly',
           includeGrievances: grievCheck.checked,
+          includeWorkload: workCheck.checked,
           includeTasks: taskCheck.checked
         };
         serverCall().withSuccessHandler(function(r) {

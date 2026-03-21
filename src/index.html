@@ -2572,7 +2572,6 @@
         _navProgressDone();
         return;
       }
-
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 

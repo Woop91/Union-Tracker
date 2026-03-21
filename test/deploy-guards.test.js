@@ -467,6 +467,9 @@ describe('G7: All .gs files have valid JavaScript syntax', () => {
 // ============================================================================
 // G8: build.js file arrays match actual src/ contents
 // ============================================================================
+// Reason: If a file exists in src/ but is not in build.js arrays, a fresh
+// --prod build would omit it from dist/, breaking the feature at runtime.
+
 describe('G8: build.js file arrays match src/ contents', () => {
   const buildCode = fs.readFileSync(path.resolve(__dirname, '..', 'build.js'), 'utf8');
 
@@ -548,12 +551,24 @@ describe('G9: Nav tabs and handlers are in sync', () => {
     });
   });
 
+  // Member-only tabs (removed from steward nav)
+  // Note: POMS tab removed from SolidBase
+  const memberOnlyTabs = [];
+  memberOnlyTabs.forEach(tabId => {
+    test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
+      const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
+      expect(count).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
 
 
 // ============================================================================
 // G10: Lazy-loaded HTML files have server functions
 // ============================================================================
+// Reason: Lazy-loaded tabs call server functions to get HTML content.
+// If the server function doesn't exist, the tab shows "Failed to load".
+
 describe('G10: Lazy-loaded views have matching server functions', () => {
   const indexCode = fs.readFileSync(path.join(SRC_DIR, 'index.html'), 'utf8');
 
@@ -597,25 +612,27 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 });
 
 
+// G11: poms_reference.html — removed from SolidBase (org-specific feature)
 
 
 // ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: Private Apps Script ID (18hHHX...) must never appear in source files.
+// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
+// files in the public SolidBase repo.
 
 describe('G12: No sensitive ID leaks', () => {
-  const PRIVATE_SCRIPT_ID_PREFIX = '18hHHX';
+  const DDS_SCRIPT_ID_PREFIX = '18hHHX';
   const srcFiles = fs.readdirSync(SRC_DIR);
 
-  // AI_REFERENCE.md legitimately contains Script IDs;
-  // the private ID is redacted so this guard still protects.
+  // AI_REFERENCE.md legitimately contains Script IDs in the private DDS repo;
+  // in public SolidBase the ID is redacted so this guard still protects there.
   const G12_EXCLUDES = ['AI_REFERENCE.md'];
 
   srcFiles.filter(f => !G12_EXCLUDES.includes(f)).forEach(file => {
-    test(`src/${file} does not contain private Script ID`, () => {
+    test(`src/${file} does not contain DDS Script ID`, () => {
       const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
-      expect(code).not.toContain(PRIVATE_SCRIPT_ID_PREFIX);
+      expect(code).not.toContain(DDS_SCRIPT_ID_PREFIX);
     });
   });
 });
@@ -674,6 +691,8 @@ describe('G13: Module load order is safe', () => {
   });
 });
 
+
+// G14: WorkloadService — removed from SolidBase (org-specific feature)
 
 // ============================================================================
 // G15: IDLE LOGOUT MODULE

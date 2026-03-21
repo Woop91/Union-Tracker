@@ -98,6 +98,11 @@ describe('doGet', () => {
     expect(output).toBeDefined();
   });
 
+  test('routes workload page when page=workload', () => {
+    const output = doGet({ parameter: { page: 'workload' } });
+    expect(output).toBeDefined();
+  });
+
   test('catches errors and returns fallback page', () => {
     // Force an error
     ConfigReader.getConfig = jest.fn(() => { throw new Error('config broken'); });
@@ -196,6 +201,8 @@ describe('_serveDashboard', () => {
     expect(() => _serveDashboard(ConfigReader.getConfig(), user, 'steward', 'tok456')).not.toThrow();
   });
 });
+
+// _serveWorkloadPortal removed in v4.20.0 — workload tracker integrated into SPA
 
 // ============================================================================
 // v4.31.0 — H8: _sanitizeConfig strips raw resource IDs

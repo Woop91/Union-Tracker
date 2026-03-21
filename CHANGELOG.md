@@ -36,7 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [4.30.2] - 2026-03-17
 
 ### Fixed
-- **Mobile: Horizontal wiggle** — Replaced FAB `100vw` calc with simple `right: 16px`; added `overflow-x: auto` to `.sub-tabs` so Union Stats sub-tab bars scroll horizontally instead of overflowing the viewport on narrow screens.
+- **Mobile: Horizontal wiggle** — Replaced FAB `100vw` calc with simple `right: 16px`; added `overflow-x: auto` to `.sub-tabs` so Union Stats and Workload sub-tab bars scroll horizontally instead of overflowing the viewport on narrow screens.
+- **Workload Tracker: Failed to open** — Added try-catch and `CURRENT_USER` null guard inside `renderWorkloadTracker()` so errors display inline instead of throwing an alert via the More menu catch handler.
 - **Org Chart: Cells not expanding** — `initDesktop()` was bound to `DOMContentLoaded` which never fires when org chart HTML is injected via `innerHTML` + script re-execution. Now calls `initDesktop()` immediately when `document.readyState` is not `loading`, plus a safety-net call from `renderOrgChart()`.
 
 ### Changed
@@ -153,6 +154,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Union Stats auth mismatch** — Grievances and Hot Spots sub-tabs were silently broken for non-steward members; created `dataGetMemberGrievanceStats` / `dataGetMemberGrievanceHotSpots` endpoints using `_resolveCallerEmail` (any authenticated member)
 - **Engagement KPI** — hidden Resource Downloads card when value is 0 (not currently tracked)
 - **Redundant sheet read** — `dataGetEngagementStats` no longer re-reads Member Directory for membership trends
+- **showLoading** — workload sub-tab now uses `showLoading(container, 'kpi')` for consistent skeleton
+- **Workload Tracker: crash-safe reporting refresh** — `_refreshReportingData()` now writes new data first, then clears stale rows (previously cleared all content before writing, risking empty sheet on timeout)
+- **Workload Tracker: atomic rate limiting** — `_checkAndRecordRateLimit()` replaces separate check+record functions, eliminating race condition where concurrent submissions could both pass the limit check
+- **Workload Tracker: bar chart dynamic scaling** — Stats tab category averages bar chart now scales to the actual data max instead of hardcoded 100 (values over 100 previously all showed 100% bars)
+- **Workload Tracker: sub-category label display** — History and Stats tabs now show human-readable labels (e.g., "Priority Cases") instead of raw keys (e.g., "priority") via `WT_CAT_KEY_LABELS` lookup
 
 ### Added
 - **Server-side dues-paying gate** on `wqGetActiveQuestions`, `wqSubmitResponse`, `wqSubmitPoolQuestion` — non-paying members blocked server-side (previously client-only)
@@ -162,6 +168,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Membership sub-tab enriched** — now renders Total Members & New (Last 90 Days) KPIs, By Unit chart, By Dues Status doughnut, and New Hires by Month bar chart (previously only showed By Location)
 - **Client-side caching** — Union Stats page mirrors steward Insights caching pattern (`AppState.unionStatsCache`, 5-min TTL); revisiting sub-tabs serves cached data instantly
 - **Monthly resolved trend** — grievance trend chart now shows both Filed and Resolved lines
+- **Workload Tracker: auto-save draft** — Form data is persisted to localStorage on every input change (400ms debounce) and restored on page reload; cleared on successful submission
+- **Workload Tracker: last submitted indicator** — Shows "Last submitted: [date]" banner at top of Submit tab, stored in localStorage
+- **Tests: 44 new workload tests** — Expanded from 19 to 63 tests covering rate limiting (atomic, per-email, case-insensitive), history shape/filtering/sorting, sub-category JSON parsing, CSV export, structural invariants
+- **Tests: G14 deploy guard** — Source-level checks ensuring crash-safe refresh pattern and atomic rate limiting are maintained
+- **Tests: G18 SPA integrity** — 10 frontend invariant tests: WT_CAT_KEY_LABELS definition, bar chart dynamic max, auto-save/draft/restore functions, last-submitted indicator, category alignment
 
 ### Changed
 - Frequency button active-state update uses class toggle instead of re-applying inline styles
@@ -187,7 +198,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `cleanVault()` — `console.error` → `Logger.log`; write-failure recovery after `clearContents()`
   - QA Forum `submitQuestion()` / `submitAnswer()` — notification calls wrapped in try/catch (prevents silent swallow)
   - `doGetWebDashboard()` — config loaded once at top of function (eliminates redundant `ConfigReader.getConfig()` in error path)
-  - Org chart script re-execution wrapped in per-script try/catch
+  - Org chart / POMS script re-execution wrapped in per-script try/catch
   - PropertiesService quota monitoring in `cleanupExpiredTokens()` (warns at 400KB/500KB)
 
 ## [4.27.2] - 2026-03-14
@@ -199,7 +210,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `dataGetFullProfile()` — returns `{success:false}` instead of raw `null` when member not found; prevents client-side crashes
   - `sendBroadcastMessage()` — added outer try/catch; prevents unhandled throws from member lookup or config reads
   - `_serveAuth()` / `_serveDashboard()` — `getUrl()` wrapped in null-safe helper; prevents `null` webAppUrl in page data
-  - `getOrgChartHtml()` — wrapped in try/catch with graceful fallback HTML
+  - `getOrgChartHtml()` / `getPOMSReferenceHtml()` — wrapped in try/catch with graceful fallback HTML
   - `_getMemberBatchData()` / `_getStewardBatchData()` — all sub-calls individually wrapped; one failing section no longer takes down the entire batch
 
 ## [4.27.1] - 2026-03-13
@@ -226,6 +237,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - TestRunner controls card contrast — accent border, card background, stronger shadow for high visibility
+- Workload Archive sheet now detected by System Diagnostics (removed from skipKeys in DIAGNOSE_SETUP)
+- Repair Dashboard creates missing Workload Archive via existing setupHiddenSheets() path
 
 ### Changed
 - Removed deprecated "Case Analytics" menu item (called deprecated showInteractiveDashboardTab → showStewardDashboard)
@@ -254,6 +267,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `newMembersLast90` and `byHireMonth` in `getMembershipStats()` — enables new hire trend tracking
 - "OVERDUE CASES" insight card with due-this-week sub-text
 - "NEW MEMBERS" insight card (last 90 days) with monthly hire trend drill-down
+- Overtime average and employment mix (FT/PT ratio) cards in Workload Insights
 - Hash-based navigation for Insights detail views — browser back button returns to detail panel
 - `scrollIntoView` on insight detail open for mobile UX
 - Tests: `withdrawnCount` in grievance stats return shape contract, `getMembershipStats` return shape tests
@@ -286,6 +300,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `configrd_` — ConfigReader module completeness, validation, JSON output, drive/auth fields
   - `portal_` — PortalSheets 0-indexed column constants validation, no duplicate indices, setup functions
   - `weeklyq_` — WeeklyQuestions module API, Q_COLS exposure, poll frequency/pool count reads
+  - `workload_` — WorkloadService module, SUB_CATEGORIES/CATEGORY_LABELS exposure, sub-categories read
   - `qaforum_` — QAForum module API, question retrieval, pagination defaults, flagged content gating
   - `timeline_` — TimelineService module, event retrieval, category validation, write auth gating
   - `failsafe_` — FailsafeService module, digest config shape, diagnostic/ensureAllSheets existence
@@ -308,6 +323,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - `diagnoseWebApp()` — 14-step diagnostic function in `22_WebDashApp.gs` for debugging app loading issues (checks deployment, permissions, doGet, view rendering, config, auth)
 - `memberId` included in profile data (`21_WebDashDataService.gs`)
+- Workload sheet diagnostics in `28_FailsafeService.gs`
 
 ### Changed
 - **Parallel view rendering** in `index.html` — steward and member views now load concurrently for faster startup

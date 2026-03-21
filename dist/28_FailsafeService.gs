@@ -7,7 +7,7 @@
  *   Data resilience system with scheduled email digests and Google Drive CSV
  *   backups. Members can opt into periodic email digests of their grievance/
  *   task data. Automatic weekly Drive backups export key sheets as
- *   CSV files to a DDS_Dashboard_Backups folder. Maintains maximum 52 backup
+ *   CSV files to a SolidBase_Backups folder. Maintains maximum 52 backup
  *   files (~1 year of weekly backups per sheet).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -35,7 +35,7 @@
 
 var FailsafeService = (function () {
 
-  var BACKUP_FOLDER_NAME = 'DDS_Dashboard_Backups';
+  var BACKUP_FOLDER_NAME = 'SolidBase_Backups';
   var MAX_BACKUP_FILES = 52; // ~1 year of weekly backups per sheet
 
   // ═══════════════════════════════════════
@@ -52,9 +52,9 @@ var FailsafeService = (function () {
     var sheet = ss.getSheetByName(SHEETS.FAILSAFE_CONFIG);
     if (!sheet) {
       sheet = ss.insertSheet(SHEETS.FAILSAFE_CONFIG);
-      sheet.getRange(1, 1, 1, 6).setValues([[
+      sheet.getRange(1, 1, 1, 7).setValues([[
         'Email', 'Digest Enabled', 'Digest Frequency', 'Last Digest Sent',
-        'Include Grievances', 'Include Tasks'
+        'Include Grievances', 'Include Workload', 'Include Tasks'
       ]]);
       // GAS-02: Use very-hidden so users cannot unhide PII-containing system sheets via menu
       if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(sheet); else sheet.hideSheet();
@@ -103,10 +103,10 @@ var FailsafeService = (function () {
   function getDigestConfig(email) {
     if (!email) return null;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) return { enabled: false, frequency: 'weekly', includeGrievances: true, includeTasks: true };
+    if (!ss) return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
     var sheet = ss.getSheetByName(SHEETS.FAILSAFE_CONFIG);
     if (!sheet || sheet.getLastRow() <= 1) {
-      return { enabled: false, frequency: 'weekly', includeGrievances: true, includeTasks: true };
+      return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
     }
 
     var data = _getCachedSheetData(SHEETS.FAILSAFE_CONFIG, 120) || sheet.getDataRange().getValues();
@@ -118,11 +118,12 @@ var FailsafeService = (function () {
           frequency: String(data[i][2] || 'weekly').toLowerCase(),
           lastSent: data[i][3] instanceof Date ? _fmtDate(data[i][3]) : '',
           includeGrievances: data[i][4] !== false && data[i][4] !== 'FALSE',
-          includeTasks: data[i][5] !== false && data[i][5] !== 'FALSE'
+          includeWorkload: data[i][5] !== false && data[i][5] !== 'FALSE',
+          includeTasks: data[i][6] !== false && data[i][6] !== 'FALSE'
         };
       }
     }
-    return { enabled: false, frequency: 'weekly', includeGrievances: true, includeTasks: true };
+    return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
   }
 
   /**
@@ -153,13 +154,14 @@ var FailsafeService = (function () {
             sheet.getRange(i + 1, 2).setValue(config.enabled ? true : false);
             sheet.getRange(i + 1, 3).setValue(frequency);
             sheet.getRange(i + 1, 5).setValue(config.includeGrievances !== false);
-            sheet.getRange(i + 1, 6).setValue(config.includeTasks !== false);
+            sheet.getRange(i + 1, 6).setValue(config.includeWorkload !== false);
+            sheet.getRange(i + 1, 7).setValue(config.includeTasks !== false);
             return { success: true, message: 'Digest settings updated.' };
           }
         }
       }
       // New row
-      sheet.appendRow([eml, config.enabled ? true : false, frequency, '', config.includeGrievances !== false, config.includeTasks !== false]);
+      sheet.appendRow([eml, config.enabled ? true : false, frequency, '', config.includeGrievances !== false, config.includeWorkload !== false, config.includeTasks !== false]);
       return { success: true, message: 'Digest settings saved.' };
     } finally {
       lock.releaseLock();
@@ -211,7 +213,8 @@ var FailsafeService = (function () {
       try {
         var config = {
           includeGrievances: data[i][4] !== false && data[i][4] !== 'FALSE',
-          includeTasks: data[i][5] !== false && data[i][5] !== 'FALSE'
+          includeWorkload: data[i][5] !== false && data[i][5] !== 'FALSE',
+          includeTasks: data[i][6] !== false && data[i][6] !== 'FALSE'
         };
         var body = _composeMemberDigest(email, config);
         if (body) {
@@ -250,9 +253,9 @@ var FailsafeService = (function () {
   }
 
   /**
-   * Composes an HTML email body summarizing a member's grievances and tasks.
+   * Composes an HTML email body summarizing a member's grievances, workload, and tasks.
    * @param {string} email - Member's email address.
-   * @param {Object} config - Include flags (includeGrievances, includeTasks).
+   * @param {Object} config - Include flags (includeGrievances, includeWorkload, includeTasks).
    * @returns {string|null} HTML string, or null if no data sections were generated.
    */
   function _composeMemberDigest(email, config) {
@@ -274,6 +277,8 @@ var FailsafeService = (function () {
         }
       } catch (e) { Logger.log('Digest grievance error: ' + e.message); }
     }
+
+    // Workload — removed from SolidBase (org-specific feature)
 
     // Tasks
     if (config.includeTasks && typeof DataService !== 'undefined') {
@@ -336,7 +341,7 @@ var FailsafeService = (function () {
       if (remaining < 5) break;
 
       try {
-        var config = { includeGrievances: true, includeTasks: true };
+        var config = { includeGrievances: true, includeWorkload: true, includeTasks: true };
         var body = _composeMemberDigest(email, config);
         if (body) {
           MailApp.sendEmail({
@@ -628,7 +633,7 @@ var FailsafeService = (function () {
 function fsGetDigestConfig(sessionToken) {
   // Server-resolved identity: SSO first, then verified session token
   var e = _resolveCallerEmail(sessionToken);
-  if (!e) return { enabled: false, frequency: 'weekly', includeGrievances: true, includeTasks: true };
+  if (!e) return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
   return FailsafeService.getDigestConfig(e);
 }
 

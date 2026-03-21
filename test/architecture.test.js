@@ -713,6 +713,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetMeetingMinutes', 'dataGetStewardDirectory',
     'dataGetCaseChecklist', 'dataGetSatisfactionTrends',
     'dataGetBroadcastFilterOptions', 'dataGetEngagementStats',
+    'dataGetWorkloadSummaryStats',
     'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
     'dataGetGrievanceForSigning', 'dataSubmitGrievanceSignature', // sigToken auth, not session
   ];
@@ -722,6 +723,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'qaInitSheets', 'tlInitSheets', 'fsInitSheets',
     'fsProcessScheduledDigests', 'fsBackupCriticalSheets',
     'fsSetupTriggers', 'fsRemoveTriggers',
+    'wtArchiveOldData', 'wtCleanVault',
   ];
 
   function extractGlobalFunctions(src, prefix) {
@@ -765,6 +767,8 @@ describe('A11: Server-exposed functions have auth checks', () => {
 // ============================================================================
 // A11b: CLIENT-CALLABLE HTML ENDPOINTS HAVE AUTH CHECKS
 // ============================================================================
+// Bug (2026-03-14): getOrgChartHtml() served HTML
+// content without any authentication — any anonymous caller could invoke them.
 // All client-callable functions in 22_WebDashApp.gs that return HTML content
 // must verify Session.getActiveUser().getEmail() before serving.
 
@@ -1122,6 +1126,7 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
   const nonDataServiceWrappers = [
     'dataMarkWelcomeDismissed',        // writes directly to PropertiesService
     'dataGetEngagementStats',          // reads live sheet data directly
+    'dataGetWorkloadSummaryStats',     // reads live sheet data directly
     'dataSendDirectMessage',           // sends email + Drive log directly (calls DataService helpers deeper than 12-line window)
     'dataEnsureSheetsIfNeeded',        // calls _ensureAllSheetsInternal() + PropertiesService directly (fire-and-forget init)
     'dataApplyColorTheme',             // saves theme to UserProperties directly (unified theme system)

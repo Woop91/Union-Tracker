@@ -183,13 +183,13 @@ function createSurveyQuestionsSheet(ss) {
     // ── Section 13: Workforce Mobility & Retention ──────────────────────────
     // Always shown — gauges retention risk and transfer awareness across membership.
     // q82–q83 are conditional (Section 13A) on q81=Yes.
-    ['q80','13','WORKFORCE_RETENTION','Workforce Mobility','How likely are you to still be working at DDS one year from now?','radio','Y','Y','Very Likely|Likely|Uncertain|Unlikely|Very Unlikely','','','','','','',''],
-    ['q81','13','WORKFORCE_RETENTION','Workforce Mobility','Are you currently exploring job opportunities outside of DDS?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 13A (q82, q83)'],
+    ['q80','13','WORKFORCE_RETENTION','Workforce Mobility','How likely are you to still be working at the agency one year from now?','radio','Y','Y','Very Likely|Likely|Uncertain|Unlikely|Very Unlikely','','','','','','',''],
+    ['q81','13','WORKFORCE_RETENTION','Workforce Mobility','Are you currently exploring job opportunities outside of the agency?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 13A (q82, q83)'],
     ['q84','13','WORKFORCE_RETENTION','Workforce Mobility','The union is effectively addressing the workplace factors that most influence members\' decisions to stay or leave.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q86','13','WORKFORCE_RETENTION','Workforce Mobility','What would most encourage you to stay at DDS? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
-    // ── Section 13A: Leaving DDS (Q81=Yes) ──────────────────────────────────
-    ['q82','13A','WORKFORCE_LEAVING','Exploring Outside DDS','What types of opportunities are you exploring outside of DDS? Select all that apply.','checkbox','Y','Y','Transfer to another MA state agency|Leaving state service entirely|Private sector|Non-profit or education|Not sure yet','q81','Yes','','2','','','Max 2 selections. Only shown if Q81=Yes. Outside-DDS options only.'],
-    ['q83','13A','WORKFORCE_LEAVING','Exploring Outside DDS','What are the primary reasons you are considering leaving? Select up to 3.','checkbox','Y','Y','Pay & Benefits|Workload / Caseload|Management & Supervision|Limited Advancement or Transfer Opportunities|Work-Life Balance|Return-to-Office Policy|Job Stress / Burnout|Workplace Culture|Other','q81','Yes','','3','','','Max 3 selections. Q85 transfer awareness folded into \"Limited Advancement or Transfer Opportunities\" option. Only shown if Q81=Yes']
+    ['q86','13','WORKFORCE_RETENTION','Workforce Mobility','What would most encourage you to stay at the agency? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
+    // ── Section 13A: Leaving the agency (Q81=Yes) ──────────────────────────────────
+    ['q82','13A','WORKFORCE_LEAVING','Exploring Outside the Agency','What types of opportunities are you exploring outside of the agency? Select all that apply.','checkbox','Y','Y','Transfer to another MA state agency|Leaving state service entirely|Private sector|Non-profit or education|Not sure yet','q81','Yes','','2','','','Max 2 selections. Only shown if Q81=Yes. Outside-agency options only.'],
+    ['q83','13A','WORKFORCE_LEAVING','Exploring Outside the Agency','What are the primary reasons you are considering leaving? Select up to 3.','checkbox','Y','Y','Pay & Benefits|Workload / Caseload|Management & Supervision|Limited Advancement or Transfer Opportunities|Work-Life Balance|Return-to-Office Policy|Job Stress / Burnout|Workplace Culture|Other','q81','Yes','','3','','','Max 3 selections. Q85 transfer awareness folded into \"Limited Advancement or Transfer Opportunities\" option. Only shown if Q81=Yes']
   ];
 
   // Build set of existing question IDs so we don't overwrite user edits

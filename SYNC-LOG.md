@@ -1,28 +1,21 @@
-# SYNC-LOG.md — SolidBase
+# SolidBase Sync Log
 
-## Purpose
-Tracks sync history for the SolidBase repository.
-
----
-
-## Definitions
-
-### Data Types
-- **System-generated data**: Any data written by code functions (auto-IDs, formulas, computed fields, dashboard KPIs, timestamps). Exception: the import function — its output is treated as manually entered.
-- **Manually entered data**: Anything imported by users via the import function, or typed directly into cells by a user. **Must never be deleted or overwritten by any function.**
-
-### Sync Rules
-- **Single branch policy: `Main` only.**
-- **Excluded from public repo:**
-  - Any credentials, tokens, or secrets
-
----
+## Sync Policy
+- **Source of truth:** DDS-Dashboard Main
+- **Target:** SolidBase Main
+- **Exclusions from SolidBase:**
+  - DDS Apps Script ID (redacted)
+  - `25_WorkloadService.gs` + `poms_reference.html` (org-specific features)
+  - `25_WorkloadService.test.js`, `scripts/sync-org-chart.js`
+  - Org-specific references (DDS, MassAbility, SEIU 509) replaced with generic equivalents
+  - `UI_REVIEW.md`, `docs/archived-reviews/` audit docs (DDS-only)
+- **SolidBase-specific branding:** "SolidBase — Built for the collective."
 
 ## Sync History
 
-| Date | Agent | Commit | Files Synced | Notes |
-|------|-------|--------|-------------|-------|
-| 2026-02-25 | Claude (claude.ai) | — | SYNC-LOG.md, AI-REFERENCE.md | Initial setup files |
-| 2026-02-28 | Claude (claude-code) | `b119401` | 102 files (40 .gs, 8 .html, tests, build) | Full sync: Batches 1-10 code review fixes |
-| 2026-03-02 | Claude (claude-code) | `d675259` | 22 files (10 src + 11 dist + CHANGELOG.md + package.json) | v4.19.0 sync: QA bug fixes & resilience |
-| 2026-03-07 | Claude (claude-code) | `609edc9` | 42 .gs + 7 .html (full parity) | v4.24.4 full sync: Q&A Forum, Timeline, dynamic surveys, auth sweep |
+### 2026-03-21 — Full sync from DDS v4.33.0
+- Source: DDS-Dashboard `e172d7c` (Main)
+- Scope: All src/, test/, docs/, scripts/, root configs
+- Changes: Full file copy, org reference scrub, POMS + Workload Tracker feature removal
+- Files synced: 50+ src, 55+ test, 25+ docs
+- Excluded: 25_WorkloadService.gs, poms_reference.html, sync-org-chart.js

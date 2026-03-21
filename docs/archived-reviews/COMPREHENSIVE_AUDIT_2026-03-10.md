@@ -1,4 +1,4 @@
-# Comprehensive Code Audit Report
+# SolidBase — Comprehensive Code Audit Report
 # Date: 2026-03-10 | Version Audited: v4.25.7 | Auditor: Claude Opus 4.6
 
 ---
@@ -56,7 +56,7 @@ All 1,380 top-level functions have unique names across the entire GS codebase. Z
 - Server-side `escapeHtml()`, `sanitizeObjectForHtml()`, `escapeForFormula()` all present
 
 ### 1.7 Script ID Security — ✅ CLEAN
-Private Apps Script ID (`18hHHX-...`) does not appear anywhere in the source files. Safe for Union-Tracker sync.
+DDS Apps Script ID does not appear anywhere in the source files. Safe for SolidBase.
 
 ### 1.8 Config-Driven Architecture — ✅ MOSTLY DYNAMIC
 Column identification by header name via `resolveColumnsFromSheet_()`. Sheet names from Config tab. Dropdowns from Config tab. Org name from Config tab (fixed in v4.20.13).
@@ -142,8 +142,8 @@ var data = sheet.getDataRange().getValues();
 | `21_WebDashDataService.gs` | 575 | `'Member Directory'` (fallback) | Remove fallback |
 | `21_WebDashDataService.gs` | 1525 | `'Contact Log'` | Should reference a constant |
 | `21_WebDashDataService.gs` | 3000 | `'Contact Log'` | Same |
-| `10b_SurveyDocSheets.gs` | 1992 | `'system@example.org'` | `getConfigValue_(CONFIG_COLS.MAIN_CONTACT_EMAIL)` |
-| `10b_SurveyDocSheets.gs` | 2007 | `'system@example.org'` | Same |
+| `10b_SurveyDocSheets.gs` | 1992 | `'system@massability.org'` | `getConfigValue_(CONFIG_COLS.MAIN_CONTACT_EMAIL)` |
+| `10b_SurveyDocSheets.gs` | 2007 | `'system@massability.org'` | Same |
 
 ### 3.2 Test Coverage Gaps — 14 Files Untested (14,853 lines)
 
@@ -192,7 +192,7 @@ The codebase mixes `var` (traditional GAS) with `const`/`let` (V8 runtime). This
 The `withErrorHandling()` wrapper function at `01_Core.gs:60` was designed to wrap any function with standardized error handling, but is never called anywhere in the codebase. This means individual try-catch blocks are used everywhere instead of a centralized pattern — leading to inconsistent error handling.
 
 ### 3.6 Workload Tracker typeof Guards — Only 4 Found
-Per SYNC-LOG.md, three files need `typeof` guards for Workload Tracker's absence in Union-Tracker. Only 4 guards found across the codebase — need to verify all necessary call sites are covered.
+Per SYNC-LOG.md, three files need `typeof` guards for Workload Tracker's absence in SolidBase. Only 4 guards found across the codebase -- need to verify all necessary call sites are covered.
 
 ---
 
@@ -205,7 +205,7 @@ Per SYNC-LOG.md, three files need `typeof` guards for Workload Tracker's absence
 `emitDataChanged`, `emitEditEvent`, `emitFormEvent`, `emitSyncComplete` in `15_EventBus.gs` are all defined but never called. The Event Bus appears to be scaffolded but not integrated into the data mutation pipeline.
 
 ### 4.3 Hardcoded Org References in DevTools
-`07_DevTools.gs` contains org-specific test emails — acceptable since DevTools is excluded from production builds.
+`07_DevTools.gs` contains org-specific emails -- acceptable since DevTools is excluded from production builds.
 
 ### 4.4 getLastRow() Without Empty-Sheet Safety
 Several `getLastRow()` calls could return 0 on empty sheets, causing `getRange(2, 1, 0, ...)` which throws. Should use `Math.max(sheet.getLastRow() - 1, 0)`.
@@ -311,7 +311,7 @@ History: getWorkloadHistorySSO() → filter by user → return
 Reminder: setWorkloadReminderSSO() / getWorkloadReminderSSO() → manage prefs
 Export: exportWorkloadHistoryCSV() → build CSV → return download
 ```
-**Status:** ✅ Complete and wired (excluded from Union-Tracker per SYNC-LOG.md)
+**Status:** Complete and wired (excluded from SolidBase per SYNC-LOG.md)
 
 ### 5.10 Failsafe / Data Protection
 ```
@@ -372,7 +372,7 @@ All buttons in `steward_view.html` use the `el()` DOM builder with `onclick` eve
 ### P0 — Fix Before Next Deploy
 1. **Add null guards** to all 32 `getSheetByName` calls without them
 2. **Add `withScriptLock_`** to the 5 unprotected data-write functions
-3. **Replace hardcoded system email** with config value (2 locations)
+3. **Replace hardcoded `system@massability.org`** with config value (2 locations)
 4. **Replace hardcoded `'_Archive_Grievances'`** with a SHEETS constant
 
 ### P1 — Fix This Sprint

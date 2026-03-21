@@ -140,13 +140,14 @@ describe('FailsafeService.getDigestConfig', () => {
     expect(result.enabled).toBe(false);
     expect(result.frequency).toBe('weekly');
     expect(result.includeGrievances).toBe(true);
+    expect(result.includeWorkload).toBe(true);
     expect(result.includeTasks).toBe(true);
   });
 
   test('returns stored config for known email', () => {
     var lastSent = new Date('2026-02-20T00:00:00');
     var sheet = buildFailsafeSheet([
-      ['admin@test.com', true, 'monthly', lastSent, true, true]
+      ['admin@test.com', true, 'monthly', lastSent, true, false, true]
     ]);
     installSS([sheet]);
 
@@ -154,6 +155,7 @@ describe('FailsafeService.getDigestConfig', () => {
     expect(result.enabled).toBe(true);
     expect(result.frequency).toBe('monthly');
     expect(result.includeGrievances).toBe(true);
+    expect(result.includeWorkload).toBe(false);
     expect(result.includeTasks).toBe(true);
     expect(result.lastSent).toBeTruthy();
   });
@@ -171,13 +173,14 @@ describe('FailsafeService.getDigestConfig', () => {
 
   test('handles boolean/string TRUE values', () => {
     var sheet = buildFailsafeSheet([
-      ['user@test.com', 'TRUE', 'weekly', '', 'TRUE', true]
+      ['user@test.com', 'TRUE', 'weekly', '', 'TRUE', 'FALSE', true]
     ]);
     installSS([sheet]);
 
     var result = FailsafeService.getDigestConfig('user@test.com');
     expect(result.enabled).toBe(true);
     expect(result.includeGrievances).toBe(true);
+    expect(result.includeWorkload).toBe(false);
     expect(result.includeTasks).toBe(true);
   });
 });
@@ -396,7 +399,7 @@ describe('FailsafeService.backupCriticalSheets', () => {
     installSS([memberSheet]);
 
     FailsafeService.backupCriticalSheets();
-    expect(DriveApp.createFolder).toHaveBeenCalledWith('DDS_Dashboard_Backups');
+    expect(DriveApp.createFolder).toHaveBeenCalledWith('SolidBase_Backups');
   });
 
   test('backs up sheets to CSV files', () => {
@@ -463,7 +466,7 @@ describe('FailsafeService.backupCriticalSheets', () => {
 
     var result = FailsafeService.backupCriticalSheets();
     expect(result).toHaveProperty('backedUp');
-    expect(result).toHaveProperty('folderName', 'DDS_Dashboard_Backups');
+    expect(result).toHaveProperty('folderName', 'SolidBase_Backups');
     expect(result.success).toBe(true);
   });
 });

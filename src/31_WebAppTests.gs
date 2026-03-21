@@ -7,7 +7,7 @@
  *   GAS-native web app test suites — comprehensive coverage of all SPA
  *   modules. 9 test suites: webapp (doGet routing), configrd (ConfigReader),
  *   portal (PortalSheets 0-indexed validation), weeklyq (WeeklyQuestions
- *   API), workload (WorkloadService), qaforum (QAForum), timeline
+ *   API), qaforum (QAForum), timeline
  *   (TimelineService), failsafe (FailsafeService), endpoints (all
  *   data, wq, qa, tl, fs wrapper functions exist and enforce auth).
  *
@@ -65,28 +65,6 @@ function test_webapp_getWebAppUrlReturnsString() {
 /** Tests webapp: org chart html exists. */
 function test_webapp_orgChartHtmlExists() {
   TestRunner.assertEquals('function', typeof getOrgChartHtml, 'getOrgChartHtml exists');
-}
-
-/** Tests webapp: poms reference html exists. */
-function test_webapp_pomsReferenceHtmlExists() {
-  TestRunner.assertEquals('function', typeof getPOMSReferenceHtml, 'getPOMSReferenceHtml exists');
-}
-
-/** Tests webapp: poms reference html returns content. */
-function test_webapp_pomsReferenceHtmlReturnsContent() {
-  // getPOMSReferenceHtml should return HTML content (not an error fallback)
-  try {
-    var html = getPOMSReferenceHtml();
-    TestRunner.assertNotNull(html, 'getPOMSReferenceHtml returns non-null');
-    TestRunner.assertTrue(typeof html === 'string', 'getPOMSReferenceHtml returns string');
-    TestRunner.assertGreaterThan(html.length, 100, 'getPOMSReferenceHtml returns substantial content');
-    // Should contain the POMS root element
-    TestRunner.assertTrue(html.indexOf('poms-root') > -1, 'getPOMSReferenceHtml contains poms-root element');
-    // Should NOT be the auth-failure fallback
-    TestRunner.assertTrue(html.indexOf('Authentication required') === -1, 'getPOMSReferenceHtml did not return auth error');
-  } catch (e) {
-    TestRunner.assertTrue(false, 'getPOMSReferenceHtml threw: ' + e.message);
-  }
 }
 
 /** Tests webapp: org chart html returns content. */
@@ -445,93 +423,6 @@ function test_weeklyq_wrappersRejectNullToken() {
 /** Tests weeklyq: auto select exists. */
 function test_weeklyq_autoSelectExists() {
   TestRunner.assertEquals('function', typeof autoSelectCommunityPoll, 'autoSelectCommunityPoll trigger handler exists');
-}
-
-/* ========================================================================
- * WORKLOAD SUITE — WorkloadService module, categories, health
- * ======================================================================== */
-
-function test_workload_moduleExists() {
-  TestRunner.assertNotNull(WorkloadService, 'WorkloadService module');
-  TestRunner.assertType(WorkloadService, 'object', 'WorkloadService is object');
-}
-
-/** Tests workload: public API complete. */
-function test_workload_publicAPIComplete() {
-  var expected = [
-    'initSheets', 'processFormSSO', 'getHistorySSO',
-    'getDashboardDataSSO', 'getReminderSSO', 'setReminderSSO',
-    'exportHistoryCSV', 'getSubCategories', 'processReminders',
-    'getHealthStatus', 'refreshLedger'
-  ];
-  for (var i = 0; i < expected.length; i++) {
-    TestRunner.assertType(WorkloadService[expected[i]], 'function',
-      'WorkloadService.' + expected[i]);
-  }
-}
-
-/** Tests workload: sub categories exposed. */
-function test_workload_subCategoriesExposed() {
-  TestRunner.assertNotNull(WorkloadService.SUB_CATEGORIES, 'SUB_CATEGORIES');
-  TestRunner.assertType(WorkloadService.SUB_CATEGORIES, 'object', 'SUB_CATEGORIES is object');
-  // Verify known category keys
-  var keys = ['priority', 'pending', 'unread', 'todo', 'referrals', 'ce', 'assistance', 'aged'];
-  for (var i = 0; i < keys.length; i++) {
-    TestRunner.assertHasKey(WorkloadService.SUB_CATEGORIES, keys[i],
-      'SUB_CATEGORIES.' + keys[i]);
-    TestRunner.assertTrue(Array.isArray(WorkloadService.SUB_CATEGORIES[keys[i]]),
-      keys[i] + ' is array');
-  }
-}
-
-/** Tests workload: category labels exposed. */
-function test_workload_categoryLabelsExposed() {
-  TestRunner.assertNotNull(WorkloadService.CATEGORY_LABELS, 'CATEGORY_LABELS');
-  TestRunner.assertType(WorkloadService.CATEGORY_LABELS, 'object', 'CATEGORY_LABELS is object');
-  // Should have t1-t8 mappings
-  for (var t = 1; t <= 8; t++) {
-    TestRunner.assertHasKey(WorkloadService.CATEGORY_LABELS, 't' + t,
-      'CATEGORY_LABELS.t' + t);
-  }
-}
-
-/** Tests workload: get sub categories callable. */
-function test_workload_getSubCategoriesCallable() {
-  var cats = WorkloadService.getSubCategories();
-  TestRunner.assertNotNull(cats, 'getSubCategories returns value');
-  TestRunner.assertType(cats, 'object', 'returns object');
-  TestRunner.assertHasKey(cats, 'priority', 'has priority key');
-}
-
-/** Tests workload: global wrappers exist. */
-function test_workload_globalWrappersExist() {
-  var wrappers = [
-    'processWorkloadFormSSO', 'getWorkloadHistorySSO', 'getWorkloadDashboardDataSSO',
-    'getWorkloadReminderSSO', 'setWorkloadReminderSSO', 'exportWorkloadHistoryCSV',
-    'getWorkloadSubCategories'
-  ];
-  for (var i = 0; i < wrappers.length; i++) {
-    TestRunner.assertEquals('function', typeof this[wrappers[i]],
-      wrappers[i] + ' exists');
-  }
-}
-
-/** Tests workload: trigger handlers exist. */
-function test_workload_triggerHandlersExist() {
-  TestRunner.assertEquals('function', typeof initWorkloadTrackerSheets, 'initWorkloadTrackerSheets');
-  TestRunner.assertEquals('function', typeof processWorkloadReminders, 'processWorkloadReminders');
-  TestRunner.assertEquals('function', typeof refreshWorkloadLedger, 'refreshWorkloadLedger');
-}
-
-/** Tests workload: wrappers reject null token. */
-function test_workload_wrappersRejectNullToken() {
-  try {
-    var result = getWorkloadHistorySSO(null);
-    // Should return empty/null for null token
-    if (Array.isArray(result)) {
-      TestRunner.assertEquals(0, result.length, 'getWorkloadHistorySSO(null) returns empty array');
-    }
-  } catch (_e) { /* throwing is acceptable */ }
 }
 
 /* ========================================================================
