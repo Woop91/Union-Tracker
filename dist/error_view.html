@@ -1,40 +1,37 @@
 <script>
-/**
- * Error View
- * Shows when auth fails, user not found, or something breaks
- */
+
 function renderError(container, error) {
-  // Apply user's saved theme (isDark, navTheme, activeRole all from localStorage via AppState)
-  if (typeof UnifiedTheme !== 'undefined' && typeof AppState !== 'undefined') {
-    UnifiedTheme.apply();
-  } else if (typeof ThemeEngine !== 'undefined') {
-    ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
+ // Apply user's saved theme (isDark, navTheme, activeRole all from localStorage via AppState)
+ if (typeof UnifiedTheme !== 'undefined' && typeof AppState !== 'undefined') {
+ UnifiedTheme.apply();
+ } else if (typeof ThemeEngine !== 'undefined') {
+ ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
+ }
+
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'error-container fade-in' });
+
+ var icons = { not_found: '\u{1F50D}', expired: '\u23F3', error: '\u26A0\uFE0F' };
+ wrapper.appendChild(el('div', { className: 'error-icon' }, icons[error.type] || '\u26A0\uFE0F'));
+
+ var titles = { not_found: 'Not Found', expired: 'Link Expired', error: 'Something Went Wrong' };
+ wrapper.appendChild(el('div', { className: 'error-title' }, titles[error.type] || 'Error'));
+ wrapper.appendChild(el('div', { className: 'error-message' }, error.message));
+
+ var retryLabel = (error.type === 'not_found' || error.type === 'expired') ? 'Back to Sign In' : 'Try Again';
+ wrapper.appendChild(el('button', {
+ className: 'btn btn-primary',
+ style: { marginTop: '24px', maxWidth: '280px' },
+ onClick: function() {
+  if (error.type === 'not_found' || error.type === 'expired') {
+  
+  renderAuth(document.getElementById('app'));
+  } else {
+  window.location.reload();
   }
+ }
+ }, retryLabel));
 
-  container.innerHTML = '';
-  var wrapper = el('div', { className: 'error-container fade-in' });
-
-  var icons = { not_found: '\u{1F50D}', expired: '\u23F3', error: '\u26A0\uFE0F' };
-  wrapper.appendChild(el('div', { className: 'error-icon' }, icons[error.type] || '\u26A0\uFE0F'));
-
-  var titles = { not_found: 'Not Found', expired: 'Link Expired', error: 'Something Went Wrong' };
-  wrapper.appendChild(el('div', { className: 'error-title' }, titles[error.type] || 'Error'));
-  wrapper.appendChild(el('div', { className: 'error-message' }, error.message));
-
-  var retryLabel = (error.type === 'not_found' || error.type === 'expired') ? 'Back to Sign In' : 'Try Again';
-  wrapper.appendChild(el('button', {
-    className: 'btn btn-primary',
-    style: { marginTop: '24px', maxWidth: '280px' },
-    onClick: function() {
-      if (error.type === 'not_found' || error.type === 'expired') {
-        // Re-render the auth screen client-side — no server round-trip needed
-        renderAuth(document.getElementById('app'));
-      } else {
-        window.location.reload();
-      }
-    }
-  }, retryLabel));
-
-  container.appendChild(wrapper);
+ container.appendChild(wrapper);
 }
 </script>
