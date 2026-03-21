@@ -306,3 +306,111 @@ have been archived to `docs/AI_REFERENCE_ARCHIVE.md`. Refer there for past devel
 | `'adhdSettings'` (prop key) | `'comfortViewSettings'` |
 
 **DATA MIGRATION NOTE:** Any existing users who had `adhdSettings` stored in PropertiesService will lose their saved Comfort View preferences on next load. They will fall back to `getDefaultComfortViewSettings_()`. This is acceptable one-time cost — defaults are safe.
+
+---
+
+## DEFERRED FEATURE — Grievance Module Toggle (2026-03-21)
+
+**Status:** NOT IMPLEMENTED — documented for future build. No code has been changed.
+
+**Purpose:** Allow the grievance module to be toggled on/off via the Config tab without touching code. Useful for orgs that use SolidBase but do not have a grievance tracking workflow.
+
+**Precedent:** Follows the exact same pattern as `ENABLE_CORRELATION` (`17_CorrelationEngine.gs` + `CONFIG_HEADER_MAP_`).
+
+---
+
+### Config Change
+
+**File:** `src/01_Core.gs`
+**Location:** End of `CONFIG_HEADER_MAP_` array, after `AUDIT_ARCHIVE_DAYS` entry.
+**What to add:**
+```js
+// ENABLE_GRIEVANCES: set to 'no' to hide all grievance features from the SPA.
+// Default blank or 'yes' = enabled (fully backward-compatible).
+{ key: 'ENABLE_GRIEVANCES', header: 'Enable Grievances' }
+```
+
+---
+
+### ConfigReader Change
+
+**File:** `src/20_WebDashConfigReader.gs`
+**Location:** Inside `getConfig()`, in the `config = { ... }` object.
+**What to add:**
+```js
+enableGrievances: _readRow(CONFIG_COLS.ENABLE_GRIEVANCES) !== 'no',
+```
+**Why:** Exposes flag to the SPA client as a boolean. Blank or `'yes'` → `true`. Only explicit `'no'` disables it.
+
+---
+
+### SPA Sidebar — `index.html`
+
+**File:** `src/index.html`
+**Location:** `_getSidebarTabs(role)` function (~line 2027).
+**Steward tabs to gate:** `cases` and `newgrievance`
+**Member tabs to gate:** `cases`
+**What to add:**
+```js
+// Steward list — wrap cases + newgrievance:
+...(CONFIG.enableGrievances ? [
+  { id: 'cases',        icon: '📋', label: 'Cases' },
+  { id: 'newgrievance', icon: '📝', label: 'New Grievance' },
+] : []),
+
+// Member list — wrap cases:
+...(CONFIG.enableGrievances ? [
+  { id: 'cases', icon: '📋', label: 'My Cases' },
+] : []),
+```
+
+---
+
+### Steward View — `steward_view.html`
+
+Three guards needed:
+
+1. **Grievance stats block** on the home dashboard (~line 228, `dataGetGrievanceStats` call).
+   Wrap with: `if (CONFIG.enableGrievances) { ... }`
+
+2. **"Start Grievance" button** in member profile panel (~line 1254).
+   Wrap with: `if (CONFIG.enableGrievances) { ... }`
+
+3. **"Has Open Case" filter option** in member list search (~line 679 and ~line 800).
+   Wrap with: `if (CONFIG.enableGrievances) { ... }`
+
+---
+
+### Member View — `member_view.html`
+
+Two guards needed:
+
+1. **Active case KPI chip** in the member dashboard KPI strip.
+   Wrap with: `if (CONFIG.enableGrievances) { ... }`
+
+2. **Open grievance badge** on member cards (~`hasOpenGrievance` references).
+   Wrap with: `if (CONFIG.enableGrievances) { ... }`
+
+---
+
+### Server-Side Gate — `21_WebDashDataService.gs`
+
+All `dataGet*Grievance*` and `dataStartGrievance*` / `dataAdvanceGrievance*` wrapper functions should early-return when disabled:
+```js
+if (getConfigValue_(CONFIG_COLS.ENABLE_GRIEVANCES) === 'no') {
+  return { error: 'Grievance module is disabled.' };
+}
+```
+**Note:** Return a soft error object (not a `403` throw) so the SPA can handle gracefully without crashing the page.
+
+---
+
+### Unresolved Questions (must decide before implementing)
+
+1. When `cases` tab is hidden for members — should deep-links to `#cases` redirect to `home`, or show a "not available" message?
+2. Should server-side endpoints return `{ error: '...' }` or `{ grievances: [] }` when disabled? (Soft error vs. empty data)
+
+---
+
+### Version Tag for When Implemented
+Suggest codename: **"Grievance Module Toggle"**, version bump: minor (e.g. `4.33.2` or next available).
