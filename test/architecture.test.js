@@ -59,7 +59,6 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
-  '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
@@ -200,7 +199,7 @@ describe('A1: Build order integrity', () => {
     '17_CorrelationEngine.gs', '19_WebDashAuth.gs',
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
-    '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
+    '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_Migrations.gs', '30_TestRunner.gs',
     '31_WebAppTests.gs', 'DevMenu.gs'
   ];
@@ -457,7 +456,6 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-    '25_WorkloadService.gs',
   ];
 
   webAppFiles.forEach(file => {
@@ -592,7 +590,7 @@ describe('A9: UI tab routes have matching render functions', () => {
   while ((m = returnRouteRegex.exec(indexHtml)) !== null) {
     if (!routedFunctions.includes(m[1])) routedFunctions.push(m[1]);
   }
-  // Also catch direct handlers like renderOrgChart, renderPOMSReference outside the switch.
+  // Also catch direct handlers like renderOrgChart outside the switch.
   // Match: if (tabId === 'xxx') { ... renderFoo(app — but only top-level render calls
   // (not _renderDuesGate or other helpers that start with _)
   const directRouteRegex = /if\s*\(tabId\s*===\s*'[^']+'\)\s*\{[^}]*?\b(render[A-Z]\w+)\s*\(/g;
@@ -715,7 +713,6 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetMeetingMinutes', 'dataGetStewardDirectory',
     'dataGetCaseChecklist', 'dataGetSatisfactionTrends',
     'dataGetBroadcastFilterOptions', 'dataGetEngagementStats',
-    'dataGetWorkloadSummaryStats',
     'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
     'dataGetGrievanceForSigning', 'dataSubmitGrievanceSignature', // sigToken auth, not session
   ];
@@ -725,7 +722,6 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'qaInitSheets', 'tlInitSheets', 'fsInitSheets',
     'fsProcessScheduledDigests', 'fsBackupCriticalSheets',
     'fsSetupTriggers', 'fsRemoveTriggers',
-    'wtArchiveOldData', 'wtCleanVault',
   ];
 
   function extractGlobalFunctions(src, prefix) {
@@ -769,8 +765,6 @@ describe('A11: Server-exposed functions have auth checks', () => {
 // ============================================================================
 // A11b: CLIENT-CALLABLE HTML ENDPOINTS HAVE AUTH CHECKS
 // ============================================================================
-// Bug (2026-03-14): getPOMSReferenceHtml() and getOrgChartHtml() served HTML
-// content without any authentication — any anonymous caller could invoke them.
 // All client-callable functions in 22_WebDashApp.gs that return HTML content
 // must verify Session.getActiveUser().getEmail() before serving.
 
@@ -780,7 +774,7 @@ describe('A11b: Client-callable HTML endpoints have auth checks', () => {
   );
 
   // HTML-serving endpoints that must have auth
-  const htmlEndpoints = ['getOrgChartHtml', 'getPOMSReferenceHtml'];
+  const htmlEndpoints = ['getOrgChartHtml'];
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() checks Session.getActiveUser before serving content`, () => {
@@ -996,7 +990,6 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
-    '25_WorkloadService.gs',
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
@@ -1057,7 +1050,6 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-    '25_WorkloadService.gs',
   ];
   const srcDir = path.resolve(__dirname, '..', 'src');
 
@@ -1130,7 +1122,6 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
   const nonDataServiceWrappers = [
     'dataMarkWelcomeDismissed',        // writes directly to PropertiesService
     'dataGetEngagementStats',          // reads live sheet data directly
-    'dataGetWorkloadSummaryStats',     // reads live sheet data directly
     'dataSendDirectMessage',           // sends email + Drive log directly (calls DataService helpers deeper than 12-line window)
     'dataEnsureSheetsIfNeeded',        // calls _ensureAllSheetsInternal() + PropertiesService directly (fire-and-forget init)
     'dataApplyColorTheme',             // saves theme to UserProperties directly (unified theme system)

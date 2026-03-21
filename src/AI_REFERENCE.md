@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | Sync flow, Workload Tracker exclusion registry |
+| 3 | **SYNC-LOG.md** | Sync flow, sync history |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -75,7 +75,7 @@ src/*.gs (42 files) + src/*.html (7 files)
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
-| `19_-25_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, workload service |
+| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, weekly questions |
 | `26_` | Q&A Forum | Steward-member Q&A with steward-only answers, resolve/reopen |
 | `27_` | Timeline Service | Activity feed with inline edit, pagination, calendar links |
 | `28_` | Failsafe Service | Security & reliability guardrails |
@@ -104,7 +104,6 @@ doGet(e)
 ├── ?page=links    → Links page
 ├── ?page=selfservice → Member self-service (Google auth or PIN)
 ├── ?page=portal   → Public portal
-├── ?page=workload → Workload tracker
 ├── ?page=checkin  → Meeting check-in (v4.11.0)
 ├── ?page=resources → SPA with resources tab pre-selected (v4.11.0)
 ├── ?page=notifications → SPA with notifications tab pre-selected (v4.12.0)
@@ -223,7 +222,6 @@ Records **why** architectural choices were made, so future LLMs don't undo them.
 | 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
 | 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
 | 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
-| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). 18_ later removed; 25_ is the sole workload module. |
 
 ---
 

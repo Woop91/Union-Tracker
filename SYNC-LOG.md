@@ -18,29 +18,6 @@ Tracks sync history for the SolidBase repository.
 
 ---
 
-## Workload Tracker Exclusion Registry
-
-> **Resolved (v4.20.0):** The standalone Workload Tracker portal (`18_WorkloadTracker.gs` + `WorkloadTracker.html`) has been deleted. The workload tracker is now fully integrated into the SPA via `25_WorkloadService.gs` and the workload tab in `member_view.html`. No exclusions remain.
-
-### Previously Excluded (now deleted)
-| File | Status |
-|------|--------|
-| `src/18_WorkloadTracker.gs` | **Deleted** — replaced by `25_WorkloadService.gs` |
-| `src/WorkloadTracker.html` | **Deleted** — replaced by SPA workload tab in `member_view.html` |
-
-### typeof Guards (kept as defensive coding)
-| File | Guard | Notes |
-|------|-------|-------|
-| `src/index.html` | `typeof` checks for workload nav | Safe — functions exist via `25_WorkloadService.gs` |
-| `src/member_view.html` | `typeof` checks for SSO wrappers | Safe — functions exist via `25_WorkloadService.gs` |
-| `src/03_UIComponents.gs` | `typeof initWorkloadTrackerSheets` guard in Tools menu | Safe — function exists |
-
-### Important Distinction
-- **"Workload Tracker"** = member caseload reporting (now via `25_WorkloadService.gs`)
-- **"Steward workload"** = grievance case count per steward → KEEP (core functionality)
-
----
-
 ## Sync History
 
 | Date | Agent | Commit | Files Synced | Notes |

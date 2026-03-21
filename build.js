@@ -63,7 +63,6 @@ const BUILD_ORDER = [
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
-  '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
@@ -83,7 +82,6 @@ const HTML_FILES = [
   'member_view.html',
   'error_view.html',
   'org_chart.html',
-  'poms_reference.html',
   'grievance_form.html',
   'esign.html',
 ];

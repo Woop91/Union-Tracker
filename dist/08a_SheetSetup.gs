@@ -77,7 +77,6 @@ function CREATE_DASHBOARD() {
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
       '• 📖 Config Guide (how to use Config tab)\n' +
-      '• 📊 Workload Tracker (member caseload tracking)\n' +
       '• 📚 Resources (educational content hub)\n' +
       '• 📚 Resource Config (dynamic category management)\n\n' +
       'Note: All dashboards are now modal-based (popup windows).\n' +
@@ -238,16 +237,6 @@ function CREATE_DASHBOARD() {
     installHiddenSheetEnforcerTrigger();
     ss.toast('Hidden sheet enforcer installed', '🏗️ Progress', 2);
 
-    // Initialize Workload Tracker sheets (18_WorkloadTracker.gs)
-    if (typeof initWorkloadTrackerSheets === 'function') {
-      try {
-        initWorkloadTrackerSheets();
-        ss.toast('Workload Tracker sheets created', '🏗️ Progress', 2);
-      } catch (wtError) {
-        Logger.log('Workload tracker sheets skipped: ' + wtError.message);
-      }
-    }
-
     // Initialize Portal sheets (23_PortalSheets.gs) — member directory mirror, events, polls, etc.
     if (typeof initPortalSheets === 'function') {
       try {
@@ -321,14 +310,11 @@ function CREATE_DASHBOARD() {
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
-        '• 📊 Workload Reporting (member caseload tracking)\n' +
         '• 📚 Resources + Resource Config (educational content hub)\n' +
         '• Portal, Weekly Questions, Contact Log (web dashboard)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
-        'Workload Tracker: Union Hub > 📊 Workload Tracker\n' +
-        'Members submit via the Workload tab in the web dashboard.\n\n' +
         'Plus hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +
@@ -476,7 +462,6 @@ function reorderSheetsToStandard(ss) {
     SHEETS.MEMBER_DIR,
     SHEETS.GRIEVANCE_LOG,
     SHEETS.CASE_CHECKLIST,
-    SHEETS.WORKLOAD_REPORTING,
     // 🟢 Reference — look-up material
     SHEETS.RESOURCES,
     SHEETS.GETTING_STARTED,
@@ -579,15 +564,6 @@ function setupHiddenSheets(ss) {
     setSheetVeryHidden_(archGriev);
   }
 
-  // Workload Archive — created empty if missing (auto-populated by WorkloadService.archiveOldData)
-  if (typeof SHEETS !== 'undefined' && SHEETS.WORKLOAD_ARCHIVE) {
-    var wlArchive = ss.getSheetByName(SHEETS.WORKLOAD_ARCHIVE);
-    if (!wlArchive) {
-      wlArchive = ss.insertSheet(SHEETS.WORKLOAD_ARCHIVE);
-      wlArchive.getRange(1, 1).setValue('Workload Archive');
-      setSheetVeryHidden_(wlArchive);
-    }
-  }
 }
 
 /**

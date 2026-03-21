@@ -615,12 +615,6 @@ var SHEETS = {
   // NOTE: GRIEVANCE_TRACKER alias removed in v4.25.9 (FIX-CORE-02) — all 22
   //   callers migrated to canonical SHEETS.GRIEVANCE_LOG. Sheet is unchanged.
   MEMBER_DIRECTORY: 'Member Directory',
-  // Workload Tracker sheets (18_WorkloadTracker.gs)
-  WORKLOAD_VAULT:     'Workload Vault',      // hidden — raw submissions with email
-  WORKLOAD_REPORTING: 'Workload Reporting',  // visible — anonymized ledger
-  WORKLOAD_REMINDERS: 'Workload Reminders',  // hidden — email reminder prefs
-  WORKLOAD_USERMETA:  'Workload UserMeta',   // hidden — sharing start dates
-  WORKLOAD_ARCHIVE:   'Workload Archive',     // hidden — data older than 24 months
   // Resources & Education (v4.11.0 — content management for educational hub)
   RESOURCES:          '📚 Resources',         // steward-managed educational content
   RESOURCE_CONFIG:    '📚 Resource Config',   // categories & settings for Resources tab (v4.22.x)

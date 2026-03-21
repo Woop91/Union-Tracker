@@ -4987,24 +4987,17 @@ function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionTo
 /**
  * Returns all Insights page data in a single round-trip. Requires steward auth.
  * @param {string} sessionToken
- * @returns {Object} { stats, hotSpots, perf, sat, memberStats, workload }
+ * @returns {Object} { stats, hotSpots, perf, sat, memberStats }
  */
 function dataGetInsightsBatch(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return { stats: { available: false }, hotSpots: [], perf: [], sat: { categories: [] }, memberStats: null, workload: { available: false } };
+  if (!s) return { stats: { available: false }, hotSpots: [], perf: [], sat: { categories: [] }, memberStats: null };
   var result = {};
   try { result.stats = DataService.getGrievanceStats(); } catch (_e) { result.stats = { available: false }; Logger.log('InsightsBatch stats: ' + _e.message); }
   try { result.hotSpots = DataService.getGrievanceHotSpots(); } catch (_e) { result.hotSpots = []; Logger.log('InsightsBatch hotSpots: ' + _e.message); }
   try { result.perf = DataService.getAllStewardPerformance(); } catch (_e) { result.perf = []; Logger.log('InsightsBatch perf: ' + _e.message); }
   try { result.sat = DataService.getSatisfactionTrends(); } catch (_e) { result.sat = { categories: [] }; Logger.log('InsightsBatch sat: ' + _e.message); }
   try { result.memberStats = DataService.getMembershipStats(); } catch (_e) { result.memberStats = null; Logger.log('InsightsBatch memberStats: ' + _e.message); }
-  try {
-    if (typeof WorkloadService !== 'undefined' && WorkloadService.getDashboardDataSSO) {
-      result.workload = WorkloadService.getDashboardDataSSO(s);
-    } else {
-      result.workload = { available: false };
-    }
-  } catch (_e) { result.workload = { available: false }; Logger.log('InsightsBatch workload: ' + _e.message); }
   return result;
 }
 
@@ -5275,7 +5268,6 @@ function _ensureAllSheetsInternal() {
     ['Failsafe Config',   function() { if (typeof FailsafeService !== 'undefined' && FailsafeService.initFailsafeSheet) FailsafeService.initFailsafeSheet(); }],
     ['Weekly Questions',  function() { if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) WeeklyQuestions.initWeeklyQuestionSheets(); }],
     ['Portal sheets',     function() { if (typeof initPortalSheets === 'function') initPortalSheets(); }],
-    ['Workload Tracker',  function() { if (typeof initWorkloadTrackerSheets === 'function') initWorkloadTrackerSheets(); }],
     ['Resources',         function() { if (typeof createResourcesSheet === 'function') createResourcesSheet(ss); }],
     ['Resource Config',   function() { if (typeof createResourceConfigSheet === 'function') createResourceConfigSheet(ss); }],
     ['Survey Questions',  function() { if (typeof createSurveyQuestionsSheet === 'function') createSurveyQuestionsSheet(ss); }],
@@ -6033,16 +6025,6 @@ function dataGetUsageStats(sessionToken) {
 }
 
 /**
- * v4.22.0 — LIVE workload summary from Workload Vault.
- * Replaces the SEEDED_UNION_STATS property stub.
- *
- * Returns:
- *   avgCaseload       — average of PRIORITY_CASES across most-recent submission per steward
- *   highCaseloadPct   — % of stewards with priority_cases > 5
- *   submissionRate    — % of stewards (IS_STEWARD = 'Yes') who have submitted at least once
- *   trendDirection    — 'increasing' | 'decreasing' | 'stable' based on avg last 4 wks vs prior 4 wks
- */
-/**
  * Returns lightweight member count and active-grievance count. Requires steward auth.
  * @param {string} sessionToken
  * @returns {Object} { total: number, withGrievances: number }
@@ -6074,108 +6056,6 @@ function dataGetSheetHealth(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   try { return DataService.getSheetHealth(); } catch (e) { Logger.log('dataGetSheetHealth error: ' + e.message); return { members: { rows: 0, status: 'ok' }, grievances: { rows: 0, status: 'ok' } }; }
-}
-
-/**
- * Returns live workload summary stats from the Workload Vault sheet. Requires auth.
- * @param {string} sessionToken
- * @returns {Object|null} { avgCaseload, highCaseloadPct, submissionRate, trendDirection }
- */
-function dataGetWorkloadSummaryStats(sessionToken) {
-  var _caller = _resolveCallerEmail(sessionToken);
-  if (!_caller) return null;
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) return null;
-    var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
-    if (!vault || vault.getLastRow() <= 1) return null;
-
-    var data = vault.getRange(2, 1, vault.getLastRow() - 1, 24).getValues();
-
-    // VAULT_COLS (0-indexed): TIMESTAMP=0 EMAIL=1 PRIORITY_CASES=2 PENDING_CASES=3
-    // Most-recent submission per steward
-    var latestByEmail = {};
-    for (var i = 0; i < data.length; i++) {
-      var email = String(data[i][1]).toLowerCase().trim();
-      if (!email) continue;
-      var ts = data[i][0] instanceof Date ? data[i][0].getTime() : new Date(data[i][0]).getTime();
-      if (!latestByEmail[email] || ts > latestByEmail[email].ts) {
-        latestByEmail[email] = { ts: ts, priority: Number(data[i][2]) || 0 };
-      }
-    }
-
-    var stewardEmails = Object.keys(latestByEmail);
-    if (stewardEmails.length === 0) return null;
-
-    var totalPriority = 0;
-    var highCount = 0;
-    var HIGH_THRESHOLD = 5;
-    for (var j = 0; j < stewardEmails.length; j++) {
-      var p = latestByEmail[stewardEmails[j]].priority;
-      totalPriority += p;
-      if (p > HIGH_THRESHOLD) highCount++;
-    }
-    var avgCaseload = totalPriority / stewardEmails.length;
-    var highCaseloadPct = Math.round((highCount / stewardEmails.length) * 100);
-
-    // Submission rate — stewards in Member Directory vs those who submitted
-    var submissionRate = 100;
-    try {
-      var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-      if (memberSheet && memberSheet.getLastRow() >= 2) {
-        var mHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
-        var isStewardIdx = mHeaders.indexOf('Is Steward');
-        var emailIdx     = mHeaders.indexOf('Email');
-        if (isStewardIdx >= 0 && emailIdx >= 0) {
-          var mData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
-          var stewardSet = {};
-          for (var mi = 0; mi < mData.length; mi++) {
-            if (String(mData[mi][isStewardIdx]).toLowerCase() === 'yes') {
-              var se = String(mData[mi][emailIdx]).toLowerCase().trim();
-              if (se) stewardSet[se] = true;
-            }
-          }
-          var totalStewards = Object.keys(stewardSet).length;
-          if (totalStewards > 0) {
-            var submitters = stewardEmails.filter(function(e) { return stewardSet[e]; }).length;
-            submissionRate = Math.round((submitters / totalStewards) * 100);
-          }
-        }
-      }
-    } catch (_sr) { Logger.log('_sr: ' + (_sr.message || _sr)); }
-
-    // Trend: compare avg priority in last 4 weeks vs prior 4 weeks
-    var trendDirection = 'stable';
-    try {
-      var now = new Date();
-      var fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 3600 * 1000);
-      var eightWeeksAgo = new Date(now.getTime() - 56 * 24 * 3600 * 1000);
-      var recentTotal = 0, recentCount = 0, priorTotal = 0, priorCount = 0;
-      for (var ti = 0; ti < data.length; ti++) {
-        var tts = data[ti][0] instanceof Date ? data[ti][0] : new Date(data[ti][0]);
-        var tp  = Number(data[ti][2]) || 0;
-        if (tts >= fourWeeksAgo)    { recentTotal += tp; recentCount++; }
-        else if (tts >= eightWeeksAgo) { priorTotal  += tp; priorCount++; }
-      }
-      if (recentCount > 0 && priorCount > 0) {
-        var recentAvg = recentTotal / recentCount;
-        var priorAvg  = priorTotal  / priorCount;
-        var delta = recentAvg - priorAvg;
-        if (delta > 0.5)       trendDirection = 'increasing';
-        else if (delta < -0.5) trendDirection = 'decreasing';
-      }
-    } catch (_td) { Logger.log('_td: ' + (_td.message || _td)); }
-
-    return {
-      avgCaseload:      Math.round(avgCaseload * 10) / 10,
-      highCaseloadPct:  highCaseloadPct,
-      submissionRate:   submissionRate,
-      trendDirection:   trendDirection,
-    };
-  } catch (e) {
-    Logger.log('dataGetWorkloadSummaryStats error: ' + e.message + '\n' + (e.stack || ''));
-    return null;
-  }
 }
 
 // ═══════════════════════════════════════

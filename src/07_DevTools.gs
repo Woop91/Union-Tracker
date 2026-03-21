@@ -284,9 +284,6 @@ function SEED_PHASE_2() {
   ss.toast('Seeding notifications...', '🌱 Phase 2', 2);
   seedNotificationsData();
 
-  ss.toast('Seeding workload submissions...', '🌱 Phase 2', 2);
-  seedWorkloadData();
-
   ss.toast('Seeding steward tasks...', '🌱 Phase 2', 2);
   seedStewardTasksData();
 
@@ -2309,134 +2306,6 @@ function seedNotificationsData() {
 }
 
 // ============================================================================
-// SEED: WORKLOAD TRACKER DATA
-// ============================================================================
-
-/**
- * Seeds 20 sample workload submissions into the Workload Vault.
- * Uses sample member emails from the Member Directory and generates
- * realistic caseload numbers. Also triggers reporting refresh.
- */
-function seedWorkloadData() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
-
-  if (!vault) {
-    Logger.log('Workload Vault sheet not found. Skipping workload seed.');
-    return;
-  }
-
-  // Check existing data
-  if (vault.getLastRow() > 1) {
-    Logger.log('Workload Vault already has data. Skipping seed.');
-    return;
-  }
-
-  // Get some member emails from the directory
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var emails = [];
-  if (memberSheet && memberSheet.getLastRow() > 1) {
-    var emailCol = MEMBER_COLS.EMAIL;
-    var memberData = memberSheet.getRange(2, emailCol, Math.min(memberSheet.getLastRow() - 1, 100), 1).getValues();
-    for (var i = 0; i < memberData.length; i++) {
-      if (memberData[i][0]) emails.push(memberData[i][0]);
-    }
-  }
-
-  // Fallback if no members seeded yet
-  if (emails.length === 0) {
-    emails = [
-      'john.smith@example.org', 'mary.johnson@example.org', 'robert.williams@example.org',
-      'patricia.jones@example.org', 'michael.davis@example.org', 'linda.miller@example.org',
-      'william.brown@example.org', 'barbara.wilson@example.org', 'david.moore@example.org',
-      'susan.taylor@example.org'
-    ];
-  }
-
-  var now = new Date();
-  var rows = [];
-
-  // Generate 20 submissions spread over the last 4 weeks
-  for (var w = 0; w < 20; w++) {
-    var daysAgo = Math.floor(Math.random() * 28);
-    var timestamp = new Date(now.getTime() - daysAgo * 86400000);
-    var email = emails[Math.floor(Math.random() * emails.length)];
-
-    // Realistic caseload numbers for social workers
-    var priorityCases = Math.floor(Math.random() * 8) + 1;
-    var pendingCases = Math.floor(Math.random() * 15) + 5;
-    var unreadDocs = Math.floor(Math.random() * 20);
-    var todoItems = Math.floor(Math.random() * 12) + 2;
-    var sentReferrals = Math.floor(Math.random() * 5);
-    var ceActivities = Math.floor(Math.random() * 3);
-    var assistanceReqs = Math.floor(Math.random() * 4);
-    var agedCases = Math.floor(Math.random() * 6);
-    var weeklyCases = Math.floor(Math.random() * 8) + 2;
-
-    // Sub-categories JSON (simplified)
-    var subCats = JSON.stringify({
-      intake: Math.floor(Math.random() * 4),
-      review: Math.floor(Math.random() * 5),
-      closing: Math.floor(Math.random() * 3)
-    });
-
-    // Employment details
-    var empTypes = ['Full-Time', 'Full-Time', 'Full-Time', 'Part-Time'];
-    var empType = empTypes[Math.floor(Math.random() * empTypes.length)];
-    var ptHours = empType === 'Part-Time' ? (20 + Math.floor(Math.random() * 16)) : '';
-
-    // Leave
-    var leaveTypes = ['', '', '', '', 'Sick', 'Vacation', 'Personal'];
-    var leaveType = leaveTypes[Math.floor(Math.random() * leaveTypes.length)];
-    var leavePlanned = leaveType ? 'Yes' : '';
-    var leaveStart = '';
-    var leaveEnd = '';
-    if (leaveType) {
-      var leaveOffset = Math.floor(Math.random() * 14) + 1;
-      leaveStart = new Date(now.getTime() + leaveOffset * 86400000);
-      leaveEnd = new Date(leaveStart.getTime() + (Math.floor(Math.random() * 3) + 1) * 86400000);
-    }
-
-    // Intake/notice
-    var noIntake = Math.random() < 0.2 ? 'Yes' : '';
-    var noticeTime = noIntake ? (Math.floor(Math.random() * 3) + 1) + ' days' : '';
-    var halfDay = Math.random() < 0.1 ? 'Yes' : '';
-
-    // Privacy & plan
-    var privacy = Math.random() < 0.3 ? 'Anonymous' : 'Identified';
-    var onPlan = Math.random() < 0.15 ? 'Yes' : 'No';
-    var overtime = Math.random() < 0.3 ? (Math.floor(Math.random() * 8) + 1) : 0;
-
-    // Vault row: 24 columns matching header order
-    rows.push([
-      timestamp, email,
-      priorityCases, pendingCases, unreadDocs, todoItems,
-      sentReferrals, ceActivities, assistanceReqs, agedCases,
-      weeklyCases, subCats,
-      empType, ptHours,
-      leaveType, leavePlanned, leaveStart, leaveEnd,
-      noIntake, noticeTime, halfDay,
-      privacy, onPlan, overtime
-    ]);
-  }
-
-  vault.getRange(2, 1, rows.length, 24).setValues(rows);
-
-  // Format timestamp column
-  vault.getRange(2, 1, rows.length, 1).setNumberFormat('MM/dd/yyyy HH:mm');
-
-  // Refresh reporting if available
-  if (typeof WorkloadPortal !== 'undefined' && WorkloadPortal._refreshReportingData) {
-    try { WorkloadPortal._refreshReportingData(); } catch (_e) { /* ok */ }
-  }
-  if (typeof WorkloadService !== 'undefined' && WorkloadService.refreshLedger) {
-    try { WorkloadService.refreshLedger(); } catch (_e) { /* ok */ }
-  }
-
-  Logger.log('Seeded ' + rows.length + ' workload submissions');
-}
-
-// ============================================================================
 // SEED: STEWARD TASKS
 // ============================================================================
 
@@ -3222,7 +3091,7 @@ function NUKE_SEEDED_DATA() {
     '• Feedback & Development sheet (entire sheet deleted)\n' +
     '• Function Checklist sheet (entire sheet deleted)\n' +
     '• _Audit_Log hidden sheet (entire sheet deleted)\n' +
-    '• Resources, Notifications, and Workload data\n\n' +
+    '• Resources and Notifications data\n\n' +
     '✅ ALL manually entered data will be PRESERVED.\n\n' +
     '⏱️ IMPORTANT: This process takes approximately 3-5 MINUTES.\n' +
     '⚠️ WAIT until the "Running script" dialog disappears!\n' +
@@ -3433,17 +3302,6 @@ function NUKE_SEEDED_DATA() {
       } catch (e) { Logger.log('Could not clear Notifications: ' + e.message); }
     }
 
-    // Clear workload vault data
-    var workloadCleared = false;
-    var workloadVault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
-    if (workloadVault && workloadVault.getLastRow() > 1) {
-      try {
-        var wlLastRow = workloadVault.getLastRow();
-        workloadVault.getRange(2, 1, wlLastRow - 1, workloadVault.getLastColumn()).clearContent();
-        workloadCleared = true;
-      } catch (e) { Logger.log('Could not clear Workload Vault: ' + e.message); }
-    }
-
     // Clear seeded member tasks (rows with MT_SEED_ prefix) from _Steward_Tasks
     var memberTasksCleared = false;
     var tasksSheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
@@ -3497,7 +3355,6 @@ function NUKE_SEEDED_DATA() {
       (weeklyCleared ? '• Weekly questions data cleared\n' : '') +
       (resourcesCleared ? '• Resources data cleared\n' : '') +
       (notificationsCleared ? '• Notifications data cleared\n' : '') +
-      (workloadCleared ? '• Workload vault data cleared\n' : '') +
       (memberTasksCleared ? '• Member tasks cleared\n' : '') +
       (checklistCleared ? '• Case checklist items cleared\n' : '') +
       '• Union stats data cleared\n' +

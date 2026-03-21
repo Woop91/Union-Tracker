@@ -140,14 +140,13 @@ describe('FailsafeService.getDigestConfig', () => {
     expect(result.enabled).toBe(false);
     expect(result.frequency).toBe('weekly');
     expect(result.includeGrievances).toBe(true);
-    expect(result.includeWorkload).toBe(true);
     expect(result.includeTasks).toBe(true);
   });
 
   test('returns stored config for known email', () => {
     var lastSent = new Date('2026-02-20T00:00:00');
     var sheet = buildFailsafeSheet([
-      ['admin@test.com', true, 'monthly', lastSent, true, false, true]
+      ['admin@test.com', true, 'monthly', lastSent, true, true]
     ]);
     installSS([sheet]);
 
@@ -155,7 +154,6 @@ describe('FailsafeService.getDigestConfig', () => {
     expect(result.enabled).toBe(true);
     expect(result.frequency).toBe('monthly');
     expect(result.includeGrievances).toBe(true);
-    expect(result.includeWorkload).toBe(false);
     expect(result.includeTasks).toBe(true);
     expect(result.lastSent).toBeTruthy();
   });
@@ -173,14 +171,13 @@ describe('FailsafeService.getDigestConfig', () => {
 
   test('handles boolean/string TRUE values', () => {
     var sheet = buildFailsafeSheet([
-      ['user@test.com', 'TRUE', 'weekly', '', 'TRUE', 'FALSE', true]
+      ['user@test.com', 'TRUE', 'weekly', '', 'TRUE', true]
     ]);
     installSS([sheet]);
 
     var result = FailsafeService.getDigestConfig('user@test.com');
     expect(result.enabled).toBe(true);
     expect(result.includeGrievances).toBe(true);
-    expect(result.includeWorkload).toBe(false);
     expect(result.includeTasks).toBe(true);
   });
 });

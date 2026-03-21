@@ -10,7 +10,7 @@
  *     (3) Route to correct view (auth_view for login, steward_view for
  *         stewards, member_view for members)
  *     (4) Config + user data injection into HTML template
- *   Deep-link support: ?page=workload opens specific SPA tab after auth.
+ *   Deep-link support: ?page=<tab> opens specific SPA tab after auth.
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
  *   "Execute as: Me" deployment means the script runs with the owner's
@@ -407,30 +407,6 @@ function getOrgChartHtml() {
   } catch (e) {
     Logger.log('getOrgChartHtml error: ' + e.message);
     return '<div class="empty-state">Org chart could not be loaded.</div>';
-  }
-}
-
-/**
- * Client-callable: Returns the POMS Reference HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the POMS Reference tab.
- * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
- */
-function getPOMSReferenceHtml() {
-  try {
-    var email = Session.getActiveUser().getEmail();
-    if (!email) return '<div class="empty-state">Authentication required.</div>';
-    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
-    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
-    var cacheKey = 'HTML_poms_ref_' + ver;
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get(cacheKey);
-    if (cached) return cached;
-    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
-    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
-    return html;
-  } catch (e) {
-    Logger.log('getPOMSReferenceHtml error: ' + e.message);
-    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
   }
 }
 

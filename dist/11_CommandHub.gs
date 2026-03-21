@@ -480,8 +480,6 @@ function applyTabColors_(ss) {
   applyColor('Grievance Log', TAB_COLORS.PURPLE);
   applyColor(SHEETS.CASE_CHECKLIST, TAB_COLORS.PURPLE);
   applyColor('Case Checklist', TAB_COLORS.PURPLE);
-  applyColor(SHEETS.WORKLOAD_REPORTING, TAB_COLORS.PURPLE);
-
   // 🟢 Green — Reference (look-up material)
   applyColor(SHEETS.RESOURCES, TAB_COLORS.GREEN);
   applyColor(SHEETS.GETTING_STARTED, TAB_COLORS.GREEN);

@@ -1111,7 +1111,7 @@ function showHelpDialog() {
               <div class="section-title"><span class="material-icons">dashboard</span>Two-Dashboard Architecture</div>
               <div class="card">
                 <div class="card-title">Steward Dashboard (Internal)</div>
-                <div class="card-desc">Comprehensive dashboard with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains PII - for internal use only.</div>
+                <div class="card-desc">Comprehensive dashboard with 5 tabs: Overview, Analytics, Hot Spots, Bargaining, Satisfaction. Contains PII - for internal use only.</div>
                 <div class="card-path">Strategic Ops > Command Center > Steward Dashboard</div>
               </div>
               <div class="card">
@@ -1177,7 +1177,7 @@ function showHelpDialog() {
 
               <div class="feature-category">Steward Tools</div>
               <div class="feature-row"><div class="feature-name">Promote/Demote</div><div class="feature-desc">One-click steward status changes with toolkit emails</div></div>
-              <div class="feature-row"><div class="feature-name">Workload Report</div><div class="feature-desc">Capacity analysis, overload detection (8+ cases)</div></div>
+              <div class="feature-row"><div class="feature-name">Caseload Report</div><div class="feature-desc">Steward capacity analysis, overload detection (8+ cases)</div></div>
               <div class="feature-row"><div class="feature-name">Rising Stars</div><div class="feature-desc">Top performers by score and win rate</div></div>
               <div class="feature-row"><div class="feature-name">Steward Directory</div><div class="feature-desc">Contact info for all stewards</div></div>
 

@@ -35,7 +35,6 @@ const WRAPPER_FILES = [
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
-  '25_WorkloadService.gs',
   '08e_SurveyEngine.gs',
 ];
 
@@ -468,10 +467,6 @@ describe('G7: All .gs files have valid JavaScript syntax', () => {
 // ============================================================================
 // G8: build.js file arrays match actual src/ contents
 // ============================================================================
-// Reason: poms_reference.html was added to src/ and dist/ but NOT to the
-// HTML_FILES array in build.js. A fresh --prod build would delete it from dist/,
-// breaking the POMS Reference tab at runtime.
-
 describe('G8: build.js file arrays match src/ contents', () => {
   const buildCode = fs.readFileSync(path.resolve(__dirname, '..', 'build.js'), 'utf8');
 
@@ -553,23 +548,12 @@ describe('G9: Nav tabs and handlers are in sync', () => {
     });
   });
 
-  // Member-only tabs (removed from steward nav)
-  const memberOnlyTabs = ['poms'];
-  memberOnlyTabs.forEach(tabId => {
-    test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
-      const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
-      expect(count).toBeGreaterThanOrEqual(1);
-    });
-  });
 });
 
 
 // ============================================================================
 // G10: Lazy-loaded HTML files have server functions
 // ============================================================================
-// Reason: renderPOMSReference calls google.script.run.getPOMSReferenceHtml().
-// If the server function doesn't exist, the tab shows "Failed to load".
-
 describe('G10: Lazy-loaded views have matching server functions', () => {
   const indexCode = fs.readFileSync(path.join(SRC_DIR, 'index.html'), 'utf8');
 
@@ -577,7 +561,7 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   const codeOnly = indexCode.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // Find all HtmlService-pattern server functions: lines like
-  //   .getOrgChartHtml();  or  .getPOMSReferenceHtml();
+  //   .getOrgChartHtml();
   // These are the terminal call in a google.script.run chain.
   // Pattern: line has only whitespace, a dot, a function name, parens, semicolon
   const terminalCalls = codeOnly.match(/^\s+\.(\w+)\(\s*\)\s*;/gm) || [];
@@ -601,9 +585,8 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   });
 
   // Must find at least the known lazy-loaders
-  test('detects lazy-loaded server functions (getOrgChartHtml, getPOMSReferenceHtml)', () => {
+  test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
-    expect(serverFunctions.has('getPOMSReferenceHtml')).toBe(true);
   });
 
   [...serverFunctions].forEach(fn => {
@@ -614,59 +597,6 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 });
 
 
-// ============================================================================
-// G11: poms_reference.html is self-contained and parseable
-// ============================================================================
-// Reason: poms_reference.html is loaded via HtmlService.createHtmlOutputFromFile
-// and injected into the SPA. If its <script> block has syntax errors, the entire
-// POMS tab fails silently.
-
-describe('G11: poms_reference.html integrity', () => {
-  const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
-
-  test('poms_reference.html exists', () => {
-    expect(fs.existsSync(pomsPath)).toBe(true);
-  });
-
-  test('contains POMS_DATA array with entries', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    const match = code.match(/POMS_DATA\s*=\s*\[/);
-    expect(match).not.toBeNull();
-    // Count entries
-    const entries = (code.match(/\{id:/g) || []).length;
-    expect(entries).toBeGreaterThanOrEqual(78);
-  });
-
-  test('contains FLOWS object with flowcharts', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    const match = code.match(/FLOWS\s*=\s*\{/);
-    expect(match).not.toBeNull();
-    // Count flowcharts (title: entries)
-    const charts = (code.match(/title:"/g) || []).length;
-    expect(charts).toBeGreaterThanOrEqual(17);
-  });
-
-  test('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
-      expect(code).toContain(`P.tab==='${tab}'`);
-    });
-  });
-
-  test('<script> block parses without syntax errors', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
-    expect(scriptMatch).not.toBeNull();
-    expect(() => {
-      new vm.Script(scriptMatch[1], { filename: 'poms_reference.html' });
-    }).not.toThrow();
-  });
-
-  test('no private Apps Script ID present', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    expect(code).not.toContain('18hHHX');
-  });
-});
 
 
 // ============================================================================
@@ -744,35 +674,6 @@ describe('G13: Module load order is safe', () => {
   });
 });
 
-
-describe('G14: WorkloadService crash-safe patterns', () => {
-  const wsCode = fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8');
-
-  test('_refreshReportingData does NOT clearContents before writing', () => {
-    // Extract the _refreshReportingData function body
-    const funcStart = wsCode.indexOf('function _refreshReportingData()');
-    expect(funcStart).toBeGreaterThan(-1);
-    const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
-    const funcBody = wsCode.substring(funcStart, funcEnd);
-
-    // The old antipattern: report.clearContents() before setValues
-    // New pattern: setValues first, then clearContent only for stale rows
-    expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
-  });
-
-  test('rate limit uses atomic check-and-record pattern', () => {
-    // _checkAndRecordRateLimit should exist (replaces separate check + record)
-    expect(wsCode).toContain('function _checkAndRecordRateLimit');
-    // Old separate _recordRateLimitAttempt should NOT exist
-    expect(wsCode).not.toContain('function _recordRateLimitAttempt');
-    // No separate _recordSubmission call
-    expect(wsCode).not.toContain('function _recordSubmission');
-  });
-
-  test('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
-    expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
-  });
-});
 
 // ============================================================================
 // G15: IDLE LOGOUT MODULE
