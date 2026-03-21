@@ -754,7 +754,7 @@ function createFunctionChecklistSheet_() {
     ['1️⃣ Foundation', '⚙️ Admin > Setup', '🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets', 'Creates/recreates all hidden sheets with self-healing formulas'],
     ['1️⃣ Foundation', '⚙️ Admin > Setup', '🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets', 'Fixes broken formulas in hidden sheets without recreating them'],
     ['1️⃣ Foundation', '🏗️ Setup', '⚙️ Setup Data Validations', 'setupDataValidations', 'Applies dropdown validations to Member Directory and Grievance Log'],
-    ['1️⃣ Foundation', '🏗️ Setup', '🎨 Setup Comfort View', 'setupADHDDefaults', 'Configures default accessibility-friendly visual settings'],
+    ['1️⃣ Foundation', '🏗️ Setup', '🎨 Setup Comfort View', 'setupComfortViewDefaults', 'Configures default accessibility-friendly visual settings'],
 
     // ═══ PHASE 2: Triggers & Data Sync ═══
     ['2️⃣ Sync', '⚙️ Admin > Setup', '⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger', 'Creates edit trigger to auto-sync data between sheets'],
@@ -799,7 +799,7 @@ function createFunctionChecklistSheet_() {
     ['8️⃣ Notify', '📊 Notifications', '🧪 Test Notifications', 'testDeadlineNotifications', 'Sends test email to verify notification setup'],
 
     // ═══ PHASE 9: Accessibility & Theming ═══
-    ['9️⃣ Access', '♿ Comfort View', '♿ Comfort View Panel', 'showADHDControlPanel', 'Central hub for all accessibility-friendly features and settings'],
+    ['9️⃣ Access', '♿ Comfort View', '♿ Comfort View Panel', 'showComfortViewControlPanel', 'Central hub for all accessibility-friendly features and settings'],
     ['9️⃣ Access', '♿ Comfort View', '🎯 Focus Mode', 'activateFocusMode', 'Highlights current row, dims distractions, reduces visual noise'],
     ['9️⃣ Access', '♿ Comfort View', '🔲 Toggle Zebra Stripes', 'toggleZebraStripes', 'Alternating row colors for easier row tracking'],
     ['9️⃣ Access', '♿ Comfort View', '📝 Quick Capture', 'showQuickCaptureNotepad', 'Fast notepad for capturing thoughts without losing focus'],
@@ -906,7 +906,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '📱 Mobile Dashboard', 'showMobileDashboard', 'Touch-friendly dashboard for phones and tablets'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '📊 Rebuild Dashboard', 'rebuildDashboard', 'Recreates the Dashboard sheet with fresh formulas'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '🔄 Refresh All Formulas', 'refreshAllFormulas', 'Recalculates all formulas across all sheets'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '♿ Comfort View Panel', 'showADHDControlPanel', 'Central hub for accessibility-friendly features'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '♿ Comfort View Panel', 'showComfortViewControlPanel', 'Central hub for accessibility-friendly features'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🎯 Focus Mode', 'activateFocusMode', 'Highlights current row, dims distractions'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🔲 Toggle Zebra Stripes', 'toggleZebraStripes', 'Alternating row colors for easier tracking'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '📝 Quick Capture Notepad', 'showQuickCaptureNotepad', 'Fast notepad for capturing thoughts'],
@@ -931,7 +931,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Setup', '🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets', 'Fixes broken formulas'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Setup', '🔍 Verify Hidden Sheets', 'verifyHiddenSheets', 'Validates hidden sheets exist'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Setup', '⚙️ Setup Data Validations', 'setupDataValidations', 'Applies dropdown validations'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Setup', '🎨 Setup Comfort View Defaults', 'setupADHDDefaults', 'Configures accessibility settings'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Setup', '🎨 Setup Comfort View Defaults', 'setupComfortViewDefaults', 'Configures accessibility settings'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard', '⚡ Quick Actions', 'showQuickActionsMenu', 'Popup menu for common actions'],
 
     // Command Menu - New Items
@@ -1709,7 +1709,7 @@ function createFeaturesReferenceSheet(ss) {
     ['Calendar & Drive', 'Batch Create Folders', 'Create Drive folders for multiple grievances at once.', 'Union Hub > Google Drive > Batch Create', 'batch, bulk, folders'],
 
     // Accessibility
-    ['Accessibility', 'Focus Mode', 'Distraction-free view, hides non-essential sheets.', 'Union Hub > Comfort View > Focus Mode', 'focus, distraction-free, ADHD'],
+    ['Accessibility', 'Focus Mode', 'Distraction-free view, hides non-essential sheets.', 'Union Hub > Comfort View > Focus Mode', 'focus, distraction-free, comfort-view'],
     ['Accessibility', 'Zebra Stripes', 'Alternating row colors for easier reading.', 'Union Hub > Comfort View > Zebra Stripes', 'zebra, stripes, alternating'],
     ['Accessibility', 'High Contrast', 'Enhanced contrast for visibility.', 'Union Hub > Comfort View > High Contrast', 'contrast, visibility, accessibility'],
     ['Accessibility', 'Dark Mode', 'Dark gradient backgrounds across all modals.', 'Union Hub > View > Dark Mode', 'dark, theme, night'],

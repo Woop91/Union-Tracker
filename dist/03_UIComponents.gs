@@ -275,7 +275,7 @@ function createDashboardMenu() {
       .addItem('🔒 Enforce Hidden Sheets (Mobile Fix)', 'enforceHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
       .addItem('👥 Setup Member Leader Role', 'setupMemberLeaderRole')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'))
+      .addItem('🎨 Setup Comfort View Defaults', 'setupComfortViewDefaults'))
 
     .addSubMenu(ui.createMenu('⏱️ Triggers')
       .addItem('✅ Install ALL Survey Triggers', 'menuInstallSurveyTriggers')
@@ -483,7 +483,7 @@ function navigateToRecord(id, type) {
  * This module handles all theme-related functions including:
  * - Theme application (dark mode, light mode, etc.)
  * - Visual settings persistence
- * - Comfort view / ADHD-friendly settings
+ * - Comfort view / Comfort View-friendly settings
  *
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
@@ -819,25 +819,25 @@ function toggleDarkMode() {
   );
 }
 // ============================================================================
-// COMFORT VIEW / ADHD-FRIENDLY SETTINGS
+// COMFORT VIEW / Comfort View SETTINGS
 // ============================================================================
 
 /**
- * Gets ADHD/Comfort View settings
+ * Gets Comfort View settings
  * @returns {Object} Settings object
  */
-function getADHDSettings() {
+function getComfortViewSettings() {
   var props = PropertiesService.getUserProperties();
-  var settings = props.getProperty('adhdSettings');
-  return settings ? JSON.parse(settings) : getDefaultADHDSettings_();
+  var settings = props.getProperty('comfortViewSettings');
+  return settings ? JSON.parse(settings) : getDefaultComfortViewSettings_();
 }
 
 /**
- * Gets default ADHD settings
+ * Gets default Comfort View settings
  * @returns {Object} Default settings
  * @private
  */
-function getDefaultADHDSettings_() {
+function getDefaultComfortViewSettings_() {
   return {
     zebraStripes: true,
     reducedMotion: false,
@@ -847,36 +847,36 @@ function getDefaultADHDSettings_() {
 }
 
 /**
- * Saves ADHD/Comfort View settings
+ * Saves Comfort View settings
  * @param {Object} settings - The settings to save
  * @returns {void}
  */
-function saveADHDSettings(settings) {
+function saveComfortViewSettings(settings) {
   var props = PropertiesService.getUserProperties();
-  props.setProperty('adhdSettings', JSON.stringify(settings));
+  props.setProperty('comfortViewSettings', JSON.stringify(settings));
 }
 
 /**
- * Applies ADHD/Comfort View settings
+ * Applies Comfort View settings
  * @param {Object} settings - The settings to apply
  * @returns {void}
  */
-function applyADHDSettings(settings) {
+function applyComfortViewSettings(settings) {
   if (settings.zebraStripes) {
     applyZebraStripesToAllSheets_();
   }
   if (settings.hideGridlines) {
     hideAllGridlines();
   }
-  saveADHDSettings(settings);
+  saveComfortViewSettings(settings);
 }
 
 /**
- * Resets ADHD/Comfort View settings to defaults
+ * Resets Comfort View settings to defaults
  * @returns {void}
  */
-function resetADHDSettings() {
-  saveADHDSettings(getDefaultADHDSettings_());
+function resetComfortViewSettings() {
+  saveComfortViewSettings(getDefaultComfortViewSettings_());
   SpreadsheetApp.getActiveSpreadsheet().toast('Comfort View settings reset', 'Settings', 2);
 }
 
@@ -895,7 +895,7 @@ function hideAllGridlines() {
  * Toggles gridlines visibility
  * @returns {void}
  */
-function toggleGridlinesADHD() {
+function toggleGridlinesComfortView() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var currentSheet = ss.getActiveSheet();
   var hidden = currentSheet.hasHiddenGridlines();
@@ -985,9 +985,9 @@ function activateFocusMode() {
     return;
   }
 
-  var settings = getADHDSettings();
+  var settings = getComfortViewSettings();
   settings.focusMode = true;
-  saveADHDSettings(settings);
+  saveComfortViewSettings(settings);
 
   ss.toast('Focus mode activated. Press Esc to exit.', 'Focus Mode', 3);
 }
@@ -997,9 +997,9 @@ function activateFocusMode() {
  * @returns {void}
  */
 function deactivateFocusMode() {
-  var settings = getADHDSettings();
+  var settings = getComfortViewSettings();
   settings.focusMode = false;
-  saveADHDSettings(settings);
+  saveComfortViewSettings(settings);
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Focus mode deactivated', 'Focus Mode', 2);
 }
@@ -1046,13 +1046,13 @@ function quickToggleDarkMode() {
 }
 
 /**
- * Sets up ADHD/Comfort View defaults
+ * Sets up Comfort View defaults
  * @returns {void}
  */
-function setupADHDDefaults() {
-  var settings = getDefaultADHDSettings_();
+function setupComfortViewDefaults() {
+  var settings = getDefaultComfortViewSettings_();
   settings.zebraStripes = true;
-  applyADHDSettings(settings);
+  applyComfortViewSettings(settings);
   SpreadsheetApp.getActiveSpreadsheet().toast('Comfort View defaults applied', 'Settings', 3);
 }
 /**
@@ -1088,8 +1088,8 @@ function refreshAllVisuals() {
       }
     }
 
-    // Reapply ADHD settings if enabled
-    var settings = getADHDSettings();
+    // Reapply Comfort View settings if enabled
+    var settings = getComfortViewSettings();
     if (settings.zebraStripes) {
       applyZebraStripesToAllSheets_();
     }

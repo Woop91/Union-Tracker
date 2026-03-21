@@ -4367,7 +4367,7 @@ function test_SearchEngine_Functions() {
 function test_ThemeService_Functions() {
   Assert.isDefined(typeof APPLY_SYSTEM_THEME, 'APPLY_SYSTEM_THEME should be defined');
   Assert.isDefined(typeof resetToDefaultTheme, 'resetToDefaultTheme should be defined');
-  Assert.isDefined(typeof getADHDSettings, 'getADHDSettings should be defined');
+  Assert.isDefined(typeof getComfortViewSettings, 'getComfortViewSettings should be defined');
   Assert.isDefined(typeof applyZebraStripes, 'applyZebraStripes should be defined');
 }
 
