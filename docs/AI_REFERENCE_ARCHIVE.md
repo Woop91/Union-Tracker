@@ -1,278 +1,10 @@
-# AI REFERENCE DOCUMENT — DDS-Dashboard
-# ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
-# Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
-# Last updated: 2026-03-09 (v4.25.5)
-# Consolidation note: On 2026-02-25, duplicate sections were replaced with
-# pointers to their canonical source files. No information was removed.
+# AI_REFERENCE — Historical Archive
 
----
+This file contains historical development logs, bug fixes, feature implementations,
+and migration notes archived from AI_REFERENCE.md on 2026-03-16.
 
-## 📖 HOW TO USE THIS FILE
-
-Read these files **in this order** when onboarding to this codebase:
-
-| Order | File | What it covers |
-|-------|------|----------------|
-| 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
-| 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | DDS↔Union-Tracker sync flow, Workload Tracker exclusion registry |
-| 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
-| 5 | **FEATURES.md** | Detailed feature documentation |
-| 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
-| 7 | **CODE_REVIEW.md** | Canonical security/code review |
-| 8 | **DEVELOPER_GUIDE.md** | Developer onboarding |
-
-**Do NOT duplicate content from those files here.** If you need to add context an LLM would need that doesn't fit those files, add it here.
-
----
-
-## 🏗️ PROJECT OVERVIEW
-
-**What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
-**Repo:** `Woop91/DDS-Dashboard` (private). Default branch: `Main` (capital M).
-**Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
-**Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users) at MassAbility DDS (SEIU 509).
-**Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
-**Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
-**Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED]`
-**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
-
-### ⚠️ Key Reminders
-- **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
-- **Sync rules & WT exclusions** → **See SYNC-LOG.md**
-- **`dist/` files are auto-generated.** Never edit directly. Edit `src/*.gs` files, then run `npm run build`.
-- **`dist/ConsolidatedDashboard.gs` is DELETED** as of v4.13.0. Build now copies individual files.
-- **`web-dashboard/` folder is LEGACY/ORPHANED.** Do not deploy or integrate it.
-- **CLASP rootDir:** `./dist` — only `dist/` contents go to Apps Script.
-- **Deploy:** `npm run deploy` (lint + test + build:prod + clasp push). Must run locally (requires Google OAuth).
-- **After any merge to Main:** Remind user to run `npm run deploy`. Agent cannot run clasp remotely.
-
----
-
-## 📁 ARCHITECTURE MAP
-
-### Build Pipeline
-```
-src/*.gs (42 files) + src/*.html (7 files)
-    → build.js (copy-files mode) → dist/*.gs + dist/*.html (individual files)
-                                    dist/appsscript.json (manifest)
-    → clasp push → Google Apps Script project
-```
-**Note:** As of v4.13.0, `dist/ConsolidatedDashboard.gs` is deleted. Build copies individual files to `dist/`. GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`.
-
-### Source File Load Order
-| Prefix | Layer | Key Files |
-|--------|-------|-----------|
-| `00_` | Foundation | `DataAccess.gs`, `Security.gs` |
-| `01_` | Core | `Core.gs` — constants, config, utilities |
-| `02_` | Data | `DataManagers.gs` — CRUD operations |
-| `03_` | UI | `UIComponents.gs` — menus, dialogs |
-| `04a-e` | UI modules | Menus, accessibility, interactive/executive/public dashboards |
-| `05_` | Integrations | Drive, Calendar, Email, Web App API functions |
-| `06_` | Maintenance | Admin tools, undo/redo, audit |
-| `07_` | DevTools | Dev-only utilities (**excluded in prod build**) |
-| `08a-e` | Sheet utils | Setup, search, forms, audit formulas, survey engine |
-| `09_` | Dashboards | Dashboard rendering |
-| `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
-| `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
-| `19_-25_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, workload service |
-| `26_` | Q&A Forum | Steward-member Q&A with steward-only answers, resolve/reopen |
-| `27_` | Timeline Service | Activity feed with inline edit, pagination, calendar links |
-| `28_` | Failsafe Service | Security & reliability guardrails |
-| `29_` | Migrations | Column auto-migration for schema changes |
-
-### HTML Files in src/
-| File | Purpose |
-|------|---------|
-| `index.html` | SPA entry point (unified dashboard) |
-| `steward_view.html` | Steward command center |
-| `member_view.html` | Member dashboard |
-| `auth_view.html` | Login/auth page |
-| `error_view.html` | Error display page |
-| `styles.html` | Shared CSS |
-| `org_chart.html` | Organizational chart view |
-
-### Web App Routing (doGet)
-```
-doGet(e)
-├── Default → SPA (doGetWebDashboard) with SSO/magic link auth
-├── ?mode=steward  → Steward Command Center (requires auth, shows PII)
-├── ?mode=member   → Member Dashboard (no PII)
-├── ?page=search   → Search (requires steward auth)
-├── ?page=grievances → Grievance list (requires steward auth)
-├── ?page=members  → Member list (requires steward auth)
-├── ?page=links    → Links page
-├── ?page=selfservice → Member self-service (Google auth or PIN)
-├── ?page=portal   → Public portal
-├── ?page=workload → Workload tracker
-├── ?page=checkin  → Meeting check-in (v4.11.0)
-├── ?page=resources → SPA with resources tab pre-selected (v4.11.0)
-├── ?page=notifications → SPA with notifications tab pre-selected (v4.12.0)
-├── ?page=qa-forum → Q&A Forum (v4.22.6)
-├── ?page=timeline → Timeline activity feed (v4.22.9)
-├── ?page=org-chart → Org chart view (v4.22.6)
-└── Deep-link: ?page=X → SPA reads PAGE_DATA.initialTab → _handleTabNav()
-```
-
-### Authentication System
-- **Steward access:** Google account email matched against authorized list via `checkWebAppAuthorization('steward')`
-- **Member access:** Google account email OR PIN-based login
-- **SPA auth:** Google SSO + magic link (19_WebDashAuth.gs)
-- **Dashboard auth toggle:** `isDashboardMemberAuthRequired()` — when enabled, all dashboard pages require member login
-- **Auth config:** `ScriptProperties` (no manual setup required — `initWebDashboardAuth()` handles first-time)
-
-### HTML Serving Method
-As of v4.13.0, the build outputs individual `.html` files to `dist/`, enabling both `HtmlService.createHtmlOutput()` (inline strings) and `createTemplateFromFile()`/`createHtmlOutputFromFile()` (file-based). The SPA modules (19-25) use file-based HTML. Legacy modules (04-13) still use inline HTML strings.
-
----
-
-## 📊 SHEET STRUCTURE
-
-### Member Directory (31 columns)
-- Headers read dynamically via `MEMBER_HEADER_MAP_` → `MEMBER_COLS`
-- Key columns: Email, Role, Name, Unit, Phone, Is Steward
-
-### Grievance Log (28 columns)
-- Headers read dynamically via `GRIEVANCE_HEADER_MAP_` → `GRIEVANCE_COLS`
-- Key columns: Grievance ID, Member Email, Status, Current Step, Deadline, Assigned Steward
-
-### Config Tab
-- Single source of truth for org-specific settings
-- Columns built via `CONFIG_HEADER_MAP_` → `CONFIG_COLS`
-- Row 1 = section headers, Row 2 = column headers, Data starts at row 3
-- **See CLAUDE.md for detailed write-path rules**
-
-### Resources Sheet (12 columns, v4.11.0)
-- Headers via `RESOURCES_HEADER_MAP_` → `RESOURCES_COLS`
-- Auto-creates with 8 starter articles on first access
-
-### Notifications Sheet (12 columns, v4.12.0)
-```
-Notification ID | Recipient | Type | Title | Message | Priority
-Sent By | Sent By Name | Created Date | Expires Date | Dismissed By | Status
-```
-- Auto-ID: NOTIF-XXX
-- Types: Steward Message, Announcement, Deadline, System
-- Priority: Normal, Urgent
-- Dismissed_By: comma-separated emails (per-member tracking)
-- Active until: Expires Date passes, member dismisses, or steward archives
-
-### Hidden Sheets (v4.12.2+)
-- `_Weekly_Questions` — weekly engagement questions
-- `_Contact_Log` — steward-member interaction log (8 columns)
-- `_Steward_Tasks` — steward task management (10 columns)
-- `_QA_Forum` — Q&A Forum questions and answers (v4.22.6)
-- `_Timeline` — Timeline activity feed entries (v4.22.9)
-- `_Surveys` — Dynamic survey schema and responses (v4.23.0)
-
-### Architectural Rule: No Formulas in Visible Sheets
-All visible sheets (Dashboard, Member Satisfaction, Feedback) contain only VALUES, never formulas. Data is recomputed by JavaScript on each change. No broken formula references, no circular dependencies, no formula chains.
-
----
-
-## ⚠️ PROTECTED CODE — DO NOT MODIFY
-
-The following code sections are USER APPROVED and must NOT be modified or removed without explicit user permission:
-
-### Dashboard Modal Popup — `src/04c_InteractiveDashboard.gs`
-Protected functions: `showInteractiveDashboardTab()`, `getInteractiveDashboardHtml()`, `getInteractiveOverviewData()`, `getInteractiveGrievanceData()`, `getInteractiveMemberData()`, `getMyStewardCases()`
-Tabs: Overview, Grievances, Members, Analytics, My Cases (steward-only)
-
-### Member Satisfaction Dashboard — `src/04c_InteractiveDashboard.gs`
-Protected functions: `showSatisfactionDashboard()`, `getSatisfactionDashboardHtml()`, `getSatisfactionOverviewData()`, `getSatisfactionResponseData()`, `getSatisfactionSectionData()`, `getSatisfactionAnalyticsData()`, `getSatisfactionTrendData()`, `getSatisfactionLocationDrill()`
-Tabs: Overview, Trends, Responses, Sections, Insights
-
-### Secure Member Dashboard — `src/11_CommandHub.gs`
-Protected functions: `showPublicMemberDashboard()`, `showStewardPerformanceModal()`, `safetyValveScrub()`, `getSecureGrievanceStats_()`, `getSecureAllStewards_()`, `getSecureSatisfactionStats_()`, `getStewardWorkload()`
-Features: Material Design UI, Weingarten Rights, live steward search, PII scrubbing
-
----
-
-## 🐛 CONSOLIDATED ERRORS & FIXES LOG
-
-| Date | Error | Cause | Fix | Status |
-|------|-------|-------|-----|--------|
-| 2026-03-06 | Add-to-Calendar URL malformed for events with ms ≠ .000 | `.replace('.000Z','Z')` is a string replace, not regex — silently fails for `.100Z`, `.500Z` etc | Changed to `.replace(/\.\d+Z$/,'Z')` regex in home widget + Events page (2 locations in member_view.html) | ✅ |
-| 2026-03-06 | Typo in Calendar ID shows "No upcoming events" (wrong error) | `CalendarApp.getCalendarById()` returns null → was returning `[]` same as empty calendar | Returns `{_calNotFound:true}` sentinel; frontend shows diagnostic message with fix instructions | ✅ |
-| 2026-03-06 | Add-to-Calendar creates event with no description | `&details=` param omitted from Google Calendar URL builder | Added `(ev.description ? '&details='+encodeURIComponent(ev.description) : '')` in both locations | ✅ |
-| 2026-03-06 | Home widget KPI shows "undefined" + forEach crash when calendar sentinel returned | `events.length` on a plain object → `undefined`; `if (!events \|\| events.length === 0)` passes for object; sentinel cached via DataCache.set | Added `Array.isArray(events)` guard before render and before `DataCache.set` | ✅ |
-| 2026-03-06 | Events dues-gated when it should be auth-only | `_isDuesPaying()` check on `renderEventsPage` blocked non-dues members | Gate removed; any authenticated session can view Events. `locked:true` removed from More menu item | ✅ |
-| 2026-02-22 | `clasp push` → "must include manifest" | `appsscript.json` not in `dist/` | Copied manifest to `dist/` | ✅ |
-| 2026-02-22 | `clasp push` → "User has not enabled Apps Script API" | API disabled | Enabled at script.google.com/home/usersettings | ✅ |
-| 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
-| 2026-02-23 | GitHub token `ghp_FTE8...` expired | Token rotated | User generated new token | ✅ |
-| 2026-02-23 | Token `ghp_q3Zd...` lacked `repo` scope | Wrong scope selected | User generated third token with correct scope | ✅ |
-| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
-| 2026-02-25 | Expired token `ghp_FTE8...` still in memory | Token rotated but memory stale | Updated memory to `ghp_7MY0...` | ✅ |
-
----
-
-## 🔑 DESIGN DECISIONS LOG
-
-Records **why** architectural choices were made, so future LLMs don't undo them.
-
-| Date | Decision | Reasoning |
-|------|----------|-----------|
-| 2026-02-24 | Resources page uses Fraunces serif font | Conveys authority/trust — it's a union tool, not a SaaS product |
-| 2026-02-24 | Navy + earth tones (#1e3a5f, #fafaf9) | Avoid generic AI purple gradients |
-| 2026-02-24 | Check-in page uses green theme | Differentiate from other pages visually |
-| 2026-02-24 | Notifications in separate sheet (not Member Directory column) | Notifications are ephemeral; don't pollute member data |
-| 2026-02-24 | Dismissed_By as comma-separated in single cell | Avoids per-member rows, scales to thousands |
-| 2026-02-24 | Notification auto-ID scans existing IDs for max number | Gap-safe even if rows deleted |
-| 2026-02-25 | ConfigReader reads column-based Config (not row-based key-value) | Aligns with existing CONFIG_COLS system; old reader was incompatible |
-| 2026-02-25 | Default accent hue changed from 250 (blue) → 30 (amber) | Warm palette matches union identity, distinguishes from generic dashboards |
-| 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
-| 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
-| 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
-| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). 18_ later removed; 25_ is the sole workload module. |
-
----
-
-## 📝 AGENT ACTIVITY LOG
-
-Records what each AI agent changed, when, and in which files.
-
-| Date | Agent | Action | Files Changed |
-|------|-------|--------|---------------|
-| 2026-02-23 | Claude (claude.ai) | Deployment audit — fixed CI triggers, verified doGet, synced branches | `.github/workflows/build.yml`, `AI_REFERENCE.md`, `web-dashboard/AI_REFERENCE.md` |
-| 2026-02-24 | Claude (claude.ai) | v4.11.0: Resources Hub + Meeting Check-In | `01_Core.gs`, `05_Integrations.gs`, `10b_SurveyDocSheets.gs`, `PHASE2_PLAN.md`, `dist/` |
-| 2026-02-24 | Claude (claude.ai) | v4.12.0: Notifications system (sheet + API + page) | `01_Core.gs`, `05_Integrations.gs`, `10b_SurveyDocSheets.gs`, `dist/` |
-| 2026-02-25 | Claude (claude.ai) | v4.12.0 continued: Notifications page + branch sync | `05_Integrations.gs`, `dist/`, `AI_REFERENCE.md` |
-| 2026-02-25 | Claude (claude.ai) | Created SYNC-LOG.md, appended sync rules | `SYNC-LOG.md`, `AI_REFERENCE.md` |
-| 2026-02-25 | Claude (claude.ai) | v4.12.2: SPA port — 6 new GS modules + 6 HTML files | `19-24_*.gs`, `*.html`, `dist/` |
-| 2026-02-25 | Claude (claude.ai) | v4.12.2b: UT feature port — config reader, auth, deep-link routing | `01_Core.gs`, `05_Integrations.gs`, `08a_SheetSetup.gs`, `10a_SheetCreation.gs`, `19-22_*.gs`, `index.html` |
-| 2026-02-25 | Claude (claude.ai) | Consolidated AI_REFERENCE.md — removed duplication with CLAUDE.md, SYNC-LOG.md, CHANGELOG.md | `AI_REFERENCE.md`, `CHANGELOG.md` |
-| 2026-02-25 | Claude (claude.ai) | Merged staging→Main: v4.13.0 SPA overhaul + notification bell/EventBus + individual-file build. Synced all 3 branches. | All `src/`, `dist/`, `build.js`, `CLAUDE.md` |
-| 2026-02-28 | Claude Code (Opus 4.6) | v4.18.1-security: Full security assessment + 7 remediations — auth default ON, magic link rate limiting, token cleanup trigger, timing attack fix, PIN token migration to PropertiesService, innerHTML→textContent, escapeForFormula | `00_Security.gs`, `19_WebDashAuth.gs`, `13_MemberSelfService.gs`, `14_MeetingCheckIn.gs`, `21_WebDashDataService.gs`, `CODE_REVIEW.md`, `CHANGELOG.md`, `FEATURES.md` |
-
----
-
-## 🚀 PARKED FEATURES (ranked by priority)
-
-1. Bulk actions (flag/email/export)
-2. Deadline calendar view
-3. Grievance history for members
-4. Welcome/landing page
-5. Events page with Join Virtual button
-
-See `PHASE2_PLAN.md` for details.
-
----
-
-## 📝 NOTES FOR FUTURE LLMs
-
-1. **Read CLAUDE.md first** — it has the most critical rules including column constant patterns, config write paths, and security patterns.
-2. **Read this file second** — it has architecture context, error history, and protected code.
-3. **Read SYNC-LOG.md if touching UT** — full exclusion registry with line numbers.
-4. **The `web-dashboard/` folder is dead code.** Do not deploy or integrate it.
-5. **Never edit `dist/` files directly.** Edit `src/*.gs` and run `npm run build` (copies individual files to dist).
-6. **Test with `npm run ci`** before pushing.
-7. **Deploy with `npm run deploy`** (lint + test + prod build + clasp push).
-8. **Build is 39 `.gs` + 8 `.html` individual files in `dist/`.** GAS has a 6MB per-file limit. Monitor individual file sizes.
-9. **The `doGet()` source is in `src/05_Integrations.gs`** (routes) and `src/22_WebDashApp.gs` (SPA entry).
-10. **Do not duplicate information across reference docs.** Each doc has one canonical purpose (see table at top).
+These entries document completed work from v4.18.1 through v4.25.9 and are preserved
+for reference. For current project context, see AI_REFERENCE.md.
 
 ---
 
@@ -922,10 +654,11 @@ All fixed with `_resolveCallerEmail()` minimum auth (both steward and member rol
 - updateTask backend supports dueDate changes.
 - Frontend: open task cards have Edit button toggling inline form (title, priority, due date). No page reload on save.
 
-**BUG-TASKS-03: Steward can complete member tasks**
-- New backend: stewardCompleteMemberTask validates task ownership (col 11=member, col 12=stewardEmail).
-- New wrapper: dataStaffCompleteMemberTask(taskId) with steward auth.
+**BUG-TASKS-03 (RESOLVED): Steward can complete member tasks**
+- Backend: stewardCompleteMemberTask validates task ownership (col 11=member, col 12=stewardEmail).
+- Wrapper: dataStaffCompleteMemberTask(taskId) with steward auth + withScriptLock_.
 - Frontend: Member Tasks sub-tab shows Complete for member button on open tasks. Confirm dialog guards it. Audit logged.
+- Fixed v4.31.1: createMemberTask now writes stewardEmail (not memberEmail) to col 2 (Steward Email). Both completion wrappers use withScriptLock_ to prevent race conditions.
 
 **BUG-TASKS-04: IIFE closures for task loop captures**
 - Complete and edit button callbacks now use IIFEs to correctly capture task reference in loop.
@@ -2949,292 +2682,433 @@ File: `src/21_WebDashDataService.gs`, line 35
 
 ### Columns With No Alias (intentional — not read by DataService)
 These exist in the sheet but are read directly by non-DataService code (GS functions, formulas) and not needed in the webapp frontend: `Contact Steward`, `Contact Notes`, `Cubicle`, `Days to Deadline` (member sheet), `Employee ID`, `Grievance Status` (member sheet), `Interest: *`, `Last Virtual/In-Person Mtg`, `Manager`, `Open Rate %`, `PIN Hash`, `Preferred Communication`, `Recent Contact Date`, `Start Grievance`, `Volunteer Hours`, `⚡ Actions`. Grievance sheet: all step date columns, reminder columns, acknowledgment columns, drive folder columns — read by GS backend only.
+## ⏱️ Test Runner Timeout Fix (2026-03-09, v4.25.6)
 
----
+### Root cause
+GAS has a hard 6-minute execution limit. The test runner had a 5-minute soft guard that checked BETWEEN tests, but:
+1. 82 tests × ~4s each = ~5.5 min cumulative
+2. 16 calls to `SpreadsheetApp.getActiveSpreadsheet()` (each a network round-trip)
+3. `authsweep` suite calls 16+ real endpoint functions, each doing `checkWebAppAuthorization()` → `getUserRole_()` → sheet read
+4. A single slow test at minute 5:01 would push past 6:00 before the next guard check fired
 
-## 🐛 BUG FIX LOG — 2026-03-11
+### Fixes applied
+1. **Timeout lowered: 5min → 3.5min** — gives 2.5min safety margin instead of 1min
+2. **Cached spreadsheet reference** — `_getCachedSS()` replaces 12 individual `SpreadsheetApp.getActiveSpreadsheet()` calls in test functions. Infrastructure functions (menu handlers, email sender) still use direct calls since they run in separate execution contexts.
+3. **Cache reset** — `_testSS_ = null` at start of `runAll()` prevents stale references between runs
+4. **SPA timeout handling** — timeout warning banner with guidance to use suite filter, skipped count card, suite headers show skipped count, failure handler detects "execution time" error and shows helpful message
 
-### Bug: Member mobile bottom-nav Contact tab broken (stuck on main page)
-**Symptom:** Clicking the "Contact" tab in the member bottom nav (mobile) had no effect — user was silently redirected back to the Home page.
-**Root Cause:** Tab ID mismatch.
-- `renderBottomNav()` in `steward_view.html` used `id: 'contact'` for the Contact tab
-- `_handleTabNav()` in `index.html` handles `case 'stewarddirectory'` (not `'contact'`), causing the unknown ID to fall through to `default: renderMemberHome(app)`
-**Fix:** Changed `id: 'contact'` → `id: 'stewarddirectory'` in `renderBottomNav` member tabs array (`steward_view.html` line ~492).
-**Files changed:** `src/steward_view.html`, `dist/steward_view.html`
-**Note:** `stewarddirectory` is already defined in `TAB_COLORS` so theming is unaffected.
+### Files modified
+1. `src/30_TestRunner.gs` — timeout constant, SS cache, cache reset in runAll
+2. `src/steward_view.html` — timeout banner, skipped card, suite skipped count, failure message
 
-### ⚠️ RULE: Tab IDs in `renderBottomNav` MUST match `case` labels in `_handleTabNav`
-When adding/renaming bottom nav tabs, always cross-check both:
-1. `renderBottomNav()` in `steward_view.html` — tab `id` property
-2. `_handleTabNav()` in `index.html` — `case 'tabId':` handler
+## 🐛 onOpen Deferred Trigger Bug Fix (2026-03-10, v4.25.7)
 
----
+### Root Cause
+Two compounding bugs in `onOpen()` (`10_Main.gs`) caused `onOpenDeferred_()` to never run on sheet open:
 
-## 🐛 BUG FIX LOG — 2026-03-11 (Part 2)
+**Bug 1 — ScriptApp not allowed in simple triggers:**
+`ScriptApp.getProjectTriggers()` requires authorization that GAS simple triggers do not have. The call threw silently, fell into the catch block, and attempted to call `onOpenDeferred_()` inline — but that function also calls `ScriptApp.getProjectTriggers()` internally (to self-clean), which failed for the same reason.
 
-### Bug: Nav (sidebar AND bottom bar) completely invisible
-**Symptom:** Neither sidebar nav (desktop) nor bottom nav bar (mobile) was visible. User stuck on home/main page content with no way to navigate.
-**Root Cause:** `renderPageLayout()` in `index.html` used a JS conditional (`isSidebarLayout()`) to decide which nav to render. Only ONE branch was taken each render:
-- `isSidebarLayout() = true` → sidebar path taken → `renderBottomNav()` NOT called
-- `isSidebarLayout() = false` → bottom nav path → sidebar NOT added to DOM
+**Bug 2 — finally block race condition:**
+Even if Bug 1 didn't exist, the `finally { cleanUpOnOpenTrigger_() }` block ran synchronously immediately after trigger creation — deleting the 1-second deferred trigger before it could fire. GAS timer triggers need to be allowed to tick; `finally` does not wait.
 
-If `isSidebarLayout()` returned the wrong value (due to viewport detection issues in GAS iframe context, timing, or any edge case), ZERO nav was rendered into the DOM.
-**Fix:** `renderPageLayout()` now ALWAYS adds both sidebar-nav AND bottom-nav to the DOM. CSS media queries (`@media (min-width: 640px)`) control which is visible. This eliminates the JS conditional entirely from nav rendering.
-**Files changed:** `src/index.html`, `dist/index.html`
-**Note:** `isSidebarLayout()` is still used in `_stewardHeader()` and `_memberHeader()` for showing/hiding mobile utility buttons — that usage is fine since it's for supplemental UI, not the primary nav.
+**Practical impact:** `syncColumnMaps()`, `enforceHiddenSheets()`, tab colors, and the "Dashboard loaded" toast never executed on sheet open.
 
-### ⚠️ ARCHITECTURAL RULE: Nav must always be in DOM
-NEVER conditionally add the primary navigation to the DOM based on JS viewport detection.
-ALWAYS use CSS media queries (`@media`) to control nav visibility.
-JS viewport detection (`window.innerWidth`) can be unreliable in GAS iframe context.
+### Fixes Applied
+1. **`onOpen()` simplified** — now only does cache clear + `createDashboardMenu()`. No ScriptApp calls, no finally block. Correct GAS simple trigger pattern.
+2. **`setupOpenDeferredTrigger()`** added to `08e_SurveyEngine.gs` — installs `onOpenDeferred_` as an installable `onOpen` trigger via `ScriptApp.newTrigger().forSpreadsheet().onOpen().create()`. Safe to re-run (removes existing first).
+3. **`menuInstallSurveyTriggers()`** updated — now also calls `setupOpenDeferredTrigger()` so "Install ALL" covers this fix.
+4. **Menu item added** — Admin → ⏱️ Triggers → 🔓 Install onOpen Deferred Trigger
 
----
-
-## 🧪 TEST GUARD LOG — 2026-03-11
-
-### G15: Bottom nav tab IDs have route handlers (`spa-integrity.test.js`)
-Prevents recurrence of the 2026-03-11 bug where `renderBottomNav` used `id:'contact'`
-but `_handleTabNav` only handled `case 'stewarddirectory'`. G8 only covered sidebar tabs —
-G15 closes the gap by also checking all bottom nav tab IDs against `_handleTabNav` case labels.
-
-### G16: renderPageLayout always renders both sidebar and bottom nav (`spa-integrity.test.js`)
-Prevents revert of the 2026-03-11 architectural fix. Guards three properties:
-1. `renderSidebarItems` is called unconditionally (not inside `if (isSidebarLayout())`)
-2. `renderBottomNav` is called unconditionally (not inside an `else` branch)
-3. No `if (isSidebarLayout()) { ... } else { ... }` branch exists in the function
-
----
-
-## 🔍 CODE REVIEW SESSION — 2026-03-11 (Resumed)
-
-### Scope
-Full end-to-end audit of all 38 .gs source files + 3 HTML files (~93K lines).
-Previous session covered: 00_Security.gs, 00_DataAccess.gs, 01_Core.gs, 19_WebDashAuth.gs, 22_WebDashApp.gs, 10_Main.gs.
-This session covered: 02_DataManagers.gs, 21_WebDashDataService.gs, 08c_FormsAndNotifications.gs, 05_Integrations.gs, 06_Maintenance.gs, 15_EventBus.gs, 20_WebDashConfigReader.gs, 28_FailsafeService.gs, 25_WorkloadService.gs, index.html, member_view.html, steward_view.html (partial deep + pattern scans).
-
-### ✅ FIXED — FIX-WDS-01: dataGetFullProfile signature bug
-**File:** `src/21_WebDashDataService.gs` ~line 2947
-**Bug:** Function declared as `dataGetFullProfile(email)` but body referenced `sessionToken` (undefined in scope). This caused a `ReferenceError` on every call — members could NEVER load their full profile from the web dashboard.
-**Fix:** Renamed signature to `dataGetFullProfile(sessionToken, email)`. Also passed sessionToken to `checkWebAppAuthorization('steward', sessionToken)` for consistency.
-**Severity:** CRITICAL (profile page broken for all members)
-
-### ✅ FIXED — FIX-SEC-01: sendSecurityAlertEmail_ used MailApp directly
-**File:** `src/00_Security.gs` ~line 804, 851
-**Bug:** `sendSecurityAlertEmail_()` called `MailApp.sendEmail()` directly and did its own `getRemainingDailyQuota()` check, inconsistent with every other email sender in codebase which uses `safeSendEmail_()`. If quota was exceeded, MailApp would throw an unhandled exception inside the catch block.
-**Fix:** Replaced `MailApp.sendEmail()` with `safeSendEmail_()`. Removed redundant quota check (safeSendEmail_ handles this internally with proper logging).
-**Severity:** MINOR (inconsistency; practical risk low since critical alerts are infrequent)
-
-### ✅ FIXED — FIX-MAIN-01: recalculateDownstreamDeadlines_ hardcoded calendar day math
-**File:** `src/10_Main.gs` ~line 838
-**Bug:** Deadline cascade chain used hardcoded day values (21, 30, 10, 30, 30) and raw millisecond arithmetic (`* 86400000` = calendar days). All other deadline calculations use `getDeadlineRules()` for configurable values and `addBusinessDays()` for business-day math.
-**Fix:** Chain now reads `getDeadlineRules()` and uses `addBusinessDays()` for each cascade step.
-**Note:** The DEFAULTS for these chain values are: FILING_DAYS=21, STEP_1_RESPONSE=7, STEP_2_APPEAL=7, STEP_2_RESPONSE=14, STEP_3_APPEAL=10. Previous hardcoded values (30, 10, 30, 30) did NOT match these defaults. The old values may have reflected different contractual rules — verify Config sheet is seeded correctly.
-**Severity:** MEDIUM (wrong deadlines cascade when a steward overrides a date)
-
-### ℹ️ OBSERVATION: GRIEVANCE_TRACKER and GRIEVANCE_LOG are aliases
-Both `SHEETS.GRIEVANCE_TRACKER` and `SHEETS.GRIEVANCE_LOG` point to `'Grievance Log'` (01_Core.gs lines 815, 859). This is intentional for backward compatibility but creates inconsistency in which alias different files use. Not a bug but a code smell.
-
-### ℹ️ OBSERVATION: onSatisfactionFormSubmit trigger deprecated v4.21.0
-`onSatisfactionFormSubmit()` in 08c_FormsAndNotifications.gs is now a no-op that logs a warning. If an old trigger is still installed in the project, it will fire on every form submit and log noise. Run `ScriptApp.getProjectTriggers()` to check and remove stale triggers.
-
-### ℹ️ OBSERVATION: Stale @version tags in file headers
-Multiple files still show old version numbers in their JSDoc `@version` tags (e.g., 4.7.0, 4.13.0). These are cosmetic only — the canonical version lives in `COMMAND_CONFIG.VERSION` in `01_Core.gs`. No action required but worth noting for maintainability.
-
-### ✅ CONFIRMED OK: All client-side render functions resolve correctly
-`index.html` includes BOTH `steward_view.html` AND `member_view.html` unconditionally (lines 1094-1095). Functions like `renderFeedbackPage` (steward_view), `renderWorkloadTracker` (member_view), and `renderQAForum` (member_view) are available to both roles at runtime. No dead render routes found.
-
-### ✅ CONFIRMED OK: All server function calls from member_view and steward_view resolve
-All `serverCall().funcName()` calls in `member_view.html` and `steward_view.html` were verified against source .gs files. Every function exists in either `21_WebDashDataService.gs`, `05_Integrations.gs`, `08e_SurveyEngine.gs`, or `25_WorkloadService.gs`. Zero dead RPC calls found.
-
-### ✅ CONFIRMED OK: XSS protection consistent across HTML files
-All user-data insertions via `innerHTML` in `member_view.html` and `steward_view.html` use `safeText()` (defined in `index.html` line 253). No raw interpolation of server data found.
-
-### ✅ CONFIRMED OK: Deadline calculations in 02_DataManagers.gs use getDeadlineRules()
-`calculateInitialDeadlines()`, `calculateNextStepDeadline()`, and `calculateResponseDeadline()` all call `getDeadlineRules()` and `addBusinessDays()`. This is correct.
-
-### ✅ CONFIRMED OK: Member deduplication (findExistingMember) is sound
-Priority: Member ID > Email > Name. Returns first high-confidence match. Does not stop scanning after name match (keeps looking for ID/email match). Correct.
-
-### ✅ CONFIRMED OK: Grievance ID sequence scanning is year-aware
-`getNextGrievanceId()` scans only current-year IDs (GRV-YYYY-NNNN format). Rolls over correctly on January 1.
-
----
-
-## ⚡ DevMenu.gs — Dev-Only Quick Deploy Menu (v4.27.0)
-
-**File:** `src/DevMenu.gs` (dev build only, excluded from `--prod` via `PROD_EXCLUDE` in `build.js`)
-
-**Purpose:** Consolidated "⚡ Dev Tools" menu providing one-click access to all initialization, refresh, trigger, and setup functions. Adds a top-level menu to the spreadsheet UI in dev builds only.
-
-**Build Gating:**
-- `build.js` `PROD_EXCLUDE` array includes `DevMenu.gs`
-- `onOpen()` in `10_Main.gs` uses `typeof buildDevMenu === 'function'` guard
-- Production builds never reference or load this file
-
-**Architecture:**
-- `buildDevMenu()` — creates the menu (called from `onOpen`)
-- `runDevGroup_(groupName, items)` — shared helper for master group actions
-- `devRunAll_*()` — 4 master "run all" buttons
-- `devWrap_(label, fn)` — shared helper for individual wrappers
-- `devWrap_*()` — 27 named wrapper functions (required by GAS string-based menu refs)
-
-### Menu Item → Function Map
-
-| # | Menu Label | Grp | Underlying Function | Source File | Line |
-|---|-----------|-----|---------------------|-------------|------|
-| 1 | Initialize All Trigger Functions | 1 | `menuInstallSurveyTriggers` | `08e_SurveyEngine.gs` | 851 |
-| 2 | Initialize All Sync Functions | 1 | `syncAllData` | `09_Dashboards.gs` | 1921 |
-| 3 | Initialize All Install Functions | 1 | `initializeDashboard` | `10_Main.gs` | 1066 |
-| 4 | Initialize All Refresh Functions | 1 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
-| 5 | Initialize Survey Engine | 1 | `initSurveyEngine` | `08e_SurveyEngine.gs` | 21 |
-| 6 | Initialize Poll Sheets | 1 | `wqInitSheets` | `24_WeeklyQuestions.gs` | 553 |
-| 7 | Workload: Initialize Sheets | 1 | `initWorkloadTrackerSheets` | `25_WorkloadService.gs` | 1131 |
-| 8 | Sync All Data Now | 2 | `syncAllData` | `09_Dashboards.gs` | 1921 |
-| 9 | Run Bulk Validation | 2 | `runBulkValidation` | `07_DevTools.gs` | 3446 |
-| 10 | Force Global Refresh | 2 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
-| 11 | Refresh All Formulas | 2 | `refreshAllFormulas` | `10c_FormHandlers.gs` | 243 |
-| 12 | Refresh All Member Data | 2 | `refreshMemberDirectoryFormulas` | `10c_FormHandlers.gs` | 210 |
-| 13 | Refresh View | 2 | `refreshMemberView` | `11_CommandHub.gs` | 315 |
-| 14 | Backfill Minutes | 2 | `BACKFILL_MINUTES_DRIVE_DOCS` | `21_WebDashDataService.gs` | 3255 |
-| 15 | Warm Up All Caches | 2 | `warmUpCaches` | `06_Maintenance.gs` | 741 |
-| 16 | Install All Survey Triggers | 3 | `menuInstallSurveyTriggers` | `08e_SurveyEngine.gs` | 851 |
-| 17 | Install Quarterly Trigger | 3 | `setupQuarterlyTrigger` | `08e_SurveyEngine.gs` | 455 |
-| 18 | Install Weekly Reminder Trigger | 3 | `setupWeeklyReminderTrigger` | `08e_SurveyEngine.gs` | 740 |
-| 19 | Install Community Poll Draw Trigger | 3 | `setupCommunityPollTrigger` | `24_WeeklyQuestions.gs` | 658 |
-| 20 | Workload: Setup Reminders | 3 | `setupWorkloadReminderSystem` | `25_WorkloadService.gs` | 1139 |
-| 21 | Install onOpen Deferred Trigger | 3 | `setupOpenDeferredTrigger` | `08e_SurveyEngine.gs` | 882 |
-| 22 | Enable Midnight Auto-Refresh | 4 | `setupMidnightTrigger` | `04d_ExecutiveDashboard.gs` | 342 |
-| 23 | Enable 1 AM Dashboard Refresh | 4 | `createAutomationTriggers` | `04d_ExecutiveDashboard.gs` | 318 |
-| 24 | Setup Weekly Backup | 4 | `setupWeeklySnapshotTrigger` | `06_Maintenance.gs` | 1794 |
-| 25 | Setup Union Events Calendar | 4 | `SETUP_CALENDAR` | `05_Integrations.gs` | 4001 |
-| 26 | Setup / Repair Drive | 4 | `SETUP_DRIVE_FOLDERS` | `05_Integrations.gs` | 3982 |
-| 27 | Create Meeting Check-In | 4 | `setupMeetingCheckInSheet` | `10a_SheetCreation.gs` | 1752 |
-
-**Master Buttons:** Each runs all items in its group sequentially with per-item try/catch and a single summary alert.
-- ⚙️ Initialize All → Group 1 (7 items)
-- 🔄 Refresh All → Group 2 (8 items)
-- 📦 Install All Triggers → Group 3 (6 items)
-- 🗓️ Setup All Scheduled → Group 4 (6 items)
-
-
----
-
-## v4.29.0 — Notifications Tab Fixes (2026-03-14)
-
-### Changes Made
-| # | File | Fix | Details |
-|---|------|-----|---------|
-| 1 | `steward_view.html` | Bug: Steward inbox missing "Auto-expires" badge on Timed notifications | Added `if (n.dismissMode === 'Timed')` badge block to `_renderNotifInbox` to match member view. Stewards retain dismiss button by design. |
-| 2 | `steward_view.html` | Bug: Archive pill DOM mutation silently no-ops | Replaced chained `querySelector` with single captured `statusPill` variable — prevents null-chain silent failure after `textContent` changes. |
-| 3 | `05_Integrations.gs` + `steward_view.html` | Security: `getNotificationRecipientListFull` had no auth gate | Added `checkWebAppAuthorization('steward', sessionToken)` guard. Updated function signature to accept `sessionToken`. Frontend compose call updated to pass `SESSION_TOKEN`. |
-| 4 | `08c_FormsAndNotifications.gs` | Dead code: EventBus.emit in GAS time-based triggers | Removed both `EventBus.emit` blocks from `checkDeadlinesAndNotify_()` and `sendStewardDeadlineAlerts()`. EventBus is client-side only — these blocks never executed. |
-| 5 | `05_Integrations.gs` | Dead code: `getNotificationRecipientList` | Removed — superseded by `getNotificationRecipientListFull`. No callers. |
-| 6 | `member_view.html` + `steward_view.html` | UX: Bell badge does not clear when notifications tab is opened | Added mark-all-read on tab open: `AppState.notificationCount = 0` + badge DOM update at entry of `renderMemberNotifications` and `renderStewardNotifications`. Steward bell preserves `qaUnansweredCount` portion. |
-
-### Notification System Reference
-- **Sheet**: `Notifications` (13 cols via `NOTIFICATIONS_HEADER_MAP_`)
-- **Schema**: Notification_ID, Recipient, Type, Title, Message, Priority, Sent_By, Sent_By_Name, Created_Date, Expires_Date, Dismissed_By, Status, Dismiss_Mode
-- **Dismiss modes**: `Dismissible` (member can permanently close) | `Timed` (auto-expires, no dismiss for members, stewards can still dismiss)
-- **Backend functions** (`05_Integrations.gs`): `getWebAppNotifications`, `getWebAppNotificationCount`, `dismissWebAppNotification`, `sendWebAppNotification`, `getAllWebAppNotifications`, `archiveWebAppNotification`, `getNotificationRecipientListFull` (steward-auth-gated)
-- **Bell badge**: Built from `AppState.notificationCount` (from batch preload) + `qaUnansweredCount` (steward only). Zeroed on notifications tab open.
-- **Priority sort**: Urgent always floats to top (reverse-then-sort, v4.22.0 fix).
-
-## v4.26.0 — Unified Theme Engine (2026-03-14)
-
-### What Changed
-- **Merged ThemeEngine + NavThemes into single `UnifiedTheme`** in `index.html`
-  - One IIFE controls: role themes, visual styles, accent palette, CRT overlays
-  - Backward-compat aliases: `var ThemeEngine = UnifiedTheme; var NavThemes = UnifiedTheme;`
-  - No changes needed in auth_view.html, error_view.html, member_view.html, steward_view.html — they use the aliases
-- **Full-page theme styles** replace nav-only CSS in `styles.html`
-  - `.theme-{name}` class on `<body>` affects sidebar, cards, tables, buttons, badges, backgrounds — everything
-  - Old `.nav-theme-{name}` class still applied for any legacy selectors
-- **5 visual styles** (all full-page now):
-  - `default` — clean, professional, no effects
-  - `blobLava` — molten morphing accents, heat wave background, floating KPI cards, lava gradient buttons
-  - `cyberpunk` — PIXEL TERMINAL: Press Start 2P / Silkscreen / Share Tech Mono fonts, CRT scanlines + vignette + pixel grid overlays (injected as DOM elements by `_manageCrtOverlay()`), red neon (#ff2a6d) forced palette, 0px border-radius, stepped transitions, pulsing borders
-  - `shatter` — angular clip-paths on all cards/buttons/badges, arrow-shaped active sidebar, crystalline glow
-  - `liquidPour` — 28px+ radius, pill buttons, floating animations, Righteous font, rounded sidebar
-- **Fonts added**: Press Start 2P, Silkscreen, Share Tech Mono, Orbitron, Righteous (all via Google Fonts with display=swap)
-- **Cyberpunk forces its own palette** regardless of role/mode/accent — hardcoded dark-only with red neon. Other themes respect accent hue picker.
-- **CRT overlay management**: `UnifiedTheme._manageCrtOverlay(show)` creates/removes three DOM elements (#crt-overlay, #crt-beam, #crt-grid) when entering/leaving cyberpunk theme
-- **`UnifiedTheme.apply()`** is the single entry point: applies role theme OR cyber palette, sets body class, manages CRT overlays
-
-### Key API (UnifiedTheme)
-- `apply()` — full theme application (call after any state change)
-- `setStyle(id)` — change visual style + persist to localStorage + apply
-- `getTheme(role, isDark)` — get role theme object
-- `applyTheme(t)` — low-level: set CSS vars from theme object
-- `updatePalette(hue)` — change accent hue + re-apply
-- `getTabColor(tabId)` — per-tab accent color for themed nav
-- `getAll()` — all style definitions
-- `getCurrent()` — current style definition
+### ⚠️ Action Required After Deploy
+Run **Admin → ⏱️ Triggers → ✅ Install ALL Survey Triggers** (or 🔓 Install onOpen Deferred Trigger alone) ONCE per Google account that uses the sheet. Installable triggers are per-user.
 
 ### Files Modified
-- `src/index.html` + `dist/index.html`: UnifiedTheme replaces ThemeEngine + NavThemes, font link updated
-- `src/styles.html` + `dist/styles.html`: full-page theme CSS replaces nav-only CSS, CRT overlay styles added, reduced-motion updated
+1. `src/10_Main.gs` — `onOpen()` stripped to menu-only
+2. `src/08e_SurveyEngine.gs` — `setupOpenDeferredTrigger()` added, `menuInstallSurveyTriggers()` updated
+3. `src/03_UIComponents.gs` — new menu item in Triggers submenu
+4. `dist/` — all three files mirrored
 
-## v4.26.1 — Consolidate renderBottomNav to index.html (2026-03-14)
+---
 
-### What Changed
-- **Moved `renderBottomNav()` from `steward_view.html` → `index.html`** (line ~1278)
-  - Was in steward_view.html despite being used by both roles — code organization smell
-  - Now sits between `_getSidebarTabs()` and `renderOrgChart()` — all nav code in one file
-  - Updated `NavThemes.getTabColor()` calls → `UnifiedTheme.getTabColor()` in the moved function
-  - Removed blob indicator for cyberpunk (no longer needed — cyberpunk uses CSS-only bottom nav styling)
-  - Left comment in steward_view.html: `// renderBottomNav() — consolidated to index.html (v4.26.1)`
-- **steward_view.html callers (lines 470, 481)** still call `renderBottomNav()` — resolves from global scope since index.html is the SPA shell
+## 🐛 BUG FIX LOG ENTRY — 2026-03-10 (v4.25.8)
 
-### Files Modified
-- `src/index.html` + `dist/index.html`: renderBottomNav added (~150 lines)
-- `src/steward_view.html` + `dist/steward_view.html`: renderBottomNav removed (~150 lines)
+### Email Magic Link Login Broken
 
-## v4.26.2 — Cyberpunk Neon Color Picker (2026-03-14)
+**Symptom:** "Email me a sign-in link" button showed error screen; no email received.
 
-### What Changed
-- **4 neon color options for cyberpunk theme**: Red (#ff2a6d), Green (#00ffaa), Blue (#00bbff), Purple (#bf5af2)
-- **CSS variable approach**: All 41 hardcoded neon references in `styles.html` replaced with `var(--neon-solid)` and `rgba(var(--neon-rgb), opacity)`. JS sets `--neon-solid` and `--neon-rgb` on `<html>` when applying cyberpunk.
-- **`CYBER_NEONS` map** in UnifiedTheme: each entry has `solid`, `rgb`, `dim`, `label`, `emoji`
-- **`_buildCyberPalette(neonKey)`**: dynamically generates the full cyberpunk palette from any neon color
-- **`UnifiedTheme.setCyberNeon(key)`**: changes neon color, persists to `localStorage('dds_cyberNeon')`, re-applies theme
-- **`AppState.cyberNeon`**: persisted via localStorage, default 'red'
-- **Sidebar neon picker**: when cyberpunk is the active theme, a row of 4 color swatches appears below the cyberpunk option in the Nav Style picker. Active swatch has white border + glow. Click swaps neon color live.
+**Root Cause:** Authorization gap in `MailApp` scope.
+- `MailApp.sendEmail()` requires `script.send_mail` OAuth scope
+- That scope was added to `appsscript.json` in v4.24.9 (2026-03-08)
+- GAS rule: adding a scope to the manifest does NOT auto-authorize deployed web apps
+- The deployed web app still ran with old scopes (missing `script.send_mail`)
+- `MailApp.sendEmail()` threw an auth exception → inner catch → `{success: false}` → error UI
 
-### API Additions
-- `UnifiedTheme.CYBER_NEONS` — { red, green, blue, purple } neon color definitions
-- `UnifiedTheme.setCyberNeon(key)` — change neon color + persist + apply
+**Fix applied in `src/19_WebDashAuth.gs`:**
+- **Primary sender switched to `GmailApp.sendEmail()`** — uses `gmail.send` scope, which was authorized in the deployment long before `script.send_mail` was added
+- **MailApp kept as fallback** — if GmailApp fails, MailApp is tried (works once deployment is re-authorized)
+- **Added step-by-step `Logger.log` statements** (STEP 0–5) so Stackdriver shows exactly where failures occur
+- **`testAuthEmailSend(testEmail)` global function added** — run from Apps Script editor to test both GmailApp and MailApp independently
 
-### Files Modified
-- `src/index.html` + `dist/index.html`: CYBER_NEONS, _buildCyberPalette(), setCyberNeon(), neon picker in sidebar
-- `src/styles.html` + `dist/styles.html`: 41 hardcoded #ff2a6d/rgba(255,42,109,...) → CSS vars
+**Re-authorization note (for admin):**
+To fully authorize `script.send_mail` in the deployed web app:
+1. Open Apps Script editor → Deploy → Manage deployments
+2. Create a new deployment version
+3. Authorize all scopes when prompted
+This makes MailApp work too (both primary and fallback paths will succeed).
 
-## v4.26.3 — Multi-Neon Cyberpunk Mode (2026-03-14)
+**Diagnostic tool:**
+```javascript
+// Run from Apps Script editor:
+testAuthEmailSend()               // sends to script owner
+testAuthEmailSend('your@email')  // sends to specific address
+```
+Check Stackdriver logs for pass/fail per sender.
 
-### What Changed
-- **"Multi" added as 5th cyberpunk neon option** — rainbow icon in swatch picker
-- **Zone-specific neon colors**: sidebar=purple, title=red, buttons=cyan, table=green, KPI cards=red/cyan/green/yellow
-- **`MULTI_NEON_ZONES` map** defines per-zone colors (solid + rgb)
-- **`apply()` updated**: when `isMulti`, sets 8 pairs of CSS vars (`--neon-sidebar`, `--neon-sidebar-rgb`, etc.) and adds `cyber-multi` class to body
-- **CSS overrides**: `.cyber-multi` class targets each zone's selectors with zone-specific var references
-- **Rainbow effects**: scan beam uses multi-color gradient, info cards cycle border through all zone colors, HP bar shimmer
-- **Non-multi modes unaffected** — `cyber-multi` class removed when switching to single-color neon
+**Key design rule reinforced:** When adding new OAuth scopes to `appsscript.json`, always create a new web app deployment and re-authorize. The deployed web app does NOT inherit new scopes automatically.
 
-### Files Modified
-- `src/index.html`: CYBER_NEONS.multi, MULTI_NEON_ZONES, apply() multi logic
-- `src/styles.html`: .cyber-multi zone override CSS (~50 rules), multiRainbowBorder animation
+---
 
-## v4.27.0 — Brutalist, Retro OS, Comic Themes (2026-03-15)
+## 🧪 TEST SUITE ENTRY — 2026-03-10 (v4.25.9)
 
-### What Changed
-- **3 new full-page themes** added to UnifiedTheme:
-  - `brutalist` — Bebas Neue + Space Mono, cream bg, black 3px borders, 6px hard drop shadows, red accent, zero radius
-  - `retroOS` — Pixelify Sans, teal (#008080) desktop, Win95 beveled borders (white top-left, gray bottom-right), blue gradient title bars, navy highlight selection
-  - `comic` — Bangers + DM Sans, halftone dot bg, 4-5px black outlines, skewed buttons/cards, each KPI a different color (yellow/red/cyan/lime), text shadows
-- **FORCED_PALETTES map** — brutalist/retroOS/comic each override role theme entirely (like cyberpunk), setting their own bg, fonts, colors
-- **apply() updated** — checks `FORCED_PALETTES[styleId]` before falling back to role theme
-- **Fonts added**: Bebas Neue, Space Mono, Pixelify Sans, Bangers, DM Sans
-- **8 total themes**: Default, Blob Lava, Cyberpunk (5 neons), Shatter, Liquid Pour, Brutalist, Retro OS, Comic
+### `emailsend` Suite Added to TestRunner
 
-### Files Modified
-- `src/index.html`: font link, style defs, FORCED_PALETTES, apply() logic
-- `src/styles.html`: ~120 lines CSS per new theme (brutalist, retroOS, comic)
+**Why:** The v4.25.8 bug (MailApp scope not authorized) would have been caught immediately by runtime tests.
+No tests existed to verify email services were accessible before the bug was reported in production.
+
+**What was added:**
+
+| File | Change |
+|------|--------|
+| `src/30_TestRunner.gs` | 10 new tests in `emailsend` suite |
+| `src/steward_view.html` | "Email & Auth Scopes" suite added to filter dropdown |
+| `.github/workflows/build.yml` | `scope-change-guard` CI job added |
+| `CLAUDE.md` | Rule 7: OAuth scope re-auth requirement documented |
+
+**Tests in `emailsend` suite:**
+
+| Test | What it catches |
+|------|----------------|
+| `test_emailsend_gmailAppAccessible` | GmailApp quota call — fails if `gmail.send` scope not authorized in deployment |
+| `test_emailsend_mailAppAccessible` | MailApp quota call — soft-fail if `script.send_mail` scope not authorized |
+| `test_emailsend_webAppUrlResolvable` | ScriptApp.getService().getUrl() null → broken sign-in links |
+| `test_emailsend_scriptPropertiesWritable` | PropertiesService R/W — fails = token storage broken, all auth fails |
+| `test_emailsend_cacheServiceWritable` | CacheService R/W — fails = rate limiting & sheet cache broken |
+| `test_emailsend_authModuleExists` | Auth IIFE missing from dist → all magic link auth silently broken |
+| `test_emailsend_globalWrappersExist` | google.script.run target functions missing → client-side failure |
+| `test_emailsend_rateLimitKeyFormat` | Rate limit key malformed → rate limiting bypassed silently |
+| `test_emailsend_tokenPrefixNotConflicting` | Token type bleeding (session vs magic link) |
+| `test_emailsend_sendMagicLinkBadEmailReturnsSafe` | Enumeration defense + full code path smoke test (no email sent) |
+
+**`scope-change-guard` CI job:**
+- Runs on every push to `Main`
+- Diffs `appsscript.json` against previous commit
+- If scopes were ADDED: **fails the build** with re-authorization instructions in GitHub Actions summary
+- If scopes were REMOVED: warns but passes
+- Uses `python3` to parse JSON (no external deps)
+
+**Key rule encoded in CLAUDE.md (Rule 7):**
+> Adding a scope to `appsscript.json` REQUIRES re-authorization of the deployed web app.
+> GAS does NOT auto-authorize new scopes in existing deployments.
+
+---
+
+## Comprehensive Code Audit — 2026-03-10
+
+### Audit Summary
+- **Scope**: Full codebase audit of 93,305 lines across 43 source files
+- **Version**: v4.25.7
+- **Result**: 1 critical bug, 4 high-severity, 5 medium-severity findings
+
+### Critical Bug Found
+- `03_UIComponents.gs:120` — Menu item calls `wtArchiveOldData_` but function is `wtArchiveOldData` (no underscore)
+
+### Key Metrics
+- 1,380 global functions, 109 frontend→backend calls (100% wired)
+- 41 test suites, 2,446 tests passing
+- 58/60 data functions have auth gates (2 are safe stubs)
+- 0 eval() calls, 0 script ID leaks, 0 npm vulnerabilities
+- 202 potentially unused functions (~14.6% dead code)
+- 12 source files have no dedicated test coverage
+- 7 hardcoded sheet name strings violate dynamic config rules
+- package.json version (4.25.2) mismatches COMMAND_CONFIG.VERSION (4.25.7)
+
+### Hardcoded Values Found
+- `06_Maintenance.gs:3365` — `'_Archive_Grievances'`
+- `21_WebDashDataService.gs:568,575,642,649` — Fallback sheet name strings
+- `21_WebDashDataService.gs:1525,3000` — `'Contact Log'`
+- `08a_SheetSetup.gs:373-374`, `21_WebDashDataService.gs:1685-1686` — Column indices 11, 12
+- `10b_SurveyDocSheets.gs:1992,2007` — `system@massability.org`
+
+### See
+- `docs/archived-reviews/COMPREHENSIVE_AUDIT_2026-03-10.md` for the full report with all findings, evidence, and recommendations.
+
+---
+
+## 🔍 COMPREHENSIVE AUDIT LOG — 2026-03-10
+
+**Audit version:** v4.25.7 | **Audit type:** Full codebase review
+**Full report:** `docs/archived-reviews/COMPREHENSIVE_AUDIT_2026-03-10.md`
+
+### Key Findings Summary
+- ✅ 117/117 HTML→GS server function wires verified
+- ✅ 60/60 data endpoints authenticated
+- ✅ 0 duplicate function names
+- ✅ src/dist parity perfect
+- ✅ DDS Script ID absent from source
+- ⚠️ 142 orphaned/dead functions identified
+- ⚠️ 32 getSheetByName calls without null guard
+- ⚠️ 5 data-write functions without lock protection
+- ⚠️ 7 hardcoded values violating dynamic-config rule
+- ⚠️ 14 source files without test coverage (14,853 lines)
+- ⚠️ 965 KB total HTML payload
+- ⚠️ 30+ @deprecated functions still shipping
+
+### Hardcoded Values Found
+1. `06_Maintenance.gs:3365` — `'_Archive_Grievances'` (needs SHEETS constant)
+2. `21_WebDashDataService.gs:568,575,642,649` — fallback sheet name strings
+3. `21_WebDashDataService.gs:1525,3000` — `'Contact Log'` hardcoded
+4. `10b_SurveyDocSheets.gs:1992,2007` — `'system@massability.org'`
+
+### Data Functions Missing Lock Protection
+1. `syncMemberGrievanceData()` — 02_DataManagers.gs:338
+2. `updateMemberDataBatch()` — 02_DataManagers.gs:951
+3. `addWebAppResource()` — 05_Integrations.gs:4011
+4. `updateWebAppResource()` — 05_Integrations.gs:4076
+5. `deleteWebAppResource()` — 05_Integrations.gs:4118
+
+### Files Without Test Coverage
+04a_UIMenus, 04b_AccessibilityFeatures, 04c_InteractiveDashboard, 04d_ExecutiveDashboard, 08a_SheetSetup, 08b_SearchAndCharts, 08c_FormsAndNotifications, 08d_AuditAndFormulas, 08e_SurveyEngine, 10a_SheetCreation, 10b_SurveyDocSheets, 10c_FormHandlers, 29_Migrations, 30_TestRunner
+
+### Fixes Applied — 2026-03-11
+
+| ID | Fix | File(s) |
+|----|-----|---------|
+| C-1 | Menu wiring `wtArchiveOldData_` → `wtArchiveOldData` | `03_UIComponents.gs:120` |
+| C-2a | `'_Archive_Grievances'` → `HIDDEN_SHEETS.ARCHIVE_GRIEVANCES` | `06_Maintenance.gs:3211,3365` |
+| C-2b | Added `ARCHIVE_GRIEVANCES` to HIDDEN_SHEETS constant | `01_Core.gs:914` |
+| C-2c | Removed redundant `'Grievance Log'` / `'Member Directory'` fallbacks | `21_WebDashDataService.gs:568,575,642,649` |
+| C-2d | `'Contact Log'` → `CONTACT_SHEET_TAB_` global constant | `21_WebDashDataService.gs:19,1435,1526,3001` |
+| C-3 | Hardcoded column indices 11/12 → named variables | `08a_SheetSetup.gs:373-374`, `21_WebDashDataService.gs:1685-1686` |
+| H-1 | `system@massability.org` → `getConfigValue_(CONFIG_COLS.MAIN_CONTACT_EMAIL)` | `10b_SurveyDocSheets.gs:1992,2007` |
+| H-2 | Added ⚠️ AUTH REQUIRED comment on poll stubs | `21_WebDashDataService.gs:3089-3093` |
+| M-5 | Synced `package.json` version to `4.25.7` (matches `COMMAND_CONFIG.VERSION`) | `package.json:3` |
+
+### Try/Catch Analysis Result
+All 13 "unmatched" try blocks are valid `try {} finally {}` patterns (no catch needed). Used for lock cleanup. No bug — no fix required.
+
+### Additional Fixes — 2026-03-11 (Batch 2)
+
+| ID | Fix | File(s) |
+|----|-----|---------|
+| M-2 | **REAL BUG**: `safeText()` was called 11x but never defined — added HTML escape function | `index.html` |
+| M-3 | Deprecated `SHEET_NAMES` alias, migrated 40 references across 6 files to `SHEETS.*` | `01_Core.gs`, `02_DataManagers.gs`, `05_Integrations.gs`, `06_Maintenance.gs`, `08b_SearchAndCharts.gs`, `08d_AuditAndFormulas.gs`, `10_Main.gs` |
+| M-4 | Added `LockService` guards to 6 unlocked write functions | `09_Dashboards.gs` (3), `16_DashboardEnhancements.gs` (3) |
+| EventBus | Wired `registerEventBusSubscribers()` into `onOpenDeferred_()` | `10_Main.gs` |
+
+### Test Coverage — 2026-03-11
+
+Added 12 new test files covering all previously untested source files:
+
+| Test File | Source File | Tests | Focus |
+|-----------|-------------|-------|-------|
+| `08c_FormsAndNotifications.test.js` | `08c_FormsAndNotifications.gs` | 46 | Form handlers, quarter calc, date parsing, survey columns |
+| `08d_AuditAndFormulas.test.js` | `08d_AuditAndFormulas.gs` | 45 | HMAC hashing, vault integrity, hidden sheet constants |
+| `10a_SheetCreation.test.js` | `10a_SheetCreation.gs` | 27 | Config/member/grievance columns, header maps |
+| `08a_SheetSetup.test.js` | `08a_SheetSetup.gs` | 22 | Contact log creation, sheet constants |
+| `04c_InteractiveDashboard.test.js` | `04c_InteractiveDashboard.gs` | 13 | Data retrieval, dropdown values |
+| `04d_ExecutiveDashboard.test.js` | `04d_ExecutiveDashboard.gs` | 22 | Function existence, stats retrieval |
+| `04a_UIMenus.test.js` | `04a_UIMenus.gs` | 14 | Visual control panel, multi-select HTML |
+| `10c_FormHandlers.test.js` | `10c_FormHandlers.gs` | 19 | Folder name sanitization, function existence |
+| `08e_SurveyEngine.test.js` | `08e_SurveyEngine.gs` | 23 | Survey period constants, function existence |
+| `04b_AccessibilityFeatures.test.js` | `04b_AccessibilityFeatures.gs` | 25 | CSV parsing, common styles, quick capture |
+| `10b_SurveyDocSheets.test.js` | `10b_SurveyDocSheets.gs` | 17 | Dynamic email verification, sheet constants |
+| `08b_SearchAndCharts.test.js` | `08b_SearchAndCharts.gs` | 23 | padRight, SHEET_NAMES migration verification |
+| `29_Migrations.test.js` | `29_Migrations.gs` | 1 | Function existence |
+
+Total: 54 test suites, 2,744 tests passing (previously 41 suites, 2,446 tests).
+
+---
+
+## 🔍 CONTRACT AUDIT + FIXES — 2026-03-11 (v4.25.9, Batch 3)
+
+### Verified Contract: SEIU Local 509 Unit 8 CBA (2024–2026), Article 23
+Source: MA DOC Grievance Policy 270.03 for Bargaining Units 8 & 10 (July 2025).
+
+**Actual Unit 8 Grievance Deadlines (calendar days unless noted):**
+
+| Stage | Contract Value | Was in DEADLINE_DEFAULTS | Status |
+|-------|---------------|--------------------------|--------|
+| Filing (after incident) | 21 calendar days | 21 | ✅ Correct |
+| Step I response | 30 cal (21 if meeting) | **7** | ❌ WRONG |
+| Step II appeal | **10 BUSINESS days** | **7** | ❌ WRONG |
+| Step II response | 30 cal (21 if conf.) | **14** | ❌ WRONG |
+| Step III | **Not in Unit 8 CBA** | 10/21 retained | ⚠️ N/A |
+| Arbitration demand | 30 calendar days | 30 | ✅ Correct |
+
+> Unit 8 has only 2 formal steps (Step I → Step II → Arbitration). Step III fields
+> retained in DEADLINE_DEFAULTS for configurable non-Unit-8 deployments.
+
+> **Config sheet MUST be re-seeded** with correct contract values. DEADLINE_DEFAULTS
+> are fallback only — if Config sheet has wrong values, they take precedence.
+
+### Fixes Applied
+
+| ID | Fix | File(s) |
+|----|-----|---------|
+| FIX-CORE-01 | Corrected `DEADLINE_DEFAULTS` to match Art. 23 (Step1Response 7→30, Step2Appeal 7→10, Step2Response 14→30). Added contract source citation in comments. | `01_Core.gs` |
+| FIX-CORE-02 | Removed `SHEETS.GRIEVANCE_TRACKER` duplicate alias (pointed to same string as `SHEETS.GRIEVANCE_LOG`). Migrated all 22 callers to canonical `SHEETS.GRIEVANCE_LOG`. Removed stale skipKey from sheet-existence checker. | `01_Core.gs`, `02_DataManagers.gs`, `05_Integrations.gs`, `06_Maintenance.gs`, `08b_SearchAndCharts.gs`, `08d_AuditAndFormulas.gs`, `10_Main.gs` |
+| FIX-FORMS-01 | Added `auditAndRemoveSatisfactionTrigger()` to detect and delete the stale `onSatisfactionFormSubmit` form-submit trigger (deprecated v4.21.0, still potentially installed). Run from Admin menu or Dev Tools. | `08c_FormsAndNotifications.gs` |
+
+### Action Required
+- [ ] **Re-seed Config sheet** with correct Article 23 deadline values (30, 10, 30, 30)
+- [ ] **Run `auditAndRemoveSatisfactionTrigger()`** once to clean stale trigger
+
+---
+
+## 🗓️ TIMELINE TAB — FULL REBUILD — 2026-03-13 (v4.26.0)
+
+### Context
+Timeline tab reviewed and rebuilt. Original implementation had hardcoded category arrays, no edit UI, no delete confirmation, no description expand, year filter capped at 5 years, and raw Drive ID input.
+
+### Architecture
+| File | Role |
+|------|------|
+| `src/27_TimelineService.gs` | Backend IIFE — CRUD, calendar import, Drive integration |
+| `src/member_view.html` | `renderTimelinePage()` — single definition, shared by both roles |
+| `src/styles.html` | CSS: `.timeline-container`, `.category-badge.*` |
+| Sheet: `_Timeline_Events` | 12-col event records (hidden) |
+| Sheet: `_Timeline_Categories` | 1-col steward-managed category list (hidden) |
+
+### Changes Applied
+
+| ID | Change | File |
+|----|--------|------|
+| TL-01 | Added `SHEETS.TIMELINE_CATEGORIES = '_Timeline_Categories'` | `01_Core.gs` L786 |
+| TL-02 | `_initCategorySheet()` — creates hidden sheet with 6 default categories | `27_TimelineService.gs` |
+| TL-03 | `getCategories()` — reads live from sheet, falls back to defaults | `27_TimelineService.gs` |
+| TL-04 | `addCategory(stewardEmail, category)` — validates, deduplicates, audits | `27_TimelineService.gs` |
+| TL-05 | `deleteCategory(stewardEmail, category)` — row delete + audit | `27_TimelineService.gs` |
+| TL-06 | `getTimelineYears()` — scans col C, returns distinct years descending, **no cap** | `27_TimelineService.gs` |
+| TL-07 | `addTimelineEvent` now validates category against sheet data dynamically | `27_TimelineService.gs` |
+| TL-08 | New global wrappers: `tlGetCategories`, `tlGetTimelineYears`, `tlAddCategory`, `tlDeleteCategory` | `27_TimelineService.gs` |
+| TL-09 | `renderTimelinePage`: year filter built from `tlGetTimelineYears` (all years) | `member_view.html` |
+| TL-10 | `renderTimelinePage`: category filter built from `tlGetCategories` (dynamic) | `member_view.html` |
+| TL-11 | Drive file input: `parseDriveIds()` regex accepts share URLs + raw IDs | `member_view.html` |
+| TL-12 | Inline Edit form per event card (steward only) — wires `tlUpdateTimelineEvent` | `member_view.html` |
+| TL-13 | Delete button requires `confirm()` dialog before firing | `member_view.html` |
+| TL-14 | Description truncated at 200 chars with Show more/less toggle | `member_view.html` |
+| TL-15 | Load More button with remaining count for pagination | `member_view.html` |
+| TL-16 | Categories management sub-tab (steward only): list, add, remove | `member_view.html` |
+| TL-17 | `cachedCategories` shared across sub-tabs to avoid duplicate server calls | `member_view.html` |
+
+### ⚠️ IMPORTANT: Run `tlInitSheets()` once after deploy
+This creates `_Timeline_Categories` on existing installations. Non-destructive.
+Can be triggered from Dev Tools → Initialize Sheets, or Admin menu.
+
+### Drive URL Parsing (TL-11)
+`parseDriveIds(raw)` handles:
+- `https://drive.google.com/file/d/FILE_ID/view`
+- `https://docs.google.com/document/d/FILE_ID/edit`
+- `https://docs.google.com/spreadsheets/d/FILE_ID/edit`
+- Raw file IDs (20+ alphanumeric chars)
+- Multiple entries (newline or comma separated)
+
+### Access Control
+- `tlGetCategories`, `tlGetTimelineYears`, `tlGetTimelineEvents` — any authenticated user (member or steward)
+- All write wrappers (`tlAddCategory`, `tlDeleteCategory`, `tlAddTimelineEvent`, `tlUpdateTimelineEvent`, `tlDeleteTimelineEvent`, `tlImportCalendarEvents`) — steward auth required via `_requireStewardAuth`
+
+### ⚠️ CORE RULES REMINDER (applies to all future timeline work)
+- Categories MUST be read from `_Timeline_Categories` sheet — NEVER hardcode them
+- Year filter MUST be built from actual event dates — NEVER cap at a fixed range
+- Event data validation MUST read valid categories from sheet dynamically
+
+---
+
+## 🔀 TIMELINE FUNCTION SPLIT — 2026-03-13 (v4.26.1)
+
+### Decision
+Per Q2 answer: steward timeline must have its own separate function definition.
+
+### Architecture (final)
+| Function | File | Role | Access |
+|----------|------|------|--------|
+| `renderStewardTimelinePage(appContainer)` | `steward_view.html` | Full write UI | Stewards only |
+| `renderMemberTimelinePage(appContainer)` | `member_view.html` | View-only | All members |
+
+### Routing (index.html)
+```
+steward switch → case 'timeline': renderStewardTimelinePage(app)
+member switch  → case 'timeline': renderMemberTimelinePage(app)
+```
+
+### Why load order matters
+`steward_view.html` is included BEFORE `member_view.html` in index.html.
+If both files define the same function name, the member_view version wins (last definition).
+Functions must use distinct names — never share a function name across both files.
+
+### ⚠️ RULE: Never define the same function name in both steward_view.html and member_view.html.
+
+---
+
+## 🗑️ WORKLOAD TRACKER REMOVED FROM STEWARD VIEW — 2026-03-13
+
+### Change
+Removed WorkloadTracker from the steward navigation and routing. Member view retains it.
+
+### Files modified
+| File | Lines changed | Action |
+|------|--------------|--------|
+| `src/index.html` | 1005, 1175 | Removed steward nav tab + steward switch case |
+
+### What was removed (steward only)
+- `_getSidebarTabs` steward array: `{ id: 'workload', icon: '📊', label: 'Workload Tracker' }`
+- Steward switch: `case 'workload': renderWorkloadTracker(app); break;`
+
+### What was NOT changed
+- Member sidebar still has workload tab (line ~1030)
+- Member switch still routes `case 'workload'` → `renderWorkloadTracker(app)` (line ~1144)
+- Color palette reference (`workload: '#f97316'`) retained — harmless
+- `src/25_WorkloadService.gs` and `renderWorkloadTracker()` function NOT deleted — still used by member view
+
+### ⚠️ RULE
+WorkloadTracker logic in `25_WorkloadService.gs` must NOT be deleted. It remains active for the member role. If adding typeof guards in UT repo, ensure they gate steward-only usage, not member usage.
+
+---
+
+## 🗑️ POMS REF + Q&A FORUM REMOVED FROM STEWARD VIEW — 2026-03-13
+
+### Change
+Removed POMS Ref and Q&A Forum from steward navigation and routing. Member view retains both.
+
+### Files modified
+| File | Change |
+|------|--------|
+| `src/index.html` | Steward nav: removed poms + qaforum tabs |
+| `src/index.html` | Shared POMS block: gated to `role === 'member'` only |
+| `src/index.html` | Steward switch: removed `case 'qaforum'` |
+
+### What was NOT changed
+- Member sidebar: poms + qaforum tabs intact
+- Member switch: both cases intact
+- `renderPOMSReference()` function untouched — still serves member role
+- `renderQAForum()` function untouched — still serves member role
+- Color palette refs (`poms`, `qaforum`) retained — harmless
+
+### ⚠️ NOTE: Bell count for Q&A
+`src/index.html` line ~876: steward bell count includes unanswered Q&A questions.
+If Q&A is fully retired from steward view, consider removing that count from the bell total.
+
+---
+
+## ↩️ Q&A FORUM RESTORED TO STEWARD VIEW — 2026-03-13
+
+### Change
+Q&A Forum was mistakenly removed from steward view and has been restored.
+
+### Current steward view state (as of this entry)
+| Feature | Steward | Member |
+|---------|---------|--------|
+| Workload Tracker | ❌ removed | ✅ |
+| POMS Ref | ❌ removed | ✅ |
+| Q&A Forum | ✅ restored | ✅ |

@@ -27,7 +27,7 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 - Node.js build system
 - ESLint for code quality (v9.x flat config)
 
-**Version:** 4.24.4
+**Version:** 4.30.0
 
 ---
 
@@ -37,8 +37,8 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 
 ```
 DDS-Dashboard/
-├── src/                    # 42 source files (.gs) + 7 HTML
-├── test/                   # Jest unit tests (2059 tests across 36 suites)
+├── src/                    # 45 source files (.gs) + 8 HTML
+├── test/                   # Jest unit tests (2,900+ tests across 58 suites)
 ├── dist/                   # Build output (auto-generated)
 ├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration
@@ -123,7 +123,6 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 | `04b_AccessibilityFeatures.gs` | Comfort view, focus mode, import/export | `setupComfortView`, `showComfortViewPanel` |
 | `04c_InteractiveDashboard.gs` | Interactive dashboard, mobile views, data retrieval | `showInteractiveDashboard`, `getMobileViewData` |
 | `04d_ExecutiveDashboard.gs` | Executive dashboard, steward dashboard, alerts | `showExecutiveDashboard`, `showStewardAlerts` |
-| `04e_PublicDashboard.gs` | Public member dashboard, unified data endpoints | `getUnifiedDashboardData`, `buildMemberDashboard` |
 
 ### Service Modules
 
@@ -131,7 +130,7 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 |------|---------|---------------|
 | `05_Integrations.gs` | Drive, Calendar, WebApp, Constant Contact integration | `doGet`, `syncToCalendar`, `setupDriveFolder`, `createMeetingDocs`, `syncConstantContactEngagement` |
 | `06_Maintenance.gs` | Diagnostics, Cache, Undo | `DIAGNOSE_SETUP`, `getCachedData`, `undoLastAction` |
-| `09_Dashboards.gs` | Satisfaction, Sync, Public dashboards | `getSatisfactionData`, `onEditAutoSync`, `buildPublicPortal` |
+| `09_Dashboards.gs` | Satisfaction, Sync dashboards | `getSatisfactionData`, `onEditAutoSync` |
 
 ### Business Logic & Entry Point
 
@@ -370,7 +369,7 @@ Note: The `--prod` flag excludes `07_DevTools.gs` from the build output.
 
 ### Build Order
 
-Files must be copied in dependency order (42 files):
+Files must be copied in dependency order (45 files including dev tools):
 
 ```javascript
 const BUILD_ORDER = [
@@ -383,7 +382,6 @@ const BUILD_ORDER = [
   '04b_AccessibilityFeatures.gs',
   '04c_InteractiveDashboard.gs',
   '04d_ExecutiveDashboard.gs',
-  '04e_PublicDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
   '07_DevTools.gs',
@@ -426,7 +424,7 @@ const BUILD_ORDER = [
 
 ### Jest Test Suite (Primary)
 
-The project uses **Jest v29.7.0** as its primary test framework, with 2059 tests across 36 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
+The project uses **Jest v29.7.0** as its primary test framework, with 2,900+ tests across 58 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
 
 #### Running Tests
 
@@ -454,7 +452,6 @@ test/
 ├── 02_DataManagers.test.js
 ├── 03_UIComponents.test.js
 ├── 04_UIService.test.js
-├── 04e_PublicDashboard.test.js
 ├── 05_Integrations.test.js
 ├── 06_Maintenance.test.js
 ├── 07_DevTools.test.js

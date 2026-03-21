@@ -1,7 +1,7 @@
 # Dashboard - User Tutorials
 
-**Version:** 4.24.4
-**Last Updated:** 2026-03-07
+**Version:** 4.30.0
+**Last Updated:** 2026-03-16
 
 Quick, practical tutorials for common tasks in the Dashboard.
 
@@ -124,6 +124,25 @@ After entering, these columns auto-populate:
 - Column S: Days Open
 - Column T: Next Action Due
 - Column U: Days to Deadline
+
+### Form-Based Grievance Filing (Recommended)
+
+Instead of manual entry, use the pre-filled Google Form workflow:
+
+1. Go to **Strategic Ops > Cases > New Case/Grievance**
+2. Select a member from the searchable list
+3. Click **Start Grievance** — a pre-filled Google Form opens with member/steward details
+4. Fill in incident date, grievance type, description, and desired resolution
+5. Submit — the system automatically:
+   - Adds the grievance to the Grievance Log with a unique ID
+   - Creates a Drive folder (Documents, Correspondence, Notes subfolders)
+   - Shares the folder with Grievance Coordinators from Config
+   - Calculates all step deadlines
+   - Updates the Member Directory
+
+**Setup required:** Configure steward contact info in Config tab (column U, rows 2-4). For Google Form setup (field IDs, submission triggers), see `setup-instructions/03_CLASP_SETUP.md` or run **Dashboard > Grievance Tools > Setup Form Trigger**.
+
+**After submission**, you can email the PDF to multiple recipients (comma-separated) or download it directly.
 
 ---
 
@@ -737,5 +756,5 @@ Share direct links to specific pages by adding `?page=` to the URL:
 
 ---
 
-**Version:** 4.24.4
-**Last Updated:** 2026-03-07
+**Version:** 4.30.0
+**Last Updated:** 2026-03-16

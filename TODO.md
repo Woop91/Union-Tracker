@@ -31,7 +31,14 @@ Re-run the visual comparison if needed — the widget was built and can be regen
 
 ## 🔧 Technical Debt
 
-*(empty — add items here as they come up)*
+### [ ] Husky v10 Migration
+**Added:** 2026-03-17
+**Current version:** 9.1.7 (deprecation warning is forward-looking, no action needed now)
+
+When Husky v10 is released:
+- [ ] Remove `#!/bin/sh` shebang from `.husky/pre-commit`, `.husky/pre-push`, `.husky/commit-msg`
+- [ ] Run `npx husky init` to regenerate the `_/` directory structure
+- [ ] Verify commitlint and lint-staged still trigger correctly
 
 ---
 

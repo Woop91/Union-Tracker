@@ -61,7 +61,6 @@ While `escapeHtml()` exists in `00_Security.gs` and is used in some places, it i
 | `04c_InteractiveDashboard.gs` | `loadMemberFilters()` | Location/unit names in `<option>` elements |
 | `04c_InteractiveDashboard.gs` | Analytics tables | Steward names, location names, category labels |
 | `04d_ExecutiveDashboard.gs` | `showStewardPerformanceModal_UIService_` | `firstName`, `lastName`, `unit` in HTML |
-| `04e_PublicDashboard.gs` | Steward directory | Names in `onclick` handlers — apostrophes break JS |
 | `05_Integrations.gs` | `openGrievanceFolder()` | `existingUrl` injected into `<script>` tags |
 | `05_Integrations.gs` | Email body (attendance) | `meetingName`, `a.name`, `a.memberId` in HTML email |
 | `06_Maintenance.gs` | `showModalDiagnostics()` | Sheet names (`c.name`) in HTML |
@@ -104,9 +103,7 @@ When `name` is `undefined`, `ss.getSheetByName(undefined)` returns `null`, then 
 
 ### C3. Unauthenticated Data Access via Public Web App
 
-**File:** `src/04e_PublicDashboard.gs:1104-1106`
-
-`getUnifiedDashboardDataAPI(isPII)` is callable by anyone who discovers the web app URL. The `isPII` parameter is client-controlled, meaning a user could call with `isPII=true` even when viewing the member dashboard. The `mode` parameter in the URL (`?mode=member` vs `?mode=steward`) has no server-side enforcement.
+> **Resolved:** `04e_PublicDashboard.gs` removed in v4.25.11. No public dashboard exists.
 
 **File:** `src/11_CommandHub.gs:3434-3435`
 
@@ -406,7 +403,7 @@ Target cell coordinates stored in `DocumentProperties` (shared). Two users openi
 
 ### M9. Hardcoded Column Indices in Satisfaction Stats
 
-**Files:** `src/11_CommandHub.gs:3141-3142`, `src/12_Features.gs:2967-2989`, `src/04e_PublicDashboard.gs:814-860`
+**Files:** `src/11_CommandHub.gs:3141-3142`, `src/12_Features.gs:2967-2989`
 
 Magic numbers for column positions instead of `SATISFACTION_COLS` constants. If survey structure changes, these silently return wrong data.
 
@@ -508,7 +505,6 @@ Iterates `ss.getSheets()` with `forEach` while calling `deleteSheet()` inside th
 | L10 | `12_Features.gs:839` | `escapeHtml(cat)` called server-side but may only be defined client-side |
 | L11 | `13_MemberSelfService.gs:1579-1580` | Resolution displayed twice — copy-paste bug |
 | L12 | Portal HTML files | No Content-Security-Policy meta tags |
-| L13 | `04e_PublicDashboard.gs:985` | Hardcoded GitHub URL exposes repo name |
 | L14 | `09_Dashboards.gs:3567` | Steward emails exposed in "public" member dashboard |
 
 ---

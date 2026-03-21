@@ -1,0 +1,124 @@
+# Changelog Archive
+
+Older entries archived from CHANGELOG.md on 2026-03-16.
+For recent changes, see CHANGELOG.md.
+
+## [4.25.0] - 2026-03-09
+
+### Added
+- GAS-native test runner framework (`30_TestRunner.gs`) — runs inside Apps Script runtime
+- 6 test suites: config, colmap, auth, grievance, security, system (48 tests)
+- SPA dashboard panel (steward-only `testrunner` tab) with run-all, per-suite filter, expandable results
+- Sheets menu item: 🛠️ Admin → 🧪 Test Runner
+- Daily trigger support (6 AM scheduled runs)
+- Server endpoints: `dataRunTests`, `dataGetTestResults`, `dataManageTestTrigger` (steward-auth gated)
+- Results stored in ScriptProperties for async SPA retrieval
+
+## [4.24.7] - 2026-03-07
+
+### Added
+- Expose `Q_COLS` on WeeklyQuestions API to eliminate duplicated indices (v4.24.4)
+- Manual community poll draw for stewards (v4.24.2)
+- Monday trigger skips draw if community poll already manually released (v4.24.3)
+
+### Changed
+- Remove legacy FlashPolls system entirely (v4.24.0)
+- Remove dead TYPE column from Feedback schema (v4.24.5)
+
+### Fixed
+- Auth sweep final: role derivation + residual fixes (v4.24.7)
+- Survey post-review fix batch addressing 12 issues (v4.24.6)
+- Double-paren syntax in QAForum wrappers + duplicate `sessionToken` param in `dataGetBatchData`
+- `seedWeeklyQuestions` schema fix; FlashPolls verdict (v4.24.1)
+
+## [4.23.0] - 2026-03-04
+
+### Added
+- Fully dynamic survey schema — Option B (v4.23.0)
+- Share Phone column in Member Directory (v4.23.5)
+- Steward phone opt-in permission for member visibility (v4.23.4)
+- Steward self-toggle for Share Phone in web dashboard (v4.23.6)
+
+### Changed
+- Complete session-token auth sweep across all services (v4.23.2)
+- Steward directory member/steward parity improvements (v4.23.3)
+
+### Fixed
+- Post-review fixes: 5 issues + 5 regressions (v4.23.1)
+- Double-paren syntax errors in `27_TimelineService.gs` wrappers (v4.23.1)
+- System-wide session token auth fix for magic link / session users (v4.23.1)
+- Add `minutesFolderId`, `grievancesFolderId`, `insightsCacheTTLMin` to `_sanitizeConfig`
+- Seed 'No' into existing rows when Share Phone column added (v4.23.7)
+
+## [4.22.0] - 2026-02-28
+
+### Added
+- Notification system overhaul (v4.22.0)
+- Notification manage hardening (v4.22.1)
+- Dues-gate home banner + Dues Paying checkbox column in Member Directory (v4.22.2)
+- Broadcast subject line, scope config, dues gate on 6 member tabs
+- Survey banner, lock icons, config scope seed for dues gate
+- Dynamic resource categories; wire Resources + Resource Config sheets into CREATE_DASHBOARD
+- MADDS Org Chart default + `sync-org-chart.js` script (v4.22.6)
+- Q&A Forum: steward-only answers, resolve, notifications
+- Q&A Forum: unanswered badge, show-resolved toggle, anonymous notify
+- Q&A Forum: unanswered count on notification bell
+- Timeline: inline edit, meetingMinutesId, load more, dynamic year filter, calendar icon link, drive file verify, auth error state + theme-aware category badges
+
+### Changed
+- Survey form URL deprecation cleanup (v4.22.7)
+- Notification cleanup pass (v4.22.2)
+- Sync-org-chart v2: push MADDS to all branches
+- Remove dues gate from resources
+
+### Fixed
+- Events sentinel propagation fix (v4.22.5)
+- Events access & calendar targeting (v4.22.4)
+- Events tab hardening (v4.22.3)
+- FailsafeService security & reliability fixes (v4.22.8)
+- Session token auth fix for magic link / session users in FailsafeService (v4.22.9)
+- Align tests with v4.20.26 source changes; remove DevTools from prod dist
+
+## [4.20.18] - 2026-02-27
+
+### Added
+- Per-member master admin folder architecture (v4.20.25)
+- Auto-migrate missing columns via `_addMissingGrievanceHeaders_` (v4.20.26)
+- Auto-migrate missing columns via `_addMissingMemberHeaders_` (v4.20.26)
+- Auto-share Minutes folder on creation; auto-migrate DriveDocUrl header (v4.20.18)
+
+### Changed
+- One-time migration for Contact Log Folder URL to Member Admin Folder URL (v4.20.26)
+
+### Fixed
+- Minutes: schema fix, pagination, date pre-fill, auto-refresh, folder warning, grievance CTA (v4.20.18)
+- Minutes: fix 3 bugs in member minutes CTA + improve SETUP_DRIVE_FOLDERS UX (v4.20.18a)
+- `dataSendDirectMessage` Drive log broken by folder return shape change (v4.20.25)
+
+## [4.13.0] - 2026-02-25
+
+See git log for detailed changes prior to this changelog.
+### Added
+- 9 new GAS-native web app test suites in `31_WebAppTests.gs` — independently triggerable via suite filter, each completes under 3 minutes
+  - `webapp_` — doGet routing, template rendering, URL resolution, diagnoseWebApp health check
+  - `configrd_` — ConfigReader module completeness, validation, JSON output, drive/auth fields
+  - `portal_` — PortalSheets 0-indexed column constants validation, no duplicate indices, setup functions
+  - `weeklyq_` — WeeklyQuestions module API, Q_COLS exposure, poll frequency/pool count reads
+  - `workload_` — WorkloadService module, SUB_CATEGORIES/CATEGORY_LABELS exposure, sub-categories read
+  - `qaforum_` — QAForum module API, question retrieval, pagination defaults, flagged content gating
+  - `timeline_` — TimelineService module, event retrieval, category validation, write auth gating
+  - `failsafe_` — FailsafeService module, digest config shape, diagnostic/ensureAllSheets existence
+  - `endpoints_` — Comprehensive data/wq/qa/tl/fs wrapper existence checks + write endpoint null-token rejection
+- Total GAS-native tests: ~170 across 20 suites (up from ~92 across 11 suites)
+- `seedQAForumData()` — seeds 10 realistic Q&A Forum questions with 15 answers. Added to `SEED_PHASE_3`
+- Individual member participation progress bars in Survey Tracking (snapped to 5% chunks, color-coded)
+- Skeleton placeholder UI for loading state (pulsing cards/rows)
+
+### Changed
+- Member seed data now assigns 2-3 random office days (comma-separated multi-select)
+
+### Fixed
+- **Chrome cache preventing web app from loading** — Added `Cache-Control: no-cache, no-store, must-revalidate`, `Pragma: no-cache`, and `Expires: 0` meta tags to `index.html`. Chrome was aggressively caching the page, serving stale session state in regular browsing mode (worked fine in incognito where cache/localStorage start empty).
+- **Stale localStorage token redirect loop** — Added redirect-loop guard (max 2 attempts) to prevent infinite redirect when an expired session token persists in `localStorage`. After 2 failed validation attempts the stale token is automatically cleared.
+- **Magic link "Failed to send email" error too generic** — Added step-level tracking (`cache`, `lookup`, `config`, `token`, `url`, `build-email`, `send`) to `sendMagicLink()` outer catch. Server logs now show exactly which step failed; client receives actionable error messages instead of the generic fallback.
+

@@ -1,9 +1,9 @@
 # Strategic Command Center - Complete Features Reference
 
-**Version:** 4.24.4 | **Codename:** Auth Sweep Complete
+**Version:** 4.30.0 | **Codename:** Review Findings Complete
 **Last Updated:** March 2026
 
-> **New in v4.24.4:** Auth sweep complete across all web dashboard APIs, FlashPolls removed, Q_COLS API exposed, QAForum wrapper fixes
+> **New in v4.30.0:** 41-item code review implementation, unified theme engine (8 visual styles), performance/scale hardening (8K+ members), resilience hardening (circuit breaker, retry, error boundaries), 2,900+ tests across 58 suites
 
 This document provides a comprehensive, searchable reference of all features in the Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -323,7 +323,7 @@ This document provides a comprehensive, searchable reference of all features in 
 |---------|-------------|-----------|----------|
 | **Audit Logging** | Track all changes with timestamps and user info. | Automatic (hidden _Audit_Log sheet) | audit, log, tracking |
 | **Sabotage Protection** | Detects mass deletion (>15 cells) and alerts. | Automatic on edit | sabotage, protection, deletion |
-| **Safety Valve PII Scrubbing** | Auto-redacts phone numbers and SSN patterns from public dashboards. | Automatic in Member Dashboard | PII, scrub, redact, privacy |
+| **Safety Valve PII Scrubbing** | Auto-redacts phone numbers and SSN patterns from dashboards. | Automatic in Member Dashboard | PII, scrub, redact, privacy |
 | **Weingarten Rights Utility** | Emergency rights statement with tap-to-expand for member protection. | Within Member Dashboard | Weingarten, rights, legal |
 | **Version History** | Access Google Sheets' built-in version history. | File > Version history | undo, history, restore |
 
@@ -504,7 +504,7 @@ Creates hidden sheets for internal Looker reports with full member data.
 
 ### PII-Free Integration (Anonymized)
 
-Creates anonymized sheets for external stakeholders, public dashboards, or compliance reporting.
+Creates anonymized sheets for external stakeholders or compliance reporting.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
@@ -537,7 +537,7 @@ Creates anonymized sheets for external stakeholders, public dashboards, or compl
 | Integration Type | Best For |
 |-----------------|----------|
 | **Standard** | Internal steward dashboards, executive reports, detailed analytics |
-| **PII-Free** | External stakeholders, public dashboards, compliance reporting, board presentations |
+| **PII-Free** | External stakeholders, compliance reporting, board presentations |
 
 ---
 
@@ -953,6 +953,12 @@ Organization chart visualization for the MADDS org chart.
 
 | Version | Features Added |
 |---------|----------------|
+| **4.30.0** | 41-item code review implementation, console.error migration, structured error codes, 2,900+ tests |
+| **4.29.0** | Timeline 7 bug fixes, notification 6 fixes, resilience hardening (3 tiers), error boundaries |
+| **4.28.0** | Speed optimizations (10 items), batch init, DataCache, pagination, unified color themes, OLED dark mode |
+| **4.27.0** | Unified Theme Engine: 8 visual styles (cyberpunk CRT, blob lava, shatter, brutalist, etc.), neon zones |
+| **4.26.0** | Timeline refactor (dynamic categories, split steward/member views) |
+| **4.25.14** | ~200 unused functions removed, shimmer skeleton, progress bar system, org chart collapse defaults |
 | **4.24.4** | Auth sweep complete across all web dashboard APIs, QAForum wrapper fixes, Q_COLS API exposed |
 | **4.24.0** | FlashPolls removed, replaced with manual community draw |
 | **4.23.4** | Share Phone column, steward self-toggle, default No seeding |
@@ -992,10 +998,13 @@ Organization chart visualization for the MADDS org chart.
 
 | Metric | Value |
 |--------|-------|
-| **Source files** | 42 .gs files + 7 .html files |
-| **Test suites** | 36 suites |
-| **Tests** | 2059 tests, 0 failures |
-| **Build mode** | copy-files, `--prod` excludes `07_DevTools.gs` |
+| **Source files** | 45 .gs files + 8 .html files (43 .gs + 8 .html in production) |
+| **Deploy guard tests** | 203 tests across 2 suites |
+| **Unit test suites** | 58 suites |
+| **Unit tests** | 2,900+ tests |
+| **GAS-native tests** | 210 tests (14 test suites in 30_TestRunner + 31_WebAppTests) |
+| **Build mode** | copy-files, `--prod` excludes `07_DevTools.gs` and `DevMenu.gs` |
+| **Minification** | `--minify` flag (index -26%, styles -22%, views -12%) |
 
 ---
 
@@ -1010,4 +1019,4 @@ Organization chart visualization for the MADDS org chart.
 
 ---
 
-*Strategic Command Center v4.24.4 - A personal project providing comprehensive tools for representatives*
+*Strategic Command Center v4.30.0 - A personal project providing comprehensive tools for representatives*

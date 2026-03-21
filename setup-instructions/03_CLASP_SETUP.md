@@ -377,5 +377,5 @@ Then open the sheet, run `CREATE_DASHBOARD`, and refresh.
 
 ---
 
-**Version:** 4.24.4
-**Last Updated:** 2026-02-25
+**Version:** 4.30.0
+**Last Updated:** 2026-03-16

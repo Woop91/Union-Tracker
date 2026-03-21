@@ -1,8 +1,8 @@
 # Strategic Command Center
 
-**Version 4.24.4** | Union Steward Dashboard for Google Sheets
+**Version 4.30.0** | Union Steward Dashboard for Google Sheets
 
-A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 42-file modular architecture and a full SPA web dashboard.
+A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 43-file modular architecture, 8 HTML templates, and a full SPA web dashboard. 2,900+ automated tests across 58 suites.
 
 ---
 
@@ -83,7 +83,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Click the **+** button next to "Files" to create a new script file
    - Name it to match the source file (without the `.gs` extension)
    - Paste the contents from the corresponding `src/` file
-   - Repeat for all 41 `.gs` files and 7 `.html` files
+   - Repeat for all 43 `.gs` files and 8 `.html` files
 
 5. **Run the initial setup:**
    - Select `CREATE_DASHBOARD` from the function dropdown
@@ -158,7 +158,7 @@ When you're ready to move from testing to real data:
 2. Delete `07_DevTools.gs` from your Apps Script project (Extensions > Apps Script > right-click > Delete)
 3. Refresh the sheet -- the Demo menu disappears automatically
 
-After that, you have **41 production `.gs` files + 7 `.html` files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
+After that, you have **43 production `.gs` files + 8 `.html` files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
 
 ---
 
@@ -188,10 +188,11 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 
 ### Dashboards & Analytics
 - **Steward Dashboard**: Internal view with 11 tabs -- Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes
-- **Member Dashboard**: PII-safe view with Home, My Cases, My Tasks, Union Stats, Steward Directory, Resources, Q&A Forum, Polls, Feedback, Minutes, Notifications, Events, Meetings, Timeline, Profile, and Survey Results. No general Directory tab -- members find stewards via the Steward Directory utility.
+- **Member Dashboard**: PII-safe view with Home, My Cases, My Tasks, Union Stats, Steward Directory, Resources, Q&A Forum, Polls, Feedback, Minutes, Notifications, Events, Meetings, Timeline, Profile, and Survey Results
 - **Executive Dashboard**: High-level metrics with Chart.js visualizations
 - **Interactive Dashboard**: Customizable metrics and chart types
 - Hot spot detection, sentiment analysis, and workload balancing
+- Count-first loading with server-side pagination for 5K+ member lists
 
 ### Drive & Calendar Integration
 - Auto-created Drive folders for each grievance (with step subfolders)
@@ -215,7 +216,7 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 
 ### Security
 - XSS prevention with HTML escaping
-- PII masking for public dashboards (phone numbers, SSNs auto-redacted)
+- PII masking (phone numbers, SSNs auto-redacted)
 - Zero-knowledge survey vault: email and member ID stored as SHA-256 hashes only (non-reversible)
 - Survey responses are cryptographically anonymous -- no one can link answers to members
 - Security event alerting with threat detection at web app, edit trigger, and self-service entry points
@@ -223,6 +224,10 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - Input sanitization and validation
 - Audit logging of all changes
 - Sabotage detection (mass deletion alerts)
+- Session token auth across all 100+ web endpoints
+- Idempotent mutations with client-generated UUID keys (prevents duplicate submissions)
+- Circuit breaker pattern for fault isolation (5-failure threshold, 30s cooldown)
+- OAuth scope-change detection via pre-push hooks
 
 ### Event-Driven Architecture (v4.8.0)
 - Decoupled pub/sub event bus replacing direct function calls in trigger handlers
@@ -272,13 +277,16 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 - Steward compose interface with recipient groups and member directory
 - `sendWebAppNotification()` / `dismissWebAppNotification()` / `getWebAppNotifications()` API
 
-### SPA Web Dashboard (v4.12.2)
+### SPA Web Dashboard (v4.12.2+)
 - Full single-page application with Google SSO + magic link authentication
 - Role-based views: `steward_view.html` and `member_view.html`
 - Deep-link routing: `?page=X` pre-selects tabs via `PAGE_DATA.initialTab`
-- 8 SPA modules: Auth, ConfigReader, DataService, WebDashApp, PortalSheets, WeeklyQuestions, QAForum, TimelineService, FailsafeService, Migrations
+- 10 SPA modules: Auth, ConfigReader, DataService, WebDashApp, PortalSheets, WeeklyQuestions, WorkloadService, QAForum, TimelineService, FailsafeService, Migrations
 - Hidden sheets: `_Weekly_Questions`, `_Contact_Log`, `_Steward_Tasks`
 - Auto-configures auth on first run -- no manual ScriptProperties setup
+- Tab pane caching with show/hide (no DOM rebuild on revisit), LRU cap at 8 panes
+- Circuit breaker fault isolation, offline banner, retry queue with jitter
+- Conditional view inclusion (~300KB savings for single-role users)
 
 ### Notification Bell & EventBus Alerts (v4.13.0)
 - Notification bell badge with unread count in SPA header
@@ -326,10 +334,46 @@ After that, you have **41 production `.gs` files + 7 `.html` files** and a clean
 ### FailsafeService (v4.22.8+)
 - Security and reliability fixes for critical operations
 - Safe execution wrappers for error-prone operations
+- Drive backup restore with pre-restore snapshot and locked writes
+- ERROR_CODES enum (9 codes) for structured error responses
 
 ### Migrations Service (v4.20.26+)
 - One-time data migrations with tracking
 - Column auto-migration for Member Directory and Grievance Log
+
+### Unified Theme Engine (v4.27.0)
+- 8 visual styles: default, cyberpunk, blob lava, shatter, liquid pour, brutalist, retro OS, comic
+- Multi-neon cyberpunk with zone-specific colors (sidebar, title, buttons, table, KPIs)
+- Cyberpunk CRT overlays, pixel terminal fonts, and neon color picker
+- Sheet themes + webapp accent colors linked via accentHue (8 color themes)
+- OLED dark mode with pure black background
+- Theme font lazy-loading via Google Fonts
+
+### Performance & Scale (v4.28.0+)
+- Batch steward init endpoint, DataCache for members tab, layout shell preservation
+- Server-side pagination for 5K+ member lists with search and filtering
+- Case list pagination (25 items per page), parallel data calls
+- DocumentFragment batching, debounced filters (150ms)
+- Chunked CacheService for >95KB sheets, batch sheet pre-warm
+- Execution time guard (25s), PropertiesService quota monitoring (warns at 400KB)
+- Scale thresholds: WARN 5K, THROTTLE 7K, CRITICAL 8K rows with smart TTL
+- Email index hash map for O(1) member lookup (replaces O(n) scan)
+- Build minification (index -26%, styles -22%, views -12%)
+
+### Resilience & Reliability (v4.29.0+)
+- cleanVault copy-on-write with staging validation before swap
+- Auth error detection with frontend redirect (authError: true pattern)
+- Script lock on concurrent mutations (assign steward, update profile, create task)
+- Per-render error boundary with inline error card and Retry button
+- Online event drains retry queue, invalidates cache, re-navigates active tab
+- Offline banner, SWR diff skip, LRU pane cache (cap 8)
+- executeWithRetry for sheet reads and Drive folder creation
+- Jitter on retry backoff (±20%) to prevent thundering herd
+- Git-based GAS deployment rollback script
+
+### POMS Reference (v4.25.0+)
+- Dedicated POMS reference page (`poms_reference.html`)
+- Org chart integration with collapsible sections
 
 ### Looker Studio Integration
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
@@ -451,24 +495,37 @@ These sheets power the auto-updating columns. You don't need to edit them.
 | `_Dashboard_Calc` | Dashboard summary metrics |
 | `_Grievance_Calc` | Grievance data for Member Directory |
 | `_Grievance_Formulas` | Self-healing formulas for timeline columns |
+| `_Grievances_Calc` | Aggregated grievance calculations |
 | `_Member_Lookup` | Member data for Grievance Log |
+| `_Members_Calc` | Member statistics calculations |
 | `_Steward_Contact_Calc` | Steward contact calculations |
 | `_Steward_Performance_Calc` | Steward performance scores |
 | `_Audit_Log` | System activity log |
+| `_ErrorLog` | Error tracking and diagnostics |
 | `_Checklist_Calc` | Checklist calculations |
+| `_Deadlines_Calc` | Deadline tracking calculations |
+| `_Sync_Calc` | Data sync status calculations |
+| `_Archive_Grievances` | Archived grievance records |
 | `_Workload_Vault` | Encrypted workload submission data |
 | `_Workload_Reporting` | Anonymized workload reporting data |
 | `_Workload_Reminders` | Email reminder configuration |
 | `_Workload_UserMeta` | Member workload preferences and metadata |
 | `_Workload_Archive` | Archived workload data (24-month rolling) |
-| `_Weekly_Questions` | Weekly check-in questions and responses |
+| `_Weekly_Questions` | Weekly check-in questions |
+| `_Weekly_Responses` | Weekly check-in responses |
+| `_Question_Pool` | Question bank for weekly check-ins |
 | `_Contact_Log` | Member contact tracking (8 cols) |
 | `_Steward_Tasks` | Steward task management (10 cols) |
 | `_Resources` | Educational resources and documents |
 | `_Notifications` | System and steward notifications (12 cols) |
-| `_QA_Forum` | Q&A Forum questions and answers |
-| `_Timeline` | Timeline events and entries |
-| `_Survey_Config` | Dynamic survey configuration |
+| `_QA_Forum` | Q&A Forum questions |
+| `_QA_Answers` | Q&A Forum answer entries |
+| `_Timeline_Events` | Timeline event entries |
+| `_Timeline_Categories` | Dynamic timeline category definitions |
+| `_Survey_Vault` | Zero-knowledge encrypted survey responses |
+| `_Survey_Periods` | Survey period configuration |
+| `_Survey_Tracking` | Survey completion tracking |
+| `_Failsafe_Config` | FailsafeService configuration and recovery settings |
 
 ---
 
@@ -485,12 +542,14 @@ npm install
 ### Available Commands
 
 ```bash
-npm run build          # Copy individual .gs + .html files to dist/
-npm run build --prod   # Production build (excludes DevTools)
+npm run build          # Copy individual .gs + .html files to dist/ (dev mode, includes DevTools)
+npm run build:prod     # Production build (excludes DevTools + DevMenu)
+npm run build -- --minify  # Minified build (index -26%, styles -22%, views -12%)
 npm run lint           # ESLint code quality checks
 npm run lint:fix       # Auto-fix ESLint issues
-npm run test:unit      # Run 2059 Jest unit tests across 36 suites
-npm test               # Full pipeline: lint + build + test
+npm run test:guards    # Run 203 deploy guard tests
+npm run test:unit      # Run 2,900+ Jest unit tests across 58 suites
+npm test               # Full pipeline: lint + guards + unit tests
 npm run clean          # Clean dist directory
 npm run deploy         # Deploy to Google Apps Script (requires clasp)
 ```
@@ -498,6 +557,8 @@ npm run deploy         # Deploy to Google Apps Script (requires clasp)
 ### Scripts
 
 - `scripts/sync-org-chart.js` -- Syncs org chart data for the MADDS org chart view
+- `scripts/check-scope-change.js` -- Pre-push hook: detects OAuth scope changes that require re-authorization
+- `scripts/rollback.sh` -- Git-based GAS deployment rollback (checkout prior commit's dist/ + clasp push)
 
 ### Making Changes
 
@@ -513,15 +574,15 @@ See the [Developer Guide](DEVELOPER_GUIDE.md) for architecture details, code pat
 
 ## Architecture
 
-The codebase uses a 42-file modular architecture (+ 7 HTML templates) with numbered prefixes that indicate load order and purpose:
+The codebase uses a 43-file modular architecture (+ 8 HTML templates) with numbered prefixes that indicate load order and purpose:
 
 | Prefix | Layer | Files |
 |--------|-------|-------|
 | 00 | Foundation | `00_Security.gs`, `00_DataAccess.gs` |
 | 01 | Core | `01_Core.gs` (constants, error handling) |
 | 02 | Data | `02_DataManagers.gs` |
-| 03-04 | UI | `03_UIComponents.gs`, `04a_UIMenus.gs`, `04b_AccessibilityFeatures.gs`, `04c_InteractiveDashboard.gs`, `04d_ExecutiveDashboard.gs`, `04e_PublicDashboard.gs` |
-| 05 | Integrations | `05_Integrations.gs` (Drive, Calendar, WebApp, doGet router) |
+| 03-04 | UI | `03_UIComponents.gs`, `04a_UIMenus.gs`, `04b_AccessibilityFeatures.gs`, `04c_InteractiveDashboard.gs`, `04d_ExecutiveDashboard.gs` |
+| 05 | Integrations | `05_Integrations.gs` (Drive, Calendar, WebApp) |
 | 06 | Maintenance | `06_Maintenance.gs` (diagnostics, cache, undo) |
 | 07 | Dev Tools | `07_DevTools.gs` (remove before production) |
 | 08 | Sheet Utilities | `08a_SheetSetup.gs`, `08b_SearchAndCharts.gs`, `08c_FormsAndNotifications.gs`, `08d_AuditAndFormulas.gs`, `08e_SurveyEngine.gs` |
@@ -536,18 +597,19 @@ The codebase uses a 42-file modular architecture (+ 7 HTML templates) with numbe
 | 17 | Analytics | `17_CorrelationEngine.gs` (cross-dimensional correlation) |
 | 19-25 | SPA Web Dashboard | `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`, `25_WorkloadService.gs` |
 | 26-29 | Extended Services | `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`, `29_Migrations.gs` |
-| -- | HTML | `index.html`, `styles.html`, `auth_view.html`, `steward_view.html`, `member_view.html`, `error_view.html`, `org_chart.html` |
+| 30-31 | Testing | `30_TestRunner.gs`, `31_WebAppTests.gs` (GAS-native test runner, 210 tests) |
+| -- | HTML | `index.html`, `styles.html`, `auth_view.html`, `steward_view.html`, `member_view.html`, `error_view.html`, `org_chart.html`, `poms_reference.html` |
 
-NOTE: No prefix 18 exists in this repo (it was the standalone WorkloadTracker, now removed).
+NOTE: No prefix 18 exists in this repo (it was the standalone WorkloadTracker, now removed). `doGet()` is in `22_WebDashApp.gs`.
 
 ### Design Principles
 
 - **Separation of Concerns**: Each file has one clear purpose
 - **Numbered Prefixes**: Show dependency order for build concatenation
-- **Production Ready**: Delete `07_DevTools.gs` for a 41-file production deployment
+- **Production Ready**: Delete `07_DevTools.gs` and `DevMenu.gs` for a 43-file production deployment
 - **Failure Isolation**: A bug in Calendar sync won't break the Member Directory
 - **Self-Healing**: Hidden calculation sheets auto-repair their formulas
-- **Performance**: CacheService integration and batch operations handle 5,000+ members
+- **Performance**: CacheService integration, server-side pagination, and batch operations handle 8,000+ members
 
 ---
 
@@ -577,7 +639,7 @@ NOTE: No prefix 18 exists in this repo (it was the standalone WorkloadTracker, n
 ### FAQ
 
 **Q: How many members can it handle?**
-A: The system is optimized for 5,000+ members using batch operations and caching.
+A: The system is optimized for 8,000+ members using server-side pagination, chunked caching, batch operations, and smart TTL scaling.
 
 **Q: Can I use this on mobile?**
 A: Yes. Use **Field Portal > Field Accessibility > Mobile View** for a phone-optimized layout, or access the web app portal.
@@ -598,19 +660,19 @@ A: Use Google Sheets' built-in version history (File > Version history) or make 
 | Document | Description |
 |----------|-------------|
 | [README.md](README.md) | This file -- project overview and quick start |
+| [CHANGELOG.md](CHANGELOG.md) | Detailed version history |
+| [FEATURES.md](FEATURES.md) | Complete searchable feature reference |
 | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Architecture, code patterns, and debugging |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute to the project |
 | [QUICK_DEPLOY.md](QUICK_DEPLOY.md) | Fast deployment instructions |
-| [SECURITY_REVIEW.md](SECURITY_REVIEW.md) | Security analysis and findings |
+| [CODE_REVIEW.md](CODE_REVIEW.md) | Canonical security/code review |
 | [STEWARD_GUIDE.md](STEWARD_GUIDE.md) | Guide for stewards using the system |
-| [USER_TUTORIALS.md](USER_TUTORIALS.md) | Step-by-step tutorials for common tasks |
+| [USER_TUTORIALS.md](USER_TUTORIALS.md) | Step-by-step tutorials (includes grievance workflow) |
 | [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) | Demo data seeding and cleanup |
 | [COMFORT_VIEW_GUIDE.md](COMFORT_VIEW_GUIDE.md) | Accessibility and visual comfort features |
-| [GRIEVANCE_WORKFLOW_GUIDE.md](GRIEVANCE_WORKFLOW_GUIDE.md) | Grievance filing workflow |
 | [INTERACTIVE_DASHBOARD_GUIDE.md](INTERACTIVE_DASHBOARD_GUIDE.md) | Dashboard customization guide |
-| [WELCOME_EMAIL.md](WELCOME_EMAIL.md) | Welcome email template and setup |
-| [CHANGELOG.md](CHANGELOG.md) | Detailed version history (being created) |
-| [FEATURES.md](FEATURES.md) | Complete searchable feature reference (being created) |
+| [WELCOME_EMAIL.md](docs/WELCOME_EMAIL.md) | Welcome email template and setup |
+| [AI_REFERENCE.md](AI_REFERENCE.md) | AI assistant context reference |
 
 ### Setup Guides
 
@@ -618,6 +680,7 @@ A: Use Google Sheets' built-in version history (File > Version history) or make 
 |-------|-------------|
 | [Heatmap Setup](setup-instructions/01_HEATMAP_SETUP.md) | Color gradient configuration |
 | [OCR Setup](setup-instructions/02_OCR_SETUP.md) | Google Cloud Vision API for OCR |
+| [Clasp Setup](setup-instructions/03_CLASP_SETUP.md) | Google clasp CLI configuration |
 | [Drive URL Setup](setup-instructions/04_RESOURCE_DRIVE_URL_LINK_SETUP.md) | Shared documents folder linking |
 | [Dropbox Setup](setup-instructions/05_RESOURCE_DROPBOX_SETUP.md) | Resource dropbox folder setup |
 | [PDF Generation](setup-instructions/06_PDF_GENERATION_SETUP.md) | PDF template and email setup |
@@ -641,6 +704,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| **4.30.0** | 2026-03-16 | 41-item code review implementation, console.error migration, structured error codes |
+| **4.29.2** | 2026-03-14 | Bug fixes: missing wrappers, inFlight leak, mobile nav picker |
+| **4.29.0** | 2026-03-14 | Timeline 7 bug fixes, notification 6 fixes, auto-expire badge, archive pill safety |
+| **4.28.8** | 2026-03-14 | Unified color theme system, OLED dark mode, auth sweep (100+ endpoints), tab race fix |
+| **4.28.0** | 2026-03-14 | Speed optimizations (10 items), batch init endpoint, DataCache, pagination, PropertiesService monitoring |
+| **4.27.0** | 2026-03-15 | Unified Theme Engine: 8 visual styles, cyberpunk CRT overlays, multi-neon zones, lazy-load fonts |
+| **4.26.0** | 2026-03-13 | Timeline refactor (dynamic categories, split steward/member views) |
+| **4.25.14** | 2026-03-13 | ~200 unused functions removed, org chart collapse defaults, progress bar system, shimmer skeleton |
 | **4.24.4** | 2026-03-07 | Auth sweep complete, Q_COLS API, FlashPolls removed, QAForum double-paren fix |
 | **4.23.0** | 2026-03 | Dynamic survey engine (Option B), Share Phone feature, steward directory parity |
 | **4.22.0** | 2026-03 | Notification overhaul, Q&A Forum, Timeline, org chart, FailsafeService, events hardening |

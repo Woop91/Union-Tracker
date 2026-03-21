@@ -278,7 +278,7 @@ The steward dashboard modal provides:
 ### 6. Test Grievance Workflow (Optional)
 
 If using the grievance workflow:
-1. Set up Google Form (see [Grievance Workflow Guide](GRIEVANCE_WORKFLOW_GUIDE.md))
+1. Set up Google Form (see [User Tutorials — Grievance Filing](USER_TUTORIALS.md#3-filing-a-new-grievance))
 2. Configure form submission trigger
 3. Test with a sample grievance
 
@@ -399,7 +399,7 @@ Once `07_DevTools.gs` is deleted:
 ## 📚 Related Documentation
 
 - [Main README](README.md) - Complete dashboard documentation
-- [Grievance Workflow Guide](GRIEVANCE_WORKFLOW_GUIDE.md) - How to use grievance features
+- [User Tutorials — Grievance Filing](USER_TUTORIALS.md#3-filing-a-new-grievance) - How to use grievance features
 - [Interactive Dashboard Guide](INTERACTIVE_DASHBOARD_GUIDE.md) - Customization options
 - [Comfort View Guide](COMFORT_VIEW_GUIDE.md) - Accessibility features
 
@@ -472,8 +472,8 @@ Your dashboard is **production-ready**! 🚀
 
 ---
 
-**Last Updated**: 2026-02-25
-**Version**: 4.24.4
+**Last Updated**: 2026-03-16
+**Version**: 4.30.0
 
 ---
 

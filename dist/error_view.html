@@ -9,7 +9,7 @@ function renderError(container, error) {
  }
 
  container.innerHTML = '';
- var wrapper = el('div', { className: 'error-container fade-in' });
+ var wrapper = el('div', { className: 'error-container fade-in', role: 'alert', 'aria-live': 'assertive' });
 
  var icons = { not_found: '\u{1F50D}', expired: '\u23F3', error: '\u26A0\uFE0F' };
  wrapper.appendChild(el('div', { className: 'error-icon' }, icons[error.type] || '\u26A0\uFE0F'));

@@ -1,6 +1,6 @@
 # Quick Deploy - Union Steward Dashboard
 
-**Version:** 4.24.4 | **Architecture:** 48-File Production
+**Version:** 4.30.0 | **Architecture:** 52-File Production
 
 Deploy the Union Steward Dashboard to a Google Sheet using the source files in `src/`.
 
@@ -8,7 +8,7 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 
 ## What You Get
 
-- 42 .gs files + 7 .html files (41 .gs in production, after removing DevTools)
+- 43 .gs files + 8 .html files in production (45 .gs total in dev, excluding DevTools and DevMenu)
 - SPA web dashboard with SSO and magic link authentication
 - Visible sheets: Config, Member Directory, Grievance Log, Dashboard, Member Satisfaction, Getting Started, FAQ, Config Guide
 - 18+ hidden sheets including calculation, workload, weekly questions, contact log, steward tasks, resources, and notifications
@@ -49,7 +49,7 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 1. Click **+** next to "Files" to add a new script file
 2. Name it exactly as shown (without the `.gs` extension)
 3. Paste the contents from the corresponding source file
-4. Repeat for all 42 .gs files plus the 7 .html files
+4. Repeat for all 43 .gs files plus the 8 .html files
 
 **Files to copy (in order):**
 
@@ -64,7 +64,6 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 | `04b_AccessibilityFeatures` | `src/04b_AccessibilityFeatures.gs` |
 | `04c_InteractiveDashboard` | `src/04c_InteractiveDashboard.gs` |
 | `04d_ExecutiveDashboard` | `src/04d_ExecutiveDashboard.gs` |
-| `04e_PublicDashboard` | `src/04e_PublicDashboard.gs` |
 | `05_Integrations` | `src/05_Integrations.gs` |
 | `06_Maintenance` | `src/06_Maintenance.gs` |
 | `07_DevTools` | `src/07_DevTools.gs` |
@@ -211,5 +210,5 @@ See [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) for the full production transition 
 
 ---
 
-**Version:** 4.24.4 (48-File Production Architecture)
-**Last Updated:** 2026-03-07
+**Version:** 4.30.0 (52-File Production Architecture)
+**Last Updated:** 2026-03-16
