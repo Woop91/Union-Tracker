@@ -98,27 +98,7 @@ describe('escapeHtml', () => {
   });
 });
 
-// ============================================================================
-// sanitizeObjectForHtml
-// ============================================================================
-
-describe('sanitizeObjectForHtml', () => {
-  test('escapes string values in object', () => {
-    const result = sanitizeObjectForHtml({ name: '<script>', age: 30 });
-    expect(result.name).toBe(escapeHtml('<script>'));
-    expect(result.age).toBe(30);
-  });
-
-  test('recursively sanitizes nested objects', () => {
-    const result = sanitizeObjectForHtml({ data: { name: '<b>test</b>' } });
-    expect(result.data.name).toBe(escapeHtml('<b>test</b>'));
-  });
-
-  test('returns non-object input as-is', () => {
-    expect(sanitizeObjectForHtml(null)).toBe(null);
-    expect(sanitizeObjectForHtml(42)).toBe(42);
-  });
-});
+// sanitizeObjectForHtml — removed (zero callers in production code)
 
 // ============================================================================
 // escapeForFormula

@@ -29,7 +29,7 @@
  *   Depends on 01_Core.gs (SHEETS), 06_Maintenance.gs (logAuditEvent).
  *   Used by SPA Q&A views and the navigation badge system.
  *
- * @version 4.31.0
+ * @version 4.33.0
  */
 
 var QAForum = (function () {
@@ -38,6 +38,10 @@ var QAForum = (function () {
   // Sheet Setup
   // ═══════════════════════════════════════
 
+  /**
+   * Initializes the _QA_Forum and _QA_Answers hidden sheets if they do not exist.
+   * @returns {void}
+   */
   function initQAForumSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) throw new Error('Spreadsheet binding broken — getActiveSpreadsheet() returned null.');
@@ -71,8 +75,12 @@ var QAForum = (function () {
   // Cached Sheet Read Helper
   // ═══════════════════════════════════════
 
-  // PERF-01: Cache full-sheet reads via CacheService to reduce redundant getDataRange() calls.
-  // TTL defaults to 60s — acceptable staleness for read-heavy Q&A list loads.
+  /**
+   * Returns cached sheet data from CacheService, falling back to a live read.
+   * @param {string} sheetName - Name of the sheet to read.
+   * @param {number} [maxAgeSec=60] - Cache TTL in seconds.
+   * @returns {Array[]|null} 2D array of sheet values, or null if empty/missing.
+   */
   function _getCachedSheetData(sheetName, maxAgeSec) {
     maxAgeSec = maxAgeSec || 60;
     try {
@@ -96,6 +104,15 @@ var QAForum = (function () {
   // Questions
   // ═══════════════════════════════════════
 
+  /**
+   * Returns a paginated, sorted list of Q&A questions.
+   * @param {string} email - Caller's email for ownership detection.
+   * @param {number} [page=1] - Page number (1-based).
+   * @param {number} [pageSize=20] - Results per page.
+   * @param {string} [sort='recent'] - Sort order: 'recent' or 'popular'.
+   * @param {boolean} [showResolved] - Whether to include resolved questions.
+   * @returns {{questions: Object[], total: number, page: number, pageSize: number}}
+   */
   function getQuestions(email, page, pageSize, sort, showResolved) {
     page = page || 1;
     pageSize = pageSize || 20;
@@ -145,6 +162,12 @@ var QAForum = (function () {
     return { questions: paged, total: total, page: page, pageSize: pageSize };
   }
 
+  /**
+   * Returns a single question with its answers, or null if not found/deleted.
+   * @param {string} email - Caller's email for ownership detection.
+   * @param {string} questionId - The question ID to look up.
+   * @returns {Object|null} Question object with nested answers array, or null.
+   */
   function getQuestionDetail(email, questionId) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
@@ -195,6 +218,14 @@ var QAForum = (function () {
     return question;
   }
 
+  /**
+   * Submits a new question to the Q&A forum with rate limiting (5/hour).
+   * @param {string} email - Author's email.
+   * @param {string} name - Author's display name.
+   * @param {string} text - Question body (max 2000 chars, sanitized).
+   * @param {boolean} isAnonymous - Whether to hide author identity.
+   * @returns {{success: boolean, questionId?: string, message?: string}}
+   */
   function submitQuestion(email, name, text, isAnonymous) {
     if (!email || !text || !text.trim()) return { success: false, message: 'Question text is required.' };
     text = _sanitize(text.trim().substring(0, 2000));
@@ -246,6 +277,15 @@ var QAForum = (function () {
     }
   }
 
+  /**
+   * Submits a steward answer to a question and increments the answer count.
+   * @param {string} email - Steward's email.
+   * @param {string} name - Steward's display name.
+   * @param {string} questionId - Target question ID.
+   * @param {string} text - Answer body (max 2000 chars, sanitized).
+   * @param {boolean} isSteward - Must be true; non-stewards are rejected.
+   * @returns {{success: boolean, answerId?: string, message?: string}}
+   */
   function submitAnswer(email, name, questionId, text, isSteward) {
     if (!email || !questionId || !text || !text.trim()) return { success: false, message: 'Answer text is required.' };
     if (!isSteward) return { success: false, message: 'Only stewards can post answers.' };
@@ -292,7 +332,15 @@ var QAForum = (function () {
     }
   }
 
-  // Wrapper that releases lock before sending notification
+  /**
+   * Wraps submitAnswer to send a notification to the question author after the lock is released.
+   * @param {string} email - Steward's email.
+   * @param {string} name - Steward's display name.
+   * @param {string} questionId - Target question ID.
+   * @param {string} text - Answer body.
+   * @param {boolean} isSteward - Must be true.
+   * @returns {{success: boolean, answerId?: string, message?: string}}
+   */
   function submitAnswerWithNotify(email, name, questionId, text, isSteward) {
     var result = submitAnswer(email, name, questionId, text, isSteward);
     if (result.success && result._authorEmail) {
@@ -319,6 +367,12 @@ var QAForum = (function () {
   // Upvoting
   // ═══════════════════════════════════════
 
+  /**
+   * Toggles an upvote on a question using hashed email for deduplication.
+   * @param {string} email - Voter's email.
+   * @param {string} questionId - Question to upvote/un-upvote.
+   * @returns {{success: boolean, upvoted?: boolean, newCount?: number, message?: string}}
+   */
   function upvoteQuestion(email, questionId) {
     if (!email || !questionId) return { success: false, message: 'Missing data.' };
 
@@ -363,6 +417,13 @@ var QAForum = (function () {
   // Moderation (steward-only)
   // ═══════════════════════════════════════
 
+  /**
+   * Moderates a question by setting its status to deleted, flagged, or active.
+   * @param {string} stewardEmail - Moderating steward's email.
+   * @param {string} questionId - Question to moderate.
+   * @param {string} action - 'delete', 'flag', or 'restore'.
+   * @returns {{success: boolean, message?: string}}
+   */
   function moderateQuestion(stewardEmail, questionId, action) {
     if (!stewardEmail || !questionId || !action) return { success: false, message: 'Missing data.' };
 
@@ -385,6 +446,13 @@ var QAForum = (function () {
     return { success: false, message: 'Question not found.' };
   }
 
+  /**
+   * Moderates an answer and adjusts the parent question's answer count if visibility changes.
+   * @param {string} stewardEmail - Moderating steward's email.
+   * @param {string} answerId - Answer to moderate.
+   * @param {string} action - 'delete', 'flag', or 'restore'.
+   * @returns {{success: boolean, message?: string}}
+   */
   function moderateAnswer(stewardEmail, answerId, action) {
     if (!stewardEmail || !answerId || !action) return { success: false, message: 'Missing data.' };
 
@@ -429,6 +497,11 @@ var QAForum = (function () {
     return { success: false, message: 'Answer not found.' };
   }
 
+  /**
+   * Returns all flagged questions and answers for steward moderation review.
+   * @param {string} stewardEmail - Requesting steward's email.
+   * @returns {{questions: Object[], answers: Object[]}}
+   */
   function getFlaggedContent(stewardEmail) {
     if (!stewardEmail) return { questions: [], answers: [] };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -547,6 +620,11 @@ var QAForum = (function () {
     }
   }
 
+  /**
+   * Removes a sheet's cached data from CacheService to force a fresh read.
+   * @param {string} sheetName - Name of the sheet whose cache entry to remove.
+   * @returns {void}
+   */
   function _invalidateCache(sheetName) {
     try {
       var cache = CacheService.getScriptCache();
@@ -554,10 +632,25 @@ var QAForum = (function () {
     } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   }
 
-  // Delegate to shared helpers in 01_Core.gs (eliminates duplicate definitions)
+  /**
+   * Formats a Date as a short string by delegating to fmtDateShort_ in 01_Core.gs.
+   * @param {Date} date - Date to format.
+   * @returns {string} Formatted date string.
+   */
   function _fmtDate(date) { return fmtDateShort_(date); }
+
+  /**
+   * Hashes an email for privacy-preserving deduplication via hashEmail_ in 01_Core.gs.
+   * @param {string} email - Email address to hash.
+   * @returns {string} Hashed email string.
+   */
   function _hashEmail(email) { return hashEmail_(email); }
 
+  /**
+   * Sanitizes user input text using escapeForFormula to prevent formula injection.
+   * @param {string} text - Raw user input.
+   * @returns {string} Sanitized text.
+   */
   function _sanitize(text) {
     if (typeof escapeForFormula === 'function') text = escapeForFormula(text);
     return text;
@@ -607,14 +700,23 @@ var QAForum = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
+/** @param {string} sessionToken @param {number} [page] @param {number} [pageSize] @param {string} [sort] @param {boolean} [showResolved] @returns {Object} Paginated question list. */
 function qaGetQuestions(sessionToken, page, pageSize, sort, showResolved) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getQuestions(e, page, pageSize, sort, showResolved); }
+/** @param {string} sessionToken @param {string} questionId @returns {Object|null} Question with answers. */
 function qaGetQuestionDetail(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return QAForum.getQuestionDetail(e, questionId); }
+/** @param {string} sessionToken @param {string} name @param {string} text @param {boolean} isAnonymous @returns {Object} Submission result. */
 function qaSubmitQuestion(sessionToken, name, text, isAnonymous) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return QAForum.submitQuestion(e, name, text, isAnonymous); }
+/** @param {string} sessionToken @param {string} name @param {string} questionId @param {string} text @param {boolean} isSteward @returns {Object} Submission result (steward-only). */
 function qaSubmitAnswer(sessionToken, name, questionId, text, isSteward) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.submitAnswer(e, name, questionId, text, true); }
+/** @param {string} sessionToken @param {string} questionId @returns {Object} Toggle result with new count. */
 function qaUpvoteQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return QAForum.upvoteQuestion(e, questionId); }
+/** @param {string} sessionToken @param {string} questionId @param {string} action @returns {Object} Moderation result (steward-only). */
 function qaModerateQuestion(sessionToken, questionId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateQuestion(e, questionId, action); }
+/** @param {string} sessionToken @param {string} answerId @param {string} action @returns {Object} Moderation result (steward-only). */
 function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateAnswer(e, answerId, action); }
+/** @param {string} sessionToken @returns {Object} Flagged questions and answers (steward-only). */
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
+/** @param {string} sessionToken @param {string} questionId @returns {Object} Resolve result (owner or steward). */
 function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_) { Logger.log('_: ' + (_.message || _)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
-function qaGetUnansweredCount(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return 0; return QAForum.getUnansweredCount(); }
+/** @returns {void} Initializes Q&A forum sheets (no auth required — setup only). */
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

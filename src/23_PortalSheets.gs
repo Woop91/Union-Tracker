@@ -123,6 +123,10 @@ function portalGetOrCreateSheet_(name, headers, hidden) {
   return sheet;
 }
 
+/**
+ * Returns (or creates) the Portal Member Directory sheet.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The portal member directory sheet
+ */
 function getOrCreatePortalMemberDirectory() {
   return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MEMBER_DIR, [
     'Email', 'Name', 'Personal Email', 'Phone', 'Role',
@@ -131,6 +135,10 @@ function getOrCreatePortalMemberDirectory() {
   ], true);
 }
 
+/**
+ * Returns (or creates) the Portal Events sheet.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The events sheet
+ */
 function getOrCreateEventsSheet() {
   return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.EVENTS, [
     'ID', 'Title', 'Type', 'DateTime', 'EndTime',
@@ -138,6 +146,10 @@ function getOrCreateEventsSheet() {
   ], false);
 }
 
+/**
+ * Returns (or creates) the Portal Minutes sheet, migrating DriveDocUrl header if needed.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The minutes sheet
+ */
 function getOrCreateMinutesSheet() {
   var sheet = portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MINUTES, [
     'ID', 'MeetingDate', 'Title', 'Bullets', 'FullMinutes',
@@ -164,6 +176,10 @@ function getOrCreateMinutesSheet() {
 
 // getOrCreatePollsSheet + getOrCreatePollResponsesSheet removed v4.24.0 — FlashPolls replaced by 24_WeeklyQuestions.gs
 
+/**
+ * Returns (or creates) the Portal Grievance sheet (hidden).
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The portal grievance sheet
+ */
 function getOrCreatePortalGrievanceSheet() {
   return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.GRIEVANCES, [
     'ID', 'MemberEmail', 'StewardEmail', 'Step', 'Status',
@@ -172,6 +188,10 @@ function getOrCreatePortalGrievanceSheet() {
   ], true);
 }
 
+/**
+ * Returns (or creates) the Portal Steward Log sheet (hidden).
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The steward log sheet
+ */
 function getOrCreateStewardLogSheet() {
   return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.STEWARD_LOG, [
     'ID', 'StewardEmail', 'MemberEmail', 'Type',
@@ -179,6 +199,10 @@ function getOrCreateStewardLogSheet() {
   ], true);
 }
 
+/**
+ * Returns (or creates) the Portal Mega Survey sheet (hidden).
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The mega survey sheet
+ */
 function getOrCreateMegaSurveySheet() {
   return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MEGA_SURVEY, [
     'Email', 'Responses', 'Progress', 'LastUpdated', 'Completed'

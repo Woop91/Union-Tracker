@@ -330,9 +330,10 @@ function SEED_PHASE_3() {
 }
 
 /**
- * Seed Config sheet with dropdown values
- * Note: Data starts at row 3 (row 1 = section headers, row 2 = column headers)
- * Seeds both preset values (Office Days, Grievance Status, etc.) and user-configurable values
+ * Seeds Config sheet with preset and user-configurable dropdown values.
+ * Data starts at row 3 (row 1 = section headers, row 2 = column headers).
+ * Only populates empty columns to preserve existing user data.
+ * @returns {void}
  */
 function seedConfigData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -349,7 +350,12 @@ function seedConfigData() {
   // Data row start (after section headers row 1 and column headers row 2)
   var dataStartRow = 3;
 
-  // Helper: only seed column if it's empty (preserves user data)
+  /**
+   * Seeds a Config column only if it currently has no data.
+   * @param {number} column - 1-based Config column index.
+   * @param {Array} values - Array of values to write.
+   * @returns {boolean} True if seeded, false if column already had data.
+   */
   function seedIfEmpty(column, values) {
     var existing = getConfigValues(sheet, column);
     if (existing.length === 0) {
@@ -502,6 +508,21 @@ function seedFeedbackData() {
   var threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
 
   var maxCol = FEEDBACK_COLS.NOTES; // last defined column
+  /**
+   * Builds a feedback row array using FEEDBACK_COLS for column placement.
+   * @param {Date} timestamp - Submission timestamp.
+   * @param {string} submittedBy - Submitter name.
+   * @param {string} category - Feedback category.
+   * @param {string} type - Bug/Feature Request/Improvement.
+   * @param {string} priority - Priority level.
+   * @param {string} title - Feedback title.
+   * @param {string} description - Detailed description.
+   * @param {string} status - Current status.
+   * @param {string} assignedTo - Assignee name.
+   * @param {string} resolution - Resolution notes.
+   * @param {string} notes - Additional notes.
+   * @returns {Array} Row array sized to FEEDBACK_COLS.
+   */
   function buildFeedbackRow(timestamp, submittedBy, category, type, priority, title, description, status, assignedTo, resolution, notes) {
     var row = [];
     for (var i = 0; i < maxCol; i++) { row.push(''); }
@@ -743,7 +764,10 @@ function seedSatisfactionData() {
   var sampleData = [];
   var now = new Date();
 
-  // Helper functions for generating seed data (defined outside loop)
+  /**
+   * Returns a weighted random rating 1-10, skewed toward higher values.
+   * @returns {number} Integer between 1 and 10.
+   */
   function weightedRating() {
     var r = Math.random();
     if (r < 0.1) return Math.floor(Math.random() * 3) + 1;      // 1-3 (10%)
@@ -752,10 +776,19 @@ function seedSatisfactionData() {
     return Math.floor(Math.random() * 3) + 8;                    // 8-10 (40%)
   }
 
+  /**
+   * Returns a random element from an array.
+   * @param {Array} arr - Source array.
+   * @returns {*} Random element.
+   */
   function randomItem(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
+  /**
+   * Returns a comma-separated string of 3 randomly selected priorities.
+   * @returns {string} Shuffled priorities joined by ', '.
+   */
   function randomPriorities() {
     var arr = priorities.slice();
     for (var j = arr.length - 1; j > 0; j--) {
@@ -1138,7 +1171,11 @@ function SEED_MEMBERS_ONLY(count) {
   var batchSize = 100; // Larger batches for 1000 members
   var today = new Date();
 
-  // Pick 2-3 random office days (comma-separated, matching multi-select format)
+  /**
+   * Picks 2-3 random office days as a comma-separated string.
+   * @param {string[]} days - Available office day values.
+   * @returns {string} Comma-separated subset of days.
+   */
   function randomOfficeDays(days) {
     var shuffled = days.slice();
     for (var d = shuffled.length - 1; d > 0; d--) {
@@ -2536,7 +2573,26 @@ function seedMeetingCheckinData() {
   ];
   var durations = [0.5, 0.75, 1, 1.5, 2];
 
-  // Helper to build a full 16-column row matching MEETING_CHECKIN_COLS
+  /**
+   * Builds a 16-column meeting check-in row using MEETING_CHECKIN_COLS.
+   * @param {string} id - Meeting check-in ID.
+   * @param {string} meetingName - Name of the meeting.
+   * @param {Date} meetingDate - Date of the meeting.
+   * @param {string} meetingType - Type of meeting.
+   * @param {string} memberId - Member ID.
+   * @param {string} memberName - Member display name.
+   * @param {Date} checkinTime - Time the member checked in.
+   * @param {string} email - Member email.
+   * @param {string} meetingTime - Scheduled meeting time.
+   * @param {number} duration - Meeting duration in hours.
+   * @param {string} status - Meeting status.
+   * @param {string} notify - Whether to notify stewards.
+   * @param {string} calEventId - Google Calendar event ID.
+   * @param {string} notesUrl - Notes document URL.
+   * @param {string} agendaUrl - Agenda document URL.
+   * @param {string} agendaStewards - Stewards on the agenda.
+   * @returns {Array} 16-element row array.
+   */
   function buildCheckinRow(id, meetingName, meetingDate, meetingType, memberId, memberName, checkinTime, email, meetingTime, duration, status, notify, calEventId, notesUrl, agendaUrl, agendaStewards) {
     var row = [];
     for (var ci = 0; ci < 16; ci++) { row.push(''); }
@@ -3611,6 +3667,10 @@ var Assert = {
 // ==================== TEST HELPERS ====================
 // ==================== UNIT TESTS ====================
 
+/**
+ * Unit test: verifies MEMBER_COLS column index constants are correct.
+ * @returns {void}
+ */
 function testMemberColsConstants() {
   Assert.assertNotNull(MEMBER_COLS, 'MEMBER_COLS should exist');
   Assert.assertEquals(1, MEMBER_COLS.MEMBER_ID, 'MEMBER_ID should be column 1');
@@ -3620,6 +3680,10 @@ function testMemberColsConstants() {
   Assert.assertEquals(31, MEMBER_COLS.START_GRIEVANCE, 'START_GRIEVANCE should be column 31');
 }
 
+/**
+ * Unit test: verifies GRIEVANCE_COLS column index constants are correct.
+ * @returns {void}
+ */
 function testGrievanceColsConstants() {
   Assert.assertNotNull(GRIEVANCE_COLS, 'GRIEVANCE_COLS should exist');
   Assert.assertEquals(1, GRIEVANCE_COLS.GRIEVANCE_ID, 'GRIEVANCE_ID should be column 1');
@@ -3628,6 +3692,10 @@ function testGrievanceColsConstants() {
   Assert.assertEquals(28, GRIEVANCE_COLS.RESOLUTION, 'RESOLUTION should be column 28');
 }
 
+/**
+ * Unit test: verifies getColumnLetter converts column numbers to letters correctly.
+ * @returns {void}
+ */
 function testColumnLetterConversion() {
   Assert.assertEquals('A', getColumnLetter(1), 'Column 1 should be A');
   Assert.assertEquals('Z', getColumnLetter(26), 'Column 26 should be Z');
@@ -3635,6 +3703,10 @@ function testColumnLetterConversion() {
   Assert.assertEquals('AE', getColumnLetter(31), 'Column 31 should be AE');
 }
 
+/**
+ * Unit test: verifies core SHEETS constant names are defined.
+ * @returns {void}
+ */
 function testSheetsConstants() {
   Assert.assertNotNull(SHEETS, 'SHEETS should exist');
   Assert.assertNotNull(SHEETS.MEMBER_DIR, 'MEMBER_DIR should exist');
@@ -3642,12 +3714,20 @@ function testSheetsConstants() {
   Assert.assertNotNull(SHEETS.CONFIG, 'CONFIG should exist');
 }
 
+/**
+ * Unit test: verifies validateRequired throws on null, empty, and undefined.
+ * @returns {void}
+ */
 function testValidateRequired() {
   Assert.assertThrows(function() { validateRequired(null, 'field'); }, 'null should throw');
   Assert.assertThrows(function() { validateRequired('', 'field'); }, 'empty should throw');
   Assert.assertThrows(function() { validateRequired(undefined, 'field'); }, 'undefined should throw');
 }
 
+/**
+ * Unit test: verifies validateEmailAddress accepts valid and rejects invalid emails.
+ * @returns {void}
+ */
 function testValidateEmail() {
   var result1 = validateEmailAddress('test@example.com');
   Assert.assertTrue(result1.valid, 'Valid email should pass');
@@ -3657,6 +3737,10 @@ function testValidateEmail() {
   Assert.assertFalse(result3.valid, 'Empty email should fail');
 }
 
+/**
+ * Unit test: verifies validatePhoneNumber accepts valid and rejects short numbers.
+ * @returns {void}
+ */
 function testValidatePhoneNumber() {
   var result1 = validatePhoneNumber('(555) 123-4567');
   Assert.assertTrue(result1.valid, 'Valid phone should pass');
@@ -3666,6 +3750,10 @@ function testValidatePhoneNumber() {
   Assert.assertFalse(result3.valid, 'Short phone should fail');
 }
 
+/**
+ * Unit test: verifies MEMBER_ID regex matches name-based format (M + 4 letters + 3 digits).
+ * @returns {void}
+ */
 function testValidateMemberId() {
   // Format: M prefix + 4 uppercase letters (2 from first name + 2 from last name) + 3 digits
   Assert.assertTrue(VALIDATION_PATTERNS.MEMBER_ID.test('MJOSM123'), 'MJOSM123 should be valid (M + John Smith + 123)');
@@ -3677,6 +3765,10 @@ function testValidateMemberId() {
   Assert.assertFalse(VALIDATION_PATTERNS.MEMBER_ID.test('M123456'), 'M123456 should be invalid (old format)');
 }
 
+/**
+ * Unit test: verifies GRIEVANCE_ID regex matches name-based format (G + 4 letters + 3 digits).
+ * @returns {void}
+ */
 function testValidateGrievanceId() {
   // Format: G prefix + 4 uppercase letters (2 from first name + 2 from last name) + 3 digits
   Assert.assertTrue(VALIDATION_PATTERNS.GRIEVANCE_ID.test('GJOSM789'), 'GJOSM789 should be valid (G + John Smith + 789)');
@@ -3686,6 +3778,10 @@ function testValidateGrievanceId() {
   Assert.assertFalse(VALIDATION_PATTERNS.GRIEVANCE_ID.test('GJOSM1234'), 'GJOSM1234 should be invalid (4 digits)');
 }
 
+/**
+ * Unit test: verifies open rate boundary values (0-100) are in valid range.
+ * @returns {void}
+ */
 function testOpenRateRange() {
   Assert.assertTrue(85 >= 0 && 85 <= 100, 'Open rate 85 should be in range');
   // eslint-disable-next-line no-self-compare -- Testing boundary conditions explicitly
@@ -3715,6 +3811,11 @@ var VALIDATION_MESSAGES = {
   GRIEVANCE_ID_DUPLICATE: 'This Grievance ID already exists'
 };
 
+/**
+ * Validates an email address format with typo detection for common domains.
+ * @param {string} email - Email address to validate.
+ * @returns {Object} { valid: boolean, message: string, suggestion?: string }
+ */
 function validateEmailAddress(email) {
   if (!email || email.toString().trim() === '') return { valid: false, message: VALIDATION_MESSAGES.EMAIL_EMPTY };
   // Handle Google Sheets auto-converting emails to Date or other types
@@ -3729,6 +3830,11 @@ function validateEmailAddress(email) {
   return { valid: true, message: 'Valid email' };
 }
 
+/**
+ * Validates a phone number has at least 10 digits and returns formatted version.
+ * @param {string} phone - Phone number string.
+ * @returns {Object} { valid: boolean, message: string, formatted?: string }
+ */
 function validatePhoneNumber(phone) {
   if (!phone || phone.toString().trim() === '') return { valid: false, message: 'Phone required' };
   var digits = phone.toString().replace(/\D/g, '');
@@ -3738,12 +3844,23 @@ function validatePhoneNumber(phone) {
   return { valid: true, message: 'Valid phone', formatted: formatted };
 }
 
+/**
+ * Formats a digit string as a US phone number: (XXX) XXX-XXXX.
+ * @param {string} digits - Digits-only phone string.
+ * @returns {string} Formatted phone or original digits if not 10-digit.
+ */
 function formatUSPhone(digits) {
   if (digits.length === 11 && digits[0] === '1') digits = digits.substring(1);
   if (digits.length === 10) return '(' + digits.substring(0, 3) + ') ' + digits.substring(3, 6) + '-' + digits.substring(6);
   return digits;
 }
 
+/**
+ * Throws an error if the value is null, undefined, or empty string.
+ * @param {*} value - Value to check.
+ * @param {string} fieldName - Field name for the error message.
+ * @returns {*} The original value if non-empty.
+ */
 function validateRequired(value, fieldName) {
   if (value === null || value === undefined || value === '') throw new Error(fieldName + ' is required');
   return value;
@@ -3791,6 +3908,10 @@ function validateGrievanceMemberIds() {
   return issues;
 }
 
+/**
+ * Runs bulk validation on Member Directory emails, phones, and IDs plus grievance references.
+ * @returns {void}
+ */
 function runBulkValidation() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -3821,6 +3942,12 @@ function runBulkValidation() {
   showValidationReport(issues, lastRow - 1 + grievanceIssues.length);
 }
 
+/**
+ * Displays an HTML modal with validation results summary and issue table.
+ * @param {Array<Object>} issues - Array of issue objects with row, field, value, message.
+ * @param {number} total - Total number of records validated.
+ * @returns {void}
+ */
 function showValidationReport(issues, total) {
   var rate = total > 0 ? (((total - issues.length) / total) * 100).toFixed(1) : 100;
   var rows = issues.slice(0, 50).map(function(i) { return '<tr><td>' + escapeHtml(i.row) + '</td><td>' + escapeHtml(i.field) + '</td><td>' + escapeHtml(i.value) + '</td><td>' + escapeHtml(i.message) + '</td></tr>'; }).join('');
@@ -3831,6 +3958,10 @@ function showValidationReport(issues, total) {
   SpreadsheetApp.getUi().showModalDialog(html, 'Validation Report');
 }
 
+/**
+ * Shows an HTML modal with validation settings and a button to run bulk validation.
+ * @returns {void}
+ */
 function showValidationSettings() {
   var html = HtmlService.createHtmlOutput(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px}h2{color:#1a73e8}.setting{margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;display:flex;justify-content:space-between;align-items:center}.title{font-weight:bold}.desc{color:#666;font-size:13px}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;width:100%;margin-top:20px}</style></head><body><h2>⚙️ Validation Settings</h2><div class="setting"><div><div class="title">Email Validation</div><div class="desc">Validate format as you type</div></div><span>✅</span></div><div class="setting"><div><div class="title">Phone Auto-format</div><div class="desc">Format to (XXX) XXX-XXXX</div></div><span>✅</span></div><div class="setting"><div><div class="title">Duplicate Detection</div><div class="desc">Warn on duplicate IDs</div></div><span>✅</span></div><button onclick="google.script.run.runBulkValidation();google.script.host.close()">🔍 Run Bulk Validation</button></body></html>'
@@ -3838,6 +3969,10 @@ function showValidationSettings() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Validation Settings');
 }
 
+/**
+ * Clears all validation notes and background colors from email, phone, and ID columns.
+ * @returns {void}
+ */
 function clearValidationIndicators() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -3851,6 +3986,10 @@ function clearValidationIndicators() {
   ss.toast('✅ Indicators cleared', 'Done', 3);
 }
 
+/**
+ * Installs an onEdit trigger for real-time validation of email and phone edits.
+ * @returns {void}
+ */
 function installValidationTrigger() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'onEditValidation') ScriptApp.deleteTrigger(t);
@@ -3859,6 +3998,11 @@ function installValidationTrigger() {
   SpreadsheetApp.getUi().alert('✅ Validation trigger installed!');
 }
 
+/**
+ * OnEdit trigger handler: validates email/phone cells and marks invalid entries.
+ * @param {Object} e - GAS onEdit event object.
+ * @returns {void}
+ */
 function onEditValidation(e) {
   if (!e || !e.range) return;
   try {
@@ -3901,7 +4045,7 @@ function onEditValidation(e) {
  *   runModuleTests()  - Run tests for specific module
  *
  * @fileoverview Unit testing framework and comprehensive test cases
- * @version 2.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -4495,8 +4639,11 @@ function test_MultiSelectCols_Populated() {
  * without actually calling PropertiesService (which requires a live session).
  */
 function test_MultiSelectAutoOpen_DefaultOn() {
-  // Simulate the logic in onSelectionChange:
-  //   if (autoOpen === 'false') return;  ← only skip when explicitly disabled
+  /**
+   * Simulates the auto-open flag check from onSelectionChange.
+   * @param {string|null|undefined} propValue - The stored property value.
+   * @returns {boolean} True if auto-open should be active.
+   */
   function isAutoOpenActive(propValue) {
     return propValue !== 'false';
   }

@@ -12,7 +12,7 @@
  *                         to EventBus for decoupled handling.
  *     3. dailyTrigger() — Installable trigger that runs nightly maintenance
  *                         (deadline alerts, data sync, security digest).
- *   Also contains cleanUpOnOpenTrigger_() for trigger hygiene.
+ *   Also contains handleSecurityAudit_() for edit-time audit logging.
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
  *   onOpen is a GAS "simple trigger" which runs with restricted authorization —
@@ -65,23 +65,6 @@ function onOpen() {
   }
 }
 
-/**
- * Removes any onOpenDeferred_ triggers created by onOpen.
- * Prevents trigger accumulation across multiple spreadsheet opens.
- * @private
- */
-function cleanUpOnOpenTrigger_() {
-  try {
-    var triggers = ScriptApp.getProjectTriggers();
-    for (var i = 0; i < triggers.length; i++) {
-      if (triggers[i].getHandlerFunction() === 'onOpenDeferred_') {
-        ScriptApp.deleteTrigger(triggers[i]);
-      }
-    }
-  } catch (e) {
-    Logger.log('Trigger cleanup error: ' + e.message);
-  }
-}
 
 /**
  * Deferred onOpen tasks — runs heavy init after the UI is responsive.
@@ -289,33 +272,8 @@ function handleSecurityAudit_(e) {
     if (numCells > 15 && !e.value && rangeIsEmpty) {
       alertMessage = 'MASS_DELETION_ALERT';
 
-      // Send alert to Chief Steward
-      var chiefEmail = '';
-      try {
-        chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
-      } catch (_configError) { Logger.log('_configError: ' + (_configError.message || _configError)); }
-
-      // L-41: MailApp methods are not available in simple trigger context.
-      // Wrap the entire email block (including quota check) in try/catch
-      // so failures are logged rather than silently dropped.
-      try {
-        if (chiefEmail && MailApp.getRemainingDailyQuota() > 0) {
-          MailApp.sendEmail({
-            to: chiefEmail,
-            subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' SABOTAGE ALERT',
-            body: 'Mass deletion detected in ' + COMMAND_CONFIG.SYSTEM_NAME + '.\n\n' +
-                  'User: ' + userEmail + '\n' +
-                  'Sheet: ' + range.getSheet().getName() + '\n' +
-                  'Range: ' + range.getA1Notation() + '\n' +
-                  'Cells Affected: ' + numCells + '\n' +
-                  'Time: ' + new Date().toLocaleString() + '\n\n' +
-                  'Please review immediately.' +
-                  COMMAND_CONFIG.EMAIL.FOOTER
-          });
-        }
-      } catch (emailError) {
-        Logger.log('Sabotage alert email failed (simple onEdit trigger cannot send email): ' + emailError.message);
-      }
+      // L-41: MailApp methods are not available in simple trigger context (onEdit).
+      // Email alerting removed — audit logging below covers sabotage detection.
 
       // Log to console for visibility (PII-safe)
       secureLog('SabotageDetection', 'Mass deletion detected', {
@@ -1844,7 +1802,7 @@ function showNewMemberDialog() {
 function addNewMember(memberData) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+    const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
       return errorResponse('Member Directory sheet not found');
@@ -1901,61 +1859,6 @@ function addNewMember(memberData) {
 // IMPORT/EXPORT DIALOGS (Added to fix missing menu functions)
 // ============================================================================
 /**
- * @deprecated v4.25.11 — Use importMembersBatch() instead (02_DataManagers.gs).
- * Legacy CSV text import with no callers. Kept for backward compatibility.
- * @param {string} text - CSV formatted text
- * @returns {Object} Result with count of imported members
- */
-function importMembersFromText(text) {
-  var userEmail = Session.getActiveUser().getEmail();
-  if (!userEmail) return { success: false, count: 0, message: 'Authentication required.' };
-  return withScriptLock_(function() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
-  }
-
-  const lines = text.split('\n').filter(line => line.trim());
-  let imported = 0;
-
-  // CR-24: Use MEMBER_COLS constants to build the row array at correct positions
-  // instead of hardcoded 9-element array with hardcoded column order.
-  // M-33: Size row by the maximum column index in MEMBER_COLS.
-  var maxImportCol = 0;
-  for (var colKey in MEMBER_COLS) {
-    if (MEMBER_COLS.hasOwnProperty(colKey) && MEMBER_COLS[colKey] > maxImportCol) {
-      maxImportCol = MEMBER_COLS[colKey];
-    }
-  }
-
-  for (const line of lines) {
-    const parts = line.split(',').map(p => p.trim());
-    if (parts.length >= 2) {
-      var newRow = new Array(maxImportCol).fill('');
-      // M-05: Apply escapeForFormula() to all imported values to prevent formula injection
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(parts[0] || '');
-      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(parts[1] || '');
-      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(parts[2] || '');
-      newRow[MEMBER_COLS.DEPARTMENT - 1] = escapeForFormula(parts[3] || '');
-      newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(parts[4] || '');
-      newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(parts[5] || '');
-      newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(parts[6] || '');
-      sheet.appendRow(newRow);
-      imported++;
-    }
-  }
-
-  // Generate IDs for imported members
-  if (typeof generateMissingMemberIDs === 'function') {
-    generateMissingMemberIDs();
-  }
-
-  return { success: true, count: imported };
-  });
-}
-/**
  * Exports member directory to specified format
  * @param {string} format - Export format (csv, email, print)
  * @returns {Object} Result with success message
@@ -1968,7 +1871,7 @@ function exportMemberDirectory(format) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2117,7 +2020,7 @@ function showFindMemberDialog() {
  */
 function searchMembersForDialog(term) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -2158,7 +2061,7 @@ function searchMembersForDialog(term) {
  */
 function navigateToMemberRow(row) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (sheet) {
     sheet.activate();

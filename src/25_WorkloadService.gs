@@ -33,7 +33,7 @@
  *   LockService (concurrency). Used by SPA workload views and email
  *   reminder triggers.
  *
- * @version 4.31.0
+ * @version 4.33.0
  */
 
 var WorkloadService = (function() {
@@ -109,6 +109,12 @@ var WorkloadService = (function() {
 
   // ── Utility Functions (private) ───────────────────────────────────────────
 
+  /**
+   * Strips control characters and truncates a string to the given max length.
+   * @param {string} input - The raw string to sanitize.
+   * @param {number} [maxLength] - Maximum allowed length (defaults to CONFIG.maxStringLength).
+   * @returns {string} The sanitized, trimmed, and truncated string.
+   */
   function _sanitizeString(input, maxLength) {
     maxLength = maxLength || CONFIG.maxStringLength;
     if (!input || typeof input !== 'string') return '';
@@ -116,10 +122,21 @@ var WorkloadService = (function() {
     return sanitized.length > maxLength ? sanitized.substring(0, maxLength) : sanitized;
   }
 
+  /**
+   * Clamps a value to an integer between 0 and 999.
+   * @param {*} val - The value to sanitize.
+   * @returns {number} An integer in the range [0, 999].
+   */
   function _sanitizeNum(val) {
     return Math.min(999, Math.max(0, Math.floor(Number(val) || 0)));
   }
 
+  /**
+   * Executes a function while holding a script-level lock for concurrency safety.
+   * @param {Function} fn - The callback to execute under lock.
+   * @param {string} lockName - Descriptive name for logging (unused at runtime).
+   * @returns {*} The return value of fn().
+   */
   function _withLock(fn, lockName) {
     var lock = LockService.getScriptLock();
     try {
@@ -132,6 +149,10 @@ var WorkloadService = (function() {
     }
   }
 
+  /**
+   * Returns the spreadsheet's timezone, falling back to America/New_York.
+   * @returns {string} IANA timezone identifier.
+   */
   function _getTimezone() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     return ss ? ss.getSpreadsheetTimeZone() : 'America/New_York';
@@ -157,12 +178,22 @@ var WorkloadService = (function() {
     return { allowed: true, attemptsRemaining: maxAttempts - attempts - 1, waitMinutes: 0 };
   }
 
+  /**
+   * Checks whether the given email has exceeded the submission rate limit.
+   * @param {string} email - The submitter's email address.
+   * @returns {{allowed: boolean, attemptsRemaining: number, waitMinutes: number}} Rate limit status.
+   */
   function _checkSubmissionRateLimit(email) {
     return _checkAndRecordRateLimit('SUBMIT_' + email.toLowerCase().trim(), CONFIG.maxSubmissionsPerHour, 60);
   }
 
   // ── UserMeta / Sharing Start Date (private) ──────────────────────────────
 
+  /**
+   * Looks up a user's sharing-start date from the UserMeta sheet for reciprocity gating.
+   * @param {string} email - The user's email address.
+   * @returns {Date|null} The date the user began sharing, or null if not found.
+   */
   function _getUserSharingStartDate(email) {
     if (!email) return null;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -181,6 +212,12 @@ var WorkloadService = (function() {
     return null;
   }
 
+  /**
+   * Sets or updates a user's sharing-start date in the UserMeta sheet.
+   * @param {string} email - The user's email address.
+   * @param {Date} startDate - The date to record as sharing start.
+   * @returns {void}
+   */
   function _setUserSharingStartDate(email, startDate) {
     if (!email) return;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -201,6 +238,10 @@ var WorkloadService = (function() {
 
   // ── Reporting Refresh (private) ───────────────────────────────────────────
 
+  /**
+   * Rebuilds the anonymized Workload Reporting sheet from raw vault data.
+   * @returns {void}
+   */
   function _refreshReportingData() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return;
@@ -323,6 +364,16 @@ var WorkloadService = (function() {
 
   // ── Reminder Helpers (private) ────────────────────────────────────────────
 
+  /**
+   * Persists a user's email reminder preferences to the Reminders sheet.
+   * @param {Object} prefs - Reminder settings.
+   * @param {string} prefs.email - The user's email address.
+   * @param {boolean} prefs.enabled - Whether reminders are enabled.
+   * @param {string} [prefs.frequency] - Frequency (daily/weekly/biweekly/monthly/quarterly).
+   * @param {string} [prefs.day] - Day of week for weekly/biweekly reminders.
+   * @param {string} [prefs.time] - Time of day in HH:MM format.
+   * @returns {void}
+   */
   function _saveReminderPreference(prefs) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return;
@@ -350,6 +401,10 @@ var WorkloadService = (function() {
 
   // ── Sheet Initialization ──────────────────────────────────────────────────
 
+  /**
+   * Creates or migrates the four workload sheets (Vault, Reporting, Reminders, UserMeta).
+   * @returns {void}
+   */
   function initSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return;
@@ -436,6 +491,12 @@ var WorkloadService = (function() {
 
   // ── Form Submission (SSO) ─────────────────────────────────────────────────
 
+  /**
+   * Validates and records a workload submission from the SPA, with rate limiting and reciprocity.
+   * @param {string} email - The authenticated user's email.
+   * @param {Object} formData - Form fields (t1-t8, employment_type, leave_*, privacy, etc.).
+   * @returns {string} Success or error message string.
+   */
   function processFormSSO(email, formData) {
     if (!email || !formData) return 'Error: Missing data.';
     var emailLower = email.toLowerCase().trim();
@@ -563,6 +624,11 @@ var WorkloadService = (function() {
 
   // ── User History (SSO) ────────────────────────────────────────────────────
 
+  /**
+   * Returns the authenticated user's full workload submission history with summary stats.
+   * @param {string} email - The authenticated user's email.
+   * @returns {{success: boolean, history: Array<Object>, summary: Object, message: string}} History payload.
+   */
   function getHistorySSO(email) {
     if (!email) return { success: false, history: [], message: 'Email required.' };
 
@@ -655,6 +721,11 @@ var WorkloadService = (function() {
 
   // ── Dashboard Data / Analytics (SSO) ──────────────────────────────────────
 
+  /**
+   * Returns aggregate workload analytics gated by the user's sharing-start date (reciprocity).
+   * @param {string} email - The authenticated user's email.
+   * @returns {{success: boolean, data: Object|null, message: string}} Dashboard analytics payload.
+   */
   function getDashboardDataSSO(email) {
     if (!email) return { success: false, data: null, message: 'Email required.' };
 
@@ -791,6 +862,11 @@ var WorkloadService = (function() {
 
   // ── Reminder Preferences (SSO) ────────────────────────────────────────────
 
+  /**
+   * Retrieves the user's email reminder preferences from the Reminders sheet.
+   * @param {string} email - The user's email address.
+   * @returns {{enabled: boolean, frequency: string, day: string, time: string}} Reminder settings.
+   */
   function getReminderSSO(email) {
     if (!email) return { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -815,6 +891,12 @@ var WorkloadService = (function() {
     return { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
   }
 
+  /**
+   * Saves updated email reminder preferences for the authenticated user.
+   * @param {string} email - The user's email address.
+   * @param {Object} prefs - Reminder settings (enabled, frequency, day, time).
+   * @returns {{success: boolean}} Result indicator.
+   */
   function setReminderSSO(email, prefs) {
     if (!email) return { success: false };
     _saveReminderPreference({
@@ -829,6 +911,11 @@ var WorkloadService = (function() {
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
 
+  /**
+   * Exports the user's workload history as a CSV-formatted string.
+   * @param {string} email - The user's email address.
+   * @returns {string} CSV content, or empty string if no data.
+   */
   function exportHistoryCSV(email) {
     var result = getHistorySSO(email);
     if (!result.success || !result.history.length) return '';
@@ -855,12 +942,20 @@ var WorkloadService = (function() {
 
   // ── Sub-Categories Getter ─────────────────────────────────────────────────
 
+  /**
+   * Returns the sub-category definitions for all eight workload categories.
+   * @returns {Object<string, string[]>} Map of category keys to arrays of sub-category names.
+   */
   function getSubCategories() {
     return SUB_CATEGORIES;
   }
 
   // ── Process Reminders (daily trigger) ─────────────────────────────────────
 
+  /**
+   * Sends scheduled workload reminder emails based on each user's frequency/day/time preferences.
+   * @returns {void}
+   */
   function processReminders() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return;
@@ -928,6 +1023,10 @@ var WorkloadService = (function() {
 
   // ── Backup & Archive ──────────────────────────────────────────────────────
 
+  /**
+   * Exports the Workload Vault as a timestamped CSV backup to Google Drive.
+   * @returns {void}
+   */
   function createBackup() {
     var ui = SpreadsheetApp.getUi();
     try {
@@ -974,6 +1073,10 @@ var WorkloadService = (function() {
     }
   }
 
+  /**
+   * Moves vault rows older than the retention period to the Archive sheet (with UI confirmation).
+   * @returns {void}
+   */
   function archiveOldData() {
     var ui = SpreadsheetApp.getUi();
     var response = ui.alert('Archive Old Workload Data',
@@ -1024,6 +1127,10 @@ var WorkloadService = (function() {
 
   // ── Vault Cleaning ────────────────────────────────────────────────────────
 
+  /**
+   * Deduplicates the vault by keeping the newest entry per email+date, using copy-on-write for safety.
+   * @returns {void}
+   */
   function cleanVault() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return;
@@ -1097,6 +1204,10 @@ var WorkloadService = (function() {
 
   // ── Health Status ─────────────────────────────────────────────────────────
 
+  /**
+   * Displays a UI alert showing row counts and existence status for all workload sheets.
+   * @returns {void}
+   */
   function getHealthStatus() {
     var ui = SpreadsheetApp.getUi();
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1119,6 +1230,10 @@ var WorkloadService = (function() {
 
   // ── Ledger Refresh (menu) ─────────────────────────────────────────────────
 
+  /**
+   * Manually triggers a reporting-sheet refresh and shows a confirmation alert.
+   * @returns {void}
+   */
   function refreshLedger() {
     _refreshReportingData();
     SpreadsheetApp.getUi().alert('Workload ledger refreshed successfully.');
@@ -1153,26 +1268,94 @@ var WorkloadService = (function() {
 // GLOBAL WRAPPERS (google.script.run calls from SPA)
 // ============================================================================
 
+/**
+ * SPA wrapper: submits workload form data after SSO authentication.
+ * @param {string} sessionToken - The caller's session token.
+ * @param {Object} formData - Workload form fields.
+ * @returns {string|Object} Success/error message or auth failure object.
+ */
 function processWorkloadFormSSO(sessionToken, formData) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.processFormSSO(e, formData) : { success: false, message: 'Not authenticated.' }; }
+/**
+ * SPA wrapper: retrieves the caller's workload submission history.
+ * @param {string} sessionToken - The caller's session token.
+ * @returns {{success: boolean, history: Array, message: string}} History payload or auth failure.
+ */
 function getWorkloadHistorySSO(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.getHistorySSO(e) : { success: false, history: [], message: 'Not authenticated.' }; }
+/**
+ * SPA wrapper: retrieves aggregate workload dashboard analytics.
+ * @param {string} sessionToken - The caller's session token.
+ * @returns {{success: boolean, data: Object|null, message: string}} Dashboard data or auth failure.
+ */
 function getWorkloadDashboardDataSSO(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.getDashboardDataSSO(e) : { success: false, message: 'Not authenticated.' }; }
+/**
+ * SPA wrapper: retrieves the caller's reminder preferences.
+ * @param {string} sessionToken - The caller's session token.
+ * @returns {Object} Reminder settings or auth failure object.
+ */
 function getWorkloadReminderSSO(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.getReminderSSO(e) : { success: false, reminder: null, message: 'Not authenticated.' }; }
+/**
+ * SPA wrapper: saves updated reminder preferences for the caller.
+ * @param {string} sessionToken - The caller's session token.
+ * @param {Object} prefs - Reminder settings (enabled, frequency, day, time).
+ * @returns {{success: boolean}} Result indicator or auth failure.
+ */
 function setWorkloadReminderSSO(sessionToken, prefs) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.setReminderSSO(e, prefs) : { success: false, message: 'Not authenticated.' }; }
+/**
+ * SPA wrapper: exports the caller's workload history as CSV.
+ * @param {string} sessionToken - The caller's session token.
+ * @returns {string|Object} CSV string or auth failure object.
+ */
 function exportWorkloadHistoryCSV(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? WorkloadService.exportHistoryCSV(e) : { success: false, message: 'Not authenticated.' }; }
+/**
+ * SPA wrapper: returns sub-category definitions (no auth required).
+ * @returns {Object<string, string[]>} Map of category keys to sub-category name arrays.
+ */
 function getWorkloadSubCategories() { return WorkloadService.getSubCategories(); }
 
 // ============================================================================
 // GLOBAL WRAPPERS (sheet init, triggers, menu items)
 // ============================================================================
 
+/**
+ * Global wrapper: creates or migrates all workload tracker sheets.
+ * @returns {void}
+ */
 function initWorkloadTrackerSheets() { return WorkloadService.initSheets(); }
+/**
+ * Global wrapper: processes scheduled workload reminder emails (daily trigger target).
+ * @returns {void}
+ */
 function processWorkloadReminders() { return WorkloadService.processReminders(); }
+/**
+ * Global wrapper: refreshes the anonymized workload reporting ledger (menu item).
+ * @returns {void}
+ */
 function refreshWorkloadLedger() { WorkloadService.refreshLedger(); }
+/**
+ * Global wrapper: creates a CSV backup of the Workload Vault in Google Drive.
+ * @returns {void}
+ */
 function createWorkloadBackup() { WorkloadService.createBackup(); }
+/**
+ * Global wrapper: archives vault data older than the retention period.
+ * @returns {void}
+ */
 function wtArchiveOldData() { WorkloadService.archiveOldData(); }
+/**
+ * Global wrapper: deduplicates the Workload Vault sheet.
+ * @returns {void}
+ */
 function wtCleanVault() { WorkloadService.cleanVault(); }
+/**
+ * Global wrapper: displays the workload tracker health status dialog.
+ * @returns {void}
+ */
 function showWorkloadHealthStatus() { WorkloadService.getHealthStatus(); }
 
+/**
+ * Creates a daily time-based trigger for workload reminder emails (replaces any existing one).
+ * @returns {void}
+ */
 function setupWorkloadReminderSystem() {
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {

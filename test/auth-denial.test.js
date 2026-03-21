@@ -33,7 +33,6 @@ loadSources([
   '03_UIComponents.gs',
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
-  '04c_InteractiveDashboard.gs',
   '04d_ExecutiveDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
@@ -392,8 +391,11 @@ describe('Build validation: syntax checking works', () => {
   const SRC_DIR = path.resolve(__dirname, '..', 'src');
 
   test('build.js passes with current clean source', () => {
+    // Use --validate-only to check syntax without overwriting dist/
+    // A full `node build.js` runs a dev build that destroys prod-minified HTML
+    // and re-adds DevTools/DevMenu to dist/, breaking G25 minification guards.
     expect(() => {
-      execSync('node build.js', { cwd: path.resolve(__dirname, '..'), timeout: 15000 });
+      execSync('node build.js --validate-only', { cwd: path.resolve(__dirname, '..'), timeout: 15000 });
     }).not.toThrow();
   });
 

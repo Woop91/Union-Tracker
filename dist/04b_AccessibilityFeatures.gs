@@ -210,13 +210,6 @@ function getCommonStyles() {
  * Features for neurodivergent users + theme customization
  */
 
-// Comfort View Configuration
-var COMFORT_VIEW_CONFIG = {
-  FOCUS_MODE_COLORS: { background: '#f5f5f5', header: '#4a4a4a', accent: '#6b9bd1' },
-  HIGH_CONTRAST: { background: '#ffffff', header: '#000000', accent: '#0066cc' },
-  PASTEL: { background: '#fef9e7', header: '#85929e', accent: '#7fb3d5' }
-};
-
 // Theme Configuration — delegates to THEME_PRESETS (03_UIComponents.gs) for unified keys
 var THEME_CONFIG = {
   THEMES: {
@@ -668,6 +661,10 @@ function mapImportColumns_(headers) {
   return map;
 }
 
+/**
+ * Displays a toast notification reminding the user to take a break.
+ * @returns {void}
+ */
 function showBreakReminder() {
   SpreadsheetApp.getActiveSpreadsheet().toast('💆 Time for a break! Stretch and rest your eyes.', 'Break Reminder', 10);
 }
@@ -682,6 +679,10 @@ function showBreakReminder() {
 
 // ==================== COMFORT VIEW CONTROL PANEL ====================
 
+/**
+ * Opens the Comfort View control panel dialog with accessibility toggles.
+ * @returns {void}
+ */
 function showADHDControlPanel() {
   var settings = getADHDSettings();
   var html = HtmlService.createHtmlOutput(
@@ -690,6 +691,10 @@ function showADHDControlPanel() {
   SpreadsheetApp.getUi().showModalDialog(html, '♿ Comfort View Panel');
 }
 
+/**
+ * Opens the Theme Manager dialog for selecting and applying sheet themes.
+ * @returns {void}
+ */
 function showThemeManager() {
   var current = getCurrentTheme();
   var themeCards = Object.keys(THEME_CONFIG.THEMES).map(function(key) {

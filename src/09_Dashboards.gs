@@ -1379,7 +1379,7 @@ function getSheetLastRow(sheet) {
  * - 01_Utilities.gs (getColumnLetter, getConfigValues, getJobMetadataByMemberCol)
  *
  * @author Claude Code Assistant
- * @version 1.0.0
+ * @version 4.33.0
  * ============================================================================
  */
 
@@ -2988,82 +2988,6 @@ function syncFeedbackValues() {
   Logger.log('Feedback values synced');
   } finally { lock.releaseLock(); }
 }
-/**
- * Get HTML for flagged submissions review interface
- * @returns {string} HTML content
- */
-function getFlaggedSubmissionsHtml() {
-  return '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
-    '<style>' +
-    ':root{--purple:#5B4B9E;--green:#059669;--red:#DC2626;--orange:#F97316}' +
-    '*{box-sizing:border-box;margin:0;padding:0}' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f5;padding:20px}' +
-    '.container{max-width:650px;margin:0 auto}' +
-    '.stats-row{display:flex;gap:15px;margin-bottom:20px}' +
-    '.stat-card{flex:1;background:white;padding:20px;border-radius:12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.1)}' +
-    '.stat-card.pending{border-left:4px solid var(--orange)}' +
-    '.stat-card.verified{border-left:4px solid var(--green)}' +
-    '.stat-value{font-size:32px;font-weight:bold;color:#333}' +
-    '.stat-label{font-size:13px;color:#666;margin-top:5px}' +
-    '.section{background:white;border-radius:12px;padding:20px;margin-bottom:15px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}' +
-    '.section-title{font-size:16px;font-weight:600;color:#333;margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid #eee}' +
-    '.email-list{max-height:250px;overflow-y:auto}' +
-    '.email-item{display:flex;align-items:center;justify-content:space-between;padding:12px;background:#f8f9fa;border-radius:8px;margin-bottom:8px}' +
-    '.email-info{display:flex;align-items:center;gap:10px}' +
-    '.email-text{font-size:14px;color:#333}' +
-    '.email-date{font-size:12px;color:#666}' +
-    '.actions{display:flex;gap:8px}' +
-    '.btn{padding:6px 12px;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500}' +
-    '.btn-approve{background:#059669;color:white}' +
-    '.btn-reject{background:#DC2626;color:white}' +
-    '.empty-state{text-align:center;padding:40px;color:#666}' +
-    '.info-box{background:#E8F4FD;padding:15px;border-radius:8px;margin-bottom:15px;font-size:13px;color:#1E40AF}' +
-    '</style></head><body>' +
-    '<div class="container">' +
-    '<div id="content"><div class="empty-state">Loading...</div></div>' +
-    '</div>' +
-    '<script>' +
-    getClientSideEscapeHtml() +
-    'function load(){google.script.run.withFailureHandler(function(e){document.getElementById("content").innerHTML="<div class=\\"empty-state\\">Error: "+escapeHtml(e.message)+"</div>"}).withSuccessHandler(render).getFlaggedSubmissionsData()}' +
-    'function render(d){' +
-    '  var h="<div class=\\"stats-row\\">";' +
-    '  h+="<div class=\\"stat-card pending\\"><div class=\\"stat-value\\">"+d.pendingCount+"</div><div class=\\"stat-label\\">Pending Review</div></div>";' +
-    '  h+="<div class=\\"stat-card verified\\"><div class=\\"stat-value\\">"+d.verifiedCount+"</div><div class=\\"stat-label\\">Verified Responses</div></div>";' +
-    '  h+="</div>";' +
-    '  h+="<div class=\\"info-box\\">⚠️ These submissions could not be matched to a member email. Survey answers are protected and not shown here.</div>";' +
-    '  h+="<div class=\\"section\\"><div class=\\"section-title\\">📧 Pending Review Emails ("+d.pendingCount+")</div>";' +
-    '  if(d.pendingEmails.length===0){' +
-    '    h+="<div class=\\"empty-state\\">✅ No submissions pending review</div>";' +
-    '  }else{' +
-    '    h+="<div class=\\"email-list\\">";' +
-    '    d.pendingEmails.forEach(function(e){' +
-    '      h+="<div class=\\"email-item\\"><div class=\\"email-info\\">";' +
-    '      h+="<span class=\\"email-text\\">"+escapeHtml(e.email)+"</span>";' +
-    '      h+="<span class=\\"email-date\\">"+escapeHtml(e.date)+" | "+escapeHtml(e.quarter)+"</span></div>";' +
-    '      h+="<div class=\\"actions\\">";' +
-    '      h+="<button class=\\"btn btn-approve\\" onclick=\\"approve("+e.row+\")\\">✓ Approve</button>";' +
-    '      h+="<button class=\\"btn btn-reject\\" onclick=\\"reject("+e.row+\")\\">✗ Reject</button>";' +
-    '      h+="</div></div>";' +
-    '    });' +
-    '    h+="</div>";' +
-    '  }' +
-    '  h+="</div>";' +
-    '  document.getElementById("content").innerHTML=h;' +
-    '}' +
-    'function approve(row){' +
-    '  if(confirm("Mark this submission as verified? This will include it in statistics.")){' +
-    '    google.script.run.withFailureHandler(function(e){alert(e.message)}).withSuccessHandler(function(){load()}).approveFlaggedSubmission(row);' +
-    '  }' +
-    '}' +
-    'function reject(row){' +
-    '  if(confirm("Reject this submission? It will be excluded from all statistics.")){' +
-    '    google.script.run.withFailureHandler(function(e){alert(e.message)}).withSuccessHandler(function(){load()}).rejectFlaggedSubmission(row);' +
-    '  }' +
-    '}' +
-    'load();' +
-    '</script></body></html>';
-}
-
 /**
  * Get data for flagged submissions review
  * @returns {Object} Pending submissions data (email, date, row number - NO survey answers)

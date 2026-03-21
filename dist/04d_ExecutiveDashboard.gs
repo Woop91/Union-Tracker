@@ -27,7 +27,7 @@ function getDashboardStats() {
     overdueCount: 0,
     totalMembers: 0,
     stewardCount: 0,
-    moraleScore: 5, // Placeholder for SurveyMonkey integration
+    moraleScore: 5, // Default; overridden by getSatisfactionSummary() below
     unitBreakdown: {},
     stewardWorkload: []
   };
@@ -261,38 +261,6 @@ function checkDashboardAlerts() {
   }
 }
 
-/**
- * @deprecated v4.3.2 - Use showStewardDashboard() instead.
- * All analytics are now in the unified Steward Dashboard (Bargaining tab).
- */
-function renderBargainingCheatSheet() {
-  showStewardDashboard();
-}
-
-/**
- * @deprecated v4.3.2 - Use showStewardDashboard() instead.
- * Hot Zones are now in the unified Steward Dashboard (Hot Spots tab).
- */
-function renderHotZones() {
-  showStewardDashboard();
-}
-
-/**
- * @deprecated v4.3.2 - Use showStewardDashboard() instead.
- * Steward metrics are now in the unified Steward Dashboard (Workload tab).
- */
-function identifyRisingStars() {
-  showStewardDashboard();
-}
-
-/**
- * @deprecated v4.3.2 - Use showStewardDashboard() instead.
- * Hostility metrics are now in the unified Steward Dashboard (Bargaining tab).
- */
-function renderHostilityFunnel() {
-  showStewardDashboard();
-}
-
 // ============================================================================
 // 5. AUTOMATION & COMMUNICATION
 // ============================================================================
@@ -384,17 +352,11 @@ function midnightAutoRefresh() {
 
     Logger.log('Midnight Auto-Refresh started at ' + startTime.toISOString());
 
-    // 1. Refresh hidden calculation sheets if function exists
-    if (typeof rebuildAllHiddenSheets === 'function') {
-      rebuildAllHiddenSheets();
-      Logger.log('Hidden calculation sheets refreshed');
-    }
-
-    // 2. Check for critical dashboard alerts
+    // 1. Check for critical dashboard alerts
     checkDashboardAlerts();
     Logger.log('Dashboard alerts checked');
 
-    // 3. Check for overdue grievances and send reminders
+    // 2. Check for overdue grievances and send reminders
     checkOverdueGrievances_();
 
     var endTime = new Date();
@@ -512,21 +474,3 @@ function emailExecutivePDF() {
   }
 }
 
-// ============================================================================
-// 6. AUTO-ID GENERATOR ENGINE
-// ============================================================================
-
-// ============================================================================
-// 7. SIGNATURE PDF ENGINE
-// ============================================================================
-
-// ============================================================================
-// 8. STEWARD PROMOTION ENGINE (Helper Functions)
-// ============================================================================
-// Note: Main promote/demote functions moved to 02_MemberManager.gs
-
-// demoteSelectedSteward_UIService_DEPRECATED removed — see demoteSelectedSteward() in 02_MemberManager.gs
-
-// ============================================================================
-// 9. GLOBAL UI STYLING ENGINE (Status Colors)
-// ============================================================================

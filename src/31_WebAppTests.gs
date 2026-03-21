@@ -28,7 +28,7 @@
  *   modules (19-28) for existence checks. Used by the test runner suite
  *   system.
  *
- * @version 4.31.0
+ * @version 4.33.0
  */
 
 /* ========================================================================
@@ -39,18 +39,22 @@ function test_webapp_doGetExists() {
   TestRunner.assertEquals('function', typeof doGet, 'doGet global function exists');
 }
 
+/** Tests webapp: do get web dashboard exists. */
 function test_webapp_doGetWebDashboardExists() {
   TestRunner.assertEquals('function', typeof doGetWebDashboard, 'doGetWebDashboard exists');
 }
 
+/** Tests webapp: include helper exists. */
 function test_webapp_includeHelperExists() {
   TestRunner.assertEquals('function', typeof include, 'include() template helper exists');
 }
 
+/** Tests webapp: get web app url exists. */
 function test_webapp_getWebAppUrlExists() {
   TestRunner.assertEquals('function', typeof getWebAppUrl, 'getWebAppUrl exists');
 }
 
+/** Tests webapp: get web app url returns string. */
 function test_webapp_getWebAppUrlReturnsString() {
   var url = getWebAppUrl();
   TestRunner.assertNotNull(url, 'getWebAppUrl returns a value');
@@ -58,14 +62,17 @@ function test_webapp_getWebAppUrlReturnsString() {
   TestRunner.assertGreaterThan(url.length, 0, 'URL is not empty');
 }
 
+/** Tests webapp: org chart html exists. */
 function test_webapp_orgChartHtmlExists() {
   TestRunner.assertEquals('function', typeof getOrgChartHtml, 'getOrgChartHtml exists');
 }
 
+/** Tests webapp: poms reference html exists. */
 function test_webapp_pomsReferenceHtmlExists() {
   TestRunner.assertEquals('function', typeof getPOMSReferenceHtml, 'getPOMSReferenceHtml exists');
 }
 
+/** Tests webapp: poms reference html returns content. */
 function test_webapp_pomsReferenceHtmlReturnsContent() {
   // getPOMSReferenceHtml should return HTML content (not an error fallback)
   try {
@@ -82,6 +89,7 @@ function test_webapp_pomsReferenceHtmlReturnsContent() {
   }
 }
 
+/** Tests webapp: org chart html returns content. */
 function test_webapp_orgChartHtmlReturnsContent() {
   // getOrgChartHtml should return HTML content (not an error fallback)
   try {
@@ -96,10 +104,12 @@ function test_webapp_orgChartHtmlReturnsContent() {
   }
 }
 
+/** Tests webapp: diagnose web app exists. */
 function test_webapp_diagnoseWebAppExists() {
   TestRunner.assertEquals('function', typeof diagnoseWebApp, 'diagnoseWebApp exists');
 }
 
+/** Tests webapp: diagnose web app runs clean. */
 function test_webapp_diagnoseWebAppRunsClean() {
   // diagnoseWebApp() is a comprehensive 14-step health check — read-only
   try {
@@ -117,14 +127,17 @@ function test_webapp_diagnoseWebAppRunsClean() {
   }
 }
 
+/** Tests webapp: serve fatal error exists. */
 function test_webapp_serveFatalErrorExists() {
   TestRunner.assertEquals('function', typeof _serveFatalError, '_serveFatalError exists');
 }
 
+/** Tests webapp: sanitize config exists. */
 function test_webapp_sanitizeConfigExists() {
   TestRunner.assertEquals('function', typeof _sanitizeConfig, '_sanitizeConfig exists');
 }
 
+/** Tests webapp: sanitize config strips internal. */
 function test_webapp_sanitizeConfigStripsInternal() {
   // _sanitizeConfig should remove sensitive fields from config before sending to client
   var testConfig = {
@@ -153,22 +166,27 @@ function test_configrd_moduleExists() {
   TestRunner.assertType(ConfigReader, 'object', 'ConfigReader is object');
 }
 
+/** Tests configrd: get config callable. */
 function test_configrd_getConfigCallable() {
   TestRunner.assertType(ConfigReader.getConfig, 'function', 'getConfig is function');
 }
 
+/** Tests configrd: validate config callable. */
 function test_configrd_validateConfigCallable() {
   TestRunner.assertType(ConfigReader.validateConfig, 'function', 'validateConfig is function');
 }
 
+/** Tests configrd: refresh config callable. */
 function test_configrd_refreshConfigCallable() {
   TestRunner.assertType(ConfigReader.refreshConfig, 'function', 'refreshConfig is function');
 }
 
+/** Tests configrd: get config JSON callable. */
 function test_configrd_getConfigJSONCallable() {
   TestRunner.assertType(ConfigReader.getConfigJSON, 'function', 'getConfigJSON is function');
 }
 
+/** Tests configrd: config has required fields. */
 function test_configrd_configHasRequiredFields() {
   var config = ConfigReader.getConfig();
   TestRunner.assertNotNull(config, 'config returned');
@@ -180,6 +198,7 @@ function test_configrd_configHasRequiredFields() {
   TestRunner.assertHasKey(config, 'memberLabel', 'memberLabel');
 }
 
+/** Tests configrd: config has drive fields. */
 function test_configrd_configHasDriveFields() {
   var config = ConfigReader.getConfig();
   // Drive integration fields — may be empty but keys should exist
@@ -190,6 +209,7 @@ function test_configrd_configHasDriveFields() {
   }
 }
 
+/** Tests configrd: config has auth fields. */
 function test_configrd_configHasAuthFields() {
   var config = ConfigReader.getConfig();
   // Auth-related config fields
@@ -197,6 +217,7 @@ function test_configrd_configHasAuthFields() {
   TestRunner.assertHasKey(config, 'cookieDurationDays', 'cookieDurationDays');
 }
 
+/** Tests configrd: validate config returns shape. */
 function test_configrd_validateConfigReturnsShape() {
   var result = ConfigReader.validateConfig();
   TestRunner.assertNotNull(result, 'validateConfig returns value');
@@ -207,6 +228,7 @@ function test_configrd_validateConfigReturnsShape() {
   TestRunner.assertTrue(Array.isArray(result.missing), 'missing is array');
 }
 
+/** Tests configrd: get config JSON returns string. */
 function test_configrd_getConfigJSONReturnsString() {
   var json = ConfigReader.getConfigJSON();
   TestRunner.assertType(json, 'string', 'getConfigJSON returns string');
@@ -232,6 +254,7 @@ function test_portal_memberDirColsDefined() {
   TestRunner.assertHasKey(PORTAL_MEMBER_DIR_COLS, 'ROLE', 'ROLE');
 }
 
+/** Tests portal: event cols defined. */
 function test_portal_eventColsDefined() {
   TestRunner.assertNotNull(PORTAL_EVENT_COLS, 'PORTAL_EVENT_COLS');
   TestRunner.assertType(PORTAL_EVENT_COLS, 'object', 'is object');
@@ -241,6 +264,7 @@ function test_portal_eventColsDefined() {
   TestRunner.assertHasKey(PORTAL_EVENT_COLS, 'DATE_TIME', 'DATE_TIME');
 }
 
+/** Tests portal: minutes cols defined. */
 function test_portal_minutesColsDefined() {
   TestRunner.assertNotNull(PORTAL_MINUTES_COLS, 'PORTAL_MINUTES_COLS');
   TestRunner.assertHasKey(PORTAL_MINUTES_COLS, 'ID', 'ID');
@@ -249,6 +273,7 @@ function test_portal_minutesColsDefined() {
   TestRunner.assertHasKey(PORTAL_MINUTES_COLS, 'DRIVE_DOC_URL', 'DRIVE_DOC_URL');
 }
 
+/** Tests portal: grievance cols defined. */
 function test_portal_grievanceColsDefined() {
   TestRunner.assertNotNull(PORTAL_GRIEVANCE_COLS, 'PORTAL_GRIEVANCE_COLS');
   TestRunner.assertHasKey(PORTAL_GRIEVANCE_COLS, 'ID', 'ID');
@@ -257,6 +282,7 @@ function test_portal_grievanceColsDefined() {
   TestRunner.assertHasKey(PORTAL_GRIEVANCE_COLS, 'STATUS', 'STATUS');
 }
 
+/** Tests portal: steward log cols defined. */
 function test_portal_stewardLogColsDefined() {
   TestRunner.assertNotNull(PORTAL_STEWARD_LOG_COLS, 'PORTAL_STEWARD_LOG_COLS');
   TestRunner.assertHasKey(PORTAL_STEWARD_LOG_COLS, 'ID', 'ID');
@@ -265,6 +291,7 @@ function test_portal_stewardLogColsDefined() {
   TestRunner.assertHasKey(PORTAL_STEWARD_LOG_COLS, 'TYPE', 'TYPE');
 }
 
+/** Tests portal: mega survey cols defined. */
 function test_portal_megaSurveyColsDefined() {
   TestRunner.assertNotNull(PORTAL_MEGA_SURVEY_COLS, 'PORTAL_MEGA_SURVEY_COLS');
   TestRunner.assertHasKey(PORTAL_MEGA_SURVEY_COLS, 'EMAIL', 'EMAIL');
@@ -272,6 +299,7 @@ function test_portal_megaSurveyColsDefined() {
   TestRunner.assertHasKey(PORTAL_MEGA_SURVEY_COLS, 'COMPLETED', 'COMPLETED');
 }
 
+/** Tests portal: all cols0 indexed. */
 function test_portal_allCols0Indexed() {
   // PORTAL_*_COLS use 0-based indexing (for array access on getValues())
   var colSets = [
@@ -297,6 +325,7 @@ function test_portal_allCols0Indexed() {
   }
 }
 
+/** Tests portal: no duplicate indices. */
 function test_portal_noDuplicateIndices() {
   var colSets = [
     { name: 'PORTAL_MEMBER_DIR_COLS', obj: PORTAL_MEMBER_DIR_COLS },
@@ -318,6 +347,7 @@ function test_portal_noDuplicateIndices() {
   }
 }
 
+/** Tests portal: setup functions exist. */
 function test_portal_setupFunctionsExist() {
   TestRunner.assertEquals('function', typeof getOrCreatePortalMemberDirectory, 'getOrCreatePortalMemberDirectory');
   TestRunner.assertEquals('function', typeof getOrCreateEventsSheet, 'getOrCreateEventsSheet');
@@ -337,6 +367,7 @@ function test_weeklyq_moduleExists() {
   TestRunner.assertType(WeeklyQuestions, 'object', 'WeeklyQuestions is object');
 }
 
+/** Tests weeklyq: public API complete. */
 function test_weeklyq_publicAPIComplete() {
   var expected = [
     'getActiveQuestions', 'submitResponse', 'setStewardQuestion',
@@ -350,6 +381,7 @@ function test_weeklyq_publicAPIComplete() {
   }
 }
 
+/** Tests weeklyq: q cols exposed. */
 function test_weeklyq_qColsExposed() {
   // Q_COLS exposed since v4.24.4
   TestRunner.assertNotNull(WeeklyQuestions.Q_COLS, 'WeeklyQuestions.Q_COLS');
@@ -359,6 +391,7 @@ function test_weeklyq_qColsExposed() {
   TestRunner.assertHasKey(WeeklyQuestions.Q_COLS, 'ACTIVE', 'Q_COLS.ACTIVE');
 }
 
+/** Tests weeklyq: global wrappers exist. */
 function test_weeklyq_globalWrappersExist() {
   var wrappers = [
     'wqGetActiveQuestions', 'wqSubmitResponse', 'wqSetStewardQuestion',
@@ -372,6 +405,7 @@ function test_weeklyq_globalWrappersExist() {
   }
 }
 
+/** Tests weeklyq: get pool count callable. */
 function test_weeklyq_getPoolCountCallable() {
   // getPoolCount is unauthenticated (returns number)
   try {
@@ -384,6 +418,7 @@ function test_weeklyq_getPoolCountCallable() {
   }
 }
 
+/** Tests weeklyq: get poll frequency callable. */
 function test_weeklyq_getPollFrequencyCallable() {
   try {
     var freq = WeeklyQuestions.getPollFrequency();
@@ -397,6 +432,7 @@ function test_weeklyq_getPollFrequencyCallable() {
   }
 }
 
+/** Tests weeklyq: wrappers reject null token. */
 function test_weeklyq_wrappersRejectNullToken() {
   // Auth-gated wrappers should return safe empty on null token
   try {
@@ -406,6 +442,7 @@ function test_weeklyq_wrappersRejectNullToken() {
   } catch (_e) { /* throwing is acceptable */ }
 }
 
+/** Tests weeklyq: auto select exists. */
 function test_weeklyq_autoSelectExists() {
   TestRunner.assertEquals('function', typeof autoSelectCommunityPoll, 'autoSelectCommunityPoll trigger handler exists');
 }
@@ -419,6 +456,7 @@ function test_workload_moduleExists() {
   TestRunner.assertType(WorkloadService, 'object', 'WorkloadService is object');
 }
 
+/** Tests workload: public API complete. */
 function test_workload_publicAPIComplete() {
   var expected = [
     'initSheets', 'processFormSSO', 'getHistorySSO',
@@ -432,6 +470,7 @@ function test_workload_publicAPIComplete() {
   }
 }
 
+/** Tests workload: sub categories exposed. */
 function test_workload_subCategoriesExposed() {
   TestRunner.assertNotNull(WorkloadService.SUB_CATEGORIES, 'SUB_CATEGORIES');
   TestRunner.assertType(WorkloadService.SUB_CATEGORIES, 'object', 'SUB_CATEGORIES is object');
@@ -445,6 +484,7 @@ function test_workload_subCategoriesExposed() {
   }
 }
 
+/** Tests workload: category labels exposed. */
 function test_workload_categoryLabelsExposed() {
   TestRunner.assertNotNull(WorkloadService.CATEGORY_LABELS, 'CATEGORY_LABELS');
   TestRunner.assertType(WorkloadService.CATEGORY_LABELS, 'object', 'CATEGORY_LABELS is object');
@@ -455,6 +495,7 @@ function test_workload_categoryLabelsExposed() {
   }
 }
 
+/** Tests workload: get sub categories callable. */
 function test_workload_getSubCategoriesCallable() {
   var cats = WorkloadService.getSubCategories();
   TestRunner.assertNotNull(cats, 'getSubCategories returns value');
@@ -462,6 +503,7 @@ function test_workload_getSubCategoriesCallable() {
   TestRunner.assertHasKey(cats, 'priority', 'has priority key');
 }
 
+/** Tests workload: global wrappers exist. */
 function test_workload_globalWrappersExist() {
   var wrappers = [
     'processWorkloadFormSSO', 'getWorkloadHistorySSO', 'getWorkloadDashboardDataSSO',
@@ -474,12 +516,14 @@ function test_workload_globalWrappersExist() {
   }
 }
 
+/** Tests workload: trigger handlers exist. */
 function test_workload_triggerHandlersExist() {
   TestRunner.assertEquals('function', typeof initWorkloadTrackerSheets, 'initWorkloadTrackerSheets');
   TestRunner.assertEquals('function', typeof processWorkloadReminders, 'processWorkloadReminders');
   TestRunner.assertEquals('function', typeof refreshWorkloadLedger, 'refreshWorkloadLedger');
 }
 
+/** Tests workload: wrappers reject null token. */
 function test_workload_wrappersRejectNullToken() {
   try {
     var result = getWorkloadHistorySSO(null);
@@ -499,6 +543,7 @@ function test_qaforum_moduleExists() {
   TestRunner.assertType(QAForum, 'object', 'QAForum is object');
 }
 
+/** Tests qaforum: public API complete. */
 function test_qaforum_publicAPIComplete() {
   var expected = [
     'initQAForumSheets', 'getQuestions', 'getQuestionDetail',
@@ -512,6 +557,7 @@ function test_qaforum_publicAPIComplete() {
   }
 }
 
+/** Tests qaforum: global wrappers exist. */
 function test_qaforum_globalWrappersExist() {
   var wrappers = [
     'qaGetQuestions', 'qaGetQuestionDetail', 'qaSubmitQuestion',
@@ -525,6 +571,7 @@ function test_qaforum_globalWrappersExist() {
   }
 }
 
+/** Tests qaforum: get questions returns array. */
 function test_qaforum_getQuestionsReturnsArray() {
   try {
     // Call with empty email — should return questions array (public)
@@ -536,6 +583,7 @@ function test_qaforum_getQuestionsReturnsArray() {
   }
 }
 
+/** Tests qaforum: wrappers reject null token. */
 function test_qaforum_wrappersRejectNullToken() {
   // Steward-gated endpoints should reject null
   try {
@@ -549,6 +597,7 @@ function test_qaforum_wrappersRejectNullToken() {
   } catch (_e) { /* throwing is acceptable */ }
 }
 
+/** Tests qaforum: pagination defaults. */
 function test_qaforum_paginationDefaults() {
   try {
     // Default pagination should work (page 1, pageSize 10)
@@ -570,6 +619,7 @@ function test_timeline_moduleExists() {
   TestRunner.assertType(TimelineService, 'object', 'TimelineService is object');
 }
 
+/** Tests timeline: public API complete. */
 function test_timeline_publicAPIComplete() {
   var expected = [
     'initTimelineSheet', 'getTimelineEvents', 'addTimelineEvent',
@@ -582,6 +632,7 @@ function test_timeline_publicAPIComplete() {
   }
 }
 
+/** Tests timeline: global wrappers exist. */
 function test_timeline_globalWrappersExist() {
   var wrappers = [
     'tlGetTimelineEvents', 'tlAddTimelineEvent', 'tlUpdateTimelineEvent',
@@ -594,6 +645,7 @@ function test_timeline_globalWrappersExist() {
   }
 }
 
+/** Tests timeline: get events returns array. */
 function test_timeline_getEventsReturnsArray() {
   try {
     var result = TimelineService.getTimelineEvents(1, 10, null, null);
@@ -604,6 +656,7 @@ function test_timeline_getEventsReturnsArray() {
   }
 }
 
+/** Tests timeline: wrappers reject null token. */
 function test_timeline_wrappersRejectNullToken() {
   // Write endpoints should reject null token
   try {
@@ -614,6 +667,7 @@ function test_timeline_wrappersRejectNullToken() {
   } catch (_e) { /* throwing is acceptable */ }
 }
 
+/** Tests timeline: categories validated. */
 function test_timeline_categoriesValidated() {
   // TimelineService should accept known categories
   var knownCategories = ['meeting', 'announcement', 'milestone', 'action', 'decision', 'other'];
@@ -639,6 +693,7 @@ function test_failsafe_moduleExists() {
   TestRunner.assertType(FailsafeService, 'object', 'FailsafeService is object');
 }
 
+/** Tests failsafe: public API complete. */
 function test_failsafe_publicAPIComplete() {
   var expected = [
     'initFailsafeSheet', 'getDigestConfig', 'updateDigestConfig',
@@ -651,6 +706,7 @@ function test_failsafe_publicAPIComplete() {
   }
 }
 
+/** Tests failsafe: global wrappers exist. */
 function test_failsafe_globalWrappersExist() {
   var wrappers = [
     'fsGetDigestConfig', 'fsUpdateDigestConfig',
@@ -664,10 +720,12 @@ function test_failsafe_globalWrappersExist() {
   }
 }
 
+/** Tests failsafe: diagnostic exists. */
 function test_failsafe_diagnosticExists() {
   TestRunner.assertEquals('function', typeof fsDiagnostic, 'fsDiagnostic exists');
 }
 
+/** Tests failsafe: digest config returns shape. */
 function test_failsafe_digestConfigReturnsShape() {
   // getDigestConfig with non-existent email should return default config
   try {
@@ -680,6 +738,7 @@ function test_failsafe_digestConfigReturnsShape() {
   }
 }
 
+/** Tests failsafe: wrappers reject null token. */
 function test_failsafe_wrappersRejectNullToken() {
   try {
     var result = fsTriggerBulkExport(null);
@@ -689,6 +748,7 @@ function test_failsafe_wrappersRejectNullToken() {
   } catch (_e) { /* throwing is acceptable */ }
 }
 
+/** Tests failsafe: ensure all sheets exists. */
 function test_failsafe_ensureAllSheetsExists() {
   TestRunner.assertEquals('function', typeof fsEnsureAllSheets, 'fsEnsureAllSheets exists');
 }
@@ -708,6 +768,7 @@ function test_endpoints_thisBindingCanary() {
     'this references global scope (canary)');
 }
 
+/** Tests endpoints: core grievance fns exist. */
 function test_endpoints_coreGrievanceFnsExist() {
   var fns = [
     'dataGetStewardCases', 'dataGetStewardKPIs',
@@ -721,6 +782,7 @@ function test_endpoints_coreGrievanceFnsExist() {
   }
 }
 
+/** Tests endpoints: task fns exist. */
 function test_endpoints_taskFnsExist() {
   var fns = [
     'dataCreateTask', 'dataGetTasks', 'dataCompleteTask', 'dataUpdateTask',
@@ -731,6 +793,7 @@ function test_endpoints_taskFnsExist() {
   }
 }
 
+/** Tests endpoints: survey feedback fns exist. */
 function test_endpoints_surveyFeedbackFnsExist() {
   var fns = [
     'dataGetSurveyStatus', 'dataGetSurveyQuestions',
@@ -742,6 +805,7 @@ function test_endpoints_surveyFeedbackFnsExist() {
   }
 }
 
+/** Tests endpoints: contact notification fns exist. */
 function test_endpoints_contactNotificationFnsExist() {
   var fns = [
     'dataLogMemberContact', 'dataGetMemberContactHistory',
@@ -752,6 +816,7 @@ function test_endpoints_contactNotificationFnsExist() {
   }
 }
 
+/** Tests endpoints: admin stats fns exist. */
 function test_endpoints_adminStatsFnsExist() {
   var fns = [
     'dataGetAllMembers', 'dataSendBroadcast',
@@ -765,6 +830,7 @@ function test_endpoints_adminStatsFnsExist() {
   }
 }
 
+/** Tests endpoints: batch diagnostic fns exist. */
 function test_endpoints_batchDiagnosticFnsExist() {
   var fns = [
     'dataGetBatchData', 'dataEnsureSheetsIfNeeded',
@@ -775,6 +841,7 @@ function test_endpoints_batchDiagnosticFnsExist() {
   }
 }
 
+/** Tests endpoints: meeting fns exist. */
 function test_endpoints_meetingFnsExist() {
   var fns = [
     'dataGetMemberMeetings', 'dataGetMeetingMinutes', 'dataAddMeetingMinutes'
@@ -784,6 +851,7 @@ function test_endpoints_meetingFnsExist() {
   }
 }
 
+/** Tests endpoints: checklist fns exist. */
 function test_endpoints_checklistFnsExist() {
   var fns = ['dataGetCaseChecklist', 'dataToggleChecklistItem'];
   for (var i = 0; i < fns.length; i++) {
@@ -791,6 +859,7 @@ function test_endpoints_checklistFnsExist() {
   }
 }
 
+/** Tests endpoints: poll stubs removed. */
 function test_endpoints_pollStubsRemoved() {
   // v4.25.11: Legacy poll stubs removed — verify they no longer exist
   TestRunner.assertEquals('undefined', typeof dataGetActivePolls, 'dataGetActivePolls removed');
@@ -798,6 +867,7 @@ function test_endpoints_pollStubsRemoved() {
   TestRunner.assertEquals('undefined', typeof dataAddPoll, 'dataAddPoll removed');
 }
 
+/** Tests endpoints: all write endpoints reject null. */
 function test_endpoints_allWriteEndpointsRejectNull() {
   // Write/mutate endpoints must reject null session tokens
   var writeEndpoints = [
@@ -826,11 +896,13 @@ function test_endpoints_allWriteEndpointsRejectNull() {
   }
 }
 
+/** Tests endpoints: notification count exists. */
 function test_endpoints_notificationCountExists() {
   TestRunner.assertEquals('function', typeof getWebAppNotificationCount,
     'getWebAppNotificationCount exists');
 }
 
+/** Tests endpoints: grievance draft fns exist. */
 function test_endpoints_grievanceDraftFnsExist() {
   // Grievance draft/drive functions
   var fns = ['dataStartGrievanceDraft', 'dataStartGrievanceDraftForMember', 'dataCreateGrievanceDrive'];

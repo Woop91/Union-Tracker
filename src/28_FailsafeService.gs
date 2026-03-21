@@ -30,7 +30,7 @@
  *   CacheService. Used by weekly backup trigger and member digest
  *   preferences in the SPA.
  *
- * @version 4.31.0
+ * @version 4.33.0
  */
 
 var FailsafeService = (function () {
@@ -42,6 +42,10 @@ var FailsafeService = (function () {
   // Sheet Setup
   // ═══════════════════════════════════════
 
+  /**
+   * Creates the _Failsafe_Config hidden sheet if it does not exist.
+   * @returns {GoogleAppsScript.Spreadsheet.Sheet} The failsafe config sheet.
+   */
   function initFailsafeSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) throw new Error('Spreadsheet binding broken — getActiveSpreadsheet() returned null.');
@@ -62,7 +66,12 @@ var FailsafeService = (function () {
   // Cached Sheet Read Helper
   // ═══════════════════════════════════════
 
-  // PERF-01: Cache sheet reads to avoid redundant getDataRange() calls across requests
+  /**
+   * Returns cached sheet data from CacheService, falling back to a live read.
+   * @param {string} sheetName - Name of the sheet to read.
+   * @param {number} [maxAgeSec=120] - Cache TTL in seconds.
+   * @returns {Array[]|null} 2D array of sheet values, or null if empty/missing.
+   */
   function _getCachedSheetData(sheetName, maxAgeSec) {
     maxAgeSec = maxAgeSec || 120;
     try {
@@ -86,6 +95,11 @@ var FailsafeService = (function () {
   // Digest Configuration
   // ═══════════════════════════════════════
 
+  /**
+   * Retrieves a member's email digest preferences, returning defaults if not configured.
+   * @param {string} email - Member's email address.
+   * @returns {Object} Digest config with enabled, frequency, and include* flags.
+   */
   function getDigestConfig(email) {
     if (!email) return null;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -112,6 +126,12 @@ var FailsafeService = (function () {
     return { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
   }
 
+  /**
+   * Creates or updates a member's email digest preferences under a script lock.
+   * @param {string} email - Member's email address.
+   * @param {Object} config - Digest settings (enabled, frequency, include* flags).
+   * @returns {{success: boolean, message: string}}
+   */
   function updateDigestConfig(email, config) {
     if (!email || !config) return { success: false, message: 'Missing data.' };
 
@@ -152,6 +172,10 @@ var FailsafeService = (function () {
   // Scheduled Digest Processing
   // ═══════════════════════════════════════
 
+  /**
+   * Iterates enabled digest configs and sends due email digests with double-checked locking.
+   * @returns {{processed: number}} Count of digests sent.
+   */
   function processScheduledDigests() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return { processed: 0 };
@@ -228,6 +252,12 @@ var FailsafeService = (function () {
     return { processed: processed };
   }
 
+  /**
+   * Composes an HTML email body summarizing a member's grievances, workload, and tasks.
+   * @param {string} email - Member's email address.
+   * @param {Object} config - Include flags (includeGrievances, includeWorkload, includeTasks).
+   * @returns {string|null} HTML string, or null if no data sections were generated.
+   */
   function _composeMemberDigest(email, config) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
@@ -305,6 +335,11 @@ var FailsafeService = (function () {
   // Bulk Export
   // ═══════════════════════════════════════
 
+  /**
+   * Sends a personal data summary email to every member in the directory.
+   * @param {string} stewardEmail - Requesting steward's email (authorization check).
+   * @returns {{success: boolean, sent?: number, message?: string}}
+   */
   function triggerBulkExport(stewardEmail) {
     if (!stewardEmail) return { success: false, message: 'Not authorized.' };
 
@@ -352,6 +387,10 @@ var FailsafeService = (function () {
   // Drive Backup
   // ═══════════════════════════════════════
 
+  /**
+   * Exports critical sheets as CSV files to the Drive backup folder and prunes old backups.
+   * @returns {{success: boolean, backedUp?: number, folderName?: string, message?: string}}
+   */
   function backupCriticalSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
@@ -399,6 +438,10 @@ var FailsafeService = (function () {
   // Trigger Management
   // ═══════════════════════════════════════
 
+  /**
+   * Installs daily digest (7 AM) and weekly backup (Sunday 2 AM) time-based triggers.
+   * @returns {{success: boolean, message: string}}
+   */
   function setupFailsafeTriggers() {
     // Remove existing triggers first
     removeFailsafeTriggers();
@@ -421,6 +464,10 @@ var FailsafeService = (function () {
     return { success: true, message: 'Triggers installed: daily digest check + weekly backup.' };
   }
 
+  /**
+   * Deletes all project triggers whose handler is a failsafe function.
+   * @returns {{success: boolean, removed: number}}
+   */
   function removeFailsafeTriggers() {
     var triggers = ScriptApp.getProjectTriggers();
     var removed = 0;
@@ -439,6 +486,12 @@ var FailsafeService = (function () {
   // Helpers
   // ═══════════════════════════════════════
 
+  /**
+   * Trashes backup CSV files beyond MAX_BACKUP_FILES per sheet prefix.
+   * @param {GoogleAppsScript.Drive.Folder} folder - Backup folder to prune.
+   * @param {string[]} sheetNames - Sheet names whose backups to prune.
+   * @returns {void}
+   */
   function _pruneOldBackups(folder, sheetNames) {
     sheetNames.forEach(function(sheetName) {
       var prefix = sheetName.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -461,6 +514,10 @@ var FailsafeService = (function () {
     });
   }
 
+  /**
+   * Returns the Drive backup folder, creating it with private sharing if it does not exist.
+   * @returns {GoogleAppsScript.Drive.Folder} The backup folder.
+   */
   function _getOrCreateBackupFolder() {
     var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
     if (folders.hasNext()) return folders.next();
@@ -475,6 +532,11 @@ var FailsafeService = (function () {
     return folder;
   }
 
+  /**
+   * Converts a 2D array to a CSV string with proper quoting and date formatting.
+   * @param {Array[]} data - 2D array of cell values.
+   * @returns {string} CSV-formatted string.
+   */
   function _toCsv(data) {
     return data.map(function (row) {
       return row.map(function (cell) {
@@ -487,7 +549,11 @@ var FailsafeService = (function () {
     }).join('\n');
   }
 
-  // Delegate to shared helper in 01_Core.gs (eliminates duplicate definition)
+  /**
+   * Formats a Date as a short string by delegating to fmtDateShort_ in 01_Core.gs.
+   * @param {Date} date - Date to format.
+   * @returns {string} Formatted date string.
+   */
   function _fmtDate(date) { return fmtDateShort_(date); }
 
   // ═══════════════════════════════════════
@@ -584,6 +650,11 @@ var FailsafeService = (function () {
 // sessionToken: client passes SESSION_TOKEN (from PAGE_DATA.sessionToken) for magic link / session auth.
 // Server validates the token via Auth.resolveEmailFromToken() — the raw email is never trusted.
 
+/**
+ * Global wrapper: returns the caller's email digest configuration.
+ * @param {string} sessionToken - Session token for server-resolved identity.
+ * @returns {Object} Digest config object.
+ */
 function fsGetDigestConfig(sessionToken) {
   // Server-resolved identity: SSO first, then verified session token
   var e = _resolveCallerEmail(sessionToken);
@@ -591,6 +662,12 @@ function fsGetDigestConfig(sessionToken) {
   return FailsafeService.getDigestConfig(e);
 }
 
+/**
+ * Global wrapper: updates the caller's email digest preferences.
+ * @param {string} sessionToken - Session token for server-resolved identity.
+ * @param {Object} config - Digest settings to save.
+ * @returns {{success: boolean, message: string}}
+ */
 function fsUpdateDigestConfig(sessionToken, config) {
   // Server-resolved identity only — sessionToken verified server-side
   var e = _resolveCallerEmail(sessionToken);
@@ -598,53 +675,84 @@ function fsUpdateDigestConfig(sessionToken, config) {
   return FailsafeService.updateDigestConfig(e, config);
 }
 
+/**
+ * Global wrapper: processes scheduled digests (trigger-invoked, no interactive auth).
+ * @returns {{processed: number}}
+ */
 function fsProcessScheduledDigests() {
   // Scheduled trigger — no interactive auth; runs as script owner
   return FailsafeService.processScheduledDigests();
 }
 
+/**
+ * Global wrapper: sends bulk data export emails to all members (steward-only).
+ * @param {string} sessionToken - Session token for steward auth.
+ * @returns {{success: boolean, sent?: number, message?: string}}
+ */
 function fsTriggerBulkExport(sessionToken) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.triggerBulkExport(e);
 }
 
+/**
+ * Global wrapper: backs up critical sheets to Drive as CSV (steward-only).
+ * @param {string} sessionToken - Session token for steward auth.
+ * @returns {{success: boolean, backedUp?: number, message?: string}}
+ */
 function fsBackupCriticalSheets(sessionToken) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.backupCriticalSheets();
 }
 
+/**
+ * Global wrapper: installs failsafe time-based triggers (steward-only).
+ * @param {string} sessionToken - Session token for steward auth.
+ * @returns {{success: boolean, message: string}}
+ */
 function fsSetupTriggers(sessionToken) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.setupFailsafeTriggers();
 }
 
+/**
+ * Global wrapper: removes failsafe time-based triggers (steward-only).
+ * @param {string} sessionToken - Session token for steward auth.
+ * @returns {{success: boolean, removed: number}}
+ */
 function fsRemoveTriggers(sessionToken) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.removeFailsafeTriggers();
 }
 
+/**
+ * Global wrapper: initializes the failsafe config sheet (steward-only).
+ * @param {string} sessionToken - Session token for steward auth.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet}
+ */
 function fsInitSheets(sessionToken) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.initFailsafeSheet();
 }
 
+/**
+ * Global wrapper: restores a sheet from a Drive CSV backup (steward-only).
+ * @param {string} sessionToken - Session token for steward auth.
+ * @param {string} fileId - Drive file ID of the CSV backup.
+ * @param {string} sheetName - Target sheet name to restore into.
+ * @param {boolean} confirmed - Must be true to proceed.
+ * @returns {{success: boolean, message: string, rowsRestored?: number}}
+ */
 function fsRestoreFromBackup(sessionToken, fileId, sheetName, confirmed) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.restoreFromDriveBackup(fileId, sheetName, confirmed);
 }
 
-/**
- * Ensures ALL required hidden/optional sheets exist.
- * Callable from the SPA (no Sheets UI needed).
- * Equivalent to the sheet-creation portions of CREATE_DASHBOARD.
- * Non-destructive: skips sheets that already exist, only creates missing ones.
- */
 /**
  * Ensures ALL required hidden/optional sheets exist.
  * Callable from the SPA (steward auth required).

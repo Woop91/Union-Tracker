@@ -17,7 +17,7 @@
  * - Version management
  *
  * @fileoverview Core constants, error handling, and configuration
- * @version 4.7.0
+ * @version 4.33.0
  */
 
 // ============================================================================
@@ -241,152 +241,6 @@ function sendCriticalErrorNotification_(errorInfo) {
 }
 
 // ============================================================================
-// PERFORMANCE MONITORING
-// ============================================================================
-
-/**
- * Performance timer for tracking operation duration
- */
-var PerformanceTimer = {
-  timers: {},
-
-  /**
-   * Start a timer
-   * @param {string} name - Timer name
-   */
-  start: function(name) {
-    this.timers[name] = {
-      start: new Date().getTime(),
-      end: null
-    };
-  },
-
-  /**
-   * Stop a timer and return duration
-   * @param {string} name - Timer name
-   * @returns {number} Duration in milliseconds
-   */
-  stop: function(name) {
-    if (!this.timers[name]) {
-      Logger.log('Timer not found: ' + name);
-      return 0;
-    }
-    this.timers[name].end = new Date().getTime();
-    var duration = this.timers[name].end - this.timers[name].start;
-    Logger.log('[PERF] ' + name + ': ' + duration + 'ms');
-    return duration;
-  },
-
-  /**
-   * Log performance if over threshold
-   * @param {string} name - Timer name
-   * @param {number} threshold - Threshold in ms
-   */
-  logIfSlow: function(name, threshold) {
-    var duration = this.stop(name);
-    if (duration > threshold) {
-      handleError(
-        new Error('Slow operation: ' + duration + 'ms'),
-        name,
-        ERROR_LEVEL.WARNING
-      );
-    }
-    return duration;
-  }
-};
-
-// ============================================================================
-// CONSTANTS VALIDATION
-// ============================================================================
-
-/**
- * Validate that required constants are defined
- * @returns {Object} Validation result with missing items
- */
-function validateConstants() {
-  var missing = [];
-  var warnings = [];
-
-  // Check SHEETS constant
-  if (typeof SHEETS === 'undefined') {
-    missing.push('SHEETS constant not defined');
-  } else {
-    var requiredSheets = ['MEMBER_DIR', 'GRIEVANCE_LOG', 'CONFIG', 'DASHBOARD'];
-    requiredSheets.forEach(function(sheet) {
-      if (!SHEETS[sheet]) {
-        warnings.push('SHEETS.' + sheet + ' not defined');
-      }
-    });
-  }
-
-  // Check column constants
-  if (typeof MEMBER_COLS === 'undefined') {
-    missing.push('MEMBER_COLS constant not defined');
-  }
-
-  if (typeof GRIEVANCE_COLS === 'undefined') {
-    missing.push('GRIEVANCE_COLS constant not defined');
-  }
-
-  return {
-    valid: missing.length === 0,
-    missing: missing,
-    warnings: warnings
-  };
-}
-
-/**
- * Validate required sheets exist
- * @returns {Object} Validation result
- */
-function validateRequiredSheets() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var missing = [];
-
-  if (typeof SHEETS !== 'undefined') {
-    var criticalSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG, SHEETS.CONFIG];
-    criticalSheets.forEach(function(sheetName) {
-      if (sheetName && !ss.getSheetByName(sheetName)) {
-        missing.push(sheetName);
-      }
-    });
-  }
-
-  return {
-    valid: missing.length === 0,
-    missing: missing
-  };
-}
-// ============================================================================
-// API VERSIONING
-// ============================================================================
-
-/**
- * API version information
- */
-// CONSOLIDATED: Derives version from COMMAND_CONFIG.VERSION (single source of truth)
-var API_VERSION = {
-  get major() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[0], 10); },
-  get minor() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[1], 10); },
-  get patch() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[2], 10); },
-  toString: function() { return COMMAND_CONFIG.VERSION; }
-};
-
-// ============================================================================
-// ERROR LOG VIEWER
-// ============================================================================
-
-/**
- * Dashboard - Constants and Configuration
- *
- * Single source of truth for all configuration constants.
- * This file must be loaded first in the build order.
- *
- * @version 4.7.0
- * @license Free for use by non-profit collective bargaining groups and unions
- */
-
-// ============================================================================
 // STRATEGIC COMMAND CENTER CONFIG (v4.0)
 // ============================================================================
 
@@ -413,14 +267,14 @@ var COMMAND_CONFIG = {
   ARCHIVE_FOLDER_ID: '',  // Drive folder ID for archived documents
 
   // Alert Configuration
-  CHIEF_STEWARD_EMAIL: '',  // Read from Config sheet (CONFIG_COLS.CHIEF_STEWARD_EMAIL)
+  CHIEF_STEWARD_EMAIL: '',  // Read at runtime via getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL)
   // Escalation triggers - for STATUS column use status values, for CURRENT_STEP use step values
   ESCALATION_STATUSES: ['In Arbitration', 'Appealed'],  // Status values that trigger alerts
   ESCALATION_STEPS: ['Step II', 'Step III', 'Arbitration'],  // Step values that trigger alerts
 
-  // Unit Code Prefixes - Now read from Config sheet (CONFIG_COLS.UNIT_CODES)
+  // Unit Code Prefixes
   // Format in Config: "Main Station:MS,Field Ops:FO,Health:HC,Admin:AD,Remote:RM"
-  UNIT_CODES: {},  // Populated dynamically from Config sheet
+  UNIT_CODES: {},  // Read at runtime from Config sheet — not populated here
 
   // Theme Settings (Roboto-based)
   THEME: {
@@ -770,6 +624,14 @@ var SHEETS = {
   // Resources & Education (v4.11.0 — content management for educational hub)
   RESOURCES:          '📚 Resources',         // steward-managed educational content
   RESOURCE_CONFIG:    '📚 Resource Config',   // categories & settings for Resources tab (v4.22.x)
+  // v4.32.1 — Hidden sheet for resource click/view analytics.
+  // Schema: [Timestamp, User Email, Resource ID, Resource Title] (4 columns).
+  // Auto-created by dataLogResourceClick() on first use; no manual setup needed.
+  // Read by dataGetEngagementStats() to compute the "Resource Views" KPI.
+  // Prefixed with underscore = hidden sheet convention (see also _Contact_Log, _Audit_Log).
+  // IF MISSING: dataLogResourceClick() creates it automatically. dataGetEngagementStats()
+  // returns resourceDownloads=0 (the _rows() helper returns [] for missing sheets).
+  RESOURCE_CLICK_LOG: '_Resource_Click_Log',
   // Weekly Questions (24_WeeklyQuestions.gs) — anonymous pulse surveys
   WEEKLY_QUESTIONS:   '_Weekly_Questions',    // hidden — active/scheduled questions
   WEEKLY_RESPONSES:   '_Weekly_Responses',    // hidden — SHA-256 hashed anonymous responses
@@ -788,10 +650,6 @@ var SHEETS = {
   // Data Failsafe (v4.17.0 — member digest preferences)
   FAILSAFE_CONFIG:    '_Failsafe_Config'      // hidden — digest/backup preferences
 };
-
-/**
- * @deprecated v4.25.7 — Removed in v4.33.0. Use SHEETS directly.
- */
 
 /**
  * Hidden sheets used for calculations (prefixed with underscore)
@@ -1159,45 +1017,6 @@ var DIALOG_SIZES = {
   LARGE: { width: 800, height: 650 },
   FULLSCREEN: { width: 1000, height: 750 },
   SIDEBAR: { width: 300 }
-};
-
-/**
- * Menu Icon Mapping - Consistent Iconography
- * Action icons for tools, View icons for dashboards
- * @const {Object}
- */
-var MENU_ICONS = {
-  // Dashboard/View Icons (📊 style)
-  DASHBOARD: '📊',
-  MEMBERS: '👥',
-  GRIEVANCES: '📋',
-  CALENDAR: '📅',
-  REPORTS: '📈',
-  SATISFACTION: '⭐',
-
-  // Action Icons (➕ style)
-  ADD: '➕',
-  EDIT: '✏️',
-  DELETE: '🗑️',
-  SEARCH: '🔍',
-  REFRESH: '🔄',
-  SYNC: '🔗',
-  EXPORT: '📤',
-  IMPORT: '📥',
-
-  // Status Icons
-  SUCCESS: '✅',
-  WARNING: '⚠️',
-  ERROR: '❌',
-  INFO: 'ℹ️',
-  CLOCK: '⏰',
-
-  // Admin/Settings Icons
-  SETTINGS: '⚙️',
-  TOOLS: '🛠️',
-  ADMIN: '🔧',
-  HELP: '❓',
-  DOCS: '📖'
 };
 
 // ============================================================================
@@ -2518,7 +2337,13 @@ var AUDIT_EVENTS = {
   // Settings events
   SETTINGS_CHANGED: 'SETTINGS_CHANGED',
   TRIGGER_INSTALLED: 'TRIGGER_INSTALLED',
-  TRIGGER_REMOVED: 'TRIGGER_REMOVED'
+  TRIGGER_REMOVED: 'TRIGGER_REMOVED',
+
+  // Resource events (v4.32.1)
+  // Currently used as a constant key for future audit integration.
+  // dataLogResourceClick() writes directly to _Resource_Click_Log (not _Audit_Log)
+  // for performance — click events are high-frequency and don't need integrity hashing.
+  RESOURCE_CLICKED: 'RESOURCE_CLICKED'
 };
 
 /**
@@ -2749,22 +2574,6 @@ function generateUUID_() {
 // ============================================================================
 // ACTION TYPE CONFIGURATION (Grievances + Other Actions)
 // ============================================================================
-
-/**
- * Action types for tracking different case types
- * Allows the system to handle grievances AND other member advocacy actions
- * @const {Object}
- */
-var ACTION_TYPES = {
-  GRIEVANCE: 'Grievance',
-  RECORDS_REQUEST: 'Records Request',
-  INFO_REQUEST: 'Information Request',
-  WEINGARTEN: 'Weingarten',
-  ULP: 'ULP Filing',
-  EEOC_MCAD: 'EEOC/MCAD',
-  ACCOMMODATION: 'Accommodation',
-  OTHER_ADMIN: 'Other Admin'
-};
 
 /**
  * Action type display names and configuration
@@ -3335,3 +3144,78 @@ function hashEmail_(email) {
   var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, email.toLowerCase().trim());
   return hash.map(function(b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('').substring(0, 12);
 }
+
+// ============================================================================
+// SHEET STYLING COLORS
+// ============================================================================
+
+/**
+ * Centralized sheet styling colors — single source of truth for all setBackground/setFontColor calls.
+ * Google Sheets API doesn't support CSS variables, but centralizing here makes branding changes a single-file edit.
+ */
+var SHEET_COLORS = {
+  // Header backgrounds (dark)
+  HEADER_NAVY: '#1a1a2e',
+  HEADER_BLUE: '#0d47a1',
+  HEADER_SLATE: '#1e293b',
+  HEADER_SLATE_MED: '#334155',
+  HEADER_DARK_BLUE: '#1a365d',
+  HEADER_DARK_RED: '#7F1D1D',
+  HEADER_DARK_PURPLE: '#5B21B6',
+  HEADER_DARK_BLUE_ALT: '#1E40AF',
+
+  // Status indicators
+  STATUS_SUCCESS: '#059669',
+  STATUS_WARNING: '#FBBF24',
+  STATUS_ERROR: '#DC2626',
+  STATUS_ERROR_DARK: '#C62828',
+  STATUS_INFO: '#3B82F6',
+  STATUS_DISABLED: '#6B7280',
+  STATUS_PURPLE: '#7C3AED',
+
+  // Light backgrounds (pastel/tinted)
+  BG_WHITE: '#ffffff',
+  BG_LIGHT_GRAY: '#F9FAFB',
+  BG_VERY_LIGHT_GRAY: '#F3F4F6',
+  BG_OFF_WHITE: '#f8fafc',
+  BG_LIGHT_BLUE: '#E0E7FF',
+  BG_LIGHT_BLUE_ALT: '#e3f2fd',
+  BG_PALE_BLUE: '#F0F9FF',
+  BG_EXTRA_PALE_BLUE: '#EFF6FF',
+  BG_LINK_BLUE: '#e8f0fe',
+  BG_LIGHT_GREEN: '#E8F5E9',
+  BG_PALE_GREEN: '#D1FAE5',
+  BG_GREEN_ALT: '#C8E6C9',
+  BG_MINT: '#ECFDF5',
+  BG_LIGHT_RED: '#FEE2E2',
+  BG_LIGHT_RED_ALT: '#FFCDD2',
+  BG_PINK: '#FFE2E2',
+  BG_LIGHT_YELLOW: '#FEF3C7',
+  BG_PALE_YELLOW: '#FFF9C4',
+  BG_EXTRA_PALE_YELLOW: '#fffde7',
+  BG_CREAM: '#fff8e1',
+  BG_LIGHT_ORANGE: '#FFE0B2',
+  BG_WARM: '#FFF3E0',
+  BG_LIGHT_PURPLE: '#FAF5FF',
+  BG_SLATE_LIGHT: '#F1F5F9',
+
+  // Text colors
+  TEXT_WHITE: '#ffffff',
+  TEXT_GRAY: '#6B7280',
+  TEXT_LIGHT_GRAY: '#9CA3AF',
+  TEXT_DARK_GREEN: '#065F46',
+  TEXT_GREEN: '#2e7d32',
+  TEXT_GREEN_ALT: '#166534',
+  TEXT_GREEN_DARK: '#1B5E20',
+  TEXT_DARK_RED: '#B71C1C',
+  TEXT_RED: '#c62828',
+  TEXT_DARK_ORANGE: '#92400E',
+  TEXT_ORANGE: '#E65100',
+  TEXT_YELLOW_DARK: '#F57F17',
+  TEXT_BROWN: '#78350F',
+  TEXT_MED_GRAY: '#666666',
+
+  // Link colors
+  LINK_PRIMARY: '#1a73e8',
+  LINK_SECONDARY: '#1155cc'
+};

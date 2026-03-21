@@ -3167,37 +3167,37 @@ document.querySelectorAll('.chapter-branch').forEach(branch => {
 });
 
 // Director / Coordinator report toggle
-function repToggle(id, btn) {
+window.repToggle = function(id, btn) {
   const el = document.getElementById(id);
   if (!el) return;
   const open = el.style.display === 'block';
   el.style.display = open ? 'none' : 'block';
   btn.textContent = open ? '▶ staff' : '▼ hide';
-}
+};
 
 // MassAbility sub-section toggle
-function maToggle(id, showLabel, hideLabel, btn) {
+window.maToggle = function(id, showLabel, hideLabel, btn) {
   const el = document.getElementById(id);
   if (!el) return;
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : 'flex';
   if (btn) btn.textContent = open ? showLabel : hideLabel;
-}
+};
 
 // Pill toggle (for collapsible sections)
-function pillToggle(id, btn) {
+window.pillToggle = function(id, btn) {
   const el = document.getElementById(id);
   if (!el) return;
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : 'block';
   btn.textContent = btn.textContent.replace(open ? '▾' : '▸', open ? '▸' : '▾');
-}
+};
 
 // Collapse MA sub-sections by default (all screen sizes)
-var _initDesktopRan = false;
-function initDesktop() {
-  if (_initDesktopRan) return;
-  _initDesktopRan = true;
+window._initDesktopRan = false;
+window.initDesktop = function() {
+  if (window._initDesktopRan) return;
+  window._initDesktopRan = true;
   // Collapse all MA sub-sections by default — user clicks to expand
   ['ma-jeb','ma-voc','ma-atlarge','ma-org','ma-vr-stewards'].forEach(id => {
     const el = document.getElementById(id);
@@ -3215,36 +3215,36 @@ function initDesktop() {
     const targetId = m[1];
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      maToggle(targetId, '▶ show', '▼ hide', this);
+      window.maToggle(targetId, '▶ show', '▼ hide', this);
     });
   });
-}
+};
 // Call initDesktop immediately — when loaded via innerHTML + script re-execution,
 // DOMContentLoaded has already fired so the listener would never trigger.
 if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', initDesktop);
+  window.addEventListener('DOMContentLoaded', window.initDesktop);
 } else {
-  initDesktop();
+  window.initDesktop();
 }
 
 // Show / hide 12 public sector chapters
-function togglePSGroup(btn) {
+window.togglePSGroup = function(btn) {
   const grp = document.getElementById('ps-group');
   const hidden = grp.style.display === 'none' || !grp.style.display;
   grp.style.display = hidden ? 'block' : 'none';
   btn.textContent = hidden ? '▼ Hide Public Sector Chapters' : '▶ Show all 12 Public Sector Chapters';
-}
+};
 
 // Show / hide 4 other chapters
-function toggleOtherGroup(btn) {
+window.toggleOtherGroup = function(btn) {
   const grp = document.getElementById('other-group');
   const hidden = grp.style.display === 'none' || !grp.style.display;
   grp.style.display = hidden ? 'block' : 'none';
   btn.textContent = hidden ? '▼ Hide Other Chapters' : '▶ Show all 4 Other Chapters';
-}
+};
 
 // Light/Dark mode toggle — syncs with global AppState
-function maddstoggleMode() {
+window.maddstoggleMode = function() {
   var _me = document.querySelector('.madds-embed'); if(_me) _me.classList.toggle('light');
   const btn = document.getElementById('madds-mode-toggle');
   var isLight = _me && _me.classList.contains('light');
@@ -3255,7 +3255,7 @@ function maddstoggleMode() {
     try { localStorage.setItem('dds_isDark', String(!isLight)); } catch(e) {}
     if (typeof UnifiedTheme !== 'undefined') UnifiedTheme.apply();
   }
-}
+};
 
 // Auto-detect from global AppState (or fallback to localStorage / system preference)
 (function() {

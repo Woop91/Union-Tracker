@@ -181,12 +181,12 @@ describe('G18: Stats renderers use all backend data fields', () => {
     expect(body).toContain('monthlyResolved');
   });
 
-  test('engagement stats renderer omits resourceDownloads when zero', () => {
+  test('engagement stats renderer includes resourceDownloads in metrics array', () => {
     const body = extractFunctionBody(memberCode, '_renderEngagementStatsContent');
     expect(body.length).toBeGreaterThan(0);
 
-    // Must conditionally show resourceDownloads (not unconditionally render)
-    expect(body).toMatch(/resourceDownloads\s*>\s*0/);
+    // resourceDownloads is now live-tracked and always shown
+    expect(body).toMatch(/resourceDownloads/);
   });
 
   test('workload stats renderer references all summary fields', () => {
@@ -337,18 +337,14 @@ describe('G21: Member-safe endpoint pairs exist', () => {
 // Bug: Resource Downloads KPI always showed "0" with no explanation.
 // This test ensures known untracked metrics are conditionally displayed.
 
-describe('G22: Untracked metrics are conditionally displayed', () => {
+describe('G22: Resource click tracking is wired end-to-end', () => {
   const memberCode = read('member_view.html');
 
-  test('resourceDownloads KPI is only shown when value > 0', () => {
+  test('resourceDownloads KPI is always shown in metrics array', () => {
     const body = extractFunctionBody(memberCode, '_renderEngagementStatsContent');
-    // Must have a conditional check before displaying
-    expect(body).toMatch(/resourceDownloads\s*>\s*0/);
-    // Must NOT have it in the unconditional metrics array
     const metricsArrayMatch = body.match(/var metrics\s*=\s*\[([\s\S]*?)\];/);
-    if (metricsArrayMatch) {
-      expect(metricsArrayMatch[1]).not.toContain('resourceDownloads');
-    }
+    expect(metricsArrayMatch).not.toBeNull();
+    expect(metricsArrayMatch[1]).toMatch(/resourceDownloads/);
   });
 
   test('backend engagement stats returns live resourceDownloads', () => {

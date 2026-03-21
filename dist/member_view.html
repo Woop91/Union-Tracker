@@ -1449,7 +1449,7 @@ function renderMemberResources(appContainer) {
         style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
         onClick: function() {
           window.open(r.url, '_blank');
-          serverCall().dataLogResourceClick(SESSION_TOKEN, 'quick:' + r.label.toLowerCase().replace(/\s+/g, '-'));
+          serverCall().dataLogResourceClick(SESSION_TOKEN, 'quick:' + r.label.toLowerCase().replace(/\s+/g, '-'), r.label);
         }
       });
       item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
@@ -1548,16 +1548,49 @@ function renderMemberResources(appContainer) {
           var resLink = el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource');
           resLink.addEventListener('click', function(ev) {
             ev.stopPropagation(); // don't toggle card expand
-            serverCall().dataLogResourceClick(SESSION_TOKEN, r.id || r.title);
+            serverCall().dataLogResourceClick(SESSION_TOKEN, r.id || r.title, r.title || '');
           });
           expandContent.appendChild(resLink);
         }
         if (r.dateAdded) expandContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Added: ' + r.dateAdded));
         card.appendChild(expandContent);
 
+        // ── Resource click tracking (v4.32.1) ─────────────────────────
+        // WHAT: Logs a "resource view" event when the card is expanded
+        //   for the first time in this page session.
+        //
+        // WHY FIRST-EXPAND ONLY: We track "did the member read this resource?"
+        //   not "how many times did they toggle the card." The card._tracked
+        //   flag (set on the DOM element) prevents duplicate server calls
+        //   when a member collapses and re-expands the same card.
+        //   A page reload resets the flag — intentional, because a return
+        //   visit on a different day is a new engagement signal.
+        //
+        // WHY FIRE-AND-FORGET: Both success and failure handlers are no-ops.
+        //   The click event is purely for analytics — it must never block,
+        //   delay, or interfere with the card expand UX. If the server call
+        //   fails (network, auth expired, quota), the resource card still
+        //   expands normally. Only the analytics row is lost.
+        //
+        // SERVER SIDE: dataLogResourceClick() in 21_WebDashDataService.gs
+        //   → writes to _Resource_Click_Log hidden sheet.
+        //
+        // DATA CONSUMED BY: dataGetEngagementStats() reads total row count
+        //   from _Resource_Click_Log → returned as resourceDownloads →
+        //   displayed as "Resource Views" KPI card below.
+        //
+        // IF THIS BREAKS: card._tracked may not get set (JS error before
+        //   the assignment) → multiple server calls per expand. Worst case:
+        //   inflated click counts. Non-destructive. Fix: check console for
+        //   JS errors in this handler.
         card.addEventListener('click', function() {
+          var wasExpanded = card.classList.contains('expanded');
           card.classList.toggle('expanded');
           hint.textContent = card.classList.contains('expanded') ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
+          if (!wasExpanded && !card._tracked) {
+            card._tracked = true;
+            serverCall().withSuccessHandler(function() {}).withFailureHandler(function() {}).dataLogResourceClick(SESSION_TOKEN, r.id, r.title);
+          }
         });
 
         cardsWrap.appendChild(card);
@@ -4606,16 +4639,17 @@ function _renderEngagementStatsContent(container, data) {
 
     container.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '\uD83D\uDCCA Aggregate engagement metrics'));
 
+    // KPI cards — engagement metrics rendered as a 2-column grid.
+    // "Resource Views" is always shown now that it's live-tracked.
+    // The || 0 fallback on each metric handles null/undefined from server errors.
     var metrics = [
       { label: 'Survey Participation', value: (data.surveyParticipation || 0) + '%', color: 'var(--accent)' },
       { label: 'Weekly Q Votes', value: String(data.weeklyQuestionVotes || 0), color: 'var(--success)' },
       { label: 'Event Attendance', value: String(data.eventAttendance || 0), color: '#facc15' },
       { label: 'Steward Contact Rate', value: (data.stewardContactRate || 0) + '%', color: 'var(--accent)' },
       { label: 'Grievance Filing Rate', value: (data.grievanceFilingRate || 0) + '%', color: 'var(--danger)' },
+      { label: 'Resource Views', value: String(data.resourceDownloads || 0), color: 'var(--success)' },
     ];
-    if (data.resourceDownloads > 0) {
-      metrics.push({ label: 'Resource Views', value: String(data.resourceDownloads), color: '#8b5cf6' });
-    }
     // Steward task completion (v4.31.4)
     if (data.taskCompletionRate !== null && data.taskCompletionRate !== undefined) {
       metrics.push({ label: 'Task Completion', value: data.taskCompletionRate + '%', color: data.taskCompletionRate >= 70 ? 'var(--success)' : '#f59e0b' });

@@ -30,7 +30,7 @@
  *   00_Security.gs (escapeForFormula).
  *   Used by menu items in 03_, daily trigger reminders, and the SPA.
  *
- * @version 4.31.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -916,22 +916,6 @@ function createChecklistForCaseId(caseId) {
   return createChecklistFromTemplate(caseId, actionType, issueCategory);
 }
 
-/**
- * Create checklist for the currently selected case
- * Called from the checklist dialog (legacy - prefer createChecklistForCaseId)
- */
-function createChecklistForSelectedCase() {
-  var sheet = SpreadsheetApp.getActiveSheet();
-  var row = sheet.getActiveRange().getRow();
-
-  if (row <= 1) {
-    return errorResponse('No case selected');
-  }
-
-  var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
-  return createChecklistForCaseId(caseId);
-}
-
 // ============================================================================
 // ACTION TYPE MANAGEMENT
 // ============================================================================
@@ -1644,42 +1628,6 @@ function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNo
 }
 
 /**
- * Gets reminders for a grievance.
- * @param {string} grievanceId - The grievance ID
- * @returns {Object} Reminder data or null if not found
- */
-function getGrievanceReminders(grievanceId) {
-  if (!grievanceId) return null;
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!sheet) return null;
-
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
-      return {
-        grievanceId: grievanceId,
-        memberName: (data[i][GRIEVANCE_COLS.FIRST_NAME - 1] || '') + ' ' +
-                    (data[i][GRIEVANCE_COLS.LAST_NAME - 1] || ''),
-        status: data[i][GRIEVANCE_COLS.STATUS - 1] || '',
-        reminder1: {
-          date: data[i][GRIEVANCE_COLS.REMINDER_1_DATE - 1] || null,
-          note: data[i][GRIEVANCE_COLS.REMINDER_1_NOTE - 1] || ''
-        },
-        reminder2: {
-          date: data[i][GRIEVANCE_COLS.REMINDER_2_DATE - 1] || null,
-          note: data[i][GRIEVANCE_COLS.REMINDER_2_NOTE - 1] || ''
-        }
-      };
-    }
-  }
-
-  return null;
-}
-/**
  * Gets all grievances with reminders due within specified days.
  * Optimized single-pass through grievance data.
  * @param {number} daysAhead - Number of days to look ahead (default 3)
@@ -1782,188 +1730,234 @@ function getDueReminders(daysAhead) {
 
   return dueReminders;
 }
+
+// ============================================================================
+// LOOKER STUDIO CONFIGURATION
+// ============================================================================
+
 /**
- * Builds the HTML for the reminder dialog.
+ * Looker Studio integration configuration.
+ * Defines sheet names for data sources and anonymized exports.
+ */
+var LOOKER_CONFIG = {
+  // Sheet names for Looker data sources (restricted to 3 source sheets)
+  SHEETS: {
+    GRIEVANCES: '_Looker_Grievances',
+    MEMBERS: '_Looker_Members',
+    SATISFACTION: '_Looker_Satisfaction'
+  },
+  // PII-FREE sheets for external/compliance use (no personally identifiable information)
+  SHEETS_ANON: {
+    GRIEVANCES: '_Looker_Anon_Grievances',
+    MEMBERS: '_Looker_Anon_Members',
+    SATISFACTION: '_Looker_Anon_Satisfaction'
+  },
+  // Source sheets (only these are allowed)
+  ALLOWED_SOURCES: ['Member Directory', 'Grievance Log', 'Member Satisfaction'],
+  // Refresh settings
+  AUTO_REFRESH_HOUR: 6 // 6 AM daily refresh
+};
+
+// ============================================================================
+// CATEGORIZATION / BUCKET HELPERS
+// ============================================================================
+
+/**
+ * Generates a deterministic anonymized hash from an ID.
+ * Uses a per-project salt stored in Script Properties.
+ * @param {string} id - The ID to hash
+ * @returns {string} Anonymized hash starting with 'A'
  * @private
  */
-function buildReminderDialogHtml_(grievanceId, reminders) {
-  const r1Date = reminders.reminder1.date instanceof Date
-    ? Utilities.formatDate(reminders.reminder1.date, Session.getScriptTimeZone(), 'yyyy-MM-dd')
-    : '';
-  const r2Date = reminders.reminder2.date instanceof Date
-    ? Utilities.formatDate(reminders.reminder2.date, Session.getScriptTimeZone(), 'yyyy-MM-dd')
-    : '';
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  ${getMobileOptimizedHead()}
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: clamp(12px,3vw,20px); color: #F8FAFC; }
-    .header { margin-bottom: 20px; }
-    .header h2 { font-size: clamp(15px,4vw,18px); color: #A78BFA; margin-bottom: 4px; }
-    .header .member { font-size: clamp(12px,3vw,14px); color: #94A3B8; }
-    .reminder-card { background: rgba(255,255,255,0.05); border: 1px solid #334155; border-radius: 12px; padding: clamp(12px,3vw,16px); margin-bottom: 16px; }
-    .reminder-card h3 { font-size: clamp(12px,3vw,14px); color: #7C3AED; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-    .reminder-card h3::before { content: '⏰'; }
-    .form-group { margin-bottom: 12px; }
-    .form-label { display: block; font-size: clamp(11px,2.8vw,12px); color: #94A3B8; margin-bottom: 4px; }
-    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-size: 16px; min-height: 44px; }
-    .form-input:focus { border-color: #7C3AED; outline: none; }
-    .form-input::placeholder { color: #64748B; }
-    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
-    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: clamp(12px,3vw,13px); font-weight: 500; transition: all 0.2s; min-height: 44px; }
-    .btn-clear { background: #334155; color: #F8FAFC; }
-    .btn-clear:hover { background: #475569; }
-    .actions { display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end; flex-wrap: wrap; }
-    .btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; padding: 12px 24px; }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }
-    .btn-secondary { background: #334155; color: #F8FAFC; padding: 12px 24px; }
-    .status { padding: 8px 12px; border-radius: 6px; margin-top: 12px; font-size: clamp(11px,2.8vw,13px); display: none; }
-    .status.success { display: block; background: rgba(16,185,129,0.2); border: 1px solid #10B981; }
-    .status.error { display: block; background: rgba(239,68,68,0.2); border: 1px solid #EF4444; }
-    @media(max-width:480px) { .actions { flex-direction: column; } .actions .btn { width: 100%; text-align: center; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h2>Grievance ${escapeHtml(grievanceId)}</h2>
-    <div class="member">${escapeHtml(reminders.memberName)} • ${escapeHtml(reminders.status)}</div>
-  </div>
-
-  <div class="reminder-card">
-    <h3>Reminder 1</h3>
-    <div class="form-group">
-      <label class="form-label">Date</label>
-      <input type="date" class="form-input" id="r1Date" value="${r1Date}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Note (e.g., "Schedule Step II meeting")</label>
-      <input type="text" class="form-input" id="r1Note" value="${escapeHtml(reminders.reminder1.note)}" placeholder="Brief description...">
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-clear" onclick="clearReminder(1)">Clear</button>
-    </div>
-  </div>
-
-  <div class="reminder-card">
-    <h3>Reminder 2</h3>
-    <div class="form-group">
-      <label class="form-label">Date</label>
-      <input type="date" class="form-input" id="r2Date" value="${r2Date}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Note</label>
-      <input type="text" class="form-input" id="r2Note" value="${escapeHtml(reminders.reminder2.note)}" placeholder="Brief description...">
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-clear" onclick="clearReminder(2)">Clear</button>
-    </div>
-  </div>
-
-  <div id="statusArea"></div>
-
-  <div class="actions">
-    <button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
-    <button class="btn btn-primary" onclick="saveReminders()">Save Reminders</button>
-  </div>
-
-  <script>
-    var grievanceId = ${JSON.stringify(grievanceId)};
-
-    function saveReminders() {
-      var r1Date = document.getElementById('r1Date').value;
-      var r1Note = document.getElementById('r1Note').value;
-      var r2Date = document.getElementById('r2Date').value;
-      var r2Note = document.getElementById('r2Note').value;
-
-      showStatus('Saving...', false);
-
-      // Save reminder 1
-      google.script.run
-        .withSuccessHandler(function() {
-          // Save reminder 2
-          google.script.run
-            .withSuccessHandler(function() {
-              showStatus('Reminders saved!', false);
-              setTimeout(function() { google.script.host.close(); }, 1000);
-            })
-            .withFailureHandler(function(e) { showStatus('Error: ' + e.message, true); })
-            .setGrievanceReminder(grievanceId, 2, r2Date, r2Note);
-        })
-        .withFailureHandler(function(e) { showStatus('Error: ' + e.message, true); })
-        .setGrievanceReminder(grievanceId, 1, r1Date, r1Note);
-    }
-
-    function clearReminder(num) {
-      if (num === 1) {
-        document.getElementById('r1Date').value = '';
-        document.getElementById('r1Note').value = '';
-      } else {
-        document.getElementById('r2Date').value = '';
-        document.getElementById('r2Note').value = '';
-      }
-    }
-
-    function showStatus(msg, isError) {
-      var area = document.getElementById('statusArea');
-      area.className = 'status ' + (isError ? 'error' : 'success');
-      area.textContent = msg;
-    }
-  </script>
-</body>
-</html>`;
+function generateAnonHash_(id) {
+  // Read salt from Script Properties; generate and store one if missing
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('ANON_HASH_SALT');
+  if (!salt) {
+    salt = Utilities.getUuid(); // Generate random salt on first run
+    props.setProperty('ANON_HASH_SALT', salt);
+  }
+  const combined = salt + String(id);
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
+  const encoded = Utilities.base64Encode(digest).substring(0, 12);
+  return 'A' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
 }
 
 /**
- * Checks for due reminders and sends notifications.
- * Call this from a daily time-driven trigger.
- * @param {number} daysAhead - Days to look ahead (default 1 = today only)
- * @returns {Object} Result with notification count
+ * Categorizes days into buckets for privacy.
+ * @param {number} days
+ * @returns {string}
+ * @private
  */
-function checkAndNotifyReminders(daysAhead) {
-  daysAhead = daysAhead || 1;
+function getDaysBucket_(days) {
+  if (days <= 7) return 'Within Week';
+  if (days <= 30) return 'Within Month';
+  if (days <= 90) return '1-3 Months';
+  if (days <= 180) return '3-6 Months';
+  if (days <= 365) return '6-12 Months';
+  return 'Over 1 Year';
+}
 
-  const dueReminders = getDueReminders(daysAhead);
+/**
+ * Categorizes contact frequency based on days since last contact.
+ * @param {Date|*} lastContact - Last contact date
+ * @param {Date} now - Current date
+ * @returns {string}
+ * @private
+ */
+function getContactFrequencyCategory_(lastContact, now) {
+  if (!(lastContact instanceof Date)) return 'No Contact';
+  const days = Math.ceil((now - lastContact) / (1000 * 60 * 60 * 24));
+  if (days <= 30) return 'Active';
+  if (days <= 90) return 'Regular';
+  if (days <= 180) return 'Occasional';
+  return 'Inactive';
+}
 
-  if (dueReminders.length === 0) {
-    return { success: true, notified: 0, message: 'No reminders due' };
+/**
+ * Categorizes volunteer hours into buckets.
+ * @param {number} hours
+ * @returns {string}
+ * @private
+ */
+function getVolunteerHoursBucket_(hours) {
+  if (hours === 0) return 'None';
+  if (hours <= 5) return '1-5 Hours';
+  if (hours <= 20) return '6-20 Hours';
+  if (hours <= 50) return '21-50 Hours';
+  return '50+ Hours';
+}
+
+/**
+ * Calculates engagement level from multiple factors.
+ * @param {number} volunteerHours
+ * @param {Date|null} lastContact
+ * @param {string} isSteward - 'Yes', 'No', or 'Member Leader'
+ * @param {number} grievanceCount
+ * @returns {string}
+ * @private
+ */
+function getEngagementLevel_(volunteerHours, lastContact, isSteward, grievanceCount) {
+  let score = 0;
+
+  // Volunteer hours contribution
+  if (volunteerHours > 50) score += 3;
+  else if (volunteerHours > 20) score += 2;
+  else if (volunteerHours > 5) score += 1;
+
+  // Recent contact contribution
+  if (lastContact instanceof Date) {
+    const days = Math.ceil((new Date() - lastContact) / (1000 * 60 * 60 * 24));
+    if (days <= 30) score += 2;
+    else if (days <= 90) score += 1;
   }
 
-  // Group reminders by steward for consolidated notifications
-  const bysteward = {};
-  for (let i = 0; i < dueReminders.length; i++) {
-    const reminder = dueReminders[i];
-    const steward = reminder.steward || 'Unassigned';
-    if (!bysteward[steward]) {
-      bysteward[steward] = [];
+  // Leadership role
+  if (isSteward === 'Yes' || isSteward === 'Member Leader') score += 2;
+
+  // Grievance involvement
+  if (grievanceCount > 0) score += 1;
+
+  // Map to engagement level
+  if (score >= 6) return 'Highly Engaged';
+  if (score >= 4) return 'Engaged';
+  if (score >= 2) return 'Somewhat Engaged';
+  if (score >= 1) return 'Low Engagement';
+  return 'Not Engaged';
+}
+
+/**
+ * Categorizes role into broader categories.
+ * @param {string} role
+ * @returns {string}
+ * @private
+ */
+function categorizeRole_(role) {
+  const roleLower = String(role).toLowerCase();
+  if (roleLower.includes('steward') || roleLower.includes('leader')) return 'Leadership';
+  if (roleLower.includes('nurse') || roleLower.includes('rn') || roleLower.includes('lpn')) return 'Nursing';
+  if (roleLower.includes('tech') || roleLower.includes('aide')) return 'Technical/Support';
+  if (roleLower.includes('admin') || roleLower.includes('clerk')) return 'Administrative';
+  return 'Other';
+}
+
+/**
+ * Categorizes tenure into buckets.
+ * @param {string} tenure
+ * @returns {string}
+ * @private
+ */
+function categorizeTenure_(tenure) {
+  const tenureLower = String(tenure).toLowerCase();
+  if (tenureLower.includes('less than') || tenureLower.includes('< 1')) return 'New (< 1 year)';
+  if (tenureLower.includes('1-3') || tenureLower.includes('1 to 3')) return '1-3 Years';
+  if (tenureLower.includes('3-5') || tenureLower.includes('3 to 5')) return '3-5 Years';
+  if (tenureLower.includes('5-10') || tenureLower.includes('5 to 10')) return '5-10 Years';
+  return '10+ Years';
+}
+
+/**
+ * Converts numeric score (1-10) to bucket.
+ * @param {*} score
+ * @returns {string}
+ * @private
+ */
+function getScoreBucket_(score) {
+  const num = parseFloat(score);
+  if (isNaN(num)) return 'No Response';
+  if (num >= 8) return 'High (8-10)';
+  if (num >= 5) return 'Medium (5-7)';
+  return 'Low (1-4)';
+}
+
+/**
+ * Calculates average of numeric values in specified columns.
+ * @param {Array} row - Data row
+ * @param {number[]} colIndices - Column indices to average
+ * @returns {number|string} Average or empty string if no valid values
+ * @private
+ */
+function calculateSectionAvg_(row, colIndices) {
+  let sum = 0;
+  let count = 0;
+
+  for (let i = 0; i < colIndices.length; i++) {
+    const val = row[colIndices[i]];
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 1 && num <= 10) {
+      sum += num;
+      count++;
     }
-    bysteward[steward].push(reminder);
   }
 
-  // Show toast summary
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const todayCount = dueReminders.filter(function(r) { return r.isToday; }).length;
-  const upcomingCount = dueReminders.length - todayCount;
+  return count > 0 ? Math.round((sum / count) * 10) / 10 : '';
+}
 
-  let message = '';
-  if (todayCount > 0) {
-    message += todayCount + ' reminder(s) due TODAY';
-  }
-  if (upcomingCount > 0) {
-    message += (message ? ', ' : '') + upcomingCount + ' upcoming';
-  }
+/**
+ * Gets quarter string from date.
+ * @param {Date} date
+ * @returns {string} e.g. '2026-Q1'
+ * @private
+ */
+function getQuarter_(date) {
+  const month = date.getMonth();
+  const quarter = Math.floor(month / 3) + 1;
+  return date.getFullYear() + '-Q' + quarter;
+}
 
-  ss.toast(message, '⏰ Grievance Reminders', 10);
-
-  return {
-    success: true,
-    notified: dueReminders.length,
-    todayCount: todayCount,
-    upcomingCount: upcomingCount,
-    reminders: dueReminders
-  };
+/**
+ * Gets outcome category from grievance status.
+ * @param {string} status
+ * @returns {string}
+ * @private
+ */
+function getOutcomeCategory_(status) {
+  if (status === GRIEVANCE_STATUS.WON) return 'Win';
+  if (status === GRIEVANCE_STATUS.DENIED) return 'Loss';
+  if (status === GRIEVANCE_STATUS.SETTLED) return 'Settlement';
+  if (status === GRIEVANCE_STATUS.WITHDRAWN) return 'Withdrawn';
+  if (status === GRIEVANCE_STATUS.CLOSED) return 'Closed';
+  return 'Active';
 }
 
 // ============================================================================

@@ -538,7 +538,7 @@ function getPendingSurveyMembers() {
     // Build email → member record map for enrichment (cubicle, officeDays, hireDate)
     var memberMap = {};
     try {
-      var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+      var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberSheet && memberSheet.getLastRow() > 1) {
         var mData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
         var mHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];

@@ -50,13 +50,13 @@
  * DEPENDENCIES:
  *   Depends on:  PropertiesService, MailApp, Session, SpreadsheetApp (all GAS built-ins)
  *                SHEETS, MEMBER_COLS, CONFIG_COLS (01_Core.gs — for role lookup)
- *                COMMAND_CONFIG (11_CommandHub.gs — for email subjects, optional)
+ *                COMMAND_CONFIG (01_Core.gs — for email subjects, optional)
  *   Used by:     EVERY module that renders HTML or writes to sheets.
  *                Key callers: 02_DataManagers.gs, 04e_PublicDashboard.gs,
  *                21_WebDashDataService.gs, 22_WebDashApp.gs, all HTML templates.
  *
  * @fileoverview Security utilities — XSS, formula injection, RBAC, PII masking
- * @version 4.31.0
+ * @version 4.33.0
  */
 
 // ============================================================================
@@ -185,45 +185,6 @@ function escapeHtml(input) {
     .replace(/`/g, '&#x60;');
 }
 
-/**
- * Sanitizes an object's string values for HTML output
- * @param {Object} obj - Object with string values to sanitize
- * @returns {Object} New object with sanitized values
- */
-function sanitizeObjectForHtml(obj) {
-  if (!obj || typeof obj !== 'object') {
-    return obj;
-  }
-
-  // Handle arrays separately to preserve array type (for...in on arrays
-  // returns indices as strings and produces a plain object, corrupting the array)
-  if (Array.isArray(obj)) {
-    return obj.map(function(item) {
-      if (typeof item === 'string') {
-        return escapeHtml(item);
-      } else if (typeof item === 'object' && item !== null) {
-        return sanitizeObjectForHtml(item);
-      }
-      return item;
-    });
-  }
-
-  var result = {};
-  for (var key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      var value = obj[key];
-      if (typeof value === 'string') {
-        result[key] = escapeHtml(value);
-      } else if (typeof value === 'object' && value !== null) {
-        result[key] = sanitizeObjectForHtml(value);
-      } else {
-        result[key] = value;
-      }
-    }
-  }
-  return result;
-}
-
 // ============================================================================
 // FORMULA INJECTION PREVENTION
 // ============================================================================
@@ -282,11 +243,6 @@ function safeSheetNameForFormula(sheetName) {
 // ACCESS CONTROL FOR WEB APP
 // ============================================================================
 
-/**
- * Checks if a user is authorized to access the web app
- * @param {string} [requiredRole] - Optional role requirement ('steward', 'admin')
- * @returns {Object} Authorization result with isAuthorized and user info
- */
 /**
  * Checks if the caller is authorized for the given role.
  *
@@ -890,34 +846,6 @@ function sendDailySecurityDigest() {
   }
 }
 
-/**
- * Installs the daily security digest trigger.
- * Runs at 7 AM in the script's timezone.
- */
-function installSecurityDigestTrigger() {
-  // Remove existing security digest triggers
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'sendDailySecurityDigest') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
-
-  // Create daily trigger at 7 AM
-  ScriptApp.newTrigger('sendDailySecurityDigest')
-    .timeBased()
-    .atHour(7)
-    .everyDays(1)
-    .create();
-
-  SpreadsheetApp.getUi().alert('✅ Security Digest Enabled',
-    'A daily security digest email will be sent at 7 AM to the Chief Steward and Admin.\n\n' +
-    'The digest includes:\n' +
-    '• All security events from the past 24 hours\n' +
-    '• Audit log integrity check results\n' +
-    '• Survey vault integrity check results',
-    SpreadsheetApp.getUi().ButtonSet.OK);
-}
 // ============================================================================
 // SAFE EMAIL WRAPPER
 // ============================================================================

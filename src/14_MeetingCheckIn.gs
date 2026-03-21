@@ -31,7 +31,7 @@
  *   13_MemberSelfService.gs (PIN auth).
  *   Used by menu items in 03_.
  *
- * @version 4.31.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -337,7 +337,6 @@ function processMeetingCheckIn(meetingId, email, pin) {
   var memberId = null;
   var memberName = '';
   var storedHash = '';
-  var _memberRow = -1;
 
   for (var i = 1; i < memberData.length; i++) {
     var rowEmail = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
@@ -346,7 +345,6 @@ function processMeetingCheckIn(meetingId, email, pin) {
       memberName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
                    String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
       storedHash = String(memberData[i][MEMBER_PIN_COLS.PIN_HASH - 1] || '');
-      _memberRow = i;
       break;
     }
   }

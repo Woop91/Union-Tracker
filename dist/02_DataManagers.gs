@@ -44,7 +44,7 @@
  *     and form submission handlers.
  *
  * @fileoverview Member directory and grievance data operations
- * @version 4.31.0
+ * @version 4.33.0
  * @requires 00_DataAccess.gs
  * @requires 00_Security.gs
  * @requires 01_Core.gs
@@ -975,54 +975,56 @@ function compactConfigColumn_(configCol) {
  * @param {Object} newValuesObj - Object with field values to update
  */
 function updateMemberDataBatch(memberId, newValuesObj) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  return withScriptLock_(function() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
-  }
-
-  var range = sheet.getDataRange();
-  var data = range.getValues();
-
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
-      // Modify array in memory
-      if (newValuesObj.email !== undefined) {
-        data[i][MEMBER_COLS.EMAIL - 1] = typeof newValuesObj.email === 'string' ? escapeForFormula(newValuesObj.email) : newValuesObj.email;
-      }
-      if (newValuesObj.phone !== undefined) {
-        data[i][MEMBER_COLS.PHONE - 1] = typeof newValuesObj.phone === 'string' ? escapeForFormula(newValuesObj.phone) : newValuesObj.phone;
-      }
-      if (newValuesObj.firstName !== undefined) {
-        data[i][MEMBER_COLS.FIRST_NAME - 1] = typeof newValuesObj.firstName === 'string' ? escapeForFormula(newValuesObj.firstName) : newValuesObj.firstName;
-      }
-      if (newValuesObj.lastName !== undefined) {
-        data[i][MEMBER_COLS.LAST_NAME - 1] = typeof newValuesObj.lastName === 'string' ? escapeForFormula(newValuesObj.lastName) : newValuesObj.lastName;
-      }
-      if (newValuesObj.unit !== undefined) {
-        data[i][MEMBER_COLS.UNIT - 1] = typeof newValuesObj.unit === 'string' ? escapeForFormula(newValuesObj.unit) : newValuesObj.unit;
-      }
-      if (newValuesObj.workLocation !== undefined) {
-        data[i][MEMBER_COLS.WORK_LOCATION - 1] = typeof newValuesObj.workLocation === 'string' ? escapeForFormula(newValuesObj.workLocation) : newValuesObj.workLocation;
-      }
-      if (newValuesObj.isSteward !== undefined) {
-        data[i][MEMBER_COLS.IS_STEWARD - 1] = typeof newValuesObj.isSteward === 'string' ? escapeForFormula(newValuesObj.isSteward) : newValuesObj.isSteward;
-      }
-
-      // Write the specific row back in one shot
-      sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
-
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        'Member ' + memberId + ' updated via batch process',
-        COMMAND_CONFIG.SYSTEM_NAME,
-        3
-      );
-      return true;
+    if (!sheet) {
+      throw new Error('Member Directory sheet not found');
     }
-  }
 
-  return false;
+    var range = sheet.getDataRange();
+    var data = range.getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+        // Modify array in memory
+        if (newValuesObj.email !== undefined) {
+          data[i][MEMBER_COLS.EMAIL - 1] = typeof newValuesObj.email === 'string' ? escapeForFormula(newValuesObj.email) : newValuesObj.email;
+        }
+        if (newValuesObj.phone !== undefined) {
+          data[i][MEMBER_COLS.PHONE - 1] = typeof newValuesObj.phone === 'string' ? escapeForFormula(newValuesObj.phone) : newValuesObj.phone;
+        }
+        if (newValuesObj.firstName !== undefined) {
+          data[i][MEMBER_COLS.FIRST_NAME - 1] = typeof newValuesObj.firstName === 'string' ? escapeForFormula(newValuesObj.firstName) : newValuesObj.firstName;
+        }
+        if (newValuesObj.lastName !== undefined) {
+          data[i][MEMBER_COLS.LAST_NAME - 1] = typeof newValuesObj.lastName === 'string' ? escapeForFormula(newValuesObj.lastName) : newValuesObj.lastName;
+        }
+        if (newValuesObj.unit !== undefined) {
+          data[i][MEMBER_COLS.UNIT - 1] = typeof newValuesObj.unit === 'string' ? escapeForFormula(newValuesObj.unit) : newValuesObj.unit;
+        }
+        if (newValuesObj.workLocation !== undefined) {
+          data[i][MEMBER_COLS.WORK_LOCATION - 1] = typeof newValuesObj.workLocation === 'string' ? escapeForFormula(newValuesObj.workLocation) : newValuesObj.workLocation;
+        }
+        if (newValuesObj.isSteward !== undefined) {
+          data[i][MEMBER_COLS.IS_STEWARD - 1] = typeof newValuesObj.isSteward === 'string' ? escapeForFormula(newValuesObj.isSteward) : newValuesObj.isSteward;
+        }
+
+        // Write the specific row back in one shot
+        sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          'Member ' + memberId + ' updated via batch process',
+          COMMAND_CONFIG.SYSTEM_NAME,
+          3
+        );
+        return true;
+      }
+    }
+
+    return false;
+  });
 }
 
 // ============================================================================
@@ -1523,7 +1525,7 @@ function showExportMembersDialog() {
  * UI components are in 04a_UIMenus.gs, integrations in 05_Integrations.gs.
  *
  * @fileoverview Grievance lifecycle management
- * @version 4.7.0
+ * @version 4.33.0
  * @requires 01_Core.gs
  */
 
@@ -1946,6 +1948,7 @@ function getStepColumnSet(step) {
 function recalcAllGrievancesBatched() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return errorResponse('Grievance Log sheet not found');
   const data = sheet.getDataRange().getValues();
 
   let updatedCount = 0;
@@ -2085,6 +2088,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
 function getGrievanceById(grievanceId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return null;
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 
@@ -2108,6 +2112,7 @@ function getGrievanceById(grievanceId) {
 function getOpenGrievances() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
 
@@ -2669,7 +2674,7 @@ function getEditGrievanceFormHtml(grievanceId) {
 
         <form id="editForm">
           <div class="form-group">
-            <label class="form-label">Issue Category</label>
+            <label class="form-label">Description</label>
             <textarea class="form-textarea" id="description">${escapeHtml(String(grievance['Issue Category'] || ''))}</textarea>
           </div>
 

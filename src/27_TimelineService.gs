@@ -30,7 +30,7 @@
  *   Depends on 01_Core.gs (SHEETS), CalendarApp, DriveApp (GAS built-ins).
  *   Used by SPA timeline views and event management features.
  *
- * @version 4.31.0
+ * @version 4.33.0
  */
 
 var TimelineService = (function () {
@@ -41,16 +41,31 @@ var TimelineService = (function () {
   var _tlCache = {};
   var _TL_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
+  /**
+   * Retrieves a value from the in-memory cache if it has not expired.
+   * @param {string} key - Cache key to look up.
+   * @returns {*|undefined} Cached value or undefined if missing/expired.
+   */
   function _cacheGet(key) {
     var entry = _tlCache[key];
     if (entry && (Date.now() - entry.ts) < _TL_CACHE_TTL) return entry.val;
     delete _tlCache[key];
     return undefined;
   }
+  /**
+   * Stores a value in the in-memory cache with a timestamp.
+   * @param {string} key - Cache key.
+   * @param {*} val - Value to cache.
+   */
   function _cacheSet(key, val) { _tlCache[key] = { val: val, ts: Date.now() }; }
+  /** Clears all entries from the in-memory cache. */
   function _cacheInvalidate() { _tlCache = {}; }
   // ─────────────────────────────────────────────────────────────────────
 
+  /**
+   * Creates the _Timeline_Events sheet with headers if it does not exist, and ensures the category sheet is initialized.
+   * @returns {GoogleAppsScript.Spreadsheet.Sheet} The timeline events sheet.
+   */
   function initTimelineSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) throw new Error('Spreadsheet binding broken.');
@@ -68,6 +83,11 @@ var TimelineService = (function () {
     return sheet;
   }
 
+  /**
+   * Creates the _Timeline_Categories sheet with default categories if it does not exist.
+   * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} [ss] - Spreadsheet instance; defaults to active spreadsheet.
+   * @returns {GoogleAppsScript.Spreadsheet.Sheet} The timeline categories sheet.
+   */
   function _initCategorySheet(ss) {
     ss = ss || SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_CATEGORIES);
@@ -82,6 +102,10 @@ var TimelineService = (function () {
     return sheet;
   }
 
+  /**
+   * Returns the list of timeline categories from the sheet, falling back to defaults.
+   * @returns {string[]} Lowercase category names.
+   */
   function getCategories() {
     var cached = _cacheGet('categories');
     if (cached) return cached;
@@ -101,6 +125,12 @@ var TimelineService = (function () {
     return result;
   }
 
+  /**
+   * Adds a new timeline category to the categories sheet.
+   * @param {string} stewardEmail - Email of the steward performing the action.
+   * @param {string} category - Category name to add.
+   * @returns {{success: boolean, message?: string, category?: string}} Result object.
+   */
   function addCategory(stewardEmail, category) {
     if (!stewardEmail || !category) return { success: false, message: 'Category name required.' };
     var cat = String(category).trim().toLowerCase().replace(/[^a-z0-9 _-]/g, '').substring(0, 40);
@@ -117,6 +147,12 @@ var TimelineService = (function () {
     return { success: true, category: cat };
   }
 
+  /**
+   * Removes a category from the categories sheet by name.
+   * @param {string} stewardEmail - Email of the steward performing the action.
+   * @param {string} category - Category name to delete.
+   * @returns {{success: boolean, message?: string}} Result object.
+   */
   function deleteCategory(stewardEmail, category) {
     if (!stewardEmail || !category) return { success: false, message: 'Missing data.' };
     var cat = String(category).trim().toLowerCase();
@@ -136,6 +172,10 @@ var TimelineService = (function () {
     return { success: false, message: 'Category not found.' };
   }
 
+  /**
+   * Returns a descending list of distinct years that have timeline events.
+   * @returns {number[]} Array of years sorted newest-first.
+   */
   function getTimelineYears() {
     var cached = _cacheGet('years');
     if (cached) return cached;
@@ -153,6 +193,14 @@ var TimelineService = (function () {
     return result;
   }
 
+  /**
+   * Returns paginated timeline events, optionally filtered by year and category.
+   * @param {number} [page=1] - Page number (1-based).
+   * @param {number} [pageSize=25] - Number of events per page.
+   * @param {number|string} [year] - Filter to events in this year.
+   * @param {string} [category] - Filter to events matching this category.
+   * @returns {{events: Object[], total: number, page: number, pageSize: number}} Paginated result.
+   */
   function getTimelineEvents(page, pageSize, year, category) {
     page = page || 1;
     pageSize = pageSize || 25;
@@ -192,6 +240,12 @@ var TimelineService = (function () {
     return { events: paged, total: total, page: page, pageSize: pageSize };
   }
 
+  /**
+   * Creates a new timeline event row with optional calendar/Drive links.
+   * @param {string} stewardEmail - Email of the steward creating the event.
+   * @param {Object} data - Event data with title, eventDate, description, category, calendarEventId, driveFileIds, driveFileNames, meetingMinutesId.
+   * @returns {{success: boolean, message?: string, eventId?: string}} Result object.
+   */
   function addTimelineEvent(stewardEmail, data) {
     if (!stewardEmail || !data || !data.title) return { success: false, message: 'Title is required.' };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -232,6 +286,13 @@ var TimelineService = (function () {
     }
   }
 
+  /**
+   * Updates fields of an existing timeline event by ID.
+   * @param {string} stewardEmail - Email of the steward performing the update.
+   * @param {string} eventId - The timeline event ID to update.
+   * @param {Object} updates - Fields to update (title, eventDate, description, category, meetingMinutesId).
+   * @returns {{success: boolean, message?: string}} Result object.
+   */
   function updateTimelineEvent(stewardEmail, eventId, updates) {
     if (!stewardEmail || !eventId) return { success: false, message: 'Missing data.' };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -259,6 +320,12 @@ var TimelineService = (function () {
     return { success: false, message: 'Event not found.' };
   }
 
+  /**
+   * Deletes a timeline event row by ID.
+   * @param {string} stewardEmail - Email of the steward performing the deletion.
+   * @param {string} eventId - The timeline event ID to delete.
+   * @returns {{success: boolean, message?: string}} Result object.
+   */
   function deleteTimelineEvent(stewardEmail, eventId) {
     if (!stewardEmail || !eventId) return { success: false, message: 'Missing data.' };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -277,6 +344,13 @@ var TimelineService = (function () {
     return { success: false, message: 'Event not found.' };
   }
 
+  /**
+   * Imports Google Calendar events within a date range as timeline events, skipping duplicates.
+   * @param {string} stewardEmail - Email of the steward performing the import.
+   * @param {string|Date} startDate - Start of the date range.
+   * @param {string|Date} endDate - End of the date range.
+   * @returns {{success: boolean, message?: string, imported?: number}} Result object.
+   */
   function importCalendarEvents(stewardEmail, startDate, endDate) {
     if (!stewardEmail || !startDate || !endDate) return { success: false, message: 'Date range required.' };
     try {
@@ -326,6 +400,13 @@ var TimelineService = (function () {
     }
   }
 
+  /**
+   * Attaches Google Drive files to an existing timeline event by appending file IDs and resolved names.
+   * @param {string} stewardEmail - Email of the steward performing the action.
+   * @param {string} eventId - The timeline event ID.
+   * @param {string} fileIds - Comma-separated Drive file IDs.
+   * @returns {{success: boolean, message?: string, filesAttached?: number}} Result object.
+   */
   function attachDriveFiles(stewardEmail, eventId, fileIds) {
     if (!stewardEmail || !eventId || !fileIds) return { success: false, message: 'Missing data.' };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -353,8 +434,19 @@ var TimelineService = (function () {
     return { success: false, message: 'Event not found.' };
   }
 
+  /**
+   * Formats a Date using the shared short-date formatter.
+   * @param {Date} date - Date to format.
+   * @returns {string} Formatted date string.
+   */
   function _fmtDate(date) { return fmtDateShort_(date); }
 
+  /**
+   * Zips parallel comma-separated ID and name strings into an array of {id, name} objects.
+   * @param {string} idsStr - Comma-separated Drive file IDs.
+   * @param {string} namesStr - Comma-separated Drive file names.
+   * @returns {{id: string, name: string}[]} Array of file descriptor objects.
+   */
   function _zipDriveFiles(idsStr, namesStr) {
     var ids = idsStr.split(',');
     var names = namesStr.split(',');
@@ -365,6 +457,11 @@ var TimelineService = (function () {
     return files;
   }
 
+  /**
+   * Sanitizes text by escaping formula injection characters if the helper is available.
+   * @param {string} text - Raw text to sanitize.
+   * @returns {string} Sanitized text.
+   */
   function _sanitize(text) {
     if (typeof escapeForFormula === 'function') text = escapeForFormula(text);
     return text;
@@ -389,14 +486,92 @@ var TimelineService = (function () {
 // GLOBAL WRAPPERS
 // ═══════════════════════════════════════
 
+/**
+ * Global wrapper: returns the list of timeline categories for an authenticated user.
+ * @param {string} sessionToken - Session token for authentication.
+ * @returns {string[]} Category names, or empty array if unauthenticated.
+ */
 function tlGetCategories(sessionToken)                                     { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return TimelineService.getCategories(); }
+
+/**
+ * Global wrapper: returns distinct years that have timeline events.
+ * @param {string} sessionToken - Session token for authentication.
+ * @returns {number[]} Array of years, or empty array if unauthenticated.
+ */
 function tlGetTimelineYears(sessionToken)                                   { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return TimelineService.getTimelineYears(); }
+
+/**
+ * Global wrapper: returns paginated timeline events with optional year/category filters.
+ * @param {string} sessionToken - Session token for authentication.
+ * @param {number} [page] - Page number.
+ * @param {number} [pageSize] - Events per page.
+ * @param {number|string} [year] - Year filter.
+ * @param {string} [category] - Category filter.
+ * @returns {Object} Paginated event result, or empty array if unauthenticated.
+ */
 function tlGetTimelineEvents(sessionToken, page, pageSize, year, category) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return TimelineService.getTimelineEvents(page, pageSize, year, category); }
+
+/**
+ * Global wrapper: adds a timeline category (steward-only).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} category - Category name to add.
+ * @returns {Object|null} Result object, or null if unauthorized.
+ */
 function tlAddCategory(sessionToken, category)                             { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.addCategory(e, category); }
+
+/**
+ * Global wrapper: deletes a timeline category (steward-only).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} category - Category name to delete.
+ * @returns {Object|null} Result object, or null if unauthorized.
+ */
 function tlDeleteCategory(sessionToken, category)                          { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.deleteCategory(e, category); }
+
+/**
+ * Global wrapper: creates a new timeline event (steward-only).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {Object} data - Event data object.
+ * @returns {Object|null} Result object with eventId, or null if unauthorized.
+ */
 function tlAddTimelineEvent(sessionToken, data)                            { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.addTimelineEvent(e, data); }
+
+/**
+ * Global wrapper: updates an existing timeline event (steward-only).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} eventId - Event ID to update.
+ * @param {Object} data - Fields to update.
+ * @returns {Object|null} Result object, or null if unauthorized.
+ */
 function tlUpdateTimelineEvent(sessionToken, eventId, data)                { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.updateTimelineEvent(e, eventId, data); }
+
+/**
+ * Global wrapper: deletes a timeline event (steward-only).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} eventId - Event ID to delete.
+ * @returns {Object|null} Result object, or null if unauthorized.
+ */
 function tlDeleteTimelineEvent(sessionToken, eventId)                      { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.deleteTimelineEvent(e, eventId); }
+
+/**
+ * Global wrapper: imports Google Calendar events into the timeline (steward-only).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string|Date} startDate - Start of the date range.
+ * @param {string|Date} endDate - End of the date range.
+ * @returns {Object|null} Result object with imported count, or null if unauthorized.
+ */
 function tlImportCalendarEvents(sessionToken, startDate, endDate)          { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.importCalendarEvents(e, startDate, endDate); }
+
+/**
+ * Global wrapper: attaches Drive files to a timeline event (steward-only).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} eventId - Event ID to attach files to.
+ * @param {string} fileIds - Comma-separated Drive file IDs.
+ * @returns {Object|null} Result object, or null if unauthorized.
+ */
 function tlAttachDriveFiles(sessionToken, eventId, fileIds)                { var e = _requireStewardAuth(sessionToken); if (!e) return null; return TimelineService.attachDriveFiles(e, eventId, fileIds); }
+
+/**
+ * Global wrapper: initializes the timeline sheets (events + categories).
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The timeline events sheet.
+ */
 function tlInitSheets()                                                    { return TimelineService.initTimelineSheet(); }

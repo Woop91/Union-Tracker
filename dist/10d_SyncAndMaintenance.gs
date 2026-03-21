@@ -123,6 +123,10 @@ function syncAllDashboardData() {
 // TESTING FUNCTIONS
 // ============================================================================
 
+/**
+ * Activates the Test Results sheet, or alerts the user if none exists yet.
+ * @returns {void}
+ */
 function viewTestResults() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.TEST_RESULTS);

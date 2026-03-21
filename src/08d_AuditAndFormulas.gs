@@ -227,13 +227,6 @@ function removeAuditTrigger() {
   SpreadsheetApp.getActiveSpreadsheet().toast('Audit tracking disabled.', '🚫 Disabled', 3);
 }
 
-// ============================================================================
-// AUDIT LOG VIEWING AND MANAGEMENT
-// ============================================================================
-
-// ============================================================================
-// AUDIT HISTORY RETRIEVAL
-// ============================================================================
 /**
  * ============================================================================
  * 08j_CalcSheets.gs - Hidden Calculation Sheet Setup & Management
@@ -259,7 +252,7 @@ function removeAuditTrigger() {
  * - _CalcFormulas: Named formula references
  *
  * @fileoverview Hidden sheet and formula management for Dashboard
- * @version 1.0.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -1020,7 +1013,7 @@ function refreshAllHiddenFormulas() {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcMembersSheet(sheet) {
-  const memberSheetName = SHEETS.MEMBER_DIRECTORY;
+  const memberSheetName = SHEETS.MEMBER_DIR;
 
   // Derive column letters from constants so formulas stay in sync with header map
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
@@ -1235,7 +1228,7 @@ function setupCalcDeadlinesSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcStatsSheet(sheet) {
-  const memberSheetName = SHEETS.MEMBER_DIRECTORY;
+  const memberSheetName = SHEETS.MEMBER_DIR;
   const grievanceSheetName = SHEETS.GRIEVANCE_LOG;
 
   // Derive column letters from constants so formulas stay in sync with header map
@@ -1322,7 +1315,7 @@ function setupCalcStatsSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupCalcSyncSheet(sheet) {
-  const memberSheetName = SHEETS.MEMBER_DIRECTORY;
+  const memberSheetName = SHEETS.MEMBER_DIR;
   const grievanceSheetName = SHEETS.GRIEVANCE_LOG;
 
   // Derive column letters from constants so formulas stay in sync with header map
@@ -1388,9 +1381,9 @@ function setupCalcFormulasSheet(sheet) {
   // Department list formula
   sheet.getRange('A4').setValue('DEPARTMENT_LIST');
   sheet.getRange('B4').setFormula(
-    `=SORT(UNIQUE(FILTER('${SHEETS.MEMBER_DIRECTORY}'!E:E,` +
-    `'${SHEETS.MEMBER_DIRECTORY}'!E:E<>"Department",` +
-    `'${SHEETS.MEMBER_DIRECTORY}'!E:E<>"")))`
+    `=SORT(UNIQUE(FILTER('${SHEETS.MEMBER_DIR}'!E:E,` +
+    `'${SHEETS.MEMBER_DIR}'!E:E<>"Department",` +
+    `'${SHEETS.MEMBER_DIR}'!E:E<>"")))`
   );
 
   // Status list formula

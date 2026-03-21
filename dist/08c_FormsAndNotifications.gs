@@ -55,10 +55,7 @@ function getFormUrlFromConfig(formType) {
       configCol = CONFIG_COLS.GRIEVANCE_FORM_URL;
       defaultUrl = GRIEVANCE_FORM_CONFIG.FORM_URL;
       break;
-    case 'contact':
-      configCol = CONFIG_COLS.CONTACT_FORM_URL;
-      defaultUrl = CONTACT_FORM_CONFIG.FORM_URL;
-      break;
+    // 'contact' case removed — contact form deprecated
     // 'satisfaction' case removed v4.22.7 — Google Form deprecated, survey is now native webapp only
     default:
       Logger.log('Unknown form type: ' + formType);
@@ -132,14 +129,11 @@ function saveFormUrlsToConfig_silent(ss) {
 
   // Config layout: Row 1 = section headers, Row 2 = column headers, Row 3+ = data
   configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue('Grievance Form URL');
-  configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setValue('Contact Form URL');
+  // CONTACT_FORM_URL removed — contact form deprecated
   // SATISFACTION_FORM_URL removed v4.22.7 — no longer written
 
   configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
-  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
-
   configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor(SHEET_COLORS.LINK_SECONDARY).setFontLine('underline');
-  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor(SHEET_COLORS.LINK_SECONDARY).setFontLine('underline');
 }
 
 // ============================================================================
@@ -197,230 +191,9 @@ function parseFormDate_(dateStr) {
   }
 }
 
-// ============================================================================
-// CONTACT FORM HANDLER
-// ============================================================================
+// sendContactInfoForm — removed (contact form deprecated)
+// onContactFormSubmit — removed (contact form deprecated)
 
-/**
- * Show the Personal Contact Info form link
- * Members fill out the blank form and data is written to Member Directory on submit
- */
-function sendContactInfoForm() {
-  var ui = SpreadsheetApp.getUi();
-  // Get form URL from Config (allows admin to update without code changes)
-  var formUrl = getFormUrlFromConfig('contact');
-
-  // Show dialog with form link options
-  var response = ui.alert('Personal Contact Info Form',
-    'Share this form with members to collect their contact information.\n\n' +
-    'When submitted, the data will be written to the Member Directory:\n' +
-    '- Existing members (matched by name) will be updated\n' +
-    '- New members will be added automatically\n\n' +
-    '- Click YES to open the form\n' +
-    '- Click NO to copy the link',
-    ui.ButtonSet.YES_NO_CANCEL);
-
-  if (response === ui.Button.YES) {
-    // Open form in new window
-    var html = HtmlService.createHtmlOutput(
-      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
-    ).setWidth(1).setHeight(1);
-    ui.showModalDialog(html, 'Opening form...');
-  } else if (response === ui.Button.NO) {
-    // Show link to copy
-    var copyHtml = HtmlService.createHtmlOutput(
-      '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
-      '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
-      '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
-      '<br><br>' +
-      '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
-      '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
-      '<script>' +
-      'function copyLink() {' +
-      '  var ta = document.getElementById("link");' +
-      '  var showOk = function() { document.getElementById("copied").style.display = "inline"; };' +
-      '  if (navigator.clipboard) { navigator.clipboard.writeText(ta.value).then(showOk).catch(function() { ta.select(); document.execCommand("copy"); showOk(); }); }' +
-      '  else { ta.select(); document.execCommand("copy"); showOk(); }' +
-      '}' +
-      '</script>' +
-      '</div></body></html>'
-    ).setWidth(450).setHeight(180);
-    ui.showModalDialog(copyHtml, 'Contact Form Link');
-  }
-}
-
-/**
- * Handle contact form submission
- * Writes member data to Member Directory (updates existing or creates new)
- *
- * @param {Object} e - Form submission event object
- */
-function onContactFormSubmit(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!memberSheet) {
-    Logger.log('Member Directory sheet not found');
-    return;
-  }
-
-  try {
-    // Get form responses from event
-    var responses = e.namedValues || {};
-
-    // Extract form data
-    var firstName = getFormValue_(responses, 'First Name');
-    var lastName = getFormValue_(responses, 'Last Name');
-    var jobTitle = getFormValue_(responses, 'Job Title / Position');
-    var unit = getFormValue_(responses, 'Department / Unit');
-    var workLocation = getFormValue_(responses, 'Worksite / Office Location');
-    var officeDays = getFormMultiValue_(responses, 'Work Schedule / Office Days');
-    var preferredComm = getFormMultiValue_(responses, 'Please select your preferred communication methods (check all that apply):');
-    var bestTime = getFormMultiValue_(responses, 'What time(s) are best for us to reach you? (check all that apply)');
-    var supervisor = getFormValue_(responses, 'Immediate Supervisor');
-    var manager = getFormValue_(responses, 'Manager / Program Director');
-    var email = getFormValue_(responses, 'Personal Email');
-    var phone = getFormValue_(responses, 'Personal Phone Number');
-    var interestAllied = getFormValue_(responses, 'Willing to support other chapters (DDS, DCF, Public Sector, etc.)?');
-    var interestChapter = getFormValue_(responses, 'Willing to be active in sub-chapter (at other worksites within your agency of employment)?');
-    var interestLocal = getFormValue_(responses, 'Willing to join direct actions (e.g., at your place of employment)?');
-    var hireDate = getFormValue_(responses, 'Hire Date');
-    var employeeId = getFormValue_(responses, 'Employee ID');
-    var streetAddress = getFormValue_(responses, 'Street Address');
-    var city = getFormValue_(responses, 'City');
-    var zipCode = getFormValue_(responses, 'Zip Code');
-    var state = getFormValue_(responses, 'State');
-
-    // Require at least first and last name
-    if (!firstName || !lastName) {
-      Logger.log('Contact form submission missing name: ' + firstName + ' ' + lastName);
-      return;
-    }
-
-    // Multi-Key Smart Match: Check ID, Email, then Name (hierarchical)
-    var data = memberSheet.getDataRange().getValues();
-    var memberId = getFormValue_(responses, 'Member ID');  // Optional field from form
-
-    var match = findExistingMember({
-      memberId: memberId,
-      email: email,
-      firstName: firstName,
-      lastName: lastName
-    }, data);
-
-    var memberRow = match ? match.row : -1;
-
-    if (match) {
-      Logger.log('Found existing member via ' + match.matchType + ' match (confidence: ' + match.confidence + ') at row ' + match.row);
-    }
-
-    if (memberRow === -1) {
-      // Member not found - create new member
-      // Mask name in logs for privacy
-      var maskedName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
-      Logger.log('Creating new member: ' + maskedName);
-
-      // Generate Member ID
-      var existingIds = {};
-      for (var k = 1; k < data.length; k++) {
-        var id = data[k][MEMBER_COLS.MEMBER_ID - 1];
-        if (id) existingIds[id] = true;
-      }
-      memberId = generateNameBasedId('M', firstName, lastName, existingIds);
-
-      // Build new row array (escapeForFormula on all user-supplied strings to prevent formula injection)
-      var newRow = [];
-      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(firstName);
-      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(lastName);
-      newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(jobTitle || '');
-      newRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(workLocation || '');
-      newRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(unit || '');
-      newRow[MEMBER_COLS.OFFICE_DAYS - 1] = escapeForFormula(officeDays || '');
-      newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(email || '');
-      newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(phone || '');
-      newRow[MEMBER_COLS.PREFERRED_COMM - 1] = escapeForFormula(preferredComm || '');
-      newRow[MEMBER_COLS.BEST_TIME - 1] = escapeForFormula(bestTime || '');
-      newRow[MEMBER_COLS.SUPERVISOR - 1] = escapeForFormula(supervisor || '');
-      newRow[MEMBER_COLS.MANAGER - 1] = escapeForFormula(manager || '');
-      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-      newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = escapeForFormula(interestLocal || '');
-      newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = escapeForFormula(interestChapter || '');
-      newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = escapeForFormula(interestAllied || '');
-      newRow[MEMBER_COLS.HIRE_DATE - 1] = hireDate ? parseFormDate_(hireDate) : '';
-      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(employeeId || '');
-      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = escapeForFormula(streetAddress || '');
-      newRow[MEMBER_COLS.CITY - 1] = escapeForFormula(city || '');
-      newRow[MEMBER_COLS.STATE - 1] = escapeForFormula(state || '');
-      newRow[MEMBER_COLS.ZIP_CODE - 1] = escapeForFormula(zipCode || '');
-
-      // Append new member row
-      memberSheet.appendRow(newRow);
-      // Log with masked name for privacy
-      Logger.log('Created new member ' + memberId + ': ' + maskedName);
-
-      // Send acknowledgment email if email provided
-      if (email) {
-        try {
-          MailApp.sendEmail({
-            to: email,
-            subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Welcome to WFSE Local',
-            body: 'Hello ' + firstName + ',\n\n' +
-              'Thank you for submitting your contact information. ' +
-              'Your Member ID is: ' + memberId + '\n\n' +
-              'Your information has been recorded and a union steward will be in touch.\n\n' +
-              'Best regards,\nWFSE Local'
-          });
-        } catch (emailError) {
-          Logger.log('Could not send welcome email: ' + emailError.message);
-        }
-      }
-
-    } else {
-      // Update existing member record with form data
-      var updates = [];
-
-      // Update all fields from form (even if they change existing values)
-      // CR-18: Apply escapeForFormula() to all string values (matches new-member branch)
-      if (jobTitle) updates.push({ col: MEMBER_COLS.JOB_TITLE, value: escapeForFormula(jobTitle) });
-      if (unit) updates.push({ col: MEMBER_COLS.UNIT, value: escapeForFormula(unit) });
-      if (workLocation) updates.push({ col: MEMBER_COLS.WORK_LOCATION, value: escapeForFormula(workLocation) });
-      if (officeDays) updates.push({ col: MEMBER_COLS.OFFICE_DAYS, value: escapeForFormula(officeDays) });
-      if (preferredComm) updates.push({ col: MEMBER_COLS.PREFERRED_COMM, value: escapeForFormula(preferredComm) });
-      if (bestTime) updates.push({ col: MEMBER_COLS.BEST_TIME, value: escapeForFormula(bestTime) });
-      if (supervisor) updates.push({ col: MEMBER_COLS.SUPERVISOR, value: escapeForFormula(supervisor) });
-      if (manager) updates.push({ col: MEMBER_COLS.MANAGER, value: escapeForFormula(manager) });
-      if (email) updates.push({ col: MEMBER_COLS.EMAIL, value: escapeForFormula(email) });
-      if (phone) updates.push({ col: MEMBER_COLS.PHONE, value: escapeForFormula(phone) });
-      if (interestLocal) updates.push({ col: MEMBER_COLS.INTEREST_LOCAL, value: escapeForFormula(interestLocal) });
-      if (interestChapter) updates.push({ col: MEMBER_COLS.INTEREST_CHAPTER, value: escapeForFormula(interestChapter) });
-      if (interestAllied) updates.push({ col: MEMBER_COLS.INTEREST_ALLIED, value: escapeForFormula(interestAllied) });
-      if (hireDate) updates.push({ col: MEMBER_COLS.HIRE_DATE, value: parseFormDate_(hireDate) });
-      if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: escapeForFormula(employeeId) });
-      if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: escapeForFormula(streetAddress) });
-      if (city) updates.push({ col: MEMBER_COLS.CITY, value: escapeForFormula(city) });
-      if (state) updates.push({ col: MEMBER_COLS.STATE, value: escapeForFormula(state) });
-      if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: escapeForFormula(zipCode) });
-
-      // M-PERF: Batch write — read row, apply all updates, write back in single call
-      var totalCols = memberSheet.getLastColumn();
-      var rowData = memberSheet.getRange(memberRow, 1, 1, totalCols).getValues()[0];
-      for (var j = 0; j < updates.length; j++) {
-        rowData[updates[j].col - 1] = updates[j].value;
-      }
-      memberSheet.getRange(memberRow, 1, 1, totalCols).setValues([rowData]);
-
-      // Mask name in logs for privacy
-      var maskedUpdateName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
-      Logger.log('Updated contact info for ' + maskedUpdateName + ' (row ' + memberRow + ')');
-    }
-
-  } catch (error) {
-    Logger.log('Error processing contact form submission: ' + error.message);
-    throw error;
-  }
-}
 // ============================================================================
 // GRIEVANCE FORM TRIGGER SETUP
 // ============================================================================
@@ -428,53 +201,9 @@ function onContactFormSubmit(e) {
 // SATISFACTION SURVEY HANDLER
 // ============================================================================
 
-/**
- * Show the Member Satisfaction Survey form link
- * Survey responses are written to the Member Satisfaction sheet
- */
-function getSatisfactionSurveyLink() {
-  var ui = SpreadsheetApp.getUi();
-  // Get form URL from Config (allows admin to update without code changes)
-  var formUrl = getFormUrlFromConfig('satisfaction');
+// getSatisfactionSurveyLink — removed (getFormUrlFromConfig('satisfaction') case was removed v4.22.7)
 
-  // Show dialog with form link options
-  var response = ui.alert('Member Satisfaction Survey',
-    'Share this survey with members to collect feedback.\n\n' +
-    'When submitted, responses will be written to the\n' +
-    'Member Satisfaction sheet.\n\n' +
-    '- Click YES to open the survey\n' +
-    '- Click NO to copy the link',
-    ui.ButtonSet.YES_NO_CANCEL);
-
-  if (response === ui.Button.YES) {
-    // Open form in new window
-    var html = HtmlService.createHtmlOutput(
-      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
-    ).setWidth(1).setHeight(1);
-    ui.showModalDialog(html, 'Opening survey...');
-  } else if (response === ui.Button.NO) {
-    // Show link to copy
-    var copyHtml = HtmlService.createHtmlOutput(
-      '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
-      '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
-      '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
-      '<br><br>' +
-      '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
-      '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
-      '<script>' +
-      'function copyLink() {' +
-      '  var ta = document.getElementById("link");' +
-      '  var showOk = function() { document.getElementById("copied").style.display = "inline"; };' +
-      '  if (navigator.clipboard) { navigator.clipboard.writeText(ta.value).then(showOk).catch(function() { ta.select(); document.execCommand("copy"); showOk(); }); }' +
-      '  else { ta.select(); document.execCommand("copy"); showOk(); }' +
-      '}' +
-      '</script>' +
-      '</div></body></html>'
-    ).setWidth(450).setHeight(180);
-    ui.showModalDialog(copyHtml, 'Survey Link');
-  }
-}
+// setupSatisfactionFormTrigger — removed (wired deprecated no-op onSatisfactionFormSubmit)
 
 /**
  * Handle satisfaction survey form submission.
@@ -493,108 +222,9 @@ function getSatisfactionSurveyLink() {
  *
  * @param {Object} e - Form submission event object with e.namedValues
  */
-/**
- * @deprecated v4.21.0 — Google Form ingest path removed.
- * In-app submitSurveyResponse() is now the only submission path.
- * v4.23.0 — Updated to use dynamic col map if somehow triggered.
- * Logs a warning and returns without writing to avoid column mismatch errors.
- */
-function onSatisfactionFormSubmit(e) {
-  Logger.log(
-    'onSatisfactionFormSubmit called — this trigger is deprecated (v4.21.0). ' +
-    'All survey responses must go through submitSurveyResponse() in the webapp. ' +
-    'No data was written. Remove the Google Form trigger to stop this message.'
-  );
-  try {
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      '⚠️ Google Form survey trigger is deprecated. Use the member webapp to submit surveys.',
-      'Deprecated Trigger', 8
-    );
-  } catch (_ui) { Logger.log('_ui: ' + (_ui.message || _ui)); }
-}
+/** @deprecated v4.21.0 — no-op stub kept for trigger safety; use auditAndRemoveSatisfactionTrigger() to clean up. */
+function onSatisfactionFormSubmit() { /* no-op */ }
 
-/**
- * Set up the satisfaction survey form submission trigger
- * Run this once to enable automatic processing of survey submissions
- */
-function setupSatisfactionFormTrigger() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
-
-  // Check for existing triggers
-  var triggers = ScriptApp.getProjectTriggers();
-  var hasSatisfactionTrigger = false;
-
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'onSatisfactionFormSubmit') {
-      hasSatisfactionTrigger = true;
-      break;
-    }
-  }
-
-  if (hasSatisfactionTrigger) {
-    ui.alert('Trigger Exists',
-      'A satisfaction survey trigger already exists.\n\n' +
-      'Survey submissions will be automatically processed.',
-      ui.ButtonSet.OK);
-    return;
-  }
-
-  // Prompt for form URL
-  var response = ui.prompt('Setup Satisfaction Survey Trigger',
-    'This will set up automatic processing of survey submissions.\n\n' +
-    'Enter the Google Form edit URL (the one ending in /edit):',
-    ui.ButtonSet.OK_CANCEL);
-
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-
-  var formUrl = response.getResponseText().trim();
-
-  if (!formUrl) {
-    ui.alert('No URL', 'Please provide the form edit URL.', ui.ButtonSet.OK);
-    return;
-  }
-
-  try {
-    // Extract form ID from URL
-    var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!match) {
-      ui.alert('Invalid URL',
-        'Could not extract form ID from URL.\n\n' +
-        'Please use the form\'s edit URL. It should look like:\n' +
-        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
-        ui.ButtonSet.OK);
-      return;
-    }
-    var formId = match[1];
-
-    // Open the form and create trigger
-    var form = FormApp.openById(formId);
-
-    ScriptApp.newTrigger('onSatisfactionFormSubmit')
-      .forForm(form)
-      .onFormSubmit()
-      .create();
-
-    ui.alert('Trigger Created',
-      'Satisfaction survey trigger has been set up!\n\n' +
-      'When a survey is submitted:\n' +
-      '- Response will be added to Member Satisfaction sheet\n' +
-      '- All 68 questions will be recorded\n' +
-      '- Dashboard will reflect new data',
-      ui.ButtonSet.OK);
-
-    ss.toast('Survey trigger created successfully!', 'Success', 3);
-
-  } catch (e) {
-    ui.alert('Error',
-      'Failed to create trigger: ' + e.message + '\n\n' +
-      'Make sure you have edit access to the form.',
-      ui.ButtonSet.OK);
-  }
-}
 
 /**
  * Audits and optionally removes the deprecated onSatisfactionFormSubmit trigger.
@@ -682,7 +312,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
  * @author SEIU Local
- * @version 1.0.0
+ * @version 4.33.0
  */
 
 // ============================================================================
@@ -1635,7 +1265,7 @@ function showSurveyTrackingDialog() {
  * - logAuditEvent() function (from core module)
  *
  * @author Union Membership System
- * @version 1.0.0
+ * @version 4.33.0
  * ============================================================================
  */
 

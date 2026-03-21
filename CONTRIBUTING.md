@@ -49,11 +49,26 @@ Please be respectful and constructive in all interactions. We're all working tow
    npm run build
    ```
 
+### Environment Variables
+
+Some helper scripts require a `.env` file in the repo root:
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `GITHUB_509D_TOKEN` | `scripts/sync-org-chart.js` | GitHub PAT for syncing the org chart between repos |
+
+Create a `.env` file (already in `.gitignore`) with:
+```
+GITHUB_509D_TOKEN=ghp_your_token_here
+```
+
+This is only needed if you run `npm run sync:org-chart`. It is **not** required for building, testing, or deploying.
+
 ## Project Structure
 
 ```
 .
-├── src/                    # Source files (42 .gs + 7 .html)
+├── src/                    # Source files (45 .gs + 8 .html)
 │   ├── 00_Security.gs              # Security utilities, XSS prevention
 │   ├── 00_DataAccess.gs            # Data Access Layer
 │   ├── 01_Core.gs                  # Error handling + Constants
@@ -63,7 +78,6 @@ Please be respectful and constructive in all interactions. We're all working tow
 │   ├── 04b_AccessibilityFeatures.gs # Comfort view, focus mode, import/export
 │   ├── 04c_InteractiveDashboard.gs # Interactive dashboard, mobile views
 │   ├── 04d_ExecutiveDashboard.gs   # Executive dashboard, alerts
-│   ├── 04e_PublicDashboard.gs      # Public member dashboard
 │   ├── 05_Integrations.gs          # Drive, Calendar, WebApp
 │   ├── 06_Maintenance.gs           # Diagnostics, cache, undo
 │   ├── 07_DevTools.gs              # Development tools (remove before prod)
@@ -96,11 +110,14 @@ Please be respectful and constructive in all interactions. We're all working tow
 │   ├── 27_TimelineService.gs       # Timeline/activity feed service
 │   ├── 28_FailsafeService.gs       # Critical operation failsafe wrapper
 │   ├── 29_Migrations.gs            # One-time data migration runner
-│   └── (7 .html files)             # SPA templates
+│   ├── 30_TestRunner.gs             # GAS-native test runner (210 tests)
+│   ├── 31_WebAppTests.gs           # GAS-native web app tests
+│   ├── DevMenu.gs                  # Dev menu (excluded from prod build)
+│   └── (8 .html files)             # SPA templates + poms_reference
 ├── test/                   # Jest unit tests
 │   ├── gas-mock.js         # GAS environment mocks
 │   ├── load-source.js      # Source file loader
-│   └── *.test.js           # Test files (2059 tests across 36 suites)
+│   └── *.test.js           # Test files (2,900+ tests across 58 suites)
 ├── dist/                   # Built output (auto-generated)
 ├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration

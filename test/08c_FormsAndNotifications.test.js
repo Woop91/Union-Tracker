@@ -21,9 +21,9 @@ describe('08c function existence', () => {
   const required = [
     'getFormUrlFromConfig', 'buildGrievanceFormUrl_',
     'saveFormUrlsToConfig_silent', 'getFormValue_', 'getFormMultiValue_',
-    'parseFormDate_', 'sendContactInfoForm', 'onContactFormSubmit',
-    'getSatisfactionSurveyLink', 'onSatisfactionFormSubmit',
-    'setupSatisfactionFormTrigger', 'showNotificationSettings',
+    'parseFormDate_',
+    'onSatisfactionFormSubmit',
+    'showNotificationSettings',
     'installDailyTrigger_', 'removeDailyTrigger_',
     'checkDeadlinesAndNotify_', 'testDeadlineNotifications',
     'sendStewardDeadlineAlerts',

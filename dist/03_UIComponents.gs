@@ -77,7 +77,8 @@ function createDashboardMenu() {
       .addItem('✅ View Checklist', 'showChecklistDialog')
       .addSeparator()
       .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
-      .addItem('📄 Create PDF', 'createPDFForSelectedGrievance')
+      .addItem('📄 Create Signature PDF', 'createPDFForSelectedGrievance')
+      .addItem('📄 Create Template PDF', 'createTemplatePDFForSelectedGrievance')
       .addSeparator()
       .addSubMenu(ui.createMenu('📋 Bulk Actions')
         .addItem('📋 Select All Open Cases', 'selectAllOpenCases')
@@ -103,7 +104,6 @@ function createDashboardMenu() {
   // ============================================================================
   ui.createMenu('🔧 Tools')
     .addSubMenu(ui.createMenu('📧 Email & Notifications')
-      .addItem('📧 Send Contact Form', 'sendContactInfoForm')
       .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember')
       .addSeparator()
       .addItem('⚙️ Notification Settings', 'showNotificationSettings')
@@ -152,7 +152,13 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('📝 Multi-Select Editor', 'openCellMultiSelectEditor')
       .addItem('⚡ Enable Multi-Select Auto-Open', 'installMultiSelectTrigger')
-      .addItem('🚫 Disable Multi-Select Auto-Open', 'removeMultiSelectTrigger'))
+      .addItem('🚫 Disable Multi-Select Auto-Open', 'removeMultiSelectTrigger')
+      .addSeparator()
+      .addItem('↩️ Undo Last Action', 'undoLastAction')
+      .addItem('↪️ Redo Last Action', 'redoLastAction')
+      .addItem('📋 Export Undo History', 'exportUndoHistoryToSheet')
+      .addSeparator()
+      .addItem('🔧 Repair Dynamic Formulas', 'repairDynamicFormulas'))
 
     .addSubMenu(ui.createMenu('🎨 Themes')
       .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
@@ -279,6 +285,7 @@ function createDashboardMenu() {
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('🔒 Enforce Hidden Sheets (Mobile Fix)', 'enforceHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
+      .addItem('👥 Setup Member Leader Role', 'setupMemberLeaderRole')
       .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'))
 
     .addSubMenu(ui.createMenu('⏱️ Triggers')
@@ -439,6 +446,11 @@ function setupThemeColumns() {
   }
 }
 
+/**
+ * Displays a simple alert dialog in the spreadsheet UI.
+ * @param {string} message - Alert body text
+ * @param {string} [title] - Dialog title; defaults to 'Alert'
+ */
 function showAlert(message, title) {
   SpreadsheetApp.getUi().alert(title || 'Alert', message, SpreadsheetApp.getUi().ButtonSet.OK);
 }
@@ -477,48 +489,6 @@ function navigateToRecord(id, type) {
 }
 
 /**
- * Navigates to a member in the sheet
- * @param {string} memberId - The member ID
- * @returns {void}
- */
-function navigateToMemberInSheet(memberId) {
-  navigateToRecord(memberId, 'member');
-}
-
-/**
- * Navigates to a grievance in the sheet
- * @param {string} grievanceId - The grievance ID
- * @returns {void}
- */
-function navigateToGrievanceInSheet(grievanceId) {
-  navigateToRecord(grievanceId, 'grievance');
-}
-
-/**
- * Shows the Member Directory sheet
- * @returns {void}
- */
-function showMemberDirectory() {
-  navigateToSheet(SHEETS.MEMBER_DIR);
-}
-
-/**
- * Shows the Grievance Log sheet
- * @returns {void}
- */
-function showGrievanceLog() {
-  navigateToSheet(SHEETS.GRIEVANCE_LOG);
-}
-
-/**
- * Shows the Config sheet
- * @returns {void}
- */
-function showConfigSheet() {
-  navigateToSheet(SHEETS.CONFIG);
-}
-
-/**
  * ============================================================================
  * ThemeService.gs - Theme Management and Visual Settings
  * ============================================================================
@@ -531,7 +501,7 @@ function showConfigSheet() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Theme management and visual settings functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -559,17 +529,21 @@ function APPLY_SYSTEM_THEME() {
 }
 
 /**
- * Applies theme styling to a single sheet
- * @param {Sheet} sheet - The sheet to style
- * @param {string} [themeKey] - Optional theme preset key; defaults to active theme
- * @returns {void}
- * @private
+ * @private Clamps a font size value to the allowed range (8-24).
+ * @param {number} size - Raw font size
+ * @returns {number} Clamped font size
  */
 function clampFontSize_(size) {
   var n = Number(size) || 10;
   return Math.max(8, Math.min(24, n));
 }
 
+/**
+ * @private Applies theme styling to a single sheet.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - The sheet to style
+ * @param {string} [themeKey] - Theme preset key; defaults to active theme
+ * @returns {void}
+ */
 function applyThemeToSheet_(sheet, themeKey) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
@@ -1156,7 +1130,7 @@ function refreshAllVisuals() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Mobile interface components and dashboard functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -1422,7 +1396,7 @@ function showMyAssignedGrievances() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Quick actions menu and member email functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -2102,7 +2076,7 @@ function sendMemberDashboardLink() {
  * - UIService.gs (getCommonStyles)
  *
  * @fileoverview Search dialog UI components
- * @version 1.0.0
+ * @version 4.33.0
  */
 
 // ============================================================================

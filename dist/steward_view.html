@@ -1899,7 +1899,7 @@ function renderStewardResources(appContainer) {
           style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
           onClick: function() {
             window.open(r.url, '_blank');
-            serverCall().dataLogResourceClick(SESSION_TOKEN, 'quick:' + r.label.toLowerCase().replace(/\s+/g, '-'));
+            serverCall().dataLogResourceClick(SESSION_TOKEN, 'quick:' + r.label.toLowerCase().replace(/\s+/g, '-'), r.label);
           }
         });
         item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
@@ -1978,7 +1978,7 @@ function renderStewardResources(appContainer) {
             var resLink = el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource');
             resLink.addEventListener('click', function(ev) {
               ev.stopPropagation();
-              serverCall().dataLogResourceClick(SESSION_TOKEN, r.id || r.title);
+              serverCall().dataLogResourceClick(SESSION_TOKEN, r.id || r.title, r.title || '');
             });
             expandContent.appendChild(resLink);
           }
@@ -3521,6 +3521,16 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
   if (workloadData && (workloadData.success || workloadData.data)) _renderWorkloadInsights(mainContent, workloadData, showDetail);
   if (perfData && perfData.length > 0) _renderPerformanceSection(mainContent, perfData, showDetail);
   if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(mainContent, satData, showDetail);
+
+  // Correlation Engine — fetch separately to avoid slowing the main batch
+  var corrPlaceholder = el('div', { id: 'correlation-insights-section' });
+  mainContent.appendChild(corrPlaceholder);
+  serverCall().withSuccessHandler(function(res) {
+    if (!res || !res.success) return;
+    var summary = res.summary;
+    if (!summary || summary.disabled || summary.total === 0) return;
+    _renderCorrelationInsights(corrPlaceholder, summary, showDetail);
+  }).withFailureHandler(function() { /* silent — optional section */ }).dataGetCorrelationSummary(SESSION_TOKEN);
 }
 
 function _renderMembershipInsights(container, ms, showDetail) {
@@ -3939,6 +3949,206 @@ function _renderSatisfactionSection(container, trends, showDetail) {
       barsCard.appendChild(row);
     });
     section.appendChild(barsCard);
+  }
+
+  container.appendChild(section);
+}
+
+// ═══════════════════════════════════════
+// SEARCH PAGE (v4.33.0 — both roles)
+// ═══════════════════════════════════════
+
+function renderSearchPage(appContainer) {
+  var role = AppState.userRole || 'steward';
+  renderPageLayout(appContainer, role, 'search', function(container) {
+    _stewardHeader(container, 'Search', 'Find members and grievances');
+    var content = el('div', { className: 'content' });
+    container.appendChild(content);
+
+    // Search input
+    var searchRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } });
+    var input = el('input', {
+      type: 'text', placeholder: 'Search by name, email, ID, or status...',
+      style: { flex: '1', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: '14px', boxSizing: 'border-box' },
+      autofocus: true
+    });
+    searchRow.appendChild(input);
+
+    // Tab filter
+    var tabSelect = el('select', {
+      style: { padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: '13px' }
+    });
+    ['all', 'members', 'grievances'].forEach(function(t) {
+      var opt = el('option', { value: t }, t.charAt(0).toUpperCase() + t.slice(1));
+      tabSelect.appendChild(opt);
+    });
+    searchRow.appendChild(tabSelect);
+    content.appendChild(searchRow);
+
+    var resultsContainer = el('div');
+    content.appendChild(resultsContainer);
+
+    var _debounceTimer = null;
+
+    function doSearch() {
+      var q = (input.value || '').trim();
+      if (q.length < 2) {
+        resultsContainer.innerHTML = '<div style="text-align:center;padding:30px 0;color:var(--muted);font-size:13px">Type at least 2 characters to search.</div>';
+        return;
+      }
+      resultsContainer.innerHTML = '';
+      showLoading(resultsContainer, 'search');
+      serverCall().withSuccessHandler(function(res) {
+        resultsContainer.innerHTML = '';
+        if (!res || !res.success) {
+          resultsContainer.appendChild(el('div', { style: { color: 'var(--danger)', padding: '20px', textAlign: 'center' } }, (res && res.message) || 'Search failed.'));
+          return;
+        }
+        var results = res.results || [];
+        if (results.length === 0) {
+          resultsContainer.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No results found for "' + safeText(q) + '".'));
+          return;
+        }
+        // Result count
+        resultsContainer.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '10px' } }, results.length + ' result' + (results.length !== 1 ? 's' : '')));
+        results.forEach(function(r) {
+          var card = el('div', { className: 'card card-glass', style: {
+            padding: '12px 14px', marginBottom: '8px', cursor: 'pointer',
+            transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+          }});
+          card.onmouseenter = function() { card.style.transform = 'translateY(-1px)'; card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'; };
+          card.onmouseleave = function() { card.style.transform = ''; card.style.boxShadow = ''; };
+
+          var header = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+          var typeColor = r.type === 'member' ? 'var(--info)' : 'var(--warning)';
+          var typeLabel = r.type === 'member' ? 'MEMBER' : 'CASE';
+          header.appendChild(el('span', { style: { fontSize: '9px', fontWeight: '700', padding: '2px 6px', borderRadius: '6px', background: typeColor, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.5px' } }, typeLabel));
+          header.appendChild(el('span', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, safeText(r.title || '')));
+          card.appendChild(header);
+
+          if (r.subtitle) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, safeText(r.subtitle)));
+          if (r.detail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px' } }, safeText(r.detail)));
+
+          // Navigate on click
+          card.onclick = function() {
+            if (r.type === 'member' && typeof _handleTabNav === 'function') {
+              _handleTabNav(role, 'members');
+            } else if (r.type === 'grievance' && typeof _handleTabNav === 'function') {
+              _handleTabNav(role, role === 'steward' ? 'cases' : 'cases');
+            }
+          };
+          resultsContainer.appendChild(card);
+        });
+      }).withFailureHandler(function(err) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.appendChild(el('div', { style: { color: 'var(--danger)', padding: '20px', textAlign: 'center' } }, 'Search failed: ' + safeText((err && err.message) || 'Unknown error')));
+      }).dataGetWebAppSearchResults(SESSION_TOKEN, q, tabSelect.value);
+    }
+
+    input.addEventListener('input', function() {
+      clearTimeout(_debounceTimer);
+      _debounceTimer = setTimeout(doSearch, 300);
+    });
+    tabSelect.addEventListener('change', doSearch);
+
+    // Initial state
+    resultsContainer.innerHTML = '<div style="text-align:center;padding:30px 0;color:var(--muted);font-size:13px">Type at least 2 characters to search.</div>';
+  });
+}
+
+// ═══════════════════════════════════════
+// CORRELATION INSIGHTS (v4.33.0 — no PII)
+// ═══════════════════════════════════════
+
+function _renderCorrelationInsights(container, summary, showDetail) {
+  container.innerHTML = '';
+  var section = el('div', { style: { marginBottom: '16px' } });
+
+  // Section header
+  var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' } });
+  headerRow.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)',
+  }}, 'Statistical Correlations'));
+  if (summary.actionableCount > 0) {
+    headerRow.appendChild(el('span', { style: {
+      fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px',
+      background: 'var(--accent)', color: '#fff',
+    }}, summary.actionableCount + ' actionable'));
+  }
+  section.appendChild(headerRow);
+
+  // Summary KPI grid
+  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', marginBottom: '12px' } });
+  var items = [
+    { label: 'STRONG', value: summary.strong, color: 'var(--danger)' },
+    { label: 'MODERATE', value: summary.moderate, color: 'var(--warning)' },
+    { label: 'WEAK', value: summary.weak, color: 'var(--muted)' },
+    { label: 'TOTAL', value: summary.total, color: 'var(--info)' }
+  ];
+  items.forEach(function(item) {
+    var card = el('div', { className: 'card card-glass', style: { padding: '12px', textAlign: 'center' } });
+    card.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '700', color: item.color } }, String(item.value)));
+    card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, item.label));
+    grid.appendChild(card);
+  });
+  section.appendChild(grid);
+
+  // Top insights list
+  if (summary.topInsights && summary.topInsights.length > 0) {
+    var listCard = el('div', { className: 'card card-glass', style: { padding: '12px' } });
+    listCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, 'Top Insights'));
+    summary.topInsights.forEach(function(ins) {
+      var row = el('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
+
+      // Correlation badge
+      var rAbs = Math.abs(ins.r || 0).toFixed(2);
+      var badgeColor = ins.strength === 'strong' ? 'var(--danger)' : ins.strength === 'moderate' ? 'var(--warning)' : 'var(--muted)';
+      row.appendChild(el('div', { style: {
+        minWidth: '44px', textAlign: 'center', padding: '4px 6px', borderRadius: '6px',
+        fontSize: '11px', fontWeight: '700', color: '#fff', background: badgeColor,
+      }}, 'r=' + rAbs));
+
+      var info = el('div', { style: { flex: '1' } });
+      info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, ins.title));
+      if (ins.insight) {
+        info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px' } }, ins.insight));
+      }
+      row.appendChild(info);
+      listCard.appendChild(row);
+    });
+    section.appendChild(listCard);
+
+    // Drill-down detail view
+    if (showDetail) {
+      var viewAll = el('button', { className: 'btn btn-sm', style: { marginTop: '8px', fontSize: '11px' }, onClick: function() {
+        showDetail('All Correlations', function(panel) {
+          // Fetch full alerts for the detail view
+          serverCall().withSuccessHandler(function(res) {
+            if (!res || !res.success || !res.alerts || res.alerts.length === 0) {
+              panel.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px', textAlign: 'center' } }, 'No actionable alerts at this time.'));
+              return;
+            }
+            res.alerts.forEach(function(alert) {
+              var alertCard = el('div', { className: 'card card-glass', style: { padding: '12px', marginBottom: '8px' } });
+              var alertHeader = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } });
+              var sevColor = alert.severity === 'high' ? 'var(--danger)' : 'var(--warning)';
+              alertHeader.appendChild(el('span', { className: 'material-icons', style: { fontSize: '18px', color: sevColor } }, alert.icon || 'trending_up'));
+              alertHeader.appendChild(el('span', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, alert.title));
+              if (alert.actionable) {
+                alertHeader.appendChild(el('span', { style: { fontSize: '9px', padding: '2px 6px', borderRadius: '8px', background: sevColor, color: '#fff', fontWeight: '600' } }, 'ACTION'));
+              }
+              alertCard.appendChild(alertHeader);
+              alertCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.4' } }, alert.message));
+              alertCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', marginTop: '6px' } }, 'r = ' + (alert.r || 0).toFixed(2) + ' | n = ' + (alert.sampleSize || 0)));
+              panel.appendChild(alertCard);
+            });
+          }).withFailureHandler(function() {
+            panel.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px' } }, 'Failed to load correlation alerts.'));
+          }).dataGetCorrelationAlerts(SESSION_TOKEN);
+        });
+      }}, 'View All Correlations \u2192');
+      section.appendChild(viewAll);
+    }
   }
 
   container.appendChild(section);
@@ -4956,6 +5166,37 @@ function renderFailsafePage(appContainer) {
       }
     }, 'Run Diagnostic'));
     content.appendChild(diagCard);
+
+    // Card 6: Restore from Drive Backup (v4.33.0)
+    var restoreCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px', borderLeft: '3px solid var(--danger)' } });
+    restoreCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Restore from Backup'));
+    restoreCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Restore a sheet from a Drive CSV backup. Creates a safety backup of the current data before overwriting. Requires the Google Drive File ID and exact sheet name.'));
+    var restoreStatus = el('div', { style: { fontSize: '12px', minHeight: '20px' }, 'aria-live': 'polite', role: 'status' });
+    var restoreFileId = el('input', { type: 'text', placeholder: 'Drive File ID of CSV backup', style: { width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: '12px', marginBottom: '6px', boxSizing: 'border-box' } });
+    var restoreSheetName = el('input', { type: 'text', placeholder: 'Sheet name (e.g. Member Directory)', style: { width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: '12px', marginBottom: '8px', boxSizing: 'border-box' } });
+    restoreCard.appendChild(restoreFileId);
+    restoreCard.appendChild(restoreSheetName);
+    restoreCard.appendChild(restoreStatus);
+    restoreCard.appendChild(el('button', {
+      style: { fontSize: '12px', padding: '8px 16px', borderRadius: '8px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600', cursor: 'pointer' },
+      onClick: function() {
+        var fId = (restoreFileId.value || '').trim();
+        var sName = (restoreSheetName.value || '').trim();
+        if (!fId || !sName) { restoreStatus.innerHTML = '<div style="color:var(--danger)">Both File ID and Sheet Name are required.</div>'; return; }
+        if (!confirm('This will overwrite "' + sName + '" with the backup file. A safety copy of the current data will be created first. Continue?')) return;
+        restoreStatus.innerHTML = '<div style="color:var(--muted)">Restoring...</div>';
+        serverCall().withSuccessHandler(function(r) {
+          if (r && r.success) {
+            restoreStatus.innerHTML = '<div style="color:var(--success);font-weight:600">\u2705 ' + safeText(r.message || 'Restore complete.') + '</div>';
+          } else {
+            restoreStatus.innerHTML = '<div style="color:var(--danger)">' + safeText((r && r.message) || 'Restore failed.') + '</div>';
+          }
+        }).withFailureHandler(function(err) {
+          restoreStatus.innerHTML = '<div style="color:var(--danger)">Restore failed: ' + safeText((err && err.message) || err) + '</div>';
+        }).fsRestoreFromBackup(SESSION_TOKEN, fId, sName, true);
+      }
+    }, 'Restore from Backup'));
+    content.appendChild(restoreCard);
 
     container.appendChild(content);
   });

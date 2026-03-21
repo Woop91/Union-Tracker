@@ -34,7 +34,6 @@ const BUILD_ORDER = [
   '03_UIComponents.gs',
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
-  '04c_InteractiveDashboard.gs',
   '04d_ExecutiveDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
@@ -292,7 +291,7 @@ const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
 
 // Files to exclude in production builds
-const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs'];
+const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (shouldClean) {
   clean();

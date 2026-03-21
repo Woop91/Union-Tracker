@@ -90,7 +90,7 @@ function DIAGNOSE_SETUP() {
 
   // Check 3: Member Directory structure
   results.checks.push('Verifying Member Directory structure...');
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (memberSheet) {
     var headers = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
     var requiredHeaders = [
@@ -849,7 +849,7 @@ function getDiagnosticsDialogHtml_(results) {
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview Caching and performance optimization functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -1250,7 +1250,7 @@ function showCacheStatusDashboard() {
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview Undo/redo system functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -1630,7 +1630,7 @@ function exportUndoHistoryToSheet() {
  * from accidentally triggering high-intensity system scans.
  *
  * @fileoverview Administrative and maintenance utilities
- * @version 2.0.0
+ * @version 4.33.0
  * @requires Constants.gs
  */
 
@@ -2376,7 +2376,7 @@ function saveSettings(settings) {
  * - Enhanced audit logging
  * - Auto-archive for closed grievances
  *
- * @version 2.0.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -2614,49 +2614,6 @@ function findOrphanedGrievances() {
   return orphaned;
 }
 
-/**
- * Highlight orphaned grievances in the Grievance Log
- * Adds red background to rows with invalid Member IDs
- */
-function highlightOrphanedGrievances() {
-  var orphaned = findOrphanedGrievances();
-
-  if (orphaned.length === 0) {
-    SpreadsheetApp.getUi().alert(
-      '✅ Data Integrity Check',
-      'All grievances have valid Member IDs. No orphaned records found.',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    return;
-  }
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (!grievanceSheet) { Logger.log('Grievance Log sheet not found'); return; }
-
-  // Highlight orphaned rows
-  orphaned.forEach(function(item) {
-    grievanceSheet.getRange(item.row, 1, 1, grievanceSheet.getLastColumn())
-      .setBackground('#FFCDD2'); // Light red
-  });
-
-  // Report findings
-  var message = 'Found ' + orphaned.length + ' orphaned grievance(s):\n\n';
-  orphaned.slice(0, 10).forEach(function(item) {
-    message += '• Row ' + item.row + ': ' + item.grievanceId + ' (Member: ' + item.memberId + ')\n';
-  });
-
-  if (orphaned.length > 10) {
-    message += '\n...and ' + (orphaned.length - 10) + ' more.';
-  }
-
-  message += '\n\nThese rows have been highlighted in red.';
-
-  SpreadsheetApp.getUi().alert('⚠️ Orphaned Grievances Found', message, SpreadsheetApp.getUi().ButtonSet.OK);
-
-  // Log to audit
-  logIntegrityEvent('GHOST_VALIDATION', 'Found ' + orphaned.length + ' orphaned grievances');
-}
 // ============================================================================
 // STEWARD LOAD BALANCING METRICS
 // ============================================================================
@@ -2715,82 +2672,6 @@ function calculateStewardWorkload() {
   return stewards;
 }
 
-/**
- * Show steward workload dashboard dialog
- */
-function showStewardWorkloadDashboard() {
-  var stewards = calculateStewardWorkload();
-
-  if (stewards.length === 0) {
-    SpreadsheetApp.getUi().alert(
-      'Steward Workload',
-      'No stewards have active grievances assigned.',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    return;
-  }
-
-  // Calculate statistics
-  var totalActive = stewards.reduce(function(sum, s) { return sum + s.activeCount; }, 0);
-  var avgLoad = totalActive / stewards.length;
-
-  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
-    'body { font-family: Arial, sans-serif; padding: 20px; }' +
-    'h2 { color: #7C3AED; margin-bottom: 10px; }' +
-    '.stats { background: #F3F4F6; padding: 15px; border-radius: 8px; margin-bottom: 20px; }' +
-    '.stat { display: inline-block; margin-right: 30px; }' +
-    '.stat-value { font-size: 24px; font-weight: bold; color: #7C3AED; }' +
-    '.stat-label { font-size: 12px; color: #6B7280; }' +
-    'table { width: 100%; border-collapse: collapse; }' +
-    'th { background: #7C3AED; color: white; padding: 10px; text-align: left; }' +
-    'td { padding: 8px; border-bottom: 1px solid #E5E7EB; }' +
-    '.high { background: #FEE2E2; }' +
-    '.medium { background: #FEF3C7; }' +
-    '.low { background: #D1FAE5; }' +
-    '.load-bar { height: 10px; background: #E5E7EB; border-radius: 5px; }' +
-    '.load-fill { height: 100%; border-radius: 5px; }' +
-    '</style>';
-
-  html += '<h2>Steward Workload Dashboard</h2>';
-
-  html += '<div class="stats">' +
-    '<div class="stat"><div class="stat-value">' + stewards.length + '</div><div class="stat-label">Active Stewards</div></div>' +
-    '<div class="stat"><div class="stat-value">' + totalActive + '</div><div class="stat-label">Total Active Cases</div></div>' +
-    '<div class="stat"><div class="stat-value">' + avgLoad.toFixed(1) + '</div><div class="stat-label">Avg Cases/Steward</div></div>' +
-    '</div>';
-
-  html += '<table><tr><th>Steward</th><th>Active</th><th>Urgent</th><th>Load Score</th><th>Status</th></tr>';
-
-  var maxLoad = stewards[0] ? stewards[0].loadScore : 1;
-
-  stewards.forEach(function(s) {
-    var statusClass = s.loadScore > avgLoad * 1.5 ? 'high' : (s.loadScore > avgLoad ? 'medium' : 'low');
-    var statusText = s.loadScore > avgLoad * 1.5 ? 'Overloaded' : (s.loadScore > avgLoad ? 'Busy' : 'Normal');
-    var loadPct = (s.loadScore / maxLoad * 100).toFixed(0);
-    var loadColor = statusClass === 'high' ? '#DC2626' : (statusClass === 'medium' ? '#F59E0B' : '#059669');
-
-    html += '<tr class="' + statusClass + '">' +
-      '<td><strong>' + escapeHtml(String(s.name)) + '</strong></td>' +
-      '<td>' + escapeHtml(String(s.activeCount)) + '</td>' +
-      '<td>' + escapeHtml(String(s.urgentCount)) + '</td>' +
-      '<td>' +
-        '<div class="load-bar"><div class="load-fill" style="width: ' + loadPct + '%; background: ' + loadColor + ';"></div></div>' +
-        '<small>' + s.loadScore + '</small>' +
-      '</td>' +
-      '<td>' + statusText + '</td>' +
-      '</tr>';
-  });
-
-  html += '</table>';
-  html += '<p style="margin-top: 15px; color: #6B7280; font-size: 12px;">' +
-    'Load Score = Active Cases + (Urgent Cases x 2). Urgent = deadline within 7 days.</p>';
-
-  var htmlOutput = HtmlService.createHtmlOutput(html)
-    .setWidth(600)
-    .setHeight(500);
-
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Steward Workload Analysis');
-}
 // ============================================================================
 // SELF-HEALING CONFIG VALIDATION TOOL
 // ============================================================================
@@ -2863,64 +2744,6 @@ function findMissingConfigValues() {
   return report;
 }
 
-/**
- * Show Config health check dialog with auto-fix option
- */
-function showConfigHealthCheck() {
-  var report = findMissingConfigValues();
-
-  if (report.error) {
-    SpreadsheetApp.getUi().alert('Error', report.error, SpreadsheetApp.getUi().ButtonSet.OK);
-    return;
-  }
-
-  if (report.missingValues.length === 0) {
-    SpreadsheetApp.getUi().alert(
-      '✅ Config Health Check',
-      'All dropdown values in your data sheets exist in the Config sheet.\n\nNo issues found!',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    return;
-  }
-
-  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
-    'body { font-family: Arial, sans-serif; padding: 20px; }' +
-    'h2 { color: #DC2626; }' +
-    '.warning { background: #FEF3C7; padding: 15px; border-radius: 8px; margin-bottom: 20px; }' +
-    'table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }' +
-    'th { background: #7C3AED; color: white; padding: 10px; text-align: left; }' +
-    'td { padding: 8px; border-bottom: 1px solid #E5E7EB; }' +
-    '.btn { background: #059669; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }' +
-    '.btn:hover { background: #047857; }' +
-    '</style>';
-
-  html += '<h2>⚠️ Missing Config Values Found</h2>';
-  html += '<div class="warning">' +
-    '<strong>' + report.missingValues.length + ' value(s)</strong> in your data sheets are not in the Config dropdowns. ' +
-    'This can cause validation errors and data inconsistency.' +
-    '</div>';
-
-  html += '<table><tr><th>Field</th><th>Missing Value</th><th>Example Row</th></tr>';
-
-  report.missingValues.slice(0, 20).forEach(function(item) {
-    html += '<tr><td>' + escapeHtml(String(item.field)) + '</td><td><strong>' + escapeHtml(String(item.value)) + '</strong></td><td>' + escapeHtml(String(item.exampleRow)) + '</td></tr>';
-  });
-
-  if (report.missingValues.length > 20) {
-    html += '<tr><td colspan="3">...and ' + (report.missingValues.length - 20) + ' more</td></tr>';
-  }
-
-  html += '</table>';
-
-  html += '<button class="btn" onclick="google.script.run.withSuccessHandler(function(){google.script.host.close();}).autoFixMissingConfigValues()">Auto-Add Missing Values to Config</button>';
-  html += '<p style="margin-top: 10px; color: #6B7280; font-size: 12px;">This will add the missing values to the appropriate Config columns.</p>';
-
-  var htmlOutput = HtmlService.createHtmlOutput(html)
-    .setWidth(550)
-    .setHeight(450);
-
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Config Health Check');
-}
 
 /**
  * Auto-add missing values to Config sheet
@@ -3021,71 +2844,6 @@ function logStewardAssignmentChange(grievanceId, oldSteward, newSteward) {
   );
 }
 
-/**
- * Show audit log viewer dialog
- */
-function showAuditLogViewer() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
-
-  if (!auditSheet || auditSheet.getLastRow() <= 1) {
-    SpreadsheetApp.getUi().alert(
-      'Audit Log',
-      'No audit log entries found. The audit log records important changes like status updates and steward assignments.',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    return;
-  }
-
-  // Get recent entries
-  var lastRow = auditSheet.getLastRow();
-  var startRow = Math.max(2, lastRow - 49); // Last 50 entries
-  var data = auditSheet.getRange(startRow, 1, lastRow - startRow + 1, 5).getValues();
-
-  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
-    'body { font-family: Arial, sans-serif; padding: 20px; }' +
-    'h2 { color: #7C3AED; }' +
-    'table { width: 100%; border-collapse: collapse; font-size: 12px; }' +
-    'th { background: #7C3AED; color: white; padding: 8px; text-align: left; position: sticky; top: 0; }' +
-    'td { padding: 6px; border-bottom: 1px solid #E5E7EB; }' +
-    'tr:hover { background: #F3F4F6; }' +
-    '.status { background: #DBEAFE; padding: 2px 6px; border-radius: 4px; }' +
-    '.steward { background: #D1FAE5; padding: 2px 6px; border-radius: 4px; }' +
-    '.config { background: #FEF3C7; padding: 2px 6px; border-radius: 4px; }' +
-    '</style>';
-
-  html += '<h2>Recent Audit Log Entries</h2>';
-  html += '<p style="color: #6B7280;">Showing last ' + data.length + ' entries</p>';
-
-  html += '<table><tr><th>Timestamp</th><th>User</th><th>Event</th><th>Details</th></tr>';
-
-  // Reverse to show most recent first
-  data.reverse().forEach(function(row) {
-    var timestamp = row[EVENT_AUDIT_COLS.TIMESTAMP - 1] instanceof Date ? row[EVENT_AUDIT_COLS.TIMESTAMP - 1].toLocaleString() : row[EVENT_AUDIT_COLS.TIMESTAMP - 1];
-    var user = row[EVENT_AUDIT_COLS.USER - 1] ? row[EVENT_AUDIT_COLS.USER - 1].split('@')[0] : 'Unknown';
-    var eventType = row[EVENT_AUDIT_COLS.EVENT_TYPE - 1] || '';
-    var details = row[EVENT_AUDIT_COLS.DETAILS - 1] || '';
-
-    var eventClass = eventType.indexOf('STATUS') !== -1 ? 'status' :
-                     (eventType.indexOf('STEWARD') !== -1 ? 'steward' :
-                     (eventType.indexOf('CONFIG') !== -1 ? 'config' : ''));
-
-    html += '<tr>' +
-      '<td>' + escapeHtml(String(timestamp)) + '</td>' +
-      '<td>' + escapeHtml(String(user)) + '</td>' +
-      '<td><span class="' + eventClass + '">' + escapeHtml(String(eventType)) + '</span></td>' +
-      '<td>' + escapeHtml(String(details).substring(0, 100)) + (details.length > 100 ? '...' : '') + '</td>' +
-      '</tr>';
-  });
-
-  html += '</table>';
-
-  var htmlOutput = HtmlService.createHtmlOutput(html)
-    .setWidth(700)
-    .setHeight(500);
-
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Audit Log Viewer');
-}
 
 // ============================================================================
 // AUTO-ARCHIVE FOR CLOSED GRIEVANCES
@@ -3194,313 +2952,6 @@ function archiveClosedGrievances(daysOld) {
   }
 }
 
-/**
- * Show archive dialog with options
- */
-function showArchiveDialog() {
-  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
-    'body { font-family: Arial, sans-serif; padding: 20px; }' +
-    'h2 { color: #7C3AED; }' +
-    '.info { background: #EFF6FF; padding: 15px; border-radius: 8px; margin-bottom: 20px; }' +
-    'label { display: block; margin-bottom: 5px; font-weight: bold; }' +
-    'input[type="number"] { width: 100px; padding: 8px; border: 1px solid #D1D5DB; border-radius: 4px; margin-bottom: 15px; }' +
-    '.btn { background: #7C3AED; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }' +
-    '.btn:hover { background: #6D28D9; }' +
-    '.btn-secondary { background: #6B7280; margin-left: 10px; }' +
-    '</style>';
-
-  html += '<h2>Archive Closed Grievances</h2>';
-
-  html += '<div class="info">' +
-    '<strong>What this does:</strong><br>' +
-    'Moves closed grievances (Won, Denied, Settled, Withdrawn, Closed) to a hidden archive sheet. ' +
-    'This keeps your active Grievance Log fast and focused on current cases.' +
-    '</div>';
-
-  html += '<label>Archive grievances closed more than:</label>';
-  html += '<input type="number" id="daysOld" value="90" min="30" max="365"> days ago';
-
-  html += '<br><br>';
-  html += '<button class="btn" onclick="runArchive()">Archive Now</button>';
-  html += '<button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>';
-
-  html += '<script>' +
-    'function runArchive() {' +
-    '  var days = document.getElementById("daysOld").value;' +
-    '  google.script.run.withSuccessHandler(function(result) {' +
-    '    alert("Archived " + result.archived + " grievances.");' +
-    '    google.script.host.close();' +
-    '  }).archiveClosedGrievances(parseInt(days));' +
-    '}' +
-    '</script>';
-
-  var htmlOutput = HtmlService.createHtmlOutput(html)
-    .setWidth(400)
-    .setHeight(350);
-
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Archive Grievances');
-}
-// ============================================================================
-// VISUAL DEADLINE HEATMAP WITH SPARKLINES
-// ============================================================================
-
-/**
- * Apply deadline heatmap conditional formatting to Grievance Log
- * Colors cells based on urgency level
- */
-function applyDeadlineHeatmap() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!grievanceSheet) return;
-
-  var lastRow = grievanceSheet.getLastRow();
-  if (lastRow < 2) return;
-
-  // Days to Deadline column
-  var deadlineRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1);
-
-  // Clear existing conditional formatting for this range
-  var rules = grievanceSheet.getConditionalFormatRules();
-  var newRules = rules.filter(function(rule) {
-    var ranges = rule.getRanges();
-    return !ranges.some(function(r) {
-      return r.getColumn() === GRIEVANCE_COLS.DAYS_TO_DEADLINE;
-    });
-  });
-
-  // Create new rules for heatmap
-  // Overdue (negative or "Overdue" text)
-  var overdueRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenNumberLessThanOrEqualTo(0)
-    .setBackground('#DC2626')  // Bright red
-    .setFontColor('#FFFFFF')
-    .setBold(true)
-    .setRanges([deadlineRange])
-    .build();
-
-  // Critical (1-3 days)
-  var criticalRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenNumberBetween(1, 3)
-    .setBackground('#F87171')  // Light red
-    .setFontColor('#7F1D1D')
-    .setBold(true)
-    .setRanges([deadlineRange])
-    .build();
-
-  // Warning (4-7 days)
-  var warningRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenNumberBetween(4, 7)
-    .setBackground('#FBBF24')  // Yellow/orange
-    .setFontColor('#78350F')
-    .setRanges([deadlineRange])
-    .build();
-
-  // Caution (8-14 days)
-  var cautionRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenNumberBetween(8, 14)
-    .setBackground('#FEF3C7')  // Light yellow
-    .setFontColor('#92400E')
-    .setRanges([deadlineRange])
-    .build();
-
-  // Safe (15+ days)
-  var safeRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenNumberGreaterThan(14)
-    .setBackground('#D1FAE5')  // Light green
-    .setFontColor('#065F46')
-    .setRanges([deadlineRange])
-    .build();
-
-  newRules.push(overdueRule, criticalRule, warningRule, cautionRule, safeRule);
-  grievanceSheet.setConditionalFormatRules(newRules);
-
-  // Also apply to status column for closed cases
-  var statusRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.STATUS, lastRow - 1, 1);
-
-  var wonRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo('Won')
-    .setBackground('#059669')  // Green
-    .setFontColor('#FFFFFF')
-    .setBold(true)
-    .setRanges([statusRange])
-    .build();
-
-  var deniedRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo('Denied')
-    .setBackground('#DC2626')  // Red
-    .setFontColor('#FFFFFF')
-    .setRanges([statusRange])
-    .build();
-
-  var settledRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo('Settled')
-    .setBackground('#7C3AED')  // Purple
-    .setFontColor('#FFFFFF')
-    .setRanges([statusRange])
-    .build();
-
-  var existingRules = grievanceSheet.getConditionalFormatRules();
-  existingRules.push(wonRule, deniedRule, settledRule);
-  grievanceSheet.setConditionalFormatRules(existingRules);
-
-  SpreadsheetApp.getUi().alert(
-    '✅ Heatmap Applied',
-    'Deadline heatmap has been applied to the Grievance Log:\n\n' +
-    '🔴 Red: Overdue or 1-3 days\n' +
-    '🟡 Yellow: 4-7 days\n' +
-    '🟢 Green: 15+ days',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
-}
-
-// ============================================================================
-// MOBILE STEWARD PORTAL VIEW
-// ============================================================================
-
-/**
- * Create or update the mobile steward portal sheet
- * Shows only essential columns for mobile access
- */
-function createMobileStewardPortal() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var portalSheetName = '📱 Steward Portal';
-
-  // Get or create portal sheet
-  var portalSheet = ss.getSheetByName(portalSheetName);
-  if (portalSheet) {
-    portalSheet.clear();
-  } else {
-    portalSheet = ss.insertSheet(portalSheetName);
-  }
-
-  // Get grievance data
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (!grievanceSheet) {
-    portalSheet.getRange('A1').setValue('Error: Grievance Log not found');
-    return;
-  }
-
-  var lastRow = grievanceSheet.getLastRow();
-  if (lastRow < 2) {
-    portalSheet.getRange('A1').setValue('No grievances found');
-    return;
-  }
-
-  // Title
-  portalSheet.getRange('A1').setValue('📱 STEWARD PORTAL')
-    .setFontSize(18)
-    .setFontWeight('bold')
-    .setFontColor('#7C3AED');
-  portalSheet.getRange('A1:E1').merge();
-
-  portalSheet.getRange('A2').setValue('Quick access to your active cases. Updated: ' + new Date().toLocaleString())
-    .setFontStyle('italic')
-    .setFontColor('#6B7280');
-  portalSheet.getRange('A2:E2').merge();
-
-  // Section: Urgent Cases (deadline <= 7 days)
-  portalSheet.getRange('A4').setValue('🚨 URGENT CASES')
-    .setFontWeight('bold')
-    .setBackground('#DC2626')
-    .setFontColor('#FFFFFF');
-  portalSheet.getRange('A4:E4').merge();
-
-  // Headers for mobile view
-  var headers = ['ID', 'Member', 'Status', 'Deadline', 'Steward'];
-  portalSheet.getRange('A5:E5').setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#F3F4F6');
-
-  // Get grievance data and filter
-  var grievanceData = grievanceSheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.STEWARD).getValues();
-  var activeStatuses = ['Open', 'Pending Info', 'In Arbitration', 'Appealed'];
-
-  var urgentCases = [];
-  var normalCases = [];
-
-  grievanceData.forEach(function(row) {
-    var status = row[GRIEVANCE_COLS.STATUS - 1];
-    if (activeStatuses.indexOf(status) === -1) return;
-
-    var mobileRow = [
-      row[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
-      (row[GRIEVANCE_COLS.FIRST_NAME - 1] || '') + ' ' + (row[GRIEVANCE_COLS.LAST_NAME - 1] || '').charAt(0) + '.',
-      row[GRIEVANCE_COLS.STATUS - 1],
-      row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1],
-      row[GRIEVANCE_COLS.STEWARD - 1]
-    ];
-
-    var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    if (typeof daysToDeadline === 'number' && daysToDeadline <= 7) {
-      urgentCases.push(mobileRow);
-    } else {
-      normalCases.push(mobileRow);
-    }
-  });
-
-  // Sort urgent cases by deadline ascending
-  urgentCases.sort(function(a, b) { return (a[3] || 999) - (b[3] || 999); });
-  normalCases.sort(function(a, b) { return (a[3] || 999) - (b[3] || 999); });
-
-  var currentRow = 6;
-
-  // Write urgent cases
-  if (urgentCases.length > 0) {
-    portalSheet.getRange(currentRow, 1, urgentCases.length, 5).setValues(urgentCases)
-      .setBackground('#FEE2E2');
-    currentRow += urgentCases.length + 1;
-  } else {
-    portalSheet.getRange(currentRow, 1).setValue('No urgent cases!')
-      .setFontColor('#059669');
-    currentRow += 2;
-  }
-
-  // Section: All Active Cases
-  portalSheet.getRange(currentRow, 1).setValue('📋 ALL ACTIVE CASES')
-    .setFontWeight('bold')
-    .setBackground('#7C3AED')
-    .setFontColor('#FFFFFF');
-  portalSheet.getRange(currentRow, 1, 1, 5).merge();
-  currentRow++;
-
-  // Headers
-  portalSheet.getRange(currentRow, 1, 1, 5).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#F3F4F6');
-  currentRow++;
-
-  // Write normal cases
-  if (normalCases.length > 0) {
-    portalSheet.getRange(currentRow, 1, normalCases.length, 5).setValues(normalCases);
-  } else {
-    portalSheet.getRange(currentRow, 1).setValue('No other active cases');
-  }
-
-  // Format columns for mobile
-  portalSheet.setColumnWidth(1, 90);  // ID
-  portalSheet.setColumnWidth(2, 120); // Member
-  portalSheet.setColumnWidth(3, 80);  // Status
-  portalSheet.setColumnWidth(4, 70);  // Deadline
-  portalSheet.setColumnWidth(5, 100); // Steward
-
-  // Freeze header
-  portalSheet.setFrozenRows(3);
-
-  // Move to front
-  ss.setActiveSheet(portalSheet);
-  ss.moveActiveSheet(2);
-
-  SpreadsheetApp.getUi().alert(
-    '📱 Steward Portal Created',
-    'The mobile-friendly Steward Portal has been created/updated.\n\n' +
-    'This view shows:\n' +
-    '• Urgent cases (7 days or less)\n' +
-    '• All active cases\n' +
-    '• Narrow columns optimized for mobile',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
-}
 
 // ============================================================================
 // ENHANCED onEdit TRIGGER WITH AUDIT LOGGING

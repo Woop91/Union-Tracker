@@ -6,6 +6,7 @@
  */
 
 require('./gas-mock');
+const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
 const { loadSources } = require('./load-source');
 
 // We need to mock some functions that Integrations.gs calls

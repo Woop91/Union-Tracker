@@ -56,38 +56,7 @@ describe('GRIEVANCE_FORM_CONFIG', () => {
   });
 });
 
-// ============================================================================
-// CONTACT_FORM_CONFIG
-// ============================================================================
-
-describe('CONTACT_FORM_CONFIG', () => {
-  test('is defined', () => {
-    expect(CONTACT_FORM_CONFIG).toBeDefined();
-  });
-
-  test('has a FORM_URL property (configured via Config sheet)', () => {
-    expect(typeof CONTACT_FORM_CONFIG.FORM_URL).toBe('string');
-  });
-
-  test('FIELD_IDS has 21 entries', () => {
-    expect(Object.keys(CONTACT_FORM_CONFIG.FIELD_IDS).length).toBe(21);
-  });
-
-  test('FIELD_IDS includes FIRST_NAME, LAST_NAME, EMAIL, PHONE', () => {
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.FIRST_NAME).toBeDefined();
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.LAST_NAME).toBeDefined();
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.EMAIL).toBeDefined();
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.PHONE).toBeDefined();
-  });
-
-  test('FIELD_IDS includes HIRE_DATE, EMPLOYEE_ID, STREET_ADDRESS, CITY, ZIP_CODE', () => {
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.HIRE_DATE).toBeDefined();
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.EMPLOYEE_ID).toBeDefined();
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.STREET_ADDRESS).toBeDefined();
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.CITY).toBeDefined();
-    expect(CONTACT_FORM_CONFIG.FIELD_IDS.ZIP_CODE).toBeDefined();
-  });
-});
+// CONTACT_FORM_CONFIG — removed (contact form deprecated)
 
 // ============================================================================
 // SATISFACTION_FORM_CONFIG

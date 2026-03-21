@@ -347,6 +347,11 @@ function CREATE_DASHBOARD() {
 // v4.12.0 SHEET SETUP — Contact Log & Steward Tasks
 // ============================================================================
 
+/**
+ * @private Ensures the Contact Log sheet exists, creating it with headers if needed.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Active spreadsheet
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The Contact Log sheet
+ */
 function _ensureContactLogSheet(ss) {
   var name = SHEETS.CONTACT_LOG;
   var sheet = ss.getSheetByName(name);
@@ -361,6 +366,11 @@ function _ensureContactLogSheet(ss) {
   return sheet;
 }
 
+/**
+ * @private Ensures the Steward Tasks sheet exists, creating or migrating columns as needed.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Active spreadsheet
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The Steward Tasks sheet
+ */
 function _ensureStewardTasksSheet(ss) {
   var name = SHEETS.STEWARD_TASKS;
   var sheet = ss.getSheetByName(name);
@@ -408,6 +418,11 @@ function _ensureStewardTasksSheet(ss) {
 // UTILITY FUNCTIONS
 // ============================================================================
 
+/**
+ * @private Ensures the Grievance Feedback sheet exists, creating it with headers if needed.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Active spreadsheet
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} The Grievance Feedback sheet
+ */
 // v4.32.0 SHEET SETUP — Grievance Feedback
 function _ensureGrievanceFeedbackSheet(ss) {
   var name = SHEETS.GRIEVANCE_FEEDBACK;
@@ -588,7 +603,7 @@ function setupHiddenSheets(ss) {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Data validation and multi-select functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -957,7 +972,7 @@ function removeMultiSelectTrigger() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Search and navigation functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 

@@ -30,7 +30,7 @@
  *   Depends on 01_Core.gs (SHEETS, CONFIG_COLS), 10_Main.gs (getConfigValue_).
  *   Used by the SPA analytics views and dashboard enhancement features.
  *
- * @version 4.31.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -42,6 +42,10 @@
 // functions return empty/disabled results. This lets admins opt in to
 // the compute-heavy correlation analysis on a per-org basis.
 
+/**
+ * @private Checks whether the Correlation Engine is enabled in the Config sheet.
+ * @returns {boolean} True if Config "Enable Correlation Engine" is 'yes'
+ */
 function _isCorrelationEnabled() {
   try {
     var val = getConfigValue_(CONFIG_COLS.ENABLE_CORRELATION);

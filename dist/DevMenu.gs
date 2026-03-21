@@ -203,30 +203,37 @@ function devWrap_(label, fn) {
 // INDIVIDUAL WRAPPERS — Group 1: Initialize
 // ============================================================================
 
+/** Dev menu: initializes all trigger functions. */
 function devWrap_InitAllTriggers() {
   devWrap_('Initialize All Trigger Functions', menuInstallSurveyTriggers);
 }
 
+/** Dev menu: initializes all sync functions. */
 function devWrap_InitAllSync() {
   devWrap_('Initialize All Sync Functions', syncAllData);
 }
 
+/** Dev menu: runs full dashboard initialization. */
 function devWrap_InitAllInstall() {
   devWrap_('Initialize All Install Functions', initializeDashboard);
 }
 
+/** Dev menu: refreshes all formulas. */
 function devWrap_InitAllRefresh() {
   devWrap_('Initialize All Refresh Functions', refreshAllFormulas);
 }
 
+/** Dev menu: initializes the survey engine. */
 function devWrap_InitSurveyEngine() {
   devWrap_('Initialize Survey Engine', initSurveyEngine);
 }
 
+/** Dev menu: initializes weekly question sheets. */
 function devWrap_InitPollSheets() {
   devWrap_('Initialize Poll Sheets', wqInitSheets);
 }
 
+/** Dev menu: initializes workload tracker sheets. */
 function devWrap_InitWorkloadSheets() {
   devWrap_('Workload: Initialize Sheets', initWorkloadTrackerSheets);
 }
@@ -235,34 +242,42 @@ function devWrap_InitWorkloadSheets() {
 // INDIVIDUAL WRAPPERS — Group 2: Refresh & Data Ops
 // ============================================================================
 
+/** Dev menu: synchronizes all data now. */
 function devWrap_SyncAllData() {
   devWrap_('Sync All Data Now', syncAllData);
 }
 
+/** Dev menu: runs bulk data validation. */
 function devWrap_RunBulkValidation() {
   devWrap_('Run Bulk Validation', runBulkValidation);
 }
 
+/** Dev menu: forces a global formula refresh. */
 function devWrap_ForceGlobalRefresh() {
   devWrap_('Force Global Refresh', refreshAllFormulas);
 }
 
+/** Dev menu: refreshes all formulas. */
 function devWrap_RefreshAllFormulas() {
   devWrap_('Refresh All Formulas', refreshAllFormulas);
 }
 
+/** Dev menu: refreshes all member directory data. */
 function devWrap_RefreshAllMemberData() {
   devWrap_('Refresh All Member Data', refreshMemberDirectoryFormulas);
 }
 
+/** Dev menu: refreshes the current member view. */
 function devWrap_RefreshView() {
   devWrap_('Refresh View', refreshMemberView);
 }
 
+/** Dev menu: backfills meeting minutes Drive docs. */
 function devWrap_BackfillMinutes() {
   devWrap_('Backfill Minutes', BACKFILL_MINUTES_DRIVE_DOCS);
 }
 
+/** Dev menu: warms up all caches. */
 function devWrap_WarmUpCaches() {
   devWrap_('Warm Up All Caches', warmUpCaches);
 }
@@ -271,26 +286,32 @@ function devWrap_WarmUpCaches() {
 // INDIVIDUAL WRAPPERS — Group 3: Trigger Installation
 // ============================================================================
 
+/** Dev menu: installs all survey triggers. */
 function devWrap_InstallAllSurveyTriggers() {
   devWrap_('Install All Survey Triggers', menuInstallSurveyTriggers);
 }
 
+/** Dev menu: installs the quarterly survey trigger. */
 function devWrap_InstallQuarterlyTrigger() {
   devWrap_('Install Quarterly Trigger', setupQuarterlyTrigger);
 }
 
+/** Dev menu: installs the weekly reminder trigger. */
 function devWrap_InstallWeeklyReminderTrigger() {
   devWrap_('Install Weekly Reminder Trigger', setupWeeklyReminderTrigger);
 }
 
+/** Dev menu: installs the community poll draw trigger. */
 function devWrap_InstallCommunityPollTrigger() {
   devWrap_('Install Community Poll Draw Trigger', setupCommunityPollTrigger);
 }
 
+/** Dev menu: sets up workload reminder system. */
 function devWrap_WorkloadSetupReminders() {
   devWrap_('Workload: Setup Reminders', setupWorkloadReminderSystem);
 }
 
+/** Dev menu: installs the onOpen deferred trigger. */
 function devWrap_InstallOnOpenDeferred() {
   devWrap_('Install onOpen Deferred Trigger', setupOpenDeferredTrigger);
 }
@@ -299,26 +320,32 @@ function devWrap_InstallOnOpenDeferred() {
 // INDIVIDUAL WRAPPERS — Group 4: Scheduled Tasks & Feature Setup
 // ============================================================================
 
+/** Dev menu: enables the midnight auto-refresh trigger. */
 function devWrap_EnableMidnightRefresh() {
   devWrap_('Enable Midnight Auto-Refresh', setupMidnightTrigger);
 }
 
+/** Dev menu: enables the 1 AM dashboard refresh trigger. */
 function devWrap_Enable1AMRefresh() {
   devWrap_('Enable 1 AM Dashboard Refresh', createAutomationTriggers);
 }
 
+/** Dev menu: sets up the weekly backup trigger. */
 function devWrap_SetupWeeklyBackup() {
   devWrap_('Setup Weekly Backup', setupWeeklySnapshotTrigger);
 }
 
+/** Dev menu: sets up the union events calendar. */
 function devWrap_SetupCalendar() {
   devWrap_('Setup Union Events Calendar', SETUP_CALENDAR);
 }
 
+/** Dev menu: sets up or repairs Drive folder structure. */
 function devWrap_SetupDrive() {
   devWrap_('Setup / Repair Drive', SETUP_DRIVE_FOLDERS);
 }
 
+/** Dev menu: creates the meeting check-in sheet. */
 function devWrap_CreateMeetingCheckIn() {
   devWrap_('Create Meeting Check-In', setupMeetingCheckInSheet);
 }

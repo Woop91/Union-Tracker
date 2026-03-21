@@ -27,6 +27,10 @@ var DataService = (function () {
   // PERF: Spreadsheet singleton — avoids redundant getActiveSpreadsheet() IPC calls.
   // Cached per execution (GAS module-scope resets between requests).
   var _cachedSS = null;
+  /**
+   * Returns the cached spreadsheet singleton, initializing on first call.
+   * @returns {Spreadsheet}
+   */
   function _getSS() {
     if (_cachedSS) return _cachedSS;
     _cachedSS = SpreadsheetApp.getActiveSpreadsheet();
@@ -84,7 +88,22 @@ var DataService = (function () {
     grievanceIssueCategory: ['issue category', 'category', 'issue type'],
     grievanceResolution: ['resolution', 'outcome', 'result'],
     grievanceDateClosed: ['date closed', 'closed date', 'closed', 'resolved date'],
-    grievanceDriveFolderUrl: ['drive folder url', 'folder url', 'case folder url'],
+
+    // v4.32.1 — Drive Folder URL lookup for grievance records.
+    // Maps to the "Drive Folder URL" column (GRIEVANCE_COLS.DRIVE_FOLDER_URL, col 33)
+    // in the Grievance Log sheet. This column is auto-populated by
+    // setupDriveFolderForGrievance() in 05_Integrations.gs when a steward creates
+    // a case folder. Multiple header aliases allow fuzzy matching via _findColumn().
+    //
+    // WHY: _buildGrievanceRecord() needs this to include driveFolderUrl in its
+    // return object. Without it, getMemberGrievanceDriveUrl() and
+    // dataGetMemberCaseFolderUrl() cannot resolve the folder URL and return null.
+    //
+    // IF THIS BREAKS: The Grievance Log "Drive Folder URL" column was renamed or
+    // removed. Check GRIEVANCE_HEADER_MAP_ in 01_Core.gs (key: DRIVE_FOLDER_URL)
+    // and verify the header text matches one of the aliases below. If none match,
+    // _getVal() returns '' and driveFolderUrl defaults to null — safe but non-functional.
+    grievanceDriveFolderUrl: ['drive folder url', 'drive url', 'folder url', 'case folder url'],
     grievanceDriveFolderId: ['drive folder id', 'folder id', 'case folder id'],
     grievanceArticles: ['articles violated', 'articles', 'contract articles'],
     grievanceStep1Due: ['step i due', 'step 1 due'],
@@ -98,15 +117,13 @@ var DataService = (function () {
   // PUBLIC: User Lookup
   // ═══════════════════════════════════════
 
-  /**
-   * Finds a user in the Member Directory by email.
-   * Returns sanitized user record or null.
-   * @param {string} email
-   * @returns {Object|null}
-   */
   // ─── Email Index — O(1) lookup replacing O(n) linear scan ───
   var _emailIndex = null; // { email: rowIndex } — built once per execution
 
+  /**
+   * Builds and returns the O(1) email-to-row-index lookup map for the Member Directory.
+   * @returns {Object} Map of lowercase email to row index
+   */
   function _getEmailIndex() {
     if (_emailIndex) return _emailIndex;
     var cached = _getCachedSheetData(MEMBER_SHEET);
@@ -121,6 +138,11 @@ var DataService = (function () {
     return _emailIndex;
   }
 
+  /**
+   * Finds a user in the Member Directory by email using O(1) index lookup.
+   * @param {string} email
+   * @returns {Object|null} Sanitized user record or null
+   */
   function findUserByEmail(email) {
     if (!email) return null;
     email = String(email).trim().toLowerCase();
@@ -576,14 +598,43 @@ var DataService = (function () {
 
   /**
    * Returns the Google Drive folder URL for a member's grievance case files.
-   * @param {string} email
-   * @returns {string|null} Drive folder URL or null
+   *
+   * WHAT: Looks up the member's grievances and returns the Drive folder URL
+   * from the most relevant case — preferring active (non-terminal) cases,
+   * falling back to the most recent case if all are closed.
+   *
+   * WHY THIS APPROACH: Rather than querying the Grievance Log sheet directly
+   * for the DRIVE_FOLDER_URL column, this reuses getMemberGrievances() which
+   * already handles caching, column resolution, and access filtering. The
+   * driveFolderUrl field was added to _buildGrievanceRecord() in v4.32.1
+   * specifically to enable this lookup.
+   *
+   * DATA FLOW:
+   *   Grievance Log sheet → _getCachedSheetData() → _buildGrievanceRecord()
+   *   → grievanceRecord.driveFolderUrl → returned here
+   *
+   * CALLERS:
+   *   - DataService.getMemberGrievanceDriveUrl (exposed in DataService public API, line ~3387)
+   *   - dataGetMemberCaseFolderUrl() (steward-only wrapper, line ~3608)
+   *
+   * IF THIS BREAKS:
+   *   Returns null. The Drive folder link in the UI will show
+   *   "No Drive folder linked to this case." This is safe — the folder
+   *   still exists in Drive, it just can't be resolved from the sheet.
+   *   Root causes: HEADERS.grievanceDriveFolderUrl aliases don't match
+   *   the actual column header, or the column was removed from the sheet.
+   *
+   * @param {string} email — member email address (case-insensitive)
+   * @returns {string|null} Full Google Drive folder URL, or null if no folder exists
    */
   function getMemberGrievanceDriveUrl(email) {
     var grievances = getMemberGrievances(email);
     if (!grievances || grievances.length === 0) return null;
 
-    // Prefer active (non-terminal) grievance; fall back to most recent
+    // Prefer an active grievance (one that hasn't reached a terminal status).
+    // Terminal statuses mirror GRIEVANCE_CLOSED_STATUSES used elsewhere.
+    // If ALL grievances are terminal, fall back to the first (most recent by filing date,
+    // since getMemberGrievances() sorts by filedTimestamp descending).
     var TERMINAL = ['resolved', 'closed', 'withdrawn', 'denied', 'won', 'settled'];
     var activeG = grievances.find(function(g) {
       return TERMINAL.indexOf((g.status || '').toLowerCase()) === -1;
@@ -1682,6 +1733,11 @@ var DataService = (function () {
   // PRIVATE: Sheet & Column Helpers
   // ═══════════════════════════════════════
 
+  /**
+   * Returns a sheet by name from the active spreadsheet, logging errors if not found.
+   * @param {string} name - Sheet name
+   * @returns {Sheet|null}
+   */
   function _getSheet(name) {
     var ss = _getSS();
     if (!ss) {
@@ -1729,7 +1785,12 @@ var DataService = (function () {
   }
 
   /**
-   * Safe getter — returns cell value or default
+   * Safe getter — returns cell value or default.
+   * @param {Array} row - Row data array
+   * @param {Object} colMap - Column name-to-index map
+   * @param {string[]} aliases - Possible header names
+   * @param {*} defaultVal - Fallback value if column missing
+   * @returns {*} Cell value or defaultVal
    */
   function _getVal(row, colMap, aliases, defaultVal) {
     var col = _findColumn(colMap, aliases);
@@ -1738,6 +1799,12 @@ var DataService = (function () {
     return (val === null || val === undefined) ? (defaultVal !== undefined ? defaultVal : '') : val;
   }
 
+  /**
+   * Constructs a normalized user record from a Member Directory row.
+   * @param {Array} row - Row data array
+   * @param {Object} colMap - Column name-to-index map
+   * @returns {Object} User record with email, name, role, contact info, etc.
+   */
   function _buildUserRecord(row, colMap) {
     var firstName = String(_getVal(row, colMap, HEADERS.memberFirstName, '')).trim();
     var lastName = String(_getVal(row, colMap, HEADERS.memberLastName, '')).trim();
@@ -1857,6 +1924,12 @@ var DataService = (function () {
     return null;
   }
 
+  /**
+   * Constructs a normalized grievance record from a Grievance Log row.
+   * @param {Array} row - Row data array
+   * @param {Object} colMap - Column name-to-index map
+   * @returns {Object} Grievance record with id, status, deadlines, etc.
+   */
   function _buildGrievanceRecord(row, colMap) {
     var deadlineRaw = _getVal(row, colMap, HEADERS.grievanceDeadline, null);
     var deadlineDays = null;
@@ -1944,11 +2017,32 @@ var DataService = (function () {
       issueCategory: String(_getVal(row, colMap, HEADERS.grievanceIssueCategory, '')).trim(),
       priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
       notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
+
+      // v4.32.1 — Google Drive folder URL for this grievance's case files.
+      // Reads from GRIEVANCE_COLS.DRIVE_FOLDER_URL (col 33, header "Drive Folder URL").
+      // Value is a full URL like "https://drive.google.com/drive/folders/{folderId}"
+      // or null if no folder has been created yet (e.g., Draft grievances).
+      //
+      // Consumed by:
+      //   - getMemberGrievanceDriveUrl() → returns URL for member's active case
+      //   - dataGetMemberCaseFolderUrl() → steward-only wrapper that resolves case folder
+      //
+      // The || null coercion ensures callers can do a simple truthy check
+      // (e.g., `if (target.driveFolderUrl)`) rather than checking for empty string.
+      //
+      // IF THIS BREAKS: driveFolderUrl will be null. getMemberGrievanceDriveUrl()
+      // returns null, dataGetMemberCaseFolderUrl() returns { success: false }.
+      // UI degrades gracefully: "No Drive folder linked to this case" message shown.
       driveFolderUrl: String(_getVal(row, colMap, HEADERS.grievanceDriveFolderUrl, '')).trim() || null,
       driveFolderId: String(_getVal(row, colMap, HEADERS.grievanceDriveFolderId, '')).trim() || null,
     };
   }
 
+  /**
+   * Formats a Date object as "Mon DD, YYYY" string.
+   * @param {Date} date
+   * @returns {string} Formatted date string
+   */
   function _formatDate(date) {
     var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
@@ -1974,7 +2068,11 @@ var DataService = (function () {
     return getOrCreateMemberAdminFolder(memberEmail);
   }
 
-  // Legacy stub — delegates to new implementation
+  /**
+   * Legacy stub — delegates to _getMemberAdminFolder_.
+   * @param {string} memberEmail
+   * @returns {Folder|null}
+   */
   function getOrCreateMemberContactFolder_(memberEmail) {
     return _getMemberAdminFolder_(memberEmail);
   }
@@ -2024,6 +2122,10 @@ var DataService = (function () {
   // PUBLIC: Contact Log (v4.12.0)
   // ═══════════════════════════════════════
 
+  /**
+   * Returns the _Contact_Log hidden sheet, creating it with headers if absent.
+   * @returns {Sheet|null}
+   */
   function _ensureContactLog() {
     var ss = _getSS();
     if (!ss) return null;
@@ -2036,6 +2138,16 @@ var DataService = (function () {
     return sheet;
   }
 
+  /**
+   * Logs a steward-member contact to the hidden sheet, Member Directory snapshot, and per-member Drive sheet.
+   * @param {string} stewardEmail
+   * @param {string} memberEmail
+   * @param {string} contactType - e.g. 'Phone', 'Email', 'In-Person'
+   * @param {string} notes
+   * @param {string} duration
+   * @param {string} memberName - Optional display name
+   * @returns {Object} { success: boolean, message: string }
+   */
   function logMemberContact(stewardEmail, memberEmail, contactType, notes, duration, memberName) {
     if (!stewardEmail || !memberEmail || !contactType) return { success: false, message: 'Missing fields.' };
 
@@ -2111,6 +2223,12 @@ var DataService = (function () {
     return { success: true, message: 'Contact logged.' };
   }
 
+  /**
+   * Returns contact history between a steward and a specific member, sorted newest first.
+   * @param {string} stewardEmail
+   * @param {string} memberEmail
+   * @returns {Object[]} Array of contact records
+   */
   function getMemberContactHistory(stewardEmail, memberEmail) {
     var sheet = _ensureContactLog();
     if (sheet.getLastRow() <= 1) return [];
@@ -2133,6 +2251,11 @@ var DataService = (function () {
     return results;
   }
 
+  /**
+   * Returns all contact log entries for a steward (max 100), sorted newest first.
+   * @param {string} stewardEmail
+   * @returns {Object[]} Array of contact records
+   */
   function getStewardContactLog(stewardEmail) {
     var sheet = _ensureContactLog();
     if (sheet.getLastRow() <= 1) return [];
@@ -2158,6 +2281,10 @@ var DataService = (function () {
   // PUBLIC: Steward Tasks (v4.12.0)
   // ═══════════════════════════════════════
 
+  /**
+   * Returns the _Steward_Tasks hidden sheet, creating it with headers if absent.
+   * @returns {Sheet|null}
+   */
   function _ensureStewardTasks() {
     var ss = _getSS();
     if (!ss) return null;
@@ -2174,6 +2301,18 @@ var DataService = (function () {
     return sheet;
   }
 
+  /**
+   * Creates a steward task with optional delegation to another steward (chief only).
+   * @param {string} stewardEmail
+   * @param {string} title
+   * @param {string} description
+   * @param {string} memberEmail - Related member email
+   * @param {string} priority - 'high', 'medium', or 'low'
+   * @param {string} dueDate
+   * @param {string} assignToEmail - Delegate target (chief steward only)
+   * @param {string} idemKey - Idempotency key to prevent duplicates
+   * @returns {Object} { success: boolean, message: string, taskId?: string }
+   */
   function createTask(stewardEmail, title, description, memberEmail, priority, dueDate, assignToEmail, idemKey) {
     if (idemKey) {
       var idemCache = CacheService.getScriptCache();
@@ -2196,6 +2335,12 @@ var DataService = (function () {
     return { success: true, message: 'Task created.', taskId: id };
   }
 
+  /**
+   * Returns steward tasks, optionally filtered by status, sorted by priority then due date.
+   * @param {string} stewardEmail
+   * @param {string} [statusFilter] - e.g. 'open', 'completed'
+   * @returns {Object[]} Array of task records
+   */
   function getTasks(stewardEmail, statusFilter) {
     // Use _getCachedSheetData for same-execution and cross-request caching.
     var cached = _getCachedSheetData(SHEETS.STEWARD_TASKS);
@@ -2226,6 +2371,13 @@ var DataService = (function () {
     return tasks;
   }
 
+  /**
+   * Updates a steward task's status, priority, title, or due date.
+   * @param {string} stewardEmail
+   * @param {string} taskId
+   * @param {Object} updates - { status?, priority?, title?, dueDate? }
+   * @returns {Object} { success: boolean, message?: string }
+   */
   function updateTask(stewardEmail, taskId, updates) {
     var sheet = _ensureStewardTasks();
     if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
@@ -2243,6 +2395,12 @@ var DataService = (function () {
     return { success: false, message: 'Task not found.' };
   }
 
+  /**
+   * Marks a steward task as completed with a timestamp.
+   * @param {string} stewardEmail
+   * @param {string} taskId
+   * @returns {Object} { success: boolean, message?: string }
+   */
   function completeTask(stewardEmail, taskId) {
     var sheet = _ensureStewardTasks();
     if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
@@ -2262,6 +2420,16 @@ var DataService = (function () {
   // Member Task Assignment (v4.17.0)
   // ═══════════════════════════════════════
 
+  /**
+   * Creates a task assigned to a member by a steward.
+   * @param {string} stewardEmail - Assigning steward
+   * @param {string} memberEmail - Member receiving the task
+   * @param {string} title
+   * @param {string} desc
+   * @param {string} priority - 'high', 'medium', or 'low'
+   * @param {string} dueDate
+   * @returns {Object} { success: boolean, message: string, taskId?: string }
+   */
   function createMemberTask(stewardEmail, memberEmail, title, desc, priority, dueDate) {
     if (!stewardEmail || !memberEmail || !title) return { success: false, message: 'Missing required fields.' };
     var sheet = _ensureStewardTasks();
@@ -2285,6 +2453,12 @@ var DataService = (function () {
     return { success: true, message: 'Task assigned to member.', taskId: id };
   }
 
+  /**
+   * Returns tasks assigned to a member, optionally filtered by status.
+   * @param {string} memberEmail
+   * @param {string} [statusFilter] - 'open', 'completed', or 'not-completed'
+   * @returns {Object[]} Array of task records
+   */
   function getMemberTasks(memberEmail, statusFilter) {
     var cached = _getCachedSheetData(SHEETS.STEWARD_TASKS);
     var data = cached ? cached.data : null;
@@ -2317,6 +2491,12 @@ var DataService = (function () {
     return tasks;
   }
 
+  /**
+   * Marks a member task as completed by the member themselves.
+   * @param {string} memberEmail
+   * @param {string} taskId
+   * @returns {Object} { success: boolean, message?: string }
+   */
   function completeMemberTask(memberEmail, taskId) {
     var sheet = _ensureStewardTasks();
     if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
@@ -2335,8 +2515,13 @@ var DataService = (function () {
     return { success: false, message: 'Task not found.' };
   }
 
+  /**
+   * Allows the assigning steward to mark a member task complete on the member's behalf.
+   * @param {string} stewardEmail
+   * @param {string} taskId
+   * @returns {Object} { success: boolean, message?: string }
+   */
   function stewardCompleteMemberTask(stewardEmail, taskId) {
-    // Allows the assigning steward to mark a member task complete on the member's behalf.
     var sheet = _ensureStewardTasks();
     if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
     var data = sheet.getDataRange().getValues();
@@ -2355,6 +2540,11 @@ var DataService = (function () {
     return { success: false, message: 'Task not found or not yours to complete.' };
   }
 
+  /**
+   * Returns all member tasks assigned by this steward.
+   * @param {string} stewardEmail
+   * @returns {Object[]} Array of member task records
+   */
   function getStewardAssignedMemberTasks(stewardEmail) {
     var cached = _getCachedSheetData(SHEETS.STEWARD_TASKS);
     var data = cached ? cached.data : null;
@@ -2435,6 +2625,11 @@ var DataService = (function () {
   // PUBLIC: Steward Member Stats (v4.12.0)
   // ═══════════════════════════════════════
 
+  /**
+   * Returns aggregate stats for a steward's members (by location, by dues status).
+   * @param {string} stewardEmail
+   * @returns {Object} { total: number, byLocation: Object, byDues: Object, scope: string }
+   */
   function getStewardMemberStats(stewardEmail) {
     var members = getStewardMembers(stewardEmail);
     var scope = 'assigned';
@@ -2458,6 +2653,11 @@ var DataService = (function () {
   // PUBLIC: Steward Directory (v4.12.0)
   // ═══════════════════════════════════════
 
+  /**
+   * Returns a directory of all stewards with phone visibility based on caller role.
+   * @param {boolean} callerIsSteward - Whether the caller is a steward (controls phone visibility)
+   * @returns {Object[]} Array of steward contact entries
+   */
   function getStewardDirectory(callerIsSteward) {
     var cached = _getCachedSheetData(MEMBER_SHEET);
     if (!cached) return [];
@@ -2487,6 +2687,10 @@ var DataService = (function () {
   // PUBLIC: Grievance Stats (v4.12.0) — anonymized
   // ═══════════════════════════════════════
 
+  /**
+   * Returns anonymized org-wide grievance statistics including status, step, category, monthly trends, and deep analytics.
+   * @returns {Object} Grievance stats with byStatus, byStep, byCategory, monthly, winRate, resolution metrics, etc.
+   */
   function getGrievanceStats() {
     // Use combined active + archive data for complete statistics
     var cached = _getAllGrievanceData();
@@ -2726,6 +2930,10 @@ var DataService = (function () {
     };
   }
 
+  /**
+   * Returns units with 3+ grievances as hotspots, sorted by count descending.
+   * @returns {Object[]} Array of { location: string, count: number }
+   */
   function getGrievanceHotSpots() {
     // Use combined active + archive for complete hotspot analysis
     var cached = _getAllGrievanceData();
@@ -2753,6 +2961,10 @@ var DataService = (function () {
   // PUBLIC: Membership Stats (v4.12.0)
   // ═══════════════════════════════════════
 
+  /**
+   * Returns anonymized membership statistics (by unit, location, dues, tenure, and hire trends).
+   * @returns {Object} { available: boolean, total: number, byUnit, byLocation, byDues, byTenure, ... }
+   */
   function getMembershipStats() {
     var cached = _getCachedSheetData(MEMBER_SHEET);
     if (!cached) return { available: false };
@@ -2814,6 +3026,11 @@ var DataService = (function () {
   // PUBLIC: Upcoming Events via CalendarApp (v4.12.0)
   // ═══════════════════════════════════════
 
+  /**
+   * Returns upcoming calendar events (next 90 days) with timeline fallback.
+   * @param {number} [limit=10] - Max events to return
+   * @returns {Object[]|Object} Array of event objects or status object
+   */
   function getUpcomingEvents(limit) {
     limit = limit || 10;
     try {
@@ -3155,6 +3372,11 @@ var DataService = (function () {
     return _getMemberBatchData(email);
   }
 
+  /**
+   * Aggregates all member-view data in one call: grievances, history, steward info, survey, events, tasks.
+   * @param {string} email - Member email
+   * @returns {Object} Batch payload for member view init
+   */
   function _getMemberBatchData(email) {
     // Pre-warm cache for sheets we'll read multiple times
     try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
@@ -3200,6 +3422,11 @@ var DataService = (function () {
     };
   }
 
+  /**
+   * Aggregates all steward-view data in one call: cases, KPIs, members, tasks, badges, Q&A.
+   * @param {string} email - Steward email
+   * @returns {Object} Batch payload for steward view init
+   */
   function _getStewardBatchData(email) {
     // Pre-warm cache for sheets we'll read multiple times
     try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
@@ -3332,6 +3559,11 @@ var DataService = (function () {
     };
   }
 
+  /**
+   * Returns feedback items submitted by a specific user, newest first.
+   * @param {string} email
+   * @returns {Object[]} Array of feedback records
+   */
   function getMyFeedback(email) {
     if (!email) return [];
     email = String(email).trim().toLowerCase();
@@ -4027,7 +4259,8 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   /**
-   * Returns the feedback sheet, auto-creating if needed.
+   * Returns the _Grievance_Feedback hidden sheet, auto-creating with headers if absent.
+   * @returns {Sheet|null}
    */
   function _ensureGrievanceFeedback() {
     var ss = _getSS();
@@ -4422,20 +4655,10 @@ var DataService = (function () {
 // ═══════════════════════════════════════
 
 /**
- * CR-01: Resolves the caller's email server-side. Never trust client-supplied email.
- * @returns {string} The authenticated caller's email, or empty string if unavailable.
- * @private
- */
-/**
- * Resolves the caller's verified email.
- * Priority: (1) Session.getActiveUser() — works for Google SSO
- *           (2) sessionToken parameter — works for magic link / session token auth
- *
- * In "Execute as: Me" deployments, getActiveUser() returns empty for non-SSO
- * users. Pass the client's SESSION_TOKEN to cover that case.
- *
- * @param {string=} sessionToken - Optional client-supplied session token (from PAGE_DATA.sessionToken)
- * @returns {string} verified email or empty string
+ * Resolves the caller's verified email server-side (never trust client-supplied email).
+ * Priority: (1) Session.getActiveUser() for Google SSO, (2) sessionToken for magic link auth.
+ * @param {string=} sessionToken - Optional client-supplied session token
+ * @returns {string} Verified email or empty string
  * @private
  */
 function _resolveCallerEmail(sessionToken) {
@@ -4472,16 +4695,27 @@ function _requireStewardAuth(sessionToken) {
 //   - Member self-service: _resolveCallerEmail(sessionToken) provides server-verified identity
 //   - Public reads: no auth required (aggregate/non-PII data only)
 
+/** @param {string} sessionToken @returns {Object[]} Steward cases. Requires steward auth. */
 function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardCases(s); }
+/** @param {string} sessionToken @returns {Object} Steward KPIs. Requires steward auth. */
 function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardKPIs(s); }
+/** @param {string} sessionToken @returns {Object[]} Member's own active grievances. Requires auth. */
 function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberGrievances(e); }
+/** @param {string} sessionToken @returns {Object} Member's closed grievance history. Requires auth. */
 function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberGrievanceHistory(e); }
+/** @param {string} sessionToken @param {string} stewardEmail @returns {Object|null} Steward contact info. Requires auth. */
 function dataGetStewardContact(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) { Logger.log('dataGetStewardContact: auth failed'); return null; } return DataService.getStewardContact(stewardEmail || e); }
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 // Steward: view any member's full profile; Member: view own profile only
 // FIX-WDS-01: v4.25.8 — Parameter was named 'email' but body referenced undefined 'sessionToken'.
 // Renamed first param to sessionToken; email is now second param (optional, steward override).
+/**
+ * Returns a member's full profile. Stewards can view any member; members see only their own.
+ * @param {string} sessionToken
+ * @param {string} [email] - Target email (steward override)
+ * @returns {Object} Profile data or error object
+ */
 function dataGetFullProfile(sessionToken, email) {
   var caller = _resolveCallerEmail(sessionToken);
   if (!caller) return { success: false, message: 'Not authenticated.' };
@@ -4495,6 +4729,12 @@ function dataGetFullProfile(sessionToken, email) {
 }
 // Member self-service: update own safe fields (address, workLocation, officeDays only)
 // Stewards can also update member profiles; both paths use updateMemberProfile's field allowlist
+/**
+ * Updates member profile fields (address, location, etc.). Requires auth; locked for concurrency.
+ * @param {string} sessionToken
+ * @param {Object} updates - Fields to update
+ * @returns {Object} { success: boolean, message: string }
+ */
 function dataUpdateProfile(sessionToken, updates) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
@@ -4504,29 +4744,49 @@ function dataUpdateProfile(sessionToken, updates) {
   if (updates && updates._targetEmail) delete updates._targetEmail; // strip internal routing field
   return withScriptLock_(function() { return DataService.updateMemberProfile(targetEmail, updates); });
 }
+/** @param {string} sessionToken @returns {Object|null} Assigned steward info for caller. Requires auth. */
 function dataGetAssignedSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getAssignedStewardInfo(e); }
+/** @param {string} sessionToken @returns {Object[]} Available stewards for self-assign. Requires auth. */
 function dataGetAvailableStewards(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getAvailableStewards(e); }
+/** @param {string} sessionToken @param {string} memberEmail @param {string} stewardEmail @returns {Object} Assigns steward to member. Requires steward auth. */
 function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.assignStewardToMember(memberEmail, stewardEmail); }); }
 // v4.28.2 — Member-safe self-assign: members can assign a steward to THEMSELVES only.
+/** @param {string} sessionToken @param {string} stewardEmail @returns {Object} Self-assigns a steward. Requires auth. */
 function dataMemberAssignSteward(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return withScriptLock_(function() { return DataService.assignStewardToMember(e, stewardEmail); }); }
+/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Starts a grievance draft. Requires auth. */
 function dataStartGrievanceDraft(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.startGrievanceDraft(e, data, idemKey); }) : { success: false, message: 'Not authenticated.' }; }
+/** @param {string} sessionToken @returns {Object} Creates Drive folder for member's grievance. Requires auth. */
 function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
-// v4.31.1 — Resource click tracking (any authenticated user)
-function dataLogResourceClick(sessionToken, resourceId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.logResourceClick(e, resourceId) : { success: false }; }
+// v4.31.1 — Resource click tracking moved to line ~5423 (3-param version with resourceTitle)
+/** @param {string} sessionToken @returns {Object} Survey completion status for caller. Requires auth. */
 function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberSurveyStatus(e); }
+/** @param {string} sessionToken @returns {Object[]} All members from directory. Requires steward auth. */
 function dataGetAllMembers(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getAllMembers(); }
+/** @param {string} sessionToken @param {string} [scope] @returns {Object} Survey tracking for steward's members. Requires steward auth. */
 function dataGetStewardSurveyTracking(sessionToken, scope) { var s = _requireStewardAuth(sessionToken); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
+/** @param {string} sessionToken @param {Object} filter @param {string} msg @param {string} subject @returns {Object} Sends broadcast email. Requires steward auth. */
 function dataSendBroadcast(sessionToken, filter, msg, subject) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg, subject); }
+/** @param {string} sessionToken @returns {Object} Aggregated survey results. Requires steward auth. */
 function dataGetSurveyResults(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getSurveyResults(); }
 // v4.21.0 — Native survey engine wrappers
+/** @param {string} sessionToken @returns {Object} Survey questions. Requires auth. */
 function dataGetSurveyQuestions(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return getSurveyQuestions(); }
+/** @param {string} sessionToken @param {Object} responses @returns {Object} Submits survey response. Requires auth. */
 function dataSubmitSurveyResponse(sessionToken, responses) { var e = _resolveCallerEmail(sessionToken); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
 // dataGetPendingSurveyMembers, dataGetSatisfactionSummary, dataOpenNewSurveyPeriod are in 08e_SurveyEngine.gs
+/** @param {string} sessionToken @param {string} memberEmail @param {string} type @param {string} notes @param {string} duration @param {string} memberName @returns {Object} Logs member contact. Requires steward auth. */
 function dataLogMemberContact(sessionToken, memberEmail, type, notes, duration, memberName) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.logMemberContact(s, memberEmail, type, notes, duration, memberName); }); }
+/** @param {string} sessionToken @param {string} memberEmail @returns {Object[]} Contact history for a member. Requires steward auth. */
 function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) { Logger.log('dataGetMemberContactHistory: auth failed'); return []; } return DataService.getMemberContactHistory(s, memberEmail); }
+/** @param {string} sessionToken @returns {Object[]} Full contact log for a steward. Requires steward auth. */
 function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) { Logger.log('dataGetStewardContactLog: auth failed'); return []; } return DataService.getStewardContactLog(s); }
 
 // S2: Batch badge counts — replaces 3 serial client calls with 1 round-trip
+/**
+ * Returns notification, task, and Q&A badge counts in a single round-trip. Requires auth.
+ * @param {string} sessionToken
+ * @returns {Object} { notificationCount, taskCount, overdueTaskCount, qaUnansweredCount }
+ */
 function dataGetBadgeCounts(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { notificationCount: 0, taskCount: 0, overdueTaskCount: 0, qaUnansweredCount: 0 };
@@ -4536,7 +4796,14 @@ function dataGetBadgeCounts(sessionToken) {
   return DataService.getBadgeCounts(e, role);
 }
 
-// Send a direct email notification to a single member (steward-only)
+/**
+ * Sends a direct email to a single member and logs it to Drive contact sheet. Requires steward auth.
+ * @param {string} sessionToken
+ * @param {string} memberEmail
+ * @param {string} subject
+ * @param {string} body
+ * @returns {Object} { success: boolean, message: string }
+ */
 function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, message: 'Steward access required.' };
@@ -4574,7 +4841,23 @@ function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
   }
 }
 
-// Returns the Drive folder URL for a member's active (non-resolved) grievance (steward-only)
+/**
+ * Returns the Drive folder URL for a member's active (non-resolved) grievance.
+ * Steward-only — requires steward auth via _requireStewardAuth().
+ *
+ * DEPENDENCY: This function reads target.driveFolderUrl from the grievance
+ * record built by _buildGrievanceRecord(). That field was wired in v4.32.1
+ * via HEADERS.grievanceDriveFolderUrl → GRIEVANCE_COLS.DRIVE_FOLDER_URL (col 33).
+ * Before v4.32.1, driveFolderUrl was never populated in the record, so this
+ * function always returned { success: false, message: 'No Drive folder...' }.
+ *
+ * IF THIS BREAKS: Returns { success: false, url: null }. Steward sees
+ * "No Drive folder linked to this case" in the UI. Non-destructive.
+ *
+ * @param {string} sessionToken — steward session token
+ * @param {string} memberEmail — member whose grievance folder to look up
+ * @returns {{ success: boolean, url: string|null, grievanceId?: string, message?: string }}
+ */
 function dataGetMemberCaseFolderUrl(sessionToken, memberEmail) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, url: null, message: 'Steward access required.' };
@@ -4595,16 +4878,37 @@ function dataGetMemberCaseFolderUrl(sessionToken, memberEmail) {
   }
 }
 // A4: LockService for concurrent write safety
+/** @param {string} sessionToken @param {string} title @param {string} desc @param {string} memberEmail @param {string} priority @param {string} dueDate @param {string} assignToEmail @param {string} idemKey @returns {Object} Creates a steward task. Requires steward auth. */
 function dataCreateTask(sessionToken, title, desc, memberEmail, priority, dueDate, assignToEmail, idemKey) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assignToEmail || '', idemKey); }); }
+/**
+ * Creates a task assigned to a specific steward. Requires chief steward auth.
+ * @param {string} sessionToken
+ * @param {string} assigneeEmail - Target steward
+ * @param {string} title
+ * @param {string} desc
+ * @param {string} memberEmail
+ * @param {string} priority
+ * @param {string} dueDate
+ * @param {string} idemKey
+ * @returns {Object} { success: boolean, message: string }
+ */
 function dataCreateTaskForSteward(sessionToken, assigneeEmail, title, desc, memberEmail, priority, dueDate, idemKey) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, message: 'Steward access required.' };
   if (!DataService.isChiefSteward(s)) return { success: false, message: 'Not authorized.' };
   return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assigneeEmail, idemKey);
 }
+/** @param {string} sessionToken @param {string} [statusFilter] @returns {Object[]} Steward tasks. Requires steward auth. */
 function dataGetTasks(sessionToken, statusFilter) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getTasks(s, statusFilter); }
+/** @param {string} sessionToken @param {string} taskId @returns {Object} Completes a steward task. Requires steward auth. */
 function dataCompleteTask(sessionToken, taskId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.completeTask(s, taskId); }); }
+/** @param {string} sessionToken @returns {Object} Member stats for steward's caseload. Requires auth. */
 function dataGetStewardMemberStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
+/**
+ * Returns the steward directory with phone visibility based on caller's role. Requires auth.
+ * @param {string} sessionToken
+ * @returns {Object[]} Array of steward contact entries
+ */
 function dataGetStewardDirectory(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return [];
@@ -4617,45 +4921,74 @@ function dataGetStewardDirectory(sessionToken) {
     return [];
   }
 }
+/** @param {string} sessionToken @returns {Object} Org-wide grievance statistics. Requires steward auth. */
 function dataGetGrievanceStats(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
+/** @param {string} sessionToken @returns {Object[]} Grievance hotspot locations. Requires steward auth. */
 function dataGetGrievanceHotSpots(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getGrievanceHotSpots(); }
+/** @param {string} sessionToken @returns {Object|null} Membership statistics. Requires auth. */
 function dataGetMembershipStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMembershipStats() : null; }
 
 // v4.28.1 — Member-safe grievance endpoints for Union Stats page.
 // Uses _resolveCallerEmail (any authenticated member) instead of _requireStewardAuth.
 // Data is already anonymized (aggregate counts only); hotspots require 3+ per location.
+/** @param {string} sessionToken @returns {Object} Anonymized grievance stats (member-safe). Requires auth. */
 function dataGetMemberGrievanceStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { available: false }; return DataService.getGrievanceStats(); }
+/** @param {string} sessionToken @returns {Object[]} Anonymized grievance hotspots (member-safe). Requires auth. */
 function dataGetMemberGrievanceHotSpots(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return DataService.getGrievanceHotSpots(); }
 
 // v4.32.0 — Grievance Feedback wrappers
+/** @param {string} sessionToken @returns {Object|null} Pending grievance feedback prompt for caller. Requires auth. */
 function dataGetPendingGrievanceFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getPendingGrievanceFeedback(e) : null; }
+/** @param {string} sessionToken @param {string} grievanceId @param {Object} ratings @param {string} comment @returns {Object} Submits grievance feedback. Requires auth. */
 function dataSubmitGrievanceFeedback(sessionToken, grievanceId, ratings, comment) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.submitGrievanceFeedback(e, grievanceId, ratings, comment); }) : { success: false, message: 'Not authenticated.' }; }
+/** @param {string} sessionToken @returns {Object|null} Aggregate grievance feedback stats. Requires auth. */
 function dataGetGrievanceFeedbackStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getGrievanceFeedbackStats() : null; }
+/** @param {string} sessionToken @returns {Object|null} Feedback summary for calling steward. Requires steward auth. */
 function dataGetStewardFeedbackSummary(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardFeedbackSummary(s) : null; }
+/** @param {string} sessionToken @param {number} [limit] @returns {Object[]} Upcoming events. Requires auth. */
 function dataGetUpcomingEvents(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getUpcomingEvents(limit) : []; }
 // dataGetSurveyQuestions and dataSubmitSurveyResponse are defined in the v4.21.0 block above (single canonical definition)
+/** @param {string} sessionToken @returns {boolean} Whether caller is the chief steward. Requires auth. */
 function dataIsChiefSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.isChiefSteward(e) : false; }
 // dataGetAgencyGrievanceStats — alias removed; frontend uses dataGetGrievanceStats directly
 
 // v4.17.0 — member task assignment wrappers (CR-AUTH-3: server-side identity)
+/** @param {string} sessionToken @param {string} memberEmail @param {string} title @param {string} desc @param {string} priority @param {string} dueDate @returns {Object} Creates member task. Requires steward auth. */
 function dataCreateMemberTask(sessionToken, memberEmail, title, desc, priority, dueDate) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.createMemberTask(s, memberEmail, title, desc, priority, dueDate); }); }
+/** @param {string} sessionToken @param {string} [statusFilter] @returns {Object[]} Tasks assigned to the calling member. Requires auth. */
 function dataGetMemberTasks(sessionToken, statusFilter) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberTasks(e, statusFilter) : []; }
+/** @param {string} sessionToken @param {string} taskId @returns {Object} Completes a member task. Requires auth. */
 function dataCompleteMemberTask(sessionToken, taskId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.completeMemberTask(e, taskId) : { success: false, message: 'Not authenticated.' }; }
+/** @param {string} sessionToken @returns {Object[]} Member tasks assigned by calling steward. Requires steward auth. */
 function dataGetStewardAssignedMemberTasks(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getStewardAssignedMemberTasks(s); }
 // BUG-TASKS-03: steward completing a member task on the member's behalf
+/** @param {string} sessionToken @param {string} taskId @returns {Object} Steward marks member task complete. Requires steward auth. */
 function dataStaffCompleteMemberTask(sessionToken, taskId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.stewardCompleteMemberTask(s, taskId); }
 
 // v4.16.0 — unwired sheet wrappers (CR-AUTH-3: server-side identity + role checks)
+/** @param {string} sessionToken @param {string} taskId @param {Object} updates @returns {Object} Updates a steward task. Requires steward auth. */
 function dataUpdateTask(sessionToken, taskId, updates) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.updateTask(s, taskId, updates); }); }
+/** @param {string} sessionToken @returns {Object[]} All steward performance metrics. Requires steward auth. */
 function dataGetAllStewardPerformance(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getAllStewardPerformance(); }
+/** @param {string} sessionToken @param {string} caseId @returns {Object[]} Checklist items for a case. Requires auth. */
 function dataGetCaseChecklist(sessionToken, caseId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getCaseChecklist(caseId) : []; }
+/** @param {string} sessionToken @param {string} checklistId @param {boolean} completed @returns {Object} Toggles checklist item. Requires auth. */
 function dataToggleChecklistItem(sessionToken, checklistId, completed) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }
+/** @param {string} sessionToken @returns {Object[]} Meetings the caller has attended. Requires auth. */
 function dataGetMemberMeetings(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberMeetings(e) : []; }
+/** @param {string} sessionToken @returns {Object} Satisfaction survey trends. Requires steward auth. */
 function dataGetSatisfactionTrends(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { categories: [] }; return DataService.getSatisfactionTrends(); }
+/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Submits user feedback. Requires auth. */
 function dataSubmitFeedback(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.submitFeedback(e, data, idemKey) : { success: false, message: 'Not authenticated.' }; }
+/** @param {string} sessionToken @returns {Object[]} Caller's submitted feedback. Requires auth. */
 function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMyFeedback(e) : []; }
 
 // v4.33.0 — Insights batch: 6 parallel server calls in 1 round-trip
+/**
+ * Returns all Insights page data in a single round-trip. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { stats, hotSpots, perf, sat, memberStats, workload }
+ */
 function dataGetInsightsBatch(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { stats: { available: false }, hotSpots: [], perf: [], sat: { categories: [] }, memberStats: null, workload: { available: false } };
@@ -4676,6 +5009,11 @@ function dataGetInsightsBatch(sessionToken) {
 }
 
 // v4.33.0 — Nav refresh batch: KPIs + badge counts in 1 round-trip
+/**
+ * Returns steward KPIs and badge counts in a single round-trip. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { kpis: Object|null, badges: Object }
+ */
 function dataRefreshNavData(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { kpis: null, badges: { notificationCount: 0, taskCount: 0, overdueTaskCount: 0, qaUnansweredCount: 0 } };
@@ -4685,12 +5023,40 @@ function dataRefreshNavData(sessionToken) {
   return { kpis: kpis, badges: badges };
 }
 
-// v4.23.0: Portal Polls deprecated — replaced by wq* system (24_WeeklyQuestions.gs).
-// Stubs return graceful empty responses for stale clients; auth gates added per CR-AUTH-3.
-function dataGetActivePolls(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return []; }
-function dataSubmitPollVote(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return { success: false, message: 'Polls system updated — please refresh.' }; }
-function dataAddPoll(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return { success: false, message: 'Polls system updated — please refresh.' }; }
+// v4.33.0 — Grievance e-signature + form option wrappers
+/**
+ * Retrieves grievance data for e-signature workflow.
+ * @param {string} sigToken - Signature token from the e-sign URL
+ * @returns {Object} Grievance data for signing or error object
+ */
+function dataGetGrievanceForSigning(sigToken) {
+  return getGrievanceForSigning(sigToken);
+}
+
+/**
+ * Submits a grievance e-signature.
+ * @param {string} sigToken - Signature token from the e-sign URL
+ * @param {string} sigBase64 - Base64-encoded signature image
+ * @returns {Object} Result object with success status
+ */
+function dataSubmitGrievanceSignature(sigToken, sigBase64) {
+  return submitGrievanceSignature(sigToken, sigBase64);
+}
+
+/**
+ * Returns grievance form dropdown options (steps, statuses, categories).
+ * @param {string} sessionToken - Session token for auth
+ * @returns {Object} Form options or error object
+ */
+function dataGetGrievanceFormOptions(sessionToken) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, message: 'Not authenticated.' };
+  return getGrievanceFormOptions();
+}
+
+/** @param {string} sessionToken @param {number} [limit] @returns {Object[]} Meeting minutes. Requires auth. */
 function dataGetMeetingMinutes(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMeetingMinutes(limit) : []; }
+/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Adds meeting minutes. Requires steward auth. */
 function dataAddMeetingMinutes(sessionToken, data, idemKey) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data, idemKey); }
 
 /**
@@ -4827,6 +5193,11 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
 }
 // OPT-1: Dedicated steward dashboard init — single round-trip combining cases, KPIs, badges, member count.
 // Used as fallback when the preloaded batch from dataGetBatchData is unavailable.
+/**
+ * Returns steward dashboard init data (cases, KPIs, badges, member count) in one call. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { cases, kpis, badges, memberCount }
+ */
 function dataGetStewardDashboardInit(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { cases: [], kpis: {}, badges: { notificationCount: 0, taskCount: 0, overdueTaskCount: 0, qaUnansweredCount: 0 }, memberCount: 0 };
@@ -4846,6 +5217,11 @@ function dataGetStewardDashboardInit(sessionToken) {
 
 // Batch data fetch — single round-trip for SPA init (CR-AUTH-3: server-side identity + role)
 // Role is re-verified server-side from the Member Directory; client-supplied role is ignored.
+/**
+ * Returns all data needed for the initial SPA render in one round-trip. Requires auth.
+ * @param {string} sessionToken
+ * @returns {Object} Batch data payload (role determined server-side)
+ */
 function dataGetBatchData(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return {};
@@ -4937,6 +5313,11 @@ function _ensureAllSheetsInternal() {
 }
 
 // Broadcast filter options (CR-AUTH-3: steward auth required)
+/**
+ * Returns available broadcast filter options (locations, office days, etc.). Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { locations, officeDays, hasDuesPayingColumn, broadcastScopeAll, totalMembers }
+ */
 function dataGetBroadcastFilterOptions(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { locations: [], officeDays: [], hasDuesPayingColumn: false, broadcastScopeAll: false, totalMembers: 0 };
@@ -4973,6 +5354,101 @@ function dataGetBroadcastFilterOptions(sessionToken) {
   } catch (e) {
     Logger.log('dataGetBroadcastFilterOptions error: ' + e.message + '\n' + (e.stack || ''));
     return { locations: [], officeDays: [], hasDuesPayingColumn: false, broadcastScopeAll: false, totalMembers: 0 };
+  }
+}
+
+// ═══════════════════════════════════════
+// Resource Click Tracking (v4.32.1)
+// ═══════════════════════════════════════
+//
+// PURPOSE:
+//   Tracks when members view/expand a resource card in the Resources tab.
+//   This data feeds the "Resource Views" KPI in the engagement stats dashboard,
+//   replacing the hardcoded 0 that was returned before v4.32.1.
+//
+// ARCHITECTURE DECISION — Why a separate sheet instead of _Audit_Log?
+//   Click events are high-frequency (every resource card expand triggers one).
+//   The _Audit_Log uses integrity hash chaining (logAuditEvent) which adds
+//   overhead per row. A lightweight append-only sheet avoids that cost and
+//   keeps click analytics separate from security-sensitive audit records.
+//   Pattern matches _Contact_Log and _Survey_Tracking (dedicated tracking sheets).
+//
+// SHEET SCHEMA (_Resource_Click_Log):
+//   Col A: Timestamp   (Date)   — server-side Date() at time of click
+//   Col B: User Email  (String) — resolved from session token (not user-supplied)
+//   Col C: Resource ID (String) — e.g. "RES-003" from 📚 Resources sheet
+//   Col D: Resource Title (String) — human-readable title, for manual inspection
+//
+// DATA FLOW:
+//   member_view.html (card expand) → google.script.run.dataLogResourceClick()
+//   → _resolveCallerEmail() → appendRow() to _Resource_Click_Log
+//   → dataGetEngagementStats() reads row count as resourceDownloads KPI
+//
+// FRONTEND DEDUPLICATION:
+//   The member_view.html click handler sets card._tracked = true after the
+//   first expand, preventing duplicate server calls for the same card in the
+//   same page session. A page reload resets this (by design — repeat visits
+//   on different days are meaningful engagement signals).
+//
+// FAILURE MODES:
+//   - Session expired / invalid token → returns { success: false }, no row written
+//   - Spreadsheet unavailable (web app context) → returns { success: false }
+//   - Sheet creation fails (permissions) → caught, logged, returns { success: false }
+//   - appendRow fails (quota/lock) → caught, logged, returns { success: false }
+//   In ALL failure cases the UI is unaffected — the click handler uses
+//   withFailureHandler(function() {}) so errors are silently swallowed.
+//   The resource card still expands normally. Only the analytics row is lost.
+//
+// SCALING:
+//   At ~50 members × ~8 resources × daily use, expect ~400 rows/day.
+//   At 10,000 rows the sheet should be reviewed for trimming (same threshold
+//   as _Audit_Log). No auto-trim is implemented yet — add if needed.
+
+/**
+ * Logs a resource view/click to the _Resource_Click_Log hidden sheet.
+ * Called from member_view.html when a resource card is expanded for the first time.
+ * Auto-creates the hidden sheet with headers if it doesn't exist yet.
+ *
+ * This is a top-level data* wrapper (not routed through DataService) because
+ * it's a simple append-only write with no business logic — same pattern as
+ * dataMarkWelcomeDismissed and dataApplyColorTheme.
+ *
+ * @param {string} sessionToken — session token for caller authentication
+ * @param {string} resourceId — resource ID from 📚 Resources sheet (e.g. "RES-003")
+ * @param {string} [resourceTitle] — optional human-readable title for log readability
+ * @returns {{ success: boolean }} — always returns object (never throws to caller)
+ */
+function dataLogResourceClick(sessionToken, resourceId, resourceTitle) {
+  // Auth: resolve email from session token. Reject unauthenticated requests.
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false };
+  if (!resourceId) return { success: false };
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false };  // null in web app context if container unbound
+
+    // Resolve sheet name from SHEETS constant; fallback string for safety
+    var sheetName = SHEETS.RESOURCE_CLICK_LOG || '_Resource_Click_Log';
+    var sheet = ss.getSheetByName(sheetName);
+
+    // Auto-create hidden sheet on first click (lazy initialization).
+    // This avoids requiring a setup step — the sheet appears only when
+    // the feature is actually used. Hidden via hideSheet() to keep the
+    // tab bar clean (matches _Contact_Log, _Survey_Tracking pattern).
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.hideSheet();
+      sheet.getRange(1, 1, 1, 4).setValues([['Timestamp', 'User Email', 'Resource ID', 'Resource Title']]);
+      sheet.setFrozenRows(1);
+    }
+
+    // Append the click record. appendRow is atomic and handles concurrency.
+    // No LockService needed — appendRow is naturally safe for concurrent appends.
+    sheet.appendRow([new Date(), email, String(resourceId), String(resourceTitle || '')]);
+    return { success: true };
+  } catch (e) {
+    Logger.log('dataLogResourceClick error: ' + e.message);
+    return { success: false };
   }
 }
 
@@ -5095,6 +5571,21 @@ function dataGetEngagementStats(sessionToken) {
         stewardContactRate = Math.round((contacted.length / totalMembers) * 100);
       }
     } catch (_cl) { Logger.log('_cl: ' + (_cl.message || _cl)); }
+
+    // ── Resource views (v4.32.1 — total clicks from _Resource_Click_Log) ────
+    // WHAT: Counts total rows in _Resource_Click_Log (each row = one resource
+    //   card expand event logged by dataLogResourceClick()).
+    // WHY TOTAL ROWS (not unique users): We want to measure overall engagement
+    //   volume, not just reach. A member viewing 5 resources is more engaged
+    //   than one who viewed 1. This matches weeklyQuestionVotes (also total rows).
+    // IF SHEET MISSING: _rows() returns [] → resourceDownloads stays 0.
+    //   The KPI card displays "0" — no error, just no data yet.
+    // IF THIS BREAKS: resourceDownloads = 0, KPI card shows "0". Non-destructive.
+    var resourceDownloads = 0;
+    try {
+      var rclRows = _rows(SHEETS.RESOURCE_CLICK_LOG || '_Resource_Click_Log');
+      resourceDownloads = rclRows.length;
+    } catch (_re) { Logger.log('_re: ' + (_re.message || _re)); }
 
     // ── Membership trends (last 6 months, by hire date) ─────────────────────
     var membershipTrends = [];
@@ -5551,24 +6042,45 @@ function dataGetUsageStats(sessionToken) {
  *   submissionRate    — % of stewards (IS_STEWARD = 'Yes') who have submitted at least once
  *   trendDirection    — 'increasing' | 'decreasing' | 'stable' based on avg last 4 wks vs prior 4 wks
  */
+/**
+ * Returns lightweight member count and active-grievance count. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { total: number, withGrievances: number }
+ */
 function dataGetMemberCount(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   try { return DataService.getMemberCount(); } catch (e) { Logger.log('dataGetMemberCount error: ' + e.message); return { total: 0, withGrievances: 0 }; }
 }
 
+/**
+ * Returns a paginated page of members with search/filter support. Requires steward auth.
+ * @param {string} sessionToken
+ * @param {Object} [opts] - { page, pageSize, search, filter }
+ * @returns {Object} { items, total, page, pageSize, totalPages }
+ */
 function dataGetMembersPaginated(sessionToken, opts) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   try { return DataService.getMembersPaginated(s, opts || {}); } catch (e) { Logger.log('dataGetMembersPaginated error: ' + e.message); return { members: [], total: 0, page: 1, pageSize: 25 }; }
 }
 
+/**
+ * Returns row counts and scale status for key sheets. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { members: { rows, status }, grievances: { rows, status } }
+ */
 function dataGetSheetHealth(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   try { return DataService.getSheetHealth(); } catch (e) { Logger.log('dataGetSheetHealth error: ' + e.message); return { members: { rows: 0, status: 'ok' }, grievances: { rows: 0, status: 'ok' } }; }
 }
 
+/**
+ * Returns live workload summary stats from the Workload Vault sheet. Requires auth.
+ * @param {string} sessionToken
+ * @returns {Object|null} { avgCaseload, highCaseloadPct, submissionRate, trendDirection }
+ */
 function dataGetWorkloadSummaryStats(sessionToken) {
   var _caller = _resolveCallerEmail(sessionToken);
   if (!_caller) return null;
@@ -5741,12 +6253,10 @@ function dataMarkWelcomeDismissed(sessionToken) {
 }
 
 /**
- * Simple hash of email for property key (avoids special chars in key names).
- * @private
- */
-/**
- * Webapp endpoint: apply a color theme (updates both sheets and webapp accent).
- * Any authenticated user can set their own theme.
+ * Applies a color theme preset (updates sheets and webapp accent). Requires auth.
+ * @param {string} sessionToken
+ * @param {string} themeKey - Theme preset key from THEME_PRESETS
+ * @returns {Object} { success: boolean, themeKey: string, accentHue: number }
  */
 function dataApplyColorTheme(sessionToken, themeKey) {
   var e = _resolveCallerEmail(sessionToken);
@@ -5760,6 +6270,12 @@ function dataApplyColorTheme(sessionToken, themeKey) {
   return { success: true, themeKey: themeKey, accentHue: preset.accentHue || 250 };
 }
 
+/**
+ * Computes a simple hash of an email for use as a ScriptProperties key.
+ * @param {string} email
+ * @returns {string} Base-36 hash string
+ * @private
+ */
 function _welcomeEmailHash(email) {
   var hash = 0;
   var str = String(email).toLowerCase();
@@ -5769,4 +6285,161 @@ function _welcomeEmailHash(email) {
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash).toString(36);
+}
+
+// ═══════════════════════════════════════
+// SEARCH WRAPPER (v4.33.0)
+// ═══════════════════════════════════════
+
+/**
+ * Webapp endpoint: cross-tab search for members and grievances.
+ * @param {string} sessionToken - Session token
+ * @param {string} query - Search query (min 2 chars)
+ * @param {string} tab - Filter: 'all', 'members', or 'grievances'
+ * @returns {Object} { success, results: Array<{type,title,subtitle,detail}> }
+ */
+function dataGetWebAppSearchResults(sessionToken, query, tab) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, authError: true, message: 'Not authenticated.' };
+  try {
+    var results = getWebAppSearchResults(query || '', tab || 'all');
+    return { success: true, results: results || [] };
+  } catch (e) {
+    Logger.log('dataGetWebAppSearchResults error: ' + e.message);
+    return { success: false, message: 'Search failed: ' + e.message };
+  }
+}
+
+// ═══════════════════════════════════════
+// UNDO SYSTEM WRAPPERS (v4.33.0)
+// ═══════════════════════════════════════
+
+/**
+ * Reverts undo history to the specified index. Requires steward auth.
+ * @param {string} sessionToken
+ * @param {number} targetIndex
+ * @returns {Object} { success: boolean, message: string }
+ */
+function dataUndoToIndex(sessionToken, targetIndex) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try {
+    undoToIndex(Math.floor(targetIndex));
+    return { success: true, message: 'Undone to index ' + targetIndex };
+  } catch (e) {
+    Logger.log('dataUndoToIndex error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Exports undo history to a new sheet. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { success: boolean, sheetUrl?: string, message?: string }
+ */
+function dataExportUndoHistory(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try {
+    var url = exportUndoHistoryToSheet();
+    return { success: true, sheetUrl: url };
+  } catch (e) {
+    Logger.log('dataExportUndoHistory error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Returns the undo history stack. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { success: boolean, history?: Array, message?: string }
+ */
+function dataGetUndoHistory(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try {
+    var history = getUndoHistory();
+    return { success: true, history: history };
+  } catch (e) {
+    Logger.log('dataGetUndoHistory error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+// ═══════════════════════════════════════
+// MEETING CHECK-IN WRAPPER (v4.33.0)
+// ═══════════════════════════════════════
+
+/**
+ * Checks in a member to a meeting via the webapp. Requires auth.
+ * @param {string} sessionToken
+ * @param {string} meetingId
+ * @param {string} pin
+ * @returns {Object} { success: boolean, message: string }
+ */
+function dataWebCheckInMember(sessionToken, meetingId, pin) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, authError: true, message: 'Not authenticated.' };
+  try {
+    return webCheckInMember(meetingId, email, pin);
+  } catch (e) {
+    Logger.log('dataWebCheckInMember error: ' + e.message);
+    return { success: false, message: 'Check-in failed: ' + e.message };
+  }
+}
+
+// ═══════════════════════════════════════
+// DEADLINE CALENDAR WRAPPER (v4.33.0)
+// ═══════════════════════════════════════
+
+/**
+ * Returns grievance deadline calendar data for the steward view. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { success: boolean, data?: Object, message?: string }
+ */
+function dataGetDeadlineCalendarData(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try {
+    return { success: true, data: getDeadlineCalendarData() };
+  } catch (e) {
+    Logger.log('dataGetDeadlineCalendarData error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+// ═══════════════════════════════════════
+// CORRELATION ENGINE WRAPPERS (v4.33.0)
+// ═══════════════════════════════════════
+
+/**
+ * Returns active correlation alerts from the correlation engine. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { success: boolean, alerts: Array }
+ */
+function dataGetCorrelationAlerts(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try {
+    return { success: true, alerts: JSON.parse(getCorrelationAlerts(false)) };
+  } catch (e) {
+    Logger.log('dataGetCorrelationAlerts error: ' + e.message);
+    return { success: true, alerts: [] };
+  }
+}
+
+/**
+ * Returns a summary of all computed correlations. Requires steward auth.
+ * @param {string} sessionToken
+ * @returns {Object} { success: boolean, summary: Object }
+ */
+function dataGetCorrelationSummary(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try {
+    return { success: true, summary: JSON.parse(getCorrelationSummary(false)) };
+  } catch (e) {
+    Logger.log('dataGetCorrelationSummary error: ' + e.message);
+    return { success: true, summary: { total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, topInsights: [], actionableCount: 0, disabled: true } };
+  }
 }

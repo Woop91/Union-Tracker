@@ -29,7 +29,7 @@
  *   Used by 10_Main.gs (onEdit dispatches events), and any module that
  *   subscribes to sheet edit events.
  *
- * @version 4.31.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -425,12 +425,8 @@ function registerEventBusSubscribers() {
 // ============================================================================
 
 /**
- * Emit edit events through the event bus based on sheet name.
- * This bridges the existing onEdit() flow to the event bus pattern.
- * Call this from onEdit() to route events to subscribers.
- *
- * @param {Object} e - The Google Sheets edit event object
- * @returns {Object} Emit result: { handled, errors }
+ * @private Builds and caches a reverse lookup map from sheet name to SHEETS constant key.
+ * @returns {Object.<string, string>} Map of sheet names to their SHEETS constant keys
  */
 // Module-level cache: rebuilt once per V8 execution context, not per edit event
 var _emitSheetKeyMap = null;
@@ -443,6 +439,11 @@ function _getSheetKeyMap() {
   return _emitSheetKeyMap;
 }
 
+/**
+ * Routes a Sheets onEdit event through the EventBus to registered subscribers.
+ * @param {Object} e - The Google Sheets edit event object
+ * @returns {Object} Emit result with handled count and errors array
+ */
 function emitEditEvent(e) {
   if (!e || !e.range) return { handled: 0, errors: [] };
 

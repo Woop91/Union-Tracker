@@ -13,7 +13,7 @@
  * All business logic should remain in their respective modules.
  *
  * @fileoverview Menu system, navigation, and dialog management
- * @version 4.7.0
+ * @version 4.33.0
  * @requires 01_Core.gs
  */
 
@@ -299,10 +299,6 @@ function getVisualControlPanelHtml() {
             .syncAllDashboardData();
         }
 
-        function goToSheet(sheetName) {
-          google.script.run.withFailureHandler(function(){}).navigateToSheet(sheetName);
-        }
-
         function showStatus(msg) {
           const bar = document.getElementById('statusBar');
           bar.textContent = '✅ ' + (msg || 'Settings applied');
@@ -315,19 +311,8 @@ function getVisualControlPanelHtml() {
 }
 
 /**
- * Saves a visual setting to user properties
- * @param {string} setting - Setting name
- * @param {boolean} value - Setting value
- */
-
-/**
- * Applies a dashboard theme
- * @param {string} theme - Theme name (default, dark, light, contrast)
- */
-
-/**
- * Helper functions for navigation
- * Note: Dashboards are now modal-based for better UX
+ * Navigates to the Member Directory sheet and prompts the user to filter by stewards.
+ * @returns {void}
  */
 function showStewardDirectory() {
   // Navigate to Member Directory filtered by stewards
@@ -338,80 +323,6 @@ function showStewardDirectory() {
 // ============================================================================
 // NAVIGATION HELPERS (Strategic Command Center)
 // ============================================================================
-
-/**
- * Navigate to Executive Dashboard (now launches modal)
- */
-
-/**
- * Navigate to Mobile View (if exists)
- * NOTE: Duplicate exists in 10_CommandCenter.gs - this version kept for compatibility
- */
-
-/**
- * Navigate to a specific sheet by name
- * @param {string} sheetName - The sheet name to navigate to
- */
-
-// ============================================================================
-// GLOBAL STYLING (Strategic Command Center)
-// ============================================================================
-
-/**
- * Applies the system theme to all visible sheets
- * Includes header styling, zebra striping, and font standardization
- */
-
-/**
- * Applies theme styling to a single sheet
- * For data sheets (Member Directory, Grievance Log), applies to ALL rows in the sheet
- * @param {Sheet} sheet - The sheet to style
- * @private
- */
-
-/**
- * Applies global styling to all visible sheets (alias for APPLY_SYSTEM_THEME)
- */
-
-/**
- * Resets all visible sheets to default styling
- */
-/**
- * Refreshes all visual elements, data calculations, and alerts
- * Main entry point for Force Global Refresh menu item
- */
-
-// ============================================================================
-// SEARCH DIALOGS
-// ============================================================================
-
-/**
- * Shows the desktop search dialog with full functionality
- * Includes member search, grievance search, and filters
- */
-
-/**
- * Shows quick search dialog (minimal interface)
- */
-
-/**
- * Shows advanced search with complex filtering options
- */
-
-/**
- * Generates HTML for desktop search dialog
- * @return {string} HTML content
- */
-
-/**
- * Generates HTML for quick search dialog
- * @return {string} HTML content
- */
-
-/**
- * Generates HTML for advanced search
- * @return {string} HTML content
- */
 
 // ============================================================================
 // MULTI-SELECT DIALOGS

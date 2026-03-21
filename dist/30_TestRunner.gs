@@ -34,7 +34,7 @@
  *   constants for verification). Used by menu items (Admin > Run Tests),
  *   daily trigger, and the SPA TestRunner tab.
  *
- * @version 4.31.0
+ * @version 4.33.0
  */
 
 /* ========================================================================
@@ -607,7 +607,7 @@ function _sendTestFailureEmail(results) {
  */
 function runTestsFromMenu() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Running all 20 test suites — this takes ~90 seconds. Please wait...', '🧪 Test Runner', 120);
+  ss.toast('Running all 23 test suites — this takes ~90 seconds. Please wait...', '🧪 Test Runner', 120);
   var results = TestRunner.runAll();
   var msg = results.summary.passed + ' passed, ' + results.summary.failed + ' failed (' + Math.round(results.duration / 1000) + 's)';
 
@@ -790,7 +790,7 @@ function _getTestRegistry() {
     { name: 'test_authsweep_stewardEndpointsRejectNull',   fn: test_authsweep_stewardEndpointsRejectNull },
     { name: 'test_authsweep_memberEndpointsRejectNull',    fn: test_authsweep_memberEndpointsRejectNull },
     { name: 'test_authsweep_noDataLeakOnNullToken',        fn: test_authsweep_noDataLeakOnNullToken },
-    { name: 'test_authsweep_pollStubsSafe',                fn: test_authsweep_pollStubsSafe },
+    { name: 'test_authsweep_pollStubsRemoved',             fn: test_authsweep_pollStubsRemoved },
     { name: 'test_authsweep_testRunnerEndpointsGated',     fn: test_authsweep_testRunnerEndpointsGated },
     { name: 'test_authsweep_wqEndpointsGated',              fn: test_authsweep_wqEndpointsGated },
     { name: 'test_authsweep_qaEndpointsGated',              fn: test_authsweep_qaEndpointsGated },
@@ -964,7 +964,7 @@ function _getTestRegistry() {
     { name: 'test_endpoints_batchDiagnosticFnsExist',      fn: test_endpoints_batchDiagnosticFnsExist },
     { name: 'test_endpoints_meetingFnsExist',              fn: test_endpoints_meetingFnsExist },
     { name: 'test_endpoints_checklistFnsExist',            fn: test_endpoints_checklistFnsExist },
-    { name: 'test_endpoints_legacyStubsSafe',              fn: test_endpoints_legacyStubsSafe },
+    { name: 'test_endpoints_pollStubsRemoved',             fn: test_endpoints_pollStubsRemoved },
     { name: 'test_endpoints_allWriteEndpointsRejectNull',  fn: test_endpoints_allWriteEndpointsRejectNull },
     { name: 'test_endpoints_notificationCountExists',      fn: test_endpoints_notificationCountExists },
     { name: 'test_endpoints_grievanceDraftFnsExist',       fn: test_endpoints_grievanceDraftFnsExist },
@@ -980,6 +980,10 @@ function _getTestRegistry() {
 // ── Shared spreadsheet cache ──────────────────────────────────────────
 // SpreadsheetApp.getActiveSpreadsheet() is a network round-trip every call.
 // Tests called it 16+ times individually — caching saves ~10-15 seconds.
+/**
+ * @private Returns the cached active spreadsheet to avoid repeated network calls in tests.
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Active spreadsheet
+ */
 var _testSS_ = null;
 function _getCachedSS() {
   if (!_testSS_) _testSS_ = SpreadsheetApp.getActiveSpreadsheet();
@@ -988,6 +992,7 @@ function _getCachedSS() {
 
 // ── CONFIG SUITE ──────────────────────────────────────────────────────
 
+/** Tests config: sheets constant defined. */
 function test_config_sheetsConstantDefined() {
   TestRunner.assertNotNull(SHEETS, 'SHEETS constant');
   TestRunner.assertType(SHEETS, 'object', 'SHEETS type');
@@ -996,6 +1001,7 @@ function test_config_sheetsConstantDefined() {
   TestRunner.assertHasKey(SHEETS, 'GRIEVANCE_LOG', 'SHEETS.GRIEVANCE_LOG');
 }
 
+/** Tests config: config sheet exists. */
 function test_config_configSheetExists() {
   var ss = _getCachedSS();
   if (!ss) return; // web context — skip gracefully
@@ -1003,6 +1009,7 @@ function test_config_configSheetExists() {
   TestRunner.assertNotNull(sheet, 'Config sheet "' + SHEETS.CONFIG + '" exists');
 }
 
+/** Tests config: member dir sheet exists. */
 function test_config_memberDirSheetExists() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1010,6 +1017,7 @@ function test_config_memberDirSheetExists() {
   TestRunner.assertNotNull(sheet, 'Member Dir sheet "' + SHEETS.MEMBER_DIR + '" exists');
 }
 
+/** Tests config: grievance log sheet exists. */
 function test_config_grievanceLogSheetExists() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1017,6 +1025,7 @@ function test_config_grievanceLogSheetExists() {
   TestRunner.assertNotNull(sheet, 'Grievance Log sheet "' + SHEETS.GRIEVANCE_LOG + '" exists');
 }
 
+/** Tests config: config reader returns object. */
 function test_config_configReaderReturnsObject() {
   TestRunner.assertNotNull(ConfigReader, 'ConfigReader module exists');
   TestRunner.assertType(ConfigReader.getConfig, 'function', 'ConfigReader.getConfig is function');
@@ -1025,6 +1034,7 @@ function test_config_configReaderReturnsObject() {
   TestRunner.assertType(config, 'object', 'Config is object');
 }
 
+/** Tests config: config has org name. */
 function test_config_configHasOrgName() {
   var config = ConfigReader.getConfig();
   TestRunner.assertHasKey(config, 'orgName', 'config.orgName');
@@ -1032,18 +1042,21 @@ function test_config_configHasOrgName() {
   TestRunner.assertGreaterThan(config.orgName.length, 0, 'orgName not empty');
 }
 
+/** Tests config: config has accent hue. */
 function test_config_configHasAccentHue() {
   var config = ConfigReader.getConfig();
   TestRunner.assertHasKey(config, 'accentHue', 'config.accentHue');
   TestRunner.assertType(config.accentHue, 'number', 'accentHue is number');
 }
 
+/** Tests config: config cols populated. */
 function test_config_configColsPopulated() {
   TestRunner.assertNotNull(CONFIG_COLS, 'CONFIG_COLS');
   TestRunner.assertHasKey(CONFIG_COLS, 'ORG_NAME', 'CONFIG_COLS.ORG_NAME');
   TestRunner.assertGreaterThan(CONFIG_COLS.ORG_NAME, 0, 'ORG_NAME > 0');
 }
 
+/** Tests config: default dropdowns defined. */
 function test_config_defaultDropdownsDefined() {
   TestRunner.assertNotNull(DEFAULT_CONFIG, 'DEFAULT_CONFIG');
   TestRunner.assertHasKey(DEFAULT_CONFIG, 'GRIEVANCE_STATUS', 'DEFAULT_CONFIG.GRIEVANCE_STATUS');
@@ -1052,6 +1065,7 @@ function test_config_defaultDropdownsDefined() {
   TestRunner.assertGreaterThan(DEFAULT_CONFIG.GRIEVANCE_STATUS.length, 0, 'GRIEVANCE_STATUS not empty');
 }
 
+/** Tests config: deadline defaults complete. */
 function test_config_deadlineDefaultsComplete() {
   TestRunner.assertNotNull(DEADLINE_DEFAULTS, 'DEADLINE_DEFAULTS');
   TestRunner.assertHasKey(DEADLINE_DEFAULTS, 'FILING_DAYS', 'FILING_DAYS');
@@ -1064,41 +1078,49 @@ function test_config_deadlineDefaultsComplete() {
 
 // ── COLMAP SUITE ──────────────────────────────────────────────────────
 
+/** Tests colmap: grievance cols defined. */
 function test_colmap_grievanceColsDefined() {
   TestRunner.assertNotNull(GRIEVANCE_COLS, 'GRIEVANCE_COLS');
   TestRunner.assertType(GRIEVANCE_COLS, 'object', 'GRIEVANCE_COLS type');
 }
 
+/** Tests colmap: member cols defined. */
 function test_colmap_memberColsDefined() {
   TestRunner.assertNotNull(MEMBER_COLS, 'MEMBER_COLS');
   TestRunner.assertType(MEMBER_COLS, 'object', 'MEMBER_COLS type');
 }
 
+/** Tests colmap: grievance has status. */
 function test_colmap_grievanceHasStatus() {
   TestRunner.assertHasKey(GRIEVANCE_COLS, 'GRIEVANCE_STATUS', 'GRIEVANCE_COLS.GRIEVANCE_STATUS');
   TestRunner.assertGreaterThan(GRIEVANCE_COLS.GRIEVANCE_STATUS, 0, 'STATUS col > 0');
 }
 
+/** Tests colmap: grievance has step. */
 function test_colmap_grievanceHasStep() {
   TestRunner.assertHasKey(GRIEVANCE_COLS, 'GRIEVANCE_STEP', 'GRIEVANCE_COLS.GRIEVANCE_STEP');
   TestRunner.assertGreaterThan(GRIEVANCE_COLS.GRIEVANCE_STEP, 0, 'STEP col > 0');
 }
 
+/** Tests colmap: member has email. */
 function test_colmap_memberHasEmail() {
   TestRunner.assertHasKey(MEMBER_COLS, 'EMAIL', 'MEMBER_COLS.EMAIL');
   TestRunner.assertGreaterThan(MEMBER_COLS.EMAIL, 0, 'EMAIL col > 0');
 }
 
+/** Tests colmap: member has role. */
 function test_colmap_memberHasRole() {
   TestRunner.assertHasKey(MEMBER_COLS, 'ROLE', 'MEMBER_COLS.ROLE');
   TestRunner.assertGreaterThan(MEMBER_COLS.ROLE, 0, 'ROLE col > 0');
 }
 
+/** Tests colmap: config cols has org name. */
 function test_colmap_configColsHasOrgName() {
   TestRunner.assertHasKey(CONFIG_COLS, 'ORG_NAME', 'CONFIG_COLS.ORG_NAME');
   TestRunner.assertGreaterThan(CONFIG_COLS.ORG_NAME, 0, 'ORG_NAME col > 0');
 }
 
+/** Tests colmap: all cols positive. */
 function test_colmap_allColsPositive() {
   // Verify no column constant is 0, negative, or NaN
   var colSets = [
@@ -1118,6 +1140,7 @@ function test_colmap_allColsPositive() {
   }
 }
 
+/** Tests colmap: no duplicate positions. */
 function test_colmap_noDuplicatePositions() {
   // Within each col set, no two keys should map to the same column number
   var colSets = [
@@ -1145,37 +1168,45 @@ function test_colmap_noDuplicatePositions() {
 
 // ── AUTH SUITE ────────────────────────────────────────────────────────
 
+/** Tests auth: module exists. */
 function test_auth_moduleExists() {
   TestRunner.assertNotNull(Auth, 'Auth module');
   TestRunner.assertType(Auth, 'object', 'Auth is object');
 }
 
+/** Tests auth: resolve user function exists. */
 function test_auth_resolveUserFunctionExists() {
   TestRunner.assertType(Auth.resolveUser, 'function', 'Auth.resolveUser is function');
 }
 
+/** Tests auth: data service exists. */
 function test_auth_dataServiceExists() {
   TestRunner.assertNotNull(DataService, 'DataService module');
   TestRunner.assertType(DataService, 'object', 'DataService is object');
 }
 
+/** Tests auth: find user by email exists. */
 function test_auth_findUserByEmailExists() {
   TestRunner.assertType(DataService.findUserByEmail, 'function', 'DataService.findUserByEmail');
 }
 
+/** Tests auth: resolve caller email exists. */
 function test_auth_resolveCallerEmailExists() {
   TestRunner.assertType(typeof _resolveCallerEmail, 'string', 'typeof check');
   TestRunner.assertEquals('function', typeof _resolveCallerEmail, '_resolveCallerEmail is function');
 }
 
+/** Tests auth: require steward auth exists. */
 function test_auth_requireStewardAuthExists() {
   TestRunner.assertEquals('function', typeof _requireStewardAuth, '_requireStewardAuth is function');
 }
 
+/** Tests auth: check web app auth exists. */
 function test_auth_checkWebAppAuthExists() {
   TestRunner.assertEquals('function', typeof checkWebAppAuthorization, 'checkWebAppAuthorization is function');
 }
 
+/** Tests auth: session token functions exist. */
 function test_auth_sessionTokenFunctionsExist() {
   TestRunner.assertType(Auth.createSessionToken, 'function', 'Auth.createSessionToken');
   TestRunner.assertType(Auth.validateSessionToken, 'function', 'Auth.validateSessionToken');
@@ -1183,6 +1214,7 @@ function test_auth_sessionTokenFunctionsExist() {
 
 // ── GRIEVANCE SUITE ───────────────────────────────────────────────────
 
+/** Tests grievance: status constants defined. */
 function test_grievance_statusConstantsDefined() {
   TestRunner.assertNotNull(GRIEVANCE_STATUS, 'GRIEVANCE_STATUS');
   TestRunner.assertHasKey(GRIEVANCE_STATUS, 'OPEN', 'OPEN');
@@ -1191,6 +1223,7 @@ function test_grievance_statusConstantsDefined() {
   TestRunner.assertHasKey(GRIEVANCE_STATUS, 'CLOSED', 'CLOSED');
 }
 
+/** Tests grievance: all statuses present. */
 function test_grievance_allStatusesPresent() {
   var expected = ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Denied', 'Won', 'Appealed', 'In Arbitration', 'Closed'];
   for (var i = 0; i < expected.length; i++) {
@@ -1201,6 +1234,7 @@ function test_grievance_allStatusesPresent() {
   }
 }
 
+/** Tests grievance: closed statuses subset. */
 function test_grievance_closedStatusesSubset() {
   TestRunner.assertNotNull(GRIEVANCE_CLOSED_STATUSES, 'GRIEVANCE_CLOSED_STATUSES');
   TestRunner.assertTrue(Array.isArray(GRIEVANCE_CLOSED_STATUSES), 'is array');
@@ -1214,6 +1248,7 @@ function test_grievance_closedStatusesSubset() {
   }
 }
 
+/** Tests grievance: priority covers all statuses. */
 function test_grievance_priorityCoversAllStatuses() {
   TestRunner.assertNotNull(GRIEVANCE_STATUS_PRIORITY, 'GRIEVANCE_STATUS_PRIORITY');
   var statuses = DEFAULT_CONFIG.GRIEVANCE_STATUS;
@@ -1225,6 +1260,7 @@ function test_grievance_priorityCoversAllStatuses() {
   }
 }
 
+/** Tests grievance: deadline rules readable. */
 function test_grievance_deadlineRulesReadable() {
   TestRunner.assertType(getDeadlineRules, 'function', 'getDeadlineRules is function');
   var rules = getDeadlineRules();
@@ -1232,6 +1268,7 @@ function test_grievance_deadlineRulesReadable() {
   TestRunner.assertType(rules, 'object', 'rules is object');
 }
 
+/** Tests grievance: deadline rules have all steps. */
 function test_grievance_deadlineRulesHaveAllSteps() {
   var rules = getDeadlineRules();
   TestRunner.assertHasKey(rules, 'FILING_DAYS', 'FILING_DAYS');
@@ -1246,6 +1283,7 @@ function test_grievance_deadlineRulesHaveAllSteps() {
   TestRunner.assertHasKey(rules.ARBITRATION, 'DAYS_TO_DEMAND', 'ARB.DAYS_TO_DEMAND');
 }
 
+/** Tests grievance: deadline defaults reasonable. */
 function test_grievance_deadlineDefaultsReasonable() {
   // Sanity check: deadline values should be positive and within contract-reasonable range
   TestRunner.assertGreaterThan(DEADLINE_DEFAULTS.FILING_DAYS, 0, 'FILING > 0');
@@ -1259,6 +1297,7 @@ function test_grievance_deadlineDefaultsReasonable() {
   TestRunner.assertTrue(DEADLINE_DEFAULTS.ARBITRATION_DEMAND <= 365, 'ARB <= 365');
 }
 
+/** Tests grievance: steps list defined. */
 function test_grievance_stepsListDefined() {
   var steps = DEFAULT_CONFIG.GRIEVANCE_STEP;
   TestRunner.assertNotNull(steps, 'GRIEVANCE_STEP');
@@ -1268,6 +1307,7 @@ function test_grievance_stepsListDefined() {
   TestRunner.assertContains(steps, 'Arbitration', 'contains Arbitration');
 }
 
+/** Tests grievance: is valid id function. */
 function test_grievance_isValidIdFunction() {
   TestRunner.assertEquals('function', typeof isValidGrievanceId, 'isValidGrievanceId exists');
   // Known-good patterns (prefix + sequence)
@@ -1277,6 +1317,7 @@ function test_grievance_isValidIdFunction() {
   TestRunner.assertFalsy(isValidGrievanceId(null), 'null invalid');
 }
 
+/** Tests grievance: outcomes defined. */
 function test_grievance_outcomesDefined() {
   TestRunner.assertNotNull(GRIEVANCE_OUTCOMES, 'GRIEVANCE_OUTCOMES');
   TestRunner.assertHasKey(GRIEVANCE_OUTCOMES, 'WON', 'WON');
@@ -1287,10 +1328,12 @@ function test_grievance_outcomesDefined() {
 
 // ── SECURITY SUITE ────────────────────────────────────────────────────
 
+/** Tests security: escape html defined. */
 function test_security_escapeHtmlDefined() {
   TestRunner.assertEquals('function', typeof escapeHtml, 'escapeHtml exists');
 }
 
+/** Tests security: escape html blocks. */
 function test_security_escapeHtmlBlocks() {
   var input = '<script>alert("xss")</script>';
   var output = escapeHtml(input);
@@ -1299,10 +1342,12 @@ function test_security_escapeHtmlBlocks() {
   TestRunner.assertTrue(output.indexOf('>') === -1, 'No raw > in output');
 }
 
+/** Tests security: escape for formula defined. */
 function test_security_escapeForFormulaDefined() {
   TestRunner.assertEquals('function', typeof escapeForFormula, 'escapeForFormula exists');
 }
 
+/** Tests security: escape formula blocks. */
 function test_security_escapeFormulaBlocks() {
   var input = '=IMPORTRANGE("evil","A1")';
   var output = escapeForFormula(input);
@@ -1310,6 +1355,7 @@ function test_security_escapeFormulaBlocks() {
   TestRunner.assertTrue(output.charAt(0) !== '=', 'No leading = after escape');
 }
 
+/** Tests security: escape html handles null. */
 function test_security_escapeHtmlHandlesNull() {
   // escapeHtml should handle null/undefined without throwing
   var output = escapeHtml(null);
@@ -1318,6 +1364,7 @@ function test_security_escapeHtmlHandlesNull() {
   TestRunner.assertType(output2, 'string', 'undefined → string');
 }
 
+/** Tests security: escape html handles numbers. */
 function test_security_escapeHtmlHandlesNumbers() {
   var output = escapeHtml(42);
   TestRunner.assertType(output, 'string', 'number → string');
@@ -1326,12 +1373,14 @@ function test_security_escapeHtmlHandlesNumbers() {
 
 // ── SYSTEM SUITE ──────────────────────────────────────────────────────
 
+/** Tests system: version info defined. */
 function test_system_versionInfoDefined() {
   TestRunner.assertNotNull(VERSION_INFO, 'VERSION_INFO');
   TestRunner.assertHasKey(VERSION_INFO, 'version', 'version');
   TestRunner.assertHasKey(VERSION_INFO, 'codename', 'codename');
 }
 
+/** Tests system: version format semver. */
 function test_system_versionFormatSemver() {
   var v = VERSION_INFO.version;
   TestRunner.assertType(v, 'string', 'version is string');
@@ -1341,6 +1390,7 @@ function test_system_versionFormatSemver() {
   TestRunner.assertTrue(!isNaN(Number(parts[0])), 'major is numeric');
 }
 
+/** Tests system: spreadsheet bound. */
 function test_system_spreadsheetBound() {
   var ss = _getCachedSS();
   // In web app context this may be null — that's okay for web-triggered tests
@@ -1352,6 +1402,7 @@ function test_system_spreadsheetBound() {
   }
 }
 
+/** Tests system: event bus exists. */
 function test_system_eventBusExists() {
   TestRunner.assertEquals('object', typeof EventBus !== 'undefined' ? 'object' : 'undefined',
     'EventBus type check — if this fails, 15_EventBus.gs may not be loaded');
@@ -1361,6 +1412,7 @@ function test_system_eventBusExists() {
   }
 }
 
+/** Tests system: hidden sheets constant. */
 function test_system_hiddenSheetsConstant() {
   if (typeof HIDDEN_SHEETS !== 'undefined') {
     TestRunner.assertType(HIDDEN_SHEETS, 'object', 'HIDDEN_SHEETS is object');
@@ -1370,35 +1422,43 @@ function test_system_hiddenSheetsConstant() {
 // ── DATASERVICE SUITE ─────────────────────────────────────────────────
 // Tests DataService CRUD operations against live sheets.
 
+/** Tests dataservice: module exists. */
 function test_dataservice_moduleExists() {
   TestRunner.assertNotNull(DataService, 'DataService');
   TestRunner.assertType(DataService, 'object', 'DataService is object');
 }
 
+/** Tests dataservice: find user by email callable. */
 function test_dataservice_findUserByEmailCallable() {
   TestRunner.assertType(DataService.findUserByEmail, 'function', 'findUserByEmail');
 }
 
+/** Tests dataservice: get user role callable. */
 function test_dataservice_getUserRoleCallable() {
   TestRunner.assertType(DataService.getUserRole, 'function', 'getUserRole');
 }
 
+/** Tests dataservice: get steward cases callable. */
 function test_dataservice_getStewardCasesCallable() {
   TestRunner.assertType(DataService.getStewardCases, 'function', 'getStewardCases');
 }
 
+/** Tests dataservice: get all members callable. */
 function test_dataservice_getAllMembersCallable() {
   TestRunner.assertType(DataService.getAllMembers, 'function', 'getAllMembers');
 }
 
+/** Tests dataservice: get units callable. */
 function test_dataservice_getUnitsCallable() {
   TestRunner.assertType(DataService.getUnits, 'function', 'getUnits');
 }
 
+/** Tests dataservice: get batch data callable. */
 function test_dataservice_getBatchDataCallable() {
   TestRunner.assertType(DataService.getBatchData, 'function', 'getBatchData');
 }
 
+/** Tests dataservice: member lookup returns shape. */
 function test_dataservice_memberLookupReturnsShape() {
   // Lookup a definitely-nonexistent email — should return null (not throw)
   var result = DataService.findUserByEmail('__nonexistent_test_probe__@example.invalid');
@@ -1407,12 +1467,14 @@ function test_dataservice_memberLookupReturnsShape() {
     'Nonexistent email returns null/undefined, not an error');
 }
 
+/** Tests dataservice: invalid email returns null. */
 function test_dataservice_invalidEmailReturnsNull() {
   var result = DataService.findUserByEmail('');
   TestRunner.assertTrue(result === null || result === undefined,
     'Empty email returns null/undefined');
 }
 
+/** Tests dataservice: public API complete. */
 function test_dataservice_publicAPIComplete() {
   // Verify all expected DataService public methods exist
   var expected = [
@@ -1438,6 +1500,7 @@ function test_dataservice_publicAPIComplete() {
 // Verifies all data* endpoints reject unauthenticated calls.
 // These tests call real endpoints with null/invalid tokens.
 
+/** Tests authsweep: all data fns exist. */
 function test_authsweep_allDataFnsExist() {
   // Spot-check critical data* wrappers exist as global functions
   var fns = [
@@ -1451,6 +1514,7 @@ function test_authsweep_allDataFnsExist() {
   }
 }
 
+/** Tests authsweep: steward endpoints reject null. */
 function test_authsweep_stewardEndpointsRejectNull() {
   // Steward-only endpoints must return safe-empty when called with null token
   var stewardEndpoints = [
@@ -1478,6 +1542,7 @@ function test_authsweep_stewardEndpointsRejectNull() {
   }
 }
 
+/** Tests authsweep: member endpoints reject null. */
 function test_authsweep_memberEndpointsRejectNull() {
   // Member endpoints must return safe-empty for null token
   var memberEndpoints = [
@@ -1505,6 +1570,7 @@ function test_authsweep_memberEndpointsRejectNull() {
   }
 }
 
+/** Tests authsweep: no data leak on null token. */
 function test_authsweep_noDataLeakOnNullToken() {
   // dataGetBatchData is a high-value target — bulk data endpoint
   try {
@@ -1521,6 +1587,7 @@ function test_authsweep_noDataLeakOnNullToken() {
   }
 }
 
+/** Tests authsweep: poll stubs removed. */
 function test_authsweep_pollStubsRemoved() {
   // v4.25.11: Legacy poll stubs removed — verify they no longer exist
   TestRunner.assertEquals('undefined', typeof dataGetActivePolls, 'dataGetActivePolls removed');
@@ -1528,6 +1595,7 @@ function test_authsweep_pollStubsRemoved() {
   TestRunner.assertEquals('undefined', typeof dataAddPoll, 'dataAddPoll removed');
 }
 
+/** Tests authsweep: test runner endpoints gated. */
 function test_authsweep_testRunnerEndpointsGated() {
   // Verify test endpoints are auth-gated by checking their code structure.
   // NOTE: Cannot test with null tokens because SSO (Session.getActiveUser) is
@@ -1552,6 +1620,7 @@ function test_authsweep_testRunnerEndpointsGated() {
   TestRunner.assertHasKey(trigResult, 'success', 'dataManageTestTrigger returns success key');
 }
 
+/** Tests authsweep: wq endpoints gated. */
 function test_authsweep_wqEndpointsGated() {
   // WeeklyQuestions endpoints: auth-gated wrappers must exist and accept sessionToken
   var gated = ['wqGetActiveQuestions', 'wqSubmitResponse', 'wqSetStewardQuestion',
@@ -1565,6 +1634,7 @@ function test_authsweep_wqEndpointsGated() {
   TestRunner.assertEquals('function', typeof wqGetPollFrequency, 'wqGetPollFrequency exists');
 }
 
+/** Tests authsweep: qa endpoints gated. */
 function test_authsweep_qaEndpointsGated() {
   // QA Forum endpoints: all must exist and be auth-gated
   var gated = ['qaGetQuestions', 'qaGetQuestionDetail', 'qaSubmitQuestion',
@@ -1575,6 +1645,7 @@ function test_authsweep_qaEndpointsGated() {
   }
 }
 
+/** Tests authsweep: tl endpoints gated. */
 function test_authsweep_tlEndpointsGated() {
   // Timeline endpoints: all must exist and be auth-gated
   var gated = ['tlGetCategories', 'tlGetTimelineYears', 'tlGetTimelineEvents',
@@ -1586,6 +1657,7 @@ function test_authsweep_tlEndpointsGated() {
   }
 }
 
+/** Tests authsweep: fs endpoints gated. */
 function test_authsweep_fsEndpointsGated() {
   // Failsafe endpoints: all must exist, write ops must be steward-gated
   var gated = ['fsGetDigestConfig', 'fsUpdateDigestConfig', 'fsTriggerBulkExport',
@@ -1601,6 +1673,7 @@ function test_authsweep_fsEndpointsGated() {
 // ── CONFIGLIVE SUITE ──────────────────────────────────────────────────
 // Verifies live sheet headers match expected column constants.
 
+/** Tests configlive: config sheet has headers. */
 function test_configlive_configSheetHasHeaders() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1610,6 +1683,7 @@ function test_configlive_configSheetHasHeaders() {
   TestRunner.assertGreaterThan(lastCol, 0, 'Config has columns');
 }
 
+/** Tests configlive: member dir has headers. */
 function test_configlive_memberDirHasHeaders() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1619,6 +1693,7 @@ function test_configlive_memberDirHasHeaders() {
   TestRunner.assertGreaterThan(headers.length, 5, 'Member Dir has 5+ columns');
 }
 
+/** Tests configlive: grievance log has headers. */
 function test_configlive_grievanceLogHasHeaders() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1628,6 +1703,7 @@ function test_configlive_grievanceLogHasHeaders() {
   TestRunner.assertGreaterThan(headers.length, 5, 'Grievance Log has 5+ columns');
 }
 
+/** Tests configlive: config cols match sheet. */
 function test_configlive_configColsMatchSheet() {
   // Verify CONFIG_COLS positions don't exceed actual sheet width
   var ss = _getCachedSS();
@@ -1645,6 +1721,7 @@ function test_configlive_configColsMatchSheet() {
   }
 }
 
+/** Tests configlive: member cols match sheet. */
 function test_configlive_memberColsMatchSheet() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1661,6 +1738,7 @@ function test_configlive_memberColsMatchSheet() {
   }
 }
 
+/** Tests configlive: grievance cols match sheet. */
 function test_configlive_grievanceColsMatchSheet() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1677,11 +1755,13 @@ function test_configlive_grievanceColsMatchSheet() {
   }
 }
 
+/** Tests configlive: sync column maps callable. */
 function test_configlive_syncColumnMapsCallable() {
   TestRunner.assertEquals('function', typeof syncColumnMaps, 'syncColumnMaps exists');
   // Don't actually call it (it writes) — just verify it's available
 }
 
+/** Tests configlive: config row3 has values. */
 function test_configlive_configRow3HasValues() {
   // Config tab row 3 holds the actual config values — verify it's not empty
   var ss = _getCachedSS();
@@ -1698,6 +1778,7 @@ function test_configlive_configRow3HasValues() {
 // ── SURVEY SUITE ──────────────────────────────────────────────────────
 // Tests survey engine integrity — constants, question schema, period mgmt.
 
+/** Tests survey: hidden sheets constants. */
 function test_survey_hiddenSheetsConstants() {
   TestRunner.assertHasKey(HIDDEN_SHEETS, 'SURVEY_TRACKING', 'SURVEY_TRACKING');
   TestRunner.assertHasKey(HIDDEN_SHEETS, 'SURVEY_VAULT', 'SURVEY_VAULT');
@@ -1707,6 +1788,7 @@ function test_survey_hiddenSheetsConstants() {
     'SURVEY_TRACKING starts with _');
 }
 
+/** Tests survey: periods cols defined. */
 function test_survey_periodsColsDefined() {
   TestRunner.assertNotNull(SURVEY_PERIODS_COLS, 'SURVEY_PERIODS_COLS');
   TestRunner.assertType(SURVEY_PERIODS_COLS, 'object', 'is object');
@@ -1714,6 +1796,7 @@ function test_survey_periodsColsDefined() {
   TestRunner.assertHasKey(SURVEY_PERIODS_COLS, 'STATUS', 'STATUS');
 }
 
+/** Tests survey: questions cols defined. */
 function test_survey_questionsColsDefined() {
   TestRunner.assertNotNull(SURVEY_QUESTIONS_COLS, 'SURVEY_QUESTIONS_COLS');
   TestRunner.assertType(SURVEY_QUESTIONS_COLS, 'object', 'is object');
@@ -1723,10 +1806,12 @@ function test_survey_questionsColsDefined() {
   TestRunner.assertHasKey(SURVEY_QUESTIONS_COLS, 'ACTIVE', 'ACTIVE');
 }
 
+/** Tests survey: get survey questions callable. */
 function test_survey_getSurveyQuestionsCallable() {
   TestRunner.assertEquals('function', typeof getSurveyQuestions, 'getSurveyQuestions exists');
 }
 
+/** Tests survey: questions return array. */
 function test_survey_questionsReturnArray() {
   var result = getSurveyQuestions();
   var questions = result && result.questions ? result.questions : result;
@@ -1734,6 +1819,7 @@ function test_survey_questionsReturnArray() {
   TestRunner.assertGreaterThan(questions.length, 0, 'at least 1 question');
 }
 
+/** Tests survey: question shape valid. */
 function test_survey_questionShapeValid() {
   var result = getSurveyQuestions();
   var questions = result && result.questions ? result.questions : result;
@@ -1749,6 +1835,7 @@ function test_survey_questionShapeValid() {
     'question.type "' + q.type + '" is a known type');
 }
 
+/** Tests survey: get survey period callable. */
 function test_survey_getSurveyPeriodCallable() {
   TestRunner.assertEquals('function', typeof getSurveyPeriod, 'getSurveyPeriod exists');
   // getSurveyPeriod returns the active period object or null
@@ -1764,11 +1851,13 @@ function test_survey_getSurveyPeriodCallable() {
   }
 }
 
+/** Tests survey: submit response callable. */
 function test_survey_submitResponseCallable() {
   TestRunner.assertEquals('function', typeof submitSurveyResponse, 'submitSurveyResponse exists');
   // Don't actually submit — just verify it exists
 }
 
+/** Tests survey: satisfaction cols defined. */
 function test_survey_satisfactionColsDefined() {
   // SATISFACTION_COLS is deprecated but kept for backward compat
   if (typeof SATISFACTION_COLS !== 'undefined') {
@@ -1780,6 +1869,7 @@ function test_survey_satisfactionColsDefined() {
   }
 }
 
+/** Tests survey: tracking sheet exists. */
 function test_survey_trackingSheetExists() {
   var ss = _getCachedSS();
   if (!ss) return;
@@ -1805,6 +1895,7 @@ function test_survey_trackingSheetExists() {
 //   3. Build artifact scope manifest checks
 //   4. Token & rate-limit infrastructure
 
+/** Tests emailsend: gmail app accessible. */
 function test_emailsend_gmailAppAccessible() {
   // The gmail.send scope ONLY supports GmailApp.sendEmail() — no read or
   // draft methods work with it. getAliases() needs gmail.readonly; createDraft()
@@ -1829,6 +1920,7 @@ function test_emailsend_gmailAppAccessible() {
   }
 }
 
+/** Tests emailsend: mail app accessible. */
 function test_emailsend_mailAppAccessible() {
   // MailApp.getRemainingDailyQuota() similarly exposes scope auth status.
   // This will FAIL if script.send_mail scope is not authorized (the v4.25.8 bug).
@@ -1848,6 +1940,7 @@ function test_emailsend_mailAppAccessible() {
   }
 }
 
+/** Tests emailsend: web app url resolvable. */
 function test_emailsend_webAppUrlResolvable() {
   // ScriptApp.getService().getUrl() returns null if the script is NOT
   // deployed as a web app. The magic link embeds this URL — a null here
@@ -1861,6 +1954,7 @@ function test_emailsend_webAppUrlResolvable() {
   }
 }
 
+/** Tests emailsend: script properties writable. */
 function test_emailsend_scriptPropertiesWritable() {
   // ScriptProperties stores magic link tokens and session tokens.
   // If write access fails, ALL auth methods (magic link, session, remember-me)
@@ -1878,6 +1972,7 @@ function test_emailsend_scriptPropertiesWritable() {
   }
 }
 
+/** Tests emailsend: cache service writable. */
 function test_emailsend_cacheServiceWritable() {
   // CacheService stores the magic link rate-limit counter (MAGIC_RATE_*)
   // and sheet data cache. If this fails, rate limiting silently breaks.
@@ -1893,6 +1988,7 @@ function test_emailsend_cacheServiceWritable() {
   }
 }
 
+/** Tests emailsend: auth module exists. */
 function test_emailsend_authModuleExists() {
   // Auth IIFE must be defined. If the build is broken or 19_WebDashAuth.gs
   // is missing from dist/, all magic link and session auth fails entirely.
@@ -1904,6 +2000,7 @@ function test_emailsend_authModuleExists() {
   TestRunner.assertType(Auth.cleanupExpiredTokens, 'function', 'Auth.cleanupExpiredTokens is function');
 }
 
+/** Tests emailsend: global wrappers exist. */
 function test_emailsend_globalWrappersExist() {
   // These are the functions google.script.run calls from the client.
   // If any are missing, the client-side email form silently fails
@@ -1915,6 +2012,7 @@ function test_emailsend_globalWrappersExist() {
   TestRunner.assertEquals('function', typeof testAuthEmailSend, 'testAuthEmailSend diagnostic exists');
 }
 
+/** Tests emailsend: rate limit key format. */
 function test_emailsend_rateLimitKeyFormat() {
   // Validate that the rate-limit key format used in sendMagicLink matches
   // what CacheService accepts (< 250 chars, no special chars that break cache).
@@ -1925,6 +2023,7 @@ function test_emailsend_rateLimitKeyFormat() {
   TestRunner.assertTrue(/^[A-Za-z0-9_.@+-]+$/.test(rateKey), 'Rate limit key uses safe characters');
 }
 
+/** Tests emailsend: token prefix not conflicting. */
 function test_emailsend_tokenPrefixNotConflicting() {
   // TOKEN_PREFIX and SESSION_PREFIX are used as ScriptProperties key prefixes.
   // They must not overlap or tokens of one type could accidentally validate as another.
@@ -1936,6 +2035,7 @@ function test_emailsend_tokenPrefixNotConflicting() {
   TestRunner.assertEquals(null, result, 'Garbage session token returns null (no token bleed)');
 }
 
+/** Tests emailsend: send magic link bad email returns safe. */
 function test_emailsend_sendMagicLinkBadEmailReturnsSafe() {
   // sendMagicLink with a non-existent email must return { success: true }
   // (security: never reveal whether an email is in the directory).
@@ -1957,6 +2057,7 @@ function test_loginlink_resolveUserExists() {
   TestRunner.assertType(Auth.resolveUser, 'function', 'Auth.resolveUser is function');
 }
 
+/** Tests loginlink: resolve user null on empty. */
 function test_loginlink_resolveUserNullOnEmpty() {
   // resolveUser with no event object and no SSO should return either a
   // user (if SSO is available in this execution context) or null.
@@ -1974,6 +2075,7 @@ function test_loginlink_resolveUserNullOnEmpty() {
   }
 }
 
+/** Tests loginlink: resolve user logout override. */
 function test_loginlink_resolveUserLogoutOverride() {
   // loggedout=1 parameter must force null return even if SSO is active.
   var fakeEvent = { parameter: { loggedout: '1' } };
@@ -1981,6 +2083,7 @@ function test_loginlink_resolveUserLogoutOverride() {
   TestRunner.assertEquals(null, result, 'resolveUser returns null when loggedout=1 (logout override)');
 }
 
+/** Tests loginlink: resolve email from token callable. */
 function test_loginlink_resolveEmailFromTokenCallable() {
   TestRunner.assertType(Auth.resolveEmailFromToken, 'function',
     'Auth.resolveEmailFromToken is exposed');
@@ -1989,6 +2092,7 @@ function test_loginlink_resolveEmailFromTokenCallable() {
   TestRunner.assertEquals(null, result, 'resolveEmailFromToken returns null for invalid token');
 }
 
+/** Tests loginlink: validate session token callable. */
 function test_loginlink_validateSessionTokenCallable() {
   TestRunner.assertType(Auth.validateSessionToken, 'function',
     'Auth.validateSessionToken is exposed');
@@ -1997,6 +2101,7 @@ function test_loginlink_validateSessionTokenCallable() {
   TestRunner.assertEquals(null, result, 'validateSessionToken returns null for invalid session');
 }
 
+/** Tests loginlink: expired token returns null. */
 function test_loginlink_expiredTokenReturnsNull() {
   // Write a token with an already-expired timestamp, then validate it.
   // This tests the expiry check without needing to wait.
@@ -2016,6 +2121,7 @@ function test_loginlink_expiredTokenReturnsNull() {
   try { props.deleteProperty(key); } catch (_e) { /* already cleaned */ }
 }
 
+/** Tests loginlink: session token round trip. */
 function test_loginlink_sessionTokenRoundTrip() {
   // Create a real session token, validate it, then clean up.
   var testEmail = 'roundtrip-test@example.invalid';
@@ -2035,6 +2141,7 @@ function test_loginlink_sessionTokenRoundTrip() {
     'Token returns null after invalidateSession (cleanup confirmed)');
 }
 
+/** Tests loginlink: cleanup expired tokens callable. */
 function test_loginlink_cleanupExpiredTokensCallable() {
   TestRunner.assertType(Auth.cleanupExpiredTokens, 'function',
     'Auth.cleanupExpiredTokens is function');
@@ -2044,6 +2151,7 @@ function test_loginlink_cleanupExpiredTokensCallable() {
   TestRunner.assertTrue(result >= 0, 'cleanupExpiredTokens result is non-negative');
 }
 
+/** Tests loginlink: magic link rate limit cache key. */
 function test_loginlink_magicLinkRateLimitCacheKey() {
   // Verify the rate limit key format for various email addresses
   var emails = [
@@ -2058,6 +2166,7 @@ function test_loginlink_magicLinkRateLimitCacheKey() {
   }
 }
 
+/** Tests loginlink: config has magic link expiry. */
 function test_loginlink_configHasMagicLinkExpiry() {
   // ConfigReader must supply magicLinkExpiryDays — used in email body text
   // and magicLinkExpiryMs — used for token expiry timestamp
@@ -2085,6 +2194,7 @@ function test_contacts_getStewardContactCallable() {
     'DataService.getStewardContact is function');
 }
 
+/** Tests contacts: get steward contact null on bad email. */
 function test_contacts_getStewardContactNullOnBadEmail() {
   // Non-existent email must return null (not throw)
   var result = DataService.getStewardContact('nonexistent-xyz@fake-domain.invalid');
@@ -2092,6 +2202,7 @@ function test_contacts_getStewardContactNullOnBadEmail() {
     'getStewardContact returns null for unknown email');
 }
 
+/** Tests contacts: get assigned steward info callable. */
 function test_contacts_getAssignedStewardInfoCallable() {
   TestRunner.assertType(DataService.getAssignedStewardInfo, 'function',
     'DataService.getAssignedStewardInfo is function');
@@ -2101,6 +2212,7 @@ function test_contacts_getAssignedStewardInfoCallable() {
     'getAssignedStewardInfo returns null for unknown member');
 }
 
+/** Tests contacts: get available stewards callable. */
 function test_contacts_getAvailableStewardsCallable() {
   TestRunner.assertType(DataService.getAvailableStewards, 'function',
     'DataService.getAvailableStewards is function');
@@ -2110,16 +2222,19 @@ function test_contacts_getAvailableStewardsCallable() {
     'getAvailableStewards returns an array');
 }
 
+/** Tests contacts: get member contact history callable. */
 function test_contacts_getMemberContactHistoryCallable() {
   TestRunner.assertType(DataService.getMemberContactHistory, 'function',
     'DataService.getMemberContactHistory is function');
 }
 
+/** Tests contacts: get steward contact log callable. */
 function test_contacts_getStewardContactLogCallable() {
   TestRunner.assertType(DataService.getStewardContactLog, 'function',
     'DataService.getStewardContactLog is function');
 }
 
+/** Tests contacts: contact wrappers reject null. */
 function test_contacts_contactWrappersRejectNull() {
   // Steward-gated contact wrappers must reject null session token
   var wrappers = [
@@ -2138,6 +2253,7 @@ function test_contacts_contactWrappersRejectNull() {
   }
 }
 
+/** Tests contacts: get member data by id callable. */
 function test_contacts_getMemberDataByIdCallable() {
   // getMemberDataById_ is a private helper but must exist for email functions
   TestRunner.assertType(getMemberDataById_, 'function',
@@ -2155,41 +2271,49 @@ function test_emailtypes_surveyEmailCallable() {
     'emailSurveyToMember is defined');
 }
 
+/** Tests emailtypes: contact form email callable. */
 function test_emailtypes_contactFormEmailCallable() {
   TestRunner.assertType(emailContactFormToMember, 'function',
     'emailContactFormToMember is defined');
 }
 
+/** Tests emailtypes: dashboard link email callable. */
 function test_emailtypes_dashboardLinkEmailCallable() {
   TestRunner.assertType(emailDashboardLinkToMember, 'function',
     'emailDashboardLinkToMember is defined');
 }
 
+/** Tests emailtypes: grievance status email callable. */
 function test_emailtypes_grievanceStatusEmailCallable() {
   TestRunner.assertType(emailGrievanceStatusToMember, 'function',
     'emailGrievanceStatusToMember is defined');
 }
 
+/** Tests emailtypes: compose email callable. */
 function test_emailtypes_composeEmailCallable() {
   TestRunner.assertType(composeEmailForMember, 'function',
     'composeEmailForMember is defined');
 }
 
+/** Tests emailtypes: send quick email callable. */
 function test_emailtypes_sendQuickEmailCallable() {
   TestRunner.assertType(sendQuickEmail, 'function',
     'sendQuickEmail is defined');
 }
 
+/** Tests emailtypes: bulk email callable. */
 function test_emailtypes_bulkEmailCallable() {
   TestRunner.assertType(bulkEmailGrievanceMembers, 'function',
     'bulkEmailGrievanceMembers is defined');
 }
 
+/** Tests emailtypes: safe send email callable. */
 function test_emailtypes_safeSendEmailCallable() {
   TestRunner.assertType(safeSendEmail_, 'function',
     'safeSendEmail_ is defined');
 }
 
+/** Tests emailtypes: safe send email validation. */
 function test_emailtypes_safeSendEmailValidation() {
   // safeSendEmail_ must reject missing required fields without throwing
   var result1 = safeSendEmail_(null);
@@ -2209,6 +2333,7 @@ function test_emailtypes_safeSendEmailValidation() {
     'safeSendEmail_ error mentions Invalid for bad format');
 }
 
+/** Tests emailtypes: broadcast wrapper exists. */
 function test_emailtypes_broadcastWrapperExists() {
   TestRunner.assertType(dataSendBroadcast, 'function',
     'dataSendBroadcast global wrapper exists');
@@ -2216,11 +2341,13 @@ function test_emailtypes_broadcastWrapperExists() {
     'DataService.sendBroadcastMessage is function');
 }
 
+/** Tests emailtypes: direct message wrapper exists. */
 function test_emailtypes_directMessageWrapperExists() {
   TestRunner.assertType(dataSendDirectMessage, 'function',
     'dataSendDirectMessage global wrapper exists');
 }
 
+/** Tests emailtypes: direct message rejects null. */
 function test_emailtypes_directMessageRejectsNull() {
   // dataSendDirectMessage must reject null session token (steward-gated)
   var result = dataSendDirectMessage(null, 'test@example.com', 'subject', 'body');
@@ -2231,6 +2358,7 @@ function test_emailtypes_directMessageRejectsNull() {
     'dataSendDirectMessage rejection mentions Steward access');
 }
 
+/** Tests emailtypes: broadcast rejects null. */
 function test_emailtypes_broadcastRejectsNull() {
   // dataSendBroadcast must reject null session token (steward-gated)
   var result = dataSendBroadcast(null, {}, 'test message', 'test subject');
@@ -2239,6 +2367,7 @@ function test_emailtypes_broadcastRejectsNull() {
     'dataSendBroadcast rejects null token');
 }
 
+/** Tests emailtypes: security alert email callable. */
 function test_emailtypes_securityAlertEmailCallable() {
   TestRunner.assertType(sendSecurityAlertEmail_, 'function',
     'sendSecurityAlertEmail_ is defined');
@@ -2246,6 +2375,7 @@ function test_emailtypes_securityAlertEmailCallable() {
     'sendDailySecurityDigest is defined');
 }
 
+/** Tests emailtypes: executive PDF email callable. */
 function test_emailtypes_executivePDFEmailCallable() {
   TestRunner.assertType(emailExecutivePDF, 'function',
     'emailExecutivePDF is defined');

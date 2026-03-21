@@ -6,8 +6,7 @@
  * WHAT THIS FILE DOES:
  *   Google Form configuration objects and form submission handlers.
  *   GRIEVANCE_FORM_CONFIG maps Google Form field entry IDs to Member Directory
- *   and Grievance Log columns. CONTACT_FORM_CONFIG maps form fields for member
- *   contact info updates. Form URLs are read from Config sheet at runtime,
+ *   and Grievance Log columns. Form URLs are read from Config sheet at runtime,
  *   not hardcoded.
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -68,40 +67,7 @@ var GRIEVANCE_FORM_CONFIG = {
  * Personal Contact Info Form Configuration
  * Maps form entry IDs to Member Directory fields for updating member contact info
  */
-/**
- * Contact Form Configuration
- * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
- * Hardcoded values serve as defaults only.
- */
-var CONTACT_FORM_CONFIG = {
-  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('contact')
-  FORM_URL: '',
-
-  // Form field entry IDs mapped to Member Directory columns
-  FIELD_IDS: {
-    FIRST_NAME: 'entry.1970622040',
-    LAST_NAME: 'entry.1536025015',
-    JOB_TITLE: 'entry.1856093463',
-    UNIT: 'entry.290280210',
-    WORK_LOCATION: 'entry.776695410',
-    OFFICE_DAYS: 'entry.1779089574',           // Multi-select
-    PREFERRED_COMM: 'entry.1201030790',        // Multi-select
-    BEST_TIME: 'entry.1790968369',             // Multi-select
-    SUPERVISOR: 'entry.781564445',
-    MANAGER: 'entry.236404577',
-    EMAIL: 'entry.736229769',
-    PHONE: 'entry.1824028805',
-    INTEREST_ALLIED: 'entry.919302622',        // Willing to support other chapters
-    INTEREST_CHAPTER: 'entry.513494211',       // Willing to be active in sub-chapter
-    INTEREST_LOCAL: 'entry.1902862430',        // Willing to join direct actions
-    HIRE_DATE: 'entry.PLACEHOLDER_HIRE_DATE',  // Hire Date — update entry ID after form creation
-    EMPLOYEE_ID: 'entry.PLACEHOLDER_EMP_ID',   // Employee ID — update entry ID after form creation
-    STREET_ADDRESS: 'entry.PLACEHOLDER_STREET', // Mailing Address: Street
-    CITY: 'entry.PLACEHOLDER_CITY',            // Mailing Address: City
-    ZIP_CODE: 'entry.PLACEHOLDER_ZIP',          // Mailing Address: Zip Code
-    STATE: 'entry.PLACEHOLDER_STATE'             // Mailing Address: State — update entry ID after form creation
-  }
-};
+// CONTACT_FORM_CONFIG — removed (contact form deprecated)
 
 // ============================================================================
 // FORM CONFIGURATION HELPERS

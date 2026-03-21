@@ -1466,7 +1466,7 @@ function syncDeadlinesToCalendar() {
  */
 function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
   const grievanceId = grievance['Grievance ID'];
-  const memberName = grievance['Member Name'];
+  const memberName = ((grievance['First Name'] || '') + ' ' + (grievance['Last Name'] || '')).trim();
   const currentStep = grievance['Current Step'];
 
   // Get the deadline for current step
@@ -1474,14 +1474,17 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
   switch (currentStep) {
     case 'Step I':
     case 'Informal':
-      deadline = grievance['Step 1 Due'];
+    case '1':
+      deadline = grievance['Step I Due'];
       break;
     case 'Step II':
-      deadline = grievance['Step 2 Due'];
+    case '2':
+      deadline = grievance['Step II Due'];
       break;
     case 'Step III':
     case 'Arbitration':
-      deadline = grievance['Step 3 Due'];
+    case '3':
+      deadline = grievance['Step III Appeal Due'];
       break;
     default:
       return { synced: false, reason: 'No applicable deadline' };
@@ -1866,6 +1869,50 @@ function createPDFForSelectedGrievance() {
 }
 
 /**
+ * Menu wrapper: creates a template-based PDF for the selected grievance row.
+ * Uses createGrievancePDF() from 11_CommandHub.gs (Docs template with placeholders).
+ */
+function createTemplatePDFForSelectedGrievance() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
+    ui.alert('Please select a grievance row in the Grievance Log sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a grievance row (not the header)');
+    return;
+  }
+
+  var data = {
+    name: sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
+          sheet.getRange(row, GRIEVANCE_COLS.LAST_NAME).getValue(),
+    id: sheet.getRange(row, GRIEVANCE_COLS.MEMBER_ID).getValue(),
+    details: sheet.getRange(row, GRIEVANCE_COLS.RESOLUTION).getValue() || 'Pending'
+  };
+
+  var response = ui.alert(
+    'Create Template PDF',
+    'Create a Docs-template PDF for ' + data.name + '?',
+    ui.ButtonSet.YES_NO
+  );
+  if (response !== ui.Button.YES) return;
+
+  try {
+    ss.toast('Creating template PDF...', 'System', 5);
+    var folder = getOrCreateMemberFolder(data.name, data.id);
+    var pdf = createGrievancePDF(folder, data);
+    ss.toast('Template PDF created: ' + pdf.getName(), 'System', 5);
+  } catch (e) {
+    ui.alert('Error', 'Failed to create template PDF: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
  * Sends grievance PDF to member via email
  * @param {Object} data - Grievance data object with memberEmail
  * @param {File} pdf - The PDF file to attach
@@ -2011,33 +2058,6 @@ function _getBottomNavHTML_(baseUrl, items, activePage) {
   }
   return html + '</nav>';
 }
-
-/** Standard steward nav: Home, Search, Cases, Members, Links */
-var _STEWARD_NAV_ = [
-  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
-  { icon: '\uD83D\uDD0D', label: 'Search', page: 'search' },
-  { icon: '\uD83D\uDCCB', label: 'Cases', page: 'grievances' },
-  { icon: '\uD83D\uDC65', label: 'Members', page: 'members' },
-  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
-];
-
-/** Member nav: Home, Check In, Learn, My Info, Links */
-var _MEMBER_NAV_ = [
-  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
-  { icon: '\u2705', label: 'Check In', page: 'checkin' },
-  { icon: '\uD83D\uDCDA', label: 'Learn', page: 'resources' },
-  { icon: '\uD83D\uDC64', label: 'My Info', page: 'selfservice' },
-  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
-];
-
-/** Deadline nav: Home, Cases, Deadlines, Search, Links */
-var _DEADLINE_NAV_ = [
-  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
-  { icon: '\uD83D\uDCCB', label: 'Cases', page: 'grievances' },
-  { icon: '\uD83D\uDCC5', label: 'Deadlines', page: 'deadlines' },
-  { icon: '\uD83D\uDD0D', label: 'Search', page: 'search' },
-  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
-];
 
 /**
  * API function to get search results for web app

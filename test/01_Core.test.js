@@ -38,11 +38,6 @@ describe('Version consistency', () => {
     expect(VERSION_INFO.CURRENT).toBe(expected);
   });
 
-  test('API_VERSION matches VERSION_INFO', () => {
-    expect(API_VERSION.major).toBe(VERSION_INFO.MAJOR);
-    expect(API_VERSION.minor).toBe(VERSION_INFO.MINOR);
-    expect(API_VERSION.patch).toBe(VERSION_INFO.PATCH);
-  });
 });
 
 // ============================================================================

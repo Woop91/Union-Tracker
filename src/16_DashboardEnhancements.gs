@@ -27,7 +27,7 @@
  *   Depends on DriveApp (chart image storage), 01_Core.gs.
  *   Used by the SPA dashboard views and menu items.
  *
- * @version 4.31.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -129,6 +129,10 @@ function scheduleEmailReport(config) {
 
   // Install trigger if not already installed
   installReportTrigger_();
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('report:scheduled', schedule);
+  }
 
   return { success: true, schedule: schedule };
 }
@@ -268,6 +272,11 @@ function removeScheduledReport(scheduleId) {
   });
 
   props.setProperty('report_schedules', JSON.stringify(schedules));
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('report:removed', { scheduleId: scheduleId });
+  }
+
   return { success: true };
 }
 // ============================================================================
@@ -334,6 +343,10 @@ function pushNotification(userEmail, notification) {
       'Dismissible'                                   // DISMISS_MODE
     ]);
 
+    if (typeof EventBus !== 'undefined' && EventBus.emit) {
+      EventBus.emit('notification:pushed', { userId: userEmail, id: nextId });
+    }
+
     return { success: true, id: nextId };
   } catch (e) {
     Logger.log('pushNotification error: ' + e.message);
@@ -384,6 +397,10 @@ function saveSharedView(view) {
     });
   }
 
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('collaboration:viewCreated', { viewId: sharedView.id, name: sharedView.name });
+  }
+
   return { success: true, view: sharedView };
   });
 }
@@ -405,51 +422,6 @@ function getSharedViews() {
   return JSON.stringify(accessible);
 }
 
-/**
- * Adds a comment to a shared view
- * @param {string} viewId - View ID
- * @param {string} commentText - Comment content
- * @returns {Object} Updated view
- */
-function addViewComment(viewId, commentText) {
-  var props = PropertiesService.getScriptProperties();
-  var views = JSON.parse(props.getProperty('shared_views') || '[]');
-  var userEmail = Session.getActiveUser().getEmail();
-
-  for (var i = 0; i < views.length; i++) {
-    if (views[i].id === viewId) {
-      // Authorization check — only the view owner or shared users can comment
-      if (views[i].createdBy !== userEmail &&
-          (!views[i].sharedWith || views[i].sharedWith.indexOf(userEmail) === -1)) {
-        return { success: false, error: 'Not authorized to comment on this view.' };
-      }
-
-      var comment = {
-        id: 'cmt_' + Date.now(),
-        author: userEmail,
-        text: escapeHtml(commentText),
-        timestamp: new Date().toISOString()
-      };
-      views[i].comments.push(comment);
-      views[i].updatedAt = new Date().toISOString();
-
-      props.setProperty('shared_views', JSON.stringify(views));
-
-      // Notify the view owner if commenter is not the owner
-      if (views[i].createdBy !== userEmail) {
-        pushNotification(views[i].createdBy, {
-          title: 'New Comment on View',
-          body: userEmail + ' commented on "' + views[i].name + '"',
-          type: 'info'
-        });
-      }
-
-      return { success: true, comment: comment };
-    }
-  }
-
-  return { success: false, error: 'View not found' };
-}
 
 /**
  * Deletes a shared view (only owner can delete)
@@ -470,6 +442,11 @@ function deleteSharedView(viewId) {
   }
 
   props.setProperty('shared_views', JSON.stringify(filtered));
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('collaboration:viewDeleted', { viewId: viewId });
+  }
+
   return { success: true };
 }
 // ============================================================================
@@ -506,6 +483,10 @@ function saveChartPreset(preset) {
   presets.push(chartPreset);
   props.setProperty('chart_presets', JSON.stringify(presets));
 
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('preset:saved', chartPreset);
+  }
+
   return { success: true, preset: chartPreset };
   });
 }
@@ -530,6 +511,10 @@ function deleteChartPreset(presetId) {
 
   presets = presets.filter(function(p) { return p.id !== presetId; });
   props.setProperty('chart_presets', JSON.stringify(presets));
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('preset:deleted', { presetId: presetId });
+  }
 
   return { success: true };
 }
@@ -655,104 +640,4 @@ function getFilteredDashboardData(isPII, filters) {
 // 8. DRILL-DOWN CAPABILITIES (Multi-level hierarchical)
 // ============================================================================
 
-/**
- * Gets detailed drill-down data for a specific chart segment with multiple levels
- * @param {boolean} isPII - Whether to include PII data
- * @param {string} chartType - Chart category: 'status','location','category','unit','steward','step'
- * @param {string} primaryKey - First-level key (e.g. status name, location name)
- * @param {string} [secondaryKey] - Second-level key for deeper drill (e.g. sub-location, sub-category)
- * @returns {string} JSON drill-down data with items and sub-groups
- */
-function getMultiLevelDrillDown(isPII, chartType, primaryKey, secondaryKey) {
-  var data = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
-  var drillDown = data.chartDrillDown || {};
-  var result = {
-    chartType: chartType,
-    primaryKey: primaryKey,
-    secondaryKey: secondaryKey || null,
-    items: [],
-    subGroups: {},
-    breadcrumbs: [{ label: 'All Data', key: null }],
-    totalCount: 0
-  };
-
-  // Level 1: Get primary data
-  var primaryItems = [];
-  if (chartType === 'status' && drillDown.statusByCase) {
-    primaryItems = drillDown.statusByCase[primaryKey] || [];
-    result.breadcrumbs.push({ label: 'Status: ' + primaryKey, key: primaryKey });
-  } else if (chartType === 'location' && drillDown.locationByCase) {
-    primaryItems = drillDown.locationByCase[primaryKey] || [];
-    result.breadcrumbs.push({ label: 'Location: ' + primaryKey, key: primaryKey });
-  } else if (chartType === 'category' && drillDown.categoryByCase) {
-    primaryItems = drillDown.categoryByCase[primaryKey] || [];
-    result.breadcrumbs.push({ label: 'Category: ' + primaryKey, key: primaryKey });
-  } else if (chartType === 'unit' && drillDown.unitByMember) {
-    primaryItems = drillDown.unitByMember[primaryKey] || [];
-    result.breadcrumbs.push({ label: 'Unit: ' + primaryKey, key: primaryKey });
-  } else if (chartType === 'steward' && drillDown.stewardByCase) {
-    primaryItems = drillDown.stewardByCase[primaryKey] || [];
-    result.breadcrumbs.push({ label: 'Steward: ' + primaryKey, key: primaryKey });
-  }
-
-  // Level 2: Sub-group by secondary dimension
-  if (!secondaryKey) {
-    // Show sub-groups available for deeper drill
-    var subGroupDimensions = getSubGroupDimensions_(chartType);
-    for (var d = 0; d < subGroupDimensions.length; d++) {
-      var dim = subGroupDimensions[d];
-      var groups = {};
-      for (var i = 0; i < primaryItems.length; i++) {
-        var item = primaryItems[i];
-        var groupKey = item[dim.field] || 'Unknown';
-        if (!groups[groupKey]) groups[groupKey] = [];
-        groups[groupKey].push(item);
-      }
-      result.subGroups[dim.label] = {};
-      for (var gk in groups) {
-        result.subGroups[dim.label][gk] = groups[gk].length;
-      }
-    }
-    result.items = primaryItems;
-  } else {
-    // Level 2 drill: filter primary items by secondary key
-    result.breadcrumbs.push({ label: secondaryKey, key: secondaryKey });
-    var subDims = getSubGroupDimensions_(chartType);
-    for (var s = 0; s < subDims.length; s++) {
-      var field = subDims[s].field;
-      var filtered = primaryItems.filter(function(item) {
-        return item[field] === secondaryKey;
-      });
-      if (filtered.length > 0) {
-        primaryItems = filtered;
-        break;
-      }
-    }
-    result.items = primaryItems;
-  }
-
-  result.totalCount = result.items.length;
-  return JSON.stringify(result);
-}
-
-/**
- * Returns which fields can be used for sub-grouping based on chart type
- * @param {string} chartType - Primary chart type
- * @returns {Object[]} Array of { field, label } for sub-group dimensions
- * @private
- */
-function getSubGroupDimensions_(chartType) {
-  var allDimensions = [
-    { field: 'status', label: 'By Status' },
-    { field: 'location', label: 'By Location' },
-    { field: 'steward', label: 'By Steward' },
-    { field: 'category', label: 'By Category' },
-    { field: 'step', label: 'By Step' }
-  ];
-
-  // Exclude the primary dimension from sub-groups
-  return allDimensions.filter(function(d) {
-    return d.field !== chartType;
-  });
-}
 

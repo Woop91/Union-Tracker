@@ -280,7 +280,7 @@ function advancedSearch(filters) {
 
   // Search members if included
   if (filters.includeMembers) {
-    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (memberSheet) {
       var data = memberSheet.getDataRange().getValues();
 
@@ -377,7 +377,7 @@ function getDepartmentList() {
 
   if (!formulaSheet) {
     var memberSheet = SpreadsheetApp.getActiveSpreadsheet()
-      .getSheetByName(SHEETS.MEMBER_DIRECTORY);
+      .getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!memberSheet || memberSheet.getLastRow() <= 1) return [];
 
@@ -402,7 +402,7 @@ function getDepartmentList() {
  */
 function getMemberList() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) return [];
 
@@ -434,7 +434,7 @@ function getMemberList() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Chart generation and display functions
- * @version 1.0.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  */
 
@@ -887,5 +887,5 @@ function padRight(str, len) {
  * Note: onGrievanceFormSubmit() is defined in 05_Integrations.gs
  *
  * @author SEIU Local Development Team
- * @version 1.0.0
+ * @version 4.33.0
  */

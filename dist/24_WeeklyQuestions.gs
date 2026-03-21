@@ -46,6 +46,10 @@ var WeeklyQuestions = (function () {
 
   // ── Sheet bootstrap ──────────────────────────────────────────────────────
 
+  /**
+   * Creates the three hidden poll sheets if they do not already exist.
+   * @returns {void}
+   */
   function initWeeklyQuestionSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) throw new Error('Spreadsheet unavailable.');
@@ -54,6 +58,13 @@ var WeeklyQuestions = (function () {
     _ensureSheet(ss, SHEETS.QUESTION_POOL,     ['ID','Text','Options','Submitted By Hash','Status','Created']);
   }
 
+  /**
+   * Returns an existing sheet or creates a hidden one with the given headers.
+   * @param {Spreadsheet} ss - Active spreadsheet instance.
+   * @param {string} name - Sheet name to find or create.
+   * @param {string[]} headers - Header row values for a new sheet.
+   * @returns {Sheet} The existing or newly created sheet.
+   */
   function _ensureSheet(ss, name, headers) {
     var sheet = ss.getSheetByName(name);
     if (sheet) return sheet;
@@ -65,6 +76,11 @@ var WeeklyQuestions = (function () {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
+  /**
+   * Returns the SHA-256 hex digest of a normalized email for anonymous storage.
+   * @param {string} email - Raw email address.
+   * @returns {string} Lowercase hex SHA-256 hash.
+   */
   function _hashEmail(email) {
     var raw = String(email).trim().toLowerCase();
     var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw);
@@ -117,14 +133,28 @@ var WeeklyQuestions = (function () {
     return monday;
   }
 
+  /**
+   * Returns the ISO date string (YYYY-MM-DD) for the current poll period start.
+   * @param {Date} [date] - Optional reference date; defaults to now.
+   * @returns {string} Period start as 'YYYY-MM-DD'.
+   */
   function _periodKey(date) {
     return _getPeriodStart(date).toISOString().split('T')[0];
   }
 
+  /**
+   * Generates a unique poll-system ID using timestamp and random suffix.
+   * @returns {string} ID in the form 'PL_<base36ts>_<rand4>'.
+   */
   function _id() {
     return 'PL_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
   }
 
+  /**
+   * Parses a stored options value from JSON or legacy comma-separated format.
+   * @param {string} raw - JSON array string or comma-separated list.
+   * @returns {string[]} Parsed answer options.
+   */
   function _parseOptions(raw) {
     if (!raw) return [];
     try { return JSON.parse(raw); } catch (_e) {
@@ -133,6 +163,11 @@ var WeeklyQuestions = (function () {
     }
   }
 
+  /**
+   * Validates that options array meets poll requirements (2-5 unique, non-blank).
+   * @param {string[]} options - Answer options to validate.
+   * @returns {string|null} Error message string, or null if valid.
+   */
   function _validateOptions(options) {
     if (!Array.isArray(options) || options.length < 2 || options.length > 5) {
       return 'Polls require 2–5 answer options.';
@@ -148,6 +183,11 @@ var WeeklyQuestions = (function () {
     return null; // valid
   }
 
+  /**
+   * Returns the named sheet, bootstrapping poll sheets if missing.
+   * @param {string} name - Sheet name from SHEETS constants.
+   * @returns {Sheet|null} The sheet, or null if spreadsheet is unavailable.
+   */
   function _getSheet(name) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
@@ -424,6 +464,13 @@ var WeeklyQuestions = (function () {
 
   // ── Public: History (paginated) ──────────────────────────────────────────
 
+  /**
+   * Returns paginated poll history with aggregate response stats.
+   * @param {string} email - Caller's email (used for auth context).
+   * @param {number} [page] - 1-based page number; defaults to 1.
+   * @param {number} [pageSize] - Results per page (max 20); defaults to 10.
+   * @returns {Object} { questions: Array, hasMore: boolean }
+   */
   function getHistory(email, page, pageSize) {
     page = Math.max(1, page || 1);
     pageSize = Math.min(20, pageSize || 10);
@@ -476,6 +523,10 @@ var WeeklyQuestions = (function () {
 
   // ── Public: Pool questions (count only, for display) ────────────────────
 
+  /**
+   * Returns the number of pending questions in the community pool.
+   * @returns {number} Count of pool questions with status 'pending'.
+   */
   function getPoolCount() {
     var sheet = _getSheet(SHEETS.QUESTION_POOL);
     if (!sheet || sheet.getLastRow() <= 1) return 0;
@@ -538,6 +589,11 @@ var WeeklyQuestions = (function () {
 // GLOBAL WRAPPERS
 // ═══════════════════════════════════════
 
+/**
+ * Global wrapper: returns active polls for the authenticated user, with dues gate.
+ * @param {string} sessionToken - Session token for caller authentication.
+ * @returns {Object} { questions: Array }
+ */
 function wqGetActiveQuestions(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { questions: [] };
@@ -549,6 +605,13 @@ function wqGetActiveQuestions(sessionToken) {
   return WeeklyQuestions.getActiveQuestions(e);
 }
 
+/**
+ * Global wrapper: submits an anonymous poll vote with dues gate.
+ * @param {string} sessionToken - Session token for caller authentication.
+ * @param {string} questionId - Poll question ID to vote on.
+ * @param {string} response - Selected answer option.
+ * @returns {Object} { success: boolean, stats?: Object, message?: string }
+ */
 function wqSubmitResponse(sessionToken, questionId, response) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
@@ -560,13 +623,26 @@ function wqSubmitResponse(sessionToken, questionId, response) {
   return WeeklyQuestions.submitResponse(e, questionId, response);
 }
 
-// v4.23.0: options param added (array of 2–5 strings)
+/**
+ * Global wrapper: steward creates this period's poll (v4.23.0: options param added).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} text - Poll question text.
+ * @param {string[]} options - 2-5 answer option strings.
+ * @returns {Object} { success: boolean, message: string, id?: string }
+ */
 function wqSetStewardQuestion(sessionToken, text, options) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
   return WeeklyQuestions.setStewardQuestion(e, text, options);
 }
 
+/**
+ * Global wrapper: member submits a poll candidate to the community pool with dues gate.
+ * @param {string} sessionToken - Session token for caller authentication.
+ * @param {string} text - Proposed question text.
+ * @param {string[]} options - 2-5 answer option strings.
+ * @returns {Object} { success: boolean, message: string }
+ */
 function wqSubmitPoolQuestion(sessionToken, text, options) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
@@ -578,19 +654,35 @@ function wqSubmitPoolQuestion(sessionToken, text, options) {
   return WeeklyQuestions.submitPoolQuestion(e, text, options);
 }
 
+/**
+ * Global wrapper: steward closes (deactivates) a poll by ID.
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} pollId - ID of the poll to close.
+ * @returns {Object} { success: boolean, message: string }
+ */
 function wqClosePoll(sessionToken, pollId) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
   return WeeklyQuestions.closePoll(e, pollId);
 }
 
+/**
+ * Global wrapper: returns paginated poll history for the authenticated user.
+ * @param {string} sessionToken - Session token for caller authentication.
+ * @param {number} [page] - 1-based page number.
+ * @param {number} [pageSize] - Results per page.
+ * @returns {Object} { questions: Array, hasMore: boolean }
+ */
 function wqGetHistory(sessionToken, page, pageSize) {
   var e = _resolveCallerEmail(sessionToken);
   return e ? WeeklyQuestions.getHistory(e, page, pageSize) : { questions: [], hasMore: false };
 }
 
+/** Global wrapper: returns the count of pending community pool questions. @returns {number} */
 function wqGetPoolCount() { return WeeklyQuestions.getPoolCount(); }
+/** Global wrapper: bootstraps the three poll sheets. @returns {void} */
 function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
+/** Global wrapper: returns the current poll frequency setting. @returns {string} */
 function wqGetPollFrequency() { return WeeklyQuestions.getPollFrequency(); }
 
 /**
@@ -616,6 +708,12 @@ function wqGetPollData(sessionToken) {
     return { frequency: freq, questions: [] };
   }
 }
+/**
+ * Global wrapper: steward sets the poll frequency (weekly/biweekly/monthly).
+ * @param {string} sessionToken - Session token for steward authentication.
+ * @param {string} freq - 'weekly', 'biweekly', or 'monthly'.
+ * @returns {Object} { success: boolean, frequency?: string, message: string }
+ */
 function wqSetPollFrequency(sessionToken, freq) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
@@ -643,10 +741,12 @@ function wqManualDrawCommunityPoll(sessionToken) {
   }
 }
 
-// Time trigger — runs every Monday but internally respects frequency.
-// For biweekly/monthly, it checks whether the period has actually changed
-// before drawing a new community poll (avoids drawing on off-weeks).
-// v4.24.3: Also skips if a community poll was already manually drawn this period.
+/**
+ * Time trigger: draws a random community poll on Monday, respecting frequency.
+ * Skips on off-weeks (biweekly) or non-1st days (monthly) and when a community
+ * poll was already manually drawn this period (v4.24.3).
+ * @returns {void}
+ */
 function autoSelectCommunityPoll() {
   try {
     var freq = WeeklyQuestions.getPollFrequency();

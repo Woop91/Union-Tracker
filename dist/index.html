@@ -2753,6 +2753,7 @@
           case 'unionstats': return renderUnionStatsPage;
           case 'events': return renderEventsPage;
           case 'stewarddirectory': return renderStewardContact;
+          case 'search': return renderSearchPage;
           case 'notifications': return renderMemberNotifications;
           case 'meetings': return renderMeetingsPage;
           case 'minutes': return renderMinutesPage;
@@ -2785,6 +2786,7 @@
           case 'timeline': return renderStewardTimelinePage;
           case 'workload': return renderWorkloadTracker;
           case 'failsafe': return renderFailsafePage;
+          case 'search': return renderSearchPage;
           case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
           default: return renderStewardDashboard;
         }

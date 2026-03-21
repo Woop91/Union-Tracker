@@ -13,7 +13,6 @@
     "test:webapp": "jest test/19_WebDashAuth.test.js test/20_WebDashConfigReader.test.js test/21_WebDashDataService.test.js test/22_WebDashApp.test.js test/23_PortalSheets.test.js test/24_WeeklyQuestions.test.js test/25_WorkloadService.test.js test/26_QAForum.test.js test/27_TimelineService.test.js test/28_FailsafeService.test.js test/29_Migrations.test.js test/auth-denial.test.js test/negative-paths.test.js --verbose",
     "coverage": "jest --coverage --verbose",
     "ci": "npm run clean && npm run lint && npm run build && npm run test:unit",
-    "watch": "node build.js --watch",
     "clean": "node build.js --clean",
     "test:guards": "jest test/deploy-guards.test.js test/spa-integrity.test.js --verbose --no-coverage",
     "deploy": "npm run lint && npm run test:guards && npm run test:unit && npm run build:prod && clasp push",

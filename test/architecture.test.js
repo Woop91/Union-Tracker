@@ -31,7 +31,6 @@ loadSources([
   '03_UIComponents.gs',
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
-  '04c_InteractiveDashboard.gs',
   '04d_ExecutiveDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
@@ -173,10 +172,7 @@ describe('A1: Cross-file dependencies', () => {
       expect(GRIEVANCE_FORM_CONFIG.FIELD_IDS.MEMBER_ID).toBeTruthy();
     });
 
-    test('CONTACT_FORM_CONFIG has FIELD_IDS', () => {
-      expect(CONTACT_FORM_CONFIG).toBeDefined();
-      expect(CONTACT_FORM_CONFIG.FIELD_IDS).toBeDefined();
-    });
+    // CONTACT_FORM_CONFIG — removed (contact form deprecated)
 
     test('SATISFACTION_FORM_CONFIG has FIELD_IDS', () => {
       expect(SATISFACTION_FORM_CONFIG).toBeDefined();
@@ -193,7 +189,7 @@ describe('A1: Build order integrity', () => {
   const BUILD_ORDER = [
     '00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '02_DataManagers.gs',
     '03_UIComponents.gs', '04a_UIMenus.gs', '04b_AccessibilityFeatures.gs',
-    '04c_InteractiveDashboard.gs', '04d_ExecutiveDashboard.gs',
+    '04d_ExecutiveDashboard.gs',
     '05_Integrations.gs', '06_Maintenance.gs',
     '07_DevTools.gs', '08a_SheetSetup.gs', '08b_SearchAndCharts.gs',
     '08c_FormsAndNotifications.gs', '08d_AuditAndFormulas.gs', '08e_SurveyEngine.gs',
@@ -721,6 +717,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetBroadcastFilterOptions', 'dataGetEngagementStats',
     'dataGetWorkloadSummaryStats',
     'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
+    'dataGetGrievanceForSigning', 'dataSubmitGrievanceSignature', // sigToken auth, not session
   ];
 
   // Functions that are init/admin only (not called from client google.script.run)
@@ -1138,6 +1135,18 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataEnsureSheetsIfNeeded',        // calls _ensureAllSheetsInternal() + PropertiesService directly (fire-and-forget init)
     'dataApplyColorTheme',             // saves theme to UserProperties directly (unified theme system)
     'dataGetMyEngagementScore',        // standalone: reads multiple sheets for per-member private score
+    'dataGetGrievanceForSigning',      // delegates to getGrievanceForSigning() (sigToken-based auth)
+    'dataSubmitGrievanceSignature',    // delegates to submitGrievanceSignature() (sigToken-based auth)
+    'dataGetGrievanceFormOptions',     // delegates to getGrievanceFormOptions() directly
+    'dataUndoToIndex',                 // delegates to undoToIndex() (undo system, 06_Maintenance.gs)
+    'dataExportUndoHistory',           // delegates to exportUndoHistoryToSheet() (undo system)
+    'dataGetUndoHistory',              // delegates to getUndoHistory() (undo system)
+    'dataWebCheckInMember',            // delegates to webCheckInMember() (14_MeetingCheckIn.gs)
+    'dataGetDeadlineCalendarData',     // delegates to getDeadlineCalendarData() (05_Integrations.gs)
+    'dataGetCorrelationAlerts',        // delegates to getCorrelationAlerts() (17_CorrelationEngine.gs)
+    'dataGetCorrelationSummary',       // delegates to getCorrelationSummary() (17_CorrelationEngine.gs)
+    'dataGetWebAppSearchResults',      // delegates to getWebAppSearchResults() (05_Integrations.gs)
+    'dataLogResourceClick',            // writes directly to _Resource_Click_Log sheet (lightweight tracking)
   ];
 
   wrappers

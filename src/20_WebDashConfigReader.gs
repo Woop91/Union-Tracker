@@ -168,15 +168,6 @@ var ConfigReader = (function () {
 
   // --- Helpers ---
 
-  function _readCell(sheet, col) {
-    if (!col) return '';
-    try {
-      return sheet.getRange(3, col).getValue();
-    } catch (_e) {
-      return '';
-    }
-  }
-
   function _deriveInitials(name) {
     if (!name) return 'ORG';
     var words = String(name).trim().split(/\s+/);

@@ -29,7 +29,7 @@
  *   Used by 00_Security.gs (COMMAND_CONFIG for email templates), menu items
  *   in 03_, and strategic analysis features.
  *
- * @version 4.31.0
+ * @version 4.33.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -380,71 +380,6 @@ function isProductionMode() {
 // NUKE HELPER FUNCTIONS - Documentation & Tab Colors
 // ============================================================================
 
-/**
- * Cleans up demo/seed/nuke references from documentation tabs
- * Called during NUKE to remove developer-focused content
- * Also adds a repo link to FAQ for users wanting seed/nuke features
- * @param {Spreadsheet} ss - The active spreadsheet
- * @private
- */
-function cleanupDocumentationTabs_(ss) {
-  var docSheets = [
-    SHEETS.FAQ,
-    SHEETS.CONFIG_GUIDE,
-    SHEETS.GETTING_STARTED
-  ];
-
-  // Patterns to identify rows mentioning seed/nuke/demo features
-  var demoPatterns = [
-    /\bseed\b/i,
-    /\bnuke\b/i,
-    /\bdemo data\b/i,
-    /\bsample data\b/i,
-    /\btest data\b/i,
-    /SEED_/i,
-    /NUKE_/i,
-    /🎭.*demo/i
-  ];
-
-  docSheets.forEach(function(sheetName) {
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) return;
-
-    try {
-      var data = sheet.getDataRange().getValues();
-      var rowsToUpdate = [];
-
-      // Find rows that contain demo-related content (skip header row)
-      for (var i = 1; i < data.length; i++) {
-        var rowText = data[i].join(' ');
-        var shouldClean = demoPatterns.some(function(pattern) {
-          return pattern.test(rowText);
-        });
-
-        if (shouldClean) {
-          // Clear this row's content (but preserve row structure)
-          rowsToUpdate.push(i + 1); // 1-indexed
-        }
-      }
-
-      // Clear identified rows
-      rowsToUpdate.forEach(function(row) {
-        try {
-          sheet.getRange(row, 1, 1, sheet.getLastColumn()).clearContent();
-        } catch (e) {
-          Logger.log('Could not clear row ' + row + ' in ' + sheetName + ': ' + e.message);
-        }
-      });
-
-      Logger.log('Cleaned ' + rowsToUpdate.length + ' demo-related rows from ' + sheetName);
-    } catch (e) {
-      Logger.log('Error cleaning ' + sheetName + ': ' + e.message);
-    }
-  });
-
-  // Add repo link to FAQ for users who want to start fresh with seed/nuke
-  addRepoLinkToFAQ_(ss);
-}
 
 /**
  * Adds a link to the GitHub repo in the FAQ sheet
@@ -1179,8 +1114,6 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     }
 
     var fieldsPopulated = [];
-    var _textLower = text.toLowerCase();
-
     // Pattern matching for common grievance form fields
     var patterns = {
       incidentDate: /(?:incident\s*date|date\s*of\s*incident|occurred\s*on)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
@@ -2106,7 +2039,7 @@ function searchPrecedentsData(query, outcomeFilter) {
  * - PII safety utilities
  *
  * @fileoverview Member portal service with PII protection
- * @version 4.5.0
+ * @version 4.33.0
  * @requires 01_Constants.gs
  * ============================================================================
  */
