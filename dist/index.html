@@ -23,17 +23,17 @@
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" as="script" crossorigin="anonymous">
 </head>
 <body>
+  <a href="#main-content" class="sr-only" style="position:absolute;top:-40px;left:0;background:var(--accent,#7C3AED);color:#fff;padding:8px 16px;z-index:10000;transition:top .2s" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Skip to content</a>
   <div id="nav-progress"></div>
   <div id="app"></div>
 
+  
+  <script type="application/json" id="page-data"><?!= pageData ?></script>
   <script>
  
  
  
- // H-50: pageData is JSON.stringify'd server-side before injection.
- 
- 
- var PAGE_DATA = <?!= pageData ?>;
+ var PAGE_DATA = JSON.parse(document.getElementById('page-data').textContent);
  var CONFIG = PAGE_DATA.config;
  var CURRENT_VIEW = PAGE_DATA.view;
  var CURRENT_USER = PAGE_DATA.user || null;
@@ -1193,6 +1193,7 @@
  
  function showLoading(container, variant) {
   container.innerHTML = '';
+  container.setAttribute('aria-busy', 'true');
   var cls = 'loading-spinner';
   var innerHtml;
   if (variant === 'list') {
@@ -1284,6 +1285,10 @@
   if (loader && loader._loadingTimeout) {
   clearTimeout(loader._loadingTimeout);
   loader._loadingTimeout = null;
+  }
+  
+  if (loaderOrContainer.hasAttribute && loaderOrContainer.hasAttribute('aria-busy')) {
+  loaderOrContainer.removeAttribute('aria-busy');
   }
  }
 
@@ -1433,7 +1438,7 @@
    }
    }
 
-   var newContent = el('div', { className: 'page-layout-content' });
+   var newContent = el('div', { className: 'page-layout-content', id: 'main-content', role: 'main' });
    contentFn(newContent);
    targetParent.appendChild(newContent);
    _layoutCache.content = newContent;
@@ -1465,11 +1470,11 @@
   }
   container.innerHTML = '';
   var layout = el('div', { className: 'page-layout' });
-  var sidebar = el('nav', { className: 'sidebar-nav' + (SplitView.isEnabled() ? ' split-active' : '') });
+  var sidebar = el('nav', { className: 'sidebar-nav' + (SplitView.isEnabled() ? ' split-active' : ''), role: 'navigation', 'aria-label': 'Main navigation' });
   renderSidebarItems(sidebar, role, activeTab);
   layout.appendChild(sidebar);
 
-  var content = el('div', { className: 'page-layout-content' });
+  var content = el('div', { className: 'page-layout-content', id: 'main-content', role: 'main' });
   contentFn(content);
 
   
@@ -1637,14 +1642,14 @@
   headerText.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
   }
   header.appendChild(headerText);
-  var bellWrap = el('div', { className: 'notif-bell-wrap', onClick: function() {
+  var bellWrap = el('div', { className: 'notif-bell-wrap', role: 'button', tabIndex: 0, 'aria-label': 'Notifications', onClick: function() {
   _handleTabNav(role, 'notifications');
-  }});
+  }, onKeyDown: function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); } } });
   bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
   
   var _bellTotal = (AppState.notificationCount || 0) + (role === 'steward' ? (AppState.qaUnansweredCount || 0) : 0);
   if (_bellTotal > 0) {
-  bellWrap.appendChild(el('span', { className: 'notif-bell-badge' }, String(_bellTotal)));
+  bellWrap.appendChild(el('span', { className: 'notif-bell-badge', 'aria-live': 'polite' }, String(_bellTotal)));
   }
   header.appendChild(bellWrap);
   sidebar.appendChild(header);
@@ -1684,7 +1689,10 @@
 
   var item = el('div', {
    className: itemClass,
-   onClick: function() { _handleTabNav(role, tab.id); }
+   role: 'button',
+   tabIndex: 0,
+   onClick: function() { _handleTabNav(role, tab.id); },
+   onKeyDown: function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); } }
   }, children);
   
   if (isPrimary && AppState.navTheme !== 'default') {
@@ -2141,7 +2149,7 @@
  // Shows 4 primary tabs per role + "More" overflow on mobile (<640px).
  
  function renderBottomNav(container, role, activeTab) {
-  var nav = el('div', { className: 'bottom-nav' });
+  var nav = el('div', { className: 'bottom-nav', role: 'navigation', 'aria-label': 'Bottom navigation' });
   var tabs = role === 'steward' ? [
   { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
   { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
@@ -3038,8 +3046,8 @@
 
   
   function _showChartFallback(container) {
-  container.innerHTML += '<div style="padding:20px;text-align:center;color:var(--text-secondary,#64748b);font-size:13px">' +
-   'Charts unavailable &mdash; please check your connection and reload</div>';
+  container.insertAdjacentHTML('beforeend', '<div style="padding:20px;text-align:center;color:var(--text-secondary,#64748b);font-size:13px">' +
+   'Charts unavailable &mdash; please check your connection and reload</div>');
   }
 
   function _create(container, id, cfg) {
@@ -3177,6 +3185,9 @@
   function _showWarning() {
   var remaining = WARN_SEC;
   _modalEl = document.createElement('div');
+  _modalEl.setAttribute('role', 'alertdialog');
+  _modalEl.setAttribute('aria-modal', 'true');
+  _modalEl.setAttribute('aria-label', 'Session timeout warning');
   _modalEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
   var card = document.createElement('div');
   card.style.cssText = 'background:var(--surface,#fff);border-radius:12px;padding:24px 32px;max-width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3)';
@@ -3190,6 +3201,11 @@
    _dismissWarning();
    _resetTimer();
   });
+
+  _modalEl.addEventListener('keydown', function(e) {
+   if (e.key === 'Escape') { _dismissWarning(); _resetTimer(); }
+  });
+  document.getElementById('idle-stay-btn').focus();
 
   _countdownInterval = setInterval(function() {
    remaining--;

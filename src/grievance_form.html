@@ -308,7 +308,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
     <div class="hdr-mid" style="flex:1;padding-top:0;min-height:60px;display:flex;flex-direction:column;justify-content:space-between;">
       <div style="font-size:clamp(15pt,5vw,30pt);font-weight:900;letter-spacing:-.01em;line-height:1.05;white-space:normal;">GRIEVANCE REPORT</div>
       <div class="irow" style="margin-bottom:0;align-items:flex-end;">
-        <span class="lbl">GRIEVANT(S):</span>
+        <label for="grievant" class="lbl">GRIEVANT(S):</label>
         <input id="grievant" class="fi" type="text" style="flex:1;">
       </div>
     </div>
@@ -327,7 +327,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
   </div>
 
   <div class="irow">
-    <span class="lbl">JOB TITLE:</span>
+    <label for="jobtitle" class="lbl">JOB TITLE:</label>
     <select id="jobtitle" class="fi" style="width:2.1in;">
       <option value=""></option>
       <option>Disability Examiner</option>
@@ -335,12 +335,12 @@ body.dark .tbtn.go:hover{background:#a00000;}
       <option>Unit Supervisor</option>
       <option>QA Specialist</option>
     </select>
-    <span class="lbl" style="margin-left:8px;">AGENCY START DATE <span style="font-weight:normal;font-size:8.5pt;">(if known)</span>:</span>
+    <label for="startdate" class="lbl" style="margin-left:8px;">AGENCY START DATE <span style="font-weight:normal;font-size:8.5pt;">(if known)</span>:</label>
     <input id="startdate" class="fi" type="date" style="flex:1;" onchange="validateDate(this)"><span class="date-msg"></span>
   </div>
 
   <div class="irow">
-    <span class="lbl">AGENCY:</span>
+    <label for="agency" class="lbl">AGENCY:</label>
     <input id="agency" class="fi" type="text" style="width:1.3in;" value="MassAbility DDS" readonly title="Agency is fixed for this form">
     <span class="lbl" style="margin-left:6px;">REGION:</span>
     <select id="region" class="fi" style="width:1.3in;" onchange="autoFillLocation()">
@@ -576,16 +576,44 @@ function toggleDark(){
   document.getElementById('dmBtn').textContent=d?'☀ Light':'🌙 Dark';
 }
 
-const MANAGERS = ['Timothy Dunphy','Aja James','Majdeline Hage','Kelly Forss','Lisa Maddox-Mason','Maryalice McGough','Matthew Dichard'];
+// Defaults — overridden by server data on DOMContentLoaded
+var MANAGERS = ['Timothy Dunphy','Aja James','Majdeline Hage','Kelly Forss','Lisa Maddox-Mason','Maryalice McGough','Matthew Dichard'];
+
+// Address lookup (union-specific — values from Config sheet, addresses here)
+var LOCATION_ADDRESSES = {
+  'Everett':   '135 Santilli Hwy, Everett, MA 02149',
+  'Worcester': '324R Clark St, Worcester, MA 01606'
+};
+
+function _rebuildManagerSelects(){
+  var sel1 = document.getElementById('managers');
+  var sel2 = document.getElementById('managers2');
+  var cur1 = sel1.value, cur2 = sel2.value;
+  sel1.innerHTML = '<option value="">— Primary —</option>';
+  sel2.innerHTML = '<option value="">— 2nd (optional) —</option>';
+  MANAGERS.forEach(function(name){
+    sel1.appendChild(Object.assign(document.createElement('option'),{value:name,textContent:name,selected:name===cur1}));
+    if(name !== cur1) sel2.appendChild(Object.assign(document.createElement('option'),{value:name,textContent:name,selected:name===cur2}));
+  });
+}
+
+function _rebuildRegionSelect(locations){
+  var sel = document.getElementById('region');
+  var cur = sel.value;
+  sel.innerHTML = '<option value=""></option>';
+  locations.forEach(function(loc){
+    sel.appendChild(Object.assign(document.createElement('option'),{value:loc,textContent:loc,selected:loc===cur}));
+  });
+}
 
 function syncManagers(){
-  const m1 = document.getElementById('managers').value;
-  const m2 = document.getElementById('managers2').value;
-  const sel2 = document.getElementById('managers2');
+  var m1 = document.getElementById('managers').value;
+  var m2 = document.getElementById('managers2').value;
+  var sel2 = document.getElementById('managers2');
   sel2.innerHTML = '<option value="">— 2nd (optional) —</option>';
-  MANAGERS.forEach(name => {
+  MANAGERS.forEach(function(name){
     if(name !== m1){
-      const o = document.createElement('option');
+      var o = document.createElement('option');
       o.value = o.textContent = name;
       if(name === m2) o.selected = true;
       sel2.appendChild(o);
@@ -594,15 +622,19 @@ function syncManagers(){
   if(m1 && m2 && m1 === m2) sel2.value = '';
 }
 
-const WORK_LOCATIONS = {
-  'Everett':   '135 Santilli Hwy, Everett, MA 02149',
-  'Worcester': '324R Clark St, Worcester, MA 01606'
-};
-
 function autoFillLocation(){
-  const region = document.getElementById('region').value;
-  const wl = document.getElementById('workloc');
-  wl.value = WORK_LOCATIONS[region] || '';
+  var region = document.getElementById('region').value;
+  var wl = document.getElementById('workloc');
+  wl.value = LOCATION_ADDRESSES[region] || '';
+}
+
+// Fetch live data from Config sheet (falls back to hardcoded defaults for PDF rendering)
+if(typeof google !== 'undefined' && google.script && google.script.run){
+  google.script.run.withSuccessHandler(function(opts){
+    if(!opts) return;
+    if(opts.managers && opts.managers.length) { MANAGERS = opts.managers; _rebuildManagerSelects(); }
+    if(opts.officeLocations && opts.officeLocations.length) _rebuildRegionSelect(opts.officeLocations);
+  }).getGrievanceFormOptions();
 }
 
 function validateDate(el){

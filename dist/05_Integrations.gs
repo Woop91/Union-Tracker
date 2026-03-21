@@ -4847,7 +4847,8 @@ function getGrievanceFormOptions() {
       managers: [],
       stewards: [],
       coordinators: [],
-      jobTitles: []
+      jobTitles: [],
+      officeLocations: []
     };
 
     if (!configSheet) return result;
@@ -4856,13 +4857,14 @@ function getGrievanceFormOptions() {
 
     // Read config columns (data starts row 3, index 2)
     var colMap = {
-      articles:        CONFIG_COLS.ARTICLES,
-      issueCategories: CONFIG_COLS.ISSUE_CATEGORY,
-      steps:           CONFIG_COLS.GRIEVANCE_STEP,
-      managers:        CONFIG_COLS.MANAGERS,
-      stewards:        CONFIG_COLS.STEWARDS,
-      coordinators:    CONFIG_COLS.GRIEVANCE_COORDINATORS,
-      jobTitles:       CONFIG_COLS.JOB_TITLES
+      articles:         CONFIG_COLS.ARTICLES,
+      issueCategories:  CONFIG_COLS.ISSUE_CATEGORY,
+      steps:            CONFIG_COLS.GRIEVANCE_STEP,
+      managers:         CONFIG_COLS.MANAGERS,
+      stewards:         CONFIG_COLS.STEWARDS,
+      coordinators:     CONFIG_COLS.GRIEVANCE_COORDINATORS,
+      jobTitles:        CONFIG_COLS.JOB_TITLES,
+      officeLocations:  CONFIG_COLS.OFFICE_LOCATIONS
     };
 
     for (var key in colMap) {

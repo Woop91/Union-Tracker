@@ -855,8 +855,6 @@ function getDefaultADHDSettings_() {
     zebraStripes: true,
     reducedMotion: false,
     focusMode: false,
-    highContrast: false,
-    largeText: false,
     hideGridlines: false
   };
 }
