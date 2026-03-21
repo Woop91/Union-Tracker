@@ -4,98 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
 <title>Grievance E-Signature</title>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-:root{
-  --bg:#f5f6f8;--surface:#fff;--text:#1a1a2e;--muted:#6b7280;
-  --accent:#2563eb;--accentBg:#eff6ff;--border:#e5e7eb;
-  --success:#059669;--danger:#dc2626;--warning:#d97706;
-}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  background:var(--bg);color:var(--text);
-  padding:0;margin:0;min-height:100vh;
-  display:flex;flex-direction:column;align-items:center;
-}
-.container{width:100%;max-width:520px;padding:16px;flex:1;}
-.card{background:var(--surface);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
-.card-header{font-size:15px;font-weight:700;margin-bottom:10px;}
-.label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px;}
-.value{font-size:13px;margin-bottom:8px;line-height:1.4;}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;}
-.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
-.badge-pending{background:#fef3c7;color:#92400e;}
-.badge-signed{background:#d1fae5;color:#065f46;}
-
-/* Canvas */
-.sig-canvas-wrap{
-  position:relative;border:2px dashed var(--border);border-radius:8px;
-  background:#fafbfc;touch-action:none;margin:8px 0;
-}
-.sig-canvas-wrap.active{border-color:var(--accent);border-style:solid;}
-canvas#sigCanvas{display:block;width:100%;height:180px;cursor:crosshair;}
-.sig-placeholder{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  color:var(--muted);font-size:14px;pointer-events:none;text-align:center;
-  transition:opacity .2s;
-}
-.sig-canvas-wrap.active .sig-placeholder{opacity:0;}
-
-/* Buttons */
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;
-  padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;
-  border:none;cursor:pointer;transition:all .15s;width:100%;
-}
-.btn-primary{background:var(--accent);color:#fff;}
-.btn-primary:hover{background:#1d4ed8;}
-.btn-primary:disabled{background:#93c5fd;cursor:not-allowed;}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
-.btn-outline:hover{background:var(--bg);}
-.btn-danger{background:var(--danger);color:#fff;}
-.btn-row{display:flex;gap:8px;margin-top:8px;}
-.btn-row .btn{flex:1;}
-
-/* Status */
-.status-msg{font-size:12px;min-height:18px;margin-bottom:6px;text-align:center;}
-.hash-display{
-  font-family:'Courier New',monospace;font-size:10px;color:var(--muted);
-  background:var(--bg);padding:6px 10px;border-radius:6px;
-  word-break:break-all;margin-top:8px;line-height:1.4;
-}
-
-/* Confirmation */
-.confirm-check{display:flex;align-items:flex-start;gap:10px;margin:12px 0;font-size:13px;line-height:1.5;}
-.confirm-check input[type=checkbox]{margin-top:3px;width:18px;height:18px;flex-shrink:0;}
-
-/* Loading */
-.spinner{display:inline-block;width:18px;height:18px;border:2px solid #93c5fd;border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
-
-/* Already signed */
-.signed-display{text-align:center;padding:20px 0;}
-.signed-display .checkmark{font-size:48px;margin-bottom:8px;}
-.signed-display .label{font-size:14px;color:var(--success);font-weight:600;text-transform:none;letter-spacing:0;}
-
-/* Error state */
-.error-state{text-align:center;padding:30px 0;color:var(--danger);}
-.error-state .icon{font-size:36px;margin-bottom:8px;}
-
-/* Dark mode */
-@media(prefers-color-scheme:dark){
-  :root{--bg:#0f1117;--surface:#1a1b26;--text:#e5e7eb;--muted:#9ca3af;
-    --accent:#60a5fa;--accentBg:#1e293b;--border:#374151;
-    --success:#34d399;--danger:#f87171;--warning:#fbbf24;}
-  .sig-canvas-wrap{background:#1e2030;}
-  canvas#sigCanvas{cursor:crosshair;}
-}
-/* Print */
-@media print{
-  .btn,.btn-row,.confirm-check,.status-msg{display:none;}
-  body{background:#fff;color:#000;}
-  .card{box-shadow:none;border:1px solid #ccc;}
-}
-</style>
+<style> *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}:root{--bg:#f5f6f8;--surface:#fff;--text:#1a1a2e;--muted:#6b7280;--accent:#2563eb;--accentBg:#eff6ff;--border:#e5e7eb;--success:#059669;--danger:#dc2626;--warning:#d97706}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);padding:0;margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center}.container{width:100%;max-width:520px;padding:16px;flex:1}.card{background:var(--surface);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.08)}.card-header{font-size:15px;font-weight:700;margin-bottom:10px}.label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px}.value{font-size:13px;margin-bottom:8px;line-height:1.4}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}.badge-pending{background:#fef3c7;color:#92400e}.badge-signed{background:#d1fae5;color:#065f46}.sig-canvas-wrap{position:relative;border:2px dashed var(--border);border-radius:8px;background:#fafbfc;touch-action:none;margin:8px 0}.sig-canvas-wrap.active{border-color:var(--accent);border-style:solid}canvas#sigCanvas{display:block;width:100%;height:180px;cursor:crosshair}.sig-placeholder{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--muted);font-size:14px;pointer-events:none;text-align:center;transition:opacity .2s}.sig-canvas-wrap.active .sig-placeholder{opacity:0}.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;border:none;cursor:pointer;transition:all .15s;width:100%}.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#1d4ed8}.btn-primary:disabled{background:#93c5fd;cursor:not-allowed}.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{background:var(--bg)}.btn-danger{background:var(--danger);color:#fff}.btn-row{display:flex;gap:8px;margin-top:8px}.btn-row .btn{flex:1}.status-msg{font-size:12px;min-height:18px;margin-bottom:6px;text-align:center}.hash-display{font-family:'Courier New',monospace;font-size:10px;color:var(--muted);background:var(--bg);padding:6px 10px;border-radius:6px;word-break:break-all;margin-top:8px;line-height:1.4}.confirm-check{display:flex;align-items:flex-start;gap:10px;margin:12px 0;font-size:13px;line-height:1.5}.confirm-check input[type=checkbox]{margin-top:3px;width:18px;height:18px;flex-shrink:0}.spinner{display:inline-block;width:18px;height:18px;border:2px solid #93c5fd;border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.signed-display{text-align:center;padding:20px 0}.signed-display .checkmark{font-size:48px;margin-bottom:8px}.signed-display .label{font-size:14px;color:var(--success);font-weight:600;text-transform:none;letter-spacing:0}.error-state{text-align:center;padding:30px 0;color:var(--danger)}.error-state .icon{font-size:36px;margin-bottom:8px}@media(prefers-color-scheme:dark){:root{--bg:#0f1117;--surface:#1a1b26;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;--accentBg:#1e293b;--border:#374151;--success:#34d399;--danger:#f87171;--warning:#fbbf24}.sig-canvas-wrap{background:#1e2030}canvas#sigCanvas{cursor:crosshair}}@media print{.btn,.btn-row,.confirm-check,.status-msg{display:none}body{background:#fff;color:#000}.card{box-shadow:none;border:1px solid #ccc}}</style>
 </head>
 <body>
 <div class="container" id="app">
@@ -106,7 +15,7 @@ canvas#sigCanvas{display:block;width:100%;height:180px;cursor:crosshair;}
 </div>
 
 <script>
-// ── Globals ──
+
 var GRIEVANCE_DATA = null;
 var SIGNATURE_TOKEN = '';
 var HAS_DRAWN = false;
@@ -115,326 +24,325 @@ var CANVAS = null;
 var DRAWING = false;
 var LAST_POINT = null;
 
-// ── Parse token from URL fragment ──
 (function() {
-  var params = {};
-  var hash = window.location.hash.substring(1);
-  if (!hash) {
-    var search = window.location.search.substring(1);
-    hash = search;
+ var params = {};
+ var hash = window.location.hash.substring(1);
+ if (!hash) {
+ var search = window.location.search.substring(1);
+ hash = search;
+ }
+ hash.split('&').forEach(function(pair) {
+ var parts = pair.split('=');
+ if (parts.length === 2) params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
+ });
+ SIGNATURE_TOKEN = params.token || params.t || '';
+
+ if (!SIGNATURE_TOKEN) {
+ document.getElementById('app').innerHTML =
+  '<div class="card"><div class="error-state"><div class="icon">&#9888;</div>' +
+  '<div>Invalid or missing signature link.</div>' +
+  '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Please use the link from your notification.</div></div></div>';
+ return;
+ }
+
+ 
+ google.script.run
+ .withSuccessHandler(function(result) {
+  if (!result || !result.success) {
+  document.getElementById('app').innerHTML =
+   '<div class="card"><div class="error-state"><div class="icon">&#9888;</div>' +
+   '<div>' + _escHtml((result && result.message) || 'Could not load grievance.') + '</div></div></div>';
+  return;
   }
-  hash.split('&').forEach(function(pair) {
-    var parts = pair.split('=');
-    if (parts.length === 2) params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
-  });
-  SIGNATURE_TOKEN = params.token || params.t || '';
-
-  if (!SIGNATURE_TOKEN) {
-    document.getElementById('app').innerHTML =
-      '<div class="card"><div class="error-state"><div class="icon">&#9888;</div>' +
-      '<div>Invalid or missing signature link.</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Please use the link from your notification.</div></div></div>';
-    return;
+  GRIEVANCE_DATA = result;
+  if (result.alreadySigned) {
+  renderAlreadySigned();
+  } else {
+  renderSigningPage();
   }
+ })
+ .withFailureHandler(function(err) {
+  document.getElementById('app').innerHTML =
+  '<div class="card"><div class="error-state"><div class="icon">&#9888;</div>' +
+  '<div>Failed to load. Please try again.</div>' +
+  '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' + _escHtml(err && err.message ? err.message : '') + '</div></div></div>';
+ })
+ .dataGetGrievanceForSigning(SIGNATURE_TOKEN);
 
-  // Fetch grievance data for this token
-  google.script.run
-    .withSuccessHandler(function(result) {
-      if (!result || !result.success) {
-        document.getElementById('app').innerHTML =
-          '<div class="card"><div class="error-state"><div class="icon">&#9888;</div>' +
-          '<div>' + _escHtml((result && result.message) || 'Could not load grievance.') + '</div></div></div>';
-        return;
-      }
-      GRIEVANCE_DATA = result;
-      if (result.alreadySigned) {
-        renderAlreadySigned();
-      } else {
-        renderSigningPage();
-      }
-    })
-    .withFailureHandler(function(err) {
-      document.getElementById('app').innerHTML =
-        '<div class="card"><div class="error-state"><div class="icon">&#9888;</div>' +
-        '<div>Failed to load. Please try again.</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' + _escHtml(err && err.message ? err.message : '') + '</div></div></div>';
-    })
-    .dataGetGrievanceForSigning(SIGNATURE_TOKEN);
-
-  // Strip token from URL to prevent exposure in browser history
-  try { if (window.history && window.history.replaceState) window.history.replaceState(null, '', window.location.pathname); } catch (_e) { /* GAS sandbox may block */ }
+ 
+ try { if (window.history && window.history.replaceState) window.history.replaceState(null, '', window.location.pathname); } catch (_e) {  }
 })();
 
 function _escHtml(str) {
-  var d = document.createElement('div');
-  d.appendChild(document.createTextNode(str || ''));
-  return d.innerHTML;
+ var d = document.createElement('div');
+ d.appendChild(document.createTextNode(str || ''));
+ return d.innerHTML;
 }
 
 function renderAlreadySigned() {
+ var app = document.getElementById('app');
+ app.innerHTML = '';
+ var card = document.createElement('div');
+ card.className = 'card';
+ card.innerHTML =
+ '<div class="signed-display">' +
+ '<div class="checkmark">&#10004;</div>' +
+ '<div class="label">This grievance has already been signed</div>' +
+ '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' +
+ 'Grievance ' + _escHtml(GRIEVANCE_DATA.grievanceId) + ' was signed on ' + _escHtml(GRIEVANCE_DATA.signedDate || '') + '.' +
+ '</div></div>';
+ app.appendChild(card);
+}
+
+function renderSigningPage() {
+ var app = document.getElementById('app');
+ app.innerHTML = '';
+ var d = GRIEVANCE_DATA;
+
+ 
+ var header = document.createElement('div');
+ header.style.cssText = 'text-align:center;margin-bottom:14px;';
+ header.innerHTML = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Grievance</div>' +
+ '<div style="font-size:18px;font-weight:700;margin-top:4px;">Grievance Signature</div>';
+ app.appendChild(header);
+
+ 
+ var summaryCard = document.createElement('div');
+ summaryCard.className = 'card';
+ summaryCard.innerHTML =
+ '<div class="card-header">Grievance Summary</div>' +
+ '<div class="info-grid">' +
+ '<div><div class="label">Grievance ID</div><div class="value">' + _escHtml(d.grievanceId) + '</div></div>' +
+ '<div><div class="label">Status</div><div class="value"><span class="badge badge-pending">Awaiting Signature</span></div></div>' +
+ '<div><div class="label">Filed By</div><div class="value">' + _escHtml(d.stewardName || '') + '</div></div>' +
+ '<div><div class="label">Date Filed</div><div class="value">' + _escHtml(d.dateFiled || '') + '</div></div>' +
+ '</div>' +
+ '<div style="margin-top:8px;"><div class="label">Articles Violated</div><div class="value">' + _escHtml(d.articles || 'N/A') + '</div></div>' +
+ '<div><div class="label">Issue Category</div><div class="value">' + _escHtml(d.issueCategory || 'N/A') + '</div></div>' +
+ '<div><div class="label">Statement</div><div class="value" style="white-space:pre-wrap;">' + _escHtml(d.description || 'N/A') + '</div></div>' +
+ '<div><div class="label">Remedy Sought</div><div class="value" style="white-space:pre-wrap;">' + _escHtml(d.remedy || 'N/A') + '</div></div>';
+
+ 
+ if (d.documentHash) {
+ summaryCard.innerHTML +=
+  '<div class="hash-display"><strong>Document Fingerprint:</strong> ' + _escHtml(d.documentHash) + '</div>';
+ }
+ app.appendChild(summaryCard);
+
+ 
+ var sigCard = document.createElement('div');
+ sigCard.className = 'card';
+ sigCard.innerHTML = '<div class="card-header">Your Signature</div>' +
+ '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Use your finger or stylus to sign below. Your signature will be permanently embedded into the grievance document.</div>';
+
+ var canvasWrap = document.createElement('div');
+ canvasWrap.className = 'sig-canvas-wrap';
+ canvasWrap.id = 'canvasWrap';
+
+ var placeholder = document.createElement('div');
+ placeholder.className = 'sig-placeholder';
+ placeholder.textContent = 'Sign here';
+ canvasWrap.appendChild(placeholder);
+
+ CANVAS = document.createElement('canvas');
+ CANVAS.id = 'sigCanvas';
+ CANVAS.setAttribute('aria-label', 'Draw your signature here');
+ CANVAS.setAttribute('role', 'img');
+ CANVAS.width = 480;
+ CANVAS.height = 180;
+ canvasWrap.appendChild(CANVAS);
+ sigCard.appendChild(canvasWrap);
+
+ 
+ var btnRow = document.createElement('div');
+ btnRow.className = 'btn-row';
+ var clearBtn = document.createElement('button');
+ clearBtn.className = 'btn btn-outline';
+ clearBtn.textContent = 'Clear';
+ clearBtn.style.flex = '0 0 auto';
+ clearBtn.style.width = 'auto';
+ clearBtn.style.padding = '6px 16px';
+ clearBtn.style.fontSize = '12px';
+ clearBtn.addEventListener('click', function() {
+ CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+ HAS_DRAWN = false;
+ canvasWrap.classList.remove('active');
+ });
+ btnRow.appendChild(clearBtn);
+ sigCard.appendChild(btnRow);
+
+ 
+ var confirmDiv = document.createElement('div');
+ confirmDiv.className = 'confirm-check';
+ var cb = document.createElement('input');
+ cb.type = 'checkbox';
+ cb.id = 'confirmCb';
+ var cbLabel = document.createElement('label');
+ cbLabel.setAttribute('for', 'confirmCb');
+ cbLabel.textContent = 'I confirm that I have reviewed the grievance details above and authorize the filing of this grievance on my behalf. I understand my signature is being digitally bound to this specific document.';
+ confirmDiv.appendChild(cb);
+ confirmDiv.appendChild(cbLabel);
+ sigCard.appendChild(confirmDiv);
+
+ 
+ var statusMsg = document.createElement('div');
+ statusMsg.className = 'status-msg';
+ statusMsg.id = 'statusMsg';
+ sigCard.appendChild(statusMsg);
+
+ 
+ var submitBtn = document.createElement('button');
+ submitBtn.className = 'btn btn-primary';
+ submitBtn.id = 'submitBtn';
+ submitBtn.textContent = 'Sign & Submit';
+ submitBtn.addEventListener('click', function() { submitSignature(submitBtn, statusMsg); });
+ sigCard.appendChild(submitBtn);
+
+ app.appendChild(sigCard);
+
+ 
+ initCanvas(canvasWrap);
+}
+
+function initCanvas(wrap) {
+ CTX = CANVAS.getContext('2d');
+
+ 
+ var rect = CANVAS.getBoundingClientRect();
+ var dpr = window.devicePixelRatio || 1;
+ CANVAS.width = rect.width * dpr;
+ CANVAS.height = 180 * dpr;
+ CANVAS.style.height = '180px';
+ CTX.scale(dpr, dpr);
+ CTX.lineCap = 'round';
+ CTX.lineJoin = 'round';
+ CTX.lineWidth = 2.5;
+ CTX.strokeStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#e5e7eb' : '#1a1a2e';
+
+ function getPos(e) {
+ var r = CANVAS.getBoundingClientRect();
+ var t = e.touches ? e.touches[0] : e;
+ return { x: t.clientX - r.left, y: t.clientY - r.top };
+ }
+
+ function startDraw(e) {
+ e.preventDefault();
+ DRAWING = true;
+ LAST_POINT = getPos(e);
+ }
+
+ function moveDraw(e) {
+ if (!DRAWING) return;
+ e.preventDefault();
+ var p = getPos(e);
+ CTX.beginPath();
+ CTX.moveTo(LAST_POINT.x, LAST_POINT.y);
+ CTX.lineTo(p.x, p.y);
+ CTX.stroke();
+ LAST_POINT = p;
+ 
+ if (!HAS_DRAWN) {
+  HAS_DRAWN = true;
+  wrap.classList.add('active');
+ }
+ }
+
+ function endDraw(e) {
+ if (DRAWING) e.preventDefault();
+ DRAWING = false;
+ LAST_POINT = null;
+ }
+
+ 
+ CANVAS.addEventListener('mousedown', startDraw);
+ CANVAS.addEventListener('mousemove', moveDraw);
+ CANVAS.addEventListener('mouseup', endDraw);
+ CANVAS.addEventListener('mouseleave', endDraw);
+
+ 
+ CANVAS.addEventListener('touchstart', startDraw, { passive: false });
+ CANVAS.addEventListener('touchmove', moveDraw, { passive: false });
+ CANVAS.addEventListener('touchend', endDraw, { passive: false });
+ CANVAS.addEventListener('touchcancel', endDraw, { passive: false });
+
+ 
+ function _resizeCanvas() {
+ 
+ var imgData = null;
+ try { imgData = CTX.getImageData(0, 0, CANVAS.width, CANVAS.height); } catch (_e) {  }
+ var newRect = CANVAS.getBoundingClientRect();
+ var newDpr = window.devicePixelRatio || 1;
+ CANVAS.width = newRect.width * newDpr;
+ CANVAS.height = 180 * newDpr;
+ CTX.scale(newDpr, newDpr);
+ CTX.lineCap = 'round';
+ CTX.lineJoin = 'round';
+ CTX.lineWidth = 2.5;
+ CTX.strokeStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#e5e7eb' : '#1a1a2e';
+ if (imgData) { try { CTX.putImageData(imgData, 0, 0); } catch (_e) {  } }
+ }
+ window.addEventListener('resize', _resizeCanvas);
+ window.addEventListener('orientationchange', function() { setTimeout(_resizeCanvas, 200); });
+}
+
+function submitSignature(btn, statusEl) {
+ 
+ if (!HAS_DRAWN) {
+ statusEl.textContent = 'Please draw your signature above.';
+ statusEl.style.color = 'var(--danger)';
+ return;
+ }
+ var cb = document.getElementById('confirmCb');
+ if (!cb || !cb.checked) {
+ statusEl.textContent = 'Please check the confirmation box.';
+ statusEl.style.color = 'var(--danger)';
+ return;
+ }
+
+ 
+ var sigDataUrl = CANVAS.toDataURL('image/png');
+ 
+ var sigBase64 = sigDataUrl.replace(/^data:image\/png;base64,/, '');
+
+ btn.disabled = true;
+ btn.innerHTML = '<span class="spinner"></span> Submitting&hellip;';
+ statusEl.textContent = 'Generating signed document...';
+ statusEl.style.color = 'var(--muted)';
+
+ google.script.run
+ .withSuccessHandler(function(result) {
+  btn.disabled = false;
+  btn.textContent = 'Sign & Submit';
+  if (result && result.success) {
+  statusEl.textContent = '';
+  
   var app = document.getElementById('app');
   app.innerHTML = '';
   var card = document.createElement('div');
   card.className = 'card';
   card.innerHTML =
-    '<div class="signed-display">' +
-    '<div class="checkmark">&#10004;</div>' +
-    '<div class="label">This grievance has already been signed</div>' +
-    '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' +
-    'Grievance ' + _escHtml(GRIEVANCE_DATA.grievanceId) + ' was signed on ' + _escHtml(GRIEVANCE_DATA.signedDate || '') + '.' +
-    '</div></div>';
+   '<div class="signed-display">' +
+   '<div class="checkmark">&#10004;</div>' +
+   '<div class="label">Grievance Signed Successfully</div>' +
+   '<div style="font-size:13px;color:var(--text);margin-top:10px;">' +
+   'Grievance <strong>' + _escHtml(GRIEVANCE_DATA.grievanceId) + '</strong> has been signed and filed.</div>' +
+   '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' +
+   'A signed copy has been saved to your case folder. Your steward will be in touch with next steps.</div>' +
+   (result.driveFolderUrl && String(result.driveFolderUrl).indexOf('https://') === 0 ? '<a href="' + _escHtml(result.driveFolderUrl) + '" target="_blank" style="display:inline-block;margin-top:12px;font-size:13px;color:var(--accent);text-decoration:none;font-weight:600;">Open Case Folder</a>' : '') +
+   '</div>';
   app.appendChild(card);
-}
-
-function renderSigningPage() {
-  var app = document.getElementById('app');
-  app.innerHTML = '';
-  var d = GRIEVANCE_DATA;
-
-  // ── Header ──
-  var header = document.createElement('div');
-  header.style.cssText = 'text-align:center;margin-bottom:14px;';
-  header.innerHTML = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Grievance</div>' +
-    '<div style="font-size:18px;font-weight:700;margin-top:4px;">Grievance Signature</div>';
-  app.appendChild(header);
-
-  // ── Grievance Summary card ──
-  var summaryCard = document.createElement('div');
-  summaryCard.className = 'card';
-  summaryCard.innerHTML =
-    '<div class="card-header">Grievance Summary</div>' +
-    '<div class="info-grid">' +
-    '<div><div class="label">Grievance ID</div><div class="value">' + _escHtml(d.grievanceId) + '</div></div>' +
-    '<div><div class="label">Status</div><div class="value"><span class="badge badge-pending">Awaiting Signature</span></div></div>' +
-    '<div><div class="label">Filed By</div><div class="value">' + _escHtml(d.stewardName || '') + '</div></div>' +
-    '<div><div class="label">Date Filed</div><div class="value">' + _escHtml(d.dateFiled || '') + '</div></div>' +
-    '</div>' +
-    '<div style="margin-top:8px;"><div class="label">Articles Violated</div><div class="value">' + _escHtml(d.articles || 'N/A') + '</div></div>' +
-    '<div><div class="label">Issue Category</div><div class="value">' + _escHtml(d.issueCategory || 'N/A') + '</div></div>' +
-    '<div><div class="label">Statement</div><div class="value" style="white-space:pre-wrap;">' + _escHtml(d.description || 'N/A') + '</div></div>' +
-    '<div><div class="label">Remedy Sought</div><div class="value" style="white-space:pre-wrap;">' + _escHtml(d.remedy || 'N/A') + '</div></div>';
-
-  // Document hash display
-  if (d.documentHash) {
-    summaryCard.innerHTML +=
-      '<div class="hash-display"><strong>Document Fingerprint:</strong> ' + _escHtml(d.documentHash) + '</div>';
+  } else {
+  statusEl.textContent = (result && result.message) || 'Error signing. Please try again.';
+  statusEl.style.color = 'var(--danger)';
   }
-  app.appendChild(summaryCard);
-
-  // ── Signature Canvas card ──
-  var sigCard = document.createElement('div');
-  sigCard.className = 'card';
-  sigCard.innerHTML = '<div class="card-header">Your Signature</div>' +
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Use your finger or stylus to sign below. Your signature will be permanently embedded into the grievance document.</div>';
-
-  var canvasWrap = document.createElement('div');
-  canvasWrap.className = 'sig-canvas-wrap';
-  canvasWrap.id = 'canvasWrap';
-
-  var placeholder = document.createElement('div');
-  placeholder.className = 'sig-placeholder';
-  placeholder.textContent = 'Sign here';
-  canvasWrap.appendChild(placeholder);
-
-  CANVAS = document.createElement('canvas');
-  CANVAS.id = 'sigCanvas';
-  CANVAS.setAttribute('aria-label', 'Draw your signature here');
-  CANVAS.setAttribute('role', 'img');
-  CANVAS.width = 480;
-  CANVAS.height = 180;
-  canvasWrap.appendChild(CANVAS);
-  sigCard.appendChild(canvasWrap);
-
-  // Clear button
-  var btnRow = document.createElement('div');
-  btnRow.className = 'btn-row';
-  var clearBtn = document.createElement('button');
-  clearBtn.className = 'btn btn-outline';
-  clearBtn.textContent = 'Clear';
-  clearBtn.style.flex = '0 0 auto';
-  clearBtn.style.width = 'auto';
-  clearBtn.style.padding = '6px 16px';
-  clearBtn.style.fontSize = '12px';
-  clearBtn.addEventListener('click', function() {
-    CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
-    HAS_DRAWN = false;
-    canvasWrap.classList.remove('active');
-  });
-  btnRow.appendChild(clearBtn);
-  sigCard.appendChild(btnRow);
-
-  // ── Confirmation checkbox ──
-  var confirmDiv = document.createElement('div');
-  confirmDiv.className = 'confirm-check';
-  var cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.id = 'confirmCb';
-  var cbLabel = document.createElement('label');
-  cbLabel.setAttribute('for', 'confirmCb');
-  cbLabel.textContent = 'I confirm that I have reviewed the grievance details above and authorize the filing of this grievance on my behalf. I understand my signature is being digitally bound to this specific document.';
-  confirmDiv.appendChild(cb);
-  confirmDiv.appendChild(cbLabel);
-  sigCard.appendChild(confirmDiv);
-
-  // Status message
-  var statusMsg = document.createElement('div');
-  statusMsg.className = 'status-msg';
-  statusMsg.id = 'statusMsg';
-  sigCard.appendChild(statusMsg);
-
-  // Submit button
-  var submitBtn = document.createElement('button');
-  submitBtn.className = 'btn btn-primary';
-  submitBtn.id = 'submitBtn';
-  submitBtn.textContent = 'Sign & Submit';
-  submitBtn.addEventListener('click', function() { submitSignature(submitBtn, statusMsg); });
-  sigCard.appendChild(submitBtn);
-
-  app.appendChild(sigCard);
-
-  // ── Initialize canvas drawing ──
-  initCanvas(canvasWrap);
-}
-
-function initCanvas(wrap) {
-  CTX = CANVAS.getContext('2d');
-
-  // Scale canvas for high-DPI screens
-  var rect = CANVAS.getBoundingClientRect();
-  var dpr = window.devicePixelRatio || 1;
-  CANVAS.width = rect.width * dpr;
-  CANVAS.height = 180 * dpr;
-  CANVAS.style.height = '180px';
-  CTX.scale(dpr, dpr);
-  CTX.lineCap = 'round';
-  CTX.lineJoin = 'round';
-  CTX.lineWidth = 2.5;
-  CTX.strokeStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#e5e7eb' : '#1a1a2e';
-
-  function getPos(e) {
-    var r = CANVAS.getBoundingClientRect();
-    var t = e.touches ? e.touches[0] : e;
-    return { x: t.clientX - r.left, y: t.clientY - r.top };
-  }
-
-  function startDraw(e) {
-    e.preventDefault();
-    DRAWING = true;
-    LAST_POINT = getPos(e);
-  }
-
-  function moveDraw(e) {
-    if (!DRAWING) return;
-    e.preventDefault();
-    var p = getPos(e);
-    CTX.beginPath();
-    CTX.moveTo(LAST_POINT.x, LAST_POINT.y);
-    CTX.lineTo(p.x, p.y);
-    CTX.stroke();
-    LAST_POINT = p;
-    // Only mark as drawn after actual movement (not just a tap)
-    if (!HAS_DRAWN) {
-      HAS_DRAWN = true;
-      wrap.classList.add('active');
-    }
-  }
-
-  function endDraw(e) {
-    if (DRAWING) e.preventDefault();
-    DRAWING = false;
-    LAST_POINT = null;
-  }
-
-  // Mouse events
-  CANVAS.addEventListener('mousedown', startDraw);
-  CANVAS.addEventListener('mousemove', moveDraw);
-  CANVAS.addEventListener('mouseup', endDraw);
-  CANVAS.addEventListener('mouseleave', endDraw);
-
-  // Touch events
-  CANVAS.addEventListener('touchstart', startDraw, { passive: false });
-  CANVAS.addEventListener('touchmove', moveDraw, { passive: false });
-  CANVAS.addEventListener('touchend', endDraw, { passive: false });
-  CANVAS.addEventListener('touchcancel', endDraw, { passive: false });
-
-  // Recalculate canvas buffer on resize/rotation (fixes coordinate offset)
-  function _resizeCanvas() {
-    // Save current drawing as image data
-    var imgData = null;
-    try { imgData = CTX.getImageData(0, 0, CANVAS.width, CANVAS.height); } catch (_e) { /* empty canvas */ }
-    var newRect = CANVAS.getBoundingClientRect();
-    var newDpr = window.devicePixelRatio || 1;
-    CANVAS.width = newRect.width * newDpr;
-    CANVAS.height = 180 * newDpr;
-    CTX.scale(newDpr, newDpr);
-    CTX.lineCap = 'round';
-    CTX.lineJoin = 'round';
-    CTX.lineWidth = 2.5;
-    CTX.strokeStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#e5e7eb' : '#1a1a2e';
-    if (imgData) { try { CTX.putImageData(imgData, 0, 0); } catch (_e) { /* dimension mismatch — user re-signs */ } }
-  }
-  window.addEventListener('resize', _resizeCanvas);
-  window.addEventListener('orientationchange', function() { setTimeout(_resizeCanvas, 200); });
-}
-
-function submitSignature(btn, statusEl) {
-  // Validate
-  if (!HAS_DRAWN) {
-    statusEl.textContent = 'Please draw your signature above.';
-    statusEl.style.color = 'var(--danger)';
-    return;
-  }
-  var cb = document.getElementById('confirmCb');
-  if (!cb || !cb.checked) {
-    statusEl.textContent = 'Please check the confirmation box.';
-    statusEl.style.color = 'var(--danger)';
-    return;
-  }
-
-  // Get signature as base64 PNG
-  var sigDataUrl = CANVAS.toDataURL('image/png');
-  // Strip data URL prefix — server only needs the base64
-  var sigBase64 = sigDataUrl.replace(/^data:image\/png;base64,/, '');
-
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Submitting&hellip;';
-  statusEl.textContent = 'Generating signed document...';
-  statusEl.style.color = 'var(--muted)';
-
-  google.script.run
-    .withSuccessHandler(function(result) {
-      btn.disabled = false;
-      btn.textContent = 'Sign & Submit';
-      if (result && result.success) {
-        statusEl.textContent = '';
-        // Show success state
-        var app = document.getElementById('app');
-        app.innerHTML = '';
-        var card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML =
-          '<div class="signed-display">' +
-          '<div class="checkmark">&#10004;</div>' +
-          '<div class="label">Grievance Signed Successfully</div>' +
-          '<div style="font-size:13px;color:var(--text);margin-top:10px;">' +
-          'Grievance <strong>' + _escHtml(GRIEVANCE_DATA.grievanceId) + '</strong> has been signed and filed.</div>' +
-          '<div style="font-size:12px;color:var(--muted);margin-top:8px;">' +
-          'A signed copy has been saved to your case folder. Your steward will be in touch with next steps.</div>' +
-          (result.driveFolderUrl && String(result.driveFolderUrl).indexOf('https://') === 0 ? '<a href="' + _escHtml(result.driveFolderUrl) + '" target="_blank" style="display:inline-block;margin-top:12px;font-size:13px;color:var(--accent);text-decoration:none;font-weight:600;">Open Case Folder</a>' : '') +
-          '</div>';
-        app.appendChild(card);
-      } else {
-        statusEl.textContent = (result && result.message) || 'Error signing. Please try again.';
-        statusEl.style.color = 'var(--danger)';
-      }
-    })
-    .withFailureHandler(function(err) {
-      btn.disabled = false;
-      btn.textContent = 'Sign & Submit';
-      statusEl.textContent = 'Failed: ' + (err && err.message ? err.message : 'Unknown error');
-      statusEl.style.color = 'var(--danger)';
-    })
-    .dataSubmitGrievanceSignature(SIGNATURE_TOKEN, sigBase64);
+ })
+ .withFailureHandler(function(err) {
+  btn.disabled = false;
+  btn.textContent = 'Sign & Submit';
+  statusEl.textContent = 'Failed: ' + (err && err.message ? err.message : 'Unknown error');
+  statusEl.style.color = 'var(--danger)';
+ })
+ .dataSubmitGrievanceSignature(SIGNATURE_TOKEN, sigBase64);
 }
 </script>
 </body>
