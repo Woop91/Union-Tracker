@@ -1,32 +1,40 @@
 /**
  * ============================================================================
- * 16_DashboardEnhancements.gs - Dashboard Enhancement Features
+ * 16_DashboardEnhancements.gs - DASHBOARD ENHANCEMENT FEATURES
  * ============================================================================
  *
- * Eight dashboard features that extend the public/executive dashboards:
+ * WHAT THIS FILE DOES:
+ *   Eight enhancement features for the steward/member dashboards:
+ *   (1) Custom date ranges for trend filtering, (2) Chart export to Drive
+ *   as PNG images, (3) Scheduled email reports with charts, (4) Web push
+ *   notifications (service worker), (5) Multi-user chart collaboration,
+ *   (6) Saved chart presets, (7) Advanced filtering options, (8) Multi-level
+ *   drill-down capabilities. saveChartImageToDrive() handles server-side
+ *   chart image storage.
  *
- * 1. Custom Date Ranges for Trend Analysis (client + server filter)
- * 2. Export Individual Charts as Images (client-side Chart.js canvas export)
- * 3. Scheduled Email Reports with Selected Charts
- * 4. Mobile App Push Notifications (web push via service worker)
- * 5. Multi-User Collaboration on Chart Selections
- * 6. Saved Chart Configurations (Presets)
- * 7. Advanced Filtering Options
- * 8. Drill-Down Capabilities (multi-level hierarchical)
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   These enhancements extend the base dashboards without modifying core
+ *   dashboard code. Chart export validates input (name sanitization, 10MB
+ *   size limit) before saving to Drive. Each feature is independently
+ *   callable — they don't depend on each other.
  *
- * @version 4.9.0
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Chart exports fail. Scheduled email reports stop. Custom date filtering
+ *   reverts to defaults. Drill-down navigation breaks. Core dashboard
+ *   display still works — these are supplementary features.
+ *
+ * DEPENDENCIES:
+ *   Depends on DriveApp (chart image storage), 01_Core.gs.
+ *   Used by the SPA dashboard views and menu items.
+ *
+ * @version 4.31.0
  * @license Free for use by non-profit collective bargaining groups and unions
+ * ============================================================================
  */
 
 // ============================================================================
 // 1. CUSTOM DATE RANGES - Server-side helpers
 // ============================================================================
-
-// getDateRangePresets removed — dead code cleanup v4.25.11
-
-// getTrendComparisonData removed — dead code cleanup v4.25.11
-
-
 // ============================================================================
 // 2. EXPORT INDIVIDUAL CHARTS AS IMAGES - Server-side download handler
 // ============================================================================
@@ -67,8 +75,6 @@ function getOrCreateExportFolder_() {
   }
   return DriveApp.createFolder(folderName);
 }
-
-
 // ============================================================================
 // 3. SCHEDULED EMAIL REPORTS
 // ============================================================================
@@ -96,7 +102,7 @@ function scheduleEmailReport(config) {
   var recipientRole = typeof getUserRole_ === 'function' ? getUserRole_(config.email) : null;
   if (recipientRole !== 'admin' && recipientRole !== 'steward') {
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* */ }
+    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     // Allow sending to self even if not steward/admin (non-PII only)
     if (config.includePII && callerEmail.toLowerCase() !== config.email.toLowerCase()) {
       return { success: false, error: 'Reports containing PII can only be sent to stewards or admins.' };
@@ -124,7 +130,6 @@ function scheduleEmailReport(config) {
   // Install trigger if not already installed
   installReportTrigger_();
 
-  EventBus.emit('report:scheduled', { scheduleId: schedule.id, email: schedule.email });
   return { success: true, schedule: schedule };
 }
 
@@ -212,7 +217,6 @@ function sendDashboardReportEmail_(schedule) {
     htmlBody: html
   });
 
-  EventBus.emit('report:sent', { scheduleId: schedule.id, email: schedule.email });
 }
 
 /**
@@ -264,11 +268,8 @@ function removeScheduledReport(scheduleId) {
   });
 
   props.setProperty('report_schedules', JSON.stringify(schedules));
-  EventBus.emit('report:removed', { scheduleId: scheduleId });
   return { success: true };
 }
-
-
 // ============================================================================
 // 4. NOTIFICATIONS (v4.22.0 — rerouted to sheet-based system in 05_Integrations.gs)
 // ============================================================================
@@ -333,15 +334,12 @@ function pushNotification(userEmail, notification) {
       'Dismissible'                                   // DISMISS_MODE
     ]);
 
-    EventBus.emit('notification:pushed', { userId: userEmail, notificationId: nextId });
     return { success: true, id: nextId };
   } catch (e) {
     Logger.log('pushNotification error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
-
-
 // ============================================================================
 // 5. MULTI-USER COLLABORATION ON CHART SELECTIONS
 // ============================================================================
@@ -386,7 +384,6 @@ function saveSharedView(view) {
     });
   }
 
-  EventBus.emit('collaboration:viewCreated', { viewId: sharedView.id });
   return { success: true, view: sharedView };
   });
 }
@@ -447,7 +444,6 @@ function addViewComment(viewId, commentText) {
         });
       }
 
-      EventBus.emit('collaboration:commentAdded', { viewId: viewId, commentId: comment.id });
       return { success: true, comment: comment };
     }
   }
@@ -474,11 +470,8 @@ function deleteSharedView(viewId) {
   }
 
   props.setProperty('shared_views', JSON.stringify(filtered));
-  EventBus.emit('collaboration:viewDeleted', { viewId: viewId });
   return { success: true };
 }
-
-
 // ============================================================================
 // 6. SAVED CHART CONFIGURATIONS (PRESETS)
 // ============================================================================
@@ -513,7 +506,6 @@ function saveChartPreset(preset) {
   presets.push(chartPreset);
   props.setProperty('chart_presets', JSON.stringify(presets));
 
-  EventBus.emit('preset:saved', { presetId: chartPreset.id, name: chartPreset.name });
   return { success: true, preset: chartPreset };
   });
 }
@@ -539,12 +531,8 @@ function deleteChartPreset(presetId) {
   presets = presets.filter(function(p) { return p.id !== presetId; });
   props.setProperty('chart_presets', JSON.stringify(presets));
 
-  EventBus.emit('preset:deleted', { presetId: presetId });
   return { success: true };
 }
-
-// updateChartPreset removed — dead code cleanup v4.25.11
-
 
 // ============================================================================
 // 7. ADVANCED FILTERING OPTIONS
@@ -663,16 +651,6 @@ function getFilteredDashboardData(isPII, filters) {
   fullData.filtersApplied = filters;
   return JSON.stringify(fullData);
 }
-
-// getAvailableFilterOptions removed — dead code cleanup v4.25.11
-
-// saveFilterPreset removed — dead code cleanup v4.25.11
-
-// getFilterPresets removed — dead code cleanup v4.25.11
-
-// deleteFilterPreset removed — dead code cleanup v4.25.11
-
-
 // ============================================================================
 // 8. DRILL-DOWN CAPABILITIES (Multi-level hierarchical)
 // ============================================================================
@@ -778,4 +756,3 @@ function getSubGroupDimensions_(chartType) {
   });
 }
 
-// getDrillDownSummary removed — dead code cleanup v4.25.11

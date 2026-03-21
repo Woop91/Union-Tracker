@@ -3,16 +3,33 @@
  * 08a_SheetSetup.gs - Sheet Creation and Management
  * ============================================================================
  *
- * This module handles all sheet creation functions including:
- * - Main dashboard setup (CREATE_DASHBOARD)
- * - Individual sheet creation (Config, Member Directory, Grievance Log, etc.)
- * - Sheet ordering and organization
- * - Hidden sheet setup
+ * WHAT THIS FILE DOES:
+ *   Master setup function (CREATE_DASHBOARD) and individual sheet creation
+ *   functions. Creates Config, Member Directory, Grievance Log, Resources,
+ *   Notifications, and all hidden system sheets with proper headers,
+ *   formatting, protection, and data validation rules.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Single entry point for first-time setup or full rebuild. Each sheet
+ *   creation function is idempotent — checks if sheet exists before creating.
+ *   Sheet ordering is enforced to match the expected tab layout. Hidden sheets
+ *   use setSheetVeryHidden_() so users can't accidentally unhide
+ *   PII-containing system sheets via the menu.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   New installations can't set up the dashboard. Missing sheets cause
+ *   cascading failures across all modules. Existing installations are
+ *   unaffected unless REPAIR is called.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, column constants, COLORS),
+ *   00_Security.gs (escapeForFormula). Used by Admin menu
+ *   (CREATE_DASHBOARD), 06_Maintenance.gs (REPAIR_DASHBOARD), and
+ *   first-time setup flow.
  *
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Sheet creation and management functions
- * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -50,7 +67,7 @@ function CREATE_DASHBOARD() {
       '• Member Directory\n' +
       '• Grievance Log (with Action Type dropdown)\n' +
       '• ✅ Case Checklist (track grievance tasks)\n' +
-      '• 📊 Member Satisfaction (Survey tracking)\n' +
+      '• 📊 Member Satisfaction (Survey tracking, hidden)\n' +
       '• 💡 Feedback & Development (Bug/feature tracking)\n' +
       '• 🤝 Volunteer Hours (track volunteer activities)\n' +
       '• 📅 Meeting Attendance (track meeting participation)\n' +
@@ -300,7 +317,7 @@ function CREATE_DASHBOARD() {
         '15+ sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
-        '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
+        '• 📊 Member Satisfaction (hidden), 💡 Feedback (tracking)\n' +
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
@@ -390,6 +407,22 @@ function _ensureStewardTasksSheet(ss) {
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
+
+// v4.32.0 SHEET SETUP — Grievance Feedback
+function _ensureGrievanceFeedbackSheet(ss) {
+  var name = SHEETS.GRIEVANCE_FEEDBACK;
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, 10).setValues([[
+      'ID', 'Grievance ID', 'Member Email', 'Steward Email',
+      'Satisfaction', 'Communication', 'Timeliness', 'Fairness',
+      'Comment', 'Created'
+    ]]);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
 
 /**
  * Gets or creates a sheet by name
@@ -542,8 +575,6 @@ function setupHiddenSheets(ss) {
   }
 }
 
-
-
 /**
  * ============================================================================
  * DataValidation.gs - Data Validation and Multi-Select
@@ -573,7 +604,7 @@ function setupHiddenSheets(ss) {
 function setupDataValidations() {
   // Re-sync column maps from actual sheet headers before applying validations.
   // This guarantees dropdowns land on the correct columns even if the layout changed.
-  try { syncColumnMaps(); } catch (_e) { /* proceed with defaults */ }
+  try { syncColumnMaps(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -627,9 +658,6 @@ function setupDataValidations() {
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Data validations applied successfully!', '✅ Success', 3);
 }
-
-// setMemberIdValidation removed — dead code cleanup v4.25.11
-
 /**
  * Sets dropdown validation from Config sheet
  * @param {Sheet} targetSheet - Sheet to apply validation
@@ -752,6 +780,7 @@ function applyMultiSelectValue(value) {
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Sheet "' + sheetName + '" not found');
   sheet.getRange(row, col).setValue(value);
 
   // Clear all multi-select state including the de-dup guard so
@@ -913,12 +942,6 @@ function removeMultiSelectTrigger() {
     SpreadsheetApp.getUi().alert('Multi-Select auto-open was already disabled.');
   }
 }
-
-// setDropdownValidationDynamic removed — dead code cleanup v4.25.11
-
-// setMultiSelectValidationDynamic removed — dead code cleanup v4.25.11
-
-
 
 /**
  * ============================================================================

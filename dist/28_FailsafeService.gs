@@ -3,14 +3,34 @@
  * 28_FailsafeService.gs - Data Failsafe / Recovery System
  * ============================================================================
  *
- * Scheduled email digests and Google Drive CSV backups for data resilience.
+ * WHAT THIS FILE DOES:
+ *   Data resilience system with scheduled email digests and Google Drive CSV
+ *   backups. Members can opt into periodic email digests of their grievance/
+ *   workload/task data. Automatic weekly Drive backups export key sheets as
+ *   CSV files to a DDS_Dashboard_Backups folder. Maintains maximum 52 backup
+ *   files (~1 year of weekly backups per sheet).
  *
- * Sheet:
- *   _Failsafe_Config — member digest preferences (7 columns)
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Failsafe protects against data loss from accidental sheet deletion,
+ *   corruption, or access revocation. Email digests give members a personal
+ *   copy of their data outside of Google Sheets. Drive CSV backups are simple
+ *   and universal — any spreadsheet tool can read them. The 52-file cap
+ *   prevents Drive storage bloat while maintaining a full year of recovery
+ *   points. Sheet reads are cached (120s TTL) to avoid redundant
+ *   getDataRange() calls.
  *
- * @fileoverview Failsafe Service IIFE module
- * @version 4.22.8
- * @requires 01_Core.gs, 06_Maintenance.gs
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Email digests stop sending — members lose their periodic data summaries.
+ *   Drive backups stop — the last backup becomes the most recent recovery
+ *   point. If the sheet is corrupted after the failsafe stops, there's no
+ *   automated recovery. Existing backups in Drive are unaffected.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS), DriveApp, MailApp (GAS built-ins),
+ *   CacheService. Used by weekly backup trigger and member digest
+ *   preferences in the SPA.
+ *
+ * @version 4.31.0
  */
 
 var FailsafeService = (function () {
@@ -50,7 +70,7 @@ var FailsafeService = (function () {
       var cacheKey = 'fs_sheet_' + sheetName;
       var cached = cache.get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch (_e) { /* fall through to fresh read */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
     var sheet = ss.getSheetByName(sheetName);
@@ -58,7 +78,7 @@ var FailsafeService = (function () {
     var data = sheet.getDataRange().getValues();
     try {
       cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
-    } catch (_e) { /* CacheService 100KB limit — fail silently */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     return data;
   }
 
@@ -103,6 +123,7 @@ var FailsafeService = (function () {
     var eml = email.toLowerCase().trim();
     var frequency = config.frequency === 'monthly' ? 'monthly' : 'weekly';
 
+    // M10: Acquire lock BEFORE reading sheet to prevent stale-read race
     var lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
@@ -435,7 +456,7 @@ var FailsafeService = (function () {
       allFiles.sort(function(a, b) { return b.name < a.name ? -1 : b.name > a.name ? 1 : 0; });
       // Delete everything beyond MAX_BACKUP_FILES
       for (var i = MAX_BACKUP_FILES; i < allFiles.length; i++) {
-        try { allFiles[i].file.setTrashed(true); } catch (_e) { /* ignore */ }
+        try { allFiles[i].file.setTrashed(true); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
     });
   }
@@ -444,7 +465,7 @@ var FailsafeService = (function () {
     var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
     if (folders.hasNext()) return folders.next();
     // SEC-07: Restrict sharing so only the script owner can access PII-containing backups
-    var folder = DriveApp.createFolder(BACKUP_FOLDER_NAME);
+    var folder = executeWithRetry(function() { return DriveApp.createFolder(BACKUP_FOLDER_NAME); }, { maxRetries: 2, baseDelay: 500 });
     try {
       folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
       folder.setDescription('Automated backups — contains member PII. Do not share.');
@@ -470,6 +491,73 @@ var FailsafeService = (function () {
   function _fmtDate(date) { return fmtDateShort_(date); }
 
   // ═══════════════════════════════════════
+  // Drive Backup Restore
+  // ═══════════════════════════════════════
+
+  /**
+   * Restores sheet data from a Drive CSV backup file.
+   * Creates a pre-restore backup before overwriting.
+   * @param {string} fileId - Google Drive file ID of the CSV backup
+   * @param {string} sheetName - Target sheet name to restore into
+   * @param {boolean} confirmed - Must be true to proceed (safety gate)
+   * @returns {Object} { success, message, rowsRestored }
+   */
+  function restoreFromDriveBackup(fileId, sheetName, confirmed) {
+    if (!confirmed) return { success: false, message: 'Restore requires explicit confirmation (confirmed=true).' };
+    if (!fileId || !sheetName) return { success: false, message: 'fileId and sheetName are required.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return { success: false, message: 'Sheet "' + sheetName + '" not found.' };
+
+    // Read CSV from Drive
+    var file;
+    try {
+      file = DriveApp.getFileById(fileId);
+    } catch (e) {
+      return { success: false, message: 'Could not access file: ' + e.message };
+    }
+    var csv = file.getBlob().getDataAsString();
+    var rows = Utilities.parseCsv(csv);
+    if (!rows || rows.length === 0) return { success: false, message: 'CSV file is empty.' };
+
+    // Validate column count matches
+    var currentCols = sheet.getLastColumn();
+    if (currentCols > 0 && rows[0].length !== currentCols) {
+      return { success: false, message: 'Column mismatch: backup has ' + rows[0].length + ' columns, sheet has ' + currentCols + '. Restore aborted.' };
+    }
+
+    // Create pre-restore backup (very-hidden sheet)
+    var backupName = '_PreRestore_' + sheetName.replace(/\s/g, '_') + '_' + Utilities.formatDate(new Date(), 'UTC', 'yyyyMMdd_HHmmss');
+    try {
+      var backup = sheet.copyTo(ss).setName(backupName);
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(backup); else backup.hideSheet();
+    } catch (backupErr) {
+      return { success: false, message: 'Could not create pre-restore backup: ' + backupErr.message };
+    }
+
+    // Restore data
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) return { success: false, message: 'Could not acquire lock for restore.' };
+    var restoreErr = null;
+    try {
+      sheet.clearContents();
+      sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+    } catch (e) {
+      restoreErr = e;
+    } finally {
+      lock.releaseLock();
+    }
+    if (restoreErr) {
+      return { success: false, message: 'Restore write failed: ' + restoreErr.message + '. Pre-restore backup saved as "' + backupName + '".' };
+    }
+
+    logAuditEvent('FAILSAFE_RESTORE', 'Restored ' + sheetName + ' from Drive file ' + fileId + ' (' + rows.length + ' rows). Pre-restore backup: ' + backupName);
+    return { success: true, message: 'Restored ' + rows.length + ' rows to "' + sheetName + '". Pre-restore backup: "' + backupName + '".', rowsRestored: rows.length };
+  }
+
+  // ═══════════════════════════════════════
   // Public API
   // ═══════════════════════════════════════
 
@@ -481,16 +569,11 @@ var FailsafeService = (function () {
     triggerBulkExport: triggerBulkExport,
     backupCriticalSheets: backupCriticalSheets,
     setupFailsafeTriggers: setupFailsafeTriggers,
-    removeFailsafeTriggers: removeFailsafeTriggers
+    removeFailsafeTriggers: removeFailsafeTriggers,
+    restoreFromDriveBackup: restoreFromDriveBackup
   };
 
 })();
-
-
-// ═══════════════════════════════════════
-// GLOBAL WRAPPERS (callable from client via google.script.run)
-// ═══════════════════════════════════════
-
 // ═══════════════════════════════════════
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
@@ -548,6 +631,12 @@ function fsInitSheets(sessionToken) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
   return FailsafeService.initFailsafeSheet();
+}
+
+function fsRestoreFromBackup(sessionToken, fileId, sheetName, confirmed) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Not authorized.' };
+  return FailsafeService.restoreFromDriveBackup(fileId, sheetName, confirmed);
 }
 
 /**
@@ -648,7 +737,7 @@ function fsDiagnostic(sessionToken) {
   try {
     var testAuth = checkWebAppAuthorization('steward', sessionToken);
     authOk = testAuth && testAuth.isAuthorized;
-  } catch (_) {}
+  } catch (_) { Logger.log('_: ' + (_.message || _)); }
 
   return {
     success: true,

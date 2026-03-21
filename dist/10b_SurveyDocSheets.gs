@@ -1,3 +1,31 @@
+/**
+ * ============================================================================
+ * 10b_SurveyDocSheets.gs — Survey Questions Sheet Creation
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Survey Questions sheet creation with 16-column dynamic schema (v4.23.0).
+ *   Creates the owner-editable survey configuration sheet where admins define
+ *   questions, types (likert/multi-choice/text/slider), branching logic, and
+ *   section groupings. Non-destructive: only adds questions that don't already
+ *   exist (matched by Question ID).
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Schema-driven design lets the spreadsheet owner customize survey questions
+ *   without code changes. 16 columns cover question text, type, options,
+ *   branching (parent/value/target), slider labels, and notes. Safe to re-run:
+ *   uses Question ID as unique key, never overwrites existing rows.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Survey questions can't be created/updated. initSurveyEngine() will fail.
+ *   The SPA survey tab shows no questions. Existing survey data is preserved
+ *   (this only manages the questions sheet, not responses).
+ *
+ * DEPENDENCIES:
+ *   Depends on: 01_Core.gs (SHEETS, SURVEY_QUESTIONS_COLS)
+ *   Used by:    08e_SurveyEngine.gs (initSurveyEngine), 08a_SheetSetup.gs (CREATE_DASHBOARD)
+ */
+
 // ============================================================================
 // SURVEY QUESTIONS SHEET — v4.23.0 Dynamic Schema
 // Owner-editable: Question Text, Active, Options, Slider Min/Max, Notes
@@ -31,8 +59,8 @@ function createSurveyQuestionsSheet(ss) {
   sheet.getRange(1, 1, 1, NUM_COLS)
     .setValues([headers])
     .setFontWeight('bold')
-    .setBackground(SHEET_COLORS.LINK_PRIMARY)
-    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setBackground('#1a73e8')
+    .setFontColor('#ffffff')
     .setWrap(true);
   sheet.setFrozenRows(1);
 
@@ -151,7 +179,17 @@ function createSurveyQuestionsSheet(ss) {
     ['q73','12','RTO_CHANGE','Return-to-Office Change','The union negotiated the best outcome it could on the office day requirement.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
     ['q74','12','RTO_CHANGE','Return-to-Office Change','The transition from 2 to 3 office days has negatively impacted my work-life balance.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree','Reverse-sentiment question'],
     ['q75','12','RTO_CHANGE','Return-to-Office Change','I am confident the union will continue to advocate on office day requirements going forward.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q76','12','RTO_CHANGE','Return-to-Office Change','What could the union or stewards have done differently regarding the office day change? (optional)','paragraph','N','Y','','','','','','','','Optional open text']
+    ['q76','12','RTO_CHANGE','Return-to-Office Change','What could the union or stewards have done differently regarding the office day change? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
+    // ── Section 13: Workforce Mobility & Retention ──────────────────────────
+    // Always shown — gauges retention risk and transfer awareness across membership.
+    // q82–q83 are conditional (Section 13A) on q81=Yes.
+    ['q80','13','WORKFORCE_RETENTION','Workforce Mobility','How likely are you to still be working at DDS one year from now?','radio','Y','Y','Very Likely|Likely|Uncertain|Unlikely|Very Unlikely','','','','','','',''],
+    ['q81','13','WORKFORCE_RETENTION','Workforce Mobility','Are you currently exploring job opportunities outside of DDS?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 13A (q82, q83)'],
+    ['q84','13','WORKFORCE_RETENTION','Workforce Mobility','The union is effectively addressing the workplace factors that most influence members\' decisions to stay or leave.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
+    ['q86','13','WORKFORCE_RETENTION','Workforce Mobility','What would most encourage you to stay at DDS? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
+    // ── Section 13A: Leaving DDS (Q81=Yes) ──────────────────────────────────
+    ['q82','13A','WORKFORCE_LEAVING','Exploring Outside DDS','What types of opportunities are you exploring outside of DDS? Select all that apply.','checkbox','Y','Y','Transfer to another MA state agency|Leaving state service entirely|Private sector|Non-profit or education|Not sure yet','q81','Yes','','2','','','Max 2 selections. Only shown if Q81=Yes. Outside-DDS options only.'],
+    ['q83','13A','WORKFORCE_LEAVING','Exploring Outside DDS','What are the primary reasons you are considering leaving? Select up to 3.','checkbox','Y','Y','Pay & Benefits|Workload / Caseload|Management & Supervision|Limited Advancement or Transfer Opportunities|Work-Life Balance|Return-to-Office Policy|Job Stress / Burnout|Workplace Culture|Other','q81','Yes','','3','','','Max 3 selections. Q85 transfer awareness folded into \"Limited Advancement or Transfer Opportunities\" option. Only shown if Q81=Yes']
   ];
 
   // Build set of existing question IDs so we don't overwrite user edits
@@ -172,16 +210,17 @@ function createSurveyQuestionsSheet(ss) {
 
     // Color rows by section
     var sectionColors = {
-      WORK_CONTEXT:   SHEET_COLORS.BG_LIGHT_BLUE_ALT, OVERALL_SAT:  SHEET_COLORS.BG_LIGHT_GREEN,
+      WORK_CONTEXT:   '#e3f2fd', OVERALL_SAT:  '#e8f5e9',
       STEWARD_3A:     '#f3e5f5', STEWARD_3B:   '#fce4ec',
-      CHAPTER:        SHEET_COLORS.BG_WARM, LEADERSHIP:   SHEET_COLORS.BG_EXTRA_PALE_YELLOW,
+      CHAPTER:        '#fff3e0', LEADERSHIP:   '#fffde7',
       CONTRACT:       '#e0f2f1', REPRESENTATION:'#e0f7fa',
       COMMUNICATION:  '#e8eaf6', MEMBER_VOICE: '#fbe9e7',
       VALUE_ACTION:   '#f9fbe7', SCHEDULING:   '#efebe9',
-      PRIORITIES:     '#f5f5f5', RTO_CHANGE:   SHEET_COLORS.BG_CREAM
+      PRIORITIES:     '#f5f5f5', RTO_CHANGE:   '#fff8e1',
+      WORKFORCE_RETENTION: '#e8f4f8', WORKFORCE_LEAVING: '#fdecea'
     };
     toAdd.forEach(function(row, i) {
-      var color = sectionColors[String(row[2]).trim()] || SHEET_COLORS.BG_WHITE;
+      var color = sectionColors[String(row[2]).trim()] || '#ffffff';
       sheet.getRange(startRow + i, 1, 1, NUM_COLS).setBackground(color);
     });
   }
@@ -235,7 +274,7 @@ function clearSurveyQuestionsCache() {
         'Survey questions cache cleared. Changes take effect immediately on next load.',
         'Cache Cleared', 4
       );
-    } catch(_ui) {}
+    } catch (_ui) { Logger.log('_ui: ' + (_ui.message || _ui)); }
   } catch(e) {
     Logger.log('clearSurveyQuestionsCache error: ' + e.message);
   }
@@ -289,8 +328,8 @@ function createSatisfactionSheet(ss) {
     sheet.getRange(1, 1, 1, headers.length)
       .setValues([headers])
       .setFontWeight('bold')
-      .setBackground(SHEET_COLORS.LINK_PRIMARY)
-      .setFontColor(SHEET_COLORS.TEXT_WHITE)
+      .setBackground('#1a73e8')
+      .setFontColor('#ffffff')
       .setWrap(false);
 
     // Column widths
@@ -363,32 +402,32 @@ function createFeedbackSheet(ss) {
   // Critical = Red
   var criticalRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Critical')
-    .setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_RED)
+    .setBackground('#FFCDD2')
+    .setFontColor('#B71C1C')
     .setRanges([priorityRange])
     .build();
 
   // High = Orange
   var highRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('High')
-    .setBackground(SHEET_COLORS.BG_LIGHT_ORANGE)
-    .setFontColor(SHEET_COLORS.TEXT_ORANGE)
+    .setBackground('#FFE0B2')
+    .setFontColor('#E65100')
     .setRanges([priorityRange])
     .build();
 
   // Medium = Yellow
   var mediumRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Medium')
-    .setBackground(SHEET_COLORS.BG_PALE_YELLOW)
-    .setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
+    .setBackground('#FFF9C4')
+    .setFontColor('#F57F17')
     .setRanges([priorityRange])
     .build();
 
   // Low = Green
   var lowRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Low')
-    .setBackground(SHEET_COLORS.BG_GREEN_ALT)
-    .setFontColor(SHEET_COLORS.TEXT_GREEN_DARK)
+    .setBackground('#C8E6C9')
+    .setFontColor('#1B5E20')
     .setRanges([priorityRange])
     .build();
 
@@ -398,8 +437,8 @@ function createFeedbackSheet(ss) {
   // Resolved = Green
   var resolvedRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Resolved')
-    .setBackground(SHEET_COLORS.BG_GREEN_ALT)
-    .setFontColor(SHEET_COLORS.TEXT_GREEN_DARK)
+    .setBackground('#C8E6C9')
+    .setFontColor('#1B5E20')
     .setRanges([statusRange])
     .build();
 
@@ -407,7 +446,7 @@ function createFeedbackSheet(ss) {
   var inProgressRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('In Progress')
     .setBackground('#BBDEFB')
-    .setFontColor(SHEET_COLORS.HEADER_BLUE)
+    .setFontColor('#0D47A1')
     .setRanges([statusRange])
     .build();
 
@@ -709,6 +748,7 @@ function createFunctionChecklistSheet_() {
   var menuItems = [
     // ═══ PHASE 1: Foundation & Setup (Test these first!) ═══
     ['1️⃣ Foundation', '🏗️ Setup', '🔧 REPAIR DASHBOARD', 'REPAIR_DASHBOARD', 'Repairs all hidden sheets, reapplies formulas, fixes broken references'],
+    ['1️⃣ Foundation', '🛠️ Admin', '🔄 UPDATE ALL SHEETS', 'UPDATE_ALL_SHEETS', 'Updates every tab: headers, validations, hidden sheets, protections, sheet order, data sync'],
     ['1️⃣ Foundation', '⚙️ Administrator', '🔍 DIAGNOSE SETUP', 'DIAGNOSE_SETUP', 'Checks sheet structure, triggers, and configuration for issues'],
     ['1️⃣ Foundation', '⚙️ Administrator', '🔍 Verify Hidden Sheets', 'verifyHiddenSheets', 'Validates all 6 hidden calculation sheets exist and have correct formulas'],
     ['1️⃣ Foundation', '⚙️ Admin > Setup', '🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets', 'Creates/recreates all hidden sheets with self-healing formulas'],
@@ -730,7 +770,7 @@ function createFunctionChecklistSheet_() {
     ['3️⃣ Dashboards', '👤 Dashboard', '⚡ Quick Actions', 'showQuickActionsMenu', 'Popup menu for common actions (add member, new grievance, etc.)'],
     ['3️⃣ Dashboards', '👤 Dashboard', '📊 Member Satisfaction', 'showSatisfactionDashboard', 'Survey results dashboard with trends and insights'],
     ['3️⃣ Dashboards', '👤 Dashboard', '🔒 Secure Member Portal', 'showPublicMemberDashboard', 'PII-safe member dashboard with charts and stats'],
-    ['3️⃣ Dashboards', '📊 Sheet Manager', '📊 Rebuild Dashboard', 'rebuildDashboard', 'Recreates the Dashboard sheet with fresh formulas'],
+    ['3️⃣ Dashboards', '📊 Sheet Manager', '📊 Steward Dashboard', 'showStewardDashboard', 'Opens the unified Steward Dashboard modal'],
     ['3️⃣ Dashboards', '📊 Sheet Manager', '🔄 Refresh All Formulas', 'refreshAllFormulas', 'Recalculates all formulas across all sheets'],
 
     // ═══ PHASE 4: Search ═══
@@ -789,13 +829,13 @@ function createFunctionChecklistSheet_() {
     ['1️⃣3️⃣ Test', '🧪 Testing', '📊 View Test Results', 'viewTestResults', 'Shows results from last test run with pass/fail details'],
 
     // ═══ PHASE 14: Strategic Command Center (Command Menu) - Modal Architecture ═══
-    ['1️⃣4️⃣ Command', '📊 Command', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'MODAL: Internal dashboard with KPIs, steward workload, Chart.js visuals'],
+    ['1️⃣4️⃣ Command', '📊 Command', '👁️ Executive Command (PII)', 'showStewardDashboard', 'MODAL: Internal dashboard with KPIs, steward workload, Chart.js visuals'],
     ['1️⃣4️⃣ Command', '📊 Command', '🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'MODAL: PII-safe dashboard with morale gauge, pipeline, sentiment trends'],
     ['1️⃣4️⃣ Command', '📊 Command', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails member portal access instructions to specified recipient'],
-    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'MODAL: Identifies locations with 3+ active grievances'],
-    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '🌟 Identify Rising Stars', 'identifyRisingStars', 'MODAL: Shows top steward performers by score and win rate'],
-    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '📉 Management Hostility Report', 'renderHostilityFunnel', 'MODAL: Analyzes denial rates across grievance steps'],
-    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'MODAL: Strategic data for contract negotiations'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '🔥 Unit Hot Zones', 'showStewardDashboard', 'MODAL: Hot Spots tab — identifies locations with 3+ active grievances'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '🌟 Steward Performance', 'showStewardDashboard', 'MODAL: Workload tab — shows top steward performers by score and win rate'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '📉 Management Hostility Report', 'showStewardDashboard', 'MODAL: Bargaining tab — analyzes denial rates across grievance steps'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '📝 Bargaining Cheat Sheet', 'showStewardDashboard', 'MODAL: Bargaining tab — strategic data for contract negotiations'],
     ['1️⃣4️⃣ Command', '📊 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates name-based Member IDs (e.g., MJASM472)'],
     ['1️⃣4️⃣ Command', '📊 Command > ID Engine', '🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs', 'Finds and highlights duplicate Member IDs'],
     ['1️⃣4️⃣ Command', '📊 Command > ID Engine', '📄 Create PDF for Grievance', 'createPDFForSelectedGrievance', 'Generates PDF with signature blocks for selected grievance'],
@@ -840,8 +880,6 @@ function createFunctionChecklistSheet_() {
     // ═══ PHASE 18: Navigation & Views (v4.1) ═══
     ['1️⃣8️⃣ Navigation', '📊 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
     ['1️⃣8️⃣ Navigation', '📊 Command > View', '🖥️ Show All Columns', 'showAllMemberColumns', 'Restores all columns after mobile view'],
-    ['1️⃣8️⃣ Navigation', '📊 Command > View', '📊 Go to Dashboard', 'navigateToDashboard', 'Navigate to Executive Dashboard'],
-    ['1️⃣8️⃣ Navigation', '📊 Command > View', '🎯 Go to Custom View', 'navigateToCustomView', 'Navigate to Custom View sheet'],
 
     // ═══ PHASE 19: Web App & Member Portal (v4.2) ═══
     ['1️⃣9️⃣ Web App', '🌐 Web App', '🚀 doGet Entry Point', 'doGet', 'Web app entry point - handles ?id= parameter for member portal'],
@@ -897,22 +935,22 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard', '⚡ Quick Actions', 'showQuickActionsMenu', 'Popup menu for common actions'],
 
     // Command Menu - New Items
-    ['2️⃣0️⃣ v4.2.1', '📊 Command > Command Center', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'Internal dashboard with KPIs'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Command Center', '👁️ Executive Command (PII)', 'showStewardDashboard', 'Internal dashboard with KPIs'],
     ['2️⃣0️⃣ v4.2.1', '📊 Command > Command Center', '👥 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'PII-safe dashboard with charts'],
     ['2️⃣0️⃣ v4.2.1', '📊 Command > Command Center', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails member portal access'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ grievances'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'Strategic data for negotiations'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '🔥 Unit Hot Zones', 'showStewardDashboard', 'Hot Spots tab — identifies locations with 3+ grievances'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '🌟 Steward Performance', 'showStewardDashboard', 'Workload tab — shows top steward performers'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '📉 Management Hostility Report', 'showStewardDashboard', 'Bargaining tab — analyzes denial rates'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'showStewardDashboard', 'Bargaining tab — strategic data for negotiations'],
     ['2️⃣0️⃣ v4.2.1', '📊 Command > Steward Management', '📧 Send Contact Form', 'sendContactInfoForm', 'Sends contact info update form'],
     ['2️⃣0️⃣ v4.2.1', '📊 Command > Steward Management', '📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink', 'Gets link to member satisfaction survey'],
 
     // COMMAND CENTER Menu - New Items
     ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Field Accessibility', '📱 Get Mobile App URL', 'showWebAppUrl', 'Retrieves and displays deployed web app URL for mobile'],
-    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ grievances'],
-    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers'],
-    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates'],
-    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'Strategic data for negotiations'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🔥 Unit Hot Zones', 'showStewardDashboard', 'Hot Spots tab — identifies locations with 3+ grievances'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🌟 Steward Performance', 'showStewardDashboard', 'Workload tab — shows top steward performers'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '📉 Management Hostility Report', 'showStewardDashboard', 'Bargaining tab — analyzes denial rates'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'showStewardDashboard', 'Bargaining tab — strategic data for negotiations'],
     ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '👤 Build Member Portal', 'buildMemberPortal', 'Creates personalized member portal'],
     ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '📊 Build Public Portal', 'buildPublicPortal', 'Creates PII-free public portal'],
     ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '📧 Send Portal Email', 'sendMemberDashboardEmail', 'Emails personalized portal link'],
@@ -956,14 +994,14 @@ function createFunctionChecklistSheet_() {
   // Alternating colors
   for (var r = 2; r <= rows.length; r++) {
     if (r % 2 === 0) {
-      sheet.getRange(r, 1, 1, 7).setBackground(SHEET_COLORS.BG_LIGHT_GRAY);
+      sheet.getRange(r, 1, 1, 7).setBackground('#F9FAFB');
     }
   }
 
   // Conditional formatting for checked items
   var rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$A2=TRUE')
-    .setBackground(SHEET_COLORS.BG_LIGHT_GREEN)
+    .setBackground('#E8F5E9')
     .setRanges([sheet.getRange(2, 1, rows.length - 1, 7)])
     .build();
   sheet.setConditionalFormatRules([rule]);
@@ -1001,7 +1039,7 @@ function createGettingStartedSheet(ss) {
   var stepBg = COLORS.ROW_ALT_GREEN;       // Light green for steps
   var tipBg = COLORS.GRADIENT_MID_LOW;     // Light yellow for tips
   var textColor = '#1F2937';
-  var white = SHEET_COLORS.TEXT_WHITE;
+  var white = '#FFFFFF';
 
   var row = 1;
 
@@ -1020,7 +1058,7 @@ function createGettingStartedSheet(ss) {
   sheet.getRange(row, 1, 1, 6).merge()
     .setValue('Welcome! This guide will help you set up and use the Dashboard effectively.')
     .setFontSize(12)
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setFontColor('#6B7280')
     .setHorizontalAlignment('center');
 
   // ═══ SECTION 1: FIRST-TIME SETUP ═══
@@ -1121,8 +1159,6 @@ function createGettingStartedSheet(ss) {
   sheet.setRowHeight(row, 35);
 
   var dashboardInfo = [
-    ['💼 Dashboard', 'Executive overview with key metrics, steward performance, and trends'],
-    ['📊 Member Satisfaction', 'Survey results dashboard (requires linked Google Form)'],
     ['📋 Survey Tracker', 'Tracks per-member survey completion across rounds. Auto-detects completions via email matching when members submit the Google Form. Manage via showSurveyTrackingDialog().'],
     ['📱 Mobile Dashboard', 'Touch-friendly view for phones and tablets']
   ];
@@ -1172,7 +1208,7 @@ function createGettingStartedSheet(ss) {
     .setBackground(tipBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE);
+    .setFontColor('#92400E');
   sheet.setRowHeight(row, 35);
 
   var tips = [
@@ -1186,14 +1222,14 @@ function createGettingStartedSheet(ss) {
 
   for (var p = 0; p < tips.length; p++) {
     row++;
-    sheet.getRange(row, 1, 1, 6).merge().setValue(tips[p]).setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE).setBackground(tipBg);
+    sheet.getRange(row, 1, 1, 6).merge().setValue(tips[p]).setFontColor('#92400E').setBackground(tipBg);
   }
 
   // ═══ FOOTER ═══
   row += 2;
   sheet.getRange(row, 1, 1, 6).merge()
     .setValue('Need more help? Check the ❓ FAQ tab or the Config tab\'s User Guide section.')
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setFontColor('#6B7280')
     .setFontStyle('italic')
     .setHorizontalAlignment('center');
 
@@ -1235,7 +1271,7 @@ function createFAQSheet(ss) {
   // Define colors
   var headerBg = COLORS.UNION_GREEN;       // Green header
   var questionBg = COLORS.ROW_ALT_GREEN;  // Light green for questions
-  var answerBg = SHEET_COLORS.BG_WHITE;       // White for answers
+  var answerBg = '#FFFFFF';       // White for answers
   var categoryBg = COLORS.GRADIENT_LOW;   // Medium green for categories
   var textColor = COLORS.TEXT_DARK;
   var white = COLORS.WHITE;
@@ -1257,7 +1293,7 @@ function createFAQSheet(ss) {
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Find answers to common questions about using the Dashboard')
     .setFontSize(12)
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setFontColor('#6B7280')
     .setHorizontalAlignment('center');
 
   // ═══ CATEGORY: GETTING STARTED ═══
@@ -1267,7 +1303,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   var gettingStartedFAQs = [
@@ -1282,7 +1318,7 @@ function createFAQSheet(ss) {
   for (var i = 0; i < gettingStartedFAQs.length; i++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(gettingStartedFAQs[i][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(gettingStartedFAQs[i][1])
@@ -1297,7 +1333,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   var memberFAQs = [
@@ -1316,7 +1352,7 @@ function createFAQSheet(ss) {
   for (var j = 0; j < memberFAQs.length; j++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(memberFAQs[j][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(memberFAQs[j][1])
@@ -1331,7 +1367,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   var grievanceFAQs = [
@@ -1352,7 +1388,7 @@ function createFAQSheet(ss) {
   for (var k = 0; k < grievanceFAQs.length; k++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(grievanceFAQs[k][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(grievanceFAQs[k][1])
@@ -1367,7 +1403,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   var troubleshootingFAQs = [
@@ -1386,7 +1422,7 @@ function createFAQSheet(ss) {
   for (var m = 0; m < troubleshootingFAQs.length; m++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(troubleshootingFAQs[m][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(troubleshootingFAQs[m][1])
@@ -1401,7 +1437,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   var engagementFAQs = [
@@ -1426,7 +1462,7 @@ function createFAQSheet(ss) {
   for (var eng = 0; eng < engagementFAQs.length; eng++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][1])
@@ -1441,7 +1477,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   var surveyTrackingFAQs = [
@@ -1466,7 +1502,7 @@ function createFAQSheet(ss) {
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(surveyTrackingFAQs[st][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(surveyTrackingFAQs[st][1])
@@ -1481,7 +1517,7 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   var advancedFAQs = [
@@ -1496,7 +1532,7 @@ function createFAQSheet(ss) {
   for (var n = 0; n < advancedFAQs.length; n++) {
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(advancedFAQs[n][0])
-      .setBackground(questionBg).setFontWeight('bold').setFontColor(SHEET_COLORS.TEXT_DARK_GREEN).setWrap(true);
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
     sheet.setRowHeight(row, 30);
     row++;
     sheet.getRange(row, 1, 1, 5).merge().setValue(advancedFAQs[n][1])
@@ -1512,18 +1548,18 @@ function createFAQSheet(ss) {
     .setBackground(categoryBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN);
+    .setFontColor('#065F46');
   sheet.setRowHeight(row, 35);
 
   // Version history header row
   row++;
   var versionHeaders = ['Version', 'Codename', 'Key Changes'];
   sheet.getRange(row, 1).setValue(versionHeaders[0])
-    .setBackground(SHEET_COLORS.TEXT_DARK_GREEN).setFontColor(SHEET_COLORS.TEXT_WHITE).setFontWeight('bold');
+    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
   sheet.getRange(row, 2).setValue(versionHeaders[1])
-    .setBackground(SHEET_COLORS.TEXT_DARK_GREEN).setFontColor(SHEET_COLORS.TEXT_WHITE).setFontWeight('bold');
+    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
   sheet.getRange(row, 3, 1, 3).merge().setValue(versionHeaders[2])
-    .setBackground(SHEET_COLORS.TEXT_DARK_GREEN).setFontColor(SHEET_COLORS.TEXT_WHITE).setFontWeight('bold');
+    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
   sheet.setRowHeight(row, 28);
 
   var versionHistory = VERSION_HISTORY.map(function(entry) {
@@ -1534,7 +1570,7 @@ function createFAQSheet(ss) {
     row++;
     var vRowBg = (v % 2 === 0) ? versionBg : answerBg;
     sheet.getRange(row, 1).setValue(versionHistory[v][0])
-      .setBackground(vRowBg).setFontWeight('bold').setFontColor(SHEET_COLORS.HEADER_DARK_PURPLE);
+      .setBackground(vRowBg).setFontWeight('bold').setFontColor('#5B21B6');
     sheet.getRange(row, 2).setValue(versionHistory[v][1])
       .setBackground(vRowBg).setFontColor(textColor).setFontStyle('italic');
     sheet.getRange(row, 3, 1, 3).merge().setValue(versionHistory[v][2])
@@ -1546,7 +1582,7 @@ function createFAQSheet(ss) {
   row += 2;
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Can\'t find your answer? Check the 📚 Getting Started tab or ask your administrator.')
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setFontColor('#6B7280')
     .setFontStyle('italic')
     .setHorizontalAlignment('center');
 
@@ -1589,11 +1625,11 @@ function createFeaturesReferenceSheet(ss) {
   }
 
   // Define colors
-  var headerBg = SHEET_COLORS.STATUS_INFO;       // Blue header
-  var categoryBg = '#DBEAFE';     // Light blue for categories (no exact SHEET_COLORS match)
-  var featureBg = SHEET_COLORS.BG_WHITE;      // White for features
-  var menuPathBg = SHEET_COLORS.BG_VERY_LIGHT_GRAY;     // Light gray for menu paths
-  var white = SHEET_COLORS.TEXT_WHITE;
+  var headerBg = '#3B82F6';       // Blue header
+  var categoryBg = '#DBEAFE';     // Light blue for categories
+  var featureBg = '#FFFFFF';      // White for features
+  var menuPathBg = '#F3F4F6';     // Light gray for menu paths
+  var white = '#FFFFFF';
 
   var row = 1;
 
@@ -1612,7 +1648,7 @@ function createFeaturesReferenceSheet(ss) {
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Complete searchable reference of all features. Use Ctrl+F (Cmd+F on Mac) to search. See FEATURES.md for detailed documentation.')
     .setFontSize(11)
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setFontColor('#6B7280')
     .setHorizontalAlignment('center')
     .setWrap(true);
 
@@ -1620,7 +1656,7 @@ function createFeaturesReferenceSheet(ss) {
   row += 2;
   var headers = ['Category', 'Feature', 'Description', 'Menu Path', 'Keywords'];
   sheet.getRange(row, 1, 1, 5).setValues([headers])
-    .setBackground(SHEET_COLORS.HEADER_DARK_BLUE_ALT)
+    .setBackground('#1E40AF')
     .setFontColor(white)
     .setFontWeight('bold')
     .setFontSize(11)
@@ -1745,10 +1781,10 @@ function createFeaturesReferenceSheet(ss) {
   row += 1;
   sheet.getRange(row, 1, 1, 5).merge()
     .setValue('Total Features: ' + features.length + ' | Use Ctrl+F to search | See FEATURES.md for complete documentation')
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setFontColor('#6B7280')
     .setFontStyle('italic')
     .setHorizontalAlignment('center')
-    .setBackground(SHEET_COLORS.BG_LIGHT_GRAY);
+    .setBackground('#F9FAFB');
 
   // Set column widths
   sheet.setColumnWidth(1, 160);  // Category
@@ -1813,8 +1849,8 @@ function createResourcesSheet(ss) {
 
   // Header formatting
   sheet.getRange(headerRow, 1, 1, headers.length)
-    .setBackground(COLORS.HEADER_BG || SHEET_COLORS.HEADER_SLATE)
-    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');
@@ -1888,7 +1924,7 @@ function createResourcesSheet(ss) {
   sheet.setFrozenRows(1);
 
   // Tab color
-  sheet.setTabColor(SHEET_COLORS.STATUS_INFO);
+  sheet.setTabColor('#3B82F6');
 
   // Apply filter
   var dataRange = sheet.getRange(1, 1, starterRows.length + 1, headers.length);
@@ -1896,8 +1932,6 @@ function createResourcesSheet(ss) {
 
   return sheet;
 }
-
-
 // ============================================================================
 // NOTIFICATIONS SHEET CREATION (v4.12.0)
 // ============================================================================
@@ -1927,8 +1961,8 @@ function createNotificationsSheet(ss) {
 
   // Header formatting
   sheet.getRange(headerRow, 1, 1, headers.length)
-    .setBackground(COLORS.HEADER_BG || SHEET_COLORS.HEADER_SLATE)
-    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');
@@ -2072,8 +2106,8 @@ function createResourceConfigSheet(ss) {
 
   // Header formatting
   sheet.getRange(1, 1, 1, headers.length)
-    .setBackground(COLORS.HEADER_BG || SHEET_COLORS.HEADER_SLATE)
-    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');

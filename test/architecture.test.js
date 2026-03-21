@@ -33,7 +33,6 @@ loadSources([
   '04b_AccessibilityFeatures.gs',
   '04c_InteractiveDashboard.gs',
   '04d_ExecutiveDashboard.gs',
-  '04e_PublicDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
   '07_DevTools.gs',
@@ -195,7 +194,7 @@ describe('A1: Build order integrity', () => {
     '00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '02_DataManagers.gs',
     '03_UIComponents.gs', '04a_UIMenus.gs', '04b_AccessibilityFeatures.gs',
     '04c_InteractiveDashboard.gs', '04d_ExecutiveDashboard.gs',
-    '04e_PublicDashboard.gs', '05_Integrations.gs', '06_Maintenance.gs',
+    '05_Integrations.gs', '06_Maintenance.gs',
     '07_DevTools.gs', '08a_SheetSetup.gs', '08b_SearchAndCharts.gs',
     '08c_FormsAndNotifications.gs', '08d_AuditAndFormulas.gs', '08e_SurveyEngine.gs',
     '09_Dashboards.gs', '10a_SheetCreation.gs', '10b_SurveyDocSheets.gs',
@@ -833,9 +832,8 @@ describe('A12: No unescaped dynamic HTML in .gs server files', () => {
     '03_UIComponents.gs',
     '04a_UIMenus.gs',
     '04b_AccessibilityFeatures.gs',
-    '04c_InteractiveDashboard.gs',
+    // 04c_InteractiveDashboard.gs removed — deprecated v4.31.0
     '04d_ExecutiveDashboard.gs',
-    '04e_PublicDashboard.gs',
     '05_Integrations.gs',
     '11_CommandHub.gs',
     '13_MemberSelfService.gs',
@@ -873,11 +871,9 @@ describe('A12: No unescaped dynamic HTML in .gs server files', () => {
 
       // Allow threshold — legacy code may have some safe cases
       // (e.g., pre-validated constants like STATUS_COLORS[status])
-      // 04e_PublicDashboard.gs contributes ~122 flagged lines that are false positives:
-      // hardcoded CSS constants, booleans (isPII), config values — not user-controlled data.
-      // Threshold set to 130 as ceiling; lower as true violations are eliminated.
+      // Threshold set to 15 per file as ceiling; lower as true violations are eliminated.
       if (issues.length > 0) {
-        expect(issues.length).toBeLessThanOrEqual(130);
+        expect(issues.length).toBeLessThanOrEqual(15);
       }
     });
   });
@@ -1141,6 +1137,7 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataSendDirectMessage',           // sends email + Drive log directly (calls DataService helpers deeper than 12-line window)
     'dataEnsureSheetsIfNeeded',        // calls _ensureAllSheetsInternal() + PropertiesService directly (fire-and-forget init)
     'dataApplyColorTheme',             // saves theme to UserProperties directly (unified theme system)
+    'dataGetMyEngagementScore',        // standalone: reads multiple sheets for per-member private score
   ];
 
   wrappers

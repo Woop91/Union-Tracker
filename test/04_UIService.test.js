@@ -20,8 +20,7 @@ loadSources([
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
   '04c_InteractiveDashboard.gs',
-  '04d_ExecutiveDashboard.gs',
-  '04e_PublicDashboard.gs'
+  '04d_ExecutiveDashboard.gs'
 ]);
 
 // ============================================================================

@@ -1,35 +1,40 @@
 /**
  * 24_WeeklyQuestions.gs — Unified Polls System (v4.23.0)
  *
- * Replaces the separate "Weekly Questions" + "Polls" systems.
+ * WHAT THIS FILE DOES:
+ *   Unified weekly polls system (v4.23.0, replaced separate "Weekly Questions"
+ *   + "Polls"). Two polls active each week:
+ *     (1) Steward Poll — manually created by any steward, resets weekly
+ *     (2) Community Poll — randomly drawn from member-submitted pool every
+ *         Monday
+ *   Fully anonymous: only SHA-256 hashed email stored, never plaintext.
+ *   Results visible to all AFTER voting (members) or always (stewards). No
+ *   "myVote" field ever returned.
  *
- * Architecture:
- *   Two polls are active each week:
- *     1. STEWARD POLL  — created manually by any steward, resets each week
- *     2. COMMUNITY POLL — drawn randomly every Monday from the member pool
- *                         (no steward curation or approval step)
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   SHA-256 email hashing ensures anonymity while preventing double-voting
+ *   (same email always produces same hash). Question pool validation enforces
+ *   non-leading question text, 2-5 distinct options, and single-concept
+ *   questions. Three hidden sheets:
+ *     _Weekly_Questions  — active and past polls
+ *       Cols: ID | Text | Options (JSON) | Source | SubmittedBy | WeekStart | Active | Created
+ *     _Weekly_Responses  — hashed-email responses
+ *       Cols: ID | QuestionID | EmailHash | Response | Timestamp
+ *     _Question_Pool     — member-submitted poll candidates
+ *       Cols: ID | Text | Options (JSON) | SubmittedByHash | Status | Created
+ *   0-indexed column constants (Q_COLS, R_COLS, P_COLS) match the portal
+ *   convention.
  *
- *   All responses are fully anonymous:
- *     - Only SHA-256 hashed email stored; never plaintext
- *     - Results visible to all AFTER voting (member) or always (steward view)
- *     - No "myVote" field ever returned; only aggregate counts + percentages
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   No polls are shown in the SPA. Voting fails. If hashing breaks, votes are
+ *   stored with plaintext emails (privacy violation). If the weekly reset
+ *   fails, stale polls persist. The question pool stops accepting member
+ *   submissions.
  *
- *   Creating a poll requires passing the question guide validation:
- *     - Non-leading question text
- *     - 2–5 distinct, non-empty options
- *     - Single-concept check (enforced by guide, not by regex)
- *
- * Sheets (all hidden):
- *   _Weekly_Questions  — active and past polls
- *     Cols: ID | Text | Options (JSON) | Source | SubmittedBy | WeekStart | Active | Created
- *   _Weekly_Responses  — hashed-email responses (unchanged from v4.11.0)
- *     Cols: ID | QuestionID | EmailHash | Response | Timestamp
- *   _Question_Pool     — member-submitted poll candidates
- *     Cols: ID | Text | Options (JSON) | SubmittedByHash | Status | Created
- *
- * @version 4.23.0
- * @requires 01_Core.gs (SHEETS, escapeForFormula)
- * @requires 06_Maintenance.gs (logAuditEvent)
+ * DEPENDENCIES:
+ *   Depends on: 01_Core.gs (SHEETS, escapeForFormula),
+ *               Utilities.computeDigest (GAS SHA-256).
+ *   Used by: SPA poll views and weekly trigger for auto-rotation.
  */
 
 var WeeklyQuestions = (function () {
@@ -75,7 +80,7 @@ var WeeklyQuestions = (function () {
     try {
       var val = PropertiesService.getScriptProperties().getProperty('POLL_FREQUENCY');
       if (val === 'biweekly' || val === 'monthly') return val;
-    } catch (_e) {}
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     return 'weekly';
   }
 
@@ -263,7 +268,7 @@ var WeeklyQuestions = (function () {
 
     // Role check — belt-and-suspenders (wrapper already calls _requireStewardAuth)
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_e) {}
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     if (!callerEmail) return { success: false, message: 'Unable to verify identity.' };
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
@@ -529,8 +534,6 @@ var WeeklyQuestions = (function () {
   };
 
 })();
-
-
 // ═══════════════════════════════════════
 // GLOBAL WRAPPERS
 // ═══════════════════════════════════════
@@ -589,30 +592,6 @@ function wqGetHistory(sessionToken, page, pageSize) {
 function wqGetPoolCount() { return WeeklyQuestions.getPoolCount(); }
 function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
 function wqGetPollFrequency() { return WeeklyQuestions.getPollFrequency(); }
-
-/**
- * v4.31.1 — Batch endpoint: returns frequency + active questions in one round-trip.
- * Eliminates the sequential waterfall on the Polls tab.
- */
-function wqGetPollData(sessionToken) {
-  var freq = 'weekly';
-  try { freq = WeeklyQuestions.getPollFrequency(); } catch (_) {}
-  var e = _resolveCallerEmail(sessionToken);
-  if (!e) return { frequency: freq, questions: [] };
-  if (typeof DataService !== 'undefined') {
-    var rec = DataService.findUserByEmail(e);
-    if (rec && rec.duesPaying === false) return { frequency: freq, questions: [] };
-  }
-  try {
-    var result = WeeklyQuestions.getActiveQuestions(e);
-    if (!result) return { frequency: freq, questions: [] };
-    result.frequency = freq;
-    return result;
-  } catch (err) {
-    Logger.log('wqGetPollData error: ' + err.message + '\n' + (err.stack || ''));
-    return { frequency: freq, questions: [] };
-  }
-}
 function wqSetPollFrequency(sessionToken, freq) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
@@ -732,5 +711,5 @@ function setupCommunityPollTrigger() {
   try {
     SpreadsheetApp.getActiveSpreadsheet()
       .toast('Community poll draw trigger installed — fires every Monday at 7 AM.', 'Polls', 5);
-  } catch (_e) {}
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 }

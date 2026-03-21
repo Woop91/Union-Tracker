@@ -26,6 +26,8 @@ global.getUnifiedDashboardData = jest.fn(() => JSON.stringify({
   avgDaysAtStep: {}
 }));
 global.isTruthyValue = jest.fn(v => !!v);
+// Mock getConfigValue_ (defined in 10_Main.gs) — enable correlation by default for tests
+global.getConfigValue_ = jest.fn(() => 'yes');
 
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '17_CorrelationEngine.gs']);
 

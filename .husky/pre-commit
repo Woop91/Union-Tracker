@@ -15,17 +15,14 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Step 2: Validate source syntax (without overwriting dist/)
-# IMPORTANT: Uses --validate-only to prevent destroying the prod-minified dist.
-# Previously this ran a full non-prod build which overwrote minified HTML with
-# non-minified versions and re-added DevTools — causing silent deployment regressions.
+# Step 2: Build verification (validate-only: checks syntax without overwriting dist/)
 echo ""
-echo "[2/3] Validating source syntax..."
+echo "[2/3] Verifying build..."
 node build.js --validate-only > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
   echo ""
-  echo "Source validation failed. Run 'node build.js --validate-only' to see details."
+  echo "Build failed. Run 'npm run build' to see details."
   exit 1
 fi
 

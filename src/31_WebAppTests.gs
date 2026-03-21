@@ -1,25 +1,34 @@
 /**
- * 31_WebAppTests.gs
- * GAS-Native Web App Test Suites — comprehensive coverage of all web app modules.
+ * ============================================================================
+ * 31_WebAppTests.gs - GAS-Native Web App Test Suites
+ * ============================================================================
  *
- * Designed to run independently via TestRunner suite filter. Each suite
- * completes well under 3 minutes to avoid GAS 6-minute execution limit.
+ * WHAT THIS FILE DOES:
+ *   GAS-native web app test suites — comprehensive coverage of all SPA
+ *   modules. 9 test suites: webapp (doGet routing), configrd (ConfigReader),
+ *   portal (PortalSheets 0-indexed validation), weeklyq (WeeklyQuestions
+ *   API), workload (WorkloadService), qaforum (QAForum), timeline
+ *   (TimelineService), failsafe (FailsafeService), endpoints (all
+ *   data, wq, qa, tl, fs wrapper functions exist and enforce auth).
  *
- * Test suites:
- *   webapp_      — doGet routing, template rendering, URL generation, diagnoseWebApp
- *   configrd_    — ConfigReader module shape, validation, caching
- *   portal_      — PortalSheets column constants, 0-indexed validation, sheet existence
- *   weeklyq_     — WeeklyQuestions module API, column constants, frequency reads
- *   workload_    — WorkloadService module, categories, health, column constants
- *   qaforum_     — QAForum module, question retrieval, pagination
- *   timeline_    — TimelineService module, event retrieval, category validation
- *   failsafe_    — FailsafeService module, digest config, diagnostics
- *   endpoints_   — All data* / wq* / qa* / tl* / fs* wrapper existence & auth gating
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Separated from 30_TestRunner.gs to keep test file sizes manageable and
+ *   allow independent suite execution. Each suite completes well under 3
+ *   minutes to avoid the GAS 6-minute execution limit. The endpoints suite
+ *   is critical — it verifies that EVERY public data function exists and
+ *   gates on authentication, catching accidental auth removal.
  *
- * IMPORTANT: All tests are READ-ONLY. They never write to sheets.
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Web app module verification is unavailable. The endpoints auth sweep
+ *   won't catch accidental auth removal on data functions. Core SPA
+ *   functionality is unaffected — these are diagnostic tests.
  *
- * @fileoverview Web app test suites for DDS-Dashboard
- * @version 1.0.0
+ * DEPENDENCIES:
+ *   Depends on 30_TestRunner.gs (TestRunner assertion library), all SPA
+ *   modules (19-28) for existence checks. Used by the test runner suite
+ *   system.
+ *
+ * @version 4.31.0
  */
 
 /* ========================================================================
@@ -782,15 +791,11 @@ function test_endpoints_checklistFnsExist() {
   }
 }
 
-function test_endpoints_legacyStubsSafe() {
-  // Legacy poll stubs must exist and return safe values
-  TestRunner.assertEquals('function', typeof dataGetActivePolls, 'dataGetActivePolls stub');
-  TestRunner.assertEquals('function', typeof dataSubmitPollVote, 'dataSubmitPollVote stub');
-  TestRunner.assertEquals('function', typeof dataAddPoll, 'dataAddPoll stub');
-
-  var polls = dataGetActivePolls();
-  TestRunner.assertTrue(Array.isArray(polls), 'dataGetActivePolls returns array');
-  TestRunner.assertEquals(0, polls.length, 'dataGetActivePolls returns empty');
+function test_endpoints_pollStubsRemoved() {
+  // v4.25.11: Legacy poll stubs removed — verify they no longer exist
+  TestRunner.assertEquals('undefined', typeof dataGetActivePolls, 'dataGetActivePolls removed');
+  TestRunner.assertEquals('undefined', typeof dataSubmitPollVote, 'dataSubmitPollVote removed');
+  TestRunner.assertEquals('undefined', typeof dataAddPoll, 'dataAddPoll removed');
 }
 
 function test_endpoints_allWriteEndpointsRejectNull() {
@@ -828,7 +833,7 @@ function test_endpoints_notificationCountExists() {
 
 function test_endpoints_grievanceDraftFnsExist() {
   // Grievance draft/drive functions
-  var fns = ['dataStartGrievanceDraft', 'dataStartGrievanceDraftForMember', 'dataCreateGrievanceDrive'];
+  var fns = ['dataStartGrievanceDraft', 'dataCreateGrievanceDrive'];
   for (var i = 0; i < fns.length; i++) {
     if (typeof this[fns[i]] !== 'undefined') {
       TestRunner.assertEquals('function', typeof this[fns[i]], fns[i] + ' exists');

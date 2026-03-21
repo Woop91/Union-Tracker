@@ -1,23 +1,34 @@
 /**
- * Auth.gs
- * Handles authentication for the web app dashboard.
+ * Auth.gs — Authentication system for the web app dashboard
  *
- * Two auth paths:
- *   1. Google SSO — Session.getActiveUser().getEmail()
- *   2. Magic Link — email-based token sent via GmailApp (primary) / MailApp (fallback)
+ * WHAT THIS FILE DOES:
+ *   Authentication system for the web app dashboard. Two auth paths:
+ *     (1) Google SSO via Session.getActiveUser().getEmail()
+ *     (2) Magic link tokens emailed via GmailApp (primary) / MailApp (fallback)
+ *   Auth.resolveUser(e) is the entry point — tries session token first, then
+ *   SSO, then magic link token from URL params. Creates session tokens for
+ *   "remember me" functionality stored in ScriptProperties.
  *
- * SCOPE NOTE: Uses GmailApp.sendEmail() (gmail.send scope) as primary sender.
- * MailApp.sendEmail() (script.send_mail scope) is kept as fallback.
- * If both fail, the deployed web app may need re-authorization — run
- * testAuthEmailSend() from the Apps Script editor to diagnose.
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Google SSO is preferred but Session.getActiveUser() returns empty in
+ *   "Execute as: Me" web apps for non-Google users. Magic links solve this
+ *   by emailing a one-time token. Token storage in ScriptProperties (not
+ *   CacheService) ensures tokens survive cache eviction. GmailApp is primary
+ *   sender because it provides better deliverability than MailApp; MailApp is
+ *   kept as fallback. The Auth IIFE pattern creates a namespace without
+ *   polluting the global scope.
  *
- * Token storage: ScriptProperties (server-side)
- * Client persistence: localStorage token (acts as "cookie")
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Nobody can log into the web app dashboard. SSO failure means Google-
+ *   authenticated users can't access the SPA. Magic link failure means
+ *   non-Google users are locked out. If session token validation breaks,
+ *   "remember me" stops working and users must re-authenticate every visit.
+ *   If both GmailApp and MailApp fail, the deploy needs re-authorization.
  *
- * Flow:
- *   doGet() → Auth.resolveUser(e) → returns { email, method } or null
- *   If null → serve login page
- *   If email → lookup role in directory → route to dashboard
+ * DEPENDENCIES:
+ *   Depends on: Session, PropertiesService, GmailApp, MailApp (GAS built-ins).
+ *   Used by: 22_WebDashApp.gs (doGet calls Auth.resolveUser),
+ *            00_Security.gs (Auth.resolveEmailFromToken for token-based authorization).
  */
 
 var Auth = (function () {
@@ -51,9 +62,7 @@ var Auth = (function () {
       if (ssoUser && ssoUser !== '') {
         return { email: ssoUser.toLowerCase(), method: 'sso' };
       }
-    } catch (_err) {
-      // SSO not available — continue
-    }
+    } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
 
     // 3. Check magic link token in URL
     if (params.token) {
@@ -229,6 +238,32 @@ var Auth = (function () {
    * @returns {string} Session token
    */
   function createSessionToken(email) {
+    // Auto-evict expired tokens if approaching quota
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var allProps = props.getProperties();
+      var propSize = JSON.stringify(allProps).length;
+      if (propSize > 350000) { // 350KB of 500KB — proactive cleanup
+        var now = Date.now();
+        var keys = Object.keys(allProps);
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          if (k.indexOf('SESSION_') === 0 || k.indexOf('MAGIC_TOKEN_') === 0) {
+            try {
+              var val = JSON.parse(allProps[k]);
+              if (val.expiry && val.expiry < now) {
+                props.deleteProperty(k);
+              }
+            } catch (_parseErr) {
+              props.deleteProperty(k); // corrupt entry
+            }
+          }
+        }
+      }
+    } catch (_evictErr) {
+      Logger.log('Auto token eviction failed: ' + _evictErr.message);
+    }
+
     var config;
     try {
       config = ConfigReader.getConfig();
@@ -240,7 +275,7 @@ var Auth = (function () {
     var expiry = Date.now() + (config.cookieDurationMs || 30 * 24 * 60 * 60 * 1000);
 
     try {
-      var props = PropertiesService.getScriptProperties();
+      props = PropertiesService.getScriptProperties();
       props.setProperty(SESSION_PREFIX + token, JSON.stringify({
         email: email.toLowerCase(),
         expiry: expiry,
@@ -248,7 +283,8 @@ var Auth = (function () {
       }));
     } catch (propErr) {
       Logger.log('Auth.createSessionToken: PropertiesService write failed (' + propErr.message + ')');
-      // Token won't persist but page load can still proceed
+      // C3: Return error instead of a token that doesn't exist server-side
+      return { error: 'session_storage_failed', message: 'Could not persist session. Please try again.' };
     }
 
     return token;
@@ -298,6 +334,10 @@ var Auth = (function () {
     var totalSize = JSON.stringify(sizeSource).length;
     if (totalSize > 400000) {
       Logger.log('WARNING: ScriptProperties usage at ' + Math.round(totalSize / 1024) + 'KB / 500KB');
+      // M9: Escalate via recordSecurityEvent so admins get notified
+      if (typeof recordSecurityEvent === 'function') {
+        recordSecurityEvent('QUOTA_WARNING', 'ScriptProperties at ' + Math.round(totalSize / 1024) + 'KB / 500KB', { totalSize: totalSize }, 'HIGH');
+      }
     }
 
     return cleaned;
@@ -344,12 +384,10 @@ var Auth = (function () {
         return null;
       }
 
-      // Mark as used
-      data.used = true;
-      props.setProperty(TOKEN_PREFIX + token, JSON.stringify(data));
-
-      // Delete after short delay to prevent replay but allow page load
-      // Token will be cleaned up by cleanupExpiredTokens()
+      // C1+C4: Immediately delete token after successful validation.
+      // Eliminates TOCTOU race (two concurrent requests validating same token)
+      // and prevents token accumulation in PropertiesService quota.
+      props.deleteProperty(TOKEN_PREFIX + token);
 
       return data.email;
     } catch (_e) {
@@ -432,8 +470,6 @@ var Auth = (function () {
   };
 
 })();
-
-
 // ═══════════════════════════════════════
 // GLOBAL FUNCTIONS (callable from client via google.script.run)
 // ═══════════════════════════════════════
@@ -453,7 +489,7 @@ function authCreateSessionToken() {
   var email = '';
   try {
     email = Session.getActiveUser().getEmail();
-  } catch (_e) { /* SSO not available */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   if (!email) {
     return { error: 'Unable to resolve authenticated user. Please sign in again.' };
   }
@@ -515,7 +551,3 @@ function testAuthEmailSend(testEmail) {
   Logger.log('testAuthEmailSend results: ' + JSON.stringify(results));
   return results;
 }
-
-// installTokenCleanupTrigger removed — dead code cleanup v4.25.11
-
-// initWebDashboardAuth removed — dead code cleanup v4.25.11

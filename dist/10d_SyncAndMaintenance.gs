@@ -1,9 +1,34 @@
+/**
+ * ============================================================================
+ * 10d_SyncAndMaintenance.gs — Visual Formatting & Data Sync Utilities
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Visual formatting utilities and data synchronization functions.
+ *   applyWinRateGradients() applies gradient heatmaps (red->yellow->green)
+ *   to win rate columns in the dashboard sheet. Also contains formatting
+ *   functions for steward performance sections and email snapshot generation
+ *   for periodic reports.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Gradient heatmaps provide at-a-glance visual indicators for steward
+ *   performance. Red=low win rate, green=high win rate. Applied via conditional
+ *   formatting rules rather than cell backgrounds so they auto-update as data
+ *   changes.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Dashboard loses visual formatting — numbers still display but without color
+ *   coding. Stewards lose the at-a-glance visual indicators. Data sync functions
+ *   failing means manual formatting is needed.
+ *
+ * DEPENDENCIES:
+ *   Depends on: 01_Core.gs (SHEETS)
+ *   Used by:    Menu items in 03_UIComponents.gs, Admin menu
+ */
+
 // ============================================================================
 // ENHANCED VISUAL FORMATTING - Gradient Heatmaps
 // ============================================================================
-
-// applyGradientHeatmaps removed — dead code cleanup v4.25.11
-
 /**
  * Applies gradient heatmap to Win Rate columns across all steward performance sections
  */
@@ -669,6 +694,10 @@ function showGrievancesWithMissingMemberIds() {
   var ui = SpreadsheetApp.getUi();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) {
+    ui.alert('Member Directory not found');
+    return;
+  }
 
   if (!grievanceSheet) {
     ui.alert('Grievance Log not found');
@@ -767,9 +796,6 @@ function repairMemberCheckboxes() {
 
   Logger.log('Repaired checkboxes for ' + (lastRow - 1) + ' member rows');
 }
-
-// repairAllCheckboxes removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // ENGAGEMENT TRACKING SYNC FUNCTIONS
 // ============================================================================
@@ -792,7 +818,6 @@ function isSyncDebounced_(syncName) {
   cache.put(key, 'running', 30);
   return false;
 }
-// isValidDate_ removed — dead code cleanup v4.25.11
 /** Builds {memberId: true} lookup from Member Directory data (skips header row).
  *  M-68: Explicitly starts at index 1 to skip the header row. Also validates
  *  that the value looks like a member ID (not a header label) as a safeguard. */
@@ -896,7 +921,7 @@ function syncVolunteerHoursToMemberDirectory() {
     Logger.log('Synced VH: ' + membersUpdated + ' members, ' + skipped + ' skipped');
   } catch (e) {
     Logger.log('syncVH error: ' + e.message);
-    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing volunteer hours: ' + e.message, '❌ Sync Error', 5); } catch (_) {}
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing volunteer hours: ' + e.message, '❌ Sync Error', 5); } catch (_) { Logger.log('_: ' + (_.message || _)); }
     throw e;
   } finally {
     lock.releaseLock();
@@ -983,7 +1008,7 @@ function syncMeetingAttendanceToMemberDirectory() {
     Logger.log('Synced MA: ' + membersUpdated + ' members, ' + skipped + ' skipped');
   } catch (e) {
     Logger.log('syncMA error: ' + e.message);
-    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing attendance: ' + e.message, '❌ Sync Error', 5); } catch (_) {}
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing attendance: ' + e.message, '❌ Sync Error', 5); } catch (_) { Logger.log('_: ' + (_.message || _)); }
     throw e;
   } finally {
     lock.releaseLock();
@@ -1001,42 +1026,5 @@ function syncEngagementToMemberDirectory() {
 // DEPRECATED SHEET CLEANUP
 // ============================================================================
 
-/**
- * Removes the deprecated Dashboard sheet and provides migration info
- * The Dashboard sheet was deprecated in v4.3.2 in favor of modal dashboards
- * @returns {void}
- */
-function removeDeprecatedDashboard() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
-  var dashSheet = ss.getSheetByName(SHEETS.DASHBOARD);
-
-  if (!dashSheet) {
-    ui.alert('✅ Clean',
-      'No deprecated Dashboard sheet found.\n\n' +
-      'Your spreadsheet is already using the modern modal dashboard system.',
-      ui.ButtonSet.OK);
-    return;
-  }
-
-  var response = ui.alert(
-    '🗑️ Remove Deprecated Dashboard Sheet',
-    'The "💼 Dashboard" sheet is deprecated as of v4.3.2.\n\n' +
-    'Modern dashboards are now modal (popup) based:\n' +
-    '• Union Hub > Dashboards > Interactive Dashboard\n' +
-    '• Union Hub > Dashboards > Executive Command\n' +
-    '• Union Hub > Dashboards > Member Dashboard\n' +
-    '• Union Hub > Dashboards > Steward Performance\n\n' +
-    'Delete the deprecated sheet?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response === ui.Button.YES) {
-    ss.deleteSheet(dashSheet);
-    ss.toast('Deprecated Dashboard sheet removed', '✅ Cleanup Complete', 3);
-    Logger.log('Removed deprecated Dashboard sheet');
-  } else {
-    ss.toast('Deprecated sheet retained', 'ℹ️ Info', 3);
-  }
-}
+// removeDeprecatedDashboard() removed v4.33.0 — merged into removeDeprecatedTabs() in 06_Maintenance.gs
 

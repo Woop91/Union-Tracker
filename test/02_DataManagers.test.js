@@ -1241,3 +1241,97 @@ describe('getAllStewards — isTruthyValue normalization for IS_STEWARD', () => 
     });
   });
 });
+
+// ============================================================================
+// Null guard tests — getSheetByName returns null
+// ============================================================================
+
+describe('null guard: getGrievanceById', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns null when sheet is missing', () => {
+    const mockSS = createMockSpreadsheet([]);
+    mockSS.getSheetByName.mockReturnValue(null);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    const result = getGrievanceById('G-001');
+    expect(result).toBeNull();
+  });
+});
+
+describe('null guard: getOpenGrievances', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns empty array when sheet is missing', () => {
+    const mockSS = createMockSpreadsheet([]);
+    mockSS.getSheetByName.mockReturnValue(null);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    const result = getOpenGrievances();
+    expect(result).toEqual([]);
+  });
+});
+
+describe('null guard: recalcAllGrievancesBatched', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('returns failure when sheet is missing', () => {
+    const mockSS = createMockSpreadsheet([]);
+    mockSS.getSheetByName.mockReturnValue(null);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    const result = recalcAllGrievancesBatched();
+    expect(result).toBeDefined();
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// LockService wrapping tests
+// ============================================================================
+
+describe('LockService: syncMemberGrievanceData', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('acquires script lock during execution', () => {
+    const mockLock = {
+      tryLock: jest.fn(() => true),
+      releaseLock: jest.fn()
+    };
+    LockService.getScriptLock.mockReturnValue(mockLock);
+
+    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR, [
+      ['Member ID', 'First Name'], ['M-001', 'John']
+    ]);
+    const grievanceSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [
+      ['Grievance ID', 'Member ID', 'Status'], ['G-001', 'M-001', 'Open']
+    ]);
+    const mockSS = createMockSpreadsheet([memberSheet, grievanceSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    syncMemberGrievanceData();
+    expect(mockLock.tryLock).toHaveBeenCalled();
+    expect(mockLock.releaseLock).toHaveBeenCalled();
+  });
+});
+
+describe('LockService: updateMemberDataBatch', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('acquires script lock during execution', () => {
+    const mockLock = {
+      tryLock: jest.fn(() => true),
+      releaseLock: jest.fn()
+    };
+    LockService.getScriptLock.mockReturnValue(mockLock);
+
+    const memberData = [['Member ID'], ['M-001']];
+    const sheet = createMockSheet(SHEETS.MEMBER_DIR, memberData);
+    const mockSS = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    updateMemberDataBatch('M-001', { email: 'new@test.com' });
+    expect(mockLock.tryLock).toHaveBeenCalled();
+    expect(mockLock.releaseLock).toHaveBeenCalled();
+  });
+});

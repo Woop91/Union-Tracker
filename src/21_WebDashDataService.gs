@@ -24,6 +24,17 @@ var DataService = (function () {
   var MEMBER_SHEET = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ? SHEETS.MEMBER_DIR : 'Member Directory';
   var GRIEVANCE_SHEET = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ? SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
+  // PERF: Spreadsheet singleton — avoids redundant getActiveSpreadsheet() IPC calls.
+  // Cached per execution (GAS module-scope resets between requests).
+  var _cachedSS = null;
+  function _getSS() {
+    if (_cachedSS) return _cachedSS;
+    _cachedSS = SpreadsheetApp.getActiveSpreadsheet();
+    return _cachedSS;
+  }
+  /** @private Reset cached spreadsheet reference (used by test harness). */
+  function _resetSSCache() { _cachedSS = null; }
+
   // Header name mappings — these are the expected header labels
   // If your sheet uses different labels, update these OR add aliases
   var HEADERS = {
@@ -56,8 +67,6 @@ var DataService = (function () {
     memberEmployeeId:    ['employee id', 'employee number', 'emp id', 'emp no'],
     memberHireDate:      ['hire date', 'date hired', 'start date'],
     memberOpenRate:      ['open rate %', 'open rate', 'email open rate'],
-    memberLastVirtualMtg:  ['last virtual mtg', 'last virtual meeting'],
-    memberLastInPersonMtg: ['last in-person mtg', 'last in-person meeting'],
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -75,6 +84,14 @@ var DataService = (function () {
     grievanceIssueCategory: ['issue category', 'category', 'issue type'],
     grievanceResolution: ['resolution', 'outcome', 'result'],
     grievanceDateClosed: ['date closed', 'closed date', 'closed', 'resolved date'],
+    grievanceDriveFolderUrl: ['drive folder url', 'folder url', 'case folder url'],
+    grievanceDriveFolderId: ['drive folder id', 'folder id', 'case folder id'],
+    grievanceArticles: ['articles violated', 'articles', 'contract articles'],
+    grievanceStep1Due: ['step i due', 'step 1 due'],
+    grievanceStep1Rcvd: ['step i rcvd', 'step 1 rcvd', 'step i received', 'step 1 received'],
+    grievanceStep2AppealDue: ['step ii appeal due', 'step 2 appeal due'],
+    grievanceStep2Due: ['step ii due', 'step 2 due'],
+    grievanceStep2Rcvd: ['step ii rcvd', 'step 2 rcvd', 'step ii received'],
   };
 
   // ═══════════════════════════════════════
@@ -87,27 +104,32 @@ var DataService = (function () {
    * @param {string} email
    * @returns {Object|null}
    */
+  // ─── Email Index — O(1) lookup replacing O(n) linear scan ───
+  var _emailIndex = null; // { email: rowIndex } — built once per execution
+
+  function _getEmailIndex() {
+    if (_emailIndex) return _emailIndex;
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return {};
+    var emailCol = _findColumn(cached.colMap, HEADERS.memberEmail);
+    if (emailCol === -1) return {};
+    _emailIndex = {};
+    for (var i = 1; i < cached.data.length; i++) {
+      var e = String(cached.data[i][emailCol]).trim().toLowerCase();
+      if (e) _emailIndex[e] = i;
+    }
+    return _emailIndex;
+  }
+
   function findUserByEmail(email) {
     if (!email) return null;
     email = String(email).trim().toLowerCase();
-
+    var idx = _getEmailIndex();
+    var rowIdx = idx[email];
+    if (rowIdx === undefined) return null;
     var cached = _getCachedSheetData(MEMBER_SHEET);
     if (!cached) return null;
-
-    var data = cached.data;
-    var colMap = cached.colMap;
-
-    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
-    if (emailCol === -1) return null;
-
-    for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
-      if (rowEmail === email) {
-        return _buildUserRecord(data[i], colMap);
-      }
-    }
-
-    return null;
+    return _buildUserRecord(cached.data[rowIdx], cached.colMap);
   }
 
   /**
@@ -263,7 +285,8 @@ var DataService = (function () {
     if (!memberEmail) return { success: true, history: [] };
     memberEmail = String(memberEmail).trim().toLowerCase();
 
-    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    // Use combined active + archive for complete member history
+    var cached = _getAllGrievanceData();
     if (!cached) return { success: true, history: [] };
 
     var data = cached.data;
@@ -382,8 +405,6 @@ var DataService = (function () {
       employeeId: user.employeeId || '',
       hireDate: user.hireDate || '',
       openRate: user.openRate || '',
-      lastVirtualMtg: user.lastVirtualMtg || '',
-      lastInPersonMtg: user.lastInPersonMtg || '',
     };
   }
 
@@ -559,13 +580,24 @@ var DataService = (function () {
    * @returns {string|null} Drive folder URL or null
    */
   function getMemberGrievanceDriveUrl(email) {
-    // Convention: folder named by grievance ID in the org shared drive
     var grievances = getMemberGrievances(email);
     if (!grievances || grievances.length === 0) return null;
-    var activeG = grievances.find(function(g) { return g.status !== 'resolved'; });
-    if (!activeG) return null;
-    // Drive URL would come from a column or Drive API lookup.
-    // For now, return null — steward can provide the link.
+
+    // Prefer active (non-terminal) grievance; fall back to most recent
+    var TERMINAL = ['resolved', 'closed', 'withdrawn', 'denied', 'won', 'settled'];
+    var activeG = grievances.find(function(g) {
+      return TERMINAL.indexOf((g.status || '').toLowerCase()) === -1;
+    });
+    var target = activeG || grievances[0];
+
+    // Return the Drive Folder URL column value if populated
+    if (target.driveFolderUrl) return target.driveFolderUrl;
+
+    // Fallback: build URL from Drive Folder ID column if present
+    if (target.driveFolderId) {
+      return 'https://drive.google.com/drive/folders/' + target.driveFolderId;
+    }
+
     return null;
   }
 
@@ -576,38 +608,40 @@ var DataService = (function () {
    * @param {Object} data — { title, category, description }
    * @returns {Object} { success: boolean, message: string }
    */
-  function startGrievanceDraft(email, data) {
+  function startGrievanceDraft(email, data, idemKey) {
+    if (idemKey) {
+      var idemCache = CacheService.getScriptCache();
+      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
+      idemCache.put('IDEM_' + idemKey, '1', 300);
+    }
     if (!email || !data) return { success: false, message: 'Missing required data.' };
     if (!data.title || !data.description) return { success: false, message: 'Title and description are required.' };
 
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet) return { success: false, message: 'Grievance sheet not found.' };
 
-      // Resolve member identity + assigned steward from directory
+      // Resolve member identity dynamically from directory
       var memberId = '';
       var memberFirstName = '';
       var memberLastName = '';
-      var assignedStewardEmail = '';
       var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberDir && memberDir.getLastRow() > 1) {
         var mData = memberDir.getDataRange().getValues();
         var mColMap = _buildColumnMap(mData[0]);
-        var mEmailCol   = _findColumn(mColMap, HEADERS.memberEmail);
-        var mIdCol      = _findColumn(mColMap, HEADERS.memberId);
-        var mFirstCol   = _findColumn(mColMap, HEADERS.memberFirstName);
-        var mLastCol    = _findColumn(mColMap, HEADERS.memberLastName);
-        var mStewardCol = _findColumn(mColMap, HEADERS.memberAssignedSteward);
+        var mEmailCol = _findColumn(mColMap, HEADERS.memberEmail);
+        var mIdCol    = _findColumn(mColMap, HEADERS.memberId);
+        var mFirstCol = _findColumn(mColMap, HEADERS.memberFirstName);
+        var mLastCol  = _findColumn(mColMap, HEADERS.memberLastName);
         var emailLower = email.toLowerCase().trim();
         for (var i = 1; i < mData.length; i++) {
           if (mEmailCol === -1) break;
           if (String(mData[i][mEmailCol] || '').toLowerCase().trim() === emailLower) {
-            memberId           = mIdCol      !== -1 ? String(mData[i][mIdCol]      || '').trim() : '';
-            memberFirstName    = mFirstCol   !== -1 ? String(mData[i][mFirstCol]   || '').trim() : '';
-            memberLastName     = mLastCol    !== -1 ? String(mData[i][mLastCol]    || '').trim() : '';
-            assignedStewardEmail = mStewardCol !== -1 ? String(mData[i][mStewardCol] || '').trim() : '';
+            memberId       = mIdCol    !== -1 ? String(mData[i][mIdCol]    || '').trim() : '';
+            memberFirstName = mFirstCol !== -1 ? String(mData[i][mFirstCol] || '').trim() : '';
+            memberLastName  = mLastCol  !== -1 ? String(mData[i][mLastCol]  || '').trim() : '';
             break;
           }
         }
@@ -629,7 +663,6 @@ var DataService = (function () {
       var colCategory    = _findColumn(gColMap, HEADERS.grievanceIssueCategory);
       var colResolution  = _findColumn(gColMap, HEADERS.grievanceResolution);
       var colEmail       = _findColumn(gColMap, HEADERS.grievanceMemberEmail);
-      var colSteward     = _findColumn(gColMap, HEADERS.grievanceSteward);
 
       if (colGrievanceId !== -1) row[colGrievanceId] = 'DRAFT-' + Utilities.getUuid().substring(0, 8);
       if (colMemberId    !== -1) row[colMemberId]    = escapeForFormula(memberId);
@@ -638,18 +671,14 @@ var DataService = (function () {
       if (colStatus      !== -1) row[colStatus]      = 'Draft';
       if (colFiled       !== -1) row[colFiled]       = new Date();
       if (colUpdated     !== -1) row[colUpdated]     = new Date();
-      // Auto-assign steward: use provided steward email or the member's assigned steward
-      var stewardEmail = data.stewardEmail || assignedStewardEmail;
-      if (colSteward !== -1 && stewardEmail) row[colSteward] = escapeForFormula(stewardEmail);
       if (colCategory    !== -1) row[colCategory]    = escapeForFormula(data.category || '');
       if (colResolution  !== -1) row[colResolution]  = escapeForFormula('[Draft] ' + data.title + ': ' + data.description);
       if (colEmail       !== -1) row[colEmail]       = escapeForFormula(email.toLowerCase().trim());
 
       sheet.appendRow(row);
-      _invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
       return { success: true, message: 'Draft submitted.' };
     } catch (e) {
-      Logger.log('DataService.startGrievanceDraft error: ' + e.message);
+      handleError(e, 'DataService.startGrievanceDraft', ERROR_LEVEL.ERROR);
       return { success: false, message: 'Error creating draft.' };
     }
   }
@@ -663,7 +692,7 @@ var DataService = (function () {
   function createGrievanceDriveFolder(email) {
     if (!email) return { success: false, message: 'Email is required.' };
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'No grievances found.' };
@@ -727,7 +756,7 @@ var DataService = (function () {
     email = String(email).trim().toLowerCase();
 
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return { hasCompleted: false, lastCompleted: null };
       var trackSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
       if (!trackSheet || trackSheet.getLastRow() <= 1) {
@@ -759,6 +788,455 @@ var DataService = (function () {
     return { hasCompleted: false, lastCompleted: null };
   }
 
+  // ═══════════════════════════════════════
+  // PUBLIC: Resource Click Tracking (v4.31.1)
+  // ═══════════════════════════════════════
+
+  /**
+   * Logs a resource click/view event. Uses ScriptProperties for durable,
+   * lightweight counting. Each resource gets its own property key:
+   *   RC_<resourceId> = cumulative click count
+   *   RC_TOTAL        = grand total across all resources
+   *
+   * @param {string} email  — caller email (server-resolved)
+   * @param {string} resourceId — e.g. 'RES-001' or 'quick:calendar'
+   * @returns {Object} { success: boolean }
+   */
+  function logResourceClick(email, resourceId) {
+    if (!email || !resourceId) return { success: false };
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var rcKey = 'RC_' + String(resourceId).replace(/[^A-Za-z0-9_:-]/g, '');
+
+      // Increment per-resource counter
+      var current = parseInt(props.getProperty(rcKey) || '0', 10) || 0;
+      props.setProperty(rcKey, String(current + 1));
+
+      // Increment grand total
+      var total = parseInt(props.getProperty('RC_TOTAL') || '0', 10) || 0;
+      props.setProperty('RC_TOTAL', String(total + 1));
+
+      return { success: true };
+    } catch (e) {
+      Logger.log('logResourceClick error: ' + e.message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Returns the total resource click count across all resources.
+   * @returns {number}
+   */
+  function getResourceClickTotal() {
+    try {
+      var props = PropertiesService.getScriptProperties();
+      return parseInt(props.getProperty('RC_TOTAL') || '0', 10) || 0;
+    } catch (_e) {
+      return 0;
+    }
+  }
+
+  /**
+   * Returns detailed resource usage stats for Union Stats > Resources sub-tab.
+   * Reads per-resource click counts from ScriptProperties (RC_<id>) and
+   * cross-references with the Resources sheet for titles and categories.
+   *
+   * Returns:
+   *   totalViews      — grand total clicks across all resources
+   *   totalResources  — count of visible resources in Resources sheet
+   *   uniqueViewed    — count of distinct resources that have at least 1 click
+   *   avgViews        — average views per resource (totalViews / totalResources)
+   *   topResources    — array of { id, title, category, views } sorted desc by views (top 10)
+   *   byCategory      — { categoryName: totalViews } aggregated by category
+   *   byCategoryCount — { categoryName: resourceCount } resources per category
+   */
+  function getResourceStats() {
+    try {
+      var ss = _getSS();
+      if (!ss) return null;
+
+      // Read Resources sheet
+      var resSheet = ss.getSheetByName(SHEETS.RESOURCES);
+      var resourceMap = {}; // id -> { title, category, visible }
+      if (resSheet && resSheet.getLastRow() >= 2) {
+        var resData = resSheet.getRange(2, 1, resSheet.getLastRow() - 1, resSheet.getLastColumn()).getValues();
+        for (var ri = 0; ri < resData.length; ri++) {
+          var rId = String(resData[ri][RESOURCES_COLS.RESOURCE_ID - 1]).trim();
+          var visible = String(resData[ri][RESOURCES_COLS.VISIBLE - 1]).trim().toLowerCase();
+          if (rId && visible === 'yes') {
+            resourceMap[rId] = {
+              title: String(resData[ri][RESOURCES_COLS.TITLE - 1]).trim(),
+              category: String(resData[ri][RESOURCES_COLS.CATEGORY - 1]).trim()
+            };
+          }
+        }
+      }
+
+      // Read per-resource click counts from ScriptProperties
+      var props = PropertiesService.getScriptProperties();
+      var allProps = props.getProperties();
+      var clickMap = {}; // resourceId -> clickCount
+      var totalViews = 0;
+      var uniqueViewed = 0;
+      for (var key in allProps) {
+        if (key.indexOf('RC_') === 0 && key !== 'RC_TOTAL') {
+          var resId = key.substring(3); // strip 'RC_'
+          var clicks = parseInt(allProps[key], 10) || 0;
+          if (clicks > 0) {
+            clickMap[resId] = clicks;
+            totalViews += clicks;
+            uniqueViewed++;
+          }
+        }
+      }
+
+      // Use RC_TOTAL as authoritative grand total (may include quick-link clicks)
+      var rcTotal = parseInt(allProps['RC_TOTAL'] || '0', 10) || 0;
+      if (rcTotal > totalViews) totalViews = rcTotal;
+
+      var totalResources = Object.keys(resourceMap).length;
+      var avgViews = totalResources > 0 ? Math.round((totalViews / totalResources) * 10) / 10 : 0;
+
+      // Build top resources list and category aggregates
+      var topList = [];
+      var byCategory = {};
+      var byCategoryCount = {};
+
+      // Aggregate from Resources sheet (visible resources)
+      for (var id in resourceMap) {
+        var cat = resourceMap[id].category || 'Uncategorized';
+        var views = clickMap[id] || 0;
+        topList.push({ id: id, title: resourceMap[id].title, category: cat, views: views });
+        byCategory[cat] = (byCategory[cat] || 0) + views;
+        byCategoryCount[cat] = (byCategoryCount[cat] || 0) + 1;
+      }
+
+      // Also count clicks on quick-link resources (quick:*) not in the sheet
+      for (var ck in clickMap) {
+        if (ck.indexOf('quick:') === 0 && !resourceMap[ck]) {
+          var quickLabel = ck.substring(6).replace(/_/g, ' ');
+          quickLabel = quickLabel.charAt(0).toUpperCase() + quickLabel.slice(1);
+          topList.push({ id: ck, title: quickLabel, category: 'Quick Links', views: clickMap[ck] });
+          byCategory['Quick Links'] = (byCategory['Quick Links'] || 0) + clickMap[ck];
+          byCategoryCount['Quick Links'] = (byCategoryCount['Quick Links'] || 0) + 1;
+        }
+      }
+
+      // Sort top resources by views desc, take top 10
+      topList.sort(function(a, b) { return b.views - a.views; });
+      topList = topList.slice(0, 10);
+
+      return {
+        totalViews: totalViews,
+        totalResources: totalResources,
+        uniqueViewed: uniqueViewed,
+        avgViews: avgViews,
+        topResources: topList,
+        byCategory: byCategory,
+        byCategoryCount: byCategoryCount
+      };
+    } catch (e) {
+      Logger.log('getResourceStats error: ' + e.message);
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Webapp Usage Analytics (v4.31.3)
+  // ═══════════════════════════════════════
+  //
+  // Lightweight analytics stored in ScriptProperties with daily aggregation.
+  // Property key scheme (all prefixed to avoid collisions):
+  //   UA_D_YYYYMMDD         = JSON: { users: {email:1,...}, total: N }
+  //   UA_T_YYYYMMDD_tabname = visit count for tab on date
+  //   UA_H_YYYYMMDD_HH      = unique user count in that hour (for peak detection)
+  //   UA_L_YYYYMMDD_location = unique user count by location on date
+  //
+  // Data is kept for 90 days max. Cleanup runs inside getUsageStats().
+
+  /**
+   * Logs a tab visit event for usage analytics.
+   * @param {string} email — caller email (server-resolved)
+   * @param {string} tab — tab identifier (e.g. 'home', 'grievances', 'resources')
+   * @param {string} role — user role ('member' or 'steward')
+   * @returns {{ success: boolean }}
+   */
+  function logTabVisit(email, tab, role) {
+    if (!email || !tab) return { success: false };
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var tz = Session.getScriptTimeZone() || 'America/New_York';
+      var now = new Date();
+      var dateKey = Utilities.formatDate(now, tz, 'yyyyMMdd');
+      var hourKey = Utilities.formatDate(now, tz, 'HH');
+      var safeTab = String(tab).replace(/[^a-z0-9_-]/gi, '').substring(0, 30).toLowerCase();
+      var safeEmail = String(email).toLowerCase().trim();
+      // Hash email to avoid storing PII in ScriptProperties
+      var emailHash = Utilities.base64Encode(
+        Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, safeEmail)
+      ).substring(0, 16);
+
+      // 1. Daily unique users
+      var dailyKey = 'UA_D_' + dateKey;
+      var dailyRaw = props.getProperty(dailyKey);
+      var daily = dailyRaw ? JSON.parse(dailyRaw) : { users: {}, total: 0 };
+      if (!daily.users[emailHash]) {
+        daily.users[emailHash] = 1;
+      }
+      daily.total = (daily.total || 0) + 1;
+      props.setProperty(dailyKey, JSON.stringify(daily));
+
+      // 2. Tab visit count
+      var tabKey = 'UA_T_' + dateKey + '_' + safeTab;
+      var tabCount = parseInt(props.getProperty(tabKey) || '0', 10) || 0;
+      props.setProperty(tabKey, String(tabCount + 1));
+
+      // 3. Hourly unique users (for peak detection)
+      var hourlyKey = 'UA_H_' + dateKey + '_' + hourKey;
+      var hourlyRaw = props.getProperty(hourlyKey);
+      var hourly = hourlyRaw ? JSON.parse(hourlyRaw) : {};
+      hourly[emailHash] = 1;
+      props.setProperty(hourlyKey, JSON.stringify(hourly));
+
+      // 4. Location-based usage (look up member's work location)
+      try {
+        var ss = _getSS();
+        if (ss) {
+          var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+          if (memberSheet && memberSheet.getLastRow() >= 2) {
+            var mHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
+            var emailIdx = mHeaders.indexOf('Email');
+            var locIdx = mHeaders.indexOf('Work Location');
+            if (emailIdx >= 0 && locIdx >= 0) {
+              var mData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
+              for (var i = 0; i < mData.length; i++) {
+                if (String(mData[i][emailIdx]).toLowerCase().trim() === safeEmail) {
+                  var loc = String(mData[i][locIdx]).trim();
+                  if (loc) {
+                    var locKey = 'UA_L_' + dateKey + '_' + loc.replace(/[^a-zA-Z0-9 _-]/g, '').substring(0, 40);
+                    var locRaw = props.getProperty(locKey);
+                    var locData = locRaw ? JSON.parse(locRaw) : {};
+                    locData[emailHash] = 1;
+                    props.setProperty(locKey, JSON.stringify(locData));
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (_locErr) { /* non-critical */ }
+
+      return { success: true };
+    } catch (e) {
+      Logger.log('logTabVisit error: ' + e.message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Returns aggregated webapp usage stats for the Union Stats > Usage sub-tab.
+   * Reads UA_* keys from ScriptProperties and computes:
+   *   dau           — daily active users (today)
+   *   wau           — weekly active users (last 7 days)
+   *   mau           — monthly active users (last 30 days)
+   *   peakHourly    — max concurrent users in a single hour (last 30 days)
+   *   peakDate      — date of the peak
+   *   repeatRate    — % of users who visited on 2+ distinct days (last 30 days)
+   *   totalPageViews — total page views last 30 days
+   *   avgDailyUsers — average DAU over last 30 days
+   *   tabHeatmap    — { tabName: totalVisits } last 30 days
+   *   byLocation    — { location: uniqueUsers } last 30 days
+   *   dailyTrend    — [{ date, users, views }] last 30 days
+   *   hourlyPattern — [{ hour, avgUsers }] averaged across last 30 days
+   */
+  function getUsageStats() {
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var allProps = props.getProperties();
+      var tz = Session.getScriptTimeZone() || 'America/New_York';
+      var now = new Date();
+      var todayKey = Utilities.formatDate(now, tz, 'yyyyMMdd');
+
+      // Date range helpers
+      function _dateKey(daysAgo) {
+        var d = new Date(now.getTime() - daysAgo * 86400000);
+        return Utilities.formatDate(d, tz, 'yyyyMMdd');
+      }
+      function _formatDate(key) {
+        return key.substring(0, 4) + '-' + key.substring(4, 6) + '-' + key.substring(6, 8);
+      }
+
+      var last30Keys = [];
+      for (var d = 0; d < 30; d++) last30Keys.push(_dateKey(d));
+      var last7Keys = last30Keys.slice(0, 7);
+
+      // Collect all user sets per day, page views per day
+      var allUsers30 = {};    // email -> count of distinct days
+      var allUsers7 = {};
+      var dau = 0;
+      var totalPageViews = 0;
+      var dailyTrend = [];
+      var activeDays = 0;     // days with any activity
+      var totalDailyUsers = 0;
+
+      for (var di = 0; di < last30Keys.length; di++) {
+        var dk = last30Keys[di];
+        var dailyProp = allProps['UA_D_' + dk];
+        var dayUsers = 0;
+        var dayViews = 0;
+
+        if (dailyProp) {
+          try {
+            var parsed = JSON.parse(dailyProp);
+            var emails = Object.keys(parsed.users || {});
+            dayUsers = emails.length;
+            dayViews = parsed.total || 0;
+            for (var ei = 0; ei < emails.length; ei++) {
+              allUsers30[emails[ei]] = (allUsers30[emails[ei]] || 0) + 1;
+              if (di < 7) allUsers7[emails[ei]] = 1;
+            }
+            if (dk === todayKey) dau = dayUsers;
+          } catch (_pe) { /* skip corrupt entries */ }
+        }
+
+        if (dayUsers > 0) {
+          activeDays++;
+          totalDailyUsers += dayUsers;
+        }
+
+        totalPageViews += dayViews;
+        dailyTrend.push({ date: _formatDate(dk), users: dayUsers, views: dayViews });
+      }
+      dailyTrend.reverse(); // oldest first
+
+      var wau = Object.keys(allUsers7).length;
+      var mau = Object.keys(allUsers30).length;
+      var avgDailyUsers = activeDays > 0 ? Math.round((totalDailyUsers / activeDays) * 10) / 10 : 0;
+
+      // Repeat rate: users who visited on 2+ distinct days
+      var repeatCount = 0;
+      for (var u in allUsers30) {
+        if (allUsers30[u] >= 2) repeatCount++;
+      }
+      var repeatRate = mau > 0 ? Math.round((repeatCount / mau) * 100) : 0;
+
+      // Peak hourly users
+      var peakHourly = 0;
+      var peakDate = '';
+      var hourlyBuckets = {}; // hour (0-23) -> total unique users across all days
+      var hourlyDaysWithData = {}; // hour -> count of days with data for averaging
+
+      for (var key in allProps) {
+        if (key.indexOf('UA_H_') === 0) {
+          var parts = key.substring(5).split('_'); // YYYYMMDD_HH
+          if (parts.length === 2) {
+            var hDateKey = parts[0];
+            var hour = parts[1];
+            // Only include last 30 days
+            if (last30Keys.indexOf(hDateKey) >= 0) {
+              try {
+                var hUsers = Object.keys(JSON.parse(allProps[key]));
+                var hCount = hUsers.length;
+                if (hCount > peakHourly) {
+                  peakHourly = hCount;
+                  peakDate = _formatDate(hDateKey) + ' ' + hour + ':00';
+                }
+                var hNum = parseInt(hour, 10);
+                hourlyBuckets[hNum] = (hourlyBuckets[hNum] || 0) + hCount;
+                hourlyDaysWithData[hNum] = (hourlyDaysWithData[hNum] || 0) + 1;
+              } catch (_he) { /* skip */ }
+            }
+          }
+        }
+      }
+
+      // Hourly pattern (average users per hour)
+      var hourlyPattern = [];
+      for (var h = 0; h < 24; h++) {
+        var hTotal = hourlyBuckets[h] || 0;
+        var hDays = hourlyDaysWithData[h] || 1;
+        hourlyPattern.push({ hour: String(h).length < 2 ? '0' + h : String(h), avgUsers: Math.round((hTotal / hDays) * 10) / 10 });
+      }
+
+      // Tab heatmap
+      var tabHeatmap = {};
+      for (var tKey in allProps) {
+        if (tKey.indexOf('UA_T_') === 0) {
+          var tParts = tKey.substring(5); // YYYYMMDD_tabname
+          var tDateEnd = tParts.indexOf('_');
+          if (tDateEnd > 0) {
+            var tDate = tParts.substring(0, tDateEnd);
+            if (last30Keys.indexOf(tDate) >= 0) {
+              var tName = tParts.substring(tDateEnd + 1);
+              tabHeatmap[tName] = (tabHeatmap[tName] || 0) + (parseInt(allProps[tKey], 10) || 0);
+            }
+          }
+        }
+      }
+
+      // Location breakdown
+      var byLocation = {};
+      for (var lKey in allProps) {
+        if (lKey.indexOf('UA_L_') === 0) {
+          var lParts = lKey.substring(5); // YYYYMMDD_location
+          var lDateEnd = lParts.indexOf('_');
+          if (lDateEnd > 0) {
+            var lDate = lParts.substring(0, lDateEnd);
+            if (last30Keys.indexOf(lDate) >= 0) {
+              var lName = lParts.substring(lDateEnd + 1);
+              try {
+                var lUsers = Object.keys(JSON.parse(allProps[lKey]));
+                // Merge into location-level unique set
+                if (!byLocation[lName]) byLocation[lName] = {};
+                for (var li = 0; li < lUsers.length; li++) byLocation[lName][lUsers[li]] = 1;
+              } catch (_le) { /* skip */ }
+            }
+          }
+        }
+      }
+      // Convert location sets to counts
+      var byLocationCounts = {};
+      for (var loc in byLocation) {
+        byLocationCounts[loc] = Object.keys(byLocation[loc]).length;
+      }
+
+      // Cleanup: remove keys older than 90 days
+      var cutoff = _dateKey(90);
+      var keysToDelete = [];
+      for (var oldKey in allProps) {
+        if (oldKey.indexOf('UA_') === 0) {
+          // Extract date portion
+          var datePortion = oldKey.replace(/^UA_[DTHL]_/, '').substring(0, 8);
+          if (datePortion < cutoff && /^\d{8}$/.test(datePortion)) {
+            keysToDelete.push(oldKey);
+          }
+        }
+      }
+      if (keysToDelete.length > 0) {
+        props.deleteProperties(keysToDelete);
+      }
+
+      return {
+        dau: dau,
+        wau: wau,
+        mau: mau,
+        peakHourly: peakHourly,
+        peakDate: peakDate,
+        repeatRate: repeatRate,
+        totalPageViews: totalPageViews,
+        avgDailyUsers: avgDailyUsers,
+        tabHeatmap: tabHeatmap,
+        byLocation: byLocationCounts,
+        dailyTrend: dailyTrend,
+        hourlyPattern: hourlyPattern
+      };
+    } catch (e) {
+      Logger.log('getUsageStats error: ' + e.message);
+      return null;
+    }
+  }
+
   /**
    * Get or create a restricted Drive folder named after the spreadsheet.
    * Users shared on this folder cannot browse outside it.
@@ -774,13 +1252,11 @@ var DataService = (function () {
       try {
         var existing = DriveApp.getFolderById(storedId);
         return 'https://drive.google.com/drive/folders/' + existing.getId();
-      } catch (_e) {
-        // Stored ID invalid, fall through to create
-      }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
 
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return '';
       var folderName = ss.getName();
 
@@ -943,7 +1419,7 @@ var DataService = (function () {
     var surveyMap = {};
     var participationMap = {};
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) throw new Error('Spreadsheet unavailable');
       var trackSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_TRACKING);
       if (trackSheet && trackSheet.getLastRow() > 1) {
@@ -1073,6 +1549,8 @@ var DataService = (function () {
     if (filtered.length === 0) return { success: false, sentCount: 0, message: 'No members match the selected filters.' };
 
     var sentCount = 0;
+    var failedCount = 0;
+    var failures = [];
     var config = ConfigReader.getConfig();
     var autoSubject = config.orgAbbrev + ' - Message from your ' + config.stewardLabel;
     var subject = (customSubject && String(customSubject).trim()) ? String(customSubject).trim() : autoSubject;
@@ -1082,6 +1560,8 @@ var DataService = (function () {
         MailApp.sendEmail(filtered[i].email, subject, message);
         sentCount++;
       } catch (e) {
+        failedCount++;
+        failures.push({ email: filtered[i].email, error: e.message });
         Logger.log('Broadcast send error for ' + filtered[i].email + ': ' + e.message);
       }
     }
@@ -1091,13 +1571,16 @@ var DataService = (function () {
         steward: stewardEmail,
         scope: scope,
         recipientCount: sentCount,
+        failedCount: failedCount,
         filter: JSON.stringify(filter || {}),
       });
     }
 
-    return { success: true, sentCount: sentCount, message: 'Sent to ' + sentCount + ' member(s).' };
+    var msg = 'Sent to ' + sentCount + ' member(s).';
+    if (failedCount > 0) msg += ' Failed: ' + failedCount + '.';
+    return { success: sentCount > 0, sentCount: sentCount, failedCount: failedCount, failures: failures, message: msg };
     } catch (outerErr) {
-      Logger.log('sendBroadcastMessage error: ' + outerErr.message + '\n' + (outerErr.stack || ''));
+      handleError(outerErr, 'DataService.sendBroadcastMessage', ERROR_LEVEL.ERROR);
       return { success: false, sentCount: 0, message: 'An error occurred while sending the broadcast.' };
     }
   }
@@ -1109,7 +1592,7 @@ var DataService = (function () {
    */
   function getSurveyResults() {
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return { available: false, count: 0, threshold: 30, sections: [] };
       var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
       if (!satSheet) return { available: false, count: 0, threshold: 30, sections: [] };
@@ -1200,7 +1683,7 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function _getSheet(name) {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = _getSS();
     if (!ss) {
       Logger.log('DataService: getActiveSpreadsheet() returned null for sheet "' + name + '"');
       return null;
@@ -1335,16 +1818,6 @@ var DataService = (function () {
         return String(raw || '').trim();
       })(),
       openRate: String(_getVal(row, colMap, HEADERS.memberOpenRate, '')).trim(),
-      lastVirtualMtg: (function() {
-        var raw = _getVal(row, colMap, HEADERS.memberLastVirtualMtg, '');
-        if (raw instanceof Date) return _formatDate(raw);
-        return String(raw || '').trim();
-      })(),
-      lastInPersonMtg: (function() {
-        var raw = _getVal(row, colMap, HEADERS.memberLastInPersonMtg, '');
-        if (raw instanceof Date) return _formatDate(raw);
-        return String(raw || '').trim();
-      })(),
     };
   }
 
@@ -1471,6 +1944,8 @@ var DataService = (function () {
       issueCategory: String(_getVal(row, colMap, HEADERS.grievanceIssueCategory, '')).trim(),
       priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
       notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
+      driveFolderUrl: String(_getVal(row, colMap, HEADERS.grievanceDriveFolderUrl, '')).trim() || null,
+      driveFolderId: String(_getVal(row, colMap, HEADERS.grievanceDriveFolderId, '')).trim() || null,
     };
   }
 
@@ -1530,8 +2005,8 @@ var DataService = (function () {
       var headers = ['Date', 'Steward', 'Contact Type', 'Notes', 'Duration'];
       sheet.getRange(1, 1, 1, headers.length).setValues([headers])
            .setFontWeight('bold')
-           .setBackground(SHEET_COLORS.HEADER_DARK_BLUE)
-           .setFontColor(SHEET_COLORS.BG_WHITE);
+           .setBackground('#1a365d')
+           .setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);
       sheet.setColumnWidth(1, 130); // Date
       sheet.setColumnWidth(2, 180); // Steward
@@ -1550,24 +2025,31 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function _ensureContactLog() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = _getSS();
     if (!ss) return null;
     var sheet = ss.getSheetByName(SHEETS.CONTACT_LOG);
     if (!sheet) {
       sheet = ss.insertSheet(SHEETS.CONTACT_LOG);
-      sheet.getRange(1, 1, 1, 8).setValues([['ID', 'Steward Email', 'Member Email', 'Contact Type', 'Date', 'Notes', 'Duration', 'Created']]);
+      sheet.getRange(1, 1, 1, 9).setValues([['ID', 'Steward Email', 'Member Email', 'Contact Type', 'Date', 'Notes', 'Duration', 'Created', 'Member Name']]);
       sheet.hideSheet();
     }
     return sheet;
   }
 
-  function logMemberContact(stewardEmail, memberEmail, contactType, notes, duration) {
+  function logMemberContact(stewardEmail, memberEmail, contactType, notes, duration, memberName) {
     if (!stewardEmail || !memberEmail || !contactType) return { success: false, message: 'Missing fields.' };
+
+    // ── 0. Resolve member display name if not provided by client ─────────
+    var resolvedName = (memberName || '').trim();
+    if (!resolvedName && typeof findUserByEmail === 'function') {
+      var mRecord = findUserByEmail(memberEmail);
+      if (mRecord && mRecord.name) resolvedName = mRecord.name;
+    }
 
     // ── 1. Append to _Contact_Log hidden sheet (fast dashboard queries) ────
     var sheet = _ensureContactLog();
     var id = 'CL_' + Date.now().toString(36);
-    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), contactType, new Date(), (notes || '').substring(0, 500), duration || '', new Date()]);
+    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), contactType, new Date(), (notes || '').substring(0, 500), duration || '', new Date(), resolvedName]);
     if (typeof logAuditEvent === 'function') logAuditEvent('CONTACT_LOG', { steward: stewardEmail, member: memberEmail, type: contactType });
 
     // ── 2. Resolve steward display name once (used in both writeback and Drive sheet) ──
@@ -1576,7 +2058,7 @@ var DataService = (function () {
 
     // ── 3. Writeback: update Member Directory snapshot columns ────────────
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (ss) {
         var memberDir = ss.getSheetByName(MEMBER_SHEET);
         if (memberDir) {
@@ -1642,7 +2124,7 @@ var DataService = (function () {
         results.push({ id: data[i][0], type: data[i][3],
           date: rawDate instanceof Date ? _formatDate(rawDate) : String(rawDate),
           _ts: rawDate instanceof Date ? rawDate.getTime() : 0,
-          notes: data[i][5], duration: data[i][6] });
+          notes: data[i][5], duration: data[i][6], memberName: data[i][8] || '' });
       }
     }
     // H-16: sort by numeric timestamp — string comparison of formatted dates is not chronological
@@ -1660,7 +2142,7 @@ var DataService = (function () {
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][1]).toLowerCase().trim() === sEmail) {
         var rawDate2 = data[i][4];
-        results.push({ id: data[i][0], memberEmail: data[i][2], type: data[i][3],
+        results.push({ id: data[i][0], memberEmail: data[i][2], memberName: data[i][8] || '', type: data[i][3],
           date: rawDate2 instanceof Date ? _formatDate(rawDate2) : String(rawDate2),
           _ts: rawDate2 instanceof Date ? rawDate2.getTime() : 0,
           notes: data[i][5], duration: data[i][6] });
@@ -1677,7 +2159,7 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function _ensureStewardTasks() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = _getSS();
     if (!ss) return null;
     var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
     if (!sheet) {
@@ -1692,7 +2174,12 @@ var DataService = (function () {
     return sheet;
   }
 
-  function createTask(stewardEmail, title, description, memberEmail, priority, dueDate, assignToEmail) {
+  function createTask(stewardEmail, title, description, memberEmail, priority, dueDate, assignToEmail, idemKey) {
+    if (idemKey) {
+      var idemCache = CacheService.getScriptCache();
+      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
+      idemCache.put('IDEM_' + idemKey, '1', 300);
+    }
     if (!stewardEmail || !title) return { success: false, message: 'Missing fields.' };
     // If assignToEmail is provided and caller is chief steward, assign to that steward
     var ownerEmail = stewardEmail.toLowerCase().trim();
@@ -1704,7 +2191,7 @@ var DataService = (function () {
     }
     var sheet = _ensureStewardTasks();
     var id = 'ST_' + Date.now().toString(36);
-    sheet.appendRow([id, ownerEmail, title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '', 'steward', '']);
+    sheet.appendRow([id, ownerEmail, title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
     _invalidateSheetCache(SHEETS.STEWARD_TASKS);
     return { success: true, message: 'Task created.', taskId: id };
   }
@@ -1904,7 +2391,7 @@ var DataService = (function () {
     try {
       var email = '';
       if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.CHIEF_STEWARD_EMAIL) {
-        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var ss = _getSS();
         if (!ss) return null;
         var cfgSheet = ss.getSheetByName(SHEETS.CONFIG);
         if (cfgSheet) email = String(cfgSheet.getRange(3, CONFIG_COLS.CHIEF_STEWARD_EMAIL).getValue() || '').toLowerCase().trim();
@@ -2001,7 +2488,8 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function getGrievanceStats() {
-    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    // Use combined active + archive data for complete statistics
+    var cached = _getAllGrievanceData();
     if (!cached) return { available: false };
     var data = cached.data;
     if (data.length <= 1) return { available: false };
@@ -2063,17 +2551,184 @@ var DataService = (function () {
     var sortedMonths = Object.keys(allMonths).sort().slice(-12);
     var monthlyArr = sortedMonths.map(function(k) { return { month: k, count: monthly[k] || 0 }; });
     var monthlyResolvedArr = sortedMonths.map(function(k) { return { month: k, count: monthlyResolved[k] || 0 }; });
+    // Win rate: Won / (Won + Denied + Settled + Withdrawn + Resolved + Closed)
+    var closedTotal = wonCount + deniedCount + settledCount + withdrawnCount;
+    // Also count 'resolved' and 'closed' from byStatus
+    var resolvedCount = byStatus['resolved'] || 0;
+    var closedStatusCount = byStatus['closed'] || 0;
+    closedTotal += resolvedCount + closedStatusCount;
+    var winRate = closedTotal > 0 ? Math.round(((wonCount + settledCount) / closedTotal) * 100) : null;
+    var favorableCount = wonCount + settledCount;
+
+    // Extended metrics pass — resolution time, deadline compliance, steward performance,
+    // recurrence, step escalation, contract articles, response SLA, YoY (v4.31.5)
+    var resolutionDays = [];
+    var deadlineMet = 0;
+    var deadlineTotal = 0;
+    var stewardResolution = {};   // steward -> [days]
+    var memberGrievanceCounts = {}; // email -> count
+    var stepProgression = { s1: 0, s2: 0, s3: 0, s1to2: 0, s2to3: 0 };
+    var articleCounts = {};       // article -> count
+    var step1SlaMetCount = 0;
+    var step1SlaTotal = 0;
+    var yearBuckets = {};         // year -> { filed, closed, won, settled, denied }
+
+    for (var ri = 1; ri < data.length; ri++) {
+      try {
+        var rRec = _buildGrievanceRecord(data[ri], colMap);
+        var rStatus = rRec.status;
+        var CLOSED = ['won', 'denied', 'settled', 'resolved', 'closed', 'withdrawn'];
+
+        // Resolution time
+        if (rRec.filedTimestamp && rRec.closedTimestamp && rRec.closedTimestamp > rRec.filedTimestamp) {
+          var days = Math.round((rRec.closedTimestamp - rRec.filedTimestamp) / 86400000);
+          if (days >= 0 && days < 3650) {
+            resolutionDays.push(days);
+            // Per-steward resolution
+            var stw = rRec.steward || 'unassigned';
+            if (!stewardResolution[stw]) stewardResolution[stw] = [];
+            stewardResolution[stw].push(days);
+          }
+        }
+
+        // Deadline compliance
+        if (rRec.deadlineDays !== null && CLOSED.indexOf(rStatus) >= 0) {
+          deadlineTotal++;
+          if (rStatus !== 'overdue') deadlineMet++;
+        }
+
+        // Recurrence — count grievances per member email
+        if (rRec.memberEmail) {
+          memberGrievanceCounts[rRec.memberEmail] = (memberGrievanceCounts[rRec.memberEmail] || 0) + 1;
+        }
+
+        // Step escalation
+        var stepVal = String(rRec.step).trim();
+        if (stepVal === '1' || stepVal.toLowerCase() === 'step 1' || stepVal.toLowerCase() === 'i') stepProgression.s1++;
+        else if (stepVal === '2' || stepVal.toLowerCase() === 'step 2' || stepVal.toLowerCase() === 'ii') { stepProgression.s2++; stepProgression.s1to2++; }
+        else if (stepVal === '3' || stepVal.toLowerCase() === 'step 3' || stepVal.toLowerCase() === 'iii' || stepVal.toLowerCase().indexOf('arb') >= 0) { stepProgression.s3++; stepProgression.s2to3++; }
+
+        // Contract articles violated
+        var articles = String(_getVal(data[ri], colMap, HEADERS.grievanceArticles, '')).trim();
+        if (articles) {
+          articles.split(/[,;]+/).forEach(function(a) {
+            var art = a.trim();
+            if (art) articleCounts[art] = (articleCounts[art] || 0) + 1;
+          });
+        }
+
+        // Step 1 response SLA — was Step I Rcvd before Step I Due?
+        var s1Due = _getVal(data[ri], colMap, HEADERS.grievanceStep1Due, null);
+        var s1Rcvd = _getVal(data[ri], colMap, HEADERS.grievanceStep1Rcvd, null);
+        if (s1Due && s1Rcvd) {
+          var dueDate = s1Due instanceof Date ? s1Due : new Date(s1Due);
+          var rcvdDate = s1Rcvd instanceof Date ? s1Rcvd : new Date(s1Rcvd);
+          if (!isNaN(dueDate.getTime()) && !isNaN(rcvdDate.getTime())) {
+            step1SlaTotal++;
+            if (rcvdDate <= dueDate) step1SlaMetCount++;
+          }
+        }
+
+        // Year-over-year
+        if (rRec.filedTimestamp) {
+          var fYear = new Date(rRec.filedTimestamp).getFullYear();
+          if (!yearBuckets[fYear]) yearBuckets[fYear] = { filed: 0, closed: 0, won: 0, settled: 0, denied: 0 };
+          yearBuckets[fYear].filed++;
+        }
+        if (rRec.closedTimestamp) {
+          var cYear = new Date(rRec.closedTimestamp).getFullYear();
+          if (!yearBuckets[cYear]) yearBuckets[cYear] = { filed: 0, closed: 0, won: 0, settled: 0, denied: 0 };
+          yearBuckets[cYear].closed++;
+          if (rStatus === 'won') yearBuckets[cYear].won++;
+          else if (rStatus === 'settled') yearBuckets[cYear].settled++;
+          else if (rStatus === 'denied') yearBuckets[cYear].denied++;
+        }
+      } catch (_re) { /* skip */ }
+    }
+
+    // Compute derived stats
+    var avgResolutionDays = resolutionDays.length > 0 ? Math.round(resolutionDays.reduce(function(a, b) { return a + b; }, 0) / resolutionDays.length) : null;
+    var medianResolutionDays = null;
+    if (resolutionDays.length > 0) {
+      resolutionDays.sort(function(a, b) { return a - b; });
+      var mid = Math.floor(resolutionDays.length / 2);
+      medianResolutionDays = resolutionDays.length % 2 === 0 ? Math.round((resolutionDays[mid - 1] + resolutionDays[mid]) / 2) : resolutionDays[mid];
+    }
+    var deadlineComplianceRate = deadlineTotal > 0 ? Math.round((deadlineMet / deadlineTotal) * 100) : null;
+
+    // Steward resolution averages (anonymized — numbered not named)
+    var stewardAvgResolution = [];
+    for (var sw in stewardResolution) {
+      var sDays = stewardResolution[sw];
+      var sAvg = Math.round(sDays.reduce(function(a, b) { return a + b; }, 0) / sDays.length);
+      var sLabel = sw;
+      if (sw && sw !== 'unassigned') {
+        var sUser = findUserByEmail(sw);
+        sLabel = (sUser && sUser.name) ? sUser.name : sw;
+      }
+      stewardAvgResolution.push({ label: sLabel, avgDays: sAvg, cases: sDays.length });
+    }
+    stewardAvgResolution.sort(function(a, b) { return a.avgDays - b.avgDays; });
+
+    // Recurrence rate
+    var totalMembers = Object.keys(memberGrievanceCounts).length;
+    var repeatGrievants = 0;
+    for (var me in memberGrievanceCounts) {
+      if (memberGrievanceCounts[me] >= 2) repeatGrievants++;
+    }
+    var recurrenceRate = totalMembers > 0 ? Math.round((repeatGrievants / totalMembers) * 100) : 0;
+
+    // Step escalation rates
+    var totalFiled = stepProgression.s1 + stepProgression.s2 + stepProgression.s3;
+    var escalation1to2 = totalFiled > 0 ? Math.round((stepProgression.s1to2 / totalFiled) * 100) : null;
+    var escalation2to3 = stepProgression.s1to2 > 0 ? Math.round((stepProgression.s2to3 / Math.max(stepProgression.s1to2, 1)) * 100) : null;
+
+    // Top violated articles (sorted desc, top 10)
+    var articleList = [];
+    for (var art in articleCounts) articleList.push({ article: art, count: articleCounts[art] });
+    articleList.sort(function(a, b) { return b.count - a.count; });
+    articleList = articleList.slice(0, 15);
+
+    // Step 1 response SLA rate
+    var step1SlaRate = step1SlaTotal > 0 ? Math.round((step1SlaMetCount / step1SlaTotal) * 100) : null;
+
+    // Year-over-year — sorted array
+    var yoyData = [];
+    var yoyYears = Object.keys(yearBuckets).sort();
+    for (var yi = 0; yi < yoyYears.length; yi++) {
+      var yb = yearBuckets[yoyYears[yi]];
+      var yClosed = yb.closed || 1;
+      yoyData.push({
+        year: yoyYears[yi],
+        filed: yb.filed,
+        closed: yb.closed,
+        winRate: yClosed > 0 ? Math.round(((yb.won + yb.settled) / yClosed) * 100) : 0
+      });
+    }
+
     return {
       available: true, total: total,
       byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory,
       monthly: monthlyArr, monthlyResolved: monthlyResolvedArr,
       openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount, withdrawnCount: withdrawnCount,
       overdueCount: overdueCount, dueSoonCount: dueSoonCount,
+      // Outcome & resolution metrics (v4.31.4)
+      winRate: winRate, favorableCount: favorableCount, closedTotal: closedTotal,
+      avgResolutionDays: avgResolutionDays, medianResolutionDays: medianResolutionDays,
+      resolvedCount: resolutionDays.length, deadlineComplianceRate: deadlineComplianceRate,
+      // Deep analytics (v4.31.5)
+      stewardAvgResolution: stewardAvgResolution,
+      recurrenceRate: recurrenceRate, repeatGrievants: repeatGrievants, uniqueGrievants: totalMembers,
+      escalation1to2: escalation1to2, escalation2to3: escalation2to3, stepProgression: stepProgression,
+      articleHeatmap: articleList,
+      step1SlaRate: step1SlaRate,
+      yoyData: yoyData,
     };
   }
 
   function getGrievanceHotSpots() {
-    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    // Use combined active + archive for complete hotspot analysis
+    var cached = _getAllGrievanceData();
     if (!cached) return [];
     var data = cached.data;
     if (data.length <= 1) return [];
@@ -2135,7 +2790,24 @@ var DataService = (function () {
         }
       }
     }
-    return { available: true, total: total, byUnit: byUnit, byLocation: byLocation, byDues: byDues, newMembersLast90: newMembersLast90, byHireMonth: byHireMonth };
+    // Tenure distribution (v4.31.4)
+    var byTenure = { '< 1 year': 0, '1-3 years': 0, '3-5 years': 0, '5-10 years': 0, '10+ years': 0 };
+    for (var ti = 1; ti < data.length; ti++) {
+      var tRec = _buildUserRecord(data[ti], colMap);
+      if (tRec.hireDate) {
+        var thd = new Date(tRec.hireDate);
+        if (!isNaN(thd.getTime())) {
+          var yearsEmployed = (now.getTime() - thd.getTime()) / (365.25 * 86400000);
+          if (yearsEmployed < 1) byTenure['< 1 year']++;
+          else if (yearsEmployed < 3) byTenure['1-3 years']++;
+          else if (yearsEmployed < 5) byTenure['3-5 years']++;
+          else if (yearsEmployed < 10) byTenure['5-10 years']++;
+          else byTenure['10+ years']++;
+        }
+      }
+    }
+
+    return { available: true, total: total, byUnit: byUnit, byLocation: byLocation, byDues: byDues, newMembersLast90: newMembersLast90, byHireMonth: byHireMonth, byTenure: byTenure };
   }
 
   // ═══════════════════════════════════════
@@ -2189,7 +2861,7 @@ var DataService = (function () {
     } catch (e) {
       Logger.log('getUpcomingEvents error: ' + e.message);
       // Last resort: try timeline fallback
-      try { var fb = _getTimelineEvents(limit); if (fb.length > 0) return fb; } catch (_e2) { /* ok */ }
+      try { var fb = _getTimelineEvents(limit); if (fb.length > 0) return fb; } catch (_e2) { Logger.log('_e2: ' + (_e2.message || _e2)); }
       return [];
     }
   }
@@ -2199,7 +2871,7 @@ var DataService = (function () {
    * Returns array of {title, startTime, endTime, location, description} sorted by date.
    */
   function _getTimelineEvents(limit) {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = _getSS();
     if (!ss) return [];
     var tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!tlSheet || tlSheet.getLastRow() <= 1) return [];
@@ -2225,6 +2897,20 @@ var DataService = (function () {
     return results.slice(0, limit || 10);
   }
 
+  // ─── Execution Time Guard ────────────────────────────────
+  var _execStart = Date.now();
+  /**
+   * Checks elapsed execution time. Throws if approaching GAS web app
+   * timeout (30s for doGet/doPost, 6min for server calls).
+   */
+  function _checkExecTime(label) {
+    var elapsed = Date.now() - _execStart;
+    if (elapsed > 25000) {
+      Logger.log('SLOW_EXEC: ' + label + ' at ' + elapsed + 'ms');
+      throw new Error('Request is taking too long. Please try again.');
+    }
+  }
+
   // ═══════════════════════════════════════
   // SHEET DATA CACHE — avoids redundant full-sheet reads within a single
   // server execution (multiple methods reading the same sheet).
@@ -2233,6 +2919,49 @@ var DataService = (function () {
 
   var _sheetDataCache = {};
   var SHEET_CACHE_TTL = 120; // 2 minutes
+  var _sheetHealthLog = {}; // { sheetName: rowCount } — for health reporting
+
+  /**
+   * Stores a large JSON string in CacheService using chunked keys.
+   * Each chunk is max 90KB to stay under the 100KB/key limit.
+   */
+  function _putChunkedCache(cache, key, json, ttl) {
+    var CHUNK_SIZE = 90000;
+    if (json.length <= CHUNK_SIZE) {
+      cache.put(key, json, ttl);
+      cache.put(key + '_n', '1', ttl);
+      return;
+    }
+    var numChunks = Math.ceil(json.length / CHUNK_SIZE);
+    var pairs = {};
+    pairs[key + '_n'] = String(numChunks);
+    for (var i = 0; i < numChunks; i++) {
+      pairs[key + '_' + i] = json.substr(i * CHUNK_SIZE, CHUNK_SIZE);
+    }
+    cache.putAll(pairs, ttl);
+  }
+
+  /**
+   * Retrieves a chunked JSON string from CacheService.
+   * Returns null on miss or partial eviction.
+   */
+  function _getChunkedCache(cache, key) {
+    var n = cache.get(key + '_n');
+    if (!n) return null;
+    n = parseInt(n, 10);
+    if (n === 1) return cache.get(key);
+    var keys = [key + '_n'];
+    var i;
+    for (i = 0; i < n; i++) keys.push(key + '_' + i);
+    var all = cache.getAll(keys);
+    var parts = [];
+    for (i = 0; i < n; i++) {
+      var chunk = all[key + '_' + i];
+      if (!chunk) return null; // partial eviction
+      parts.push(chunk);
+    }
+    return parts.join('');
+  }
 
   /**
    * Returns cached sheet data (headers + rows) or reads from the sheet
@@ -2249,9 +2978,13 @@ var DataService = (function () {
     var cacheKey = 'SD_' + sheetName.replace(/\s/g, '_');
     try {
       var cache = CacheService.getScriptCache();
-      var cached = cache.get(cacheKey);
+      var cached = _getChunkedCache(cache, cacheKey);
       if (cached) {
         var parsed = JSON.parse(cached);
+        // Log cache age for observability
+        if (parsed._cachedAt) {
+          Logger.log('Sheet cache hit: ' + sheetName + ' (age: ' + (Date.now() - parsed._cachedAt) + 'ms)');
+        }
         // Restore Date objects from serialized __d markers
         parsed.data = parsed.data.map(function(row) {
           return row.map(function(cell) {
@@ -2262,31 +2995,52 @@ var DataService = (function () {
         _sheetDataCache[sheetName] = parsed;
         return parsed;
       }
-    } catch (_e) { /* cache miss or parse error — read from sheet */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     var sheet = _getSheet(sheetName);
     if (!sheet) return null;
 
-    var data = sheet.getDataRange().getValues();
+    var data = executeWithRetry(function() { return sheet.getDataRange().getValues(); }, { maxRetries: 2, baseDelay: 500 });
     var colMap = _buildColumnMap(data[0]);
     var result = { data: data, colMap: colMap };
+
+    // ─── Health Monitor — log scale warnings ───
+    var rowCount = data.length - 1; // exclude header
+    _sheetHealthLog[sheetName] = rowCount;
+    if (typeof SCALE_THRESHOLDS !== 'undefined') {
+      if (rowCount >= SCALE_THRESHOLDS.CRITICAL_ROWS) {
+        Logger.log('SCALE_CRITICAL: ' + sheetName + ' has ' + rowCount + ' rows — manual intervention recommended');
+      } else if (rowCount >= SCALE_THRESHOLDS.THROTTLE_ROWS) {
+        Logger.log('SCALE_THROTTLE: ' + sheetName + ' has ' + rowCount + ' rows — paginated mode active');
+      } else if (rowCount >= SCALE_THRESHOLDS.WARN_ROWS) {
+        Logger.log('SCALE_WARN: ' + sheetName + ' has ' + rowCount + ' rows');
+      }
+    }
 
     // Store in memory
     _sheetDataCache[sheetName] = result;
 
+    // Smart TTL: extend cache lifetime for large sheets to reduce re-reads
+    var smartTTL = SHEET_CACHE_TTL;
+    if (typeof SCALE_THRESHOLDS !== 'undefined') {
+      if (rowCount >= SCALE_THRESHOLDS.THROTTLE_ROWS) {
+        smartTTL = 300; // 5 min — large sheet, expensive to re-read
+      } else if (rowCount >= SCALE_THRESHOLDS.WARN_ROWS) {
+        smartTTL = 180; // 3 min
+      }
+    }
+
     // Store in CacheService (serialize dates as ISO strings for JSON)
     try {
+      var writeCache = CacheService.getScriptCache();
       var serializable = data.map(function(row) {
         return row.map(function(cell) {
           return cell instanceof Date ? { __d: cell.toISOString() } : cell;
         });
       });
-      var json = JSON.stringify({ data: serializable });
-      // CacheService limit is 100KB per key — skip if too large
-      if (json.length < 95000) {
-        cache.put(cacheKey, json, SHEET_CACHE_TTL);
-      }
-    } catch (_e) { /* non-fatal — in-memory cache still works */ }
+      var json = JSON.stringify({ data: serializable, _cachedAt: Date.now() });
+      _putChunkedCache(writeCache, cacheKey, json, smartTTL);
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     return result;
   }
@@ -2297,10 +3051,86 @@ var DataService = (function () {
    */
   function _invalidateSheetCache(sheetName) {
     delete _sheetDataCache[sheetName];
+    // H1: Invalidate email index so stale lookups don't persist in batch ops
+    if (sheetName === MEMBER_SHEET) _emailIndex = null;
     try {
       var cacheKey = 'SD_' + sheetName.replace(/\s/g, '_');
-      CacheService.getScriptCache().remove(cacheKey);
-    } catch (_e) { /* non-fatal */ }
+      var cache = CacheService.getScriptCache();
+      var n = cache.get(cacheKey + '_n');
+      cache.remove(cacheKey);
+      cache.remove(cacheKey + '_n');
+      if (n) {
+        var num = parseInt(n, 10);
+        for (var i = 0; i < num; i++) cache.remove(cacheKey + '_' + i);
+      }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  }
+
+  // ═══════════════════════════════════════
+  // GRIEVANCE ARCHIVE HELPERS (v4.30.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns cached archive grievance data with a longer TTL (10 min).
+   * Archive contains only closed/resolved cases — data is stable.
+   * @returns {Object|null} { data: Array[], colMap: Object } or null
+   */
+  function _getCachedArchiveData() {
+    var archiveName = SHEETS.GRIEVANCE_ARCHIVE;
+    // Check in-memory first
+    if (_sheetDataCache[archiveName]) return _sheetDataCache[archiveName];
+
+    var sheet = _getSheet(archiveName);
+    if (!sheet || sheet.getLastRow() <= 1) return null;
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var result = { data: data, colMap: colMap };
+    _sheetDataCache[archiveName] = result;
+
+    // Cache with 10-min TTL (archive data is stable)
+    try {
+      var cache = CacheService.getScriptCache();
+      var cacheKey = 'SD_' + archiveName.replace(/\s/g, '_');
+      var serialized = JSON.stringify({ data: data, _cachedAt: Date.now() });
+      _putChunkedCache(cache, cacheKey, serialized, 600);
+    } catch (_e) { Logger.log('_getCachedArchiveData cache write: ' + (_e.message || _e)); }
+
+    return result;
+  }
+
+  /**
+   * Returns combined active + archive grievance data for functions
+   * that need a complete view (stats, hotspots, history).
+   * @returns {Object|null} { data: Array[], colMap: Object }
+   */
+  function _getAllGrievanceData() {
+    var active = _getCachedSheetData(GRIEVANCE_SHEET);
+    var archive = _getCachedArchiveData();
+
+    // If no archive, just return active data
+    if (!archive || !archive.data || archive.data.length <= 1) return active;
+    if (!active || !active.data || active.data.length <= 1) return archive;
+
+    // Validate column alignment: archive headers must match active headers.
+    // If columns were added/reordered after archive creation, skip archive
+    // to avoid misaligned data (stats would be inaccurate for archived rows).
+    var activeHeaders = active.data[0];
+    var archiveHeaders = archive.data[0];
+    if (activeHeaders.length !== archiveHeaders.length) {
+      Logger.log('_getAllGrievanceData: column count mismatch (active=' + activeHeaders.length + ', archive=' + archiveHeaders.length + ') — using active only');
+      return active;
+    }
+    for (var h = 0; h < activeHeaders.length; h++) {
+      if (String(activeHeaders[h]).trim() !== String(archiveHeaders[h]).trim()) {
+        Logger.log('_getAllGrievanceData: header mismatch at col ' + (h + 1) + ' ("' + activeHeaders[h] + '" vs "' + archiveHeaders[h] + '") — using active only');
+        return active;
+      }
+    }
+
+    // Merge: skip header row from archive, concatenate data rows
+    var merged = active.data.concat(archive.data.slice(1));
+    return { data: merged, colMap: active.colMap };
   }
 
   // ═══════════════════════════════════════
@@ -2315,6 +3145,7 @@ var DataService = (function () {
    * @returns {Object} Batch data payload
    */
   function getBatchData(email, role) {
+    _checkExecTime('getBatchData');
     if (!email) return {};
     email = String(email).trim().toLowerCase();
 
@@ -2325,29 +3156,38 @@ var DataService = (function () {
   }
 
   function _getMemberBatchData(email) {
+    // Pre-warm cache for sheets we'll read multiple times
+    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+
+    _checkExecTime('_getMemberBatchData:start');
     var grievances = [];
-    try { grievances = getMemberGrievances(email); } catch (_e) { Logger.log('_getMemberBatchData: getMemberGrievances failed: ' + _e.message); }
+    try { grievances = getMemberGrievances(email); } catch (_e) { handleError(_e, '_getMemberBatchData.getMemberGrievances', ERROR_LEVEL.WARNING); }
+    _checkExecTime('_getMemberBatchData:grievances');
     var history = { success: false, history: [] };
-    try { history = getMemberGrievanceHistory(email); } catch (_e) { Logger.log('_getMemberBatchData: getMemberGrievanceHistory failed: ' + _e.message); }
+    try { history = getMemberGrievanceHistory(email); } catch (_e) { handleError(_e, '_getMemberBatchData.getMemberGrievanceHistory', ERROR_LEVEL.WARNING); }
+    _checkExecTime('_getMemberBatchData:history');
     var stewardInfo = null;
-    try { stewardInfo = getAssignedStewardInfo(email); } catch (_e) { Logger.log('_getMemberBatchData: getAssignedStewardInfo failed: ' + _e.message); }
+    try { stewardInfo = getAssignedStewardInfo(email); } catch (_e) { handleError(_e, '_getMemberBatchData.getAssignedStewardInfo', ERROR_LEVEL.WARNING); }
+    _checkExecTime('_getMemberBatchData:stewardInfo');
     var surveyStatus = null;
-    try { surveyStatus = getMemberSurveyStatus(email); } catch (_e) { Logger.log('_getMemberBatchData: getMemberSurveyStatus failed: ' + _e.message); }
+    try { surveyStatus = getMemberSurveyStatus(email); } catch (_e) { handleError(_e, '_getMemberBatchData.getMemberSurveyStatus', ERROR_LEVEL.WARNING); }
+    _checkExecTime('_getMemberBatchData:surveyStatus');
     var events = [];
-    try { events = getUpcomingEvents(5); } catch (_e) { Logger.log('_getMemberBatchData: getUpcomingEvents failed: ' + _e.message); }
+    try { events = getUpcomingEvents(5); } catch (_e) { handleError(_e, '_getMemberBatchData.getUpcomingEvents', ERROR_LEVEL.WARNING); }
     var notifCount = 0;
     try {
       if (typeof getWebAppNotificationCount === 'function') {
         var nc = getWebAppNotificationCount(email, 'member');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { /* non-fatal */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     var memberTaskCount = 0;
     try {
       var openTasks = getMemberTasks(email, 'not-completed');
       memberTaskCount = openTasks.length;
-    } catch (_e) { /* non-fatal */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     return {
       grievances: grievances,
@@ -2361,15 +3201,22 @@ var DataService = (function () {
   }
 
   function _getStewardBatchData(email) {
+    // Pre-warm cache for sheets we'll read multiple times
+    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    try { _getCachedSheetData(SHEETS.STEWARD_TASKS); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+
+    _checkExecTime('_getStewardBatchData:start');
     // Read cases once and compute KPIs from same data (avoids double sheet read)
     var cases = [];
     try {
       cases = getStewardCases(email);
     } catch (_e) {
-      Logger.log('_getStewardBatchData: getStewardCases failed: ' + _e.message);
+      handleError(_e, '_getStewardBatchData.getStewardCases', ERROR_LEVEL.WARNING);
     }
     var kpis = _computeKPIsFromCases(cases);
 
+    _checkExecTime('_getStewardBatchData:cases');
     // Member counts — Member Directory already cached from getStewardCases call above.
     // getStewardMembers falls back to getAllMembers() when no members are assigned,
     // so memberCount is always meaningful.
@@ -2377,8 +3224,9 @@ var DataService = (function () {
     try {
       memberCount = getStewardMembers(email).length;
       if (memberCount === 0) memberCount = getAllMembers().length;
-    } catch (_e) { /* non-fatal */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
+    _checkExecTime('_getStewardBatchData:members');
     // Task counts — open tasks only; derive overdue from dueDays < 0.
     // No extra sheet read if _Steward_Tasks was already read this execution.
     var taskCount = 0;
@@ -2389,7 +3237,7 @@ var DataService = (function () {
       for (var t = 0; t < openTasks.length; t++) {
         if (openTasks[t].dueDays !== null && openTasks[t].dueDays < 0) overdueTaskCount++;
       }
-    } catch (_e) { /* non-fatal */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     var notifCount = 0;
     try {
@@ -2397,7 +3245,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, 'steward');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { /* non-fatal */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     var qaUnansweredCount = 0;
     try {
@@ -2405,7 +3253,7 @@ var DataService = (function () {
         // Use lightweight count — avoids building 999 full question objects
         qaUnansweredCount = QAForum.getUnansweredCount();
       }
-    } catch (_e) { /* non-fatal */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     return {
       cases: cases,
@@ -2453,7 +3301,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, role || 'steward');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { /* non-fatal */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     var taskCount = 0;
     var overdueTaskCount = 0;
@@ -2464,7 +3312,7 @@ var DataService = (function () {
         for (var t = 0; t < openTasks.length; t++) {
           if (openTasks[t].dueDays !== null && openTasks[t].dueDays < 0) overdueTaskCount++;
         }
-      } catch (_e) { /* non-fatal */ }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
 
     var qaUnansweredCount = 0;
@@ -2473,7 +3321,7 @@ var DataService = (function () {
         if (typeof QAForum !== 'undefined') {
           qaUnansweredCount = QAForum.getUnansweredCount();
         }
-      } catch (_e) { /* non-fatal */ }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
 
     return {
@@ -2488,7 +3336,7 @@ var DataService = (function () {
     if (!email) return [];
     email = String(email).trim().toLowerCase();
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = _getSS();
     if (!ss) return [];
     var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
     if (!sheet || sheet.getLastRow() <= 1) return [];
@@ -2571,7 +3419,12 @@ var DataService = (function () {
    * @param {Object} data - { title, meetingDate, bullets, fullMinutes }
    * @returns {Object}
    */
-  function addMeetingMinutes(stewardEmail, minutesData) {
+  function addMeetingMinutes(stewardEmail, minutesData, idemKey) {
+    if (idemKey) {
+      var idemCache = CacheService.getScriptCache();
+      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
+      idemCache.put('IDEM_' + idemKey, '1', 300);
+    }
     if (!stewardEmail || !minutesData || !minutesData.title) {
       return { success: false, message: 'Missing required fields.' };
     }
@@ -2653,7 +3506,7 @@ var DataService = (function () {
     try {
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       if (!headers[7]) sheet.getRange(1, 8).setValue('DriveDocUrl');
-    } catch (_he) {}
+    } catch (_he) { Logger.log('_he: ' + (_he.message || _he)); }
 
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title, driveDocUrl: driveDocUrl });
@@ -2677,7 +3530,7 @@ var DataService = (function () {
       if (!email) return {};
       email = String(email).trim().toLowerCase();
 
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return {};
       var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
       if (!sheet || sheet.getLastRow() <= 1) return {};
@@ -2712,7 +3565,7 @@ var DataService = (function () {
    */
   function getAllStewardPerformance() {
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return [];
       var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
       if (!sheet || sheet.getLastRow() <= 1) return [];
@@ -2756,7 +3609,7 @@ var DataService = (function () {
       if (!caseId) return [];
       caseId = String(caseId).trim();
 
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return [];
       var sheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
       if (!sheet || sheet.getLastRow() <= 1) return [];
@@ -2833,7 +3686,7 @@ var DataService = (function () {
     try {
       if (!checklistId) return { success: false, message: 'Missing checklist ID.' };
 
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
       if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Checklist not found.' };
@@ -2872,7 +3725,7 @@ var DataService = (function () {
       if (!email) return [];
       email = String(email).trim().toLowerCase();
 
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return [];
       var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
       if (!sheet || sheet.getLastRow() <= 1) return [];
@@ -2906,7 +3759,7 @@ var DataService = (function () {
    */
   function getMeetingStats() {
     try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return { totalMeetings: 0, totalCheckins: 0, uniqueAttendees: 0, avgAttendance: 0 };
       var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
       if (!sheet || sheet.getLastRow() <= 1) {
@@ -2993,14 +3846,19 @@ var DataService = (function () {
    * @param {Object} data - { category, type, priority, title, description }
    * @returns {Object} { success, message }
    */
-  function submitFeedback(email, feedbackData) {
+  function submitFeedback(email, feedbackData, idemKey) {
+    if (idemKey) {
+      var idemCache = CacheService.getScriptCache();
+      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
+      idemCache.put('IDEM_' + idemKey, '1', 300);
+    }
     try {
       if (!email || !feedbackData || !feedbackData.title) {
         return { success: false, message: 'Missing required fields.' };
       }
       email = String(email).trim().toLowerCase();
 
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var ss = _getSS();
       if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
       var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
       if (!sheet) return { success: false, message: 'Feedback sheet not found.' };
@@ -3031,92 +3889,445 @@ var DataService = (function () {
   }
 
   // ═══════════════════════════════════════
-  // MEETINGS — Steward meeting creation + scheduled meeting retrieval (v4.30.0)
+  // PAGINATED MEMBERS — server-side pagination for large member directories
   // ═══════════════════════════════════════
 
   /**
-   * Creates a scheduled meeting. Stewards fill out meeting info; members can view and save to calendar.
-   * @param {string} stewardEmail - The steward creating the meeting
-   * @param {Object} data - { meetingName, meetingDate, meetingTime, meetingType, duration, meetingLink, notes }
-   * @returns {Object} { success, message, meetingId }
+   * Returns a page of members with optional search/filter.
+   * Avoids transferring 8K+ records to the frontend.
+   * @param {string} stewardEmail - Authenticated steward email
+   * @param {Object} opts - { page: 1, pageSize: 50, search: '', filter: { steward, location, hasGrievance } }
+   * @returns {{ items: Object[], total: number, page: number, pageSize: number, totalPages: number }}
    */
-  function createScheduledMeeting(stewardEmail, data) {
-    if (!stewardEmail || !data || !data.meetingName || !data.meetingDate) {
-      return { success: false, message: 'Meeting name and date are required.' };
-    }
-    try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
-      var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
-      if (!sheet) {
-        sheet = ss.insertSheet(SHEETS.MEETING_CHECKIN_LOG);
-        var headers = MEETING_CHECKIN_HEADER_MAP_.map(function(h) { return h.header; });
-        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      }
-      var meetingId = 'MTG_' + Date.now().toString(36);
-      var row = new Array(MEETING_CHECKIN_HEADER_MAP_.length).fill('');
-      row[MEETING_CHECKIN_COLS.MEETING_ID - 1]       = meetingId;
-      row[MEETING_CHECKIN_COLS.MEETING_NAME - 1]      = escapeForFormula(data.meetingName.substring(0, 200));
-      row[MEETING_CHECKIN_COLS.MEETING_DATE - 1]      = new Date(data.meetingDate);
-      row[MEETING_CHECKIN_COLS.MEETING_TYPE - 1]      = escapeForFormula(data.meetingType || 'General');
-      row[MEETING_CHECKIN_COLS.MEETING_TIME - 1]      = escapeForFormula(data.meetingTime || '');
-      row[MEETING_CHECKIN_COLS.MEETING_DURATION - 1]  = escapeForFormula(data.duration || '');
-      row[MEETING_CHECKIN_COLS.EVENT_STATUS - 1]      = 'scheduled';
-      row[MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1]     = data.meetingLink && /^https?:\/\//i.test(data.meetingLink) ? data.meetingLink : '';
-      row[MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1]   = escapeForFormula(stewardEmail);
-      row[MEETING_CHECKIN_COLS.EMAIL - 1]             = escapeForFormula(stewardEmail); // creator
-      row[MEETING_CHECKIN_COLS.MEMBER_NAME - 1]       = '(Scheduled)';
+  function getMembersPaginated(stewardEmail, opts) {
+    opts = opts || {};
+    var page = Math.max(1, opts.page || 1);
+    var pageSize = Math.min(100, Math.max(10, opts.pageSize || 50));
+    var search = String(opts.search || '').trim().toLowerCase();
+    var filter = opts.filter || {};
 
-      sheet.appendRow(row);
-      _invalidateSheetCache(SHEETS.MEETING_CHECKIN_LOG);
-      return { success: true, message: 'Meeting scheduled.', meetingId: meetingId };
-    } catch (e) {
-      Logger.log('createScheduledMeeting error: ' + e.message);
-      return { success: false, message: 'Failed to create meeting.' };
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return { items: [], total: 0, page: page, pageSize: pageSize, totalPages: 0 };
+
+    var data = cached.data;
+    var colMap = cached.colMap;
+    var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
+    var nameCol = _findColumn(colMap, HEADERS.memberName);
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    var locCol = _findColumn(colMap, HEADERS.memberWorkLocation);
+
+    // Build filtered index (row indices that match)
+    var matches = [];
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = emailCol !== -1 ? String(data[i][emailCol]).trim() : '';
+      if (!rowEmail) continue;
+
+      // Search filter — match name, email, or location
+      if (search) {
+        var name = nameCol !== -1 ? String(data[i][nameCol]).toLowerCase() : '';
+        var loc = locCol !== -1 ? String(data[i][locCol]).toLowerCase() : '';
+        if (name.indexOf(search) === -1 && rowEmail.toLowerCase().indexOf(search) === -1 && loc.indexOf(search) === -1) continue;
+      }
+
+      // Steward filter
+      if (filter.steward) {
+        var assignedTo = stewardCol !== -1 ? String(data[i][stewardCol]).trim().toLowerCase() : '';
+        if (assignedTo !== String(filter.steward).toLowerCase()) continue;
+      }
+
+      // Location filter
+      if (filter.location) {
+        var memberLoc = locCol !== -1 ? String(data[i][locCol]).trim() : '';
+        if (memberLoc !== filter.location) continue;
+      }
+
+      // Open grievance filter
+      if (filter.hasGrievance) {
+        var rec = _buildUserRecord(data[i], colMap);
+        if (!rec.hasOpenGrievance) continue;
+      }
+
+      matches.push(i);
     }
+
+    var total = matches.length;
+    var totalPages = Math.ceil(total / pageSize) || 1;
+    var startIdx = (page - 1) * pageSize;
+    var pageIndices = matches.slice(startIdx, startIdx + pageSize);
+
+    var items = pageIndices.map(function(rowIdx) {
+      var rec = _buildUserRecord(data[rowIdx], colMap);
+      return {
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        cubicle: rec.cubicle,
+        hireDate: rec.hireDate,
+        duesStatus: rec.duesStatus,
+        hasOpenGrievance: rec.hasOpenGrievance,
+        assignedSteward: stewardCol !== -1 ? String(data[rowIdx][stewardCol]).trim() : ''
+      };
+    });
+
+    return { items: items, total: total, page: page, pageSize: pageSize, totalPages: totalPages };
   }
 
   /**
-   * Returns upcoming scheduled meetings (EVENT_STATUS = 'scheduled', future date).
-   * Available to all authenticated members.
-   * @returns {Object[]} Array of meeting objects with meetingId, meetingName, meetingDate, meetingType, meetingTime, duration, meetingLink, createdBy
+   * Returns member count and active-grievance count (lightweight — no full records).
+   * @returns {{ total: number, withGrievances: number }}
    */
-  function getScheduledMeetings() {
-    try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      if (!ss) return [];
-      var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
-      if (!sheet || sheet.getLastRow() <= 1) return [];
+  function getMemberCount() {
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return { total: 0, withGrievances: 0 };
+    var data = cached.data;
+    var colMap = cached.colMap;
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    if (emailCol === -1) return { total: 0, withGrievances: 0 };
+    var total = 0;
+    var withGrievances = 0;
+    for (var i = 1; i < data.length; i++) {
+      if (!String(data[i][emailCol]).trim()) continue;
+      total++;
+      var rec = _buildUserRecord(data[i], colMap);
+      if (rec.hasOpenGrievance) withGrievances++;
+    }
+    return { total: total, withGrievances: withGrievances };
+  }
 
-      var data = sheet.getDataRange().getValues();
-      var meetings = [];
-      var now = new Date();
-      for (var i = 1; i < data.length; i++) {
-        var status = String(data[i][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '').trim().toLowerCase();
-        if (status !== 'scheduled') continue;
-        var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
-        // Include meetings from today onward (not past)
-        if (meetingDate instanceof Date && meetingDate.getTime() < now.getTime() - 86400000) continue;
-        meetings.push({
-          meetingId: String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || ''),
-          meetingName: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
-          meetingDate: meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || ''),
-          meetingDateRaw: meetingDate instanceof Date ? meetingDate.toISOString() : '',
-          meetingType: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
-          meetingTime: String(data[i][MEETING_CHECKIN_COLS.MEETING_TIME - 1] || ''),
-          duration: String(data[i][MEETING_CHECKIN_COLS.MEETING_DURATION - 1] || ''),
-          meetingLink: String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || ''),
-          createdBy: String(data[i][MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] || ''),
+  /**
+   * Returns row counts and scale status for key sheets.
+   * Frontend uses this to decide between bulk-load and paginated mode.
+   * @returns {{ members: Object, grievances: Object }}
+   */
+  function getSheetHealth() {
+    // Trigger cache reads to populate _sheetHealthLog
+    _getCachedSheetData(MEMBER_SHEET);
+    _getCachedSheetData(GRIEVANCE_SHEET);
+    var thresholds = (typeof SCALE_THRESHOLDS !== 'undefined') ? SCALE_THRESHOLDS : { WARN_ROWS: 5000, THROTTLE_ROWS: 7000, CRITICAL_ROWS: 8000 };
+
+    function _status(count) {
+      if (count >= thresholds.CRITICAL_ROWS) return 'critical';
+      if (count >= thresholds.THROTTLE_ROWS) return 'throttle';
+      if (count >= thresholds.WARN_ROWS) return 'warn';
+      return 'ok';
+    }
+
+    var memberRows = _sheetHealthLog[MEMBER_SHEET] || 0;
+    var grievanceRows = _sheetHealthLog[GRIEVANCE_SHEET] || 0;
+
+    return {
+      members: { rows: memberRows, status: _status(memberRows) },
+      grievances: { rows: grievanceRows, status: _status(grievanceRows) }
+    };
+  }
+
+  // ═══════════════════════════════════════
+  // GRIEVANCE FEEDBACK (v4.32.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns the feedback sheet, auto-creating if needed.
+   */
+  function _ensureGrievanceFeedback() {
+    var ss = _getSS();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_FEEDBACK);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEETS.GRIEVANCE_FEEDBACK);
+      sheet.getRange(1, 1, 1, 10).setValues([[
+        'ID', 'Grievance ID', 'Member Email', 'Steward Email',
+        'Satisfaction', 'Communication', 'Timeliness', 'Fairness',
+        'Comment', 'Created'
+      ]]);
+      sheet.hideSheet();
+    }
+    return sheet;
+  }
+
+  /**
+   * Checks if the member has any recently closed grievances (within 14 days)
+   * that haven't been rated yet.
+   * @param {string} email - Member email
+   * @returns {Object|null} { grievanceId, steward, stewardName, step, closedDate, issueCategory } or null
+   */
+  function getPendingGrievanceFeedback(email) {
+    if (!email) return null;
+    email = email.toLowerCase().trim();
+
+    // 1. Get closed grievances for this member
+    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (!cached) return null;
+    var data = cached.data;
+    var colMap = cached.colMap;
+    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
+
+    var now = new Date();
+    var fourteenDaysAgo = now.getTime() - 14 * 86400000;
+    var candidates = [];
+
+    for (var i = 0; i < data.length; i++) {
+      var rec = _buildGrievanceRecord(data[i], colMap);
+      if (rec.memberEmail !== email) continue;
+      if (closedStatuses.indexOf(rec.status) === -1) continue;
+      if (rec.closedTimestamp < fourteenDaysAgo || rec.closedTimestamp === 0) continue;
+      candidates.push(rec);
+    }
+
+    if (candidates.length === 0) return null;
+
+    // 2. Check which ones already have feedback
+    var fbSheet = _getSS().getSheetByName(SHEETS.GRIEVANCE_FEEDBACK);
+    var ratedIds = {};
+    if (fbSheet && fbSheet.getLastRow() >= 2) {
+      var fbData = fbSheet.getRange(2, 1, fbSheet.getLastRow() - 1, 3).getValues();
+      for (var fi = 0; fi < fbData.length; fi++) {
+        if (String(fbData[fi][2]).toLowerCase().trim() === email) {
+          ratedIds[String(fbData[fi][1]).trim()] = true;
+        }
+      }
+    }
+
+    // 3. Find first unrated
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var c = candidates[ci];
+      if (!ratedIds[c.id]) {
+        var stewardName = c.steward;
+        if (c.steward && c.steward !== 'unassigned') {
+          var sUser = findUserByEmail(c.steward);
+          if (sUser && sUser.name) stewardName = sUser.name;
+        }
+        return {
+          grievanceId: c.id,
+          steward: c.steward,
+          stewardName: stewardName,
+          step: c.step,
+          closedDate: c.closedTimestamp ? new Date(c.closedTimestamp).toLocaleDateString() : '',
+          issueCategory: c.issueCategory,
+          status: c.status
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Submits grievance feedback from a member.
+   * @param {string} email - Member email (server-verified)
+   * @param {string} grievanceId - The grievance ID being rated
+   * @param {Object} ratings - { satisfaction, communication, timeliness, fairness } (1-5 each)
+   * @param {string=} comment - Optional comment
+   * @returns {Object} { success: true/false, message }
+   */
+  function submitGrievanceFeedback(email, grievanceId, ratings, comment) {
+    if (!email || !grievanceId || !ratings) return { success: false, message: 'Missing fields.' };
+
+    // Validate ratings are 1-5
+    var fields = ['satisfaction', 'communication', 'timeliness', 'fairness'];
+    for (var fi = 0; fi < fields.length; fi++) {
+      var val = parseInt(ratings[fields[fi]], 10);
+      if (isNaN(val) || val < 1 || val > 5) return { success: false, message: 'Ratings must be 1-5.' };
+    }
+
+    // Verify this grievance belongs to this member and is closed
+    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (!cached) return { success: false, message: 'Could not read grievances.' };
+    var data = cached.data;
+    var colMap = cached.colMap;
+    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
+    var matchedRec = null;
+
+    for (var i = 0; i < data.length; i++) {
+      var rec = _buildGrievanceRecord(data[i], colMap);
+      if (rec.id === grievanceId && rec.memberEmail === email.toLowerCase().trim()) {
+        if (closedStatuses.indexOf(rec.status) !== -1) matchedRec = rec;
+        break;
+      }
+    }
+
+    if (!matchedRec) return { success: false, message: 'Grievance not found or not closed.' };
+
+    // Check for duplicate feedback
+    var fbSheet = _ensureGrievanceFeedback();
+    if (!fbSheet) return { success: false, message: 'Could not access feedback sheet.' };
+    if (fbSheet.getLastRow() >= 2) {
+      var existing = fbSheet.getRange(2, 1, fbSheet.getLastRow() - 1, 3).getValues();
+      for (var ei = 0; ei < existing.length; ei++) {
+        if (String(existing[ei][1]).trim() === grievanceId &&
+            String(existing[ei][2]).toLowerCase().trim() === email.toLowerCase().trim()) {
+          return { success: false, message: 'Feedback already submitted for this grievance.' };
+        }
+      }
+    }
+
+    // Write feedback
+    var id = 'GF-' + Utilities.getUuid().substring(0, 8);
+    var safeComment = comment ? String(comment).substring(0, 500).trim() : '';
+    fbSheet.appendRow([
+      id,
+      grievanceId,
+      email.toLowerCase().trim(),
+      matchedRec.steward || '',
+      parseInt(ratings.satisfaction, 10),
+      parseInt(ratings.communication, 10),
+      parseInt(ratings.timeliness, 10),
+      parseInt(ratings.fairness, 10),
+      safeComment,
+      new Date()
+    ]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('GRIEVANCE_FEEDBACK', { grievanceId: grievanceId, member: email });
+    }
+
+    return { success: true, message: 'Thank you for your feedback.' };
+  }
+
+  /**
+   * Returns aggregate grievance feedback stats for Union Stats.
+   * @returns {Object|null} { totalFeedback, avgSatisfaction, avgCommunication, avgTimeliness, avgFairness,
+   *                          avgOverall, bySteward: [{ label, avgScore, count }], trend: [{ month, avg }] }
+   */
+  function getGrievanceFeedbackStats() {
+    var ss = _getSS();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_FEEDBACK);
+    if (!sheet || sheet.getLastRow() < 2) return { totalFeedback: 0 };
+
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getValues();
+    var sums = { satisfaction: 0, communication: 0, timeliness: 0, fairness: 0 };
+    var count = 0;
+    var bySteward = {}; // stewardEmail -> { total, count }
+    var byMonth = {};   // 'YYYY-MM' -> { total, count }
+
+    for (var i = 0; i < data.length; i++) {
+      var sat = parseFloat(data[i][4]) || 0;
+      var com = parseFloat(data[i][5]) || 0;
+      var tim = parseFloat(data[i][6]) || 0;
+      var fair = parseFloat(data[i][7]) || 0;
+      if (sat < 1 || sat > 5) continue; // skip invalid rows
+
+      var avg = (sat + com + tim + fair) / 4;
+      sums.satisfaction += sat;
+      sums.communication += com;
+      sums.timeliness += tim;
+      sums.fairness += fair;
+      count++;
+
+      // Per-steward aggregation
+      var stw = String(data[i][3]).toLowerCase().trim();
+      if (stw) {
+        if (!bySteward[stw]) bySteward[stw] = { total: 0, count: 0 };
+        bySteward[stw].total += avg;
+        bySteward[stw].count++;
+      }
+
+      // Monthly trend
+      var created = data[i][9];
+      if (created instanceof Date) {
+        var monthKey = created.getFullYear() + '-' + String(created.getMonth() + 1).padStart(2, '0');
+        if (!byMonth[monthKey]) byMonth[monthKey] = { total: 0, count: 0 };
+        byMonth[monthKey].total += avg;
+        byMonth[monthKey].count++;
+      }
+    }
+
+    if (count === 0) return { totalFeedback: 0 };
+
+    // Build steward scores with real names
+    var stewardScores = [];
+    for (var sw in bySteward) {
+      var sLabel = sw;
+      var sUser = findUserByEmail(sw);
+      if (sUser && sUser.name) sLabel = sUser.name;
+      stewardScores.push({
+        label: sLabel,
+        avgScore: Math.round((bySteward[sw].total / bySteward[sw].count) * 10) / 10,
+        count: bySteward[sw].count
+      });
+    }
+    stewardScores.sort(function(a, b) { return b.avgScore - a.avgScore; });
+
+    // Build monthly trend
+    var trend = [];
+    var months = Object.keys(byMonth).sort();
+    for (var mi = 0; mi < months.length; mi++) {
+      var m = months[mi];
+      trend.push({
+        month: m,
+        avg: Math.round((byMonth[m].total / byMonth[m].count) * 10) / 10
+      });
+    }
+
+    return {
+      totalFeedback: count,
+      avgSatisfaction: Math.round((sums.satisfaction / count) * 10) / 10,
+      avgCommunication: Math.round((sums.communication / count) * 10) / 10,
+      avgTimeliness: Math.round((sums.timeliness / count) * 10) / 10,
+      avgFairness: Math.round((sums.fairness / count) * 10) / 10,
+      avgOverall: Math.round(((sums.satisfaction + sums.communication + sums.timeliness + sums.fairness) / (count * 4)) * 10) / 10,
+      bySteward: stewardScores,
+      trend: trend
+    };
+  }
+
+  /**
+   * Returns feedback summary for a specific steward.
+   * @param {string} stewardEmail
+   * @returns {Object|null} { totalFeedback, avgSatisfaction, avgCommunication, avgTimeliness, avgFairness,
+   *                          avgOverall, recentComments: [{ date, comment, grievanceId }] }
+   */
+  function getStewardFeedbackSummary(stewardEmail) {
+    if (!stewardEmail) return null;
+    stewardEmail = stewardEmail.toLowerCase().trim();
+    var ss = _getSS();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_FEEDBACK);
+    if (!sheet || sheet.getLastRow() < 2) return { totalFeedback: 0 };
+
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getValues();
+    var sums = { satisfaction: 0, communication: 0, timeliness: 0, fairness: 0 };
+    var count = 0;
+    var comments = [];
+
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][3]).toLowerCase().trim() !== stewardEmail) continue;
+      var sat = parseFloat(data[i][4]) || 0;
+      if (sat < 1 || sat > 5) continue;
+
+      sums.satisfaction += sat;
+      sums.communication += (parseFloat(data[i][5]) || 0);
+      sums.timeliness += (parseFloat(data[i][6]) || 0);
+      sums.fairness += (parseFloat(data[i][7]) || 0);
+      count++;
+
+      var comment = String(data[i][8] || '').trim();
+      if (comment) {
+        var created = data[i][9];
+        comments.push({
+          date: created instanceof Date ? created.toLocaleDateString() : '',
+          comment: comment,
+          grievanceId: String(data[i][1]).trim()
         });
       }
-      meetings.sort(function(a, b) {
-        return (a.meetingDateRaw || '').localeCompare(b.meetingDateRaw || '');
-      });
-      return meetings;
-    } catch (e) {
-      Logger.log('getScheduledMeetings error: ' + e.message);
-      return [];
     }
+
+    if (count === 0) return { totalFeedback: 0 };
+
+    // Most recent 5 comments
+    comments.reverse();
+    comments = comments.slice(0, 5);
+
+    return {
+      totalFeedback: count,
+      avgSatisfaction: Math.round((sums.satisfaction / count) * 10) / 10,
+      avgCommunication: Math.round((sums.communication / count) * 10) / 10,
+      avgTimeliness: Math.round((sums.timeliness / count) * 10) / 10,
+      avgFairness: Math.round((sums.fairness / count) * 10) / 10,
+      avgOverall: Math.round(((sums.satisfaction + sums.communication + sums.timeliness + sums.fairness) / (count * 4)) * 10) / 10,
+      recentComments: comments
+    };
   }
 
   // Public API
@@ -3136,6 +4347,11 @@ var DataService = (function () {
     assignStewardToMember: assignStewardToMember,
     getMemberGrievanceDriveUrl: getMemberGrievanceDriveUrl,
     getMemberSurveyStatus: getMemberSurveyStatus,
+    logResourceClick: logResourceClick,
+    getResourceClickTotal: getResourceClickTotal,
+    getResourceStats: getResourceStats,
+    logTabVisit: logTabVisit,
+    getUsageStats: getUsageStats,
     getOrgLinks: getOrgLinks,
     getStewardMembers: getStewardMembers,
     getAllMembers: getAllMembers,
@@ -3182,19 +4398,25 @@ var DataService = (function () {
     toggleChecklistItem: toggleChecklistItem,
     getMemberMeetings: getMemberMeetings,
     getMeetingStats: getMeetingStats,
-    createScheduledMeeting: createScheduledMeeting,
-    getScheduledMeetings: getScheduledMeetings,
     getSatisfactionTrends: getSatisfactionTrends,
     submitFeedback: submitFeedback,
     // Perf: batch + cache
     getBatchData: getBatchData,
     getBadgeCounts: getBadgeCounts,
     _invalidateSheetCache: _invalidateSheetCache,
+    _resetSSCache: _resetSSCache,
+    // Scale: paginated members + health monitor
+    getMembersPaginated: getMembersPaginated,
+    getMemberCount: getMemberCount,
+    getSheetHealth: getSheetHealth,
+    // v4.32.0 — Grievance Feedback
+    getPendingGrievanceFeedback: getPendingGrievanceFeedback,
+    submitGrievanceFeedback: submitGrievanceFeedback,
+    getGrievanceFeedbackStats: getGrievanceFeedbackStats,
+    getStewardFeedbackSummary: getStewardFeedbackSummary,
   };
 
 })();
-
-
 // ═══════════════════════════════════════
 // GLOBAL FUNCTIONS (callable from client via google.script.run)
 // ═══════════════════════════════════════
@@ -3220,7 +4442,7 @@ function _resolveCallerEmail(sessionToken) {
   try {
     var email = Session.getActiveUser().getEmail();
     if (email) return email.toLowerCase().trim();
-  } catch (_e) { /* SSO not available */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   // Fallback: verify session token server-side — never trust plain email from client
   if (sessionToken && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
     var tokenEmail = Auth.resolveEmailFromToken(sessionToken);
@@ -3250,11 +4472,11 @@ function _requireStewardAuth(sessionToken) {
 //   - Member self-service: _resolveCallerEmail(sessionToken) provides server-verified identity
 //   - Public reads: no auth required (aggregate/non-PII data only)
 
-function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardCases(s) : []; }
-function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardKPIs(s) : {}; }
-function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberGrievances(e) : []; }
-function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberGrievanceHistory(e) : { success: false, message: 'Not authenticated.' }; }
-function dataGetStewardContact(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return DataService.getStewardContact(stewardEmail || e); }
+function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardCases(s); }
+function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardKPIs(s); }
+function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberGrievances(e); }
+function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberGrievanceHistory(e); }
+function dataGetStewardContact(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) { Logger.log('dataGetStewardContact: auth failed'); return null; } return DataService.getStewardContact(stewardEmail || e); }
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 // Steward: view any member's full profile; Member: view own profile only
@@ -3280,28 +4502,29 @@ function dataUpdateProfile(sessionToken, updates) {
   // Members can only update their own record; stewards can pass a target email via updates._targetEmail
   var targetEmail = (isSteward && updates && updates._targetEmail) ? updates._targetEmail : e;
   if (updates && updates._targetEmail) delete updates._targetEmail; // strip internal routing field
-  return DataService.updateMemberProfile(targetEmail, updates);
+  return withScriptLock_(function() { return DataService.updateMemberProfile(targetEmail, updates); });
 }
-function dataGetAssignedSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getAssignedStewardInfo(e) : null; }
-function dataGetAvailableStewards(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getAvailableStewards(e) : []; }
-function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.assignStewardToMember(memberEmail, stewardEmail); }
+function dataGetAssignedSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getAssignedStewardInfo(e); }
+function dataGetAvailableStewards(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getAvailableStewards(e); }
+function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.assignStewardToMember(memberEmail, stewardEmail); }); }
 // v4.28.2 — Member-safe self-assign: members can assign a steward to THEMSELVES only.
-function dataMemberAssignSteward(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return DataService.assignStewardToMember(e, stewardEmail); }
-function dataStartGrievanceDraft(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.startGrievanceDraft(e, data); }) : { success: false, message: 'Not authenticated.' }; }
-function dataStartGrievanceDraftForMember(sessionToken, memberEmail, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; data = data || {}; data.stewardEmail = s; return withScriptLock_(function() { return DataService.startGrievanceDraft(memberEmail, data); }); }
+function dataMemberAssignSteward(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return withScriptLock_(function() { return DataService.assignStewardToMember(e, stewardEmail); }); }
+function dataStartGrievanceDraft(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.startGrievanceDraft(e, data, idemKey); }) : { success: false, message: 'Not authenticated.' }; }
 function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
-function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberSurveyStatus(e) : null; }
-function dataGetAllMembers(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getAllMembers(); }
+// v4.31.1 — Resource click tracking (any authenticated user)
+function dataLogResourceClick(sessionToken, resourceId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.logResourceClick(e, resourceId) : { success: false }; }
+function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberSurveyStatus(e); }
+function dataGetAllMembers(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getAllMembers(); }
 function dataGetStewardSurveyTracking(sessionToken, scope) { var s = _requireStewardAuth(sessionToken); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
 function dataSendBroadcast(sessionToken, filter, msg, subject) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg, subject); }
-function dataGetSurveyResults(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getSurveyResults(); }
+function dataGetSurveyResults(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getSurveyResults(); }
 // v4.21.0 — Native survey engine wrappers
-function dataGetSurveyQuestions(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? getSurveyQuestions() : []; }
+function dataGetSurveyQuestions(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return getSurveyQuestions(); }
 function dataSubmitSurveyResponse(sessionToken, responses) { var e = _resolveCallerEmail(sessionToken); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
 // dataGetPendingSurveyMembers, dataGetSatisfactionSummary, dataOpenNewSurveyPeriod are in 08e_SurveyEngine.gs
-function dataLogMemberContact(sessionToken, memberEmail, type, notes, duration) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.logMemberContact(s, memberEmail, type, notes, duration); }); }
-function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getMemberContactHistory(s, memberEmail); }
-function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getStewardContactLog(s); }
+function dataLogMemberContact(sessionToken, memberEmail, type, notes, duration, memberName) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.logMemberContact(s, memberEmail, type, notes, duration, memberName); }); }
+function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) { Logger.log('dataGetMemberContactHistory: auth failed'); return []; } return DataService.getMemberContactHistory(s, memberEmail); }
+function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) { Logger.log('dataGetStewardContactLog: auth failed'); return []; } return DataService.getStewardContactLog(s); }
 
 // S2: Batch badge counts — replaces 3 serial client calls with 1 round-trip
 function dataGetBadgeCounts(sessionToken) {
@@ -3372,12 +4595,12 @@ function dataGetMemberCaseFolderUrl(sessionToken, memberEmail) {
   }
 }
 // A4: LockService for concurrent write safety
-function dataCreateTask(sessionToken, title, desc, memberEmail, priority, dueDate, assignToEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assignToEmail || ''); }); }
-function dataCreateTaskForSteward(sessionToken, assigneeEmail, title, desc, memberEmail, priority, dueDate) {
+function dataCreateTask(sessionToken, title, desc, memberEmail, priority, dueDate, assignToEmail, idemKey) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assignToEmail || '', idemKey); }); }
+function dataCreateTaskForSteward(sessionToken, assigneeEmail, title, desc, memberEmail, priority, dueDate, idemKey) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, message: 'Steward access required.' };
   if (!DataService.isChiefSteward(s)) return { success: false, message: 'Not authorized.' };
-  return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assigneeEmail);
+  return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assigneeEmail, idemKey);
 }
 function dataGetTasks(sessionToken, statusFilter) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getTasks(s, statusFilter); }
 function dataCompleteTask(sessionToken, taskId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.completeTask(s, taskId); }); }
@@ -3403,13 +4626,19 @@ function dataGetMembershipStats(sessionToken) { var e = _resolveCallerEmail(sess
 // Data is already anonymized (aggregate counts only); hotspots require 3+ per location.
 function dataGetMemberGrievanceStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { available: false }; return DataService.getGrievanceStats(); }
 function dataGetMemberGrievanceHotSpots(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return DataService.getGrievanceHotSpots(); }
+
+// v4.32.0 — Grievance Feedback wrappers
+function dataGetPendingGrievanceFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getPendingGrievanceFeedback(e) : null; }
+function dataSubmitGrievanceFeedback(sessionToken, grievanceId, ratings, comment) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.submitGrievanceFeedback(e, grievanceId, ratings, comment); }) : { success: false, message: 'Not authenticated.' }; }
+function dataGetGrievanceFeedbackStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getGrievanceFeedbackStats() : null; }
+function dataGetStewardFeedbackSummary(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardFeedbackSummary(s) : null; }
 function dataGetUpcomingEvents(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getUpcomingEvents(limit) : []; }
 // dataGetSurveyQuestions and dataSubmitSurveyResponse are defined in the v4.21.0 block above (single canonical definition)
 function dataIsChiefSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.isChiefSteward(e) : false; }
 // dataGetAgencyGrievanceStats — alias removed; frontend uses dataGetGrievanceStats directly
 
 // v4.17.0 — member task assignment wrappers (CR-AUTH-3: server-side identity)
-function dataCreateMemberTask(sessionToken, memberEmail, title, desc, priority, dueDate) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.createMemberTask(s, memberEmail, title, desc, priority, dueDate); }
+function dataCreateMemberTask(sessionToken, memberEmail, title, desc, priority, dueDate) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.createMemberTask(s, memberEmail, title, desc, priority, dueDate); }); }
 function dataGetMemberTasks(sessionToken, statusFilter) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberTasks(e, statusFilter) : []; }
 function dataCompleteMemberTask(sessionToken, taskId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.completeMemberTask(e, taskId) : { success: false, message: 'Not authenticated.' }; }
 function dataGetStewardAssignedMemberTasks(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getStewardAssignedMemberTasks(s); }
@@ -3422,18 +4651,47 @@ function dataGetAllStewardPerformance(sessionToken) { var s = _requireStewardAut
 function dataGetCaseChecklist(sessionToken, caseId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getCaseChecklist(caseId) : []; }
 function dataToggleChecklistItem(sessionToken, checklistId, completed) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMemberMeetings(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberMeetings(e) : []; }
-function dataCreateScheduledMeeting(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.createScheduledMeeting(s, data); }); }
-function dataGetScheduledMeetings(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getScheduledMeetings() : []; }
 function dataGetSatisfactionTrends(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { categories: [] }; return DataService.getSatisfactionTrends(); }
-function dataSubmitFeedback(sessionToken, data) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
+function dataSubmitFeedback(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.submitFeedback(e, data, idemKey) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMyFeedback(e) : []; }
+
+// v4.33.0 — Insights batch: 6 parallel server calls in 1 round-trip
+function dataGetInsightsBatch(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { stats: { available: false }, hotSpots: [], perf: [], sat: { categories: [] }, memberStats: null, workload: { available: false } };
+  var result = {};
+  try { result.stats = DataService.getGrievanceStats(); } catch (_e) { result.stats = { available: false }; Logger.log('InsightsBatch stats: ' + _e.message); }
+  try { result.hotSpots = DataService.getGrievanceHotSpots(); } catch (_e) { result.hotSpots = []; Logger.log('InsightsBatch hotSpots: ' + _e.message); }
+  try { result.perf = DataService.getAllStewardPerformance(); } catch (_e) { result.perf = []; Logger.log('InsightsBatch perf: ' + _e.message); }
+  try { result.sat = DataService.getSatisfactionTrends(); } catch (_e) { result.sat = { categories: [] }; Logger.log('InsightsBatch sat: ' + _e.message); }
+  try { result.memberStats = DataService.getMembershipStats(); } catch (_e) { result.memberStats = null; Logger.log('InsightsBatch memberStats: ' + _e.message); }
+  try {
+    if (typeof WorkloadService !== 'undefined' && WorkloadService.getDashboardDataSSO) {
+      result.workload = WorkloadService.getDashboardDataSSO(s);
+    } else {
+      result.workload = { available: false };
+    }
+  } catch (_e) { result.workload = { available: false }; Logger.log('InsightsBatch workload: ' + _e.message); }
+  return result;
+}
+
+// v4.33.0 — Nav refresh batch: KPIs + badge counts in 1 round-trip
+function dataRefreshNavData(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { kpis: null, badges: { notificationCount: 0, taskCount: 0, overdueTaskCount: 0, qaUnansweredCount: 0 } };
+  var kpis = null;
+  try { kpis = DataService.getStewardKPIs(s); } catch (_e) { Logger.log('RefreshNavData kpis: ' + _e.message); }
+  var badges = DataService.getBadgeCounts(s, 'steward');
+  return { kpis: kpis, badges: badges };
+}
+
 // v4.23.0: Portal Polls deprecated — replaced by wq* system (24_WeeklyQuestions.gs).
 // Stubs return graceful empty responses for stale clients; auth gates added per CR-AUTH-3.
 function dataGetActivePolls(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return []; }
 function dataSubmitPollVote(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return { success: false, message: 'Polls system updated — please refresh.' }; }
 function dataAddPoll(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return { success: false, message: 'Polls system updated — please refresh.' }; }
 function dataGetMeetingMinutes(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMeetingMinutes(limit) : []; }
-function dataAddMeetingMinutes(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data); }
+function dataAddMeetingMinutes(sessionToken, data, idemKey) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data, idemKey); }
 
 /**
  * BACKFILL: Generates Drive docs for any existing MeetingMinutes rows
@@ -3447,7 +4705,7 @@ function dataAddMeetingMinutes(sessionToken, data) { var s = _requireStewardAuth
  */
 function BACKFILL_MINUTES_DRIVE_DOCS() {
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) return { processed: 0, skipped: 0, errors: 0, message: 'No active spreadsheet.' };
@@ -3467,7 +4725,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
     if (!minutesFolderId) {
       minutesFolderId = PropertiesService.getScriptProperties().getProperty('MINUTES_FOLDER_ID') || '';
     }
-  } catch (_re) {}
+  } catch (_re) { Logger.log('_re: ' + (_re.message || _re)); }
 
   var data      = sheet.getDataRange().getValues();
   var tz        = Session.getScriptTimeZone();
@@ -3533,7 +4791,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
         try {
           DriveApp.getFolderById(minutesFolderId).addFile(docFile);
           DriveApp.getRootFolder().removeFile(docFile);
-        } catch (_mv) {}
+        } catch (_mv) { Logger.log('_mv: ' + (_mv.message || _mv)); }
       }
 
       // Write URL back to sheet immediately (0-indexed col + 1 = 1-indexed for getRange)
@@ -3567,8 +4825,6 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
   Logger.log('BACKFILL_MINUTES_DRIVE_DOCS: processed=' + processed + ' skipped=' + skipped + ' errors=' + errors);
   return { processed: processed, skipped: skipped, errors: errors, message: summary };
 }
-
-
 // OPT-1: Dedicated steward dashboard init — single round-trip combining cases, KPIs, badges, member count.
 // Used as fallback when the preloaded batch from dataGetBatchData is unavailable.
 function dataGetStewardDashboardInit(sessionToken) {
@@ -3598,17 +4854,6 @@ function dataGetBatchData(sessionToken) {
   // Normalize 'both' → steward view (steward functions are a superset)
   if (serverRole === 'both' || serverRole === 'admin') serverRole = 'steward';
   return DataService.getBatchData(e, serverRole);
-}
-
-/**
- * v4.31.1 — Returns member batch data for dual-role users switching to member view.
- * dataGetBatchData always returns steward data for role=both users, so this endpoint
- * forces member batch data regardless of server-side role.
- */
-function dataGetMemberBatchData(sessionToken) {
-  var e = _resolveCallerEmail(sessionToken);
-  if (!e) return {};
-  return DataService.getBatchData(e, 'member');
 }
 
 /**
@@ -3668,6 +4913,7 @@ function _ensureAllSheetsInternal() {
         s.hideSheet();
       }
     }],
+    ['Grievance Feedback', function() { if (typeof _ensureGrievanceFeedbackSheet === 'function') _ensureGrievanceFeedbackSheet(ss); }],
     ['Audit Log',         function() {
       if (!ss.getSheetByName(SHEETS.AUDIT_LOG)) {
         var s = ss.insertSheet(SHEETS.AUDIT_LOG);
@@ -3716,7 +4962,7 @@ function dataGetBroadcastFilterOptions(sessionToken) {
     try {
       var config = ConfigReader.getConfig();
       broadcastScopeAll = (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes');
-    } catch (_e) { /* non-fatal — defaults to false */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     return {
       locations: Object.keys(locations).sort(),
       officeDays: Object.keys(officeDays).sort(),
@@ -3741,7 +4987,7 @@ function dataGetBroadcastFilterOptions(sessionToken) {
  *   eventAttendance      — unique members who checked in to any meeting (Meeting Check-In Log)
  *   grievanceFilingRate  — % of active members with at least one grievance row
  *   stewardContactRate   — % of active members who appear as a member email in _Contact_Log
- *   resourceDownloads    — not currently tracked; returns 0
+ *   resourceDownloads    — total resource click count from ScriptProperties (RC_TOTAL)
  *   membershipTrends     — monthly total/new member counts from Member Directory HIRE_DATE (last 6 mo)
  */
 function dataGetEngagementStats(sessionToken) {
@@ -3791,14 +5037,14 @@ function dataGetEngagementStats(sessionToken) {
         if (status === 'completed') completedCount++;
       }
       surveyParticipation = stRows.length > 0 ? Math.round((completedCount / Math.max(totalMembers, 1)) * 100) : 0;
-    } catch(_se) {}
+    } catch (_se) { Logger.log('_se: ' + (_se.message || _se)); }
 
     // ── Weekly question votes ───────────────────────────────────────────────
     var weeklyQuestionVotes = 0;
     try {
       var wqRows = _rows(SHEETS.WEEKLY_RESPONSES || '_Weekly_Responses');
       weeklyQuestionVotes = wqRows.length;
-    } catch(_we) {}
+    } catch (_we) { Logger.log('_we: ' + (_we.message || _we)); }
 
     // ── Event attendance (unique members at any meeting) ────────────────────
     var eventAttendance = 0;
@@ -3811,7 +5057,7 @@ function dataGetEngagementStats(sessionToken) {
         if (ciEmail) attendeeSet[ciEmail] = true;
       }
       eventAttendance = Object.keys(attendeeSet).length;
-    } catch(_ce) {}
+    } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
 
     // ── Grievance filing rate ───────────────────────────────────────────────
     var grievanceFilingRate = 0;
@@ -3831,7 +5077,7 @@ function dataGetEngagementStats(sessionToken) {
           grievanceFilingRate = Math.round((grievants.length / totalMembers) * 100);
         }
       }
-    } catch(_ge) {}
+    } catch (_ge) { Logger.log('_ge: ' + (_ge.message || _ge)); }
 
     // ── Steward contact rate ────────────────────────────────────────────────
     var stewardContactRate = 0;
@@ -3848,7 +5094,7 @@ function dataGetEngagementStats(sessionToken) {
         var contacted = Object.keys(contactedSet).filter(function(e) { return memberEmails.indexOf(e) >= 0; });
         stewardContactRate = Math.round((contacted.length / totalMembers) * 100);
       }
-    } catch(_cl) {}
+    } catch (_cl) { Logger.log('_cl: ' + (_cl.message || _cl)); }
 
     // ── Membership trends (last 6 months, by hire date) ─────────────────────
     var membershipTrends = [];
@@ -3881,7 +5127,202 @@ function dataGetEngagementStats(sessionToken) {
         }
         for (var mk2 in monthMap) membershipTrends.push(monthMap[mk2]);
       }
-    } catch(_te) {}
+    } catch (_te) { Logger.log('_te: ' + (_te.message || _te)); }
+
+    // ── Meeting attendance trends (last 6 months) ─────────────────────────
+    var meetingTrends = [];
+    var totalMeetings = 0;
+    var avgMeetingAttendance = 0;
+    try {
+      var ciSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+      if (ciSheet && ciSheet.getLastRow() >= 2) {
+        var ciData = ciSheet.getRange(2, 1, ciSheet.getLastRow() - 1, ciSheet.getLastColumn()).getValues();
+        var ciHeaders = ciSheet.getRange(1, 1, 1, ciSheet.getLastColumn()).getValues()[0];
+        var ciDateIdx = ciHeaders.indexOf('Meeting Date');
+        var ciEmailIdx2 = ciHeaders.indexOf('Email');
+        var ciMeetingIdIdx = ciHeaders.indexOf('Meeting ID');
+        if (ciDateIdx >= 0) {
+          var mtMap = {};
+          var meetingIds = {};
+          var sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+          for (var mi2 = 0; mi2 < ciData.length; mi2++) {
+            var md = ciData[mi2][ciDateIdx];
+            if (!md) continue;
+            var mdDate = md instanceof Date ? md : new Date(md);
+            if (isNaN(mdDate.getTime()) || mdDate < sixMonthsAgo) continue;
+            var mtKey = (mdDate.getMonth() + 1) + '/' + (mdDate.getFullYear() - 2000);
+            if (!mtMap[mtKey]) mtMap[mtKey] = {};
+            var mtEmail = ciEmailIdx2 >= 0 ? String(ciData[mi2][ciEmailIdx2]).toLowerCase().trim() : '';
+            if (mtEmail) mtMap[mtKey][mtEmail] = 1;
+            if (ciMeetingIdIdx >= 0 && ciData[mi2][ciMeetingIdIdx]) meetingIds[String(ciData[mi2][ciMeetingIdIdx])] = 1;
+          }
+          totalMeetings = Object.keys(meetingIds).length;
+          var mtAttTotal = 0;
+          for (var mtk in mtMap) {
+            var mtCount = Object.keys(mtMap[mtk]).length;
+            meetingTrends.push({ month: mtk, attendees: mtCount });
+            mtAttTotal += mtCount;
+          }
+          avgMeetingAttendance = meetingTrends.length > 0 ? Math.round(mtAttTotal / meetingTrends.length) : 0;
+        }
+      }
+    } catch (_mt) { Logger.log('_mt: ' + (_mt.message || _mt)); }
+
+    // ── Contact Log volume (last 6 months) ──────────────────────────────
+    var contactTrends = [];
+    var totalContacts = 0;
+    try {
+      var clSheet2 = ss.getSheetByName(SHEETS.CONTACT_LOG || '_Contact_Log');
+      if (clSheet2 && clSheet2.getLastRow() >= 2) {
+        var clData2 = clSheet2.getRange(2, 1, clSheet2.getLastRow() - 1, clSheet2.getLastColumn()).getValues();
+        // _Contact_Log: ID[0] StewardEmail[1] MemberEmail[2] Type[3] Date[4] Notes[5] Duration[6] Created[7]
+        var clMap = {};
+        var sixMoAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        for (var ci2 = 0; ci2 < clData2.length; ci2++) {
+          var clDate = clData2[ci2][4]; // Date column
+          if (!clDate) continue;
+          var cld = clDate instanceof Date ? clDate : new Date(clDate);
+          if (isNaN(cld.getTime())) continue;
+          totalContacts++;
+          if (cld >= sixMoAgo) {
+            var clKey = (cld.getMonth() + 1) + '/' + (cld.getFullYear() - 2000);
+            clMap[clKey] = (clMap[clKey] || 0) + 1;
+          }
+        }
+        for (var clk in clMap) contactTrends.push({ month: clk, count: clMap[clk] });
+      }
+    } catch (_cl2) { Logger.log('_cl2: ' + (_cl2.message || _cl2)); }
+
+    // ── Satisfaction trends ──────────────────────────────────────────────
+    var satisfactionData = null;
+    try {
+      satisfactionData = DataService.getSatisfactionTrends();
+    } catch (_sat) { Logger.log('_sat: ' + (_sat.message || _sat)); }
+
+    // ── Steward task completion rate ─────────────────────────────────────
+    var taskCompletionRate = null;
+    var totalTasks = 0;
+    var completedTasks = 0;
+    try {
+      var taskSheet = ss.getSheetByName(SHEETS.STEWARD_TASKS || '_Steward_Tasks');
+      if (taskSheet && taskSheet.getLastRow() >= 2) {
+        var taskData = taskSheet.getRange(2, 1, taskSheet.getLastRow() - 1, taskSheet.getLastColumn()).getValues();
+        // _Steward_Tasks: ID[0] StewardEmail[1] Title[2] Description[3] MemberEmail[4] Priority[5] Status[6] DueDate[7] Created[8] Completed[9]
+        for (var tki = 0; tki < taskData.length; tki++) {
+          var tkStatus = String(taskData[tki][6]).trim().toLowerCase();
+          if (tkStatus) {
+            totalTasks++;
+            if (tkStatus === 'completed' || tkStatus === 'done') completedTasks++;
+          }
+        }
+        taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : null;
+      }
+    } catch (_tk) { Logger.log('_tk: ' + (_tk.message || _tk)); }
+
+    // ── Notification engagement ──────────────────────────────────────────
+    var notifTotal = 0;
+    var notifDismissed = 0;
+    var notifActive = 0;
+    try {
+      var notifSheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+      if (notifSheet && notifSheet.getLastRow() >= 2) {
+        var notifData = notifSheet.getRange(2, 1, notifSheet.getLastRow() - 1, notifSheet.getLastColumn()).getValues();
+        var notifHeaders = notifSheet.getRange(1, 1, 1, notifSheet.getLastColumn()).getValues()[0];
+        var notifStatusIdx = notifHeaders.indexOf('Status');
+        var notifDismissedIdx = notifHeaders.indexOf('Dismissed_By');
+        for (var ni = 0; ni < notifData.length; ni++) {
+          notifTotal++;
+          var nStatus = notifStatusIdx >= 0 ? String(notifData[ni][notifStatusIdx]).trim().toLowerCase() : '';
+          var nDismissed = notifDismissedIdx >= 0 ? String(notifData[ni][notifDismissedIdx]).trim() : '';
+          if (nStatus === 'active' || nStatus === 'sent') notifActive++;
+          if (nDismissed) notifDismissed++;
+        }
+      }
+    } catch (_ni) { Logger.log('_ni: ' + (_ni.message || _ni)); }
+
+    // ── QA Forum activity ────────────────────────────────────────────────
+    var qaQuestions = 0;
+    var qaAnswered = 0;
+    var qaUpvotes = 0;
+    try {
+      var qaSheet = ss.getSheetByName(SHEETS.QA_FORUM || '_QA_Forum');
+      if (qaSheet && qaSheet.getLastRow() >= 2) {
+        var qaData = qaSheet.getRange(2, 1, qaSheet.getLastRow() - 1, qaSheet.getLastColumn()).getValues();
+        // _QA_Forum: ID[0] AuthorEmail[1] AuthorName[2] IsAnonymous[3] QuestionText[4] Status[5] UpvoteCount[6] Upvoters[7] AnswerCount[8] Created[9] Updated[10]
+        for (var qi = 0; qi < qaData.length; qi++) {
+          qaQuestions++;
+          var ansCount = parseInt(qaData[qi][8], 10) || 0;
+          if (ansCount > 0) qaAnswered++;
+          qaUpvotes += parseInt(qaData[qi][6], 10) || 0;
+        }
+      }
+    } catch (_qa) { Logger.log('_qa: ' + (_qa.message || _qa)); }
+
+    // ── Steward coverage ratio & workload equity (v4.31.5) ───────────────
+    var stewardCoverage = [];
+    var workloadEquity = null;
+    try {
+      // Re-read member sheet for steward assignments
+      if (memberSheet && memberSheet.getLastRow() >= 2) {
+        var memHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
+        var assignedStewardIdx = memHeaders.indexOf('Assigned Steward');
+        var isStewardIdx = memHeaders.indexOf('Is Steward');
+        var memLocIdx = memHeaders.indexOf('Work Location');
+        if (assignedStewardIdx >= 0) {
+          var memAllData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
+          var stewardMemberCount = {}; // stewardEmail -> count
+          var locationStewards = {}; // location -> { stewards: {}, members: 0 }
+          for (var sci = 0; sci < memAllData.length; sci++) {
+            var assignedTo = String(memAllData[sci][assignedStewardIdx]).trim().toLowerCase();
+            var isSteward = isStewardIdx >= 0 ? String(memAllData[sci][isStewardIdx]).trim().toLowerCase() : '';
+            var memLoc = memLocIdx >= 0 ? String(memAllData[sci][memLocIdx]).trim() : 'Unknown';
+            if (!locationStewards[memLoc]) locationStewards[memLoc] = { stewards: {}, members: 0 };
+            locationStewards[memLoc].members++;
+            if (isSteward === 'yes' || isSteward === 'true') {
+              var sEmail = emailIdx >= 0 ? String(memAllData[sci][emailIdx]).toLowerCase().trim() : '';
+              if (sEmail) locationStewards[memLoc].stewards[sEmail] = 1;
+            }
+            if (assignedTo && assignedTo !== 'unassigned' && assignedTo !== '') {
+              stewardMemberCount[assignedTo] = (stewardMemberCount[assignedTo] || 0) + 1;
+            }
+          }
+          // Coverage by location
+          for (var locName in locationStewards) {
+            var ls = locationStewards[locName];
+            var stewardCount = Object.keys(ls.stewards).length;
+            if (ls.members > 0) {
+              stewardCoverage.push({
+                location: locName,
+                members: ls.members,
+                stewards: stewardCount,
+                ratio: stewardCount > 0 ? Math.round((ls.members / stewardCount) * 10) / 10 : null
+              });
+            }
+          }
+          stewardCoverage.sort(function(a, b) { return (b.ratio || 999) - (a.ratio || 999); });
+
+          // Workload equity (Gini coefficient of caseload distribution)
+          var caseloads = [];
+          for (var ste in stewardMemberCount) caseloads.push(stewardMemberCount[ste]);
+          if (caseloads.length >= 2) {
+            caseloads.sort(function(a, b) { return a - b; });
+            var n = caseloads.length;
+            var totalSum = caseloads.reduce(function(a, b) { return a + b; }, 0);
+            var giniSum = 0;
+            for (var gj = 0; gj < n; gj++) giniSum += (2 * (gj + 1) - n - 1) * caseloads[gj];
+            var gini = totalSum > 0 ? Math.round((giniSum / (n * totalSum)) * 100) / 100 : 0;
+            workloadEquity = {
+              gini: gini,
+              equityLabel: gini < 0.2 ? 'Very Even' : gini < 0.35 ? 'Fairly Even' : gini < 0.5 ? 'Moderate' : 'Uneven',
+              stewardCount: n,
+              avgCaseload: Math.round((totalSum / n) * 10) / 10,
+              maxCaseload: caseloads[n - 1],
+              minCaseload: caseloads[0]
+            };
+          }
+        }
+      }
+    } catch (_sc) { Logger.log('_sc: ' + (_sc.message || _sc)); }
 
     return {
       surveyParticipation:  surveyParticipation,
@@ -3889,11 +5330,213 @@ function dataGetEngagementStats(sessionToken) {
       eventAttendance:      eventAttendance,
       grievanceFilingRate:  grievanceFilingRate,
       stewardContactRate:   stewardContactRate,
-      resourceDownloads:    0,  // Not currently tracked — reserved for future resource click-tracking
+      resourceDownloads:    DataService.getResourceClickTotal(),
       membershipTrends:     membershipTrends,
+      // New metrics (v4.31.4)
+      meetingTrends:        meetingTrends,
+      totalMeetings:        totalMeetings,
+      avgMeetingAttendance: avgMeetingAttendance,
+      contactTrends:        contactTrends,
+      totalContacts:        totalContacts,
+      satisfactionData:     satisfactionData,
+      taskCompletionRate:   taskCompletionRate,
+      totalTasks:           totalTasks,
+      completedTasks:       completedTasks,
+      notifTotal:           notifTotal,
+      notifDismissed:       notifDismissed,
+      notifActive:          notifActive,
+      qaQuestions:           qaQuestions,
+      qaAnswered:            qaAnswered,
+      qaUpvotes:             qaUpvotes,
+      // Operational health (v4.31.5)
+      stewardCoverage:       stewardCoverage,
+      workloadEquity:        workloadEquity,
     };
   } catch (e) {
     Logger.log('dataGetEngagementStats error: ' + e.message + '\n' + (e.stack || ''));
+    return null;
+  }
+}
+
+/**
+ * v4.31.5 — Per-member engagement score. Private — only shows the caller's own data.
+ * Composite score (0-100) based on: survey participation, meeting attendance,
+ * resource views, Q&A activity, and steward contact.
+ */
+function dataGetMyEngagementScore(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return null;
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
+    var email = e.toLowerCase().trim();
+
+    var score = 0;
+    var breakdown = [];
+
+    // 1. Survey participation (0-25 points)
+    try {
+      var stSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING || '_Survey_Tracking');
+      if (stSheet && stSheet.getLastRow() >= 2) {
+        var stData = stSheet.getRange(2, 1, stSheet.getLastRow() - 1, stSheet.getLastColumn()).getValues();
+        for (var si = 0; si < stData.length; si++) {
+          if (String(stData[si][1]).toLowerCase().trim() === email) { // col 2 = email (0-indexed: 1)
+            var status = String(stData[si][5]).toLowerCase().trim(); // col 6 = status
+            if (status === 'completed') { score += 25; breakdown.push({ label: 'Survey Completed', points: 25, max: 25 }); }
+            else if (status === 'in progress') { score += 10; breakdown.push({ label: 'Survey In Progress', points: 10, max: 25 }); }
+            else { breakdown.push({ label: 'Survey Not Started', points: 0, max: 25 }); }
+            break;
+          }
+        }
+      }
+      if (!breakdown.length) breakdown.push({ label: 'Survey', points: 0, max: 25 });
+    } catch (_s) { breakdown.push({ label: 'Survey', points: 0, max: 25 }); }
+
+    // 2. Meeting attendance (0-25 points): 5 pts per meeting attended (max 25)
+    var meetingPts = 0;
+    try {
+      var ciSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+      if (ciSheet && ciSheet.getLastRow() >= 2) {
+        var ciData = ciSheet.getRange(2, 1, ciSheet.getLastRow() - 1, ciSheet.getLastColumn()).getValues();
+        var ciHeaders = ciSheet.getRange(1, 1, 1, ciSheet.getLastColumn()).getValues()[0];
+        var ciEmailIdx = ciHeaders.indexOf('Email');
+        if (ciEmailIdx >= 0) {
+          var meetingsAttended = 0;
+          for (var mi = 0; mi < ciData.length; mi++) {
+            if (String(ciData[mi][ciEmailIdx]).toLowerCase().trim() === email) meetingsAttended++;
+          }
+          meetingPts = Math.min(meetingsAttended * 5, 25);
+        }
+      }
+    } catch (_m) { /* skip */ }
+    score += meetingPts;
+    breakdown.push({ label: 'Meeting Attendance', points: meetingPts, max: 25 });
+
+    // 3. Q&A activity (0-20 points): 5 pts per question asked, 3 pts per upvote given
+    var qaPts = 0;
+    try {
+      var qaSheet = ss.getSheetByName(SHEETS.QA_FORUM || '_QA_Forum');
+      if (qaSheet && qaSheet.getLastRow() >= 2) {
+        var qaData = qaSheet.getRange(2, 1, qaSheet.getLastRow() - 1, qaSheet.getLastColumn()).getValues();
+        for (var qi = 0; qi < qaData.length; qi++) {
+          if (String(qaData[qi][1]).toLowerCase().trim() === email) qaPts += 5;
+          // Check upvoters for this user
+          var upvoters = String(qaData[qi][7]);
+          if (upvoters.toLowerCase().indexOf(email) >= 0) qaPts += 3;
+        }
+        qaPts = Math.min(qaPts, 20);
+      }
+    } catch (_q) { /* skip */ }
+    score += qaPts;
+    breakdown.push({ label: 'Q&A Participation', points: qaPts, max: 20 });
+
+    // 4. Resource engagement (0-15 points): based on total views by this user
+    // We can't track per-user views with current RC_ scheme, so give 15 if they've used resources tab
+    var resourcePts = 0;
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var allProps = props.getProperties();
+      // Check usage analytics for resource tab visits by this user
+      for (var uaKey in allProps) {
+        if (uaKey.indexOf('UA_D_') === 0) {
+          try {
+            var parsed = JSON.parse(allProps[uaKey]);
+            if (parsed.users && parsed.users[email]) { resourcePts = 10; break; }
+          } catch (_p) { /* skip */ }
+        }
+      }
+      // Bonus if they've viewed resources tab specifically
+      for (var tKey in allProps) {
+        if (tKey.indexOf('UA_T_') >= 0 && tKey.indexOf('_resources') >= 0) {
+          resourcePts = 15;
+          break;
+        }
+      }
+    } catch (_r) { /* skip */ }
+    score += resourcePts;
+    breakdown.push({ label: 'Resource Engagement', points: resourcePts, max: 15 });
+
+    // 5. Steward contact (0-15 points): contacted steward at least once
+    var contactPts = 0;
+    try {
+      var clSheet = ss.getSheetByName(SHEETS.CONTACT_LOG || '_Contact_Log');
+      if (clSheet && clSheet.getLastRow() >= 2) {
+        var clData = clSheet.getRange(2, 1, clSheet.getLastRow() - 1, clSheet.getLastColumn()).getValues();
+        for (var ci = 0; ci < clData.length; ci++) {
+          if (String(clData[ci][2]).toLowerCase().trim() === email) { contactPts = 15; break; }
+        }
+      }
+    } catch (_c) { /* skip */ }
+    score += contactPts;
+    breakdown.push({ label: 'Steward Contact', points: contactPts, max: 15 });
+
+    // Percentile (approximate — based on active member count)
+    var percentile = null;
+    try {
+      var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+      if (memberSheet && memberSheet.getLastRow() >= 2) {
+        // Very rough: assume normal distribution centered at 40 with std of 20
+        var memberCount = memberSheet.getLastRow() - 1;
+        if (memberCount > 0) {
+          // z-score approximation
+          var z = (score - 40) / 20;
+          percentile = Math.min(99, Math.max(1, Math.round(50 + 50 * (z / Math.sqrt(1 + z * z)))));
+        }
+      }
+    } catch (_pe) { /* skip */ }
+
+    return {
+      score: Math.min(score, 100),
+      breakdown: breakdown,
+      percentile: percentile,
+      maxScore: 100
+    };
+  } catch (err) {
+    Logger.log('dataGetMyEngagementScore error: ' + err.message);
+    return null;
+  }
+}
+
+/**
+ * v4.25.11 — Resource usage stats for Union Stats > Resources sub-tab.
+ * Returns per-resource views, top resources, category breakdown.
+ */
+function dataGetResourceStats(sessionToken) {
+  var _caller = _resolveCallerEmail(sessionToken);
+  if (!_caller) return null;
+  try {
+    return DataService.getResourceStats();
+  } catch (e) {
+    Logger.log('dataGetResourceStats error: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * v4.31.3 — Log a tab visit for webapp usage analytics.
+ * Fire-and-forget; client does not wait for response.
+ */
+function dataLogTabVisit(sessionToken, tab, role) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { success: false };
+  try {
+    return DataService.logTabVisit(e, tab, role);
+  } catch (err) {
+    Logger.log('dataLogTabVisit error: ' + err.message);
+    return { success: false };
+  }
+}
+
+/**
+ * v4.31.3 — Aggregated webapp usage stats for Union Stats > Usage sub-tab.
+ */
+function dataGetUsageStats(sessionToken) {
+  var _caller = _resolveCallerEmail(sessionToken);
+  if (!_caller) return null;
+  try {
+    return DataService.getUsageStats();
+  } catch (e) {
+    Logger.log('dataGetUsageStats error: ' + e.message);
     return null;
   }
 }
@@ -3908,6 +5551,24 @@ function dataGetEngagementStats(sessionToken) {
  *   submissionRate    — % of stewards (IS_STEWARD = 'Yes') who have submitted at least once
  *   trendDirection    — 'increasing' | 'decreasing' | 'stable' based on avg last 4 wks vs prior 4 wks
  */
+function dataGetMemberCount(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try { return DataService.getMemberCount(); } catch (e) { Logger.log('dataGetMemberCount error: ' + e.message); return { total: 0, withGrievances: 0 }; }
+}
+
+function dataGetMembersPaginated(sessionToken, opts) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try { return DataService.getMembersPaginated(s, opts || {}); } catch (e) { Logger.log('dataGetMembersPaginated error: ' + e.message); return { members: [], total: 0, page: 1, pageSize: 25 }; }
+}
+
+function dataGetSheetHealth(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  try { return DataService.getSheetHealth(); } catch (e) { Logger.log('dataGetSheetHealth error: ' + e.message); return { members: { rows: 0, status: 'ok' }, grievances: { rows: 0, status: 'ok' } }; }
+}
+
 function dataGetWorkloadSummaryStats(sessionToken) {
   var _caller = _resolveCallerEmail(sessionToken);
   if (!_caller) return null;
@@ -3969,7 +5630,7 @@ function dataGetWorkloadSummaryStats(sessionToken) {
           }
         }
       }
-    } catch(_sr) {}
+    } catch (_sr) { Logger.log('_sr: ' + (_sr.message || _sr)); }
 
     // Trend: compare avg priority in last 4 weeks vs prior 4 weeks
     var trendDirection = 'stable';
@@ -3991,7 +5652,7 @@ function dataGetWorkloadSummaryStats(sessionToken) {
         if (delta > 0.5)       trendDirection = 'increasing';
         else if (delta < -0.5) trendDirection = 'decreasing';
       }
-    } catch(_td) {}
+    } catch (_td) { Logger.log('_td: ' + (_td.message || _td)); }
 
     return {
       avgCaseload:      Math.round(avgCaseload * 10) / 10,

@@ -1,24 +1,39 @@
 /**
- * 14_MeetingCheckIn.gs - Meeting Check-In System
+ * ============================================================================
+ * 14_MeetingCheckIn.gs - MEETING CHECK-IN SYSTEM
+ * ============================================================================
  *
- * Stewards can plan meetings in advance. Events appear in Google Calendar.
- * On the day of the event the check-in form becomes active.
- * A few hours after the event ends the check-in becomes inactive.
- * If multiple events are planned for the same day, members select which event.
- * Stewards can opt to receive an attendance report via email.
+ * WHAT THIS FILE DOES:
+ *   Meeting management and check-in system. Full lifecycle: steward creates
+ *   meeting -> event appears in Google Calendar -> check-in kiosk activates
+ *   on meeting day -> members enter email+PIN -> attendance is recorded ->
+ *   report is emailed after meeting ends. Supports multiple meetings per day
+ *   (member selects which). Auto-deactivates check-in a few hours
+ *   (CALENDAR_CONFIG.MEETING_DEACTIVATE_HOURS) after the event ends.
  *
- * Flow:
- * 1. Steward creates a meeting via "Setup Meeting" dialog (with date, time, duration)
- * 2. Meeting appears in Google Calendar
- * 3. On the day of the meeting, check-in becomes active
- * 4. Steward opens the check-in kiosk dialog (stays open)
- * 5. Members enter email + PIN -> click Check In
- * 6. After meeting duration + buffer, check-in deactivates and attendance is emailed
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Physical check-in kiosks at union meetings use a dialog that stays open
+ *   on a shared device. Members authenticate with email+PIN (same as
+ *   self-service portal) so a single auth system is maintained. Google
+ *   Calendar integration ensures meetings appear on stewards' calendars
+ *   automatically. Attendance reports are emailed rather than stored in a
+ *   visible sheet to protect member privacy.
  *
- * @version 4.7.0
- * @requires 01_Core.gs (SHEETS, MEMBER_COLS, MEETING_CHECKIN_COLS, MEETING_STATUS, COLORS)
- * @requires 05_Integrations.gs (createMeetingCalendarEvent, emailMeetingAttendanceReport)
- * @requires 13_MemberSelfService.gs (authenticateMember, verifyPIN, hashPIN)
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Meetings can't be created. Check-in kiosk won't activate. Attendance
+ *   isn't recorded. Post-meeting reports aren't emailed. Google Calendar
+ *   events aren't created. If the deactivation timer breaks, check-in stays
+ *   active indefinitely.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, MEMBER_COLS, MEETING_CHECKIN_COLS,
+ *   MEETING_STATUS, COLORS), 05_Integrations.gs (Calendar),
+ *   13_MemberSelfService.gs (PIN auth).
+ *   Used by menu items in 03_.
+ *
+ * @version 4.31.0
+ * @license Free for use by non-profit collective bargaining groups and unions
+ * ============================================================================
  */
 
 // ============================================================================
@@ -197,9 +212,6 @@ function generateMeetingId_(sheet, dateStr) {
 
   return prefix + ('00' + (maxNum + 1)).slice(-3);
 }
-
-// getActiveMeetings removed — dead code cleanup v4.25.11
-
 /**
  * Get meetings eligible for check-in (today only, Active or Scheduled status,
  * within the active time window)
@@ -1018,7 +1030,6 @@ function webCheckInMember(meetingId, email, pin) {
   return processMeetingCheckIn(meetingId, email, pin);
 }
 
-// getCheckInPageHtml removed — dead code cleanup v4.25.11
 // ============================================================================
 // DRIVE FOLDER INTEGRATION (v4.20.18)
 // ============================================================================
@@ -1047,7 +1058,7 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
     if (!folderId) {
       folderId = PropertiesService.getScriptProperties().getProperty('EVENT_CHECKIN_FOLDER_ID') || '';
     }
-  } catch (_e) {}
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   if (!folderId) {
     Logger.log('saveAttendanceToDriveFolder_: Event Check-In folder ID not configured — skipping Drive save for ' + meetingId);

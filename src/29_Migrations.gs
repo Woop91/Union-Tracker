@@ -1,3 +1,35 @@
+/**
+ * ============================================================================
+ * 29_Migrations.gs - One-Time Data & Schema Migrations
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   One-time data and schema migration functions. Each migration handles a
+ *   specific version upgrade (e.g., column renames, data moves). All
+ *   migrations are idempotent — they detect already-migrated state and no-op
+ *   safely. Designed to be run ONCE from the Apps Script editor after a
+ *   version upgrade. Current migrations include:
+ *   migrateContactLogFolderUrlColumn() (v4.20.25 — renames Member Directory
+ *   column).
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Schema changes (column renames, data format changes) require data
+ *   migration for existing deployments. New installations get the correct
+ *   schema from CREATE_DASHBOARD, but existing users have data in the old
+ *   format. Each migration function documents its background, logic, and
+ *   safe-to-rerun guarantees. Migrations never delete data — they copy to
+ *   new location, verify, then clear the old location.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Schema migration for existing deployments fails. Users may have data in
+ *   old column formats. Since migrations are idempotent, they can be re-run
+ *   after the fix. If a migration fails mid-way, partial state is handled
+ *   by the "skip if already has value" guard on each row.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS). Used by manual execution from Apps
+ *   Script editor and DevMenu.gs run-all functions.
+ */
 // ============================================================================
 // MIGRATIONS — one-time data/schema fixes
 // Run each function ONCE from the Apps Script editor. They are all idempotent

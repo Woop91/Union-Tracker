@@ -1,3 +1,36 @@
+/**
+ * ============================================================================
+ * 08d_AuditAndFormulas.gs - Audit Log Setup, Formulas, and Event Logging
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Audit log sheet setup, formula generation, and audit event logging.
+ *   setupAuditLogSheet() creates or verifies the audit log with the canonical
+ *   10-column schema (H-43). protectAuditLogSheet_() applies sheet protection
+ *   so only the script owner can edit audit records. logAuditEvent() writes
+ *   timestamped entries for security/compliance tracking.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Audit logging is a compliance requirement — the log is never cleared if
+ *   it has existing data (line 19-20 check). The canonical schema (H-43) is
+ *   the single source of truth — if 06_Maintenance.gs has a different schema,
+ *   it should match this one. Sheet protection prevents stewards from
+ *   tampering with audit records.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Audit logging stops — security events are not recorded. Compliance
+ *   requirements are not met. If the sheet protection is lost, audit records
+ *   can be manually edited/deleted, destroying the audit trail.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, COLORS, AUDIT_LOG_HEADER_MAP_). Used by
+ *   00_Security.gs (recordSecurityEvent), 02_DataManagers.gs,
+ *   06_Maintenance.gs, and every module that calls logAuditEvent().
+ *
+ * @fileoverview Audit log setup and event logging functions
+ * @requires 01_Core.gs
+ */
+
 // ============================================================================
 // AUDIT LOG SHEET SETUP
 // ============================================================================
@@ -106,6 +139,18 @@ function protectAuditLogSheet_(sheet) {
 function onEditAudit(e) {
   if (!e || !e.range) return;
 
+  try {
+  // Throttle: max 1 audit event per second per user (prevents rapid-fire edits flooding the log)
+  // Uses ScriptCache (not UserCache) because onEdit runs as a simple trigger where
+  // getUserCache() is not permitted. Key includes effective user for per-user isolation.
+  try {
+    var cache = CacheService.getScriptCache();
+    var throttleUser = (e.user && e.user.email) ? e.user.email : Session.getEffectiveUser().getEmail();
+    var throttleKey = 'audit_throttle_' + throttleUser;
+    if (cache.get(throttleKey)) return; // Already logged within 1 second
+    cache.put(throttleKey, '1', 1); // 1-second TTL
+  } catch (_te) { /* CacheService unavailable — proceed without throttle */ }
+
   var sheet = e.range.getSheet();
   var sheetName = sheet.getName();
 
@@ -165,10 +210,8 @@ function onEditAudit(e) {
     newValue: newValue,
     recordId: recordId
   });
+  } catch (err) { Logger.log('onEditAudit error: ' + (err.message || err)); }
 }
-
-// installAuditTrigger removed — dead code cleanup v4.25.11
-
 /**
  * Remove the audit trigger
  * Disables automatic change tracking
@@ -188,18 +231,9 @@ function removeAuditTrigger() {
 // AUDIT LOG VIEWING AND MANAGEMENT
 // ============================================================================
 
-// viewAuditLog removed — dead code cleanup v4.25.11
-
-// clearOldAuditEntries removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // AUDIT HISTORY RETRIEVAL
 // ============================================================================
-
-// getAuditHistory removed — dead code cleanup v4.25.11
-
-
-
 /**
  * ============================================================================
  * 08j_CalcSheets.gs - Hidden Calculation Sheet Setup & Management
@@ -284,6 +318,8 @@ function setupGrievanceMemberDropdown() {
 /**
  * Setup the _Grievance_Calc hidden sheet with self-healing formulas
  * Calculates: Has Open Grievance, Grievance Status, Next Deadline per member
+ * @deprecated v4.30.0 — Replaced by JavaScript-computed values in DataService.
+ * Kept for backward compatibility with existing sheet formulas.
  */
 function setupGrievanceCalcSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -355,6 +391,7 @@ function setupGrievanceCalcSheet() {
  * Setup the _Grievance_Formulas hidden sheet with self-healing formulas
  * Calculates: First Name, Last Name, Email, Unit, Location, Steward (from Member Dir)
  *            Filing Deadline, Step I-III dates, Days Open, Next Action Due, Days to Deadline
+ * @deprecated v4.30.0 — Replaced by JavaScript-computed values in DataService.
  */
 function setupGrievanceFormulasSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -581,6 +618,7 @@ function setupGrievanceFormulasSheet() {
 /**
  * Setup the _Member_Lookup hidden sheet with self-healing formulas
  * Looks up: First Name, Last Name, Email, Unit, Location, Steward from Member Directory
+ * @deprecated v4.30.0 — Replaced by JavaScript-computed values in DataService.
  */
 function setupMemberLookupSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -633,6 +671,7 @@ function setupMemberLookupSheet() {
 /**
  * Setup the _Steward_Contact_Calc hidden sheet with self-healing formulas
  * Tracks and aggregates steward contact data from Member Directory
+ * @deprecated v4.30.0 — Replaced by JavaScript-computed values in DataService.
  */
 function setupStewardContactCalcSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -684,6 +723,7 @@ function setupStewardContactCalcSheet() {
 /**
  * Setup the _Dashboard_Calc hidden sheet with self-healing formulas
  * Calculates key dashboard metrics that auto-update
+ * @deprecated v4.30.0 — Replaced by JavaScript-computed values in DataService.
  */
 function setupDashboardCalcSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -754,6 +794,7 @@ function setupDashboardCalcSheet() {
 /**
  * Setup the _Steward_Performance_Calc hidden sheet
  * Calculates detailed steward performance metrics
+ * @deprecated v4.30.0 — Replaced by JavaScript-computed values in DataService.
  */
 function setupStewardPerformanceCalcSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -830,17 +871,18 @@ function setupAllHiddenSheets() {
   var created = 0;
   var repaired = 0;
 
-  // Core grievance/member calculation sheets (7 total)
-  // Each function creates the sheet if missing or updates if exists
-  try { setupGrievanceCalcSheet(); created++; } catch (_e) { repaired++; }
-  try { setupGrievanceFormulasSheet(); created++; } catch (_e) { repaired++; }
-  try { setupMemberLookupSheet(); created++; } catch (_e) { repaired++; }
-  try { setupStewardContactCalcSheet(); created++; } catch (_e) { repaired++; }
-  try { setupDashboardCalcSheet(); created++; } catch (_e) { repaired++; }
-  try { setupStewardPerformanceCalcSheet(); created++; } catch (_e) { repaired++; }
-  try { setupChecklistCalcSheet(); created++; } catch (_e) { repaired++; }
+  // @deprecated v4.30.0 — 6 calc sheets are replaced by JS-computed values in DataService.
+  // Still created for backward compatibility unless existing sheets are already present.
+  // The checklist calc sheet is NOT deprecated (still actively used).
+  try { setupGrievanceCalcSheet(); created++; } catch (_e) { Logger.log('setupGrievanceCalcSheet: ' + (_e.message || _e)); repaired++; }
+  try { setupGrievanceFormulasSheet(); created++; } catch (_e) { Logger.log('setupGrievanceFormulasSheet: ' + (_e.message || _e)); repaired++; }
+  try { setupMemberLookupSheet(); created++; } catch (_e) { Logger.log('setupMemberLookupSheet: ' + (_e.message || _e)); repaired++; }
+  try { setupStewardContactCalcSheet(); created++; } catch (_e) { Logger.log('setupStewardContactCalcSheet: ' + (_e.message || _e)); repaired++; }
+  try { setupDashboardCalcSheet(); created++; } catch (_e) { Logger.log('setupDashboardCalcSheet: ' + (_e.message || _e)); repaired++; }
+  try { setupStewardPerformanceCalcSheet(); created++; } catch (_e) { Logger.log('setupStewardPerformanceCalcSheet: ' + (_e.message || _e)); repaired++; }
+  try { setupChecklistCalcSheet(); created++; } catch (_e) { Logger.log('setupChecklistCalcSheet: ' + (_e.message || _e)); repaired++; }
 
-  ss.toast('All 7 hidden sheets created!', '✅ Success', 3);
+  ss.toast('Hidden sheets setup complete', '✅ Success', 3);
 
   return { created: created, repaired: repaired, success: true };
 }
@@ -1490,8 +1532,8 @@ function setupSurveyVaultSheet() {
     var headers = getHeadersFromMap_(SURVEY_VAULT_HEADER_MAP_);
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setFontWeight('bold')
-      .setBackground(SHEET_COLORS.HEADER_DARK_RED)
-      .setFontColor(SHEET_COLORS.BG_WHITE);
+      .setBackground('#7F1D1D')
+      .setFontColor('#FFFFFF');
     sheet.setFrozenRows(1);
   }
 
@@ -1900,9 +1942,6 @@ function verifyAuditLogIntegrity() {
 
   return result;
 }
-
-// verifyAuditLogIntegrityDialog removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // VAULT INTEGRITY VERIFICATION
 // ============================================================================
@@ -1998,4 +2037,3 @@ function verifySurveyVaultIntegrity() {
   };
 }
 
-// verifySurveyVaultIntegrityDialog removed — dead code cleanup v4.25.11

@@ -3,15 +3,31 @@
  * 03_UIComponents.gs - Menu System and Navigation
  * ============================================================================
  *
- * This module handles all menu-related functions including:
- * - Main menu creation (createDashboardMenu)
- * - Sheet navigation
- * - Quick action menus
+ * WHAT THIS FILE DOES:
+ *   Menu system creation — the main UI entry point for all spreadsheet features.
+ *   createDashboardMenu() builds 3 top-level menus (Union Hub, Tools, Admin)
+ *   with 40+ items covering search, members, grievances, analytics, calendar,
+ *   drive, notifications, admin, and more. Uses emoji prefixes for visual
+ *   scanning in the menu bar.
  *
- * REFACTORED: Split from 04_UIService.gs for better maintainability
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Called by onOpen() in 10_Main.gs. Centralizes all menu items in one place
+ *   so features are discoverable without scattering menu logic across modules.
+ *   40+ items is acceptable for the power-user audience (union stewards who
+ *   need fast access to many features). Refactored out of 04_UIService.gs to
+ *   keep menu definition separate from presentation/dialog logic.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Users see NO menus when they open the spreadsheet. ALL spreadsheet-based
+ *   features become inaccessible — users must manually call functions from the
+ *   Apps Script editor, which is not viable for non-technical stewards. This
+ *   is a critical file for usability.
+ *
+ * DEPENDENCIES:
+ *   - Depends on: 01_Core.gs (SHEETS, getLocalNumberFromConfig_)
+ *   - Used by:    10_Main.gs (onOpen calls createDashboardMenu)
  *
  * @fileoverview Menu creation and navigation functions
- * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -155,6 +171,7 @@ function createDashboardMenu() {
     .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
     .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
     .addItem('🔧 Repair Dashboard', 'showRepairDialog')
+    .addItem('🔄 Update All Sheets', 'UPDATE_ALL_SHEETS')
     .addItem('⚙️ Settings', 'showSettingsDialog')
     .addSeparator()
 
@@ -171,6 +188,10 @@ function createDashboardMenu() {
       .addItem('📧 CC Authorize Account', 'authorizeConstantContact')
       .addItem('📧 CC Connection Status', 'showConstantContactStatus')
       .addItem('🔌 CC Disconnect', 'disconnectConstantContact')
+      .addSeparator()
+      .addItem('📊 Setup Looker Studio Sheets', 'setupLookerIntegration')
+      .addItem('📊 Refresh Looker Data', 'refreshLookerData')
+      .addItem('📊 Refresh Looker Anon Data', 'refreshLookerAnonData')
       .addSeparator()
       .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
       .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
@@ -235,7 +256,8 @@ function createDashboardMenu() {
       .addItem('🏗️ Setup / Repair Drive', 'SETUP_DRIVE_FOLDERS')
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
       .addSeparator()
-      .addItem('--- MAINTENANCE ---', 'refreshAllFormulas')
+      .addItem('--- UPDATE & MAINTENANCE ---', 'UPDATE_ALL_SHEETS')
+      .addItem('🔄 Update All Sheets', 'UPDATE_ALL_SHEETS')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
       .addItem('🔄 Refresh All Member Data', 'refreshMemberDirectoryFormulas')
       .addItem('🔄 Refresh View', 'refreshMemberView')
@@ -281,7 +303,7 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
-      .addItem('🗑️ Remove Deprecated Dashboard', 'removeDeprecatedDashboard'))
+      .addItem('🗑️ Remove Deprecated Tabs', 'removeDeprecatedTabs'))
 
     .addSubMenu(ui.createMenu('🎨 Styling')
       .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
@@ -305,6 +327,7 @@ function createDashboardMenu() {
     adminMenu.addSeparator()
       .addSubMenu(ui.createMenu('🎭 Demo Data')
         .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
+        .addItem('📇 Seed Contact Log Only', 'SEED_CONTACT_LOG')
         .addSeparator()
         .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
         .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
@@ -312,12 +335,15 @@ function createDashboardMenu() {
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }
 
-  adminMenu.addSeparator()
-    .addSubMenu(ui.createMenu('🧪 Test Runner')
-      .addItem('▶ Run All Tests', 'runTestsFromMenu')
-      .addSeparator()
-      .addItem('🕐 Enable Daily Trigger', 'setupTestTriggerFromMenu')
-      .addItem('🚫 Disable Trigger', 'removeTestTriggerFromMenu'));
+  // Only show Test Runner menu in dev mode (30_TestRunner.gs excluded from prod builds)
+  if (!isProductionMode()) {
+    adminMenu.addSeparator()
+      .addSubMenu(ui.createMenu('🧪 Test Runner')
+        .addItem('▶ Run All Tests', 'runTestsFromMenu')
+        .addSeparator()
+        .addItem('🕐 Enable Daily Trigger', 'setupTestTriggerFromMenu')
+        .addItem('🚫 Disable Trigger', 'removeTestTriggerFromMenu'));
+  }
 
   adminMenu.addToUi();
 }
@@ -325,10 +351,6 @@ function createDashboardMenu() {
 // ============================================================================
 // NAVIGATION FUNCTIONS
 // ============================================================================
-
-// navToDash removed — dead code cleanup v4.25.11
-// navToMobile_UIService_ removed — dead code cleanup v4.25.11
-
 /**
  * Navigates to a specific sheet by name
  * @param {string} sheetName - Name of the sheet to navigate to
@@ -496,8 +518,6 @@ function showConfigSheet() {
   navigateToSheet(SHEETS.CONFIG);
 }
 
-
-
 /**
  * ============================================================================
  * ThemeService.gs - Theme Management and Visual Settings
@@ -579,7 +599,7 @@ function applyThemeToSheet_(sheet, themeKey) {
     // F23b: Apply alternating row colors in single setBackgrounds call
     var backgrounds = [];
     for (var row = 2; row <= lastRow; row++) {
-      var color = (row % 2 === 0) ? theme.altRow : SHEET_COLORS.BG_WHITE;
+      var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
       backgrounds.push(new Array(lastCol).fill(color));
     }
     dataRange.setBackgrounds(backgrounds);
@@ -596,9 +616,9 @@ function applyThemeToSheet_(sheet, themeKey) {
 var THEME_PRESETS = {
   'default': {
     name: 'Default (Dark Slate)',
-    headerBg: SHEET_COLORS.HEADER_SLATE,
-    headerText: SHEET_COLORS.BG_WHITE,
-    altRow: SHEET_COLORS.BG_OFF_WHITE,
+    headerBg: '#1e293b',
+    headerText: '#ffffff',
+    altRow: '#f8fafc',
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -607,9 +627,9 @@ var THEME_PRESETS = {
   },
   'union-blue': {
     name: 'Union Blue',
-    headerBg: SHEET_COLORS.HEADER_DARK_BLUE_ALT,
-    headerText: SHEET_COLORS.BG_WHITE,
-    altRow: SHEET_COLORS.BG_EXTRA_PALE_BLUE,
+    headerBg: '#1e40af',
+    headerText: '#ffffff',
+    altRow: '#eff6ff',
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -618,8 +638,8 @@ var THEME_PRESETS = {
   },
   'forest': {
     name: 'Forest Green',
-    headerBg: SHEET_COLORS.TEXT_GREEN_ALT,
-    headerText: SHEET_COLORS.BG_WHITE,
+    headerBg: '#166534',
+    headerText: '#ffffff',
     altRow: '#f0fdf4',
     font: 'Roboto',
     fontSize: 10,
@@ -630,8 +650,8 @@ var THEME_PRESETS = {
   'charcoal': {
     name: 'Charcoal',
     headerBg: '#374151',
-    headerText: SHEET_COLORS.BG_LIGHT_GRAY,
-    altRow: SHEET_COLORS.BG_VERY_LIGHT_GRAY,
+    headerText: '#f9fafb',
+    altRow: '#f3f4f6',
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -641,8 +661,8 @@ var THEME_PRESETS = {
   'midnight': {
     name: 'Midnight Purple',
     headerBg: '#581c87',
-    headerText: SHEET_COLORS.BG_WHITE,
-    altRow: SHEET_COLORS.BG_LIGHT_PURPLE,
+    headerText: '#ffffff',
+    altRow: '#faf5ff',
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -652,7 +672,7 @@ var THEME_PRESETS = {
   'crimson': {
     name: 'Crimson',
     headerBg: '#991b1b',
-    headerText: SHEET_COLORS.BG_WHITE,
+    headerText: '#ffffff',
     altRow: '#fef2f2',
     font: 'Roboto',
     fontSize: 10,
@@ -663,8 +683,8 @@ var THEME_PRESETS = {
   'steel': {
     name: 'Steel Gray',
     headerBg: '#475569',
-    headerText: SHEET_COLORS.BG_WHITE,
-    altRow: SHEET_COLORS.BG_SLATE_LIGHT,
+    headerText: '#ffffff',
+    altRow: '#f1f5f9',
     font: 'Roboto',
     fontSize: 10,
     headerSize: 11,
@@ -674,7 +694,7 @@ var THEME_PRESETS = {
   'ocean': {
     name: 'Ocean Teal',
     headerBg: '#115e59',
-    headerText: SHEET_COLORS.BG_WHITE,
+    headerText: '#ffffff',
     altRow: '#f0fdfa',
     font: 'Roboto',
     fontSize: 10,
@@ -837,9 +857,6 @@ function toggleDarkMode() {
     'Theme', 2
   );
 }
-
-// showThemeSettings removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // COMFORT VIEW / ADHD-FRIENDLY SETTINGS
 // ============================================================================
@@ -915,9 +932,6 @@ function hideAllGridlines() {
     sheet.setHiddenGridlines(true);
   });
 }
-
-// showAllGridlines removed — dead code cleanup v4.25.11
-
 /**
  * Toggles gridlines visibility
  * @returns {void}
@@ -943,7 +957,7 @@ function applyZebraStripes(sheet) {
   // F23b: Build backgrounds array and apply in single setBackgrounds call
   var backgrounds = [];
   for (var row = 2; row <= lastRow; row++) {
-    var color = (row % 2 === 0) ? SHEET_COLORS.BG_SLATE_LIGHT : SHEET_COLORS.BG_WHITE;
+    var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
     var rowColors = new Array(lastCol).fill(color);
     backgrounds.push(rowColors);
   }
@@ -977,7 +991,7 @@ function removeZebraStripes(sheet) {
   if (lastRow < 2 || lastCol < 1) return;
 
   var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-  dataRange.setBackground(SHEET_COLORS.BG_WHITE);
+  dataRange.setBackground('#ffffff');
 }
 
 /**
@@ -998,9 +1012,6 @@ function toggleZebraStripes() {
     applyZebraStripes(sheet);
   }
 }
-
-// toggleReducedMotion removed — dead code cleanup v4.25.11
-
 /**
  * Activates focus mode
  * @returns {void}
@@ -1067,11 +1078,6 @@ function applyTheme(themeKey, scope) {
   }
 }
 
-// applyThemeToSheet removed — dead code cleanup v4.25.11
-
-// previewTheme removed — dead code cleanup v4.25.11
-// resetToDefaultThemeViaSystem_ removed — dead code cleanup v4.25.11
-
 /**
  * Quick toggle for dark mode
  * @returns {void}
@@ -1090,10 +1096,6 @@ function setupADHDDefaults() {
   applyADHDSettings(settings);
   SpreadsheetApp.getActiveSpreadsheet().toast('Comfort View defaults applied', 'Settings', 3);
 }
-
-// applyADHDDefaultsWithOptions removed — dead code cleanup v4.25.11
-// undoADHDDefaults removed — dead code cleanup v4.25.11
-
 /**
  * Refreshes all visual elements
  * @returns {void}
@@ -1139,8 +1141,6 @@ function refreshAllVisuals() {
     Logger.log('refreshAllVisuals error: ' + e.toString());
   }
 }
-
-
 
 /**
  * ============================================================================
@@ -1407,8 +1407,6 @@ function showMyAssignedGrievances() {
   SpreadsheetApp.getUi().alert('My Cases', msg, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
-
-
 /**
  * ============================================================================
  * QuickActions.gs - Quick Actions and Email Functions
@@ -1499,6 +1497,7 @@ function showQuickActionsMenu() {
 function showMemberQuickActions(row) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) { SpreadsheetApp.getUi().alert('Member Directory sheet not found.'); return; }
   var data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
   var memberId = data[MEMBER_COLS.MEMBER_ID - 1];
   var name = data[MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[MEMBER_COLS.LAST_NAME - 1];
@@ -1573,6 +1572,7 @@ function showMemberQuickActions(row) {
 function showGrievanceQuickActions(row) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) { SpreadsheetApp.getUi().alert('Grievance Log sheet not found.'); return; }
   var data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
   var grievanceId = data[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
   var memberId = data[GRIEVANCE_COLS.MEMBER_ID - 1];
@@ -1726,7 +1726,7 @@ function sendQuickEmail(to, subject, body, memberId) {
     // Rate limiting: max 10 emails per minute per user
     var cache = CacheService.getScriptCache();
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     var rateLimitKey = 'email_rate_' + (callerEmail || 'unknown');
     var emailCount = parseInt(cache.get(rateLimitKey) || '0', 10);
     if (emailCount >= 10) {
@@ -2085,11 +2085,6 @@ function sendMemberDashboardLink() {
     }
   }
 }
-
-// sendStewardToolkit_ removed — dead code cleanup v4.25.11
-
-
-
 /**
  * ============================================================================
  * SearchDialogs.gs - Search Dialog Components

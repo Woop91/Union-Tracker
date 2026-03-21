@@ -1032,3 +1032,38 @@ describe('Global wrappers', () => {
     spy.mockRestore();
   });
 });
+
+// ============================================================================
+// Lock Failure Tests
+// ============================================================================
+
+describe('Lock failure handling', () => {
+  var failingLock = { tryLock: jest.fn(() => false), waitLock: jest.fn(), releaseLock: jest.fn() };
+
+  afterEach(() => {
+    // Restore default lock mock
+    LockService.getScriptLock.mockReturnValue({ tryLock: jest.fn(() => true), waitLock: jest.fn(), releaseLock: jest.fn() });
+  });
+
+  test('submitQuestion returns busy message on lock failure', () => {
+    var forumSheet = createMockSheet(SHEETS.QA_FORUM, [FORUM_HEADERS]);
+    var ss = createMockSpreadsheet([forumSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    LockService.getScriptLock.mockReturnValue(failingLock);
+    var result = QAForum.submitQuestion('test@example.com', 'Name', 'Question?', false);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('busy');
+  });
+
+  test('submitAnswer returns busy message on lock failure', () => {
+    var ansSheet = createMockSheet(SHEETS.QA_ANSWERS, [['ID', 'QuestionID', 'AuthorEmail', 'AuthorName', 'IsSteward', 'AnswerText', 'Status', 'Timestamp']]);
+    var ss = createMockSpreadsheet([ansSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    LockService.getScriptLock.mockReturnValue(failingLock);
+    var result = QAForum.submitAnswer('steward@example.com', 'Steward', 'QA_123', 'Answer text', true);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('busy');
+  });
+});

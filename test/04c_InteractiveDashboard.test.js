@@ -1,6 +1,7 @@
 /**
  * Tests for 04c_InteractiveDashboard.gs
- * Covers dashboard data retrieval, filters, analytics, and member save.
+ * The Interactive Dashboard was deprecated and removed in v4.31.0.
+ * All functionality consolidated into Steward Dashboard (04d) and web app.
  */
 
 require('./gas-mock');
@@ -12,35 +13,23 @@ loadSources([
   '04c_InteractiveDashboard.gs'
 ]);
 
-describe('04c function existence', () => {
-  const required = [
-    'showInteractiveDashboardTab', 'getInteractiveDashboardHtml',
-    'getInteractiveOverviewData', 'getConfigDropdownValues',
-    'getInteractiveMemberData', 'getInteractiveGrievanceData',
-    'getMyStewardCases', 'getInteractiveAnalyticsData',
-    'getInteractiveResourceLinks',
-    'saveInteractiveMember'
-  ];
+describe('04c_InteractiveDashboard.gs (deprecated)', () => {
+  test('file loads without error (empty stub)', () => {
+    // File is intentionally empty — all Interactive Dashboard code removed in v4.31.0
+    expect(true).toBe(true);
+  });
 
-  required.forEach(fn => {
-    test(`${fn} is defined`, () => {
-      expect(typeof global[fn]).toBe('function');
+  test('deprecated functions no longer exist', () => {
+    const removed = [
+      'showInteractiveDashboardTab', 'getInteractiveDashboardHtml',
+      'getInteractiveOverviewData', 'getConfigDropdownValues',
+      'getInteractiveMemberData', 'getInteractiveGrievanceData',
+      'getMyStewardCases', 'getInteractiveAnalyticsData',
+      'getInteractiveResourceLinks', 'saveInteractiveMember'
+    ];
+
+    removed.forEach(fn => {
+      expect(typeof global[fn]).not.toBe('function');
     });
-  });
-});
-
-describe('getConfigDropdownValues', () => {
-  test('returns an object', () => {
-    const result = getConfigDropdownValues();
-    expect(typeof result).toBe('object');
-  });
-});
-
-describe('getInteractiveOverviewData', () => {
-  test('returns an object with expected shape', () => {
-    const result = getInteractiveOverviewData();
-    expect(typeof result).toBe('object');
-    // Should have member and grievance counts
-    expect(result).toHaveProperty('totalMembers');
   });
 });

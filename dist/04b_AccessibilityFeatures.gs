@@ -1,3 +1,36 @@
+/**
+ * ============================================================================
+ * 04b_AccessibilityFeatures.gs - Shared Styles & Productivity Tools
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Two responsibilities:
+ *   1. Shared CSS — getCommonStyles() returns a CSS string used by ALL dialog
+ *      and sidebar HTML (button, form, input, and responsive styles).
+ *   2. Productivity & accessibility features — Pomodoro timer, Quick Capture
+ *      notepad, ADHD control panel, break reminders, theme manager, smart
+ *      dashboard, and Member Import dialog (CSV parsing + column mapping).
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Centralizes CSS so all dialogs have consistent styling via UI_THEME
+ *   constants from 01_Core.gs. The productivity tools are grouped here
+ *   because they share the same CSS foundation and target accessibility /
+ *   quality-of-life needs rather than core union workflows.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   All dialogs and sidebars appear unstyled (raw HTML). Pomodoro timer,
+ *   Quick Capture, ADHD tools, and Member Import stop working. Core
+ *   grievance and member operations are unaffected.
+ *
+ * DEPENDENCIES:
+ *   - Depends on: 01_Core.gs (UI_THEME, getMobileOptimizedHead)
+ *   - Used by:    Every file that generates dialog/sidebar HTML
+ *                 (04a, 04d, 04e, 08b, 08c, 09_, 11_, 13_, 14_)
+ *
+ * @fileoverview Common CSS styles, productivity tools, and accessibility features
+ * @requires 01_Core.gs
+ */
+
 // ============================================================================
 // COMMON UI UTILITIES
 // ============================================================================
@@ -264,9 +297,6 @@ function startPomodoroTimer() {
 
   ui.showModelessDialog(html, '🍅 Pomodoro Timer');
 }
-
-// onPomodoroEnd_ removed — dead code cleanup v4.25.11
-
 // ==================== QUICK CAPTURE NOTEPAD ====================
 
 /**
@@ -313,9 +343,6 @@ function clearQuickCaptureNotes() {
     return errorResponse(e.message);
   }
 }
-
-// getQuickCaptureMetadata removed — dead code cleanup v4.25.11
-
 /**
  * Shows the Quick Capture Notepad dialog
  * A fast notepad for capturing thoughts without losing focus
@@ -415,9 +442,6 @@ function showQuickCaptureNotepad() {
 
   SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture Notepad');
 }
-
-// showImportDialog_UIService_ removed — dead code cleanup v4.25.11
-
 /**
  * Generates HTML for import dialog
  * @private
@@ -643,10 +667,6 @@ function mapImportColumns_(headers) {
 
   return map;
 }
-
-// showExportDialog_UIService_ removed — dead code cleanup v4.25.11
-
-// setBreakReminders removed — dead code cleanup v4.25.11
 
 function showBreakReminder() {
   SpreadsheetApp.getActiveSpreadsheet().toast('💆 Time for a break! Stretch and rest your eyes.', 'Break Reminder', 10);

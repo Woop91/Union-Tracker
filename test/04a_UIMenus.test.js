@@ -15,7 +15,7 @@ loadSources([
 describe('04a function existence', () => {
   const required = [
     'showVisualControlPanel', 'getVisualControlPanelHtml',
-    'showExecutiveDashboard', 'showStewardDirectory',
+    'showStewardDirectory',
     'openCellMultiSelectEditor',
     'showMultiSelectDialog', 'getMultiSelectHtml'
   ];

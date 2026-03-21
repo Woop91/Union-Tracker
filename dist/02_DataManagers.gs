@@ -3,15 +3,50 @@
  * 02_DataManagers.gs - Member & Grievance Data Operations
  * ============================================================================
  *
- * This module handles all member and grievance data operations including:
- * - Member directory management
- * - Steward promotion/demotion
- * - Member ID generation and validation
- * - Member data sync
- * - Grievance tracking and management
+ * WHAT THIS FILE DOES:
+ *   Contains all data mutation operations for the Member Directory and
+ *   Grievance Log sheets. Includes:
+ *   - addMember() / updateMember() — Member Directory CRUD.
+ *   - startNewGrievance() / advanceGrievanceStep() / resolveGrievance() —
+ *     Grievance Log lifecycle (create, advance workflow, resolve).
+ *   - Steward promotion and demotion workflows.
+ *   - Member ID generation and validation.
+ *   Every write operation in this file uses withScriptLock_() for concurrency
+ *   safety and escapeForFormula() on all string inputs before writing to
+ *   prevent formula injection attacks.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Centralizes ALL write operations into a single module so that security
+ *   controls are applied consistently and cannot be bypassed:
+ *   - withScriptLock_() (from 00_DataAccess.gs) serializes concurrent edits,
+ *     preventing race conditions when multiple users submit data at the same
+ *     time.
+ *   - escapeForFormula() (from 00_Security.gs) strips leading =, +, -, @
+ *     characters from every input string, blocking formula injection.
+ *   - 1-indexed MEMBER_COLS / GRIEVANCE_COLS (from 01_Core.gs) are used for
+ *     all column positioning so that column references stay in sync with
+ *     sheet structure automatically.
+ *   No other module should write directly to Member Directory or Grievance
+ *   Log; all writes must flow through this file.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   No members can be added or updated, no grievances can be filed or
+ *   modified. The entire data-entry pipeline stops. If escapeForFormula()
+ *   calls are lost, formula injection becomes possible. If withScriptLock_()
+ *   calls are lost, concurrent edits can corrupt sheet data.
+ *
+ * DEPENDENCIES:
+ *   - Depends on: 00_DataAccess.gs (withScriptLock_), 00_Security.gs
+ *     (escapeForFormula), 01_Core.gs (SHEETS, MEMBER_COLS, GRIEVANCE_COLS,
+ *     successResponse, errorResponse).
+ *   - Used by: 03_UIComponents.gs, 08c_FormsAndNotifications.gs,
+ *     10c_FormHandlers.gs, the SPA data service (21_WebDashDataService.gs),
+ *     and form submission handlers.
  *
  * @fileoverview Member directory and grievance data operations
- * @version 4.7.0
+ * @version 4.31.0
+ * @requires 00_DataAccess.gs
+ * @requires 00_Security.gs
  * @requires 01_Core.gs
  */
 
@@ -318,6 +353,7 @@ function getStewardWorkloadDetailed() {
  * Updates grievance counts and status in Member Directory
  */
 function syncMemberGrievanceData() {
+  return withScriptLock_(function() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
@@ -364,6 +400,7 @@ function syncMemberGrievanceData() {
   }
 
   Logger.log('Member grievance data synced');
+  });
 }
 
 // ============================================================================
@@ -732,31 +769,38 @@ function demoteSelectedSteward() {
  * @private
  */
 function addToConfigDropdown_(configCol, value) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  try {
+    withScriptLock_(function() {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
-  if (!configSheet) return;
+      if (!configSheet) return;
 
-  var lastRow = configSheet.getLastRow();
-  var rowCount = lastRow >= 3 ? lastRow - 2 : 0;
+      var lastRow = configSheet.getLastRow();
+      var rowCount = lastRow >= 3 ? lastRow - 2 : 0;
 
-  if (rowCount > 0) {
-    var colData = configSheet.getRange(3, configCol, rowCount, 1).getValues();
-    var emptyRow = -1;
+      if (rowCount > 0) {
+        var colData = configSheet.getRange(3, configCol, rowCount, 1).getValues();
+        var emptyRow = -1;
 
-    for (var i = 0; i < colData.length; i++) {
-      var cellVal = (colData[i][0] || '').toString().trim();
-      // Skip if value already exists (prevent duplicates)
-      if (cellVal === value.toString().trim()) return;
-      if (!cellVal && emptyRow === -1) {
-        emptyRow = i + 3;
+        for (var i = 0; i < colData.length; i++) {
+          var cellVal = (colData[i][0] || '').toString().trim();
+          // Skip if value already exists (prevent duplicates)
+          if (cellVal === value.toString().trim()) return;
+          if (!cellVal && emptyRow === -1) {
+            emptyRow = i + 3;
+          }
+        }
+
+        if (emptyRow === -1) emptyRow = lastRow + 1;
+        configSheet.getRange(emptyRow, configCol).setValue(escapeForFormula(value));
+      } else {
+        configSheet.getRange(3, configCol).setValue(escapeForFormula(value));
       }
-    }
-
-    if (emptyRow === -1) emptyRow = lastRow + 1;
-    configSheet.getRange(emptyRow, configCol).setValue(escapeForFormula(value));
-  } else {
-    configSheet.getRange(3, configCol).setValue(escapeForFormula(value));
+    });
+  } catch (lockErr) {
+    // Lock timeout is non-critical for config dropdown updates — log and continue
+    Logger.log('addToConfigDropdown_: lock unavailable for col ' + configCol + ': ' + lockErr.message);
   }
 }
 
@@ -1288,9 +1332,6 @@ function getImportMembersHtml_() {
     '</script>' +
     '</body></html>';
 }
-
-// importMembersFromData removed — dead code cleanup v4.25.11
-
 /**
  * Returns existing member emails and names for client-side duplicate checking.
  * Called once before import begins to avoid redundant sheet reads per batch.
@@ -1420,7 +1461,7 @@ function importMembersBatch(batchData, mapping) {
       };
 
     } catch (e) {
-      console.error('Batch import error: ' + e.message);
+      Logger.log('Batch import error: ' + e.message);
       return errorResponse(e.message, 'importMembersBatch');
     }
   });
@@ -1439,9 +1480,7 @@ function showExportMembersDialog() {
       ui.alert('Access Denied', 'Steward or admin access is required to export member data.', ui.ButtonSet.OK);
       return;
     }
-  } catch (_e) {
-    // If auth check fails (e.g. no Config sheet yet), allow — menu access implies editor role
-  }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -1467,8 +1506,6 @@ function showExportMembersDialog() {
     sheet.getRange('A1').activate();
   }
 }
-
-
 
 /**
  * ============================================================================
@@ -1567,7 +1604,7 @@ function startNewGrievance(grievanceData) {
       };
     });
   } catch (error) {
-    console.error('Error creating grievance:', error);
+    Logger.log('Error creating grievance:', error);
     return errorResponse(error.message, 'createGrievance');
   }
 }
@@ -1611,7 +1648,7 @@ function handleGrievanceDialogSubmit(formData) {
         }
       }
     } catch (e) {
-      console.log('Note: Could not set action type: ' + e.message);
+      Logger.log('Note: Could not set action type: ' + e.message);
     }
 
     // Create checklist from template
@@ -1623,10 +1660,10 @@ function handleGrievanceDialogSubmit(formData) {
           grievanceData.grievanceType
         );
         if (checklistResult.success) {
-          console.log('Checklist created with ' + checklistResult.count + ' items');
+          Logger.log('Checklist created with ' + checklistResult.count + ' items');
         }
       } catch (e) {
-        console.log('Note: Checklist creation skipped: ' + e.message);
+        Logger.log('Note: Checklist creation skipped: ' + e.message);
       }
     }
 
@@ -1718,9 +1755,6 @@ function calculateInitialDeadlines(filingDate) {
     step1Due: step1Due
   };
 }
-
-// calculateNextStepDeadline removed — dead code cleanup v4.25.11
-
 /**
  * Calculates response deadline for a given step
  * @param {number} step - Grievance step
@@ -1769,9 +1803,6 @@ function addBusinessDays(startDate, days) {
 
   return result;
 }
-
-// getDaysUntilDeadline removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // STEP ADVANCEMENT
 // ============================================================================
@@ -1872,13 +1903,10 @@ function advanceGrievanceStep(grievanceId, options) {
     };
     });
   } catch (error) {
-    console.error('Error advancing grievance:', error);
+    Logger.log('Error advancing grievance:', error);
     return errorResponse(error.message, 'advanceGrievanceStep');
   }
 }
-
-// getStepDateColumn removed — dead code cleanup v4.25.11
-
 /**
  * Returns explicit column references for a step's filed/due/rcvd columns.
  * Avoids hardcoded +1/+2 offsets that break when header order changes.
@@ -1930,7 +1958,7 @@ function recalcAllGrievancesBatched() {
   for (let i = 1; i < data.length; i++) {
     // Check execution time limit
     if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - 30000) {
-      console.log('Approaching time limit, stopping batch');
+      Logger.log('Approaching time limit, stopping batch');
       break;
     }
 
@@ -2040,7 +2068,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
       };
     });
   } catch (error) {
-    console.error('Error in bulk status update:', error);
+    Logger.log('Error in bulk status update:', error);
     return errorResponse(error.message, 'bulkUpdateGrievanceStatus');
   }
 }
@@ -2337,7 +2365,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
       };
     });
   } catch (error) {
-    console.error('Error resolving grievance:', error);
+    Logger.log('Error resolving grievance:', error);
     return errorResponse(error.message);
   }
 }
@@ -2779,9 +2807,6 @@ function clearTrafficLightIndicators() {
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Traffic light indicators cleared', COMMAND_CONFIG.SYSTEM_NAME, 3);
 }
-
-// highlightUrgentGrievances removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // BULK ACTIONS — Grievance Log (PHASE2 Feature 4)
 // ============================================================================

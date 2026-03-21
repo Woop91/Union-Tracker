@@ -4,12 +4,47 @@
  * 00_DataAccess.gs - Shared Time Constants and Lock Helper
  * ============================================================================
  *
- * Previously housed the DataAccess namespace (removed — zero callers).
- * Now provides TIME_CONSTANTS (used by deadline logic and tests) and
- * withScriptLock_ (used by DataManagers and Maintenance).
+ * WHAT THIS FILE DOES:
+ *   Provides three foundational utilities used across the entire codebase:
+ *   1. TIME_CONSTANTS — millisecond conversion factors and grievance deadline
+ *      day counts (filing windows, appeal periods, reminder intervals).
+ *   2. withScriptLock_(fn) — executes a function under a GAS script-level lock
+ *      to prevent concurrent writes from corrupting sheet data.
+ *   3. _getSheetSafe(name) — a null-safe sheet accessor that logs warnings
+ *      instead of silently returning null when a sheet is missing.
  *
- * @fileoverview Shared constants and lock helper
- * @version 1.0.0
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   - Loaded first (00_ prefix) so every other module can depend on these
+ *     constants without worrying about load order. GAS loads .gs files
+ *     alphabetically by filename, so the 00_ prefix guarantees this file
+ *     is evaluated before anything in 01_ through 31_.
+ *   - TIME_CONSTANTS.DEADLINE_DAYS uses JavaScript getters that reference
+ *     DEADLINE_DEFAULTS from 01_Core.gs. This creates a single source of
+ *     truth in 01_Core.gs while allowing 00_DataAccess.gs to provide safe
+ *     fallback values (e.g., 21 days) if 01_Core.gs hasn't loaded yet.
+ *   - withScriptLock_ uses tryLock() instead of waitLock() because tryLock
+ *     is non-blocking with a max-wait timeout, preventing indefinite hangs.
+ *   - Previously housed a full DataAccess namespace (sheet read/write layer).
+ *     That was removed when it had zero callers — modules now use direct
+ *     SpreadsheetApp calls via SHEETS constants from 01_Core.gs.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   - If TIME_CONSTANTS is missing: deadline calculations in 08c, 05_, and
+ *     12_ will throw ReferenceErrors. All grievance deadline tracking stops.
+ *   - If withScriptLock_ is missing: 02_DataManagers.gs (addMember,
+ *     updateMember, createGrievance) and 06_Maintenance.gs will throw
+ *     ReferenceErrors on any write operation. No data can be modified.
+ *   - If _getSheetSafe is missing: callers fall back to raw getSheetByName()
+ *     which returns null silently — harder to debug missing-sheet issues.
+ *
+ * DEPENDENCIES:
+ *   Depends on:  LockService (GAS built-in), SpreadsheetApp (GAS built-in)
+ *                DEADLINE_DEFAULTS (01_Core.gs, optional — has fallback values)
+ *   Used by:     02_DataManagers.gs, 06_Maintenance.gs, 08c_FormsAndNotifications.gs,
+ *                05_Integrations.gs, 12_Features.gs, test suites
+ *
+ * @fileoverview Shared constants and lock helper — loaded first in build order
+ * @version 4.31.0
  */
 
 // ============================================================================
@@ -98,4 +133,30 @@ function withScriptLock_(fn, timeoutMs) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// ============================================================================
+// SAFE SHEET ACCESSOR (v4.30.0)
+// ============================================================================
+
+/**
+ * Global safe sheet accessor — logs a warning when a sheet is not found
+ * instead of returning null silently. Use this for critical sheet lookups
+ * where a missing sheet indicates a configuration problem.
+ *
+ * @param {string} name - Sheet name (use SHEETS.* constants)
+ * @param {Spreadsheet} [ss] - Optional spreadsheet reference
+ * @returns {Sheet|null} The sheet, or null if not found
+ */
+function _getSheetSafe(name, ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    Logger.log('_getSheetSafe: getActiveSpreadsheet() returned null for "' + name + '"');
+    return null;
+  }
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    Logger.log('_getSheetSafe: Sheet "' + name + '" not found');
+  }
+  return sheet;
 }

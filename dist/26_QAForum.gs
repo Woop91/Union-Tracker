@@ -3,15 +3,33 @@
  * 26_QAForum.gs - Q&A Forum Module
  * ============================================================================
  *
- * Member-steward Q&A system with anonymous posting, upvoting, and moderation.
+ * WHAT THIS FILE DOES:
+ *   Q&A forum for member-steward communication. Members post questions
+ *   (optionally anonymous), stewards answer. Features: upvoting, question
+ *   status (open/resolved/reopened), answer moderation, unanswered question
+ *   count badge. Two hidden sheets:
+ *     _QA_Forum   — questions (11 columns)
+ *     _QA_Answers — answers (8 columns)
  *
- * Sheets:
- *   _QA_Forum   — member questions (11 columns)
- *   _QA_Answers  — answers to questions (8 columns)
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Only stewards can post answers — this ensures members get authoritative
+ *   responses about union procedures. Anonymous posting encourages questions
+ *   about sensitive topics (workplace issues, rights). Sheets are very-hidden
+ *   (setSheetVeryHidden_) to protect PII (author emails). Unanswered count
+ *   drives the badge indicator in the SPA navigation, ensuring stewards
+ *   notice pending questions.
  *
- * @fileoverview Q&A Forum IIFE module
- * @version 4.17.0
- * @requires 01_Core.gs, 06_Maintenance.gs
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Q&A tab in the SPA shows no questions/answers. Members can't ask
+ *   questions. Stewards can't respond. The unanswered badge shows 0
+ *   (stewards won't notice pending questions). Existing Q&A data is
+ *   preserved in sheets but inaccessible through the UI.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS), 06_Maintenance.gs (logAuditEvent).
+ *   Used by SPA Q&A views and the navigation badge system.
+ *
+ * @version 4.31.0
  */
 
 var QAForum = (function () {
@@ -62,7 +80,7 @@ var QAForum = (function () {
       var cacheKey = 'qa_sheet_' + sheetName;
       var cached = cache.get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch (_e) { /* cache miss or parse error — fall through to fresh read */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
     var sheet = ss.getSheetByName(sheetName);
@@ -70,7 +88,7 @@ var QAForum = (function () {
     var data = sheet.getDataRange().getValues();
     try {
       cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
-    } catch (_e) { /* CacheService has 100KB per-key limit — fail silently */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     return data;
   }
 
@@ -209,6 +227,7 @@ var QAForum = (function () {
       // Notify all stewards of the new unanswered question
       var preview = text.substring(0, 120) + (text.length > 120 ? '...' : '');
       var authorLabel = isAnonymous ? 'A member' : (name || 'A member');
+      var notificationSent = false;
       try {
         _createNotificationInternal_(
           'All Stewards',
@@ -216,11 +235,12 @@ var QAForum = (function () {
           'New Question in Q&A Forum',
           authorLabel + ' posted: "' + preview + '"'
         );
+        notificationSent = true;
       } catch (notifErr) {
         Logger.log('QA submitQuestion: steward notification failed: ' + notifErr.message);
       }
 
-      return { success: true, questionId: id };
+      return { success: true, questionId: id, notificationSent: notificationSent };
     } finally {
       lock.releaseLock();
     }
@@ -263,28 +283,36 @@ var QAForum = (function () {
         }
       }
 
-      // Notify the question author that their question received an answer
-      if (questionAuthorEmail) {
-        try {
-          var preview = questionText + (questionText.length >= 80 ? '...' : '');
-          _createNotificationInternal_(
-            questionAuthorEmail,
-            'Q&A Forum',
-            'Your Question Got an Answer',
-            (name || 'A steward') + ' answered your question: "' + preview + '"'
-          );
-        } catch (notifErr) {
-          Logger.log('QA submitAnswer: author notification failed: ' + notifErr.message);
-        }
-      }
-
       _invalidateCache(SHEETS.QA_FORUM);
       _invalidateCache(SHEETS.QA_ANSWERS);
       logAuditEvent('QA_ANSWER_SUBMITTED', 'Answer ' + id + ' on question ' + questionId);
-      return { success: true, answerId: id };
+      return { success: true, answerId: id, _authorEmail: questionAuthorEmail, _questionText: questionText, _stewardName: name };
     } finally {
       lock.releaseLock();
     }
+  }
+
+  // Wrapper that releases lock before sending notification
+  function submitAnswerWithNotify(email, name, questionId, text, isSteward) {
+    var result = submitAnswer(email, name, questionId, text, isSteward);
+    if (result.success && result._authorEmail) {
+      try {
+        var preview = result._questionText + (result._questionText.length >= 80 ? '...' : '');
+        _createNotificationInternal_(
+          result._authorEmail,
+          'Q&A Forum',
+          'Your Question Got an Answer',
+          (result._stewardName || 'A steward') + ' answered your question: "' + preview + '"'
+        );
+      } catch (notifErr) {
+        Logger.log('QA submitAnswer: author notification failed: ' + notifErr.message);
+      }
+      // Strip internal fields from response
+      delete result._authorEmail;
+      delete result._questionText;
+      delete result._stewardName;
+    }
+    return result;
   }
 
   // ═══════════════════════════════════════
@@ -523,7 +551,7 @@ var QAForum = (function () {
     try {
       var cache = CacheService.getScriptCache();
       cache.remove('qa_sheet_' + sheetName);
-    } catch (_e) { /* cache unavailable — ignore */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   }
 
   // Delegate to shared helpers in 01_Core.gs (eliminates duplicate definitions)
@@ -566,7 +594,7 @@ var QAForum = (function () {
     getQuestionDetail: getQuestionDetail,
     getUnansweredCount: getUnansweredCount,
     submitQuestion: submitQuestion,
-    submitAnswer: submitAnswer,
+    submitAnswer: submitAnswerWithNotify,
     upvoteQuestion: upvoteQuestion,
     moderateQuestion: moderateQuestion,
     moderateAnswer: moderateAnswer,
@@ -575,8 +603,6 @@ var QAForum = (function () {
   };
 
 })();
-
-
 // ═══════════════════════════════════════
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
@@ -589,6 +615,6 @@ function qaUpvoteQuestion(sessionToken, questionId) { var e = _resolveCallerEmai
 function qaModerateQuestion(sessionToken, questionId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateQuestion(e, questionId, action); }
 function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.moderateAnswer(e, answerId, action); }
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
-function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch(_) {} return QAForum.resolveQuestion(e, questionId, isSteward); }
+function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_) { Logger.log('_: ' + (_.message || _)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
 function qaGetUnansweredCount(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return 0; return QAForum.getUnansweredCount(); }
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

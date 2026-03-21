@@ -1,3 +1,33 @@
+/**
+ * ============================================================================
+ * 08b_SearchAndCharts.gs - Search Engine and Chart Generation
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Search engine for the spreadsheet interface. Provides desktop search
+ *   (multi-field: name, email, job title, location, grievance ID, issue type)
+ *   and chart generation for analytics dashboards. getDesktopSearchData()
+ *   searches both Member Directory and Grievance Log with filters.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Search is the most-used feature for stewards finding members or cases
+ *   quickly. Desktop search searches more fields than mobile search (job
+ *   title, location, issue type) because desktop users have wider screens to
+ *   show results. Results are ranked by relevance.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   The Desktop Search dialog returns no results. Stewards must manually scan
+ *   sheets to find members/cases. Chart generation for analytics dashboards
+ *   fails.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, MEMBER_COLS, GRIEVANCE_COLS). Used by
+ *   menu items in 03_, the Steward Dashboard, and search dialogs.
+ *
+ * @fileoverview Search and chart generation functions
+ * @requires 01_Core.gs
+ */
+
 // ============================================================================
 // SEARCH FUNCTIONS
 // ============================================================================
@@ -391,11 +421,6 @@ function getMemberList() {
 
   return members;
 }
-
-// getCalcValue removed — dead code cleanup v4.25.11
-
-
-
 /**
  * ============================================================================
  * ChartBuilder.gs - Dashboard Chart Generation
@@ -645,7 +670,7 @@ function createScorecardChart_(sheet) {
     .setFontSize(14)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
-    .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW);
+    .setBackground('#FEF3C7');
   sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
@@ -745,7 +770,7 @@ function createSummaryTableChart_(sheet) {
     .setFontSize(12)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
-    .setBackground(SHEET_COLORS.BG_VERY_LIGHT_GRAY);
+    .setBackground('#F3F4F6');
   sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
@@ -823,7 +848,7 @@ function createStewardLeaderboardChart_(sheet) {
     .setFontSize(11)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
-    .setBackground(SHEET_COLORS.BG_EXTRA_PALE_BLUE);
+    .setBackground('#EFF6FF');
   sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
@@ -840,8 +865,6 @@ function padRight(str, len) {
   }
   return str.substring(0, len);
 }
-
-
 
 /**
  * ============================================================================

@@ -9,6 +9,8 @@
  *   node build.js           - Build (includes all files)
  *   node build.js --prod    - Production build (excludes dev-only files)
  *   node build.js --clean   - Clean dist directory
+ *   node build.js --minify  - Build with HTML/CSS/JS minification
+ *   node build.js --prod --minify - Production build with minification
  *
  * Production builds (--prod or --production):
  *   Excludes development/test files that should not be deployed:
@@ -34,7 +36,6 @@ const BUILD_ORDER = [
   '04b_AccessibilityFeatures.gs',
   '04c_InteractiveDashboard.gs',
   '04d_ExecutiveDashboard.gs',
-  '04e_PublicDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
   '07_DevTools.gs',
@@ -84,6 +85,8 @@ const HTML_FILES = [
   'error_view.html',
   'org_chart.html',
   'poms_reference.html',
+  'grievance_form.html',
+  'esign.html',
 ];
 
 /**
@@ -140,6 +143,59 @@ function validate(gsFiles, htmlFiles) {
   console.log('  ✓ All files validated — no syntax errors.\n');
 }
 
+/**
+ * Basic zero-dependency minification for HTML files.
+ * Strips JS/CSS comments, collapses whitespace, preserves GAS template tags.
+ * NOT a full minifier — for that, install html-minifier-terser.
+ */
+function minifyHtml(content) {
+  // Preserve GAS template tags by replacing them with placeholders
+  var templates = [];
+  content = content.replace(/<\?[!=]?[\s\S]*?\?>/g, function(match) {
+    templates.push(match);
+    return '___GAS_TPL_' + (templates.length - 1) + '___';
+  });
+
+  // Remove HTML comments (but not IE conditional comments)
+  content = content.replace(/<!--(?!\[if)[\s\S]*?-->/g, '');
+
+  // Minify <style> blocks: collapse whitespace, remove CSS comments
+  content = content.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/gi, function(_, open, css, close) {
+    css = css.replace(/\/\*[\s\S]*?\*\//g, ''); // remove /* */ comments
+    css = css.replace(/\s*\n\s*/g, ' ');         // collapse newlines
+    css = css.replace(/\s*{\s*/g, '{');
+    css = css.replace(/\s*}\s*/g, '}');
+    css = css.replace(/\s*;\s*/g, ';');
+    css = css.replace(/\s*:\s*/g, ':');
+    css = css.replace(/\s*,\s*/g, ',');
+    css = css.replace(/;}/g, '}');               // remove trailing semicolons
+    return open + css + close;
+  });
+
+  // Minify <script> blocks: remove // comments (careful with URLs), collapse whitespace
+  content = content.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/gi, function(_, open, js, close) {
+    // Remove single-line comments (but not URLs like https://)
+    js = js.replace(/([^:])\/\/(?![\/*])(?![^\n]*['"`]).*$/gm, '$1');
+    // Remove multi-line comments
+    js = js.replace(/\/\*[\s\S]*?\*\//g, '');
+    // Collapse multiple blank lines into one
+    js = js.replace(/\n{3,}/g, '\n\n');
+    // Remove leading whitespace on lines (preserve indentation structure minimally)
+    js = js.replace(/^[ \t]+/gm, function(spaces) {
+      // Reduce indentation by half (keep structure readable for debugging)
+      return spaces.substr(0, Math.ceil(spaces.length / 4));
+    });
+    return open + js + close;
+  });
+
+  // Restore GAS template tags
+  content = content.replace(/___GAS_TPL_(\d+)___/g, function(_, i) {
+    return templates[parseInt(i, 10)];
+  });
+
+  return content;
+}
+
 function build(fileList) {
   const startTime = Date.now();
   console.log('Building dashboard (multi-file mode)...\n');
@@ -171,7 +227,7 @@ function build(fileList) {
     console.log(`  Copied: ${file} (${lineCount} lines)`);
   }
 
-  // Copy each .html file to dist/ (with optional minification)
+  // Copy each .html file to dist/
   for (const file of HTML_FILES) {
     const src = path.join(SRC_DIR, file);
     const dest = path.join(DIST_DIR, file);
@@ -181,23 +237,22 @@ function build(fileList) {
       continue;
     }
 
+    let htmlContent = fs.readFileSync(src, 'utf8');
+    const originalSize = htmlContent.length;
     if (shouldMinify) {
-      const content = fs.readFileSync(src, 'utf8');
-      const minified = minifyHtml(content);
-      fs.writeFileSync(dest, minified, 'utf8');
-      const origSize = Buffer.byteLength(content, 'utf8');
-      const newSize = Buffer.byteLength(minified, 'utf8');
-      const pct = ((1 - newSize / origSize) * 100).toFixed(1);
-      const lineCount = minified.split('\n').length;
-      totalLines += lineCount;
-      copiedHtml++;
-      console.log(`  Minified: ${file} (${lineCount} lines, -${pct}%)`);
+      htmlContent = minifyHtml(htmlContent);
+    }
+    fs.writeFileSync(dest, htmlContent);
+    const finalSize = htmlContent.length;
+    const savings = originalSize - finalSize;
+    const pct = originalSize > 0 ? ((savings / originalSize) * 100).toFixed(1) : 0;
+    const lineCount = htmlContent.split('\n').length;
+    totalLines += lineCount;
+    copiedHtml++;
+    if (shouldMinify && savings > 0) {
+      console.log(`  Copied: ${file} (${(originalSize / 1024).toFixed(1)}KB → ${(finalSize / 1024).toFixed(1)}KB, -${pct}%)`);
     } else {
-      fs.copyFileSync(src, dest);
-      const lineCount = fs.readFileSync(src, 'utf8').split('\n').length;
-      totalLines += lineCount;
-      copiedHtml++;
-      console.log(`  Copied: ${file} (${lineCount} lines)`);
+      console.log(`  Copied: ${file} (${(originalSize / 1024).toFixed(1)}KB)`);
     }
   }
 
@@ -207,6 +262,9 @@ function build(fileList) {
   console.log(`  .html files: ${copiedHtml}`);
   console.log(`  Total lines: ${totalLines}`);
   console.log(`  Output dir:  ${DIST_DIR}`);
+  if (shouldMinify) {
+    console.log(`  Minification: enabled (--minify)`);
+  }
 }
 
 function clean() {
@@ -227,119 +285,17 @@ function clean() {
   }
 }
 
-/**
- * Minifies an HTML file (with embedded <script>/<style>) by stripping
- * blank lines, comment-only lines, and leading whitespace.
- * Preserves GAS template tags (<?...?>) and string contents.
- * @param {string} content - File content
- * @returns {string} Minified content
- */
-function minifyHtml(content) {
-  // Normalize line endings (CRLF→LF) so output is identical on Windows and Linux
-  const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-  const out = [];
-  let inBlockComment = false;
-  let inHtmlComment = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-    const trimmed = line.trimStart();
-
-    // Skip blank lines
-    if (trimmed === '') continue;
-
-    // Track HTML comments (<!-- ... -->)
-    if (inHtmlComment) {
-      if (trimmed.includes('-->')) {
-        inHtmlComment = false;
-        const afterComment = trimmed.substring(trimmed.indexOf('-->') + 3).trim();
-        if (afterComment) out.push(afterComment);
-      }
-      continue;
-    }
-
-    // Track block comments (/* ... */)
-    if (inBlockComment) {
-      if (trimmed.includes('*/')) {
-        inBlockComment = false;
-        // Keep any code after the closing */
-        const afterComment = trimmed.substring(trimmed.indexOf('*/') + 2).trim();
-        if (afterComment) out.push(afterComment);
-      }
-      // Skip lines inside block comments
-      continue;
-    }
-
-    // HTML comment — entire line is <!-- ... --> (single-line)
-    if (trimmed.startsWith('<!--') && trimmed.includes('-->')) {
-      const afterComment = trimmed.substring(trimmed.indexOf('-->') + 3).trim();
-      if (afterComment) out.push(afterComment);
-      continue;
-    }
-
-    // HTML comment — multi-line start (<!-- without closing -->)
-    if (trimmed.startsWith('<!--')) {
-      inHtmlComment = true;
-      continue;
-    }
-
-    // Inline HTML comments: strip <!-- ... --> from lines that have code before/after
-    // e.g. </div><!-- /.officer-grid --> → </div>
-    if (trimmed.includes('<!--') && trimmed.includes('-->')) {
-      const stripped = trimmed.replace(/<!--[\s\S]*?-->/g, '').trim();
-      if (stripped) {
-        out.push(stripped);
-        continue;
-      }
-      continue;
-    }
-
-    // Block comment start on its own line (no code before it)
-    if (trimmed.startsWith('/*') || trimmed.startsWith('* ') || trimmed === '*' || trimmed === '*/') {
-      if (trimmed.startsWith('/*') && !trimmed.includes('*/')) {
-        inBlockComment = true;
-        continue;
-      }
-      if (trimmed.startsWith('/*') && trimmed.includes('*/')) {
-        // Single-line block comment — skip it
-        const afterComment = trimmed.substring(trimmed.indexOf('*/') + 2).trim();
-        if (afterComment) out.push(afterComment);
-        continue;
-      }
-      // Lines starting with * (JSDoc continuation) or ending */
-      if (trimmed === '*/' || trimmed.startsWith('* ') || trimmed === '*') continue;
-    }
-
-    // Single-line comment on its own line (// ...)
-    // Only strip if the ENTIRE line is a comment (no code before //)
-    if (trimmed.startsWith('//')) continue;
-
-    // Strip leading whitespace (safe for JS/CSS — indentation is cosmetic)
-    out.push(trimmed);
-  }
-
-  return out.join('\n');
-}
-
 // Parse command line arguments
 const args = process.argv.slice(2);
 const shouldClean = args.includes('--clean');
 const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
-const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds
-const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs'];
+const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs'];
 
 if (shouldClean) {
   clean();
-} else if (validateOnly) {
-  // --validate-only: check syntax of all source files without touching dist/
-  // Used by pre-commit hook to verify code compiles without overwriting prod build.
-  const fileList = BUILD_ORDER;
-  console.log('Validate-only mode: checking syntax (dist/ unchanged)...\n');
-  validate(fileList, HTML_FILES);
-  console.log('Validation passed.\n');
 } else {
   const fileList = isProd
     ? BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f))

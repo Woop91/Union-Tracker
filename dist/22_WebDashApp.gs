@@ -1,20 +1,38 @@
 /**
- * WebApp.gs
- * Main entry point for the web app dashboard.
+ * WebApp.gs — Main entry point for the web app SPA
  *
- * doGet(e) handles:
- *   1. Auth resolution (SSO / magic link / session token)
- *   2. Role lookup from Member Directory
- *   3. Routing to the correct view (auth, steward, member)
- *   4. Injecting config + user data into the HTML template
+ * WHAT THIS FILE DOES:
+ *   Main entry point for the web app SPA. doGet(e) is THE function Google
+ *   Apps Script calls when a user visits the deployed web app URL. It handles:
+ *     (1) Auth resolution via Auth.resolveUser(e) — tries SSO/magic link/
+ *         session token
+ *     (2) Role lookup from Member Directory (admin/steward/member)
+ *     (3) Route to correct view (auth_view for login, steward_view for
+ *         stewards, member_view for members)
+ *     (4) Config + user data injection into HTML template
+ *   Deep-link support: ?page=workload opens specific SPA tab after auth.
  *
- * Deployment: Deploy as Web App
- *   - Execute as: Me (the script owner)
- *   - Who has access: Anyone (or anyone within org)
- *   - Note: Users arrive via Bitly redirect, not the raw URL
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   "Execute as: Me" deployment means the script runs with the owner's
+ *   permissions, allowing access to all sheets. "Who has access: Anyone" is
+ *   required so members can use the web app. Users arrive via Bitly redirects,
+ *   not the raw Apps Script URL. The try/catch in doGet wraps
+ *   doGetWebDashboard and falls back to _serveFatalError() — this ensures
+ *   users always see a page, even if the SPA fails to load.
  *
- * Deep-link support: ?page=workload (or any tab name) opens the SPA
- * at that tab after authentication.
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   The entire web app is down. Users see a fatal error page or a Google
+ *   error. Nobody can access the SPA dashboard. If routing breaks, stewards
+ *   might see the member view (less data than expected) or members might see
+ *   the steward view (PII exposure — security issue).
+ *
+ * DEPENDENCIES:
+ *   Depends on: 19_WebDashAuth.gs (Auth.resolveUser),
+ *               20_WebDashConfigReader.gs (ConfigReader.getConfig),
+ *               21_WebDashDataService.gs (DataService),
+ *               HtmlService (GAS built-in).
+ *   Used by: All HTML template files (index.html, steward_view.html,
+ *            member_view.html, auth_view.html, error_view.html).
  */
 
 /**
@@ -24,6 +42,17 @@
  */
 function doGet(e) {
   e = e || { parameter: {} };
+
+  // v4.33.0 — E-Signature page (token-authenticated, no login required)
+  if (e.parameter && e.parameter.page === 'esign') {
+    try {
+      return HtmlService.createHtmlOutputFromFile('esign')
+        .setTitle('Grievance E-Signature — Local 509');
+    } catch (esignErr) {
+      Logger.log('doGet esign error: ' + esignErr.message);
+      return _serveFatalError('E-Signature page unavailable.');
+    }
+  }
 
   try {
     return doGetWebDashboard(e);
@@ -35,7 +64,7 @@ function doGet(e) {
         ', Auth=' + (typeof Auth) +
         ', DataService=' + (typeof DataService) +
         ', SHEETS=' + (typeof SHEETS));
-    } catch (_) { /* best-effort */ }
+    } catch (_) { Logger.log('_: ' + (_.message || _)); }
     return _serveFatalError(fatalErr.message);
   }
 }
@@ -56,6 +85,8 @@ function doGetWebDashboard(e) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
     config = { orgName: 'Dashboard', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
+
+  var _doGetStart = Date.now();
 
   try {
     var user = Auth.resolveUser(e);
@@ -96,8 +127,12 @@ function doGetWebDashboard(e) {
             phone: '',
             isBootstrapAdmin: true,
           };
+          // H5: Audit log bootstrap admin access
+          if (typeof recordSecurityEvent === 'function') {
+            recordSecurityEvent('BOOTSTRAP_ADMIN', 'MEDIUM', 'Script owner granted admin access without directory entry', { email: user.email });
+          }
         }
-      } catch (_ownerErr) { /* SSO not available — fall through */ }
+      } catch (_ownerErr) { Logger.log('_ownerErr: ' + (_ownerErr.message || _ownerErr)); }
     }
 
     if (!userRecord) {
@@ -111,7 +146,14 @@ function doGetWebDashboard(e) {
     // session users). This is safe: the token was already validated by resolveUser().
     var sessionToken = null;
     if (e.parameter.remember === '1' && user.method === 'magic') {
-      sessionToken = Auth.createSessionToken(user.email);
+      var tokenResult = Auth.createSessionToken(user.email);
+      // C3: Handle session storage failure — createSessionToken may return error object
+      if (tokenResult && typeof tokenResult === 'object' && tokenResult.error) {
+        Logger.log('Session token storage failed: ' + tokenResult.message);
+        // Proceed without remember-me; user will need to re-authenticate next visit
+      } else {
+        sessionToken = tokenResult;
+      }
     } else if (user.method === 'session' && e.parameter.sessionToken) {
       // Echo back the already-validated session token so the client can use it
       sessionToken = e.parameter.sessionToken;
@@ -120,6 +162,11 @@ function doGetWebDashboard(e) {
     // Route to appropriate dashboard
     var role = userRecord.role; // 'steward', 'member', or 'both'
     var initialTab = e.parameter.page || null;
+
+    var elapsed = Date.now() - _doGetStart;
+    if (elapsed > 20000) {
+      Logger.log('doGet slow: ' + elapsed + 'ms before serving dashboard');
+    }
 
     return _serveDashboard(config, userRecord, role, sessionToken, initialTab);
 
@@ -158,7 +205,7 @@ function _serveAuth(config, e, authError) {
  */
 function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
-  template.view = (role === 'steward') ? 'both' : role; // stewards always get both views
+  template.view = role; // 'steward', 'member', or 'both'
 
   // Sanitize user record — strip sensitive fields
   var safeUser = {
@@ -194,6 +241,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     webAppUrl: _getWebAppUrlSafe(),
     colorTheme: colorThemeData.themeKey || 'default',
     colorThemes: (typeof getColorThemeList === 'function') ? getColorThemeList() : [],
+    isDevMode: !isProductionMode(),
   });
 
   return template.evaluate()
@@ -247,7 +295,7 @@ function _sanitizeConfig(config) {
       var parsed = JSON.parse(savedHue);
       if (typeof parsed === 'number' && parsed >= 0 && parsed <= 360) userHue = parsed;
     }
-  } catch (_e) { /* keep default */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   return {
     orgName: config.orgName,
     orgAbbrev: config.orgAbbrev,
@@ -258,14 +306,16 @@ function _sanitizeConfig(config) {
     magicLinkExpiryDays: config.magicLinkExpiryDays,
     cookieDurationDays: config.cookieDurationDays,
     calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
-    calendarId: config.calendarId || '',
+    // H8: Pre-build URLs server-side instead of exposing raw resource IDs
+    calendarCreateUrl: config.calendarId ? 'https://calendar.google.com/calendar/render?action=TEMPLATE&src=' + encodeURIComponent(config.calendarId) : '',
     driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
     // surveyFormUrl removed v4.22.7 — survey is native webapp (renderSurveyFormPage in member_view.html)
     orgWebsite: config.orgWebsite || '',
     broadcastScopeAll: (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes'),
-    // v4.20.18: folder IDs needed client-side for Drive links and warnings
-    minutesFolderId:    config.minutesFolderId    || '',
-    grievancesFolderId: config.grievancesFolderId || '',
+    // H8: v4.31.0 — replaced raw folder IDs with pre-built URLs and boolean flags
+    minutesFolderUrl: config.minutesFolderId ? 'https://drive.google.com/drive/folders/' + config.minutesFolderId : '',
+    hasMinutesFolder: !!config.minutesFolderId,
+    hasGrievancesFolder: !!config.grievancesFolderId,
     // v4.20.18: insights cache TTL exposed so client can show staleness info
     insightsCacheTTLMin: config.insightsCacheTTLMin || 5,
     issueCategories: (typeof DEFAULT_CONFIG !== 'undefined' && Array.isArray(DEFAULT_CONFIG.ISSUE_CATEGORY)) ? DEFAULT_CONFIG.ISSUE_CATEGORY : [],
@@ -290,11 +340,11 @@ function _serveFatalError(detail) {
     + '<style>'
     + 'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
     + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#141414;color:#e0e0e0}'
-    + 'body.light{background:#f5f5f5;color:#1a1a1a}'
+    + 'body.light{background:#f2f2f5;color:#1a1a2e}'
     + '.card{max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center}'
-    + 'body.light .card{background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.08)}'
+    + 'body.light .card{background:#ffffff;box-shadow:0 2px 12px rgba(0,0,0,0.08)}'
     + 'h1{font-size:20px;margin:0 0 12px}p{color:#888;font-size:14px;line-height:1.6;margin:0 0 20px}'
-    + 'body.light p{color:#666}'
+    + 'body.light p{color:#5c5c7a}'
     + 'a{display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;'
     + 'border-radius:8px;text-decoration:none;font-weight:600}'
     + '</style></head><body><div class="card">'
@@ -344,7 +394,16 @@ function getOrgChartHtml() {
   try {
     var email = Session.getActiveUser().getEmail();
     if (!email) return '<div class="empty-state">Authentication required.</div>';
-    return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
+    // PERF: Cache static HTML in CacheService — avoids re-reading the file on every tab click.
+    // Version-keyed so deploys automatically bust the cache.
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_org_chart_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('org_chart').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
   } catch (e) {
     Logger.log('getOrgChartHtml error: ' + e.message);
     return '<div class="empty-state">Org chart could not be loaded.</div>';
@@ -360,7 +419,15 @@ function getPOMSReferenceHtml() {
   try {
     var email = Session.getActiveUser().getEmail();
     if (!email) return '<div class="empty-state">Authentication required.</div>';
-    return HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_poms_ref_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
   } catch (e) {
     Logger.log('getPOMSReferenceHtml error: ' + e.message);
     return '<div class="empty-state">POMS Reference could not be loaded.</div>';

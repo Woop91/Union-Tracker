@@ -174,7 +174,7 @@
   display: block;
   width: 2px;
   height: 28px;
-  background: rgba(255,255,255,0.1);
+  background: var(--bdr);
   margin: 0 auto;
 }
 .madds-embed.light .connector { background: rgba(99,102,241,0.2); }
@@ -209,7 +209,7 @@
 .card.tc { border-top-color: var(--gold); }
 .card.peer {
   border-top-style: dashed;
-  border-top-color: rgba(79,142,247,0.5);
+  border-top-color: rgba(79,142,247,0.4);
   opacity: 0.75;
 }
 .card.wide  { min-width: 220px; max-width: 260px; }
@@ -232,7 +232,7 @@
 .c-badge.tc { background: rgba(240,192,64,0.12);   color: var(--gold); }
 
 .c-role { font-size: 0.6rem; color: var(--mute); text-transform: uppercase; letter-spacing: 0.07em; }
-.c-name { font-family: var(--ff-disp); font-size: 1rem; color: #edf0f7; margin: 3px 0; }
+.c-name { font-family: var(--ff-disp); font-size: 1rem; color: var(--txt); margin: 3px 0; }
 .c-email { font-size: 0.58rem; color: var(--blue); text-decoration: none; word-break: break-all; display: block; }
 .c-phone { font-size: 0.58rem; color: var(--dim); }
 .c-note  { font-size: 0.58rem; color: var(--mute); margin-top: 5px; line-height: 1.4; }
@@ -260,7 +260,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #ccd0de;
+  color: var(--mute);
   border-bottom: 1px solid var(--bdr);
   padding-bottom: 8px;
   margin-bottom: 12px;
@@ -283,8 +283,8 @@
   border-bottom: 1px solid var(--bdr);
 }
 .person:last-child { border-bottom: none; padding-bottom: 0; }
-.p-dept { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #9aa2b8; }
-.p-name { font-family: var(--ff-disp); font-size: 1.05rem; color: #edf0f7; }
+.p-dept { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); }
+.p-name { font-family: var(--ff-disp); font-size: 1.05rem; color: var(--txt); }
 .p-email { font-size: 0.65rem; color: var(--blue); text-decoration: none; display: block; }
 .p-email-u { font-size: 0.65rem; color: var(--dim); text-decoration: none; display: block; font-style: italic; }
 .c-email-u { font-size: 0.58rem; color: var(--dim); text-decoration: none; word-break: break-all; display: block; font-style: italic; }
@@ -342,7 +342,7 @@
   margin-top: 3px;
   transition: all 0.15s;
 }
-.rep-btn:hover { background: rgba(255,255,255,0.07); color: var(--mute); }
+.rep-btn:hover { background: var(--surf2); color: var(--mute); }
 .rep-list {
   font-size: 0.8rem;
   color: #9fa8be;
@@ -388,8 +388,8 @@
   color: var(--mute); padding: 5px 7px 10px 2px;
 }
 .sl-item {
-  font-size: 0.82rem; color: #8d96ae; padding: 5px 7px;
-  border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.5;
+  font-size: 0.82rem; color: var(--mute); padding: 5px 7px;
+  border-bottom: 1px solid var(--bdr); line-height: 1.5;
 }
 .sl-item:last-child { border-bottom: none; }
 .sl-item .contact { font-size: 0.70rem; color: var(--dim); display: block; line-height: 1.4; margin-top: 1px; }
@@ -3194,7 +3194,10 @@ function pillToggle(id, btn) {
 }
 
 // Collapse MA sub-sections by default (all screen sizes)
+var _initDesktopRan = false;
 function initDesktop() {
+  if (_initDesktopRan) return;
+  _initDesktopRan = true;
   // Collapse all MA sub-sections by default — user clicks to expand
   ['ma-jeb','ma-voc','ma-atlarge','ma-org','ma-vr-stewards'].forEach(id => {
     const el = document.getElementById(id);
@@ -3216,7 +3219,13 @@ function initDesktop() {
     });
   });
 }
-window.addEventListener('DOMContentLoaded', initDesktop);
+// Call initDesktop immediately — when loaded via innerHTML + script re-execution,
+// DOMContentLoaded has already fired so the listener would never trigger.
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initDesktop);
+} else {
+  initDesktop();
+}
 
 // Show / hide 12 public sector chapters
 function togglePSGroup(btn) {
@@ -3237,28 +3246,27 @@ function toggleOtherGroup(btn) {
 // Light/Dark mode toggle — syncs with global AppState
 function maddstoggleMode() {
   var _me = document.querySelector('.madds-embed'); if(_me) _me.classList.toggle('light');
+  const btn = document.getElementById('madds-mode-toggle');
   var isLight = _me && _me.classList.contains('light');
-  var btn = document.getElementById('madds-mode-toggle');
   btn.textContent = isLight ? '🌙 Dark' : '☀ Light';
-  // Write back to AppState + localStorage so other views stay in sync
-  if (typeof AppState !== 'undefined') { AppState.isDark = !isLight; }
-  try { localStorage.setItem('dds_isDark', String(!isLight)); } catch(e) {}
-  if (typeof UnifiedTheme !== 'undefined') { UnifiedTheme.apply(); }
+  // Sync back to global AppState so other tabs respect the change
+  if (typeof AppState !== 'undefined') {
+    AppState.isDark = !isLight;
+    try { localStorage.setItem('dds_isDark', String(!isLight)); } catch(e) {}
+    if (typeof UnifiedTheme !== 'undefined') UnifiedTheme.apply();
+  }
 }
 
-// Sync with global dark/light state on load (AppState > localStorage > prefers-color-scheme)
+// Auto-detect from global AppState (or fallback to localStorage / system preference)
 (function() {
-  var wantLight = false;
-  if (typeof AppState !== 'undefined' && AppState.isDark !== undefined) {
-    wantLight = !AppState.isDark;
-  } else {
-    try {
-      var stored = localStorage.getItem('dds_isDark');
-      if (stored !== null) { wantLight = stored === 'false'; }
-      else { wantLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches; }
-    } catch(e) { wantLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches; }
+  var isLight = false;
+  try {
+    if (typeof AppState !== 'undefined') { isLight = !AppState.isDark; }
+    else { var v = localStorage.getItem('dds_isDark'); isLight = v === 'false'; }
+  } catch(e) {
+    isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
   }
-  if (wantLight) {
+  if (isLight) {
     var _me = document.querySelector('.madds-embed');
     if (_me) _me.classList.add('light');
     var btn = document.getElementById('madds-mode-toggle');

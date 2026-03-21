@@ -37,6 +37,9 @@ global.DataService = {
   getDirectoryData: jest.fn(() => [])
 };
 
+// isProductionMode defined in 11_CommandHub.gs — needed by _serveDashboard
+global.isProductionMode = jest.fn(() => false);
+
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '22_WebDashApp.gs']);
 
 // ============================================================================
@@ -200,3 +203,60 @@ describe('_serveDashboard', () => {
 });
 
 // _serveWorkloadPortal removed in v4.20.0 — workload tracker integrated into SPA
+
+// ============================================================================
+// v4.31.0 — H8: _sanitizeConfig strips raw resource IDs
+// ============================================================================
+
+describe('v4.31.0 H8: _sanitizeConfig output', () => {
+  test('has calendarCreateUrl (not calendarId)', () => {
+    const result = _sanitizeConfig({
+      orgName: 'Test', orgAbbrev: 'T', logoInitials: 'T',
+      accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member',
+      calendarId: 'test-calendar-id@group.calendar.google.com'
+    });
+    expect(result).toHaveProperty('calendarCreateUrl');
+    expect(result.calendarCreateUrl).toContain('calendar.google.com');
+    expect(result).not.toHaveProperty('calendarId');
+  });
+
+  test('has minutesFolderUrl and hasMinutesFolder (not minutesFolderId)', () => {
+    const result = _sanitizeConfig({
+      orgName: 'Test', orgAbbrev: 'T', logoInitials: 'T',
+      accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member',
+      minutesFolderId: 'abc123_folder_id'
+    });
+    expect(result).toHaveProperty('minutesFolderUrl');
+    expect(result.minutesFolderUrl).toContain('drive.google.com');
+    expect(result).toHaveProperty('hasMinutesFolder', true);
+    expect(result).not.toHaveProperty('minutesFolderId');
+  });
+
+  test('has hasGrievancesFolder (not grievancesFolderId)', () => {
+    const result = _sanitizeConfig({
+      orgName: 'Test', orgAbbrev: 'T', logoInitials: 'T',
+      accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member',
+      grievancesFolderId: 'xyz789_folder_id'
+    });
+    expect(result).toHaveProperty('hasGrievancesFolder', true);
+    expect(result).not.toHaveProperty('grievancesFolderId');
+  });
+
+  test('hasMinutesFolder is false when minutesFolderId is empty', () => {
+    const result = _sanitizeConfig({
+      orgName: 'Test', orgAbbrev: 'T', logoInitials: 'T',
+      accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member',
+      minutesFolderId: ''
+    });
+    expect(result.hasMinutesFolder).toBe(false);
+    expect(result.minutesFolderUrl).toBe('');
+  });
+
+  test('hasGrievancesFolder is false when grievancesFolderId is missing', () => {
+    const result = _sanitizeConfig({
+      orgName: 'Test', orgAbbrev: 'T', logoInitials: 'T',
+      accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member'
+    });
+    expect(result.hasGrievancesFolder).toBe(false);
+  });
+});

@@ -1,19 +1,34 @@
 /**
- * 23_PortalSheets.gs
- * Sheet setup infrastructure for the Member & Steward Portal.
- * Creates the 8 portal-specific sheets and defines their column constants.
+ * 23_PortalSheets.gs — Portal sheet infrastructure with 0-indexed column constants
  *
- * Sheets created:
- *   PortalMemberDirectory (hidden) — portal profile extensions (office days, badges, etc.)
- *   Events               — upcoming union events and meetings
- *   MeetingMinutes       — union meeting notes with bullet summaries
- *   PortalGrievances (hidden) — portal grievance cases (separate from Grievance Log)
- *   StewardLog (hidden)  — steward-member interaction audit trail
- *   MegaSurvey (hidden)  — 56-question survey progress
+ * WHAT THIS FILE DOES:
+ *   Sheet setup infrastructure for the Member & Steward Portal. Creates 6
+ *   portal-specific sheets (PortalMemberDirectory, Events, MeetingMinutes,
+ *   PortalGrievances, StewardLog, MegaSurvey) and defines their column
+ *   constants (PORTAL_*_COLS). Sheets with PII are hidden via
+ *   setSheetVeryHidden_().
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Portal sheets are SEPARATE from the core sheets (Member Directory,
+ *   Grievance Log) to avoid schema collision. Portal columns use 0-INDEXED
+ *   constants (unlike the rest of the codebase which uses 1-indexed) because
+ *   portal modules work exclusively with getValues() arrays (0-indexed)
+ *   rather than getRange() calls (1-indexed). This is a critical difference
+ *   documented at the top of the file — using PORTAL_*_COLS with getRange()
+ *   will cause off-by-one errors.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Portal sheets can't be created. Events, meeting minutes, and steward
+ *   interaction logs stop working. If the column constants are wrong, data
+ *   appears in incorrect columns. The 0-indexed vs 1-indexed confusion is
+ *   the #1 source of bugs in portal code (see COLUMN_ISSUES_LOG.md).
+ *
+ * DEPENDENCIES:
+ *   Depends on: 01_Core.gs (SHEETS).
+ *   Used by: 24_WeeklyQuestions.gs, 25_WorkloadService.gs, 26_QAForum.gs,
+ *            27_TimelineService.gs, and SPA views.
  *
  * Note: FlashPolls/PollResponses removed v4.24.0 — replaced by 24_WeeklyQuestions.gs.
- * Note: Sheet names PortalMemberDirectory and PortalGrievances are distinct from
- * DDS's existing "Member Directory" and "Grievance Log" sheets to avoid schema collision.
  */
 
 // ═══════════════════════════════════════════════════════
@@ -100,8 +115,8 @@ function portalGetOrCreateSheet_(name, headers, hidden) {
     sheet.appendRow(headers);
     sheet.getRange(1, 1, 1, headers.length)
       .setFontWeight('bold')
-      .setBackground(SHEET_COLORS.HEADER_NAVY)
-      .setFontColor(SHEET_COLORS.BG_WHITE);
+      .setBackground('#1a1a2e')
+      .setFontColor('#ffffff');
     sheet.setFrozenRows(1);
     if (hidden) sheet.hideSheet();
   }
@@ -136,8 +151,8 @@ function getOrCreateMinutesSheet() {
     if (!headerRange.getValue()) {
       headerRange.setValue('DriveDocUrl')
         .setFontWeight('bold')
-        .setBackground(SHEET_COLORS.HEADER_NAVY)
-        .setFontColor(SHEET_COLORS.BG_WHITE);
+        .setBackground('#1a1a2e')
+        .setFontColor('#ffffff');
       Logger.log('getOrCreateMinutesSheet: migrated — added DriveDocUrl header to col 8');
     }
   } catch (migErr) {

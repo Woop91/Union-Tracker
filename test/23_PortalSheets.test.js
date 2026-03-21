@@ -50,8 +50,6 @@ describe('PORTAL_MEMBER_DIR_COLS', () => {
   });
 });
 
-// PORTAL_POLL_COLS removed v4.24.0 — FlashPolls replaced by unified wq* poll system
-
 describe('PORTAL_GRIEVANCE_COLS', () => {
   test('has all 12 columns', () => {
     const keys = Object.keys(PORTAL_GRIEVANCE_COLS);
@@ -160,8 +158,6 @@ describe('getOrCreateMinutesSheet', () => {
     expect(mockSs.insertSheet).toHaveBeenCalled();
   });
 });
-
-// getOrCreatePollsSheet / getOrCreatePollResponsesSheet removed v4.24.0
 
 describe('getOrCreatePortalGrievanceSheet', () => {
   test('creates hidden PortalGrievances sheet', () => {

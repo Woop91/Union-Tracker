@@ -4,21 +4,34 @@
  * DevMenu.gs — Dev-Only Quick Deploy Menu
  * ============================================================================
  *
- * Consolidated "⚡ Dev Tools" menu providing one-click access to all
- * initialization, refresh, trigger installation, and setup functions.
+ * WHAT THIS FILE DOES:
+ *   Development-only quick deploy menu providing one-click access to all
+ *   initialization, refresh, trigger installation, and setup functions.
+ *   Creates the "Dev Tools" top-level menu with 4 master group actions
+ *   (Initialize All, Refresh All, Install All Triggers, Setup All Scheduled)
+ *   and individual wrappers for every init/setup function across all modules.
  *
- * BUILD GATING: Excluded from production builds via PROD_EXCLUDE in build.js.
- * The onOpen() guard `typeof buildDevMenu === 'function'` ensures production
- * deployments (where this file is absent) never error.
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Excluded from production builds via PROD_EXCLUDE in build.js. The
+ *   onOpen() guard `typeof buildDevMenu === 'function'` ensures production
+ *   deployments never error when this file is absent. devWrap_*() wrappers
+ *   add try/catch + alert() around each function call so developers see
+ *   immediate feedback. runDevGroup_() runs multiple functions in sequence
+ *   with a progress toast between each.
  *
- * ARCHITECTURE:
- * - buildDevMenu()        → creates the menu (called from onOpen)
- * - devRunAll_*()          → master "run all" buttons (4 groups)
- * - runDevGroup_()         → shared helper for master buttons
- * - devWrap_*()            → individual item wrappers (try/catch + alert)
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Developers lose the quick deploy menu and must call init functions
+ *   individually from the script editor. No production impact — this file
+ *   is excluded from production builds. If the PROD_EXCLUDE filter fails
+ *   and this file reaches production, the dev menu appears for all users
+ *   (cosmetic issue but confusing).
+ *
+ * DEPENDENCIES:
+ *   Depends on every module's init/setup functions (initSurveyEngine,
+ *   initWeeklyQuestionSheets, initWorkloadSheets, etc.). Used only in
+ *   development builds.
  *
  * @dev-only Excluded from production builds
- * @fileoverview Dev-only quick deploy menu
  */
 
 // ============================================================================

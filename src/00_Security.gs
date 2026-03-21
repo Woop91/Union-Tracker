@@ -3,17 +3,60 @@
  * 00_Security.gs - Security Utilities and Access Control
  * ============================================================================
  *
- * This module provides centralized security functions including:
- * - XSS prevention (HTML sanitization)
- * - Formula injection prevention
- * - Access control for web apps
- * - Input validation and sanitization
- * - PII masking for logs
+ * WHAT THIS FILE DOES:
+ *   Centralizes ALL security functions for the entire application:
+ *   1. escapeHtml(input) — XSS prevention by escaping HTML special characters.
+ *      Called everywhere user data is rendered into HTML dialogs or the SPA.
+ *   2. escapeForFormula(input) — formula injection prevention for sheet writes.
+ *      Prefixes dangerous characters (=, +, -, @) that Sheets interprets as formulas.
+ *   3. checkWebAppAuthorization(role) — role-based access control for the web app.
+ *      Resolves the caller's role (admin/steward/member/anonymous) from the Member Directory.
+ *   4. maskEmail/maskPhone/maskName — PII masking for safe logging.
+ *   5. secureLog(context, message, data) — structured logging that auto-masks PII fields.
+ *   6. isValidSafeString(input) — input validation that rejects <script>, javascript:, etc.
+ *   7. recordSecurityEvent() — centralized security alerting (CRITICAL=immediate email,
+ *      HIGH=daily digest, MEDIUM/LOW=log only).
+ *   8. safeSendEmail_() — quota-aware email wrapper that prevents quota exhaustion.
+ *   9. Dashboard auth toggle — admin can require/disable PIN login for dashboards.
  *
- * MUST be loaded first in build order (00_ prefix).
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   - Loaded first (00_ prefix alongside 00_DataAccess.gs) because security
+ *     functions like escapeHtml() must be available before ANY module renders HTML.
+ *   - escapeHtml() is defined as a global function (not in a namespace) because
+ *     GAS HTML templates call it via scriptlets (<?= escapeHtml(data) ?>).
+ *     CLAUDE.md rule: "All HTML must use escapeHtml(). No exceptions."
+ *   - ACCESS_CONTROL.ENABLED is fail-secure: when set to false (e.g., admin
+ *     troubleshooting), access is DENIED rather than granted. This prevents
+ *     accidental data exposure if an admin disables AC to debug something.
+ *   - getUserRole_() checks the spreadsheet owner first (always admin), then
+ *     scans the Member Directory for steward/member status. This means the
+ *     script owner always has admin access even if not in the directory.
+ *   - Security events use a tiered severity system (CRITICAL/HIGH/MEDIUM/LOW)
+ *     to avoid alert fatigue. Only CRITICAL sends immediate email.
  *
- * @fileoverview Security utilities for the dashboard
- * @version 1.0.0
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   - If escapeHtml() is missing: EVERY HTML dialog and SPA view becomes
+ *     vulnerable to XSS attacks. User-supplied names, notes, and grievance
+ *     descriptions could execute arbitrary JavaScript.
+ *   - If escapeForFormula() is missing: sheet writes could inject formulas.
+ *     A member name like "=IMPORTRANGE(...)" could exfiltrate data.
+ *   - If checkWebAppAuthorization() is missing: the web app (22_WebDashApp.gs)
+ *     cannot verify user roles. All dashboard access would fail.
+ *   - If secureLog() is missing: logging falls back to raw Logger.log() which
+ *     would expose PII (emails, phones, names) in Stackdriver logs.
+ *   - If safeSendEmail_() is missing: security alerts and daily digests fail
+ *     to send. Admins won't be notified of security incidents.
+ *
+ * DEPENDENCIES:
+ *   Depends on:  PropertiesService, MailApp, Session, SpreadsheetApp (all GAS built-ins)
+ *                SHEETS, MEMBER_COLS, CONFIG_COLS (01_Core.gs — for role lookup)
+ *                COMMAND_CONFIG (11_CommandHub.gs — for email subjects, optional)
+ *   Used by:     EVERY module that renders HTML or writes to sheets.
+ *                Key callers: 02_DataManagers.gs, 04e_PublicDashboard.gs,
+ *                21_WebDashDataService.gs, 22_WebDashApp.gs, all HTML templates.
+ *
+ * @fileoverview Security utilities — XSS, formula injection, RBAC, PII masking
+ * @version 4.31.0
  */
 
 // ============================================================================
@@ -235,9 +278,6 @@ function safeSheetNameForFormula(sheetName) {
   }
   return escaped;
 }
-
-// sanitizeForQuery removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // ACCESS CONTROL FOR WEB APP
 // ============================================================================
@@ -371,10 +411,6 @@ function getUserRole_(email) {
   }
 }
 
-// validateWebAppRequest removed — dead code cleanup v4.25.11
-
-// getAccessDeniedPage removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // PII MASKING FOR LOGS
 // ============================================================================
@@ -425,10 +461,6 @@ function maskName(firstName, lastName) {
   var last = lastName ? String(lastName).charAt(0) + '.' : '';
   return (first + ' ' + last).trim() || '[anonymous]';
 }
-
-// maskMemberForLog removed — dead code cleanup v4.25.11
-
-// maskGrievanceForLog removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // SECURE LOGGING
@@ -517,9 +549,6 @@ function isValidSafeString(input, maxLength) {
 
   return true;
 }
-
-// isValidMemberId removed — dead code cleanup v4.25.11
-
 /**
  * Validates a grievance ID format
  * @param {string} grievanceId - Grievance ID to validate
@@ -557,9 +586,6 @@ function getClientSideEscapeHtml() {
     '}' +
     'function safeText(t){return escapeHtml(t);}';
 }
-
-// getClientSecurityScript removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SECURITY EVENT ALERTING SYSTEM
 // ============================================================================
@@ -623,6 +649,12 @@ function recordSecurityEvent(eventType, severity, description, details) {
  * @private
  */
 function sendSecurityAlertEmail_(eventType, description, details) {
+  // L5: Known limitation — config reads (getConfigValue_ for CHIEF_STEWARD_EMAIL /
+  // ADMIN_EMAILS) below are not protected by a LockService lock. In theory a concurrent
+  // config write could cause a stale or partial read. This is accepted because:
+  //   1. Config changes are extremely rare (admin-only, manual).
+  //   2. Adding a lock here risks delaying time-sensitive security alerts.
+  //   3. Worst case is an alert sent to a slightly stale recipient list.
   try {
     // Gather recipient emails from Config
     var recipients = [];
@@ -633,7 +665,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       try {
         chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
         adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
-      } catch (_e) { /* Config not available */ }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
       if (chiefEmail) recipients.push(chiefEmail);
       if (adminEmails) {
@@ -649,7 +681,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       try {
         var ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
         if (ownerEmail) recipients.push(ownerEmail);
-      } catch (_e) { /* Can't get owner */ }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
 
     // FIX-SEC-01 (cont): Quota check removed — safeSendEmail_() handles this internally.
@@ -752,10 +784,10 @@ function sendDailySecurityDigest() {
     var auditIntegrity = null;
     var vaultIntegrity = null;
     if (typeof verifyAuditLogIntegrity === 'function') {
-      try { auditIntegrity = verifyAuditLogIntegrity(); } catch (_e) { /* skip */ }
+      try { auditIntegrity = verifyAuditLogIntegrity(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
     if (typeof verifySurveyVaultIntegrity === 'function') {
-      try { vaultIntegrity = verifySurveyVaultIntegrity(); } catch (_e) { /* skip */ }
+      try { vaultIntegrity = verifySurveyVaultIntegrity(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
 
     // Gather recipients
@@ -771,13 +803,13 @@ function sendDailySecurityDigest() {
             if (trimmed && recipients.indexOf(trimmed) === -1) recipients.push(trimmed);
           });
         }
-      } catch (_e) { /* skip */ }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
     if (recipients.length === 0) {
       try {
         var ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
         if (ownerEmail) recipients.push(ownerEmail);
-      } catch (_e) { /* skip */ }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
 
     if (recipients.length === 0) return;
@@ -886,9 +918,6 @@ function installSecurityDigestTrigger() {
     '• Survey vault integrity check results',
     SpreadsheetApp.getUi().ButtonSet.OK);
 }
-
-// showSecurityStatusDialog removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SAFE EMAIL WRAPPER
 // ============================================================================

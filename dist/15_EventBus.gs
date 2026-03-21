@@ -1,21 +1,37 @@
 /**
  * ============================================================================
- * 15_EventBus.gs - Event Bus / Event-Driven Architecture
+ * 15_EventBus.gs - EVENT BUS / PUB-SUB SYSTEM
  * ============================================================================
  *
- * Decoupled publish/subscribe event system that replaces direct function calls
- * in trigger handlers. Modules subscribe to named events and react independently
- * without modifying the central dispatcher.
+ * WHAT THIS FILE DOES:
+ *   Decoupled publish/subscribe event bus for inter-module communication.
+ *   Modules subscribe to named events (e.g., 'sheet:edit:GRIEVANCE_LOG')
+ *   and react independently. Supports wildcard listeners that receive all
+ *   events. Maintains an event log (last 200 events) for debugging. Can be
+ *   enabled/disabled globally.
  *
- * Event naming convention: domain:action
- *   - sheet:edit:GRIEVANCE_LOG
- *   - sheet:edit:MEMBER_DIR
- *   - form:submit:grievance
- *   - sync:complete
- *   - data:changed
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Replaces direct function calls in trigger handlers, which caused tight
+ *   coupling between modules. With the EventBus, adding a new reaction to
+ *   a sheet edit doesn't require modifying onEdit() — just subscribe from
+ *   your module. Event naming uses domain:action convention for clarity.
+ *   The wildcard listener feature allows audit logging to capture all events
+ *   without subscribing individually.
  *
- * @version 4.8.0
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   onEdit() dispatched events won't reach subscriber modules. Real-time
+ *   features (auto-formatting, status tracking, badge refresh) stop
+ *   updating. Core CRUD operations still work because they don't depend
+ *   on the EventBus — it's used for secondary/reactive behavior only.
+ *
+ * DEPENDENCIES:
+ *   Depends on nothing (self-contained IIFE).
+ *   Used by 10_Main.gs (onEdit dispatches events), and any module that
+ *   subscribes to sheet edit events.
+ *
+ * @version 4.31.0
  * @license Free for use by non-profit collective bargaining groups and unions
+ * ============================================================================
  */
 
 // ============================================================================
@@ -137,7 +153,7 @@ var EventBus = (function() {
           result.handled++;
         } catch (err) {
           result.errors.push('Wildcard[' + sub.id + ']: ' + err.message);
-          console.log('EventBus wildcard error: ' + err.message);
+          Logger.log('EventBus wildcard error: ' + err.message);
         }
       });
 
@@ -151,7 +167,7 @@ var EventBus = (function() {
           result.handled++;
         } catch (err) {
           result.errors.push(eventName + '[' + subs[i].id + ']: ' + err.message);
-          console.log('EventBus error in ' + eventName + ': ' + err.message);
+          Logger.log('EventBus error in ' + eventName + ': ' + err.message);
         }
         if (subs[i].once) {
           toRemove.push(subs[i].id);
@@ -169,7 +185,7 @@ var EventBus = (function() {
             result.handled++;
           } catch (err) {
             result.errors.push(parentEvent + '[' + parentSubs[j].id + ']: ' + err.message);
-            console.log('EventBus error in ' + parentEvent + ' (parent of ' + eventName + '): ' + err.message);
+            Logger.log('EventBus error in ' + parentEvent + ' (parent of ' + eventName + '): ' + err.message);
           }
           if (parentSubs[j].once) {
             toRemove.push(parentSubs[j].id);
@@ -278,12 +294,12 @@ function registerEventBusSubscribers() {
   }, { priority: 80, id: 'grievance_stagegate_handler' });
 
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
-    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { /* skip */ }
+    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
   }, { priority: 70, id: 'grievance_config_sync' });
 
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function() {
     if (typeof sortGrievanceLogByStatus === 'function') {
-      try { sortGrievanceLogByStatus(); } catch (_err) { /* skip */ }
+      try { sortGrievanceLogByStatus(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
     }
   }, { priority: 60, id: 'grievance_sort_handler' });
 
@@ -297,7 +313,7 @@ function registerEventBusSubscribers() {
   }, { priority: 90, id: 'member_style_handler' });
 
   EventBus.on('sheet:edit:MEMBER_DIR', function(e) {
-    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { /* skip */ }
+    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
   }, { priority: 70, id: 'member_config_sync' });
 
   // --- Checklist edit handler ---
@@ -308,14 +324,14 @@ function registerEventBusSubscribers() {
   // --- Volunteer Hours sync ---
   EventBus.on('sheet:edit:VOLUNTEER_HOURS', function() {
     if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
-      try { syncVolunteerHoursToMemberDirectory(); } catch (_err) { /* skip */ }
+      try { syncVolunteerHoursToMemberDirectory(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
     }
   }, { priority: 100, id: 'volunteer_sync_handler' });
 
   // --- Meeting Attendance sync ---
   EventBus.on('sheet:edit:MEETING_ATTENDANCE', function() {
     if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
-      try { syncMeetingAttendanceToMemberDirectory(); } catch (_err) { /* skip */ }
+      try { syncMeetingAttendanceToMemberDirectory(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
     }
   }, { priority: 100, id: 'attendance_sync_handler' });
 
@@ -327,22 +343,38 @@ function registerEventBusSubscribers() {
   // --- Cross-cutting: Audit logging (high-value sheets) ---
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
     if (typeof onEditAudit === 'function') {
-      try { onEditAudit(e); } catch (_err) { /* skip */ }
+      try { onEditAudit(e); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
     }
   }, { priority: 10, id: 'grievance_audit' });
 
   EventBus.on('sheet:edit:MEMBER_DIR', function(e) {
     if (typeof onEditAudit === 'function') {
-      try { onEditAudit(e); } catch (_err) { /* skip */ }
+      try { onEditAudit(e); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
     }
   }, { priority: 10, id: 'member_audit' });
+
+  // --- v4.30.0: Log terminal grievance status changes (archive candidates) ---
+  EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
+    try {
+      if (!e || !e.range) return;
+      var col = e.range.getColumn();
+      if (typeof GRIEVANCE_COLS !== 'undefined' && col === GRIEVANCE_COLS.STATUS) {
+        var newVal = String(e.range.getValue() || '').trim();
+        var terminalStatuses = ['won', 'denied', 'settled', 'withdrawn', 'closed'];
+        if (terminalStatuses.indexOf(newVal.toLowerCase()) !== -1) {
+          var row = e.range.getRow();
+          Logger.log('Grievance terminal status: row ' + row + ' → ' + newVal + ' (archive candidate)');
+        }
+      }
+    } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+  }, { priority: 50, id: 'grievance_terminal_status_logger' });
 
   // --- Auto-sync (debounced via onEditAutoSync) ---
   // M-48: Mark _grievanceEditHandled so onEditAutoSync skips redundant formula sync
   // (handleGrievanceEdit at priority 100 already computed deadline values for this row)
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
     if (typeof onEditAutoSync === 'function') {
-      try { e._grievanceEditHandled = true; onEditAutoSync(e); } catch (_err) { /* skip */ }
+      try { e._grievanceEditHandled = true; onEditAutoSync(e); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
     }
   }, { priority: 20, id: 'grievance_auto_sync' });
 
@@ -400,31 +432,27 @@ function registerEventBusSubscribers() {
  * @param {Object} e - The Google Sheets edit event object
  * @returns {Object} Emit result: { handled, errors }
  */
+// Module-level cache: rebuilt once per V8 execution context, not per edit event
+var _emitSheetKeyMap = null;
+function _getSheetKeyMap() {
+  if (_emitSheetKeyMap) return _emitSheetKeyMap;
+  _emitSheetKeyMap = {};
+  Object.keys(SHEETS).forEach(function(key) {
+    _emitSheetKeyMap[SHEETS[key]] = key;
+  });
+  return _emitSheetKeyMap;
+}
+
 function emitEditEvent(e) {
   if (!e || !e.range) return { handled: 0, errors: [] };
 
   var sheetName = e.range.getSheet().getName();
-
-  // Map sheet display names to SHEETS constant keys
-  var sheetKeyMap = {};
-  Object.keys(SHEETS).forEach(function(key) {
-    sheetKeyMap[SHEETS[key]] = key;
-  });
-
-  var sheetKey = sheetKeyMap[sheetName];
+  var sheetKey = _getSheetKeyMap()[sheetName];
   if (!sheetKey) return { handled: 0, errors: [] };
 
   return EventBus.emit('sheet:edit:' + sheetKey, e);
 }
-
-// emitFormEvent removed — dead code cleanup v4.25.11
-
-// emitSyncComplete removed — dead code cleanup v4.25.11
-
-// emitDataChanged removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // EVENT BUS DIAGNOSTICS
 // ============================================================================
 
-// showEventBusStatus removed — dead code cleanup v4.25.11

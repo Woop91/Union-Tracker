@@ -1,18 +1,32 @@
 /**
- * 09_Dashboards.gs - Satisfaction Engine Module
+ * ============================================================================
+ * 09_Dashboards.gs — Member Satisfaction Dashboard
+ * ============================================================================
  *
- * Member satisfaction survey management, dashboard display, analytics,
- * and trend analysis functionality.
+ * WHAT THIS FILE DOES:
+ *   Member Satisfaction Dashboard display and analytics. showSatisfactionDashboard()
+ *   opens a modal with survey results, section scores, trend analysis, and
+ *   worksite/role breakdowns. getSatisfactionDashboardHtml() generates the full
+ *   HTML with embedded charts (Chart.js). Calculates section-level scores across
+ *   6 categories and generates plain-language insights.
  *
- * This module handles:
- * - Satisfaction dashboard display (modal dialogs)
- * - Survey response data retrieval and analysis
- * - Section-level score calculations
- * - Trend analysis and insights generation
- * - Worksite/role breakdown analytics
- * - Value synchronization and dashboard updates
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Modal dialog approach (not a separate sheet) because satisfaction data is
+ *   sensitive — it shouldn't be visible as a sheet tab. Chart.js is embedded
+ *   because GAS dialogs can't load external scripts reliably. Green theme
+ *   differentiates this from the navy Steward Dashboard.
  *
- * @version 4.7.0
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   The satisfaction dashboard menu item shows an empty or errored modal.
+ *   Stewards lose visibility into member satisfaction trends. Section scores
+ *   and insights are unavailable for bargaining preparation.
+ *
+ * DEPENDENCIES:
+ *   Depends on: 01_Core.gs (SHEETS, getMobileOptimizedHead),
+ *               08e_SurveyEngine.gs (survey data),
+ *               04b_AccessibilityFeatures.gs (getCommonStyles)
+ *   Used by:    Menu items in 03_UIComponents.gs
+ *
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -523,6 +537,19 @@ function getSatisfactionOverviewData() {
   var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  if (!sheet) return {
+    totalResponses: 0,
+    avgOverall: 0,
+    avgSteward: 0,
+    avgLeadership: 0,
+    avgTrust: 0,
+    avgProtected: 0,
+    avgRecommend: 0,
+    npsScore: 0,
+    responseRate: 'N/A',
+    insights: [],
+    distribution: { high: 0, mid: 0, low: 0 }
+  };
 
   var data = {
     totalResponses: 0,
@@ -537,8 +564,6 @@ function getSatisfactionOverviewData() {
     insights: [],
     distribution: { high: 0, mid: 0, low: 0 }
   };
-
-  if (!sheet) return data;
 
   // Check if there's data by looking at column A (Timestamp)
   var lastRow = sheet.getLastRow();
@@ -699,9 +724,6 @@ function getSatisfactionOverviewData() {
 
   return data;
 }
-
-// getAggregateSatisfactionStats removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SATISFACTION DATA RETRIEVAL - RESPONSES AND SECTIONS
 // ============================================================================
@@ -847,17 +869,6 @@ function getSatisfactionSectionData() {
 
   return result;
 }
-
-// getSatisfactionTrendData removed — dead code cleanup v4.25.11
-
-// getSatisfactionBreakdownData removed — dead code cleanup v4.25.11
-
-// getSatisfactionInsightsData removed — dead code cleanup v4.25.11
-
-// getSatisfactionDrillData removed — dead code cleanup v4.25.11
-
-// getSatisfactionLocationDrill removed — dead code cleanup v4.25.11
-
 /**
  * Get analytics data for satisfaction dashboard insights
  */
@@ -1060,7 +1071,7 @@ function getSatisfactionAnalyticsData() {
  */
 function syncSatisfactionValues() {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return; // another sync in progress
+  if (!lock.tryLock(5000)) { Logger.log('syncSatisfactionValues: lock contention — skipped'); return; }
   try {
   var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1351,8 +1362,6 @@ function computeSatisfactionRowAverages(row) {
 function getSheetLastRow(sheet) {
   return sheet.getLastRow();
 }
-
-
 
 /**
  * ============================================================================
@@ -2074,9 +2083,6 @@ function removeAutoSyncTrigger() {
   Logger.log('Removed ' + removed + ' auto-sync triggers');
   SpreadsheetApp.getActiveSpreadsheet().toast('Auto-sync trigger removed', 'Info', 3);
 }
-
-// getAutoSyncOptions removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // DASHBOARD VALUE SYNC
 // ============================================================================
@@ -2088,7 +2094,7 @@ function removeAutoSyncTrigger() {
  */
 function syncDashboardValues() {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return; // another sync in progress
+  if (!lock.tryLock(5000)) { Logger.log('syncDashboardValues: lock contention — skipped'); return; }
   try {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var dashSheet = ss.getSheetByName(SHEETS.DASHBOARD);
@@ -2101,6 +2107,7 @@ function syncDashboardValues() {
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) { Logger.log('Config sheet not found for Dashboard sync'); }
 
   if (!memberSheet || !grievanceSheet) {
     Logger.log('Required sheets not found for Dashboard sync');
@@ -2692,26 +2699,26 @@ function writeDashboardValues_(sheet, metrics) {
   var changeCell44 = sheet.getRange(L.TREND_START_ROW, 4);
   var change44Val = grievanceChange;
   if (change44Val < 0) {
-    changeCell44.setFontColor(SHEET_COLORS.STATUS_SUCCESS); // Green - grievances down is good
+    changeCell44.setFontColor('#059669'); // Green - grievances down is good
   } else if (change44Val > 0) {
-    changeCell44.setFontColor(SHEET_COLORS.STATUS_ERROR); // Red - grievances up is bad
+    changeCell44.setFontColor('#DC2626'); // Red - grievances up is bad
   } else {
-    changeCell44.setFontColor(SHEET_COLORS.STATUS_DISABLED); // Gray - no change
+    changeCell44.setFontColor('#6B7280'); // Gray - no change
   }
 
   // For members: positive change = green (good), negative = red (bad)
   var changeCell45 = sheet.getRange(L.TREND_START_ROW + 1, 4);
   if (memberChange > 0) {
-    changeCell45.setFontColor(SHEET_COLORS.STATUS_SUCCESS); // Green - members up is good
+    changeCell45.setFontColor('#059669'); // Green - members up is good
   } else if (memberChange < 0) {
-    changeCell45.setFontColor(SHEET_COLORS.STATUS_ERROR); // Red - members down is bad
+    changeCell45.setFontColor('#DC2626'); // Red - members down is bad
   } else {
-    changeCell45.setFontColor(SHEET_COLORS.STATUS_DISABLED); // Gray
+    changeCell45.setFontColor('#6B7280'); // Gray
   }
 
   // For cases filed: neutral coloring (blue)
   var changeCell46 = sheet.getRange(L.TREND_START_ROW + 2, 4);
-  changeCell46.setFontColor(SHEET_COLORS.STATUS_INFO); // Blue - neutral
+  changeCell46.setFontColor('#3B82F6'); // Blue - neutral
 
   // ══════════════════════════════════════════════════════════════════════
   // STEWARD SUMMARY - Card layout
@@ -2784,21 +2791,21 @@ function writeDashboardValues_(sheet, metrics) {
  */
 function applyDashboardGradients_(sheet) {
   // Define gradient color scale (Green -> Yellow -> Red)
-  var _greenColor = SHEET_COLORS.BG_PALE_GREEN;  // Low values (good for some metrics)
-  var _yellowColor = SHEET_COLORS.BG_LIGHT_YELLOW; // Mid values
+  var _greenColor = '#D1FAE5';  // Low values (good for some metrics)
+  var _yellowColor = '#FEF3C7'; // Mid values
   var _redColor = '#FCA5A5';    // High values (bad for some metrics)
 
   // Reverse scale (Red -> Yellow -> Green) for positive metrics
   var redToGreen = {
     minColor: '#FCA5A5',
-    midColor: SHEET_COLORS.BG_LIGHT_YELLOW,
-    maxColor: SHEET_COLORS.BG_PALE_GREEN
+    midColor: '#FEF3C7',
+    maxColor: '#D1FAE5'
   };
 
   // Standard scale (Green -> Yellow -> Red) for negative metrics
   var greenToRed = {
-    minColor: SHEET_COLORS.BG_PALE_GREEN,
-    midColor: SHEET_COLORS.BG_LIGHT_YELLOW,
+    minColor: '#D1FAE5',
+    midColor: '#FEF3C7',
     maxColor: '#FCA5A5'
   };
 
@@ -2908,7 +2915,7 @@ function applyDashboardGradients_(sheet) {
  */
 function syncFeedbackValues() {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return; // another sync in progress
+  if (!lock.tryLock(5000)) { Logger.log('syncFeedbackValues: lock contention — skipped'); return; }
   try {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
@@ -2981,11 +2988,6 @@ function syncFeedbackValues() {
   Logger.log('Feedback values synced');
   } finally { lock.releaseLock(); }
 }
-
-
-
-// showFlaggedSubmissionsReview removed — dead code cleanup v4.25.11
-
 /**
  * Get HTML for flagged submissions review interface
  * @returns {string} HTML content
@@ -3022,7 +3024,7 @@ function getFlaggedSubmissionsHtml() {
     '</div>' +
     '<script>' +
     getClientSideEscapeHtml() +
-    'function load(){google.script.run.withFailureHandler(function(e){document.getElementById("content").innerHTML="<div class=\\"empty-state\\">Error: "+e.message+"</div>"}).withSuccessHandler(render).getFlaggedSubmissionsData()}' +
+    'function load(){google.script.run.withFailureHandler(function(e){document.getElementById("content").innerHTML="<div class=\\"empty-state\\">Error: "+escapeHtml(e.message)+"</div>"}).withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
     '  h+="<div class=\\"stat-card pending\\"><div class=\\"stat-value\\">"+d.pendingCount+"</div><div class=\\"stat-label\\">Pending Review</div></div>";' +
@@ -3116,7 +3118,7 @@ function getFlaggedSubmissionsData() {
 function approveFlaggedSubmission(rowNum) {
   // Verify caller is an authorized steward/admin
   var callerEmail = '';
-  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
   }
@@ -3151,7 +3153,7 @@ function approveFlaggedSubmission(rowNum) {
 function rejectFlaggedSubmission(rowNum) {
   // Verify caller is an authorized steward/admin
   var callerEmail = '';
-  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
   }
@@ -3179,15 +3181,3 @@ function rejectFlaggedSubmission(rowNum) {
   // Update dashboard
   syncSatisfactionValues();
 }
-
-// getSecureMemberDashboardHtml removed — dead code cleanup v4.25.11
-
-// getPublicOverviewData removed — dead code cleanup v4.25.11
-
-// getPublicSurveyData removed — dead code cleanup v4.25.11
-
-// getPublicGrievanceData removed — dead code cleanup v4.25.11
-
-// getPublicStewardData removed — dead code cleanup v4.25.11
-
-// getStewardCoverageStats removed — dead code cleanup v4.25.11

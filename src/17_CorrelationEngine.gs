@@ -1,21 +1,57 @@
 /**
  * ============================================================================
- * 17_CorrelationEngine.gs - Cross-Dimensional Correlation Engine
+ * 17_CorrelationEngine.gs - CROSS-DIMENSIONAL CORRELATION ENGINE
  * ============================================================================
  *
- * Statistical correlation engine for union dashboard analytics. Computes
- * relationships between member engagement, grievance outcomes, satisfaction
- * scores, and organizational dimensions.
+ * WHAT THIS FILE DOES:
+ *   Cross-dimensional statistical correlation engine. Computes relationships
+ *   between member engagement, grievance outcomes, satisfaction scores, and
+ *   organizational dimensions. Uses ~10 curated correlation pairs (not an
+ *   N*N matrix) chosen for union relevance. Returns confidence levels
+ *   alongside coefficients. Generates plain-language insight strings for
+ *   non-statistician users using "associated with" framing (never "causes").
  *
- * Design principles:
- *   - ~10 curated, union-relevant correlation pairs (not an N×N matrix)
- *   - Confidence reporting alongside every coefficient
- *   - Plain-language insight strings for non-statistician users
- *   - "Associated with" framing, never "causes"
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Opt-in via Config -> "Enable Correlation Engine" = 'yes' because
+ *   correlation analysis is compute-heavy (reads multiple sheets, runs
+ *   statistical calculations). Admins enable it per-org based on data
+ *   volume. When disabled, all public functions return empty/disabled
+ *   results (no errors). The ~10 curated pairs approach prevents information
+ *   overload and ensures every correlation shown is meaningful to union
+ *   operations.
  *
- * @version 4.9.0
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Correlation insights disappear from dashboards. The analytics tab shows
+ *   "disabled" state. No impact on core functionality — this is a
+ *   supplementary analytics feature. If the enable check fails, it defaults
+ *   to disabled (safe fallback).
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, CONFIG_COLS), 10_Main.gs (getConfigValue_).
+ *   Used by the SPA analytics views and dashboard enhancement features.
+ *
+ * @version 4.31.0
  * @license Free for use by non-profit collective bargaining groups and unions
+ * ============================================================================
  */
+
+// ============================================================================
+// CORRELATION ENGINE CONFIG GATE (v4.30.0)
+// ============================================================================
+// When Config → "Enable Correlation Engine" is not 'yes', all public
+// functions return empty/disabled results. This lets admins opt in to
+// the compute-heavy correlation analysis on a per-org basis.
+
+function _isCorrelationEnabled() {
+  try {
+    var val = getConfigValue_(CONFIG_COLS.ENABLE_CORRELATION);
+    return String(val || '').toLowerCase().trim() === 'yes';
+  } catch (_e) { return false; }
+}
+
+var _CORRELATION_DISABLED_INSIGHTS = '[]';
+var _CORRELATION_DISABLED_ALERTS = '[]';
+var _CORRELATION_DISABLED_SUMMARY = JSON.stringify({ total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, topInsights: [], actionableCount: 0, disabled: true });
 
 // ============================================================================
 // STATISTICAL PRIMITIVES
@@ -104,9 +140,6 @@ function toRanks_(arr) {
   }
   return ranks;
 }
-
-// chiSquareTest_ removed — dead code cleanup v4.25.11
-
 /**
  * Classifies correlation strength and returns a plain-language label.
  * Minimum sample size guard: N < 5 returns confidence='insufficient', reliable=false.
@@ -144,14 +177,9 @@ function classifyCorrelation_(r, n) {
 
   return { strength: strength, confidence: confidence, reliable: reliable };
 }
-
-
 // ============================================================================
 // DATA EXTRACTION HELPERS
 // ============================================================================
-
-// extractPairs_ removed — dead code cleanup v4.25.11
-
 
 // ============================================================================
 // CURATED CORRELATION PAIRS
@@ -165,6 +193,7 @@ function classifyCorrelation_(r, n) {
  * @returns {string} JSON array of correlation results
  */
 function getCorrelationInsights(isPII, cachedData) {
+  if (!_isCorrelationEnabled()) return _CORRELATION_DISABLED_INSIGHTS;
   var data = cachedData || JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   var insights = [];
 
@@ -203,8 +232,6 @@ function getCorrelationInsights(isPII, cachedData) {
 
   return JSON.stringify(insights);
 }
-
-
 // ============================================================================
 // INDIVIDUAL CORRELATION IMPLEMENTATIONS
 // ============================================================================
@@ -724,8 +751,6 @@ function correlateVolunteerVsEngagement_(data) {
     insight: generateInsight_('email engagement', 'meeting attendance', r, cls, 'location', x.length)
   };
 }
-
-
 // ============================================================================
 // INSIGHT GENERATION
 // ============================================================================
@@ -794,8 +819,6 @@ function buildDataPoints_(labels, x, y) {
   }
   return points;
 }
-
-
 // ============================================================================
 // HOTSPOT INTEGRATION
 // ============================================================================
@@ -808,6 +831,7 @@ function buildDataPoints_(labels, x, y) {
  * @returns {string} JSON array of alert objects
  */
 function getCorrelationAlerts(isPII) {
+  if (!_isCorrelationEnabled()) return _CORRELATION_DISABLED_ALERTS;
   // Fetch data once and reuse for insights to avoid redundant dashboard fetches
   var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   var insightsJson = getCorrelationInsights(isPII, dashboardData);
@@ -837,11 +861,8 @@ function getCorrelationAlerts(isPII) {
     });
   }
 
-  EventBus.emit('correlation:alertsGenerated', { count: alerts.length });
   return JSON.stringify(alerts);
 }
-
-
 // ============================================================================
 // SUMMARY / OVERVIEW
 // ============================================================================
@@ -854,6 +875,7 @@ function getCorrelationAlerts(isPII) {
  * @returns {string} JSON summary object
  */
 function getCorrelationSummary(isPII) {
+  if (!_isCorrelationEnabled()) return _CORRELATION_DISABLED_SUMMARY;
   // Fetch data once and reuse for insights to avoid redundant dashboard fetches
   var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   var insights = JSON.parse(getCorrelationInsights(isPII, dashboardData));

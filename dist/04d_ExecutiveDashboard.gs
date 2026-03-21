@@ -9,16 +9,6 @@
 // ============================================================================
 
 /**
- * @deprecated v4.3.2 - Use showStewardDashboard() instead.
- * Executive metrics are now in the unified Steward Dashboard.
- */
-function rebuildExecutiveDashboard() {
-  showStewardDashboard();
-}
-
-// launchExecutiveDashboard removed — dead code cleanup v4.25.11
-
-/**
  * High-Performance KPI Aggregator for the Modal (Bridge Pattern)
  * Returns JSON data for client-side rendering
  * @returns {string} JSON string with dashboard statistics
@@ -65,10 +55,10 @@ function getDashboardStats() {
         stats.activeGrievances++;
       }
 
-      // Count by step
-      if (currentStep.indexOf('step 1') !== -1 || currentStep === '1') stats.activeSteps.step1++;
-      if (currentStep.indexOf('step 2') !== -1 || currentStep === '2') stats.activeSteps.step2++;
-      if (currentStep.indexOf('arbitration') !== -1 || currentStep.indexOf('step 3') !== -1) stats.activeSteps.arbitration++;
+      // M7: Count by step — use word-boundary matching to prevent 'step 10' matching 'step 1'
+      if (/\bstep\s*1\b/.test(currentStep) || currentStep === '1' || currentStep === 'step i') stats.activeSteps.step1++;
+      if (/\bstep\s*2\b/.test(currentStep) || currentStep === '2' || currentStep === 'step ii') stats.activeSteps.step2++;
+      if (/\barbitration\b/.test(currentStep) || /\bstep\s*3\b/.test(currentStep) || currentStep === 'step iii') stats.activeSteps.arbitration++;
 
       // Count outcomes using the Resolution column (not Status)
       var resolution = (row[GRIEVANCE_COLS.RESOLUTION - 1] || '').toString().toLowerCase();
@@ -94,9 +84,9 @@ function getDashboardStats() {
       // Check for overdue — use deadline matching the current step
       if (status === 'open' || status === 'pending info') {
         var dueDate = null;
-        if (currentStep.indexOf('step 2') !== -1 || currentStep === '2') {
+        if (/\bstep\s*2\b/.test(currentStep) || currentStep === '2' || currentStep === 'step ii') {
           dueDate = row[GRIEVANCE_COLS.STEP2_DUE - 1];
-        } else if (currentStep.indexOf('arbitration') !== -1 || currentStep.indexOf('step 3') !== -1) {
+        } else if (/\barbitration\b/.test(currentStep) || /\bstep\s*3\b/.test(currentStep) || currentStep === 'step iii') {
           dueDate = row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1];
         } else {
           dueDate = row[GRIEVANCE_COLS.STEP1_DUE - 1];
@@ -146,9 +136,6 @@ function getDashboardStats() {
 
   return JSON.stringify(stats);
 }
-
-// getExecutiveDashboardHtml_ removed — dead code cleanup v4.25.11
-
 /**
  * Gets executive metrics from dashboard calculations
  * @returns {Object} Metrics object with activeGrievances, winRate, overdueSteps
@@ -245,8 +232,6 @@ function showStewardDashboard() {
   ).setWidth(500).setHeight(400);
   SpreadsheetApp.getUi().showModalDialog(html, 'Steward Command Center');
 }
-
-
 // ============================================================================
 // 4. STRATEGIC PRO MOVES & ALERTS
 // ============================================================================
@@ -490,9 +475,6 @@ function checkOverdueGrievances_() {
   }
 }
 
-
-// showStewardPerformanceModal_UIService_ removed — dead code cleanup v4.25.11
-
 /**
  * Emails the Executive Dashboard as a PDF snapshot
  */
@@ -534,17 +516,9 @@ function emailExecutivePDF() {
 // 6. AUTO-ID GENERATOR ENGINE
 // ============================================================================
 
-// generateMissingMemberIDs_UIService_ removed — dead code cleanup v4.25.11
-
-// checkDuplicateMemberIDs_UIService_ removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // 7. SIGNATURE PDF ENGINE
 // ============================================================================
-
-// createGrievancePDF_UIService_ removed — dead code cleanup v4.25.11
-
-// createPDFForSelectedGrievance_UIService_ removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // 8. STEWARD PROMOTION ENGINE (Helper Functions)
@@ -556,6 +530,3 @@ function emailExecutivePDF() {
 // ============================================================================
 // 9. GLOBAL UI STYLING ENGINE (Status Colors)
 // ============================================================================
-
-// applyStatusColors removed — dead code cleanup v4.25.11
-

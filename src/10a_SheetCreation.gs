@@ -1,13 +1,29 @@
 /**
- * 10a_SheetCreation.gs - Main Entry Point
+ * ============================================================================
+ * 10a_SheetCreation.gs — Individual Sheet Creation Functions
+ * ============================================================================
  *
- * Core setup functions, menu system, and sheet creation.
+ * WHAT THIS FILE DOES:
+ *   Individual sheet creation functions for Config, Member Directory, and
+ *   Grievance Log sheets. Each function creates a specific sheet with its
+ *   headers, formatting, data validation rules, and protection settings.
+ *   createConfigSheet() sets up the column-based configuration layout
+ *   (row 1=section headers, row 2=column headers, row 3+=values).
  *
- * ⚠️ WARNING: DO NOT DEPLOY THIS FILE DIRECTLY
- * This is a source file used to generate ConsolidatedDashboard.gs.
- * Deploy ONLY ConsolidatedDashboard.gs to avoid function conflicts.
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Split from 08a_SheetSetup.gs for maintainability. Each sheet creation
+ *   function is standalone and idempotent. The Config sheet uses a column-based
+ *   layout (not row-based) because it's easier to add new config options by
+ *   adding columns than by managing row indices.
  *
- * @version 4.7.0
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Individual sheets can't be created or repaired. CREATE_DASHBOARD will fail
+ *   at the specific sheet creation step. Existing sheets are unaffected.
+ *
+ * DEPENDENCIES:
+ *   Depends on: 01_Core.gs (SHEETS, CONFIG_COLS, MEMBER_COLS, GRIEVANCE_COLS, COLORS)
+ *   Used by:    08a_SheetSetup.gs (CREATE_DASHBOARD), 06_Maintenance.gs (REPAIR_DASHBOARD)
+ *
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -451,8 +467,8 @@ function applyConfigSheetStyling(sheet) {
 
   // ═══ ROW 1: Section Headers - Dark Slate ═══
   sheet.getRange(1, 1, 1, lastCol)
-    .setBackground(SHEET_COLORS.HEADER_SLATE)  // Dark slate
-    .setFontColor(SHEET_COLORS.BG_OFF_WHITE)   // Light text
+    .setBackground('#1e293b')  // Dark slate
+    .setFontColor('#f8fafc')   // Light text
     .setFontWeight('bold')
     .setFontStyle('italic')
     .setHorizontalAlignment('center')
@@ -461,8 +477,8 @@ function applyConfigSheetStyling(sheet) {
 
   // ═══ ROW 2: Column Headers - Purple ═══
   sheet.getRange(2, 1, 1, lastCol)
-    .setBackground(SHEET_COLORS.STATUS_PURPLE)  // Primary purple
-    .setFontColor(SHEET_COLORS.TEXT_WHITE)   // White text
+    .setBackground('#7C3AED')  // Primary purple
+    .setFontColor('#ffffff')   // White text
     .setFontWeight('bold')
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
@@ -472,8 +488,8 @@ function applyConfigSheetStyling(sheet) {
   if (maxRows >= 3) {
     var dataRange = sheet.getRange(3, 1, maxRows - 2, lastCol);
     dataRange
-      .setBackground(SHEET_COLORS.BG_OFF_WHITE)  // Very light gray/white
-      .setFontColor(SHEET_COLORS.HEADER_SLATE)   // Dark text
+      .setBackground('#f8fafc')  // Very light gray/white
+      .setFontColor('#1e293b')   // Dark text
       .setFontWeight('normal')
       .setVerticalAlignment('middle');
 
@@ -481,7 +497,7 @@ function applyConfigSheetStyling(sheet) {
     // instead of one setBackground() per row for a large performance improvement.
     var bgColors = [];
     for (var row = 3; row <= maxRows; row++) {
-      var rowColor = (row % 2 === 0) ? SHEET_COLORS.BG_SLATE_LIGHT : SHEET_COLORS.BG_WHITE;
+      var rowColor = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
       bgColors.push(new Array(lastCol).fill(rowColor));
     }
     sheet.getRange(3, 1, maxRows - 2, lastCol).setBackgrounds(bgColors);
@@ -504,22 +520,22 @@ function applyConfigSheetStyling(sheet) {
 function applySectionColors_(sheet, lastCol) {
   // Section color definitions (16 sections, columns A-BI)
   var SECTION_COLORS = {
-    EMPLOYMENT: { bg: '#3b82f6', text: SHEET_COLORS.TEXT_WHITE },      // Blue - A-E
-    SUPERVISION: { bg: '#8b5cf6', text: SHEET_COLORS.TEXT_WHITE },     // Violet - F-G
-    STEWARD: { bg: '#06b6d4', text: SHEET_COLORS.TEXT_WHITE },         // Cyan - H-I
-    GRIEVANCE: { bg: '#ef4444', text: SHEET_COLORS.TEXT_WHITE },       // Red - J-M
-    LINKS: { bg: '#f97316', text: SHEET_COLORS.TEXT_WHITE },           // Orange - N-Q
-    NOTIFICATIONS: { bg: '#eab308', text: SHEET_COLORS.HEADER_SLATE },   // Yellow - R-T
-    ORGANIZATION: { bg: '#22c55e', text: SHEET_COLORS.TEXT_WHITE },    // Green - U-X
-    INTEGRATION: { bg: '#14b8a6', text: SHEET_COLORS.TEXT_WHITE },     // Teal - Y-Z
-    DEADLINES: { bg: '#ec4899', text: SHEET_COLORS.TEXT_WHITE },       // Pink - AA-AD
-    MULTISELECT: { bg: '#a855f7', text: SHEET_COLORS.TEXT_WHITE },     // Purple - AE
-    CONTRACT: { bg: '#6366f1', text: SHEET_COLORS.TEXT_WHITE },        // Indigo - AF-AI
-    IDENTITY: { bg: '#0ea5e9', text: SHEET_COLORS.TEXT_WHITE },        // Sky - AJ-AL
-    EXTENDED: { bg: '#84cc16', text: SHEET_COLORS.HEADER_SLATE },        // Lime - AM-AQ
-    COMMAND: { bg: '#f43f5e', text: SHEET_COLORS.TEXT_WHITE },         // Rose - AR-AX
-    MOBILE: { bg: '#10b981', text: SHEET_COLORS.TEXT_WHITE },          // Emerald - AY-BE
-    CUSTOM_LINKS: { bg: '#f59e0b', text: SHEET_COLORS.HEADER_SLATE }    // Amber - BF-BI
+    EMPLOYMENT: { bg: '#3b82f6', text: '#ffffff' },      // Blue - A-E
+    SUPERVISION: { bg: '#8b5cf6', text: '#ffffff' },     // Violet - F-G
+    STEWARD: { bg: '#06b6d4', text: '#ffffff' },         // Cyan - H-I
+    GRIEVANCE: { bg: '#ef4444', text: '#ffffff' },       // Red - J-M
+    LINKS: { bg: '#f97316', text: '#ffffff' },           // Orange - N-Q
+    NOTIFICATIONS: { bg: '#eab308', text: '#1e293b' },   // Yellow - R-T
+    ORGANIZATION: { bg: '#22c55e', text: '#ffffff' },    // Green - U-X
+    INTEGRATION: { bg: '#14b8a6', text: '#ffffff' },     // Teal - Y-Z
+    DEADLINES: { bg: '#ec4899', text: '#ffffff' },       // Pink - AA-AD
+    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE
+    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AF-AI
+    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AJ-AL
+    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AM-AQ
+    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AR-AX
+    MOBILE: { bg: '#10b981', text: '#ffffff' },          // Emerald - AY-BE
+    CUSTOM_LINKS: { bg: '#f59e0b', text: '#1e293b' }    // Amber - BF-BI
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
@@ -587,11 +603,11 @@ function createConfigGuideSheet(ss) {
 
   // Define guide colors
   var headerBg = COLORS.STATUS_BLUE;       // Blue header
-  var sectionBg = '#E8F4FD';     // Light blue section (no exact SHEET_COLORS match)
-  var tipBg = '#FFF9E6';         // Light yellow for tips (no exact SHEET_COLORS match)
-  var warningBg = SHEET_COLORS.BG_LIGHT_RED;     // Light red for warnings
-  var successBg = '#DCFCE7';     // Light green for success (no exact SHEET_COLORS match)
-  var textColor = '#1F2937';     // Dark text (no exact SHEET_COLORS match)
+  var sectionBg = '#E8F4FD';     // Light blue section
+  var tipBg = '#FFF9E6';         // Light yellow for tips
+  var warningBg = '#FEE2E2';     // Light red for warnings
+  var successBg = '#DCFCE7';     // Light green for success
+  var textColor = '#1F2937';     // Dark text
 
   var row = 1;
 
@@ -599,7 +615,7 @@ function createConfigGuideSheet(ss) {
   sheet.getRange(row, 1, 1, 6).merge()
     .setValue('📖 CONFIG TAB USER GUIDE')
     .setBackground(headerBg)
-    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setFontColor('#FFFFFF')
     .setFontWeight('bold')
     .setFontSize(18)
     .setHorizontalAlignment('center')
@@ -681,8 +697,8 @@ function createConfigGuideSheet(ss) {
     row++;
     sheet.getRange(row, 1).setValue(columnData[j][0]).setFontColor(COLORS.STATUS_BLUE).setFontWeight('bold').setHorizontalAlignment('center');
     sheet.getRange(row, 2).setValue(columnData[j][1]).setFontColor(textColor);
-    sheet.getRange(row, 3, 1, 2).merge().setValue(columnData[j][2]).setFontColor(SHEET_COLORS.TEXT_GRAY);
-    sheet.getRange(row, 5, 1, 2).merge().setValue(columnData[j][3]).setFontColor(SHEET_COLORS.TEXT_GRAY).setFontStyle('italic');
+    sheet.getRange(row, 3, 1, 2).merge().setValue(columnData[j][2]).setFontColor('#6B7280');
+    sheet.getRange(row, 5, 1, 2).merge().setValue(columnData[j][3]).setFontColor('#6B7280').setFontStyle('italic');
   }
 
   // ═══ TIPS ═══
@@ -692,7 +708,7 @@ function createConfigGuideSheet(ss) {
     .setBackground(tipBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE);
+    .setFontColor('#92400E');
   sheet.setRowHeight(row, 35);
 
   var tips = [
@@ -704,7 +720,7 @@ function createConfigGuideSheet(ss) {
 
   for (var k = 0; k < tips.length; k++) {
     row++;
-    sheet.getRange(row, 1, 1, 6).merge().setValue(tips[k]).setBackground(tipBg).setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE);
+    sheet.getRange(row, 1, 1, 6).merge().setValue(tips[k]).setBackground(tipBg).setFontColor('#92400E');
   }
 
   // ═══ WARNINGS ═══
@@ -714,7 +730,7 @@ function createConfigGuideSheet(ss) {
     .setBackground(warningBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.STATUS_ERROR);
+    .setFontColor('#DC2626');
   sheet.setRowHeight(row, 35);
 
   var warnings = [
@@ -725,7 +741,7 @@ function createConfigGuideSheet(ss) {
 
   for (var m = 0; m < warnings.length; m++) {
     row++;
-    sheet.getRange(row, 1, 1, 6).merge().setValue(warnings[m]).setBackground(warningBg).setFontColor(SHEET_COLORS.STATUS_ERROR);
+    sheet.getRange(row, 1, 1, 6).merge().setValue(warnings[m]).setBackground(warningBg).setFontColor('#DC2626');
   }
 
   // ═══ NEED HELP ═══
@@ -735,14 +751,14 @@ function createConfigGuideSheet(ss) {
     .setBackground(successBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor(SHEET_COLORS.TEXT_GREEN_ALT);
+    .setFontColor('#166534');
   sheet.setRowHeight(row, 35);
 
   row++;
   sheet.getRange(row, 1, 1, 6).merge()
     .setValue('Check the "📚 Getting Started" tab for full setup instructions, or the "❓ FAQ" tab for common questions.')
     .setBackground(successBg)
-    .setFontColor(SHEET_COLORS.TEXT_GREEN_ALT);
+    .setFontColor('#166534');
 
   // Set column widths
   sheet.setColumnWidth(1, 50);
@@ -821,11 +837,11 @@ function _addMissingMemberHeaders_(sheet) {
       var existingRules = sheet.getConditionalFormatRules();
       var duesTrueRule = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied('=' + colLetter + '2=TRUE')
-        .setBackground(SHEET_COLORS.BG_LIGHT_GREEN).setFontColor(SHEET_COLORS.TEXT_GREEN)
+        .setBackground('#e8f5e9').setFontColor('#2e7d32')
         .setRanges([duesRange]).build();
       var duesFalseRule = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied('=' + colLetter + '2=FALSE')
-        .setBackground(SHEET_COLORS.BG_CREAM).setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
+        .setBackground('#fff8e1').setFontColor('#f57f17')
         .setRanges([duesRange]).build();
       sheet.setConditionalFormatRules(existingRules.concat([duesTrueRule, duesFalseRule]));
     }
@@ -884,11 +900,11 @@ function createMemberDirectory(ss) {
       var dpRange = sheet.getRange(2, dpCol, 4999, 1);
       var dpTrueRule = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied('=' + dpLetter + '2=TRUE')
-        .setBackground(SHEET_COLORS.BG_LIGHT_GREEN).setFontColor(SHEET_COLORS.TEXT_GREEN)
+        .setBackground('#e8f5e9').setFontColor('#2e7d32')
         .setRanges([dpRange]).build();
       var dpFalseRule = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied('=' + dpLetter + '2=FALSE')
-        .setBackground(SHEET_COLORS.BG_CREAM).setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
+        .setBackground('#fff8e1').setFontColor('#f57f17')
         .setRanges([dpRange]).build();
       // Rules array will be extended below with the rest of the conditional formatting
       // Store these for later application (setConditionalFormatRules is called once at end)
@@ -1021,8 +1037,8 @@ function createMemberDirectory(ss) {
 
   var redRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Yes')
-    .setBackground('#ffebee')  // Light red background (no exact SHEET_COLORS match)
-    .setFontColor(SHEET_COLORS.TEXT_RED)   // Dark red text
+    .setBackground('#ffebee')  // Light red background
+    .setFontColor('#c62828')   // Dark red text
     .setBold(true)
     .setRanges([hasOpenGrievanceRange])
     .build();
@@ -1042,14 +1058,14 @@ function createMemberDirectory(ss) {
   // Rule: Red background for empty Email
   var emptyEmailRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND($' + colId + '2<>"",ISBLANK($' + colEmail + '2))')
-    .setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT)
+    .setBackground('#ffcdd2')
     .setRanges([emailRange])
     .build();
 
   // Rule: Red background for empty Phone
   var emptyPhoneRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND($' + colId + '2<>"",ISBLANK($' + colPhone + '2))')
-    .setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT)
+    .setBackground('#ffcdd2')
     .setRanges([phoneRange])
     .build();
 
@@ -1062,7 +1078,7 @@ function createMemberDirectory(ss) {
   var deadlineOverdueRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=OR($' + colDeadline + '2="Overdue",AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2<=0))')
     .setBackground('#ffebee')
-    .setFontColor(SHEET_COLORS.TEXT_RED)
+    .setFontColor('#c62828')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
@@ -1070,8 +1086,8 @@ function createMemberDirectory(ss) {
   // Rule: Orange - Due in 1-3 days
   var deadline1to3Rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>=1,$' + colDeadline + '2<=3)')
-    .setBackground(SHEET_COLORS.BG_WARM)
-    .setFontColor(SHEET_COLORS.TEXT_ORANGE)
+    .setBackground('#fff3e0')
+    .setFontColor('#e65100')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
@@ -1079,16 +1095,16 @@ function createMemberDirectory(ss) {
   // Rule: Yellow - Due in 4-7 days
   var deadline4to7Rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>=4,$' + colDeadline + '2<=7)')
-    .setBackground(SHEET_COLORS.BG_EXTRA_PALE_YELLOW)
-    .setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
+    .setBackground('#fffde7')
+    .setFontColor('#f57f17')
     .setRanges([daysDeadlineRange])
     .build();
 
   // Rule: Green - On Track (more than 7 days remaining)
   var deadlineOnTrackRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>7)')
-    .setBackground(SHEET_COLORS.BG_LIGHT_GREEN)
-    .setFontColor(SHEET_COLORS.TEXT_GREEN)
+    .setBackground('#e8f5e9')
+    .setFontColor('#2e7d32')
     .setRanges([daysDeadlineRange])
     .build();
 
@@ -1105,11 +1121,11 @@ function createMemberDirectory(ss) {
     var duesPayingRange = sheet.getRange(2, MEMBER_COLS.DUES_PAYING, 4999, 1);
     var duesPayingTrueRule = SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + getColumnLetter(MEMBER_COLS.DUES_PAYING) + '2=TRUE')
-      .setBackground(SHEET_COLORS.BG_LIGHT_GREEN).setFontColor(SHEET_COLORS.TEXT_GREEN)
+      .setBackground('#e8f5e9').setFontColor('#2e7d32')
       .setRanges([duesPayingRange]).build();
     var duesPayingFalseRule = SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied('=' + getColumnLetter(MEMBER_COLS.DUES_PAYING) + '2=FALSE')
-      .setBackground(SHEET_COLORS.BG_CREAM).setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
+      .setBackground('#fff8e1').setFontColor('#f57f17')
       .setRanges([duesPayingRange]).build();
     rules = rules.concat([duesPayingTrueRule, duesPayingFalseRule]);
   }
@@ -1313,7 +1329,7 @@ function createGrievanceLog(ss) {
   var deadlineOverdueRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=OR($' + grColDaysDeadline + '2="Overdue",AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2<=0))')
     .setBackground('#ffebee')
-    .setFontColor(SHEET_COLORS.TEXT_RED)
+    .setFontColor('#c62828')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
@@ -1321,8 +1337,8 @@ function createGrievanceLog(ss) {
   // Rule: Orange - Due in 1-3 days
   var deadline1to3Rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=1,$' + grColDaysDeadline + '2<=3)')
-    .setBackground(SHEET_COLORS.BG_WARM)
-    .setFontColor(SHEET_COLORS.TEXT_ORANGE)
+    .setBackground('#fff3e0')
+    .setFontColor('#e65100')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
@@ -1330,16 +1346,16 @@ function createGrievanceLog(ss) {
   // Rule: Yellow - Due in 4-7 days
   var deadline4to7Rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=4,$' + grColDaysDeadline + '2<=7)')
-    .setBackground(SHEET_COLORS.BG_EXTRA_PALE_YELLOW)
-    .setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
+    .setBackground('#fffde7')
+    .setFontColor('#f57f17')
     .setRanges([daysDeadlineRange])
     .build();
 
   // Rule: Green - On Track (more than 7 days remaining)
   var deadlineOnTrackRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>7)')
-    .setBackground(SHEET_COLORS.BG_LIGHT_GREEN)
-    .setFontColor(SHEET_COLORS.TEXT_GREEN)
+    .setBackground('#e8f5e9')
+    .setFontColor('#2e7d32')
     .setRanges([daysDeadlineRange])
     .build();
 
@@ -1355,7 +1371,7 @@ function createGrievanceLog(ss) {
   // Completed cases: All columns green (Closed, Won, Denied, Settled, Withdrawn)
   var completedRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=OR($' + grColStatus + '2="Closed",$' + grColStatus + '2="Won",$' + grColStatus + '2="Denied",$' + grColStatus + '2="Settled",$' + grColStatus + '2="Withdrawn")')
-    .setBackground(SHEET_COLORS.BG_LIGHT_GREEN)
+    .setBackground('#e8f5e9')
     .setRanges([allStepsRange])
     .build();
 
@@ -1363,7 +1379,7 @@ function createGrievanceLog(ss) {
   var step3ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 8);
   var step3ProgressRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$' + grColStep + '2="Step III"')
-    .setBackground(SHEET_COLORS.BG_LIGHT_BLUE_ALT)
+    .setBackground('#e3f2fd')
     .setRanges([step3ProgressRange])
     .build();
 
@@ -1371,14 +1387,14 @@ function createGrievanceLog(ss) {
   var step2ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 6);
   var step2ProgressRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$' + grColStep + '2="Step II"')
-    .setBackground(SHEET_COLORS.BG_LIGHT_BLUE_ALT)
+    .setBackground('#e3f2fd')
     .setRanges([step2ProgressRange])
     .build();
 
   // Step I in progress
   var step1ProgressRule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$' + grColStep + '2="Step I"')
-    .setBackground(SHEET_COLORS.BG_LIGHT_BLUE_ALT)
+    .setBackground('#e3f2fd')
     .setRanges([step1Range])
     .build();
 
@@ -1399,9 +1415,6 @@ function createGrievanceLog(ss) {
   // Set tab color
   sheet.setTabColor(COLORS.SOLIDARITY_RED);
 }
-
-// createDashboard removed — dead code cleanup v4.25.11
-
 /**
  * Creates native Google Sheets charts for the dashboard
  * Adds a chart options section where users can select which charts to display
@@ -1429,10 +1442,10 @@ function createDashboardCharts_(sheet) {
   sheet.getRange('A120').setValue('Enter chart number in cell G120 and run "Generate Selected Chart" from Dashboard menu')
     .setFontStyle('italic')
     .setFontSize(10)
-    .setFontColor(SHEET_COLORS.TEXT_GRAY);
+    .setFontColor('#6B7280');
   sheet.getRange('A120:F120').merge();
   sheet.getRange('G120').setValue(1)
-    .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)
+    .setBackground('#FEF3C7')
     .setFontWeight('bold')
     .setHorizontalAlignment('center');
 
@@ -1441,7 +1454,7 @@ function createDashboardCharts_(sheet) {
   sheet.getRange('A121:F121').setValues(chartHeader)
     .setFontWeight('bold')
     .setFontSize(10)
-    .setBackground(SHEET_COLORS.BG_LIGHT_BLUE)
+    .setBackground('#E0E7FF')
     .setHorizontalAlignment('center');
 
   // Chart options data
@@ -1496,10 +1509,10 @@ function createDashboardCharts_(sheet) {
   // Placeholder for chart
   sheet.getRange('A135').setValue('Select a chart option above and run "Generate Selected Chart" to display here')
     .setFontStyle('italic')
-    .setFontColor(SHEET_COLORS.TEXT_LIGHT_GRAY)
+    .setFontColor('#9CA3AF')
     .setHorizontalAlignment('center');
   sheet.getRange('A135:G145').merge()
-    .setBackground(SHEET_COLORS.BG_LIGHT_GRAY)
+    .setBackground('#F9FAFB')
     .setVerticalAlignment('middle');
 
   // Border around chart area
@@ -1520,8 +1533,6 @@ function createDashboardCharts_(sheet) {
 // - createStewardLeaderboardChart_()
 // - padRight()
 // ============================================================================
-
-
 // ============================================================================
 // VOLUNTEER HOURS & MEETING ATTENDANCE SHEETS
 // ============================================================================
@@ -1563,8 +1574,8 @@ function createVolunteerHoursSheet(ss) {
   sheet.getRange(2, 1, 1, hints.length).setValues([hints])
     .setFontStyle('italic')
     .setFontSize(9)
-    .setBackground(SHEET_COLORS.BG_PALE_BLUE)
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setBackground('#F0F9FF')
+    .setFontColor('#6B7280')
     .setHorizontalAlignment('center');
 
   // Set column widths
@@ -1643,8 +1654,8 @@ function createMeetingAttendanceSheet(ss) {
   sheet.getRange(2, 1, 1, hints.length).setValues([hints])
     .setFontStyle('italic')
     .setFontSize(9)
-    .setBackground(SHEET_COLORS.BG_PALE_BLUE)
-    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setBackground('#F0F9FF')
+    .setFontColor('#6B7280')
     .setHorizontalAlignment('center');
 
   // Set column widths
@@ -1753,4 +1764,40 @@ function setupMeetingCheckInSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   createMeetingCheckInLogSheet(ss);
   ss.toast('Meeting Check-In Log sheet created', '📝 Meeting Check-In', 5);
+}
+
+// ============================================================================
+// GRIEVANCE ARCHIVE SHEET (v4.30.0)
+// ============================================================================
+
+/**
+ * Ensures the _Archive_Grievances sheet exists. Copies headers from
+ * Grievance Log and sets the sheet to "very hidden" (only visible via
+ * Apps Script, not the Sheets UI).
+ *
+ * @param {Spreadsheet} [ss] - Optional spreadsheet reference
+ * @returns {Sheet} The archive sheet
+ */
+function ensureGrievanceArchiveSheet_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var archive = ss.getSheetByName(SHEETS.GRIEVANCE_ARCHIVE);
+  if (archive) return archive;
+
+  archive = ss.insertSheet(SHEETS.GRIEVANCE_ARCHIVE);
+  // Copy header row from active Grievance Log
+  var headers = getGrievanceHeaders();
+  if (headers && headers.length > 0) {
+    archive.getRange(1, 1, 1, headers.length).setValues([headers]);
+    archive.setFrozenRows(1);
+  }
+  // Very hidden — only accessible via script
+  archive.hideSheet();
+  try { archive.showSheet(); archive.hideSheet(); } catch (_e) { /* already hidden */ }
+  // Use VERY_HIDDEN protection level
+  try { ss.setSheetVisibility(archive, SpreadsheetApp.SheetVisibility.VERY_HIDDEN); } catch (_e2) {
+    // setSheetVisibility may not exist in older GAS runtimes, fall back to hideSheet
+    Logger.log('ensureGrievanceArchiveSheet_: VERY_HIDDEN not available, sheet is regular-hidden');
+  }
+  Logger.log('Created grievance archive sheet: ' + SHEETS.GRIEVANCE_ARCHIVE);
+  return archive;
 }

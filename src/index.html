@@ -8,14 +8,20 @@
   <meta http-equiv="Expires" content="0">
   <title>Dashboard</title>
 
-  <!-- N1: Fonts — core + theme-specific (pixel fonts lazy-load via display=swap) -->
+  <!-- N1: Fonts — core only; theme-specific fonts lazy-loaded by UnifiedTheme -->
+  <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Righteous&family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Pixelify+Sans:wght@400;700&family=Bangers&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#6366f1">
+  <!-- PERF: Non-render-blocking font load — prevents font CSS from blocking first paint.
+       display=swap ensures text is visible immediately with fallback fonts. -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
 
   <?!= include('styles') ?>
 
   <!-- Chart.js — deferred until actually needed (lazy-loaded by ChartHelper) -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" as="script" crossorigin="anonymous">
 </head>
 <body>
   <div id="nav-progress"></div>
@@ -33,6 +39,7 @@
     var CURRENT_VIEW = PAGE_DATA.view;
     var CURRENT_USER = PAGE_DATA.user || null;
     var IS_DUAL_ROLE = PAGE_DATA.isDualRole || false;
+    var IS_DEV_MODE = PAGE_DATA.isDevMode || false;
     var SESSION_TOKEN = PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
     var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
@@ -41,11 +48,8 @@
 
     // Store session token in localStorage if provided
     if (SESSION_TOKEN) {
-      try {
-        localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
-        // Reset redirect counter — token is valid, auth succeeded
-        localStorage.removeItem('dashboardSessionRedirectCount');
-      } catch (_lsErr) { /* localStorage may be blocked */ }
+      safeLSSet('dashboardSessionToken', SESSION_TOKEN);
+      try { localStorage.removeItem('dashboardSessionRedirectCount'); } catch (_lsErr) {}
     }
 
     // On auth page: try to restore session from localStorage
@@ -73,7 +77,7 @@
               localStorage.removeItem('dashboardSessionRedirectCount');
               console.warn('Session restore: cleared stale token after ' + redirectCount + ' failed attempts');
             } else {
-              localStorage.setItem('dashboardSessionRedirectCount', String(redirectCount + 1));
+              safeLSSet('dashboardSessionRedirectCount', String(redirectCount + 1));
               // Redirect to web app URL with stored session token so server can validate
               window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
             }
@@ -92,18 +96,35 @@
     var _preloadedBatch = null;
     var _preloadReady = false;
     var _preloadCallbacks = [];
+    var _preloadViewId = CURRENT_VIEW; // stamp the view at preload request time
 
     if ((CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member') && CURRENT_USER && CURRENT_USER.email) {
       google.script.run
         .withSuccessHandler(function(batch) {
+          // H4: Discard stale preload data if the view changed while the request was in flight
+          if (CURRENT_VIEW !== _preloadViewId) return;
           _preloadedBatch = batch || {};
           _preloadReady = true;
+          // Skip re-render if SWR already showed identical data
+          if (_swrApplied) {
+            try {
+              var oldCache = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
+              if (oldCache) {
+                var oldData = JSON.parse(oldCache);
+                if (oldData && oldData.data && JSON.stringify(oldData.data) === JSON.stringify(batch)) {
+                  return; // Data unchanged — SWR render is still valid
+                }
+              }
+            } catch (_diffErr) { /* proceed with re-render */ }
+          }
           // C3: Stale-while-revalidate — persist batch data for instant return visits
-          try { localStorage.setItem('dds_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch })); } catch(_) {}
+          safeLSSet('dds_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch }));
           for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](_preloadedBatch);
           _preloadCallbacks = [];
         })
         .withFailureHandler(function() {
+          // H4: Discard stale preload failure if the view changed while the request was in flight
+          if (CURRENT_VIEW !== _preloadViewId) return;
           _preloadedBatch = null;
           _preloadReady = true;
           for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](null);
@@ -277,6 +298,7 @@
       }
 
       // ── Forced palettes for themes that override role colors ──
+      // Each key has a .light and .dark variant so the dark/light toggle works.
       var FORCED_PALETTES = {
         brutalist: {
           light: {
@@ -292,13 +314,13 @@
             mode: 'light',
           },
           dark: {
-            bg: '#1a1a1a', surface: '#222', surfaceAlt: '#2a2a2a', raised: '#2e2e2e',
-            text: '#e0e0e0', 'text-secondary': '#aaa', muted: '#777',
-            card: '#222', 'bg-tertiary': '#2a2a2a',
-            success: '#00cc55', warning: '#ddaa00', danger: '#ff4444', info: '#4488cc',
-            border: '#e0e0e0', radius: '0px',
-            accent: '#ff4444', accentDim: '#dd2222', accentGlow: 'rgba(255,68,68,0.25)',
-            accentBg: 'rgba(255,68,68,0.08)', accentBorder: 'rgba(255,68,68,0.35)',
+            bg: '#0a0a08', surface: '#141410', surfaceAlt: '#1a1a16', raised: '#1e1e1a',
+            text: '#e8e4dc', 'text-secondary': '#aaa89e', muted: '#777570',
+            card: '#141410', 'bg-tertiary': '#1e1e1a',
+            success: '#22cc55', warning: '#dd9922', danger: '#ff4444', info: '#5588cc',
+            border: '#e8e4dc', radius: '0px',
+            accent: '#ff4444', accentDim: '#cc2222', accentGlow: 'rgba(255,68,68,0.25)',
+            accentBg: 'rgba(255,68,68,0.08)', accentBorder: 'rgba(255,68,68,0.3)',
             fontBody: "'Space Mono', monospace",
             fontDisplay: "'Bebas Neue', sans-serif",
             mode: 'dark',
@@ -318,13 +340,13 @@
             mode: 'light',
           },
           dark: {
-            bg: '#003838', surface: '#2a2a3a', surfaceAlt: '#333344', raised: '#2e2e3e',
-            text: '#d0d0e0', 'text-secondary': '#9999aa', muted: '#777788',
-            card: '#2a2a3a', 'bg-tertiary': '#252535',
-            success: '#00aa44', warning: '#aaaa00', danger: '#dd3333', info: '#4466cc',
-            border: '#555566', radius: '0px',
-            accent: '#4466cc', accentDim: '#3355bb', accentGlow: 'rgba(68,102,204,0.25)',
-            accentBg: 'rgba(68,102,204,0.1)', accentBorder: 'rgba(68,102,204,0.35)',
+            bg: '#003838', surface: '#505058', surfaceAlt: '#5a5a62', raised: '#606068',
+            text: '#e0e0e0', 'text-secondary': '#b0b0b0', muted: '#808088',
+            card: '#505058', 'bg-tertiary': '#484850',
+            success: '#44cc44', warning: '#cccc44', danger: '#ee4444', info: '#6688ff',
+            border: '#808088', radius: '0px',
+            accent: '#6688ff', accentDim: '#4466cc', accentGlow: 'rgba(102,136,255,0.25)',
+            accentBg: 'rgba(102,136,255,0.10)', accentBorder: 'rgba(102,136,255,0.3)',
             fontBody: "'Pixelify Sans', system-ui",
             fontDisplay: "'Pixelify Sans', system-ui",
             mode: 'dark',
@@ -344,13 +366,13 @@
             mode: 'light',
           },
           dark: {
-            bg: '#1a1028', surface: '#231838', surfaceAlt: '#2a1e40', raised: '#2e2248',
-            text: '#e8e0f0', 'text-secondary': '#b0a0c0', muted: '#887799',
-            card: '#231838', 'bg-tertiary': '#2a1e40',
-            success: '#44cc66', warning: '#ff8800', danger: '#ff4466', info: '#4488ff',
-            border: '#e8e0f0', radius: '0px',
-            accent: '#ff4477', accentDim: '#dd2255', accentGlow: 'rgba(255,68,119,0.25)',
-            accentBg: 'rgba(255,68,119,0.08)', accentBorder: 'rgba(255,68,119,0.35)',
+            bg: '#1a1520', surface: '#221c2a', surfaceAlt: '#2a2232', raised: '#2e2638',
+            text: '#f0e8f5', 'text-secondary': '#b0a8c0', muted: '#887898',
+            card: '#221c2a', 'bg-tertiary': '#2a2232',
+            success: '#4ade80', warning: '#f59e0b', danger: '#ef4444', info: '#60a5fa',
+            border: '#f0e8f5', radius: '0px',
+            accent: '#ff2d5e', accentDim: '#d4002e', accentGlow: 'rgba(255,45,94,0.25)',
+            accentBg: 'rgba(255,45,94,0.08)', accentBorder: 'rgba(255,45,94,0.3)',
             fontBody: "'DM Sans', sans-serif",
             fontDisplay: "'Bangers', cursive",
             mode: 'dark',
@@ -417,6 +439,7 @@
       /** Apply the full unified theme: role+mode base, style overlay, accent palette */
       function apply() {
         var styleId = AppState.navTheme || 'default';
+        _loadThemeFonts(styleId);
         var isCyber = styleId === 'cyberpunk';
 
         // 1. Apply base role theme OR cyberpunk forced palette
@@ -493,7 +516,7 @@
       function setStyle(styleId) {
         if (!styles[styleId]) styleId = 'default';
         AppState.navTheme = styleId;
-        try { localStorage.setItem('dds_navTheme', styleId); } catch(e) {}
+        safeLSSet('dds_navTheme', styleId);
         apply();
       }
 
@@ -509,8 +532,26 @@
       function setCyberNeon(neonKey) {
         if (!CYBER_NEONS[neonKey]) neonKey = 'red';
         AppState.cyberNeon = neonKey;
-        try { localStorage.setItem('dds_cyberNeon', neonKey); } catch(e) {}
+        safeLSSet('dds_cyberNeon', neonKey);
         apply();
+      }
+
+      // ─── Theme Font Lazy-Loader ───────────────────────────
+      var _loadedThemeFonts = {};
+      function _loadThemeFonts(themeId) {
+        if (_loadedThemeFonts[themeId]) return;
+        var fontMap = {
+          cyberpunk: 'Press+Start+2P&display=swap&family=Share+Tech+Mono&display=swap&family=Silkscreen&display=swap',
+          retroOS: 'Pixelify+Sans&display=swap&family=Orbitron:wght@400;700&display=swap',
+          comic: 'Bangers&display=swap&family=Righteous&display=swap',
+          brutalist: 'Bebas+Neue&display=swap&family=Space+Mono:wght@400;700&display=swap'
+        };
+        if (!fontMap[themeId]) return;
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://fonts.googleapis.com/css2?family=' + fontMap[themeId];
+        document.head.appendChild(link);
+        _loadedThemeFonts[themeId] = true;
       }
 
       return {
@@ -560,6 +601,38 @@
         .replace(/'/g, '&#39;');
     }
 
+    /** Generate a simple unique key for idempotent mutation dedup */
+    function _genIdemKey() {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+      return Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    /**
+     * Safe localStorage setter with LRU eviction on quota error.
+     */
+    function safeLSSet(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch (_e) {
+        // Storage full — evict non-critical dds_ cache entries
+        var PROTECTED_KEYS = { dashboardSessionToken: 1, dashboardTheme: 1, dashboardSessionRedirectCount: 1 };
+        var evictable = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('dds_') === 0 && !PROTECTED_KEYS[k]) evictable.push(k);
+        }
+        evictable.forEach(function(k) { try { localStorage.removeItem(k); } catch(_) {} });
+        try { localStorage.setItem(key, value); } catch (_) {
+          // Still full — evict batch data specifically
+          for (var j = 0; j < localStorage.length; j++) {
+            var bk = localStorage.key(j);
+            if (bk && bk.indexOf('dds_batchData') === 0) { try { localStorage.removeItem(bk); } catch(_) {} }
+          }
+          try { localStorage.setItem(key, value); } catch (_) { /* give up */ }
+        }
+      }
+    }
+
     // ═══════════════════════════════════════
     // SAFE SERVER CALL — default failure handler for google.script.run
     // ═══════════════════════════════════════
@@ -577,6 +650,61 @@
      * active loading state. Callers can still override with their
      * own .withFailureHandler() — it will replace the default.
      */
+    // ─── Circuit Breaker ──────────────────────────────────────
+    // Prevents thundering-herd retries during sustained outages.
+    var CircuitBreaker = (function() {
+      var _failures = 0;
+      var _lastFailure = 0;
+      var _state = 'CLOSED'; // CLOSED | OPEN | HALF_OPEN
+      var THRESHOLD = 5;
+      var COOLDOWN = 30000; // 30s
+
+      return {
+        recordSuccess: function() { _failures = 0; _state = 'CLOSED'; },
+        recordFailure: function() {
+          _failures++;
+          _lastFailure = Date.now();
+          if (_failures >= THRESHOLD) _state = 'OPEN';
+        },
+        canCall: function() {
+          if (_state === 'CLOSED') return true;
+          if (_state === 'OPEN' && Date.now() - _lastFailure > COOLDOWN) {
+            _state = 'HALF_OPEN';
+            return true;
+          }
+          return _state === 'HALF_OPEN';
+        },
+        getState: function() { return _state; },
+        forceHalfOpen: function() { _state = 'HALF_OPEN'; }
+      };
+    })();
+
+    // ─── Offline Awareness ────────────────────────────────────
+    var _offlineBanner = null;
+    function _showOfflineBanner() {
+      if (_offlineBanner) return;
+      _offlineBanner = document.createElement('div');
+      _offlineBanner.className = 'offline-banner';
+      _offlineBanner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999;background:#ef4444;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:600;';
+      _offlineBanner.textContent = 'You are offline — showing cached data';
+      document.body.appendChild(_offlineBanner);
+    }
+    function _hideOfflineBanner() {
+      if (_offlineBanner) {
+        _offlineBanner.parentNode.removeChild(_offlineBanner);
+        _offlineBanner = null;
+      }
+      // Drain any queued server calls that were waiting during offline
+      _drainQueue();
+      // Refresh the active tab's data by invalidating client cache and re-navigating
+      DataCache.invalidate();
+      if (AppState.activeRole && AppState.activeTab) {
+        _handleTabNav(AppState.activeRole, AppState.activeTab);
+      }
+    }
+    window.addEventListener('offline', _showOfflineBanner);
+    window.addEventListener('online', _hideOfflineBanner);
+
     /** Default failure UI — shows error in any active loading spinners */
     function _showFailureUI(err) {
       var msg = (err && err.message) ? err.message : String(err || 'Unknown error');
@@ -599,6 +727,13 @@
           onClick: function() { location.reload(); }
         }, isTransient ? 'Retry' : 'Reload');
         errorDiv.appendChild(reloadBtn);
+        if (CircuitBreaker.getState() === 'OPEN') {
+          var forceBtn = el('button', {
+            style: { padding: '6px 16px', borderRadius: '6px', background: 'var(--warning, #f59e0b)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', marginLeft: '8px' },
+            onClick: function() { CircuitBreaker.forceHalfOpen(); location.reload(); }
+          }, 'Force retry');
+          errorDiv.appendChild(forceBtn);
+        }
         s.appendChild(errorDiv);
       });
     }
@@ -667,11 +802,6 @@
 
       function invalidate(key) { if (key) delete _cache[key]; else _cache = {}; }
 
-      /** v4.31.1: Invalidate all cache entries whose key starts with prefix */
-      function invalidatePrefix(prefix) {
-        for (var k in _cache) { if (k.indexOf(prefix) === 0) delete _cache[k]; }
-      }
-
       /** Check if a cache key has a valid (non-expired) entry */
       function has(key) { return get(key) !== undefined; }
 
@@ -698,7 +828,7 @@
         });
       }
 
-      return { get: get, set: set, has: has, invalidate: invalidate, invalidatePrefix: invalidatePrefix, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
+      return { get: get, set: set, has: has, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
     })();
 
     // ═══════════════════════════════════════
@@ -729,6 +859,12 @@
 
     /** Queue-aware entry point: limits concurrent calls, then delegates to retry logic */
     function _throttledServerCall(fnName, args, onSuccess, onFailure) {
+      if (!CircuitBreaker.canCall()) {
+        if (typeof onFailure === 'function') {
+          onFailure({ message: 'Server temporarily unavailable. Please wait a moment and try again.' });
+        }
+        return;
+      }
       if (_inFlight < _MAX_CONCURRENT) {
         _serverCallWithRetry(fnName, args, onSuccess, onFailure, 0);
       } else {
@@ -742,23 +878,34 @@
       var runner = google.script.run
         .withSuccessHandler(function(result) {
           _inFlight--;
+          CircuitBreaker.recordSuccess();
           _drainQueue();
           onSuccess(result);
         })
         .withFailureHandler(function(err) {
           _inFlight--;
           if (attempt < _MAX_RETRIES && _isTransientError(err)) {
-            var delay = _RETRY_BASE_MS * Math.pow(2, attempt);
+            var baseDelay = _RETRY_BASE_MS * Math.pow(2, attempt);
+            var delay = baseDelay * (0.8 + Math.random() * 0.4);
             console.warn('Retrying ' + fnName + ' (attempt ' + (attempt + 2) + '/' + (_MAX_RETRIES + 1) + ') in ' + delay + 'ms');
             setTimeout(function() {
               _serverCallWithRetry(fnName, args, onSuccess, onFailure, attempt + 1);
             }, delay);
           } else {
+            CircuitBreaker.recordFailure();
             _drainQueue();
             onFailure(err);
           }
         });
-      runner[fnName].apply(runner, args || []);
+      try {
+        runner[fnName].apply(runner, args || []);
+      } catch (clientErr) {
+        _inFlight--;
+        CircuitBreaker.recordFailure();
+        _drainQueue();
+        console.error('Client-side call error for ' + fnName + ':', clientErr);
+        if (typeof onFailure === 'function') onFailure(clientErr);
+      }
     }
 
     // ═══════════════════════════════════════
@@ -793,7 +940,11 @@
           // Remove sentinel before appending new items
           var oldSentinel = container.querySelector('.lazy-sentinel');
           if (oldSentinel) oldSentinel.remove();
-          container.appendChild(frag);
+          if (rendered === 0) {
+            container.appendChild(frag);
+          } else {
+            requestAnimationFrame(function() { container.appendChild(frag); });
+          }
           rendered = end;
 
           // Add sentinel for next page
@@ -808,7 +959,7 @@
                   obs.disconnect();
                   renderPage();
                 }
-              }, { rootMargin: '200px' });
+              }, { rootMargin: '400px' });
               obs.observe(sentinel);
             } else {
               // Fallback: render all if no IntersectionObserver
@@ -869,7 +1020,7 @@
 
       // Persist preference
       function _save() {
-        try { localStorage.setItem('dds_splitView', JSON.stringify({ enabled: _state.enabled, splitRatio: _state.splitRatio })); } catch(e) {}
+        safeLSSet('dds_splitView', JSON.stringify({ enabled: _state.enabled, splitRatio: _state.splitRatio }));
       }
       function _load() {
         try {
@@ -1229,7 +1380,23 @@
       }, 180);
     }
 
+    // ═══════════════════════════════════════
+    // M1-M3: Centralized timer/observer cleanup
+    // Called on logout and idle-logout to prevent leaked timers.
+    // ═══════════════════════════════════════
+    function _cleanupAppTimers() {
+      // Clear nav progress timer
+      if (_navProgressTimer) { clearTimeout(_navProgressTimer); _navProgressTimer = null; }
+      // Clear resize debounce timer
+      if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null; }
+      // Reset scroll-nav cooldown state
+      _scrollNav.cooldown = false;
+      // Flush call queue to prevent orphaned server calls after logout
+      _callQueue.length = 0;
+    }
+
     function handleLogout() {
+      _cleanupAppTimers();
       var token = localStorage.getItem('dashboardSessionToken');
       localStorage.removeItem('dashboardSessionToken');
 
@@ -1285,6 +1452,13 @@
     function renderPageLayout(container, role, activeTab, contentFn) {
       getLayoutMode(); // keep LayoutState current for other callers (e.g. isSidebarLayout in headers)
 
+      // Fire-and-forget usage analytics (v4.31.3)
+      try {
+        if (typeof SESSION_TOKEN !== 'undefined' && SESSION_TOKEN && activeTab) {
+          google.script.run.dataLogTabVisit(SESSION_TOKEN, activeTab, role || '');
+        }
+      } catch (_ua) { /* non-critical */ }
+
       if (_layoutCache.container === container && _layoutCache.role === role && _layoutCache.layout) {
         // Same role, same container — preserve layout shell.
         _layoutCache.sidebar.innerHTML = '';
@@ -1297,9 +1471,11 @@
           // Rendering into secondary panel
           var secPanel = _layoutCache.splitSecondary;
           if (!secPanel) return;
-          // Hide old secondary content
-          var oldSecContent = secPanel.querySelector('.page-layout-content');
-          if (oldSecContent) oldSecContent.style.display = 'none';
+          // Remove ALL old secondary content panes (prevent stacking)
+          var oldSecPanes = secPanel.querySelectorAll('.page-layout-content');
+          for (var _si = 0; _si < oldSecPanes.length; _si++) {
+            oldSecPanes[_si].parentNode.removeChild(oldSecPanes[_si]);
+          }
 
           var newSecContent = el('div', { className: 'page-layout-content' });
           contentFn(newSecContent);
@@ -1314,10 +1490,24 @@
         // Rendering into primary panel (default behavior)
         if (!_isSecondaryRender || !_layoutCache.splitContainer) {
           var targetParent = _layoutCache.splitPrimary || _layoutCache.layout;
+
+          // Hide ALL visible content panes in the primary panel (prevent stacking)
+          var existingPanes = targetParent.querySelectorAll('.page-layout-content');
+          for (var _pi = 0; _pi < existingPanes.length; _pi++) {
+            if (existingPanes[_pi].style.display !== 'none') {
+              existingPanes[_pi].style.display = 'none';
+            }
+          }
+
           var newContent = el('div', { className: 'page-layout-content' });
           contentFn(newContent);
           targetParent.appendChild(newContent);
-          _activatePane(newContent); // hides old pane, syncs _activePane + _layoutCache.content
+          _layoutCache.content = newContent;
+
+          // SELF-HEALING: always sync _activePane to the newly rendered content.
+          // This prevents desync when render functions are called outside _handleTabNav
+          // (e.g. from More menus, resize handlers, or deep-link callbacks).
+          _activePane = newContent;
 
           // Update primary header if split is active
           if (_layoutCache.splitPrimaryHeader) {
@@ -1333,6 +1523,12 @@
       }
 
       // Full rebuild (first render or role change)
+      // SELF-HEALING: flush tab pane cache on full rebuild to prevent stale
+      // panes from a prior role or session lingering in the DOM/cache.
+      if (_tabPanesRole !== role) {
+        _invalidateTabCache();
+        _tabPanesRole = role;
+      }
       container.innerHTML = '';
       var layout = el('div', { className: 'page-layout' });
       var sidebar = el('nav', { className: 'sidebar-nav' + (SplitView.isEnabled() ? ' split-active' : '') });
@@ -1353,7 +1549,8 @@
         layout.appendChild(content);
         container.appendChild(layout);
         _layoutCache = { container: container, role: role, layout: layout, sidebar: sidebar, content: content };
-        _activePane = content; // sync with _layoutCache.content (old pane destroyed by innerHTML='')
+        // SELF-HEALING: sync _activePane on full rebuild
+        _activePane = content;
       }
 
       // Bottom nav always added to DOM; CSS hides it at tablet+ (min-width: 640px)
@@ -1578,7 +1775,8 @@
             }
             // Force full layout rebuild
             _layoutCache = {};
-            _invalidateTabCache(); // flushes both primary + secondary pane caches
+            _invalidateTabCache();
+            SplitView.invalidateSecondaryCache();
             _handleTabNav(role, activeTab);
           }
         }, [
@@ -1624,10 +1822,26 @@
         sidebar.appendChild(el('div', {
           className: 'sidebar-item',
           onClick: function() {
+            // Reset navigation state before switching roles
+            _invalidateTabCache();
+            _activePane = null;
+            _layoutCache = {};
+            _tabPanesRole = null;
             AppState.activeRole = switchRole;
+            AppState.activeTab = switchRole === 'steward' ? 'cases' : 'home';
             var app = document.getElementById('app');
-            if (switchRole === 'steward') initStewardView(app);
-            else initMemberView(app);
+            try {
+              if (switchRole === 'steward') initStewardView(app);
+              else initMemberView(app);
+            } catch (switchErr) {
+              console.error('Switch role error:', switchErr);
+              app.innerHTML = '';
+              app.appendChild(el('div', { style: { textAlign: 'center', padding: '40px' } }, [
+                el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'),
+                el('div', { style: { fontWeight: '600', marginBottom: '8px' } }, 'Failed to switch view'),
+                el('button', { style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' }, onClick: function() { location.reload(); } }, 'Reload')
+              ]));
+            }
           }
         }, [
           el('span', { className: 'sidebar-item-icon' }, role === 'steward' ? '\uD83D\uDC64' : '\uD83D\uDD27'),
@@ -1638,19 +1852,8 @@
         className: 'sidebar-item',
         onClick: function() {
           AppState.isDark = !AppState.isDark;
-          try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
+          safeLSSet('dds_isDark', AppState.isDark);
           UnifiedTheme.apply();
-          // Sync embedded views (POMS, org chart) with new dark/light state
-          if (typeof _pomsSyncTheme === 'function') _pomsSyncTheme();
-          if (typeof maddstoggleMode !== 'function') {
-            // Org chart not loaded — will read AppState on next render
-          } else {
-            var ocEmbed = document.querySelector('.madds-embed');
-            if (ocEmbed) {
-              var ocIsLight = ocEmbed.classList.contains('light');
-              if (AppState.isDark === ocIsLight) maddstoggleMode();
-            }
-          }
           _handleTabNav(role, activeTab);
         }
       }, [
@@ -1664,7 +1867,7 @@
         var pickerToggle = el('div', {
           className: 'sidebar-item',
           onClick: function() {
-            var panel = pickerWrap.querySelector('.nav-theme-picker');
+            var panel = pickerWrap.querySelector('.theme-picker');
             if (panel) {
               panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
             }
@@ -1675,7 +1878,7 @@
         ]);
         pickerWrap.appendChild(pickerToggle);
 
-        var pickerPanel = el('div', { className: 'nav-theme-picker', style: { display: 'none', padding: '4px 12px 8px' } });
+        var pickerPanel = el('div', { className: 'theme-picker', style: { display: 'none', padding: '4px 12px 8px' } });
         var allThemes = NavThemes.getAll();
         for (var tid in allThemes) {
           if (!allThemes.hasOwnProperty(tid)) continue;
@@ -1683,23 +1886,23 @@
           (function(themeObj) {
             var isActive = AppState.navTheme === themeObj.tid;
             var item = el('div', {
-              className: 'nav-theme-picker-item' + (isActive ? ' active' : ''),
+              className: 'theme-picker-option' + (isActive ? ' active' : ''),
               onClick: function() {
                 NavThemes.setNavTheme(themeObj.tid);
                 UnifiedTheme.apply();
                 _handleTabNav(role, activeTab);
               }
             });
-            item.appendChild(el('span', { className: 'ntp-emoji' }, themeObj.emoji));
+            item.appendChild(el('span', { className: 'theme-emoji' }, themeObj.emoji));
             var info = el('div');
-            info.appendChild(el('div', { className: 'ntp-label' }, themeObj.label));
-            info.appendChild(el('div', { className: 'ntp-desc' }, themeObj.desc));
+            info.appendChild(el('div', { className: 'theme-label' }, themeObj.label));
+            info.appendChild(el('div', { className: 'theme-desc' }, themeObj.desc));
             item.appendChild(info);
             item.appendChild(el('span', {
-              className: 'ntp-badge ' + themeObj.type,
+              className: 'theme-badge ' + themeObj.type,
             }, themeObj.type === 'default' ? 'DEFAULT' : 'EXTRA'));
             if (isActive) {
-              item.appendChild(el('span', { className: 'ntp-check' }, '\u2713'));
+              item.appendChild(el('span', { className: 'theme-check' }, '\u2713'));
             }
             pickerPanel.appendChild(item);
 
@@ -1754,7 +1957,7 @@
         var ctToggle = el('div', {
           className: 'sidebar-item',
           onClick: function() {
-            var panel = ctWrap.querySelector('.nav-theme-picker');
+            var panel = ctWrap.querySelector('.theme-picker');
             if (panel) panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
           }
         }, [
@@ -1762,11 +1965,11 @@
           el('span', null, 'Color: ' + (currentCT ? currentCT.emoji : ''))
         ]);
         ctWrap.appendChild(ctToggle);
-        var ctPanel = el('div', { className: 'nav-theme-picker', style: { display: 'none', padding: '4px 12px 8px' } });
+        var ctPanel = el('div', { className: 'theme-picker', style: { display: 'none', padding: '4px 12px 8px' } });
         AppState.colorThemes.forEach(function(ct) {
           var isActive = AppState.colorTheme === ct.key;
           var item = el('div', {
-            className: 'nav-theme-picker-item' + (isActive ? ' active' : ''),
+            className: 'theme-picker-option' + (isActive ? ' active' : ''),
             onClick: function() {
               // Update accent palette instantly
               ThemeEngine.updatePalette(ct.accentHue);
@@ -1779,15 +1982,15 @@
               _handleTabNav(role, activeTab);
             }
           });
-          item.appendChild(el('span', { className: 'ntp-emoji' }, ct.emoji));
+          item.appendChild(el('span', { className: 'theme-emoji' }, ct.emoji));
           var info = el('div');
-          info.appendChild(el('div', { className: 'ntp-label' }, ct.name));
+          info.appendChild(el('div', { className: 'theme-label' }, ct.name));
           var hueDesc = 'Hue ' + ct.accentHue + '\u00B0';
-          info.appendChild(el('div', { className: 'ntp-desc' }, hueDesc));
+          info.appendChild(el('div', { className: 'theme-desc' }, hueDesc));
           item.appendChild(info);
           var swatch = el('span', { style: { marginLeft: 'auto', width: '16px', height: '16px', borderRadius: '50%', background: ct.headerBg, flexShrink: '0' } });
           item.appendChild(swatch);
-          if (isActive) item.appendChild(el('span', { className: 'ntp-check' }, '\u2713'));
+          if (isActive) item.appendChild(el('span', { className: 'theme-check' }, '\u2713'));
           ctPanel.appendChild(item);
         });
         ctWrap.appendChild(ctPanel);
@@ -1802,14 +2005,24 @@
       ]));
     }
 
+    // Dev-only tabs filtered out in production mode
+    var _DEV_ONLY_TABS = { testrunner: 1 };
+
+    function _filterDevTabs(tabs) {
+      if (IS_DEV_MODE) return tabs;
+      return tabs.filter(function(t) { return !t.id || !_DEV_ONLY_TABS[t.id]; });
+    }
+
     function _getSidebarTabs(role) {
-      if (role === 'steward') return [
+      if (role === 'steward') return _filterDevTabs([
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
+        { id: 'newgrievance', icon: '\uD83D\uDCDD', label: 'New Grievance' },
         { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { group: 'Manage' },
         { id: 'tasks', icon: '\u2705', label: 'Tasks' },
         { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
+        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { group: 'Reference' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
@@ -1823,11 +2036,11 @@
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
         { divider: true },
-        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
+        { group: 'Temp' },
         { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
         { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
-      ];
+      ]);
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
@@ -1854,6 +2067,139 @@
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
+    }
+
+    // ═══════════════════════════════════════
+    // THEME OPTIONS FOR MOBILE MORE MENUS
+    // Dark/Light toggle + Nav Style + Color Theme
+    // ═══════════════════════════════════════
+    function _renderMoreNavStyle(container, role) {
+      if (typeof NavThemes === 'undefined' || typeof UnifiedTheme === 'undefined') return;
+      var moreTab = 'more' + (role === 'steward' ? '_steward' : '');
+      container.appendChild(el('div', { style: { height: '1px', background: 'var(--border)', margin: '10px 0' } }));
+      container.appendChild(el('div', {
+        style: { fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-secondary, #888)', padding: '8px 0 4px' }
+      }, 'Appearance'));
+
+      // ── Dark / Light Mode Toggle ──
+      var darkLightCard = el('div', { className: 'card card-glass', style: { padding: '12px 14px', marginBottom: '8px' } });
+      var darkLightItem = el('div', {
+        className: 'more-menu-item', style: { cursor: 'pointer', padding: '0' },
+        onClick: function() {
+          AppState.isDark = !AppState.isDark;
+          safeLSSet('dds_isDark', AppState.isDark);
+          UnifiedTheme.apply();
+          _handleTabNav(role, moreTab);
+        }
+      });
+      darkLightItem.appendChild(el('span', { className: 'more-menu-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
+      var dlText = el('div', { style: { flex: '1' } });
+      dlText.appendChild(el('div', { className: 'more-menu-label' }, AppState.isDark ? 'Light Mode' : 'Dark Mode'));
+      dlText.appendChild(el('div', { className: 'more-menu-desc' }, AppState.isDark ? 'Switch to light theme' : 'Switch to dark theme'));
+      darkLightItem.appendChild(dlText);
+      darkLightCard.appendChild(darkLightItem);
+      container.appendChild(darkLightCard);
+
+      // ── Nav Style Picker ──
+      var currentTheme = NavThemes.getCurrent();
+      var pickerCard = el('div', { className: 'card card-glass', style: { padding: '12px 14px', marginBottom: '8px' } });
+      var pickerHeader = el('div', {
+        className: 'more-menu-item', style: { cursor: 'pointer', padding: '0' },
+        onClick: function() { pickerPanel.style.display = pickerPanel.style.display === 'none' ? 'block' : 'none'; }
+      });
+      pickerHeader.appendChild(el('span', { className: 'more-menu-icon' }, '\uD83C\uDFA8'));
+      var hText = el('div', { style: { flex: '1' } });
+      hText.appendChild(el('div', { className: 'more-menu-label' }, 'Nav Style'));
+      hText.appendChild(el('div', { className: 'more-menu-desc' }, currentTheme.label + ' ' + currentTheme.emoji));
+      pickerHeader.appendChild(hText);
+      pickerHeader.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u25BE'));
+      pickerCard.appendChild(pickerHeader);
+      var pickerPanel = el('div', { style: { display: 'none', marginTop: '8px' } });
+      var allThemes = NavThemes.getAll();
+      for (var tid in allThemes) {
+        if (!allThemes.hasOwnProperty(tid)) continue;
+        (function(themeObj) {
+          var isActive = AppState.navTheme === themeObj.tid;
+          var row = el('div', {
+            style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 4px', cursor: 'pointer', borderRadius: '8px', background: isActive ? 'var(--surface)' : 'transparent' },
+            onClick: function() { NavThemes.setNavTheme(themeObj.tid); UnifiedTheme.apply(); _handleTabNav(role, moreTab); }
+          });
+          row.appendChild(el('span', { style: { fontSize: '18px' } }, themeObj.emoji));
+          var info = el('div', { style: { flex: '1' } });
+          info.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, themeObj.label));
+          info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, themeObj.desc));
+          row.appendChild(info);
+          if (isActive) row.appendChild(el('span', { style: { color: 'var(--accent)', fontWeight: '700' } }, '\u2713'));
+          pickerPanel.appendChild(row);
+          if (themeObj.tid === 'cyberpunk' && isActive && typeof UnifiedTheme.CYBER_NEONS !== 'undefined') {
+            var neonRow = el('div', { style: { display: 'flex', gap: '6px', padding: '6px 4px 2px 32px', alignItems: 'center' } });
+            neonRow.appendChild(el('span', { style: { fontSize: '9px', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--muted)' } }, 'NEON:'));
+            var neons = UnifiedTheme.CYBER_NEONS;
+            for (var nk in neons) {
+              if (!neons.hasOwnProperty(nk)) continue;
+              (function(neonKey, neonObj) {
+                var isNeonActive = AppState.cyberNeon === neonKey;
+                neonRow.appendChild(el('div', {
+                  onClick: function(e) { e.stopPropagation(); UnifiedTheme.setCyberNeon(neonKey); _handleTabNav(role, moreTab); },
+                  title: neonObj.label,
+                  style: {
+                    width: '26px', height: '26px', borderRadius: '4px', background: neonObj.solid, cursor: 'pointer',
+                    border: isNeonActive ? '3px solid #fff' : '2px solid rgba(255,255,255,0.15)',
+                    boxShadow: isNeonActive ? '0 0 10px ' + neonObj.solid : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px',
+                  }
+                }, isNeonActive ? '\u2713' : ''));
+              })(nk, neons[nk]);
+            }
+            pickerPanel.appendChild(neonRow);
+          }
+        })(allThemes[tid]);
+      }
+      pickerCard.appendChild(pickerPanel);
+      container.appendChild(pickerCard);
+
+      // ── Color Theme Picker ──
+      if (AppState.colorThemes && AppState.colorThemes.length) {
+        var currentCT = AppState.colorThemes.filter(function(ct) { return ct.key === AppState.colorTheme; })[0];
+        var ctCard = el('div', { className: 'card card-glass', style: { padding: '12px 14px' } });
+        var ctHeader = el('div', {
+          className: 'more-menu-item', style: { cursor: 'pointer', padding: '0' },
+          onClick: function() { ctPanel.style.display = ctPanel.style.display === 'none' ? 'block' : 'none'; }
+        });
+        ctHeader.appendChild(el('span', { className: 'more-menu-icon' }, '\uD83C\uDF08'));
+        var ctText = el('div', { style: { flex: '1' } });
+        ctText.appendChild(el('div', { className: 'more-menu-label' }, 'Color'));
+        ctText.appendChild(el('div', { className: 'more-menu-desc' }, (currentCT ? currentCT.name + ' ' + currentCT.emoji : 'Default')));
+        ctHeader.appendChild(ctText);
+        ctHeader.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u25BE'));
+        ctCard.appendChild(ctHeader);
+        var ctPanel = el('div', { style: { display: 'none', marginTop: '8px' } });
+        AppState.colorThemes.forEach(function(ct) {
+          var isActive = AppState.colorTheme === ct.key;
+          var row = el('div', {
+            style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 4px', cursor: 'pointer', borderRadius: '8px', background: isActive ? 'var(--surface)' : 'transparent' },
+            onClick: function() {
+              ThemeEngine.updatePalette(ct.accentHue);
+              AppState.colorTheme = ct.key;
+              serverCall()
+                .withSuccessHandler(function() {})
+                .withFailureHandler(function() {})
+                .dataApplyColorTheme(SESSION_TOKEN, ct.key);
+              _handleTabNav(role, moreTab);
+            }
+          });
+          row.appendChild(el('span', { style: { fontSize: '18px' } }, ct.emoji));
+          var info = el('div', { style: { flex: '1' } });
+          info.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, ct.name));
+          info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Hue ' + ct.accentHue + '\u00B0'));
+          row.appendChild(info);
+          row.appendChild(el('span', { style: { marginLeft: 'auto', width: '16px', height: '16px', borderRadius: '50%', background: ct.headerBg, flexShrink: '0' } }));
+          if (isActive) row.appendChild(el('span', { style: { color: 'var(--accent)', fontWeight: '700' } }, '\u2713'));
+          ctPanel.appendChild(row);
+        });
+        ctCard.appendChild(ctPanel);
+        container.appendChild(ctCard);
+      }
     }
 
     // ═══════════════════════════════════════
@@ -1930,7 +2276,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--danger)', color: 'var(--accent-contrast, #fff)',
+                background: 'var(--danger)', color: '#fff',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -1945,7 +2291,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
+                background: 'var(--accent)', color: '#fff',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -1960,7 +2306,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--warning, #f59e0b)', color: 'var(--accent-contrast, #fff)',
+                background: 'var(--warning, #f59e0b)', color: '#fff',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -1975,7 +2321,7 @@
             iconWrap.appendChild(el('span', {
               style: {
                 position: 'absolute', top: '-4px', right: '-6px',
-                background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
+                background: 'var(--accent)', color: '#fff',
                 fontSize: '9px', fontWeight: '700', borderRadius: '8px',
                 padding: '1px 4px', lineHeight: '1.4', minWidth: '14px', textAlign: 'center',
               }
@@ -2010,25 +2356,36 @@
 
     function renderOrgChart(appContainer, role) {
       var mySwitch = _navSwitchId;
+      var myGen = _renderGeneration; // H7: capture render generation at request time
       renderPageLayout(appContainer, role, 'orgchart', function(container) {
         showLoading(container);
         google.script.run
           .withSuccessHandler(function(html) {
-            if (_navSwitchId !== mySwitch) return; // user already navigated away
+            if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; // user already navigated away
             container.innerHTML = '';
+            // Mark parent content pane so CSS can remove max-width constraint
+            container.classList.add('orgchart-content');
             var wrap = el('div');
             wrap.innerHTML = html;
             container.appendChild(wrap);
+            // Reset init flag so re-navigation works
+            window._initDesktopRan = false;
             // Re-execute any <script> tags from org_chart.html
+            // Use document.head.appendChild for reliable global-scope execution
             wrap.querySelectorAll('script').forEach(function(old) {
               try {
                 var s = document.createElement('script');
                 s.textContent = old.textContent;
-                old.parentNode.replaceChild(s, old);
+                old.parentNode.removeChild(old);
+                document.head.appendChild(s);
               } catch (scriptErr) {
                 console.error('Org chart script re-execution failed:', scriptErr);
               }
             });
+            // Safety net: ensure org chart init runs even if DOMContentLoaded already fired
+            if (typeof window.initDesktop === 'function') {
+              try { window.initDesktop(); } catch (_e) { /* already ran or not available */ }
+            }
           })
           .withFailureHandler(function(err) {
             container.innerHTML = '';
@@ -2044,6 +2401,7 @@
      */
     function renderPOMSReference(appContainer, role) {
       var mySwitch = _navSwitchId;
+      var myGen = _renderGeneration; // H7: capture render generation at request time
       renderPageLayout(appContainer, role, 'poms', function(container) {
         showLoading(container);
         // Set container to fill height for POMS app shell
@@ -2052,7 +2410,7 @@
         container.style.overflow = 'hidden';
         google.script.run
           .withSuccessHandler(function(html) {
-            if (_navSwitchId !== mySwitch) return; // user already navigated away
+            if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; // user already navigated away
             container.innerHTML = '';
             var wrap = el('div');
             wrap.style.height = '100%';
@@ -2083,45 +2441,62 @@
     // Tabs that mutate data are re-rendered fresh each time.
     // ═══════════════════════════════════════
     var _tabPanes = {};       // tabId → { pane: Element, role: string }
+    var _MAX_CACHED_PANES = 8;
+    var _paneAccessOrder = [];
     var _tabPanesRole = null;
     var _activePane = null;   // currently visible pane element
 
-    /**
-     * Centralized pane activation — the ONLY way to change the active pane.
-     * Hides old pane, shows new pane, keeps _activePane + _layoutCache.content
-     * in sync. Prevents the ghost-pane bug where two panes are visible at once.
-     */
-    function _activatePane(newPane) {
-      if (_activePane && _activePane !== newPane) _activePane.style.display = 'none';
-      if (newPane) newPane.style.display = '';
-      _activePane = newPane;
-      _layoutCache.content = newPane;
+    function _touchPane(cacheId) {
+      _paneAccessOrder = _paneAccessOrder.filter(function(id) { return id !== cacheId; });
+      _paneAccessOrder.push(cacheId);
+      // Evict oldest panes if over limit
+      while (_paneAccessOrder.length > _MAX_CACHED_PANES) {
+        var evictId = _paneAccessOrder.shift();
+        if (_tabPanes[evictId]) {
+          if (_tabPanes[evictId].pane && _tabPanes[evictId].pane.parentNode) {
+            _tabPanes[evictId].pane.parentNode.removeChild(_tabPanes[evictId].pane);
+          }
+          delete _tabPanes[evictId];
+        }
+      }
     }
 
     // Tabs that must always re-render (forms, mutation state, must be fresh)
     var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
 
-    /** Invalidate cached tab pane(s) — call after data mutations.
-     *  Always invalidates BOTH primary and secondary (split-view) caches
-     *  for the same tabId to prevent stale-pane desync. */
+    /** Invalidate cached tab pane(s) — call after data mutations */
     function _invalidateTabCache(tabId) {
       if (tabId) {
         if (_tabPanes[tabId]) {
+          // Remove from DOM if it exists
           if (_tabPanes[tabId].pane.parentNode) _tabPanes[tabId].pane.parentNode.removeChild(_tabPanes[tabId].pane);
           delete _tabPanes[tabId];
         }
-        SplitView.invalidateSecondaryCache(tabId); // keep secondary in sync
       } else {
         // Flush all
         for (var k in _tabPanes) {
           if (_tabPanes[k].pane.parentNode) _tabPanes[k].pane.parentNode.removeChild(_tabPanes[k].pane);
         }
         _tabPanes = {};
-        SplitView.invalidateSecondaryCache(); // flush secondary too
       }
     }
 
     var _navSwitchId = 0; // monotonic counter to discard stale tab switches
+    var _renderGeneration = 0; // H7: monotonic counter to discard stale async render callbacks
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ROUTING RULE: All user-initiated navigation MUST go through
+    // _handleTabNav(role, tabId). NEVER call render functions directly
+    // from onClick handlers, menus, or callbacks.
+    //
+    // Direct render calls bypass: pane caching, _activePane tracking,
+    // sidebar/bottom-nav highlights, stale-switch guards, and
+    // _renderGeneration. This causes pane visibility desync where
+    // multiple content panes display simultaneously.
+    //
+    // Exceptions: initStewardView/initMemberView (full re-init on boot
+    // or role switch — these reset all state).
+    // ══════════════════════════════════════════════════════════════════════
 
     /**
      * Returns a snapshot of the current switch ID. Call at render time, then
@@ -2131,12 +2506,14 @@
      */
     function _tabGuard() {
       var id = _navSwitchId;
-      return { stale: function() { return id !== _navSwitchId; } };
+      var gen = _renderGeneration; // H7: also capture render generation
+      return { stale: function() { return id !== _navSwitchId || gen !== _renderGeneration; } };
     }
 
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
       var switchId = ++_navSwitchId; // claim this switch; any older in-flight switch is now stale
+      _renderGeneration++; // H7: bump render generation so stale async callbacks are discarded
 
       // ── SPLIT VIEW ROUTING ──
       // When split-view is active, determine which panel receives this navigation
@@ -2163,29 +2540,44 @@
 
       // On role change, flush all cached panes
       if (_tabPanesRole !== role) {
-        _invalidateTabCache(); // flushes both primary + secondary pane caches
+        _invalidateTabCache();
+        SplitView.invalidateSecondaryCache();
         _tabPanesRole = role;
-        _activatePane(null);
+        _activePane = null;
       }
 
       _navProgressStart();
 
       // Handle "More" menus for both roles (mobile bottom-nav)
-      // Note: renderPageLayout inside these calls _activatePane automatically
-      if (tabId === 'more' || tabId === '_member_more') { _navProgressDone(); renderMemberMore(app); return; }
-      if (tabId === 'more_steward' || tabId === '_steward_more') { _navProgressDone(); renderStewardMore(app); return; }
+      if (tabId === 'more' || tabId === '_member_more') { _hideAllVisiblePanes(); _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
+      if (tabId === 'more_steward' || tabId === '_steward_more') { _hideAllVisiblePanes(); _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
 
       // ── SPLIT VIEW: secondary panel rendering ──
       if (_isSplitSecondary && _layoutCache.splitSecondary) {
         _splitRenderTarget = 'secondary';
         var renderFn = _getTabRenderFn(role, tabId);
         if (renderFn) {
-          renderFn(app);
-          // After renderPageLayout runs for secondary, it populates _layoutCache.secondaryContent
+          try {
+            renderFn(app);
+          } catch (splitErr) {
+            console.error('Split-view render error in tab "' + tabId + '":', splitErr);
+            if (_layoutCache.splitSecondary) {
+              _layoutCache.splitSecondary.innerHTML = '';
+              var errCard = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '32px' } });
+              errCard.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\u26A0\uFE0F'));
+              errCard.appendChild(el('div', { style: { color: 'var(--text)', fontWeight: '600', marginBottom: '6px' } }, 'This panel failed to load'));
+              errCard.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '12px', marginBottom: '12px' } }, String(splitErr.message || splitErr)));
+              _layoutCache.splitSecondary.appendChild(errCard);
+            }
+          }
+          // After renderPageLayout runs for secondary, it populates _layoutCache.secondaryContent.
+          // Guard: if the render threw, secondaryContent may be stale/undefined — skip caching.
           if (_layoutCache.secondaryContent && !_ALWAYS_FRESH_TABS[cacheId]) {
             SplitView.setSecondaryPane(cacheId, _layoutCache.secondaryContent);
           }
-          SplitView.setSecondaryActivePane(_layoutCache.secondaryContent);
+          if (_layoutCache.secondaryContent) {
+            SplitView.setSecondaryActivePane(_layoutCache.secondaryContent);
+          }
         }
         _splitRenderTarget = 'primary';
 
@@ -2198,9 +2590,6 @@
         return;
       }
 
-      // ── Stale-switch guard (shared tabs) — bail if a newer click already fired ──
-      if (switchId !== _navSwitchId) { _navProgressDone(); return; }
-
       // Shared tabs (available in both roles)
       if (tabId === 'orgchart') {
         if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
@@ -2210,18 +2599,18 @@
           _navProgressDone();
           return;
         }
-        // renderPageLayout inside renderOrgChart calls _activatePane automatically
+        _hideAllVisiblePanes();
         _splitRenderTarget = 'primary';
         renderOrgChart(app, role);
-        _gcHiddenPanes(); // clean up orphaned hidden panes (orgchart/poms are not cached)
+        _activePane = _layoutCache.content;
         _navProgressDone();
         return;
       }
       if (tabId === 'poms') {
-        // renderPageLayout inside renderPOMSReference calls _activatePane automatically
+        _hideAllVisiblePanes();
         _splitRenderTarget = 'primary';
         renderPOMSReference(app, role);
-        _gcHiddenPanes(); // clean up orphaned hidden panes
+        _activePane = _layoutCache.content;
         _navProgressDone();
         return;
       }
@@ -2234,8 +2623,19 @@
       var cached = isCacheable && _tabPanes[cacheId];
 
       if (cached) {
-        // INSTANT: hide current pane, show cached pane, update nav chrome
-        _activatePane(cached.pane);
+        // INSTANT: hide ALL visible panes, show cached pane, update nav chrome
+        var _gcRoot = _layoutCache.splitPrimary || _layoutCache.layout;
+        if (_gcRoot) {
+          var _visPanes = _gcRoot.querySelectorAll('.page-layout-content');
+          for (var _vi = 0; _vi < _visPanes.length; _vi++) {
+            if (_visPanes[_vi] !== cached.pane && _visPanes[_vi].style.display !== 'none') {
+              _visPanes[_vi].style.display = 'none';
+            }
+          }
+        }
+        cached.pane.style.display = '';
+        _activePane = cached.pane;
+        _touchPane(cacheId);
 
         // Update sidebar + bottom nav active highlights
         if (_layoutCache.sidebar) {
@@ -2250,7 +2650,17 @@
       }
 
       // ── FRESH RENDER: build new pane, cache it ──
-      // _activatePane inside renderPageLayout handles hiding the old pane
+      // Hide ALL visible panes (belt-and-suspenders: renderPageLayout also hides them)
+      var _frRoot = _layoutCache.splitPrimary || _layoutCache.layout;
+      if (_frRoot) {
+        var _frPanes = _frRoot.querySelectorAll('.page-layout-content');
+        for (var _fi = 0; _fi < _frPanes.length; _fi++) {
+          if (_frPanes[_fi].style.display !== 'none') _frPanes[_fi].style.display = 'none';
+        }
+      } else if (_activePane) {
+        _activePane.style.display = 'none';
+      }
+
       _splitRenderTarget = 'primary';
       _renderTabFresh(app, role, tabId, cacheId);
 
@@ -2265,16 +2675,46 @@
 
       // Call the render function — it will go through renderPageLayout
       // which creates a new content pane inside the layout shell (hiding the old one).
-      renderFn(app);
+      try {
+        renderFn(app);
+      } catch (renderErr) {
+        console.error('Render error in tab "' + tabId + '":', renderErr);
+        // Show error card in the content pane
+        renderPageLayout(app, role, tabId, function(container) {
+          container.innerHTML = '';
+          var errCard = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '32px' } });
+          errCard.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\u26A0\uFE0F'));
+          errCard.appendChild(el('div', { style: { color: 'var(--text)', fontWeight: '600', marginBottom: '6px' } }, 'This tab failed to load'));
+          errCard.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '12px', marginBottom: '12px' } }, String(renderErr.message || renderErr)));
+          var retryBtn = el('button', {
+            style: { padding: '6px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px' },
+            onClick: function() { _renderTabFresh(app, role, tabId, cacheId); }
+          }, 'Retry');
+          errCard.appendChild(retryBtn);
+          container.appendChild(errCard);
+        });
+      }
 
-      // After renderPageLayout runs, _activatePane has already synced _activePane.
+      // After renderPageLayout runs, _layoutCache.content holds the new content pane.
       if (_layoutCache.content && !_ALWAYS_FRESH_TABS[cacheId]) {
         _tabPanes[cacheId] = { pane: _layoutCache.content, role: role };
+        _touchPane(cacheId);
       }
+      _activePane = _layoutCache.content;
 
       // Clean up: remove hidden panes that aren't in the tab cache.
       // This prevents always-fresh tabs from accumulating orphaned hidden divs.
       _gcHiddenPanes();
+    }
+
+    /** Hide all visible content panes in the primary panel (prevents stacking) */
+    function _hideAllVisiblePanes() {
+      var root = _layoutCache.splitPrimary || _layoutCache.layout;
+      if (!root) { if (_activePane) _activePane.style.display = 'none'; return; }
+      var panes = root.querySelectorAll('.page-layout-content');
+      for (var i = 0; i < panes.length; i++) {
+        if (panes[i].style.display !== 'none') panes[i].style.display = 'none';
+      }
     }
 
     /** Remove hidden page-layout-content nodes that aren't in the tab pane cache */
@@ -2284,7 +2724,9 @@
       for (var k in _tabPanes) {
         if (_tabPanes[k] && _tabPanes[k].pane) kept[k] = _tabPanes[k].pane;
       }
-      var panes = _layoutCache.layout.querySelectorAll('.page-layout-content');
+      // Only GC from the primary panel (or layout root if no split), not from the secondary panel
+      var gcRoot = _layoutCache.splitPrimary || _layoutCache.layout;
+      var panes = gcRoot.querySelectorAll('.page-layout-content');
       for (var i = 0; i < panes.length; i++) {
         var p = panes[i];
         if (p === _activePane) continue; // currently visible
@@ -2324,6 +2766,7 @@
         switch(tabId) {
           case 'home':
           case 'cases': return renderStewardDashboard;
+          case 'newgrievance': return renderNewGrievanceForm;
           case 'members': return renderStewardMembers;
           case 'insights': return renderInsightsPage;
           case 'stewarddirectory': return renderStewardDirectoryPage;
@@ -2340,8 +2783,9 @@
           case 'feedback': return function(a) { renderFeedbackPage(a, 'steward'); };
           case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
           case 'timeline': return renderStewardTimelinePage;
+          case 'workload': return renderWorkloadTracker;
           case 'failsafe': return renderFailsafePage;
-          case 'testrunner': return renderTestRunnerPage;
+          case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
           default: return renderStewardDashboard;
         }
       }
@@ -2353,6 +2797,8 @@
      */
     function _checkDeepLink(role) {
       if (!AppState.initialTab) return;
+      // Guard: if user switched roles before data loaded, discard stale deep-link
+      if (AppState.activeRole && AppState.activeRole !== role) { AppState.initialTab = null; return; }
       var tab = AppState.initialTab;
       AppState.initialTab = null; // one-shot
       _handleTabNav(role, tab);
@@ -2367,10 +2813,16 @@
         var newMode = getLayoutMode();
         if (newMode !== _prevMode) {
           _prevMode = newMode;
-          // Re-render current view
-          var app = document.getElementById('app');
-          if (AppState.activeRole === 'steward') renderStewardDashboard(app);
-          else if (AppState.activeRole === 'member') renderMemberHome(app);
+          // Force full layout rebuild (sidebar ↔ bottom-nav) then re-render current tab
+          try {
+            _layoutCache = {};
+            _invalidateTabCache();
+            var role = AppState.activeRole;
+            var tab = AppState.activeTab || (role === 'steward' ? 'cases' : 'home');
+            _handleTabNav(role, tab);
+          } catch (resizeErr) {
+            console.error('Resize re-render error:', resizeErr);
+          }
         }
       }, 200);
     });
@@ -2383,13 +2835,12 @@
     // ═══════════════════════════════════════
     var _scrollNav = {
       startY: 0,
-      startScrollTop: 0,
-      startScrollHeight: 0,
-      startClientHeight: 0,
+      wasAtTop: false,
+      wasAtBottom: false,
       pulling: false,
       direction: null, // 'next' or 'prev'
       indicator: null,
-      threshold: 90, // px of overscroll needed to trigger
+      threshold: 70, // px of overscroll needed to trigger
       cooldown: false
     };
 
@@ -2468,101 +2919,125 @@
     }
 
     // Attach touch listeners to document (delegated, since content panes change)
-    document.addEventListener('touchstart', function(e) {
-      if (LayoutState.mode !== 'mobile' || _scrollNav.cooldown) return;
-      var role = AppState.activeRole;
-      if (!role) return;
+    var _touchHandlers = {
+      start: function(e) {
+        if (LayoutState.mode !== 'mobile' || _scrollNav.cooldown) return;
+        var role = AppState.activeRole;
+        if (!role) return;
 
-      // Don't interfere with horizontal scrolling or interactive elements
-      var tag = (e.target.tagName || '').toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        // Don't interfere with interactive elements
+        var tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
-      var content = _getScrollContent();
-      if (!content) return;
+        var content = _getScrollContent();
+        if (!content) return;
 
-      _scrollNav.startY = e.touches[0].clientY;
-      // Check scroll position of the content pane or window
-      _scrollNav.startScrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      _scrollNav.startScrollHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-      _scrollNav.startClientHeight = window.innerHeight;
-      _scrollNav.pulling = false;
-      _scrollNav.direction = null;
-    }, { passive: true });
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var scrollHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        var clientHeight = window.innerHeight;
 
-    document.addEventListener('touchmove', function(e) {
-      if (LayoutState.mode !== 'mobile' || _scrollNav.cooldown) return;
-      if (_scrollNav.startY === 0) return;
-
-      var role = AppState.activeRole;
-      if (!role) return;
-
-      var currentY = e.touches[0].clientY;
-      var deltaY = currentY - _scrollNav.startY;
-      var scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      var scrollHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-      var clientHeight = window.innerHeight;
-      var atTop = scrollTop <= 1;
-      var atBottom = (scrollTop + clientHeight) >= (scrollHeight - 2);
-
-      // Pulling down while at top → go to previous tab
-      if (deltaY > 20 && atTop) {
-        var prev = _getAdjacentTab(role, 'prev');
-        if (prev) {
-          _scrollNav.pulling = true;
-          _scrollNav.direction = 'prev';
-          var progress = Math.min(1, (deltaY - 20) / _scrollNav.threshold);
-          _showScrollNavIndicator('prev', prev.label, progress);
-        }
-        return;
-      }
-
-      // Pulling up while at bottom → go to next tab
-      if (deltaY < -20 && atBottom) {
-        var next = _getAdjacentTab(role, 'next');
-        if (next) {
-          _scrollNav.pulling = true;
-          _scrollNav.direction = 'next';
-          var progressN = Math.min(1, (Math.abs(deltaY) - 20) / _scrollNav.threshold);
-          _showScrollNavIndicator('next', next.label, progressN);
-        }
-        return;
-      }
-
-      // If user scrolled away from the edge, cancel
-      if (_scrollNav.pulling) {
+        _scrollNav.startY = e.touches[0].clientY;
+        // Lock edge state at touch-start so scroll jitter can't cancel mid-gesture
+        _scrollNav.wasAtTop = scrollTop <= 5;
+        _scrollNav.wasAtBottom = (scrollTop + clientHeight) >= (scrollHeight - 5);
         _scrollNav.pulling = false;
         _scrollNav.direction = null;
-        _hideScrollNavIndicator();
-      }
-    }, { passive: true });
+      },
+      move: function(e) {
+        if (LayoutState.mode !== 'mobile' || _scrollNav.cooldown) return;
+        if (_scrollNav.startY === 0) return;
 
-    document.addEventListener('touchend', function() {
-      if (!_scrollNav.pulling || !_scrollNav.direction) {
+        var role = AppState.activeRole;
+        if (!role) return;
+
+        var currentY = e.touches[0].clientY;
+        var deltaY = currentY - _scrollNav.startY;
+
+        // ── Already pulling: track progress without re-checking scroll edge ──
+        if (_scrollNav.pulling) {
+          var absDelta = Math.abs(deltaY);
+          // Cancel only if user reverses back past the dead-zone
+          if ((_scrollNav.direction === 'prev' && deltaY < 5) ||
+              (_scrollNav.direction === 'next' && deltaY > -5)) {
+            _scrollNav.pulling = false;
+            _scrollNav.direction = null;
+            _hideScrollNavIndicator();
+            return;
+          }
+          // Update indicator progress
+          var progress = Math.min(1, (absDelta - 20) / _scrollNav.threshold);
+          var target = _getAdjacentTab(role, _scrollNav.direction);
+          if (target) _showScrollNavIndicator(_scrollNav.direction, target.label, progress);
+          // Suppress rubber-band / scroll bounce while pulling
+          if (e.cancelable) e.preventDefault();
+          return;
+        }
+
+        // ── Not yet pulling: check if gesture qualifies ──
+        // Use edge state locked at touchstart (immune to scroll jitter)
+        if (deltaY > 20 && _scrollNav.wasAtTop) {
+          var prev = _getAdjacentTab(role, 'prev');
+          if (prev) {
+            _scrollNav.pulling = true;
+            _scrollNav.direction = 'prev';
+            var progressP = Math.min(1, (deltaY - 20) / _scrollNav.threshold);
+            _showScrollNavIndicator('prev', prev.label, progressP);
+            if (e.cancelable) e.preventDefault();
+          }
+          return;
+        }
+        if (deltaY < -20 && _scrollNav.wasAtBottom) {
+          var next = _getAdjacentTab(role, 'next');
+          if (next) {
+            _scrollNav.pulling = true;
+            _scrollNav.direction = 'next';
+            var progressN = Math.min(1, (Math.abs(deltaY) - 20) / _scrollNav.threshold);
+            _showScrollNavIndicator('next', next.label, progressN);
+            if (e.cancelable) e.preventDefault();
+          }
+          return;
+        }
+      },
+      end: function() {
+        if (!_scrollNav.pulling || !_scrollNav.direction) {
+          _scrollNav.startY = 0;
+          _hideScrollNavIndicator();
+          return;
+        }
+
+        var role = AppState.activeRole;
+        var target = _getAdjacentTab(role, _scrollNav.direction);
+        var ind = _scrollNav.indicator;
+        var wasReady = ind && ind.classList.contains('ready');
+
+        _scrollNav.pulling = false;
+        _scrollNav.direction = null;
         _scrollNav.startY = 0;
         _hideScrollNavIndicator();
-        return;
+
+        if (wasReady && target) {
+          // Cooldown to prevent rapid-fire navigation
+          _scrollNav.cooldown = true;
+          setTimeout(function() { _scrollNav.cooldown = false; }, 600);
+          // Navigate to the target tab
+          _handleTabNav(role, target.id);
+          // Scroll to top of new content
+          window.scrollTo(0, 0);
+        }
       }
+    };
+    document.addEventListener('touchstart', _touchHandlers.start, { passive: true });
+    document.addEventListener('touchmove', _touchHandlers.move, { passive: false });
+    document.addEventListener('touchend', _touchHandlers.end, { passive: true });
 
-      var role = AppState.activeRole;
-      var target = _getAdjacentTab(role, _scrollNav.direction);
-      var ind = _scrollNav.indicator;
-      var wasReady = ind && ind.classList.contains('ready');
-
-      _scrollNav.pulling = false;
-      _scrollNav.direction = null;
-      _scrollNav.startY = 0;
-      _hideScrollNavIndicator();
-
-      if (wasReady && target) {
-        // Cooldown to prevent rapid-fire navigation
-        _scrollNav.cooldown = true;
-        setTimeout(function() { _scrollNav.cooldown = false; }, 600);
-        // Navigate to the target tab
-        _handleTabNav(role, target.id);
-        // Scroll to top of new content
-        window.scrollTo(0, 0);
-      }
-    }, { passive: true });
+    /** Removes touch-based scroll-nav + offline/online listeners (call on view teardown) */
+    function _cleanupTouchListeners() {
+      document.removeEventListener('touchstart', _touchHandlers.start);
+      document.removeEventListener('touchmove', _touchHandlers.move);
+      document.removeEventListener('touchend', _touchHandlers.end);
+      window.removeEventListener('offline', _showOfflineBanner);
+      window.removeEventListener('online', _hideOfflineBanner);
+    }
 
     // ═══════════════════════════════════════
     // CHART HELPER — lazy-loads Chart.js on first use
@@ -2574,13 +3049,18 @@
       var _pendingCallbacks = [];
       var _cachedColors = null;
 
+      var _chartJsFailed = false; // M13: track permanent CDN failure
+
       function _ensureChartJs(callback) {
         if (_chartJsLoaded) { callback(); return; }
+        // M13: If CDN already failed, signal failure immediately
+        if (_chartJsFailed) { callback(true); return; }
         _pendingCallbacks.push(callback);
         if (_chartJsLoading) return;
         _chartJsLoading = true;
         var script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+        script.crossOrigin = 'anonymous';
         script.onload = function() {
           _chartJsLoaded = true;
           _chartJsLoading = false;
@@ -2589,8 +3069,13 @@
           cbs.forEach(function(cb) { cb(); });
         };
         script.onerror = function() {
+          // M13: Signal failure to all pending callbacks instead of silently dropping
           _chartJsLoading = false;
+          _chartJsFailed = true;
+          var cbs = _pendingCallbacks.slice();
           _pendingCallbacks = [];
+          cbs.forEach(function(cb) { cb(true); }); // true = failed
+          console.warn('Chart.js CDN unavailable — charts will not render');
         };
         document.head.appendChild(script);
       }
@@ -2614,19 +3099,11 @@
 
       function invalidateColorCache() { _cachedColors = null; }
 
-      /** Convert any CSS color (hex, hsl, rgb) to a hex string for chart fills */
-      function _toHex(color) {
-        if (!color || color.charAt(0) === '#') return color;
-        var ctx = document.createElement('canvas').getContext('2d');
-        ctx.fillStyle = color;
-        return ctx.fillStyle; // browser resolves to #rrggbb
-      }
-
       function _palette(count) {
         var c = _getColors();
         var pool = [c.accent, c.success, c.warning, c.info, c.danger, '#a78bfa', '#f472b6', '#38bdf8'];
         var out = [];
-        for (var i = 0; i < count; i++) out.push(_toHex(pool[i % pool.length]));
+        for (var i = 0; i < count; i++) out.push(pool[i % pool.length]);
         return out;
       }
 
@@ -2634,7 +3111,15 @@
         if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
       }
 
+      // M13: Show fallback message when Chart.js is unavailable
+      function _showChartFallback(container) {
+        container.innerHTML += '<div style="padding:20px;text-align:center;color:var(--text-secondary,#64748b);font-size:13px">' +
+          'Charts unavailable &mdash; please check your connection and reload</div>';
+      }
+
       function _create(container, id, cfg) {
+        // M13: Guard against Chart.js not being loaded
+        if (typeof Chart === 'undefined') { _showChartFallback(container); return null; }
         destroyChart(id);
         var wrap = el('div', { className: 'chart-container' });
         var canvas = document.createElement('canvas');
@@ -2650,11 +3135,12 @@
       }
 
       function _lazyCreate(container, id, cfgFn) {
-        _ensureChartJs(function() { cfgFn(); });
+        _ensureChartJs(function(failed) { if (failed) return; cfgFn(); });
       }
 
       function createBarChart(container, id, labels, datasets, opts) {
-        _ensureChartJs(function() {
+        _ensureChartJs(function(failed) {
+          if (failed) { _showChartFallback(container); return; }
           var c = _getColors();
           var dsList = datasets.map(function(ds, i) {
             return Object.assign({
@@ -2676,7 +3162,8 @@
       }
 
       function createHorizontalBarChart(container, id, labels, data, colors) {
-        _ensureChartJs(function() {
+        _ensureChartJs(function(failed) {
+          if (failed) { _showChartFallback(container); return; }
           var c = _getColors();
           _create(container, id, {
             type: 'bar',
@@ -2694,7 +3181,8 @@
       }
 
       function createDoughnutChart(container, id, labels, data, colors) {
-        _ensureChartJs(function() {
+        _ensureChartJs(function(failed) {
+          if (failed) { _showChartFallback(container); return; }
           _create(container, id, {
             type: 'doughnut',
             data: {
@@ -2710,13 +3198,13 @@
       }
 
       function createLineChart(container, id, labels, datasets, opts) {
-        _ensureChartJs(function() {
+        _ensureChartJs(function(failed) {
+          if (failed) { _showChartFallback(container); return; }
           var c = _getColors();
           var dsList = datasets.map(function(ds, i) {
-            var hex = _toHex(ds.color || _palette(datasets.length)[i]);
             return Object.assign({
-              borderColor: hex,
-              backgroundColor: hex + '20',
+              borderColor: ds.color || _palette(datasets.length)[i],
+              backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
               fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
             }, ds);
           });
@@ -2742,6 +3230,106 @@
       };
     })();
 
+    // ═══════════════════════════════════════════════════════════════
+    // Idle Auto-Logout (v4.31.0)
+    // After 15 min of inactivity, show a 2-min countdown warning.
+    // If the user does not interact, kill the session server-side
+    // and redirect to the auth page. Activity = click/key/scroll/touch.
+    // ═══════════════════════════════════════════════════════════════
+    var IdleLogout = (function() {
+      var IDLE_MS = 15 * 60 * 1000;   // 15 minutes
+      var WARN_SEC = 2 * 60;          // 2 minutes (in seconds)
+      var _idleTimer = null;
+      var _countdownInterval = null;
+      var _modalEl = null;
+
+      function _resetTimer() {
+        clearTimeout(_idleTimer);
+        if (_modalEl) _dismissWarning();
+        _idleTimer = setTimeout(_showWarning, IDLE_MS);
+      }
+
+      function _showWarning() {
+        var remaining = WARN_SEC;
+        _modalEl = document.createElement('div');
+        _modalEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+        var card = document.createElement('div');
+        card.style.cssText = 'background:var(--surface,#fff);border-radius:12px;padding:24px 32px;max-width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3)';
+        card.innerHTML = '<div style="font-size:18px;font-weight:700;margin-bottom:12px;color:var(--text,#1e293b)">Session Expiring</div>' +
+          '<div style="color:var(--text-secondary,#64748b);margin-bottom:16px">You will be logged out in <span id="idle-countdown" style="font-weight:700;color:var(--accent,#3b82f6)">' + remaining + '</span> seconds due to inactivity.</div>' +
+          '<button id="idle-stay-btn" style="background:var(--accent,#3b82f6);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">Stay logged in</button>';
+        _modalEl.appendChild(card);
+        document.body.appendChild(_modalEl);
+
+        document.getElementById('idle-stay-btn').addEventListener('click', function() {
+          _dismissWarning();
+          _resetTimer();
+        });
+
+        _countdownInterval = setInterval(function() {
+          remaining--;
+          var el = document.getElementById('idle-countdown');
+          if (el) el.textContent = remaining;
+          if (remaining <= 0) {
+            clearInterval(_countdownInterval);
+            _countdownInterval = null;
+            _doLogout();
+          }
+        }, 1000);
+      }
+
+      function _dismissWarning() {
+        if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
+        if (_modalEl && _modalEl.parentNode) { _modalEl.parentNode.removeChild(_modalEl); _modalEl = null; }
+      }
+
+      function _doLogout() {
+        _dismissWarning();
+        // Kill session token server-side (best-effort) — do NOT clear localStorage
+        var token = SESSION_TOKEN || '';
+        function _redirect() {
+          if (WEB_APP_URL) {
+            try { window.top.location.href = WEB_APP_URL + '?loggedout=1'; } catch (_e) {
+              window.location.href = WEB_APP_URL + '?loggedout=1';
+            }
+          } else {
+            try { window.top.location.reload(); } catch (_e2) { window.location.reload(); }
+          }
+        }
+        if (token) {
+          try {
+            google.script.run
+              .withSuccessHandler(_redirect)
+              .withFailureHandler(_redirect)
+              .authLogout(token);
+          } catch (_e) { _redirect(); }
+        } else {
+          _redirect();
+        }
+      }
+
+      function init() {
+        var events = ['click', 'keypress', 'scroll', 'touchstart'];
+        for (var i = 0; i < events.length; i++) {
+          document.addEventListener(events[i], _resetTimer, { passive: true, capture: true });
+        }
+        _resetTimer();
+      }
+
+      function destroy() {
+        clearTimeout(_idleTimer);
+        _dismissWarning();
+        var events = ['click', 'keypress', 'scroll', 'touchstart'];
+        for (var i = 0; i < events.length; i++) {
+          document.removeEventListener(events[i], _resetTimer, { capture: true });
+        }
+        // M1-M3: Clean up all app-wide timers on session teardown
+        _cleanupAppTimers();
+      }
+
+      return { init: init, destroy: destroy, reset: _resetTimer };
+    })();
+
     // ═══════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════
@@ -2759,34 +3347,24 @@
             .withSuccessHandler(function() {})
             .withFailureHandler(function() {})
             .dataEnsureSheetsIfNeeded(SESSION_TOKEN);
+
+          // Start idle auto-logout timer for authenticated sessions
+          IdleLogout.init();
         }
       } catch (bootErr) {
         console.error('Bootstrap error:', bootErr);
         var app = document.getElementById('app');
         if (app) {
           var errDetail = bootErr && bootErr.message ? bootErr.message : String(bootErr);
-          app.innerHTML = '<style>'
-            + '.fatal-bg{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,sans-serif;background:#f5f5f5;color:#1a1a1a}'
-            + '.fatal-card{max-width:440px;padding:40px 32px;background:#fff;border-radius:16px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.1)}'
-            + '.fatal-title{font-size:20px;margin:0 0 12px}'
-            + '.fatal-msg{color:#555;font-size:14px;line-height:1.6;margin:0 0 20px}'
-            + '.fatal-detail{color:#888;font-size:11px;line-height:1.4;margin:0 0 20px;font-family:monospace;word-break:break-all}'
-            + '.fatal-btn{display:inline-block;padding:10px 24px;background:hsl(250,70%,58%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px}'
-            + '@media(prefers-color-scheme:dark){'
-            + '.fatal-bg{background:#141414;color:#e0e0e0}'
-            + '.fatal-card{background:#1e1e1e;box-shadow:0 2px 12px rgba(0,0,0,0.4)}'
-            + '.fatal-msg{color:#888}'
-            + '.fatal-detail{color:#555}'
-            + '.fatal-btn{background:hsl(250,70%,68%)}'
-            + '}'
-            + '</style>'
-            + '<div class="fatal-bg">'
-            + '<div class="fatal-card">'
-            + '<h1 class="fatal-title">Something went wrong</h1>'
-            + '<p class="fatal-msg">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
-            + '<p class="fatal-detail">' + errDetail + '</p>'
-            + '<a href="javascript:localStorage.removeItem(\'dashboardSessionToken\');location.reload()" class="fatal-btn">Clear &amp; Reload</a>'
+          app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,sans-serif;background:#141414;color:#e0e0e0">'
+            + '<div style="max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center">'
+            + '<h1 style="font-size:20px;margin:0 0 12px">Something went wrong</h1>'
+            + '<p style="color:#888;font-size:14px;line-height:1.6;margin:0 0 20px">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
+            + '<p id="boot-err-detail" style="color:#555;font-size:11px;line-height:1.4;margin:0 0 20px;font-family:monospace;word-break:break-all"></p>'
+            + '<a href="javascript:localStorage.removeItem(\'dashboardSessionToken\');location.reload()" style="display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px">Clear &amp; Reload</a>'
             + '</div></div>';
+          var errEl = document.getElementById('boot-err-detail');
+          if (errEl) errEl.textContent = errDetail;
         }
       }
     });
@@ -2794,13 +3372,11 @@
 
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>
-  <? } else if (view === 'steward' || view === 'member' || view === 'both') { ?>
-    <? if (view === 'steward' || view === 'both') { ?>
-      <?!= include('steward_view') ?>
-    <? } ?>
-    <? if (view === 'member' || view === 'both') { ?>
-      <?!= include('member_view') ?>
-    <? } ?>
+  <? } else if (view === 'steward' || view === 'both') { ?>
+    <?!= include('steward_view') ?>
+    <?!= include('member_view') ?>
+  <? } else if (view === 'member') { ?>
+    <?!= include('member_view') ?>
   <? } else { ?>
     <?!= include('error_view') ?>
   <? } ?>

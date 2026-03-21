@@ -3,16 +3,30 @@
  * 06_Maintenance.gs - System Diagnostics and Repair
  * ============================================================================
  *
- * This module handles all diagnostic and repair functions including:
- * - System diagnostics (DIAGNOSE_SETUP)
- * - Dashboard repair (REPAIR_DASHBOARD)
- * - Modal diagnostics
- * - Sheet verification
+ * WHAT THIS FILE DOES:
+ *   System diagnostics and self-repair. DIAGNOSE_SETUP() audits all sheets,
+ *   columns, triggers, and config values — returns a report of checks/
+ *   warnings/errors. REPAIR_DASHBOARD() fixes common issues (missing sheets,
+ *   broken formatting, orphan triggers). Also manages audit log setup and
+ *   verification.
  *
- * REFACTORED: Split from 06_Maintenance.gs for better maintainability
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Union stewards are non-technical users. When something breaks, they need
+ *   a one-click "fix it" button. DIAGNOSE runs infrequently (manual trigger)
+ *   so bulk reads are acceptable performance-wise. Repair is idempotent —
+ *   safe to run multiple times.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Stewards lose the ability to diagnose and auto-repair issues. They'd
+ *   need to manually inspect sheets and triggers in the script editor. The
+ *   audit log may not get created/protected.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, column constants), ScriptApp (for trigger
+ *   management). Used by Admin menu in 03_, DevMenu.gs, and daily trigger
+ *   in 10_Main.gs.
  *
  * @fileoverview System diagnostics and repair functions
- * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -43,12 +57,10 @@ function DIAGNOSE_SETUP() {
   var existingSheets = ss.getSheets().map(function(s) { return s.getName(); });
 
   var skipKeys = {
-    DASHBOARD: true,           // @deprecated v4.3.2 - modal dashboards now
-    REPORTS: true,             // Backward-compat alias for DASHBOARD
+    DASHBOARD: true,           // Deprecated — removed by removeDeprecatedTabs()
+    SATISFACTION: true,        // Hidden tab — data accessed via modal. removeDeprecatedTabs() hides it.
     TEST_RESULTS: true,        // Created on-demand by test framework only
     MEMBER_DIRECTORY: true     // Backward-compat alias for MEMBER_DIR
-    // WORKLOAD_ARCHIVE removed from skip v4.26.0 — now in HIDDEN_SHEETS, repair creates if missing
-    // GRIEVANCE_TRACKER removed v4.25.9 - alias deleted, all callers use GRIEVANCE_LOG
   };
 
   var checkedValues = {};
@@ -261,16 +273,274 @@ function REPAIR_DASHBOARD() {
   }
 }
 
+// ============================================================================
+// UPDATE ALL SHEETS
+// ============================================================================
+
+/**
+ * Updates every sheet tab in the spreadsheet without destroying data.
+ *
+ * What it does (in order):
+ *   1. Syncs column maps from actual sheet headers (runtime discovery)
+ *   2. Updates headers on core data sheets (Config, Member Dir, Grievance Log)
+ *   3. Ensures all feature sheets exist (Contact Log, Tasks, QA, Timeline, etc.)
+ *   4. Refreshes all hidden calculation sheets and re-hides them
+ *   5. Reapplies data validations (dropdowns from Config)
+ *   6. Re-enforces hidden-sheet protection (mobile-safe)
+ *   7. Reorders sheets to standard layout
+ *   8. Runs a data sync across all calculation sheets
+ *
+ * Safe to run repeatedly — preserves all user data, only touches structure.
+ * Callable from menu: Union Hub > Admin > Update All Sheets
+ *
+ * @returns {Object} Summary with counts of updated, created, and repaired items
+ */
+function UPDATE_ALL_SHEETS() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = null;
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { /* headless */ }
+
+  if (ui) {
+    var response = ui.alert(
+      '🔄 Update All Sheets',
+      'This will update every tab in the spreadsheet:\n\n' +
+      '• Update headers on Config, Member Directory, Grievance Log\n' +
+      '• Ensure all feature sheets exist (QA, Timeline, Workload, etc.)\n' +
+      '• Refresh hidden calculation sheets & formulas\n' +
+      '• Reapply data validations (dropdowns)\n' +
+      '• Re-enforce hidden sheet protection\n' +
+      '• Reorder sheets to standard layout\n' +
+      '• Sync all calculation data\n\n' +
+      'Your data will NOT be deleted.\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+    if (response !== ui.Button.YES) {
+      ui.alert('Update cancelled.');
+      return { cancelled: true };
+    }
+  }
+
+  var summary = {
+    updated: [],
+    created: [],
+    repaired: [],
+    errors: [],
+    startTime: new Date()
+  };
+
+  ss.toast('Starting full sheet update...', '🔄 Update', 5);
+
+  // ── STEP 1: Sync column maps ─────────────────────────────────────────────
+  try {
+    syncColumnMaps();
+    summary.updated.push('Column maps synced');
+    ss.toast('Column maps synced', '🔄 Step 1/8', 2);
+  } catch (e) {
+    summary.errors.push('syncColumnMaps: ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS syncColumnMaps error: ' + e.message);
+  }
+
+  // ── STEP 2: Update core data sheet headers ────────────────────────────────
+  var step2 = 'Config';
+  try {
+    step2 = 'Config';
+    createConfigSheet(ss);
+    summary.updated.push('Config headers + defaults');
+    ss.toast('Config updated', '🔄 Step 2/8', 2);
+
+    step2 = 'Member Directory';
+    createMemberDirectory(ss);
+    summary.updated.push('Member Directory headers');
+
+    step2 = 'Grievance Log';
+    createGrievanceLog(ss);
+    summary.updated.push('Grievance Log headers');
+
+    step2 = 'Action Type column';
+    setupActionTypeColumn();
+    summary.updated.push('Action Type dropdown');
+
+    step2 = 'Case Checklist';
+    getOrCreateChecklistSheet();
+    summary.updated.push('Case Checklist');
+
+    ss.toast('Core data sheets updated', '🔄 Step 2/8', 2);
+  } catch (e) {
+    summary.errors.push('Step 2 (' + step2 + '): ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS step 2 error (' + step2 + '): ' + e.message);
+  }
+
+  // ── STEP 3: Ensure all feature sheets exist ───────────────────────────────
+  ss.toast('Ensuring feature sheets...', '🔄 Step 3/8', 3);
+  var featureSteps = [
+    { name: 'Survey Questions', fn: function() { createSurveyQuestionsSheet(ss); } },
+    { name: 'Satisfaction', fn: function() { createSatisfactionSheet(ss); } },
+    { name: 'Feedback', fn: function() { createFeedbackSheet(ss); } },
+    { name: 'Resources', fn: function() { if (typeof createResourcesSheet === 'function') createResourcesSheet(ss); } },
+    { name: 'Resource Config', fn: function() { if (typeof createResourceConfigSheet === 'function') createResourceConfigSheet(ss); } },
+    { name: 'Notifications', fn: function() { if (typeof createNotificationsSheet === 'function') createNotificationsSheet(ss); } },
+    { name: 'Volunteer Hours', fn: function() { createVolunteerHoursSheet(ss); } },
+    { name: 'Meeting Attendance', fn: function() { createMeetingAttendanceSheet(ss); } },
+    { name: 'Meeting Check-In Log', fn: function() { createMeetingCheckInLogSheet(ss); } },
+    { name: 'Getting Started', fn: function() { createGettingStartedSheet(ss); } },
+    { name: 'FAQ', fn: function() { createFAQSheet(ss); } },
+    { name: 'Config Guide', fn: function() { createConfigGuideSheet(ss); } },
+    { name: 'Features Reference', fn: function() { createFeaturesReferenceSheet(ss); } },
+    { name: 'Function Checklist', fn: function() { createFunctionChecklistSheet_(); } },
+    { name: 'Contact Log', fn: function() { _ensureContactLogSheet(ss); } },
+    { name: 'Steward Tasks', fn: function() { _ensureStewardTasksSheet(ss); } },
+    { name: 'Workload Tracker', fn: function() { if (typeof initWorkloadTrackerSheets === 'function') initWorkloadTrackerSheets(); } },
+    { name: 'Portal Sheets', fn: function() { if (typeof initPortalSheets === 'function') initPortalSheets(); } },
+    { name: 'Weekly Questions', fn: function() { if (typeof WeeklyQuestions !== 'undefined' && typeof WeeklyQuestions.initWeeklyQuestionSheets === 'function') WeeklyQuestions.initWeeklyQuestionSheets(); } },
+    { name: 'QA Forum', fn: function() { if (typeof QAForum !== 'undefined' && typeof QAForum.initQAForumSheets === 'function') QAForum.initQAForumSheets(); } },
+    { name: 'Timeline', fn: function() { if (typeof TimelineService !== 'undefined' && typeof TimelineService.initTimelineSheet === 'function') TimelineService.initTimelineSheet(); } },
+    { name: 'Failsafe Config', fn: function() { if (typeof FailsafeService !== 'undefined' && typeof FailsafeService.initFailsafeSheet === 'function') FailsafeService.initFailsafeSheet(); } },
+    { name: 'Grievance Feedback', fn: function() { if (typeof _ensureGrievanceFeedbackSheet === 'function') _ensureGrievanceFeedbackSheet(ss); } }
+  ];
+
+  for (var i = 0; i < featureSteps.length; i++) {
+    try {
+      var existed = !!ss.getSheetByName(featureSteps[i].name);
+      featureSteps[i].fn();
+      if (!existed && ss.getSheetByName(featureSteps[i].name)) {
+        summary.created.push(featureSteps[i].name);
+      } else {
+        summary.updated.push(featureSteps[i].name);
+      }
+    } catch (e) {
+      summary.errors.push(featureSteps[i].name + ': ' + e.message);
+      Logger.log('UPDATE_ALL_SHEETS feature "' + featureSteps[i].name + '": ' + e.message);
+    }
+  }
+  ss.toast('Feature sheets ready', '🔄 Step 3/8', 2);
+
+  // ── STEP 4: Refresh hidden calculation sheets ─────────────────────────────
+  ss.toast('Refreshing hidden sheets...', '🔄 Step 4/8', 3);
+  try {
+    setupHiddenSheets(ss);
+    summary.repaired.push('Hidden calculation sheets (16)');
+    ss.toast('Hidden sheets refreshed', '🔄 Step 4/8', 2);
+  } catch (e) {
+    summary.errors.push('setupHiddenSheets: ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS setupHiddenSheets error: ' + e.message);
+  }
+
+  // Also refresh the self-contained hidden sheets (08d)
+  try {
+    if (typeof setupAllHiddenSheets === 'function') {
+      setupAllHiddenSheets();
+      summary.repaired.push('Self-contained calc sheets (7)');
+    }
+  } catch (e) {
+    summary.errors.push('setupAllHiddenSheets: ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS setupAllHiddenSheets error: ' + e.message);
+  }
+
+  // ── STEP 5: Reapply data validations ──────────────────────────────────────
+  ss.toast('Reapplying validations...', '🔄 Step 5/8', 3);
+  try {
+    setupDataValidations();
+    summary.updated.push('Data validations (dropdowns)');
+  } catch (e) {
+    summary.errors.push('setupDataValidations: ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS setupDataValidations error: ' + e.message);
+  }
+
+  // ── STEP 6: Re-enforce hidden sheet protection ────────────────────────────
+  ss.toast('Enforcing hidden sheet protection...', '🔄 Step 6/8', 3);
+  try {
+    var allSheets = ss.getSheets();
+    var hiddenCount = 0;
+    for (var h = 0; h < allSheets.length; h++) {
+      var sName = allSheets[h].getName();
+      if (sName.charAt(0) === '_') {
+        setSheetVeryHidden_(allSheets[h]);
+        hiddenCount++;
+      }
+    }
+    summary.repaired.push(hiddenCount + ' hidden sheets re-protected');
+  } catch (e) {
+    summary.errors.push('Hidden sheet enforcement: ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS hidden enforcement error: ' + e.message);
+  }
+
+  // ── STEP 7: Reorder sheets ────────────────────────────────────────────────
+  ss.toast('Reordering sheets...', '🔄 Step 7/8', 2);
+  try {
+    reorderSheetsToStandard(ss);
+    summary.updated.push('Sheet order');
+  } catch (e) {
+    summary.errors.push('reorderSheetsToStandard: ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS reorder error: ' + e.message);
+  }
+
+  // ── STEP 8: Sync all data ─────────────────────────────────────────────────
+  ss.toast('Syncing calculation data...', '🔄 Step 8/8', 3);
+  try {
+    syncAllData();
+    summary.updated.push('Calculation data synced');
+  } catch (e) {
+    summary.errors.push('syncAllData: ' + e.message);
+    Logger.log('UPDATE_ALL_SHEETS syncAllData error: ' + e.message);
+  }
+
+  // Also repair checkboxes
+  try {
+    if (typeof repairGrievanceCheckboxes === 'function') repairGrievanceCheckboxes();
+    if (typeof repairMemberCheckboxes === 'function') repairMemberCheckboxes();
+    summary.repaired.push('Checkboxes');
+  } catch (e) {
+    Logger.log('UPDATE_ALL_SHEETS checkbox repair: ' + e.message);
+  }
+
+  // ── DONE ──────────────────────────────────────────────────────────────────
+  summary.duration = ((new Date() - summary.startTime) / 1000).toFixed(1) + 's';
+
+  // Log the update
+  try {
+    logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
+      action: 'UPDATE_ALL_SHEETS',
+      updated: summary.updated.length,
+      created: summary.created.length,
+      repaired: summary.repaired.length,
+      errors: summary.errors.length,
+      duration: summary.duration,
+      runBy: Session.getActiveUser().getEmail()
+    });
+  } catch (_e) { /* audit log may not exist yet */ }
+
+  var resultMsg = '✅ Update complete in ' + summary.duration + '!\n\n' +
+    '📝 Updated: ' + summary.updated.length + ' sheets\n' +
+    '🆕 Created: ' + summary.created.length + ' new sheets\n' +
+    '🔧 Repaired: ' + summary.repaired.length + ' items\n' +
+    (summary.errors.length > 0 ? '⚠️ Errors: ' + summary.errors.length + '\n' + summary.errors.join('\n') : '✅ No errors');
+
+  ss.toast('Update complete!', '✅ Done', 5);
+  if (ui) {
+    ui.alert('🔄 Update All Sheets — Complete', resultMsg, ui.ButtonSet.OK);
+  }
+
+  Logger.log('UPDATE_ALL_SHEETS complete: ' + JSON.stringify(summary));
+  return summary;
+}
+
 /**
  * Removes deprecated tabs from the spreadsheet
  * @returns {void}
  */
 function removeDeprecatedTabs() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  // Exact-match names — only delete if name matches exactly
-  var exactMatches = [
+  // Exact-match names — delete if name matches exactly
+  var deleteMatches = [
     'Dashboard_OLD',
-    'Member List_OLD'
+    'Member List_OLD',
+    SHEETS.DASHBOARD,     // 💼 Dashboard — replaced by modal dashboards (v4.3.2)
+    '🎯 Custom View'      // Replaced by modal dashboards (v4.2.3)
+  ];
+  // Exact-match names — hide (not delete) because data is still accessed by modals
+  var hideMatches = [
+    SHEETS.SATISFACTION   // 📊 Member Satisfaction — data used by showSatisfactionDashboard()
   ];
   // Prefix patterns — delete if name starts with the pattern (intentional wildcard)
   var prefixPatterns = [
@@ -279,14 +549,25 @@ function removeDeprecatedTabs() {
   ];
 
   var removed = [];
+  var hidden = [];
   var sheets = ss.getSheets();
   for (var i = sheets.length - 1; i >= 0; i--) {
     var sheet = sheets[i];
     var name = sheet.getName();
+
+    // Check hide matches first (data preservation)
+    if (hideMatches.indexOf(name) !== -1) {
+      if (!sheet.isSheetHidden()) {
+        sheet.hideSheet();
+        hidden.push(name);
+      }
+      continue;
+    }
+
     var shouldRemove = false;
 
-    // Check exact matches
-    if (exactMatches.indexOf(name) !== -1) {
+    // Check exact delete matches
+    if (deleteMatches.indexOf(name) !== -1) {
       shouldRemove = true;
     } else {
       // Check prefix patterns
@@ -308,10 +589,15 @@ function removeDeprecatedTabs() {
     }
   }
 
+  var messages = [];
   if (removed.length > 0) {
-    SpreadsheetApp.getUi().alert(
-      'Removed ' + removed.length + ' deprecated sheets:\n' + removed.join('\n')
-    );
+    messages.push('Deleted ' + removed.length + ' sheet(s):\n' + removed.join('\n'));
+  }
+  if (hidden.length > 0) {
+    messages.push('Hidden ' + hidden.length + ' sheet(s):\n' + hidden.join('\n'));
+  }
+  if (messages.length > 0) {
+    SpreadsheetApp.getUi().alert(messages.join('\n\n'));
   } else {
     SpreadsheetApp.getUi().alert('No deprecated sheets found.');
   }
@@ -549,8 +835,6 @@ function getDiagnosticsDialogHtml_(results) {
     '</body></html>';
 }
 
-
-
 /**
  * ============================================================================
  * CacheManager.gs - Caching and Performance
@@ -619,16 +903,14 @@ function getCachedData(key, loader, ttl) {
     var cached = null;
     try {
       cached = memCache.get(key);
-    } catch (_memErr) {
-      // CacheService may be unavailable
-    }
+    } catch (_memErr) { Logger.log('_memErr: ' + (_memErr.message || _memErr)); }
     if (cached) {
       try {
         if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Memory] ' + key);
         return JSON.parse(cached);
       } catch (_parseErr) {
         // Corrupted cache entry, remove it
-        try { memCache.remove(key); } catch (_e) {}
+        try { memCache.remove(key); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
     }
 
@@ -642,18 +924,16 @@ function getCachedData(key, loader, ttl) {
           // Refresh memory cache from properties
           var str = JSON.stringify(obj.data);
           if (str.length < 100000) {
-            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) {}
+            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
           }
           if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Props] ' + key);
           return obj.data;
         } else {
           // Expired - clean up stale property
-          try { propsCache.deleteProperty(key); } catch (_e) {}
+          try { propsCache.deleteProperty(key); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
         }
       }
-    } catch (_propsErr) {
-      // Properties unavailable, continue to loader
-    }
+    } catch (_propsErr) { Logger.log('_propsErr: ' + (_propsErr.message || _propsErr)); }
 
     // Cache miss - load fresh data
     if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE MISS] ' + key);
@@ -713,9 +993,6 @@ function setCachedData(key, data, ttl) {
     Logger.log('Set cache error for ' + key + ': ' + e.message);
   }
 }
-
-// invalidateCache removed — dead code cleanup v4.25.11
-
 /**
  * Invalidates all caches
  * @returns {void}
@@ -793,9 +1070,6 @@ function warmWebAppCaches_() {
     }
   }
 }
-
-// setupWebAppCacheWarmingTrigger removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // CACHED DATA LOADERS
 // ============================================================================
@@ -919,7 +1193,7 @@ function showCacheStatusDashboard() {
         if (obj.timestamp) {
           age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
         }
-      } catch (_e) { /* cached value may not be valid JSON; skip age display */ }
+      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     }
 
     // M-13: Apply escapeHtml() to dynamic values embedded in HTML
@@ -961,8 +1235,6 @@ function showCacheStatusDashboard() {
 
   SpreadsheetApp.getUi().showModalDialog(html, '🗄️ Cache Status');
 }
-
-
 
 /**
  * ============================================================================
@@ -1081,13 +1353,6 @@ function recordAction(type, description, beforeState, afterState) {
   history.currentIndex = history.actions.length;
   saveUndoHistory(history);
 }
-
-// recordCellEdit removed — dead code cleanup v4.25.11
-
-// recordRowAddition removed — dead code cleanup v4.25.11
-
-// recordRowDeletion removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // UNDO/REDO OPERATIONS
 // ============================================================================
@@ -1146,9 +1411,6 @@ function undoToIndex(targetIndex) {
     history = getUndoHistory();
   }
 }
-
-// redoToIndex removed — dead code cleanup v4.25.11
-
 /**
  * Applies a saved state to the spreadsheet
  * @param {Object} state - State to apply
@@ -1329,7 +1591,7 @@ function exportUndoHistoryToSheet() {
   sheet.getRange(1, 1, 1, headers.length)
     .setValues([headers])
     .setFontWeight('bold')
-    .setBackground(SHEET_COLORS.STATUS_PURPLE)
+    .setBackground('#7c3aed')
     .setFontColor('#fff');
 
   if (history.actions.length > 0) {
@@ -1351,11 +1613,6 @@ function exportUndoHistoryToSheet() {
 
   return ss.getUrl() + '#gid=' + sheet.getSheetId();
 }
-
-// showUndoRedoPanel removed — dead code cleanup v4.25.11
-
-
-
 /**
  * ============================================================================
  * Maintenance.gs - Admin & Diagnostic Tools
@@ -1512,13 +1769,10 @@ function logAuditEvent(eventType, details) {
     }
 
   } catch (error) {
-    console.error('Error logging audit event:', error);
+    Logger.log('Error logging audit event:', error);
     // Don't throw - audit logging shouldn't break main functionality
   }
 }
-
-// getRecentAuditLogs removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // NUCLEAR OPTIONS (ADMIN ONLY)
 // ============================================================================
@@ -1687,9 +1941,7 @@ function createWeeklySnapshot() {
   var archiveFolderId = '';
   try {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
-  } catch (_e) {
-    // Fall back to a default if config is not available
-  }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   var folder;
   if (!archiveFolderId) {
@@ -1813,9 +2065,6 @@ function setupWeeklySnapshotTrigger() {
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
-
-// setupWeeklyDriveCleanupTrigger removed — dead code cleanup v4.25.11
-
 /**
  * Cleans up old export files from Drive.
  * Called by a weekly trigger (set up via setupWeeklyExportCleanupTrigger).
@@ -2180,10 +2429,6 @@ function batchSetValues(sheet, updates) {
   });
 }
 
-// batchSetRowValues removed — dead code cleanup v4.25.11
-
-// batchAppendRows removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // ERROR HANDLING WITH RETRY LOGIC
 // ============================================================================
@@ -2224,16 +2469,9 @@ function executeWithRetry(fn, options) {
   // All retries exhausted
   throw new Error('Operation failed after ' + (maxRetries + 1) + ' attempts: ' + lastError.message);
 }
-
-// safeSheetOperation removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // CONFIRMATION DIALOGS FOR DESTRUCTIVE ACTIONS
 // ============================================================================
-
-// getOrCreateSheetSafe removed — dead code cleanup v4.25.11
-
-// confirmDestructiveAction removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // DYNAMIC VALIDATION RANGES
@@ -2316,7 +2554,7 @@ function validateMemberIdOnEdit(e) {
     );
 
     // Optionally highlight the cell
-    range.setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT); // Light red
+    range.setBackground('#FFCDD2'); // Light red
 
     // Revert to old value if available
     if (e.oldValue) {
@@ -2394,11 +2632,12 @@ function highlightOrphanedGrievances() {
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!grievanceSheet) { Logger.log('Grievance Log sheet not found'); return; }
 
   // Highlight orphaned rows
   orphaned.forEach(function(item) {
     grievanceSheet.getRange(item.row, 1, 1, grievanceSheet.getLastColumn())
-      .setBackground(SHEET_COLORS.BG_LIGHT_RED_ALT); // Light red
+      .setBackground('#FFCDD2'); // Light red
   });
 
   // Report findings
@@ -2418,9 +2657,6 @@ function highlightOrphanedGrievances() {
   // Log to audit
   logIntegrityEvent('GHOST_VALIDATION', 'Found ' + orphaned.length + ' orphaned grievances');
 }
-
-// runScheduledGhostValidation removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // STEWARD LOAD BALANCING METRICS
 // ============================================================================
@@ -2555,9 +2791,6 @@ function showStewardWorkloadDashboard() {
 
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Steward Workload Analysis');
 }
-
-// getStewardWithLowestWorkload removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SELF-HEALING CONFIG VALIDATION TOOL
 // ============================================================================
@@ -2873,21 +3106,8 @@ function archiveClosedGrievances(daysOld) {
     return { archived: 0 };
   }
 
-  // Get or create archive sheet
-  var archiveSheetName = HIDDEN_SHEETS.ARCHIVE_GRIEVANCES;
-  var archiveSheet = ss.getSheetByName(archiveSheetName);
-
-  if (!archiveSheet) {
-    archiveSheet = ss.insertSheet(archiveSheetName);
-    setSheetVeryHidden_(archiveSheet);
-
-    // Copy headers
-    var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues();
-    archiveSheet.getRange(1, 1, 1, headers[0].length).setValues(headers)
-      .setFontWeight('bold')
-      .setBackground(SHEET_COLORS.STATUS_DISABLED)
-      .setFontColor(SHEET_COLORS.BG_WHITE);
-  }
+  // Get or create archive sheet — uses canonical SHEETS.GRIEVANCE_ARCHIVE constant
+  var archiveSheet = ensureGrievanceArchiveSheet_(ss);
 
   // Find rows to archive
   var closedStatuses = ['Closed', 'Won', 'Denied', 'Settled', 'Withdrawn'];
@@ -3020,9 +3240,6 @@ function showArchiveDialog() {
 
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Archive Grievances');
 }
-
-// restoreFromArchive removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // VISUAL DEADLINE HEATMAP WITH SPARKLINES
 // ============================================================================
@@ -3056,8 +3273,8 @@ function applyDeadlineHeatmap() {
   // Overdue (negative or "Overdue" text)
   var overdueRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberLessThanOrEqualTo(0)
-    .setBackground(SHEET_COLORS.STATUS_ERROR)  // Bright red
-    .setFontColor(SHEET_COLORS.BG_WHITE)
+    .setBackground('#DC2626')  // Bright red
+    .setFontColor('#FFFFFF')
     .setBold(true)
     .setRanges([deadlineRange])
     .build();
@@ -3066,7 +3283,7 @@ function applyDeadlineHeatmap() {
   var criticalRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberBetween(1, 3)
     .setBackground('#F87171')  // Light red
-    .setFontColor(SHEET_COLORS.HEADER_DARK_RED)
+    .setFontColor('#7F1D1D')
     .setBold(true)
     .setRanges([deadlineRange])
     .build();
@@ -3074,24 +3291,24 @@ function applyDeadlineHeatmap() {
   // Warning (4-7 days)
   var warningRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberBetween(4, 7)
-    .setBackground(SHEET_COLORS.STATUS_WARNING)  // Yellow/orange
-    .setFontColor(SHEET_COLORS.TEXT_BROWN)
+    .setBackground('#FBBF24')  // Yellow/orange
+    .setFontColor('#78350F')
     .setRanges([deadlineRange])
     .build();
 
   // Caution (8-14 days)
   var cautionRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberBetween(8, 14)
-    .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)  // Light yellow
-    .setFontColor(SHEET_COLORS.TEXT_DARK_ORANGE)
+    .setBackground('#FEF3C7')  // Light yellow
+    .setFontColor('#92400E')
     .setRanges([deadlineRange])
     .build();
 
   // Safe (15+ days)
   var safeRule = SpreadsheetApp.newConditionalFormatRule()
     .whenNumberGreaterThan(14)
-    .setBackground(SHEET_COLORS.BG_PALE_GREEN)  // Light green
-    .setFontColor(SHEET_COLORS.TEXT_DARK_GREEN)
+    .setBackground('#D1FAE5')  // Light green
+    .setFontColor('#065F46')
     .setRanges([deadlineRange])
     .build();
 
@@ -3103,23 +3320,23 @@ function applyDeadlineHeatmap() {
 
   var wonRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Won')
-    .setBackground(SHEET_COLORS.STATUS_SUCCESS)  // Green
-    .setFontColor(SHEET_COLORS.BG_WHITE)
+    .setBackground('#059669')  // Green
+    .setFontColor('#FFFFFF')
     .setBold(true)
     .setRanges([statusRange])
     .build();
 
   var deniedRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Denied')
-    .setBackground(SHEET_COLORS.STATUS_ERROR)  // Red
-    .setFontColor(SHEET_COLORS.BG_WHITE)
+    .setBackground('#DC2626')  // Red
+    .setFontColor('#FFFFFF')
     .setRanges([statusRange])
     .build();
 
   var settledRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Settled')
-    .setBackground(SHEET_COLORS.STATUS_PURPLE)  // Purple
-    .setFontColor(SHEET_COLORS.BG_WHITE)
+    .setBackground('#7C3AED')  // Purple
+    .setFontColor('#FFFFFF')
     .setRanges([statusRange])
     .build();
 
@@ -3174,26 +3391,26 @@ function createMobileStewardPortal() {
   portalSheet.getRange('A1').setValue('📱 STEWARD PORTAL')
     .setFontSize(18)
     .setFontWeight('bold')
-    .setFontColor(SHEET_COLORS.STATUS_PURPLE);
+    .setFontColor('#7C3AED');
   portalSheet.getRange('A1:E1').merge();
 
   portalSheet.getRange('A2').setValue('Quick access to your active cases. Updated: ' + new Date().toLocaleString())
     .setFontStyle('italic')
-    .setFontColor(SHEET_COLORS.STATUS_DISABLED);
+    .setFontColor('#6B7280');
   portalSheet.getRange('A2:E2').merge();
 
   // Section: Urgent Cases (deadline <= 7 days)
   portalSheet.getRange('A4').setValue('🚨 URGENT CASES')
     .setFontWeight('bold')
-    .setBackground(SHEET_COLORS.STATUS_ERROR)
-    .setFontColor(SHEET_COLORS.BG_WHITE);
+    .setBackground('#DC2626')
+    .setFontColor('#FFFFFF');
   portalSheet.getRange('A4:E4').merge();
 
   // Headers for mobile view
   var headers = ['ID', 'Member', 'Status', 'Deadline', 'Steward'];
   portalSheet.getRange('A5:E5').setValues([headers])
     .setFontWeight('bold')
-    .setBackground(SHEET_COLORS.BG_VERY_LIGHT_GRAY);
+    .setBackground('#F3F4F6');
 
   // Get grievance data and filter
   var grievanceData = grievanceSheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.STEWARD).getValues();
@@ -3231,26 +3448,26 @@ function createMobileStewardPortal() {
   // Write urgent cases
   if (urgentCases.length > 0) {
     portalSheet.getRange(currentRow, 1, urgentCases.length, 5).setValues(urgentCases)
-      .setBackground(SHEET_COLORS.BG_LIGHT_RED);
+      .setBackground('#FEE2E2');
     currentRow += urgentCases.length + 1;
   } else {
     portalSheet.getRange(currentRow, 1).setValue('No urgent cases!')
-      .setFontColor(SHEET_COLORS.STATUS_SUCCESS);
+      .setFontColor('#059669');
     currentRow += 2;
   }
 
   // Section: All Active Cases
   portalSheet.getRange(currentRow, 1).setValue('📋 ALL ACTIVE CASES')
     .setFontWeight('bold')
-    .setBackground(SHEET_COLORS.STATUS_PURPLE)
-    .setFontColor(SHEET_COLORS.BG_WHITE);
+    .setBackground('#7C3AED')
+    .setFontColor('#FFFFFF');
   portalSheet.getRange(currentRow, 1, 1, 5).merge();
   currentRow++;
 
   // Headers
   portalSheet.getRange(currentRow, 1, 1, 5).setValues([headers])
     .setFontWeight('bold')
-    .setBackground(SHEET_COLORS.BG_VERY_LIGHT_GRAY);
+    .setBackground('#F3F4F6');
   currentRow++;
 
   // Write normal cases
@@ -3333,7 +3550,7 @@ function onEditWithAuditLogging(e) {
       validateMemberIdOnEdit(e);
     }
   } catch (err) {
-    console.error('onEditWithAuditLogging error:', err.message);
+    Logger.log('onEditWithAuditLogging error:', err.message);
   }
 }
 
@@ -3454,7 +3671,88 @@ function dataAuditTriggers(sessionToken) {
 }
 
 // ============================================================================
+// AUDIT LOG ARCHIVAL (v4.30.0)
+// ============================================================================
+
+/**
+ * Archives audit log entries older than `daysOld` days.
+ * - Lock-protected to prevent concurrent archival
+ * - CSV backup to Drive before deleting
+ * - Preserves integrity hash chain checkpoint
+ * - Deletes rows bottom-up to avoid index shifting
+ *
+ * @param {number} [daysOld=90] - Archive entries older than this many days
+ * @returns {{ archived: number, backupFileId: string }}
+ */
+function archiveOldAuditLogs_(daysOld) {
+  daysOld = daysOld || 90;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+  if (!auditSheet || auditSheet.getLastRow() <= 1) return { archived: 0 };
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    Logger.log('archiveOldAuditLogs_: lock contention — skipped');
+    return { archived: 0, error: 'Lock unavailable' };
+  }
+
+  try {
+    var cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - daysOld);
+
+    var lastRow = auditSheet.getLastRow();
+    var data = auditSheet.getRange(2, 1, lastRow - 1, auditSheet.getLastColumn()).getValues();
+    var rowsToArchive = [];
+    var deleteIndices = [];
+
+    for (var i = 0; i < data.length; i++) {
+      var ts = data[i][0]; // timestamp is col 1
+      if (ts instanceof Date && ts < cutoff) {
+        rowsToArchive.push(data[i]);
+        deleteIndices.push(i + 2); // +2 for header and 0-index
+      }
+    }
+
+    if (rowsToArchive.length === 0) return { archived: 0 };
+
+    // CSV backup to Drive
+    var headers = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+    var csv = headers.join(',') + '\n';
+    for (var r = 0; r < rowsToArchive.length; r++) {
+      csv += rowsToArchive[r].map(function(cell) {
+        var val = cell instanceof Date ? cell.toISOString() : String(cell || '');
+        return '"' + val.replace(/"/g, '""') + '"';
+      }).join(',') + '\n';
+    }
+
+    var backupFolder = typeof _getOrCreateBackupFolder === 'function' ? _getOrCreateBackupFolder() : DriveApp.getRootFolder();
+    var fileName = 'AUDIT_LOG_ARCHIVE_' + new Date().toISOString().slice(0, 10) + '.csv';
+    var file = backupFolder.createFile(fileName, csv, 'text/csv');
+    Logger.log('Audit log archive backup: ' + file.getId() + ' (' + rowsToArchive.length + ' rows)');
+
+    // Delete rows bottom-up to avoid index shifting
+    for (var d = deleteIndices.length - 1; d >= 0; d--) {
+      auditSheet.deleteRow(deleteIndices[d]);
+    }
+
+    logAuditEvent('AUDIT_LOG_ARCHIVED', rowsToArchive.length + ' entries archived (>' + daysOld + ' days). Backup: ' + file.getId());
+    return { archived: rowsToArchive.length, backupFileId: file.getId() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Wrapper for time-driven trigger. Archives audit logs older than 90 days.
+ */
+function dailyAuditArchive() {
+  var result = archiveOldAuditLogs_(90);
+  if (result.archived > 0) {
+    Logger.log('dailyAuditArchive: archived ' + result.archived + ' entries');
+  }
+}
+
+// ============================================================================
 // MENU ADDITIONS
 // ============================================================================
 
-// addDataIntegrityMenuItems removed — dead code cleanup v4.25.11

@@ -53,7 +53,7 @@ describe('Search uses SHEETS constants', () => {
     const code = fs.readFileSync(
       path.resolve(__dirname, '..', 'src', '08b_SearchAndCharts.gs'), 'utf8'
     );
-    // After our migration, should use SHEETS. not SHEET_NAMES.
+    // SHEET_NAMES alias removed in v4.31.1 — verify no references remain
     expect(code).not.toContain('SHEET_NAMES.');
   });
 });

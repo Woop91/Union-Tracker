@@ -1,7 +1,35 @@
-// ============================================================================
-// 08e_SurveyEngine.gs — Survey Period Management & Aggregation
-// v4.21.0 — Replaces Google Form integration with fully native webapp survey
-// ============================================================================
+/**
+ * ============================================================================
+ * 08e_SurveyEngine.gs - Survey Period Management and Aggregation
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Native survey engine replacing Google Form integration (v4.21.0).
+ *   initSurveyEngine() is a one-shot setup function that creates survey
+ *   sheets, seeds config, installs triggers (quarterly auto-open, weekly
+ *   reminders), and activates the current period. Manages survey periods,
+ *   tracking, and aggregation.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Google Forms required external access and couldn't enforce the union's
+ *   specific survey sections and branching logic. The native engine uses a
+ *   schema-driven approach where survey questions are defined in the Survey
+ *   Questions sheet and can be edited by the spreadsheet owner.
+ *   initSurveyEngine() is idempotent — safe to re-run.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Surveys cannot be opened/closed. Survey responses are not collected.
+ *   Quarterly auto-triggers don't fire. Member satisfaction data goes stale.
+ *   The satisfaction dashboard shows outdated scores.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, SURVEY_QUESTIONS_COLS),
+ *   10b_SurveyDocSheets.gs (createSurveyQuestionsSheet). Used by DevMenu.gs
+ *   (init), daily/quarterly triggers, and the satisfaction dashboard in 09_.
+ *
+ * @fileoverview Survey engine setup, period management, and aggregation
+ * @requires 01_Core.gs, 10b_SurveyDocSheets.gs
+ */
 
 // ── One-shot init (run once after deployment) ─────────────────────────────────
 
@@ -24,7 +52,7 @@ function initSurveyEngine() {
 
   try {
     // 0. Survey Questions sheet (seed if not exists — owner edits question text here)
-    createSurveyQuestionsSheet(ss2);
+    createSurveyQuestionsSheet(SpreadsheetApp.getActiveSpreadsheet());
     log.push('✅ 📋 Survey Questions sheet ready');
   } catch(e) { log.push('❌ Survey Questions sheet: ' + e.message); }
 
@@ -94,6 +122,7 @@ function initSurveyEngine() {
     var ss2 = SpreadsheetApp.getActiveSpreadsheet();
     var trackSheet = ss2.getSheetByName(SHEETS.SURVEY_TRACKING);
     var memberSheet = ss2.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!trackSheet) { log.push('⚠️  _Survey_Tracking sheet not found — skipping.'); throw new Error('_Survey_Tracking sheet not found'); }
     var memberCount = memberSheet ? Math.max(0, memberSheet.getLastRow() - 1) : 0;
     if (memberCount === 0) {
       log.push('⚠️  Member Directory empty — tracking not populated. Add members first, then re-run.');
@@ -157,7 +186,7 @@ function setupSurveyPeriodsSheet() {
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
-    .setBackground(SHEET_COLORS.BG_LIGHT_BLUE);
+    .setBackground('#E0E7FF');
 
   sheet.setFrozenRows(1);
 
@@ -233,8 +262,13 @@ function openNewSurveyPeriod(callerEmail) {
       var periodName= 'Q' + quarter + ' ' + year + ' Member Satisfaction Survey';
 
       // Quarter date bounds
+      // Day 0 of month N gives the last day of month N-1, so:
+      //   Q1 → new Date(y, 3, 0) = Mar 31
+      //   Q2 → new Date(y, 6, 0) = Jun 30
+      //   Q3 → new Date(y, 9, 0) = Sep 30
+      //   Q4 → new Date(y, 12,0) = Dec 31
       var qStart = new Date(year, (quarter - 1) * 3, 1);
-      var qEnd   = new Date(year,  quarter * 3,      0);  // last day of quarter
+      var qEnd   = new Date(year,  quarter * 3,      0);
 
       // Write to _Survey_Periods
       var periodsSheet = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_PERIODS);
@@ -607,7 +641,7 @@ function getSatisfactionSummary() {
     try {
       var cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch(_ce) {}
+    } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
 
     var ss       = SpreadsheetApp.getActiveSpreadsheet();
     var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
@@ -672,7 +706,7 @@ function getSatisfactionSummary() {
       sections:      sections
     };
 
-    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 600); } catch(_ce) {}
+    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 600); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
     return result;
 
   } catch(e) {
@@ -954,7 +988,7 @@ function menuToggleRTOSection() {
     var cache = CacheService.getScriptCache();
     cache.remove('surveyQuestions_v1');
     cache.remove('satisfactionColMap_v1');
-  } catch(_c) {}
+  } catch (_c) { Logger.log('_c: ' + (_c.message || _c)); }
 
   var action = currentlyActive ? 'deactivated (hidden)' : 'activated (visible)';
   ui.alert(

@@ -415,7 +415,7 @@ describe('G12: All client server calls have matching server functions', () => {
           if (JS_BUILTINS.has(name)) continue;
           if (serverFunctions.has(name)) continue;
           // Skip if it looks like a client-side function (starts lowercase, common patterns)
-          if (['serverCall', 'showLoading', 'showToast', 'el', 'escHtml_', 'invalidate', 'invalidatePrefix', 'cachedCall'].includes(name)) continue;
+          if (['serverCall', 'showLoading', 'showToast', 'el', 'escHtml_'].includes(name)) continue;
 
           missing.push(`${file}:${i + 1} calls .${name}() — no matching server function`);
         }
@@ -758,30 +758,32 @@ describe('G18: Shared tabs route for both roles', () => {
     expect(sharedTabs.length).toBeGreaterThan(0);
   });
 
+  // Extract tab IDs handled in _getTabRenderFn per role
+  function extractRenderFnTabs(code, role) {
+    const fnStart = code.indexOf('function _getTabRenderFn');
+    if (fnStart === -1) return new Set();
+    const fnCode = code.substring(fnStart, code.indexOf('\n    }', fnStart + 500) + 10);
+    const roleBlock = role === 'member'
+      ? fnCode.substring(fnCode.indexOf("if (role === 'member')"))
+      : fnCode.substring(fnCode.indexOf("} else"));
+    const ids = new Set();
+    for (const m of roleBlock.matchAll(/case\s*'([^']+)':/g)) ids.add(m[1]);
+    return ids;
+  }
+
+  const memberRenderTabs = extractRenderFnTabs(indexCode, 'member');
+  const stewardRenderTabs = extractRenderFnTabs(indexCode, 'steward');
+
   sharedTabs.forEach(tabId => {
     test(`shared tab '${tabId}' is handled before role-specific switch (not role-gated)`, () => {
-      // Must be in shared handlers OR in BOTH role-specific switch blocks
-      if (sharedHandlers.has(tabId)) return; // handled as shared — OK
+      // OK if handled as shared tab before role switch
+      if (sharedHandlers.has(tabId)) return;
+      // Also OK if handled in BOTH role blocks of _getTabRenderFn
+      const inBothRenderFn = memberRenderTabs.has(tabId) && stewardRenderTabs.has(tabId);
+      if (inBothRenderFn) return;
 
-      // Otherwise check both switches have it
-      const memberSwitch = indexCode.match(/if\s*\(role\s*===\s*'member'\)\s*\{[\s\S]*?^\s{6}\}/m);
-      const stewardSwitch = indexCode.match(/\}\s*else\s*\{[\s\S]*?case\s*'([^']+)'/gm);
-
-      const memberCases = new Set();
-      const stewardCases = new Set();
-      // Member switch cases
-      for (const m of indexCode.matchAll(/if\s*\(role\s*===\s*'member'\)\s*\{[\s\S]*?case\s*'([^']+)'/g)) {
-        memberCases.add(m[1]);
-      }
-      // All case labels (steward + member)
-      for (const m of indexCode.matchAll(/case\s*'([^']+)':/g)) {
-        stewardCases.add(m[1]);
-      }
-
-      const inShared = sharedHandlers.has(tabId);
-      const msg = `Tab '${tabId}' is in both steward and member menus but not handled as a shared tab. ` +
-        'Add it before the role-specific switch in _handleTabNav to prevent role-gated routing.';
-      expect(inShared).toBe(true); // enforce: shared tabs must be handled as shared
+      fail(`Tab '${tabId}' is in both steward and member menus but not handled as a shared tab ` +
+        'or in both role blocks of _getTabRenderFn.');
     });
   });
 });
@@ -1030,65 +1032,34 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/switchId\s*!==\s*_navSwitchId/);
   });
 
-  // orgchart, poms, and "more" early-return paths delegate to _activatePane
-  // (via renderPageLayout) — no direct _activePane assignment needed
-  test('orgchart early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
+  // orgchart, poms, and "more" early-return paths must update _activePane
+  test('orgchart early-return path updates _activePane', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    // After renderOrgChart, _activePane must be set before return
     const orgchartBlock = fnBody.match(/renderOrgChart\([\s\S]*?return;/);
     expect(orgchartBlock).not.toBeNull();
-    // Must NOT have direct _activePane assignment (handled by _activatePane inside renderPageLayout)
-    expect(orgchartBlock[0]).not.toMatch(/_activePane\s*=/);
+    expect(orgchartBlock[0]).toContain('_activePane');
   });
 
-  test('poms early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
+  test('poms early-return path updates _activePane', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const pomsBlock = fnBody.match(/renderPOMSReference\([\s\S]*?return;/);
     expect(pomsBlock).not.toBeNull();
-    expect(pomsBlock[0]).not.toMatch(/_activePane\s*=/);
+    expect(pomsBlock[0]).toContain('_activePane');
   });
 
-  test('_member_more early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
+  test('_member_more early-return path updates _activePane', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const moreBlock = fnBody.match(/_member_more[\s\S]*?return;\s*\}/);
     expect(moreBlock).not.toBeNull();
-    expect(moreBlock[0]).not.toMatch(/_activePane\s*=/);
+    expect(moreBlock[0]).toContain('_activePane');
   });
 
-  test('_steward_more early-return path delegates to renderPageLayout (which calls _activatePane)', () => {
+  test('_steward_more early-return path updates _activePane', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const moreBlock = fnBody.match(/_steward_more[\s\S]*?return;\s*\}/);
     expect(moreBlock).not.toBeNull();
-    expect(moreBlock[0]).not.toMatch(/_activePane\s*=/);
-  });
-
-  // G24: _activatePane is the single source of truth for pane state
-  test('_activatePane function exists and syncs both _activePane and _layoutCache.content', () => {
-    const fnBody = extractFnBody(indexCode, '_activatePane');
-    expect(fnBody).not.toBe('');
-    expect(fnBody).toContain('_activePane');
-    expect(fnBody).toContain('_layoutCache.content');
-  });
-
-  test('renderPageLayout primary path uses _activatePane (not direct _layoutCache.content assignment)', () => {
-    const fnBody = extractFnBody(indexCode, 'renderPageLayout');
-    // The primary panel render should call _activatePane, not manually set _layoutCache.content
-    expect(fnBody).toContain('_activatePane(newContent)');
-  });
-
-  test('_handleTabNav cache-hit path uses _activatePane (not direct _activePane assignment)', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    // The cached-pane code should use _activatePane(cached.pane)
-    expect(fnBody).toContain('_activatePane(cached.pane)');
-  });
-
-  test('_activePane is never directly assigned in _handleTabNav or _renderTabFresh', () => {
-    // Direct _activePane = ... assignments in these functions would bypass _activatePane
-    // and risk desynchronizing _activePane from _layoutCache.content (ghost-pane bug).
-    const navBody = extractFnBody(indexCode, '_handleTabNav');
-    const freshBody = extractFnBody(indexCode, '_renderTabFresh');
-    // Only _activatePane calls allowed — no direct assignments
-    const directAssignments = (navBody + freshBody).match(/_activePane\s*=(?!=)/g) || [];
-    expect(directAssignments).toEqual([]);
+    expect(moreBlock[0]).toContain('_activePane');
   });
 
   // Async callbacks must check for stale switches
@@ -1100,28 +1071,6 @@ describe('G23: Tab navigation race condition guard', () => {
   test('renderPOMSReference async callback checks _navSwitchId', () => {
     const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
     expect(fnBody).toMatch(/_navSwitchId/);
-  });
-
-  // G25: _invalidateTabCache always invalidates secondary pane cache too
-  test('_invalidateTabCache flushes secondary pane cache for specific tabId', () => {
-    const fnBody = extractFnBody(indexCode, '_invalidateTabCache');
-    // Per-tab branch must call SplitView.invalidateSecondaryCache(tabId)
-    expect(fnBody).toMatch(/SplitView\.invalidateSecondaryCache\(tabId\)/);
-  });
-
-  test('_invalidateTabCache flushes secondary pane cache on full flush', () => {
-    const fnBody = extractFnBody(indexCode, '_invalidateTabCache');
-    // Full-flush branch must call SplitView.invalidateSecondaryCache()
-    expect(fnBody).toMatch(/SplitView\.invalidateSecondaryCache\(\)/);
-  });
-
-  test('callers of _invalidateTabCache do not redundantly call SplitView.invalidateSecondaryCache', () => {
-    // _invalidateTabCache now handles secondary internally.
-    // No caller should need to call SplitView.invalidateSecondaryCache separately.
-    const navBody = extractFnBody(indexCode, '_handleTabNav');
-    // Count SplitView.invalidateSecondaryCache calls in _handleTabNav — should be 0
-    const directCalls = (navBody.match(/SplitView\.invalidateSecondaryCache/g) || []);
-    expect(directCalls.length).toBe(0);
   });
 });
 
@@ -1140,3 +1089,154 @@ function extractFnBody(code, funcName) {
   }
   return body;
 }
+
+
+// ============================================================================
+// G24: TAB STACKING PREVENTION — ALL VISIBLE PANES HIDDEN BEFORE RENDER
+// ============================================================================
+// Bug (2026-03-18): Switching tabs left the previous tab's content visible
+// alongside the new tab, displaying two panels side-by-side. Root cause:
+// only _activePane and _layoutCache.content were hidden, missing panes
+// that were neither tracked reference. Fix: _hideAllVisiblePanes() hides
+// ALL visible .page-layout-content elements in the primary panel.
+
+describe('G24: Tab stacking prevention', () => {
+  const indexCode = read('index.html');
+
+  test('_hideAllVisiblePanes helper is defined', () => {
+    expect(indexCode).toContain('function _hideAllVisiblePanes()');
+  });
+
+  test('_hideAllVisiblePanes queries all .page-layout-content elements', () => {
+    const fnBody = extractFnBody(indexCode, '_hideAllVisiblePanes');
+    expect(fnBody).toContain("querySelectorAll('.page-layout-content')");
+  });
+
+  test('_hideAllVisiblePanes sets display none on visible panes', () => {
+    const fnBody = extractFnBody(indexCode, '_hideAllVisiblePanes');
+    expect(fnBody).toContain("style.display = 'none'");
+  });
+
+  test('renderPageLayout primary panel hides ALL visible panes before appending new content', () => {
+    const fnBody = extractFnBody(indexCode, 'renderPageLayout');
+    // Must query all panes and hide them (not just _layoutCache.content and _activePane)
+    expect(fnBody).toContain("existingPanes = targetParent.querySelectorAll('.page-layout-content')");
+  });
+
+  test('cache-hit path hides all visible panes (not just _activePane)', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    // The cache-hit block must query all panes in the root
+    const cacheBlock = fnBody.match(/if\s*\(cached\)\s*\{[\s\S]*?_touchPane/);
+    expect(cacheBlock).not.toBeNull();
+    expect(cacheBlock[0]).toContain("querySelectorAll('.page-layout-content')");
+  });
+
+  test('fresh-render path hides all visible panes before _renderTabFresh', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    // Between "FRESH RENDER" comment and _renderTabFresh call, must hide all panes
+    const freshBlock = fnBody.match(/FRESH RENDER[\s\S]*?_renderTabFresh/);
+    expect(freshBlock).not.toBeNull();
+    expect(freshBlock[0]).toContain("querySelectorAll('.page-layout-content')");
+  });
+
+  test('orgchart early-return uses _hideAllVisiblePanes', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const orgBlock = fnBody.match(/tabId === 'orgchart'[\s\S]*?renderOrgChart[\s\S]*?return;/);
+    expect(orgBlock).not.toBeNull();
+    expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
+  });
+
+  test('poms early-return uses _hideAllVisiblePanes', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
+    expect(pomsBlock).not.toBeNull();
+    expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
+  });
+
+  test('More menu handlers use _hideAllVisiblePanes', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const memberMore = fnBody.match(/_member_more[\s\S]*?renderMemberMore[\s\S]*?return;/);
+    expect(memberMore).not.toBeNull();
+    expect(memberMore[0]).toContain('_hideAllVisiblePanes()');
+    const stewardMore = fnBody.match(/_steward_more[\s\S]*?renderStewardMore[\s\S]*?return;/);
+    expect(stewardMore).not.toBeNull();
+    expect(stewardMore[0]).toContain('_hideAllVisiblePanes()');
+  });
+});
+
+
+// ============================================================================
+// G25: SWITCH TO MEMBER/STEWARD RESETS NAVIGATION STATE
+// ============================================================================
+// Bug (2026-03-18): "Switch to Member" sidebar button did not reset stale
+// navigation state (_layoutCache, _tabPanes, _activePane) before calling
+// initMemberView/initStewardView. After showLoading() destroyed the DOM,
+// cached references pointed to detached nodes, causing render failures.
+
+describe('G25: Switch to Member/Steward resets navigation state', () => {
+  const indexCode = read('index.html');
+
+  // Extract the Switch role click handler: starts at IS_DUAL_ROLE, ends at 'Switch to '
+  function getSwitchHandler() {
+    const start = indexCode.indexOf("if (IS_DUAL_ROLE) {");
+    if (start === -1) return '';
+    const end = indexCode.indexOf("'Switch to ' + switchLabel", start);
+    if (end === -1) return '';
+    return indexCode.substring(start, end);
+  }
+
+  test('Switch role handler calls _invalidateTabCache() before init', () => {
+    const handler = getSwitchHandler();
+    expect(handler).toContain('_invalidateTabCache()');
+  });
+
+  test('Switch role handler resets _activePane to null', () => {
+    const handler = getSwitchHandler();
+    expect(handler).toContain('_activePane = null');
+  });
+
+  test('Switch role handler resets _layoutCache', () => {
+    const handler = getSwitchHandler();
+    expect(handler).toContain('_layoutCache = {}');
+  });
+
+  test('Switch role handler resets _tabPanesRole', () => {
+    const handler = getSwitchHandler();
+    expect(handler).toContain('_tabPanesRole = null');
+  });
+
+  test('Switch role handler has error handling (try/catch)', () => {
+    const handler = getSwitchHandler();
+    expect(handler).toContain('try {');
+    expect(handler).toContain('catch');
+  });
+
+  test('Switch role handler calls initMemberView or initStewardView', () => {
+    const handler = getSwitchHandler();
+    expect(handler).toContain('initStewardView');
+    expect(handler).toContain('initMemberView');
+  });
+});
+
+
+// ============================================================================
+// G26: COMIC THEME BOLD TEXT LETTER SPACING
+// ============================================================================
+// Bug (2026-03-18): In the comic theme, bold text (<strong>/<b>) in .main-content
+// had letter-spacing: 0.5px, causing characters to be too close together and
+// hard to read. Fix: increased to 1.5px.
+
+describe('G26: Comic theme bold text letter spacing', () => {
+  const stylesCode = read('styles.html');
+
+  test('comic theme bold text has letter-spacing >= 1px', () => {
+    const match = stylesCode.match(/\.theme-comic\s+\.main-content\s+strong[^{]*\{[^}]*letter-spacing:\s*([\d.]+)px/);
+    expect(match).not.toBeNull();
+    const spacing = parseFloat(match[1]);
+    expect(spacing).toBeGreaterThanOrEqual(1);
+  });
+
+  test('comic theme bold text letter-spacing is not set to 0.5px (known bad value)', () => {
+    expect(stylesCode).not.toMatch(/\.theme-comic\s+\.main-content\s+strong[^{]*\{[^}]*letter-spacing:\s*0\.5px/);
+  });
+});

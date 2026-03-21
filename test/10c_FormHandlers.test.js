@@ -17,7 +17,7 @@ describe('10c function existence', () => {
     'getCurrentStewardInfo_',
     'sanitizeFolderName_', 'shareWithCoordinators_',
     'refreshMemberDirectoryFormulas',
-    'rebuildDashboard', 'refreshAllFormulas'
+    'refreshAllFormulas'
   ];
 
   required.forEach(fn => {

@@ -1,14 +1,37 @@
 /**
- * ConfigReader.gs
- * Reads org-specific configuration from the "Config" tab.
- * Caches in CacheService to avoid repeated sheet reads.
+ * ConfigReader.gs — Configuration reader for the web app SPA
  *
- * Config Tab Layout (column-based):
- *   Row 2 = headers, Row 3 = values
- *   Indexed via CONFIG_COLS constants from 01_Core.gs
+ * WHAT THIS FILE DOES:
+ *   Configuration reader for the web app SPA. ConfigReader.getConfig() reads
+ *   organization-specific settings from the Config tab and returns them as a
+ *   JavaScript object. Uses a three-tier caching strategy:
+ *     (1) in-execution memo (avoids repeated JSON.parse within same request)
+ *     (2) CacheService (6-hour TTL, persists across requests)
+ *     (3) sheet read (fallback when cache misses)
+ *   Config tab layout: row 2=headers, row 3=values, indexed via CONFIG_COLS
+ *   from 01_Core.gs.
  *
- * SPA-specific settings (accent hue, labels, magic link / cookie
- * duration) are not in the Config tab — sensible defaults are used.
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   The three-tier cache minimizes expensive sheet reads (each getDataRange()
+ *   is an IPC call to Google's server). In-execution memo prevents redundant
+ *   cache.get() + JSON.parse() within the same GAS execution. 6-hour
+ *   CacheService TTL balances freshness with performance. The IIFE pattern
+ *   creates a clean namespace. SPA-specific settings (accent hue, labels) are
+ *   not stored in Config — sensible defaults are used to reduce config
+ *   complexity.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   The SPA can't read organization settings (org name, colors, feature
+ *   flags). Falls back to hardcoded defaults which may not match the org's
+ *   configuration. If CacheService is down, every page load reads from the
+ *   sheet (slower but functional). If the Config sheet is missing, throws an
+ *   error and the SPA shows a fatal error page.
+ *
+ * DEPENDENCIES:
+ *   Depends on: CacheService, SpreadsheetApp (GAS built-ins),
+ *               01_Core.gs (SHEETS, CONFIG_COLS).
+ *   Used by: 22_WebDashApp.gs (injects config into SPA),
+ *            21_WebDashDataService.gs, and all SPA views.
  */
 
 var ConfigReader = (function () {
@@ -36,9 +59,7 @@ var ConfigReader = (function () {
         try {
           _memo = JSON.parse(cached);
           return _memo;
-        } catch (_e) {
-          // Cache corrupted, fall through to read from sheet
-        }
+        } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
     }
 

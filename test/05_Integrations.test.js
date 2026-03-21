@@ -679,3 +679,55 @@ describe('disconnectConstantContact', () => {
     expect(deletedKeys).toContain(CC_CONFIG.PROP_TOKEN_EXPIRY);
   });
 });
+
+// ============================================================================
+// LockService wrapping for WebApp resource functions
+// ============================================================================
+
+describe('LockService: addWebAppResource', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('acquires script lock during resource creation', () => {
+    const mockLock = {
+      tryLock: jest.fn(() => true),
+      releaseLock: jest.fn()
+    };
+    LockService.getScriptLock.mockReturnValue(mockLock);
+
+    // Mock auth to pass
+    global.checkWebAppAuthorization = jest.fn(() => ({ isAuthorized: true, email: 'test@example.com' }));
+
+    const resourceData = [['Resource ID', 'Title'], ['RES-001', 'Test']];
+    const sheet = createMockSheet(SHEETS.RESOURCES, resourceData);
+    sheet.appendRow = jest.fn();
+    const mockSS = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    addWebAppResource('token', { title: 'New Resource' });
+    expect(mockLock.tryLock).toHaveBeenCalled();
+    expect(mockLock.releaseLock).toHaveBeenCalled();
+  });
+});
+
+describe('LockService: deleteWebAppResource', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('acquires script lock during resource deletion', () => {
+    const mockLock = {
+      tryLock: jest.fn(() => true),
+      releaseLock: jest.fn()
+    };
+    LockService.getScriptLock.mockReturnValue(mockLock);
+
+    global.checkWebAppAuthorization = jest.fn(() => ({ isAuthorized: true, email: 'test@example.com' }));
+
+    const resourceData = [['Resource ID', 'Visible'], ['RES-001', 'Yes']];
+    const sheet = createMockSheet(SHEETS.RESOURCES, resourceData);
+    const mockSS = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    deleteWebAppResource('token', 'RES-001');
+    expect(mockLock.tryLock).toHaveBeenCalled();
+    expect(mockLock.releaseLock).toHaveBeenCalled();
+  });
+});

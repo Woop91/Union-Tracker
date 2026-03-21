@@ -3,18 +3,31 @@
  * 05_Integrations.gs - External Service Integration
  * ============================================================================
  *
- * This module handles all interactions with external Google services:
- * - Google Drive folder management for grievance documents
- * - Google Calendar deadline synchronization
- * - Email notifications
- * - External API calls
+ * WHAT THIS FILE DOES:
+ *   All external Google service integrations — Drive (folder hierarchy for
+ *   grievance documents), Calendar (deadline/meeting sync), Email
+ *   (notifications, PDF delivery), and Constant Contact API (member
+ *   engagement tracking). Also contains CALENDAR_CONFIG constants.
  *
- * SEPARATION OF CONCERNS: Isolating external dependencies ensures that if
- * one service (e.g., Drive) has an outage, core spreadsheet functionality
- * remains responsive.
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Isolates all external service dependencies so that if Drive/Calendar/email
+ *   has an outage, core spreadsheet functionality stays responsive. Drive
+ *   folders follow a strict hierarchy (DashboardTest/ -> Grievances/,
+ *   Resources/, Minutes/, Event Check-In/) with PRIVATE access controls.
+ *   Calendar sync creates events for grievance deadlines with configurable
+ *   reminders at 7, 3, and 1 day.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Grievance documents won't be filed to Drive. Calendar deadlines won't
+ *   sync. Email notifications stop. Constant Contact engagement data goes
+ *   stale.
+ *
+ * DEPENDENCIES:
+ *   Depends on DriveApp, CalendarApp, MailApp/GmailApp (GAS built-ins),
+ *   01_Core.gs (SHEETS, GRIEVANCE_COLS, CONFIG_COLS). Used by menu items
+ *   in 03_, trigger functions in 10_, and the SPA.
  *
  * @fileoverview External service integrations
- * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -61,6 +74,7 @@ function setupDashboardDriveFolders() {
   var props = PropertiesService.getScriptProperties();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) throw new Error('Config sheet not found');
 
   // ── 1. Get or create DashboardTest root ─────────────────────────────────
   var rootFolder = _getOrCreateNamedFolder_(
@@ -73,10 +87,12 @@ function setupDashboardDriveFolders() {
   if (!rootFolder) throw new Error('Could not create or access the root Dashboard folder');
 
   // Lock it down: PRIVATE — nobody can discover it outside explicit sharing
+  // H6: Treat sharing failure as fatal — folder must be private before proceeding
   try {
     rootFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
   } catch (shareErr) {
-    Logger.log('setupDashboardDriveFolders: could not set root folder to PRIVATE: ' + shareErr.message);
+    Logger.log('setupDashboardDriveFolders: FATAL — could not set root folder to PRIVATE: ' + shareErr.message);
+    throw new Error('Could not set root folder sharing to PRIVATE. Aborting setup to prevent data exposure. Error: ' + shareErr.message);
   }
 
   // ── 2. Create required subfolders inside DashboardTest ───────────────────
@@ -133,7 +149,7 @@ function _getOrCreateNamedFolder_(name, propKey, props, configSheet, parentFolde
     try {
       var found = DriveApp.getFolderById(storedId);
       if (found) return found;
-    } catch (_e) { /* stale ID */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   }
 
   // Try name search inside parent (or all of Drive)
@@ -177,6 +193,7 @@ function setupDashboardCalendar() {
   var props = PropertiesService.getScriptProperties();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return { success: false, message: 'Config sheet not found' };
 
   // Derive calendar name from org name
   var orgName = getSystemName_();
@@ -191,7 +208,7 @@ function setupDashboardCalendar() {
         _writeCalendarIdToConfig_(configSheet, storedId);
         return { success: true, calendarId: storedId, calendarName: existingCal.getName() };
       }
-    } catch (_e) { /* stale ID */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   }
 
   // Search by name
@@ -247,7 +264,7 @@ function getOrCreateRootFolder() {
   if (storedId) {
     try {
       return DriveApp.getFolderById(storedId);
-    } catch (_e) { /* stale — fall through */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   }
 
   // Find or create the DashboardTest root, then the Grievances subfolder inside it.
@@ -270,7 +287,7 @@ function getOrCreateRootFolder() {
   // Lock root if it's new (best-effort)
   try {
     rootFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-  } catch (_e) {}
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   grievancesFolder.setDescription('Individual case folders — Auto-managed by Union Dashboard');
 
@@ -397,9 +414,9 @@ function getOrCreateMemberAdminFolder(memberEmail) {
       try {
         var folderUrl = masterFolder.getUrl();
         if (mSheet) {
-          // Reload fresh (mData may be stale after loop above)
-          var mData2    = mSheet.getDataRange().getValues();
-          var mHeaders2 = mData2[0];
+          // M8: Reuse cached data — only the URL column is written, headers don't change
+          var mData2    = mData;
+          var mHeaders2 = mHeaders;
           var mEmailIdx2 = -1, mAdminIdx2 = -1;
           for (var h2 = 0; h2 < mHeaders2.length; h2++) {
             var hl2 = String(mHeaders2[h2]).toLowerCase().trim();
@@ -471,7 +488,7 @@ function setupDriveFolderForGrievance(grievanceId) {
       var membersRootId = props.getProperty('MEMBERS_FOLDER_ID') || '';
       var membersRoot   = null;
       if (membersRootId) {
-        try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (_e) {}
+        try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
       if (!membersRoot) membersRoot = getOrCreateRootFolder(); // ultimate fallback to dashboard root
       var memberFolderName = (lastName && firstName)
@@ -842,9 +859,6 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
     }
   }
 }
-
-// openGrievanceFolder removed — dead code cleanup v4.25.11
-
 /**
  * Sanitizes a string for use as a folder name
  * @param {string} name - The name to sanitize
@@ -934,9 +948,6 @@ function createMeetingCalendarEvent(meetingData) {
     return '';
   }
 }
-
-// deleteMeetingCalendarEvent removed — dead code cleanup v4.25.11
-
 /**
  * Emails the attendance report for a meeting to specified stewards
  * @param {string} meetingId - Meeting ID to report on
@@ -957,13 +968,13 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
 
-  // Validate all recipient email addresses
+  // L3: Validate and filter recipient email addresses
   var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var emails = String(recipientEmails).split(',');
-  for (var e = 0; e < emails.length; e++) {
-    if (!emailRegex.test(emails[e].trim())) {
-      return errorResponse('Invalid email address: ' + emails[e].trim());
-    }
+  var emails = String(recipientEmails).split(',').filter(function(e) {
+    return e.trim() && emailRegex.test(e.trim());
+  });
+  if (emails.length === 0) {
+    return errorResponse('No valid email addresses provided');
   }
 
   try {
@@ -1185,14 +1196,14 @@ function setDocViewOnlyByLink(docUrl) {
 function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipientEmails) {
   if (!recipientEmails || !docUrl) return;
 
-  // Validate all recipient email addresses
+  // L3: Validate and filter recipient email addresses
   var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var emails = String(recipientEmails).split(',');
-  for (var e = 0; e < emails.length; e++) {
-    if (!emailRegex.test(emails[e].trim())) {
-      Logger.log('Invalid email address in recipient list: ' + emails[e].trim());
-      return;
-    }
+  var emails = String(recipientEmails).split(',').filter(function(e) {
+    return e.trim() && emailRegex.test(e.trim());
+  });
+  if (emails.length === 0) {
+    Logger.log('No valid email addresses in recipient list');
+    return;
   }
 
   try {
@@ -1442,7 +1453,7 @@ function syncDeadlinesToCalendar() {
     };
 
   } catch (error) {
-    console.error('Error syncing to calendar:', error);
+    Logger.log('Error syncing to calendar:', error);
     return errorResponse(error.message);
   }
 }
@@ -1507,9 +1518,7 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
         existingEvent.setDescription(description);
         return { synced: true, updated: true };
       }
-    } catch (_lookupErr) {
-      // Stored ID stale — fall through to create new
-    }
+    } catch (_lookupErr) { Logger.log('_lookupErr: ' + (_lookupErr.message || _lookupErr)); }
   }
 
   // Fallback: search by day in case event exists without stored ID
@@ -1617,7 +1626,7 @@ function sendDeadlineReminders(daysAhead) {
     };
 
   } catch (error) {
-    console.error('Error sending reminders:', error);
+    Logger.log('Error sending reminders:', error);
     return errorResponse(error.message);
   }
 }
@@ -1666,7 +1675,7 @@ function sendEmailToMember(memberId, subject, body) {
     };
 
   } catch (error) {
-    console.error('Error sending email:', error);
+    Logger.log('Error sending email:', error);
     return errorResponse(error.message);
   }
 }
@@ -1698,13 +1707,11 @@ function getOrCreateMemberFolder(name, id) {
 
   try {
     var parentFolder = DriveApp.getFolderById(archiveFolderId);
-    folderName = name + ' (' + id + ')';
     folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
     Logger.log('Archive folder not found, using root: ' + e.message);
     rootFolder = getOrCreateRootFolder();
-    folderName = name + ' (' + id + ')';
     folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
@@ -1956,10 +1963,6 @@ function onGrievanceFormSubmit(e) {
 // ============================================================================
 // UI DIALOGS FOR INTEGRATIONS
 // ============================================================================
-
-// showCalendarSyncDialog removed — dead code cleanup v4.25.11
-
-// showUpcomingDeadlines removed — dead code cleanup v4.25.11
 /**
  * ============================================================================
  * WEB APP DEPLOYMENT FOR MOBILE ACCESS
@@ -2035,14 +2038,6 @@ var _DEADLINE_NAV_ = [
   { icon: '\uD83D\uDD0D', label: 'Search', page: 'search' },
   { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
 ];
-
-// getWebAppSearchHtml removed — dead code cleanup v4.25.11
-
-// getWebAppGrievanceListHtml removed — dead code cleanup v4.25.11
-
-// getWebAppMemberListHtml removed — dead code cleanup v4.25.11
-
-// getWebAppLinksHtml removed — dead code cleanup v4.25.11
 
 /**
  * API function to get search results for web app
@@ -2197,6 +2192,7 @@ function getWebAppResourceLinks() {
 
   if (!ss) return links;
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return links;
 
   links = {
     grievanceForm: '',
@@ -2216,9 +2212,7 @@ function getWebAppResourceLinks() {
       links.grievanceForm = configRow[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
       links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
       links.orgWebsite = configRow[CONFIG_COLS.ORG_WEBSITE - 1] || '';
-    } catch (_e) {
-      // Ignore errors reading config
-    }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   }
 
   // Resolve Resources/ folder URL from stored ID (v4.20.18)
@@ -2232,13 +2226,10 @@ function getWebAppResourceLinks() {
     if (resFolderId) {
       links.resourcesFolderUrl = DriveApp.getFolderById(resFolderId).getUrl();
     }
-  } catch (_re) {}
+  } catch (_re) { Logger.log('_re: ' + (_re.message || _re)); }
 
   return links;
 }
-
-// getWebAppDashboardStats removed — dead code cleanup v4.25.11
-
 /**
  * Menu function to show the deployed mobile dashboard URL
  */
@@ -2317,8 +2308,8 @@ function addMobileDashboardLinkToConfig() {
   linkCell.setFormula('=HYPERLINK(' + JSON.stringify(url) + ', "📱 Tap to Open Dashboard")');
   linkCell.setFontSize(14);
   linkCell.setFontWeight('bold');
-  linkCell.setFontColor(SHEET_COLORS.LINK_PRIMARY);
-  linkCell.setBackground(SHEET_COLORS.BG_LINK_BLUE);
+  linkCell.setFontColor('#1a73e8');
+  linkCell.setBackground('#e8f0fe');
 
   // Also add plain URL below for copying
   var urlCell = configSheet.getRange(4, targetCol);
@@ -2330,7 +2321,7 @@ function addMobileDashboardLinkToConfig() {
   var instructionCell = configSheet.getRange(5, targetCol);
   instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
   instructionCell.setFontSize(9);
-  instructionCell.setFontColor(SHEET_COLORS.TEXT_MED_GRAY);
+  instructionCell.setFontColor('#666666');
   instructionCell.setWrap(true);
 
   // Set column width
@@ -2591,9 +2582,6 @@ function storeConstantContactTokens_(tokenResponse) {
   var expiry = new Date(Date.now() + expiresIn * 1000).toISOString();
   props.setProperty(CC_CONFIG.PROP_TOKEN_EXPIRY, expiry);
 }
-
-// checkConstantContactHealth removed — dead code cleanup v4.25.11
-
 /**
  * Gets a valid access token, refreshing if expired.
  * @returns {string|null} The access token, or null if not authorized
@@ -3184,8 +3172,6 @@ function getWebAppResourcesListAll() {
     return [];
   }
 }
-
-
 /**
  * Add a new resource to the 📚 Resources sheet.
  * @param {Object} data — { title, category, summary, content, url, icon, sortOrder, visible, audience }
@@ -3197,59 +3183,59 @@ function addWebAppResource(sessionToken, data) {
     var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
-    if (!sheet) {
-      if (typeof createResourcesSheet === 'function') {
-        sheet = createResourcesSheet(ss);
+    return withScriptLock_(function() {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+      if (!sheet) {
+        if (typeof createResourcesSheet === 'function') {
+          sheet = createResourcesSheet(ss);
+        }
+        if (!sheet) return { success: false, message: 'Resources sheet not found' };
       }
-      if (!sheet) return { success: false, message: 'Resources sheet not found' };
-    }
 
-    if (!data.title) return { success: false, message: 'Title is required' };
+      if (!data.title) return { success: false, message: 'Title is required' };
 
-    // Generate next ID
-    var allData = sheet.getDataRange().getValues();
-    var maxNum = 0;
-    for (var i = 1; i < allData.length; i++) {
-      var existId = String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '');
-      var match = existId.match(/RES-(\d+)/);
-      if (match) {
-        var num = parseInt(match[1], 10);
-        if (num > maxNum) maxNum = num;
+      // Generate next ID
+      var allData = sheet.getDataRange().getValues();
+      var maxNum = 0;
+      for (var i = 1; i < allData.length; i++) {
+        var existId = String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '');
+        var match = existId.match(/RES-(\d+)/);
+        if (match) {
+          var num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
       }
-    }
-    var nextId = 'RES-' + String(maxNum + 1).padStart(3, '0');
+      var nextId = 'RES-' + String(maxNum + 1).padStart(3, '0');
 
-    var tz = Session.getScriptTimeZone();
-    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-    var addedBy = auth.email || 'unknown';
+      var tz = Session.getScriptTimeZone();
+      var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+      var addedBy = auth.email || 'unknown';
 
-    // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
-    var newRow = [
-      nextId,
-      escapeForFormula(data.title),
-      escapeForFormula(data.category || 'General'),
-      escapeForFormula(data.summary || ''),
-      escapeForFormula(data.content || ''),
-      escapeForFormula(data.url || ''),
-      escapeForFormula(data.icon || '\uD83D\uDCC4'),
-      data.sortOrder || 999,
-      escapeForFormula(data.visible || 'Yes'),
-      escapeForFormula(data.audience || 'All'),
-      today,
-      addedBy
-    ];
+      // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
+      var newRow = [
+        nextId,
+        escapeForFormula(data.title),
+        escapeForFormula(data.category || 'General'),
+        escapeForFormula(data.summary || ''),
+        escapeForFormula(data.content || ''),
+        escapeForFormula(data.url || ''),
+        escapeForFormula(data.icon || '\uD83D\uDCC4'),
+        data.sortOrder || 999,
+        escapeForFormula(data.visible || 'Yes'),
+        escapeForFormula(data.audience || 'All'),
+        today,
+        addedBy
+      ];
 
-    sheet.appendRow(newRow);
-    return { success: true, resourceId: nextId, message: 'Resource added' };
+      sheet.appendRow(newRow);
+      return { success: true, resourceId: nextId, message: 'Resource added' };
+    });
   } catch (e) {
     logError_('addWebAppResource', e);
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
-
-
 /**
  * Update an existing resource by ID.
  * @param {string} resourceId — e.g. "RES-001"
@@ -3262,37 +3248,37 @@ function updateWebAppResource(sessionToken, resourceId, data) {
     var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
-    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+    return withScriptLock_(function() {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+      if (!sheet) return { success: false, message: 'Resources sheet not found' };
 
-    var allData = sheet.getDataRange().getValues();
-    for (var i = 1; i < allData.length; i++) {
-      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
-        // M-PERF: Batch write — modify row copy in-memory, write back in single call
-        var rowData = allData[i].slice();
-        // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
-        if (data.title !== undefined)     rowData[RESOURCES_COLS.TITLE - 1] = escapeForFormula(data.title);
-        if (data.category !== undefined)  rowData[RESOURCES_COLS.CATEGORY - 1] = escapeForFormula(data.category);
-        if (data.summary !== undefined)   rowData[RESOURCES_COLS.SUMMARY - 1] = escapeForFormula(data.summary);
-        if (data.content !== undefined)   rowData[RESOURCES_COLS.CONTENT - 1] = escapeForFormula(data.content);
-        if (data.url !== undefined)       rowData[RESOURCES_COLS.URL - 1] = escapeForFormula(data.url);
-        if (data.icon !== undefined)      rowData[RESOURCES_COLS.ICON - 1] = escapeForFormula(data.icon);
-        if (data.sortOrder !== undefined) rowData[RESOURCES_COLS.SORT_ORDER - 1] = data.sortOrder;
-        if (data.visible !== undefined)   rowData[RESOURCES_COLS.VISIBLE - 1] = escapeForFormula(data.visible);
-        if (data.audience !== undefined)  rowData[RESOURCES_COLS.AUDIENCE - 1] = escapeForFormula(data.audience);
-        sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
-        return { success: true, message: 'Resource updated' };
+      var allData = sheet.getDataRange().getValues();
+      for (var i = 1; i < allData.length; i++) {
+        if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+          // M-PERF: Batch write — modify row copy in-memory, write back in single call
+          var rowData = allData[i].slice();
+          // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
+          if (data.title !== undefined)     rowData[RESOURCES_COLS.TITLE - 1] = escapeForFormula(data.title);
+          if (data.category !== undefined)  rowData[RESOURCES_COLS.CATEGORY - 1] = escapeForFormula(data.category);
+          if (data.summary !== undefined)   rowData[RESOURCES_COLS.SUMMARY - 1] = escapeForFormula(data.summary);
+          if (data.content !== undefined)   rowData[RESOURCES_COLS.CONTENT - 1] = escapeForFormula(data.content);
+          if (data.url !== undefined)       rowData[RESOURCES_COLS.URL - 1] = escapeForFormula(data.url);
+          if (data.icon !== undefined)      rowData[RESOURCES_COLS.ICON - 1] = escapeForFormula(data.icon);
+          if (data.sortOrder !== undefined) rowData[RESOURCES_COLS.SORT_ORDER - 1] = data.sortOrder;
+          if (data.visible !== undefined)   rowData[RESOURCES_COLS.VISIBLE - 1] = escapeForFormula(data.visible);
+          if (data.audience !== undefined)  rowData[RESOURCES_COLS.AUDIENCE - 1] = escapeForFormula(data.audience);
+          sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
+          return { success: true, message: 'Resource updated' };
+        }
       }
-    }
-    return { success: false, message: 'Resource not found' };
+      return { success: false, message: 'Resource not found' };
+    });
   } catch (e) {
     logError_('updateWebAppResource', e);
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
-
-
 /**
  * Soft-delete a resource (set Visible=No).
  * @param {string} resourceId — e.g. "RES-001"
@@ -3304,25 +3290,25 @@ function deleteWebAppResource(sessionToken, resourceId) {
     var auth = checkWebAppAuthorization('steward', sessionToken);
     if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
-    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+    return withScriptLock_(function() {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+      if (!sheet) return { success: false, message: 'Resources sheet not found' };
 
-    var allData = sheet.getDataRange().getValues();
-    for (var i = 1; i < allData.length; i++) {
-      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
-        sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('No');
-        return { success: true, message: 'Resource hidden' };
+      var allData = sheet.getDataRange().getValues();
+      for (var i = 1; i < allData.length; i++) {
+        if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+          sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('No');
+          return { success: true, message: 'Resource hidden' };
+        }
       }
-    }
-    return { success: false, message: 'Resource not found' };
+      return { success: false, message: 'Resource not found' };
+    });
   } catch (e) {
     logError_('deleteWebAppResource', e);
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
-
-
 /**
  * Restore a soft-deleted resource (set Visible=Yes).
  * @param {string} resourceId — e.g. "RES-001"
@@ -3350,12 +3336,6 @@ function restoreWebAppResource(sessionToken, resourceId) {
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
-
-
-// getWebAppResourcesHtml removed — dead code cleanup v4.25.11
-
-// getWebAppCheckInHtml removed — dead code cleanup v4.25.11
-
 
 // ============================================================================
 // DEADLINE CALENDAR VIEW (v4.13.0 — PHASE2)
@@ -3476,9 +3456,6 @@ function getDeadlineCalendarData() {
   return { deadlines: deadlines };
 }
 
-// getDeadlineCalendarHtml removed — dead code cleanup v4.25.11
-
-
 // ============================================================================
 // NOTIFICATIONS API (v4.12.0)
 // ============================================================================
@@ -3583,8 +3560,6 @@ function getWebAppNotifications(sessionToken, userRole) {
     return [];
   }
 }
-
-
 /**
  * Lightweight notification count for SPA bell badge.
  * Reuses same filtering logic as getWebAppNotifications but returns only count.
@@ -3601,8 +3576,6 @@ function getWebAppNotificationCount(sessionToken, userRole) {
     return { count: 0 };
   }
 }
-
-
 /**
  * Dismiss a notification for a specific user.
  * Appends user's email to the Dismissed_By column (comma-separated).
@@ -3642,8 +3615,6 @@ function dismissWebAppNotification(sessionToken, notificationId) {
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
-
-
 /**
  * Send a new notification (steward form submission).
  * Creates a new row in the Notifications sheet.
@@ -3717,8 +3688,6 @@ function sendWebAppNotification(sessionToken, data) {
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
-
-
 /**
  * Returns ALL notifications from the sheet regardless of recipient/expiry.
  * Steward-only — used by the Manage sub-tab to give stewards a full ledger view.
@@ -3780,8 +3749,6 @@ function getAllWebAppNotifications(sessionToken) {
     return [];
   }
 }
-
-
 /**
  * Archives a notification (sets Status = 'Archived').
  * Steward-only. Archived notifications are excluded from all member views
@@ -3816,8 +3783,6 @@ function archiveWebAppNotification(sessionToken, notificationId) {
     return { success: false, message: 'Error: ' + String(e) };
   }
 }
-
-
 // getNotificationRecipientList removed v4.29.0 — dead code, superseded by getNotificationRecipientListFull (auth-gated)
 
 /**
@@ -3872,12 +3837,8 @@ function getNotificationRecipientListFull(sessionToken) {
     return [];
   }
 }
-
-
 // NOTE (v4.22.0): getWebAppNotificationsHtml() removed — standalone ?page=notifications
 // route was never wired in doGet(). Notifications fully handled by SPA (index.html).
-
-
 // ─── ONE-TIME MIGRATIONS ────────────────────────────────────────────────────
 
 /**
@@ -3892,7 +3853,7 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   if (!sheet) {
     var msg = 'Notifications sheet not found. Nothing to migrate.';
@@ -3920,7 +3881,7 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
   var headerCell = sheet.getRange(1, newColIndex);
   headerCell.setValue('Dismiss_Mode')
     .setBackground(COLORS.HEADER_BG || '#1e293b')
-    .setFontColor(SHEET_COLORS.BG_WHITE)
+    .setFontColor('#ffffff')
     .setFontWeight('bold')
     .setFontSize(11)
     .setHorizontalAlignment('center');
@@ -3953,7 +3914,7 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
 function SETUP_DRIVE_FOLDERS() {
   var result = setupDashboardDriveFolders();
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   var msg = result.success
     ? '✅ Drive folders ready!\n\n' + result.rootFolderName + ': ' + result.rootFolderUrl +
       '\n\nAll folder IDs have been saved to the Config sheet.' +
@@ -3965,6 +3926,941 @@ function SETUP_DRIVE_FOLDERS() {
   return result;
 }
 
+// ═══════════════════════════════════════
+// GRIEVANCE FORM — PDF GENERATION & INITIATION  (v4.32.0)
+// ═══════════════════════════════════════
+
+/**
+ * Generates a populated grievance form PDF from member/grievance data.
+ * Reads src/grievance_form.html template, injects field values, converts to PDF blob.
+ * @param {Object} formData - All form fields (grievant, jobtitle, region, articles, etc.)
+ * @returns {Blob|null} PDF blob or null on error
+ * @private
+ */
+function generateGrievancePDF_(formData) {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('grievance_form').getContent();
+
+    // Build value injection map — each key is an element ID in the form
+    var valueMap = {
+      'grievant':   formData.grievant   || '',
+      'jobtitle':   formData.jobtitle   || '',
+      'startdate':  formData.startdate  || '',
+      'agency':     formData.agency     || 'MassAbility DDS',
+      'region':     formData.region     || '',
+      'workloc':    formData.workloc    || '',
+      'articles':   formData.articles   || '',
+      'step':       formData.step       || '1',
+      'statement':  formData.statement  || '',
+      'statement2': formData.statement2 || '',
+      'remedy1':    formData.remedy1    || '',
+      'remedy2':    formData.remedy2    || ''
+    };
+
+    // Inject values into input/textarea/select fields by ID
+    for (var id in valueMap) {
+      if (!valueMap.hasOwnProperty(id)) continue;
+      var val = escapeHtml(String(valueMap[id]));
+
+      // Handle <input id="X" ... value="Y"> — inject/replace value attribute
+      var inputRx = new RegExp('(<(?:input|INPUT)[^>]*id=["\']' + id + '["\'][^>]*?)(/?>)', 'g');
+      html = html.replace(inputRx, function(match, before, close) {
+        // Remove any existing value attribute
+        before = before.replace(/\s+value="[^"]*"/i, '');
+        return before + ' value="' + val + '"' + close;
+      });
+
+      // Handle <textarea id="X">...</textarea> — inject content
+      var taRx = new RegExp('(<textarea[^>]*id=["\']' + id + '["\'][^>]*>)(</textarea>)', 'gi');
+      html = html.replace(taRx, '$1' + val + '$2');
+
+      // Handle <select id="X"> — mark matching <option> as selected
+      if (val) {
+        var selRx = new RegExp('(<select[^>]*id=["\']' + id + '["\'][^>]*>[\\s\\S]*?</select>)', 'gi');
+        html = html.replace(selRx, function(selectBlock) {
+          // Remove any existing selected attributes
+          selectBlock = selectBlock.replace(/ selected/gi, '');
+          // Add selected to matching option
+          var optRx = new RegExp('(<option[^>]*value=["\']' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '["\'])');
+          return selectBlock.replace(optRx, '$1 selected');
+        });
+      }
+    }
+
+    // Handle managers selects (special — value is name text, not a simple match)
+    if (formData.managers) {
+      var mgrVal = escapeHtml(String(formData.managers));
+      var mgrRx = /(<select[^>]*id=['"]managers['"][^>]*>[\s\S]*?<\/select>)/gi;
+      html = html.replace(mgrRx, function(block) {
+        block = block.replace(/ selected/gi, '');
+        var optRx = new RegExp('(<option[^>]*>)(' + mgrVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(</option>)');
+        return block.replace(optRx, function(_m, p1, p2, p3) { return p1 + ' selected' + p2 + p3; });
+      });
+    }
+
+    // Convert HTML to PDF blob via Drive
+    var blob = Utilities.newBlob(html, 'text/html', 'grievance_form.html');
+    var pdfBlob = blob.getAs('application/pdf');
+    var grievantName = formData.grievant || 'Unknown';
+    pdfBlob.setName('Grievance Form - ' + grievantName + '.pdf');
+
+    return pdfBlob;
+  } catch (e) {
+    Logger.log('generateGrievancePDF_ error: ' + e.message + '\n' + (e.stack || ''));
+    return null;
+  }
+}
+
+// ============================================================================
+// E-SIGNATURE SYSTEM  (v4.33.0)
+// ============================================================================
+
+/**
+ * Generates a SHA-256 document hash for a grievance to bind the signature to the content.
+ * The hash covers all substantive grievance fields so any change after signing is detectable.
+ * @param {Object} grievanceRow - Key/value object of grievance data
+ * @returns {string} Hex-encoded SHA-256 hash
+ */
+function generateDocumentHash_(grievanceRow) {
+  var fields = [
+    String(grievanceRow.grievanceId  || ''),
+    String(grievanceRow.memberId     || ''),
+    String(grievanceRow.firstName    || ''),
+    String(grievanceRow.lastName     || ''),
+    String(grievanceRow.articles     || ''),
+    String(grievanceRow.issueCategory|| ''),
+    String(grievanceRow.description  || ''),
+    String(grievanceRow.remedy       || ''),
+    String(grievanceRow.step         || ''),
+    String(grievanceRow.incidentDate || ''),
+    String(grievanceRow.dateFiled    || '')
+  ];
+  var payload = fields.join('|');
+  var rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, payload, Utilities.Charset.UTF_8);
+  return rawHash.map(function(b) { return ('0' + ((b < 0 ? b + 256 : b)).toString(16)).slice(-2); }).join('');
+}
+
+/**
+ * Generates a one-time signature token for a grievance.
+ * Stored in the Grievance Log row and used in the signing URL.
+ * @param {string} grievanceId
+ * @returns {string} UUID-based token
+ */
+function generateSignatureToken_(grievanceId) {
+  // Use two full UUIDs concatenated for 256-bit entropy — prevents brute-force enumeration
+  return 'SIG-' + Utilities.getUuid() + '-' + Utilities.getUuid();
+}
+
+/**
+ * Generates a QR code image URL via Google Charts API.
+ * The QR encodes the grievance ID + document hash for verification.
+ * @param {string} grievanceId
+ * @param {string} documentHash
+ * @returns {string} URL to QR code image
+ */
+function getQRCodeUrl_(grievanceId, documentHash) {
+  var qrData = 'GRIEVANCE:' + grievanceId + '|HASH:' + documentHash.substring(0, 16);
+  return 'https://chart.googleapis.com/chart?cht=qr&chs=120x120&chl=' + encodeURIComponent(qrData) + '&choe=UTF-8';
+}
+
+/**
+ * Generates a draft grievance PDF with a QR code footer.
+ * The QR contains the grievance ID + document hash for tamper detection.
+ * @param {Object} formData - Same shape as generateGrievancePDF_
+ * @param {string} grievanceId
+ * @param {string} documentHash
+ * @returns {Blob|null} PDF blob
+ */
+function generateDraftGrievancePDF_(formData, grievanceId, documentHash) {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('grievance_form').getContent();
+
+    // Build value injection map
+    var valueMap = {
+      'grievant':   formData.grievant   || '',
+      'jobtitle':   formData.jobtitle   || '',
+      'startdate':  formData.startdate  || '',
+      'agency':     formData.agency     || 'MassAbility DDS',
+      'region':     formData.region     || '',
+      'workloc':    formData.workloc    || '',
+      'articles':   formData.articles   || '',
+      'step':       formData.step       || '1',
+      'statement':  formData.statement  || '',
+      'statement2': formData.statement2 || '',
+      'remedy1':    formData.remedy1    || '',
+      'remedy2':    formData.remedy2    || ''
+    };
+
+    // Inject values into form fields
+    for (var id in valueMap) {
+      if (!valueMap.hasOwnProperty(id)) continue;
+      var val = escapeHtml(String(valueMap[id]));
+      var inputRx = new RegExp('(<(?:input|INPUT)[^>]*id=["\']' + id + '["\'][^>]*?)(/?>)', 'g');
+      html = html.replace(inputRx, function(match, before, close) {
+        before = before.replace(/\s+value="[^"]*"/i, '');
+        return before + ' value="' + val + '"' + close;
+      });
+      var taRx = new RegExp('(<textarea[^>]*id=["\']' + id + '["\'][^>]*>)(</textarea>)', 'gi');
+      html = html.replace(taRx, '$1' + val + '$2');
+      if (val) {
+        var selRx = new RegExp('(<select[^>]*id=["\']' + id + '["\'][^>]*>[\\s\\S]*?</select>)', 'gi');
+        html = html.replace(selRx, function(selectBlock) {
+          selectBlock = selectBlock.replace(/ selected/gi, '');
+          var optRx = new RegExp('(<option[^>]*value=["\']' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '["\'])');
+          return selectBlock.replace(optRx, '$1 selected');
+        });
+      }
+    }
+
+    // Handle managers selects
+    if (formData.managers) {
+      var mgrVal = escapeHtml(String(formData.managers));
+      var mgrRx = /(<select[^>]*id=['"]managers['"][^>]*>[\s\S]*?<\/select>)/gi;
+      html = html.replace(mgrRx, function(block) {
+        block = block.replace(/ selected/gi, '');
+        var optRx = new RegExp('(<option[^>]*>)(' + mgrVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(</option>)');
+        return block.replace(optRx, function(_m, p1, p2, p3) { return p1 + ' selected' + p2 + p3; });
+      });
+    }
+
+    // ── Inject QR code + document reference footer ──
+    var qrUrl = getQRCodeUrl_(grievanceId, documentHash);
+    var shortHash = documentHash.substring(0, 16);
+    var footerHtml = '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #ccc;display:flex;align-items:flex-end;justify-content:space-between;font-size:8pt;color:#888;">' +
+      '<div style="flex:1;"><span style="font-size:7pt;letter-spacing:.5px;">DRAFT — AWAITING MEMBER SIGNATURE</span><br>' +
+      '<span style="font-family:Courier New,monospace;font-size:7pt;">Ref: ' + escapeHtml(grievanceId) + ' | ' + shortHash + '</span></div>' +
+      '<img src="' + escapeHtml(qrUrl) + '" width="80" height="80" style="margin-left:12px;" alt="QR">' +
+      '</div>';
+
+    // Insert footer before closing </div><!-- /.page --> or </body>
+    html = html.replace(/<\/div>\s*<div id="toast">/, footerHtml + '</div><div id="toast">');
+
+    var blob = Utilities.newBlob(html, 'text/html', 'grievance_draft.html');
+    var pdfBlob = blob.getAs('application/pdf');
+    return pdfBlob;
+  } catch (e) {
+    if (typeof secureLog === 'function') secureLog('esign', 'generateDraftGrievancePDF_ error', { error: e.message });
+    else Logger.log('generateDraftGrievancePDF_ error: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Generates the final signed grievance PDF with embedded signature image + QR code.
+ * The signature is rendered as part of the HTML so it cannot be extracted/reused.
+ * @param {Object} formData - Form field values
+ * @param {string} grievanceId
+ * @param {string} documentHash
+ * @param {string} sigBase64 - Base64-encoded PNG of the drawn signature
+ * @param {string} memberName - Printed name for the signature block
+ * @param {string} signedDate - ISO date string
+ * @returns {Blob|null} PDF blob
+ */
+function generateSignedGrievancePDF_(formData, grievanceId, documentHash, sigBase64, memberName, signedDate) {
+  try {
+    var html = HtmlService.createHtmlOutputFromFile('grievance_form').getContent();
+
+    // Inject form values (same as draft)
+    var valueMap = {
+      'grievant':   formData.grievant   || '',
+      'jobtitle':   formData.jobtitle   || '',
+      'startdate':  formData.startdate  || '',
+      'agency':     formData.agency     || 'MassAbility DDS',
+      'region':     formData.region     || '',
+      'workloc':    formData.workloc    || '',
+      'articles':   formData.articles   || '',
+      'step':       formData.step       || '1',
+      'statement':  formData.statement  || '',
+      'statement2': formData.statement2 || '',
+      'remedy1':    formData.remedy1    || '',
+      'remedy2':    formData.remedy2    || ''
+    };
+
+    for (var id in valueMap) {
+      if (!valueMap.hasOwnProperty(id)) continue;
+      var val = escapeHtml(String(valueMap[id]));
+      var inputRx = new RegExp('(<(?:input|INPUT)[^>]*id=["\']' + id + '["\'][^>]*?)(/?>)', 'g');
+      html = html.replace(inputRx, function(match, before, close) {
+        before = before.replace(/\s+value="[^"]*"/i, '');
+        return before + ' value="' + val + '"' + close;
+      });
+      var taRx = new RegExp('(<textarea[^>]*id=["\']' + id + '["\'][^>]*>)(</textarea>)', 'gi');
+      html = html.replace(taRx, '$1' + val + '$2');
+      if (val) {
+        var selRx = new RegExp('(<select[^>]*id=["\']' + id + '["\'][^>]*>[\\s\\S]*?</select>)', 'gi');
+        html = html.replace(selRx, function(selectBlock) {
+          selectBlock = selectBlock.replace(/ selected/gi, '');
+          var optRx = new RegExp('(<option[^>]*value=["\']' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '["\'])');
+          return selectBlock.replace(optRx, '$1 selected');
+        });
+      }
+    }
+
+    if (formData.managers) {
+      var mgrVal = escapeHtml(String(formData.managers));
+      var mgrRx = /(<select[^>]*id=['"]managers['"][^>]*>[\s\S]*?<\/select>)/gi;
+      html = html.replace(mgrRx, function(block) {
+        block = block.replace(/ selected/gi, '');
+        var optRx = new RegExp('(<option[^>]*>)(' + mgrVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(</option>)');
+        return block.replace(optRx, function(_m, p1, p2, p3) { return p1 + ' selected' + p2 + p3; });
+      });
+    }
+
+    // ── Replace the first signature box with the drawn signature ──
+    // Find the first sig-box div and replace with the signature image bound to this document
+    var sigBlockHtml =
+      '<div style="position:relative;border-bottom:2px solid #000;min-height:60px;padding:4px;">' +
+      '<img src="data:image/png;base64,' + sigBase64 + '" style="max-height:55px;max-width:100%;" alt="Signature">' +
+      '</div>';
+    // Replace first grievant signature box
+    html = html.replace(/<div class="sig-box"><\/div>(\s*<span class="sig-lbl">Grievant Signature\(s\)<\/span>)/, sigBlockHtml + '$1');
+
+    // ── Fill in the grievant date field for the first sig block ──
+    var dateRx = /(<input[^>]*id=['"]sig1gdate['"][^>]*?)(\/?>\s*)/;
+    html = html.replace(dateRx, function(match, before, close) {
+      before = before.replace(/\s+value="[^"]*"/i, '');
+      return before + ' value="' + escapeHtml(signedDate) + '"' + close;
+    });
+
+    // ── Inject signed footer with QR code ──
+    var qrUrl = getQRCodeUrl_(grievanceId, documentHash);
+    var shortHash = documentHash.substring(0, 16);
+    var footerHtml =
+      '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #ccc;display:flex;align-items:flex-end;justify-content:space-between;font-size:8pt;color:#888;">' +
+      '<div style="flex:1;">' +
+      '<span style="font-size:8pt;font-weight:bold;color:#059669;">&#10003; SIGNED</span><br>' +
+      '<span style="font-size:7pt;">Signed by ' + escapeHtml(memberName) + ' on ' + escapeHtml(signedDate) + '</span><br>' +
+      '<span style="font-family:Courier New,monospace;font-size:7pt;">Ref: ' + escapeHtml(grievanceId) + ' | Hash: ' + shortHash + '</span>' +
+      '</div>' +
+      '<img src="' + escapeHtml(qrUrl) + '" width="80" height="80" style="margin-left:12px;" alt="QR">' +
+      '</div>';
+
+    html = html.replace(/<\/div>\s*<div id="toast">/, footerHtml + '</div><div id="toast">');
+
+    var blob = Utilities.newBlob(html, 'text/html', 'grievance_signed.html');
+    var pdfBlob = blob.getAs('application/pdf');
+    return pdfBlob;
+  } catch (e) {
+    if (typeof secureLog === 'function') secureLog('esign', 'generateSignedGrievancePDF_ error', { error: e.message });
+    else Logger.log('generateSignedGrievancePDF_ error: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Builds a standardized PDF filename for a grievance.
+ * Pattern: {GrievanceID}_{LastName}-{FirstName}_Grievance_{Status}_{DateFiled}.pdf
+ * @param {string} grievanceId
+ * @param {string} firstName
+ * @param {string} lastName
+ * @param {string} status - 'Draft' or 'Signed'
+ * @param {Date|string} dateFiled
+ * @returns {string}
+ */
+function buildGrievancePdfName_(grievanceId, firstName, lastName, status, dateFiled) {
+  var dateStr = '';
+  try {
+    dateStr = Utilities.formatDate(new Date(dateFiled), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  } catch (_e) {
+    dateStr = 'unknown';
+  }
+  var safeLast  = (lastName  || 'Unknown').replace(/[^a-zA-Z0-9]/g, '');
+  var safeFirst = (firstName || ''       ).replace(/[^a-zA-Z0-9]/g, '');
+  var namePart = safeLast + (safeFirst ? '-' + safeFirst : '');
+  return grievanceId + '_' + namePart + '_Grievance_' + status + '_' + dateStr + '.pdf';
+}
+
+/**
+ * Retrieves grievance data for the e-signature page.
+ * Validates the signature token and returns a summary of the grievance.
+ * @param {string} sigToken - The unique signature token from the signing URL
+ * @returns {Object} { success, grievanceId, documentHash, articles, ... } or { success: false, message }
+ */
+function getGrievanceForSigning(sigToken) {
+  try {
+    if (!sigToken) return { success: false, message: 'Invalid signature link.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Service temporarily unavailable.' };
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'Service temporarily unavailable.' };
+
+    var data = sheet.getDataRange().getValues();
+    var C = GRIEVANCE_COLS;
+    var targetRow = -1;
+
+    for (var i = 1; i < data.length; i++) {
+      var token = String(data[i][C.SIGNATURE_TOKEN - 1] || '').trim();
+      if (token === sigToken) {
+        targetRow = i;
+        break;
+      }
+    }
+
+    if (targetRow === -1) return { success: false, message: 'Invalid or expired signature link.' };
+
+    var row = data[targetRow];
+    var sigStatus = String(row[C.SIGNATURE_STATUS - 1] || '').trim();
+    var grievanceId = String(row[C.GRIEVANCE_ID - 1] || '');
+
+    // Already signed?
+    if (sigStatus === 'Signed') {
+      return {
+        success: true,
+        alreadySigned: true,
+        grievanceId: grievanceId,
+        signedDate: String(row[C.SIGNED_DATE - 1] || '')
+      };
+    }
+
+    // Build grievance data object for hash + display
+    var grievanceObj = {
+      grievanceId:   grievanceId,
+      memberId:      String(row[C.MEMBER_ID - 1]       || ''),
+      firstName:     String(row[C.FIRST_NAME - 1]      || ''),
+      lastName:      String(row[C.LAST_NAME - 1]       || ''),
+      articles:      String(row[C.ARTICLES - 1]        || ''),
+      issueCategory: String(row[C.ISSUE_CATEGORY - 1]  || ''),
+      description:   String(row[C.RESOLUTION - 1]      || ''),
+      remedy:        '',  // stored in resolution field combined
+      step:          String(row[C.CURRENT_STEP - 1]     || ''),
+      incidentDate:  row[C.INCIDENT_DATE - 1] ? String(row[C.INCIDENT_DATE - 1]) : '',
+      dateFiled:     row[C.DATE_FILED - 1] ? String(row[C.DATE_FILED - 1]) : ''
+    };
+
+    var documentHash = generateDocumentHash_(grievanceObj);
+
+    // Resolve steward name
+    var stewardEmail = String(row[C.STEWARD - 1] || '');
+    var stewardName = stewardEmail.split('@')[0];
+    try {
+      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
+      if (memberDir && memberDir.getLastRow() > 1) {
+        var mData = memberDir.getDataRange().getValues();
+        for (var j = 1; j < mData.length; j++) {
+          var sEmail = String(mData[j][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim();
+          if (sEmail === stewardEmail.toLowerCase().trim()) {
+            var sFirst = String(mData[j][MEMBER_COLS.FIRST_NAME - 1] || '').trim();
+            var sLast  = String(mData[j][MEMBER_COLS.LAST_NAME - 1]  || '').trim();
+            if (sFirst || sLast) stewardName = (sFirst + ' ' + sLast).trim();
+            break;
+          }
+        }
+      }
+    } catch (_e) { /* fallback to email prefix */ }
+
+    var dateFiledStr = '';
+    try {
+      if (row[C.DATE_FILED - 1]) {
+        dateFiledStr = Utilities.formatDate(new Date(row[C.DATE_FILED - 1]), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      }
+    } catch (_e) { dateFiledStr = String(row[C.DATE_FILED - 1] || ''); }
+
+    return {
+      success: true,
+      alreadySigned: false,
+      grievanceId: grievanceId,
+      memberName: grievanceObj.firstName + ' ' + grievanceObj.lastName,
+      stewardName: stewardName,
+      dateFiled: dateFiledStr,
+      articles: grievanceObj.articles,
+      issueCategory: grievanceObj.issueCategory,
+      description: grievanceObj.description,
+      remedy: grievanceObj.remedy,
+      step: grievanceObj.step,
+      documentHash: documentHash
+    };
+  } catch (e) {
+    if (typeof secureLog === 'function') secureLog('esign', 'getGrievanceForSigning error', { error: e.message });
+    else Logger.log('getGrievanceForSigning error: ' + e.message);
+    return { success: false, message: 'Error loading grievance.' };
+  }
+}
+
+/**
+ * Processes a submitted signature for a grievance.
+ * - Validates signature token
+ * - Generates document hash and verifies integrity
+ * - Generates signed PDF with embedded signature + QR code
+ * - Saves signed PDF to Drive (replaces draft)
+ * - Updates Grievance Log with signature metadata
+ * - Notifies member: "Grievance Filed" + canned message
+ * - Notifies steward: signature completed
+ * @param {string} sigToken - Signature token
+ * @param {string} sigBase64 - Base64 PNG of drawn signature
+ * @returns {Object} { success, message, driveFolderUrl }
+ */
+function submitGrievanceSignature(sigToken, sigBase64) {
+  try {
+    if (!sigToken || !sigBase64) return { success: false, message: 'Missing signature data.' };
+
+    // Validate sigBase64: must be pure base64 characters, max 500KB
+    if (sigBase64.length > 500000) return { success: false, message: 'Signature data too large.' };
+    if (!/^[A-Za-z0-9+/=]+$/.test(sigBase64)) return { success: false, message: 'Invalid signature data format.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'Grievance Log not found.' };
+
+    var data = sheet.getDataRange().getValues();
+    var C = GRIEVANCE_COLS;
+    var targetRow = -1;
+
+    for (var i = 1; i < data.length; i++) {
+      var token = String(data[i][C.SIGNATURE_TOKEN - 1] || '').trim();
+      if (token === sigToken) {
+        targetRow = i;
+        break;
+      }
+    }
+
+    if (targetRow === -1) return { success: false, message: 'Invalid or expired signature link.' };
+
+    var row = data[targetRow];
+    var sheetRow = targetRow + 1; // 1-indexed sheet row
+
+    // Already signed guard
+    if (String(row[C.SIGNATURE_STATUS - 1] || '').trim() === 'Signed') {
+      return { success: false, message: 'This grievance has already been signed.' };
+    }
+
+    var grievanceId = String(row[C.GRIEVANCE_ID - 1] || '');
+    var firstName   = String(row[C.FIRST_NAME - 1]   || '');
+    var lastName    = String(row[C.LAST_NAME - 1]     || '');
+    var memberEmail = String(row[C.MEMBER_EMAIL - 1]  || '').trim().toLowerCase();
+    var stewardEmail = String(row[C.STEWARD - 1]      || '').trim();
+    var dateFiled   = row[C.DATE_FILED - 1] || new Date();
+    var driveFolderUrl = String(row[C.DRIVE_FOLDER_URL - 1] || '');
+    var driveFolderId  = String(row[C.DRIVE_FOLDER_ID - 1]  || '');
+
+    // Build grievance data for hash
+    var grievanceObj = {
+      grievanceId:   grievanceId,
+      memberId:      String(row[C.MEMBER_ID - 1]       || ''),
+      firstName:     firstName,
+      lastName:      lastName,
+      articles:      String(row[C.ARTICLES - 1]        || ''),
+      issueCategory: String(row[C.ISSUE_CATEGORY - 1]  || ''),
+      description:   String(row[C.RESOLUTION - 1]      || ''),
+      remedy:        '',
+      step:          String(row[C.CURRENT_STEP - 1]     || ''),
+      incidentDate:  row[C.INCIDENT_DATE - 1] ? String(row[C.INCIDENT_DATE - 1]) : '',
+      dateFiled:     row[C.DATE_FILED - 1] ? String(row[C.DATE_FILED - 1]) : ''
+    };
+
+    var documentHash = generateDocumentHash_(grievanceObj);
+    var tz = Session.getScriptTimeZone();
+    var signedDate = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var memberName = (firstName + ' ' + lastName).trim();
+
+    // ── Generate signed PDF ──
+    var hireDateStr = '';
+    // Look up hire date from member directory
+    try {
+      var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
+      if (memberDir && memberDir.getLastRow() > 1) {
+        var mAll = memberDir.getDataRange().getValues();
+        for (var m = 1; m < mAll.length; m++) {
+          if (String(mAll[m][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim() === memberEmail) {
+            var hd = mAll[m][MEMBER_COLS.HIRE_DATE - 1];
+            if (hd) {
+              try { hireDateStr = Utilities.formatDate(new Date(hd), tz, 'yyyy-MM-dd'); } catch (_e) { hireDateStr = String(hd); }
+            }
+            break;
+          }
+        }
+      }
+    } catch (_e) { /* skip */ }
+
+    var regionVal = '';
+    var workLoc = String(row[C.LOCATION - 1] || '');
+    if (workLoc) {
+      var locLower = workLoc.toLowerCase();
+      if (locLower.indexOf('everett') !== -1) regionVal = 'Everett';
+      else if (locLower.indexOf('worcester') !== -1) regionVal = 'Worcester';
+    }
+
+    var pdfData = {
+      grievant:   memberName,
+      jobtitle:   '', // from member dir if available
+      startdate:  hireDateStr,
+      agency:     'MassAbility DDS',
+      region:     regionVal,
+      workloc:    workLoc,
+      articles:   grievanceObj.articles,
+      step:       grievanceObj.step,
+      statement:  grievanceObj.description,
+      statement2: '',
+      remedy1:    grievanceObj.remedy,
+      remedy2:    '',
+      managers:   ''
+    };
+
+    var signedPdfBlob = generateSignedGrievancePDF_(pdfData, grievanceId, documentHash, sigBase64, memberName, signedDate);
+
+    // ── Save signed PDF to Drive ──
+    if (signedPdfBlob && driveFolderId) {
+      try {
+        var signedFileName = buildGrievancePdfName_(grievanceId, firstName, lastName, 'Signed', dateFiled);
+        signedPdfBlob.setName(signedFileName);
+        var caseFolder = DriveApp.getFolderById(driveFolderId);
+
+        // Remove all draft PDFs (handles retries that may have created duplicates)
+        var draftPrefix = grievanceId + '_';
+        var files = caseFolder.getFiles();
+        while (files.hasNext()) {
+          var f = files.next();
+          if (f.getName().indexOf(draftPrefix) === 0 && f.getName().indexOf('_Draft_') !== -1) {
+            f.setTrashed(true);
+          }
+        }
+
+        caseFolder.createFile(signedPdfBlob);
+      } catch (driveErr) {
+        if (typeof secureLog === 'function') secureLog('esign', 'Drive save error', { error: driveErr.message });
+        else Logger.log('submitGrievanceSignature: Drive save error: ' + driveErr.message);
+      }
+    }
+
+    // ── Update Grievance Log row ──
+    if (C.SIGNATURE_STATUS) sheet.getRange(sheetRow, C.SIGNATURE_STATUS).setValue('Signed');
+    if (C.SIGNATURE_HASH)   sheet.getRange(sheetRow, C.SIGNATURE_HASH).setValue(documentHash);
+    if (C.SIGNED_DATE)      sheet.getRange(sheetRow, C.SIGNED_DATE).setValue(new Date());
+    if (C.LAST_UPDATED)     sheet.getRange(sheetRow, C.LAST_UPDATED).setValue(new Date());
+
+    // Signature image is embedded in the signed PDF (authoritative copy in Drive).
+    // No separate storage of raw signature data — avoids PII persistence in Script Properties.
+
+    // ── Clear signature token (prevent reuse) ──
+    if (C.SIGNATURE_TOKEN) sheet.getRange(sheetRow, C.SIGNATURE_TOKEN).setValue('');
+
+    // ── Notify member: Grievance Filed ──
+    if (typeof pushNotification === 'function' && memberEmail) {
+      pushNotification(memberEmail, {
+        title: 'Grievance Filed (' + grievanceId + ')',
+        body: 'Your grievance (' + grievanceId + ') has been signed and officially filed. ' +
+              'Your steward will keep you updated on the progress. ' +
+              (driveFolderUrl ? 'Your case folder: ' + driveFolderUrl : ''),
+        type: 'Grievance Filed'
+      });
+    }
+
+    // ── Notify steward: Signature received ──
+    if (typeof pushNotification === 'function' && stewardEmail) {
+      pushNotification(stewardEmail, {
+        title: 'Signature Received (' + grievanceId + ')',
+        body: memberName + ' has signed grievance ' + grievanceId + '. The signed PDF is ready in the case folder. You may now email the document.',
+        type: 'Signature Received'
+      });
+    }
+
+    // ── Refresh badges ──
+    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+
+    // ── Audit log ──
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent(AUDIT_EVENTS.GRIEVANCE_SIGNED || 'GRIEVANCE_SIGNED', {
+        grievanceId: grievanceId,
+        memberEmail: memberEmail,
+        documentHash: documentHash,
+        signedDate: signedDate
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Grievance signed successfully.',
+      driveFolderUrl: driveFolderUrl
+    };
+  } catch (e) {
+    if (typeof secureLog === 'function') secureLog('esign', 'submitGrievanceSignature error', { error: e.message });
+    else Logger.log('submitGrievanceSignature error: ' + e.message);
+    return { success: false, message: 'Error processing signature.' };
+  }
+}
+
+/**
+ * Initiates a grievance on behalf of a member. Steward-only.
+ * - Creates Grievance Log entry
+ * - Generates populated PDF form
+ * - Saves PDF to member's grievance Drive folder
+ * - Notifies member on webapp
+ *
+ * @param {string} stewardEmail - Authenticated steward email
+ * @param {Object} data - { memberEmail, step, articles, issueCategory, description, remedy,
+ *                          incidentDate, managers, formOverrides }
+ * @param {string} [idemKey] - Idempotency key to prevent duplicate submissions
+ * @returns {Object} { success, grievanceId, driveFolderUrl, message }
+ */
+function initiateGrievance(stewardEmail, data, idemKey) {
+  try {
+    // Idempotency guard
+    if (idemKey) {
+      var idemCache = CacheService.getScriptCache();
+      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored.' };
+      idemCache.put('IDEM_' + idemKey, '1', 300);
+    }
+
+    if (!stewardEmail || !data || !data.memberEmail) {
+      return { success: false, message: 'Steward email and member email are required.' };
+    }
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+
+    // ── 1. Look up member in Member Directory ────────────────────────────────
+    var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!memberDir || memberDir.getLastRow() < 2) {
+      return { success: false, message: 'Member Directory not found or empty.' };
+    }
+
+    var memberData = null;
+    var allMembers = memberDir.getDataRange().getValues();
+    var emailLower = data.memberEmail.toLowerCase().trim();
+    for (var i = 1; i < allMembers.length; i++) {
+      var rowEmail = String(allMembers[i][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim();
+      if (rowEmail === emailLower) {
+        memberData = {
+          memberId:     String(allMembers[i][MEMBER_COLS.MEMBER_ID - 1]    || '').trim(),
+          firstName:    String(allMembers[i][MEMBER_COLS.FIRST_NAME - 1]   || '').trim(),
+          lastName:     String(allMembers[i][MEMBER_COLS.LAST_NAME - 1]    || '').trim(),
+          email:        emailLower,
+          phone:        String(allMembers[i][MEMBER_COLS.PHONE - 1]        || '').trim(),
+          jobTitle:     String(allMembers[i][MEMBER_COLS.JOB_TITLE - 1]    || '').trim(),
+          workLocation: String(allMembers[i][MEMBER_COLS.WORK_LOCATION - 1]|| '').trim(),
+          unit:         String(allMembers[i][MEMBER_COLS.UNIT - 1]         || '').trim(),
+          supervisor:   String(allMembers[i][MEMBER_COLS.SUPERVISOR - 1]   || '').trim(),
+          manager:      String(allMembers[i][MEMBER_COLS.MANAGER - 1]      || '').trim(),
+          hireDate:     allMembers[i][MEMBER_COLS.HIRE_DATE - 1] || '',
+          streetAddress:String(allMembers[i][MEMBER_COLS.STREET_ADDRESS - 1]|| '').trim(),
+          city:         String(allMembers[i][MEMBER_COLS.CITY - 1]         || '').trim(),
+          state:        String(allMembers[i][MEMBER_COLS.STATE - 1]        || '').trim(),
+          zipCode:      String(allMembers[i][MEMBER_COLS.ZIP_CODE - 1]     || '').trim()
+        };
+        break;
+      }
+    }
+
+    if (!memberData) {
+      return { success: false, message: 'Member not found in directory.' };
+    }
+
+    // ── 2. Create Grievance Log entry ───────────────────────────────────────
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!grievanceSheet) return { success: false, message: 'Grievance Log sheet not found.' };
+
+    var grievanceId = getNextGrievanceId(grievanceSheet);
+    var filingDate = new Date();
+    var deadlines = calculateInitialDeadlines(filingDate);
+
+    var totalCols = getGrievanceHeaders().length;
+    var rowData = new Array(totalCols).fill('');
+
+    rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
+    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = escapeForFormula(memberData.memberId);
+    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = escapeForFormula(memberData.firstName);
+    if (GRIEVANCE_COLS.LAST_NAME) {
+      rowData[GRIEVANCE_COLS.LAST_NAME - 1]     = escapeForFormula(memberData.lastName);
+    }
+    rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
+    rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = data.step || 1;
+    if (data.incidentDate) {
+      rowData[GRIEVANCE_COLS.INCIDENT_DATE - 1] = new Date(data.incidentDate);
+    }
+    rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
+    rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
+    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = escapeForFormula(data.articles || '');
+    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = escapeForFormula(data.issueCategory || '');
+    rowData[GRIEVANCE_COLS.MEMBER_EMAIL - 1]    = escapeForFormula(memberData.email);
+    rowData[GRIEVANCE_COLS.LOCATION - 1]        = escapeForFormula(memberData.workLocation);
+    rowData[GRIEVANCE_COLS.STEWARD - 1]         = escapeForFormula(stewardEmail);
+    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = escapeForFormula(data.description || '');
+    rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
+    if (GRIEVANCE_COLS.ACTION_TYPE) {
+      rowData[GRIEVANCE_COLS.ACTION_TYPE - 1]   = 'Grievance';
+    }
+
+    // ── Signature tracking fields ──
+    var sigToken = generateSignatureToken_(grievanceId);
+    if (GRIEVANCE_COLS.SIGNATURE_STATUS) rowData[GRIEVANCE_COLS.SIGNATURE_STATUS - 1] = 'Pending';
+    if (GRIEVANCE_COLS.SIGNATURE_TOKEN)  rowData[GRIEVANCE_COLS.SIGNATURE_TOKEN - 1]  = sigToken;
+
+    grievanceSheet.appendRow(rowData);
+
+    logAuditEvent(AUDIT_EVENTS.GRIEVANCE_CREATED, {
+      grievanceId: grievanceId,
+      memberId: memberData.memberId,
+      memberEmail: memberData.email,
+      createdBy: stewardEmail
+    });
+
+    // ── 3. Setup Drive folder ───────────────────────────────────────────────
+    var driveResult = setupDriveFolderForGrievance(grievanceId);
+    var driveFolderUrl = (driveResult && driveResult.success) ? driveResult.folderUrl : '';
+
+    // ── 4. Generate and save grievance PDF ──────────────────────────────────
+    var hireDateStr = '';
+    if (memberData.hireDate) {
+      try {
+        hireDateStr = Utilities.formatDate(new Date(memberData.hireDate), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      } catch (_e) {
+        hireDateStr = String(memberData.hireDate);
+      }
+    }
+
+    // Determine region from work location
+    var regionVal = '';
+    if (memberData.workLocation) {
+      var locLower = memberData.workLocation.toLowerCase();
+      if (locLower.indexOf('everett') !== -1) regionVal = 'Everett';
+      else if (locLower.indexOf('worcester') !== -1) regionVal = 'Worcester';
+    }
+
+    var formOverrides = data.formOverrides || {};
+    var pdfData = {
+      grievant:   memberData.firstName + ' ' + memberData.lastName,
+      jobtitle:   formOverrides.jobtitle || memberData.jobTitle,
+      startdate:  formOverrides.startdate || hireDateStr,
+      agency:     formOverrides.agency || 'MassAbility DDS',
+      region:     formOverrides.region || regionVal,
+      workloc:    formOverrides.workloc || memberData.workLocation,
+      managers:   formOverrides.managers || memberData.manager || memberData.supervisor,
+      articles:   formOverrides.articles || data.articles,
+      step:       formOverrides.step || String(data.step || '1'),
+      statement:  formOverrides.statement || data.description,
+      statement2: formOverrides.statement2 || '',
+      remedy1:    formOverrides.remedy1 || data.remedy,
+      remedy2:    formOverrides.remedy2 || ''
+    };
+
+    // Generate document hash for draft PDF
+    // Note: remedy is not stored in a separate sheet column, so it must be '' here
+    // to match the hash reconstructed at signing time from sheet data.
+    var grievanceObj = {
+      grievanceId:   grievanceId,
+      memberId:      memberData.memberId,
+      firstName:     memberData.firstName,
+      lastName:      memberData.lastName,
+      articles:      data.articles || '',
+      issueCategory: data.issueCategory || '',
+      description:   data.description || '',
+      remedy:        '',
+      step:          String(data.step || '1'),
+      incidentDate:  data.incidentDate || '',
+      dateFiled:     String(filingDate)
+    };
+    var documentHash = generateDocumentHash_(grievanceObj);
+
+    var pdfBlob = generateDraftGrievancePDF_(pdfData, grievanceId, documentHash);
+
+    if (pdfBlob && driveResult && driveResult.folderId) {
+      try {
+        var draftFileName = buildGrievancePdfName_(grievanceId, memberData.firstName, memberData.lastName, 'Draft', filingDate);
+        pdfBlob.setName(draftFileName);
+        var caseFolder = DriveApp.getFolderById(driveResult.folderId);
+        caseFolder.createFile(pdfBlob);
+      } catch (pdfErr) {
+        Logger.log('initiateGrievance: PDF save failed: ' + pdfErr.message);
+      }
+    }
+
+    // ── 5. Notify member: Signature Needed ────────────────────────────────
+    var stewardName = stewardEmail.split('@')[0]; // fallback
+    try {
+      // Try to resolve steward's display name
+      for (var j = 1; j < allMembers.length; j++) {
+        var sEmail = String(allMembers[j][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim();
+        if (sEmail === stewardEmail.toLowerCase().trim()) {
+          var sFirst = String(allMembers[j][MEMBER_COLS.FIRST_NAME - 1] || '').trim();
+          var sLast  = String(allMembers[j][MEMBER_COLS.LAST_NAME - 1] || '').trim();
+          if (sFirst || sLast) stewardName = (sFirst + ' ' + sLast).trim();
+          break;
+        }
+      }
+    } catch (_e) { /* use fallback name */ }
+
+    var notifTitle = 'Signature Needed (' + grievanceId + ')';
+    var notifBody = 'Your steward, ' + stewardName + ', has prepared a grievance (' + grievanceId + ') on your behalf and needs your signature. ' +
+      'Please open the dashboard and go to your grievance to review and sign the document.';
+
+    if (typeof pushNotification === 'function') {
+      pushNotification(memberData.email, {
+        title: notifTitle,
+        body: notifBody,
+        type: 'Signature Needed'
+      });
+    }
+
+    // ── 6. Refresh badges ───────────────────────────────────────────────────
+    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+
+    return {
+      success: true,
+      grievanceId: grievanceId,
+      driveFolderUrl: driveFolderUrl,
+      memberName: memberData.firstName + ' ' + memberData.lastName,
+      message: 'Grievance ' + grievanceId + ' created for ' + memberData.firstName + ' ' + memberData.lastName + '.'
+    };
+
+  } catch (error) {
+    Logger.log('initiateGrievance error: ' + error.message + '\n' + (error.stack || ''));
+    return errorResponse(error.message, 'initiateGrievance');
+  }
+}
+
+/**
+ * Returns grievance form field options from Config sheet.
+ * Used by the steward intake form to populate dropdowns dynamically.
+ * @returns {Object} { articles, issueCategories, steps, managers, stewards, coordinators }
+ */
+function getGrievanceFormOptions() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return {};
+
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    var result = {
+      articles: [],
+      issueCategories: [],
+      steps: [],
+      managers: [],
+      stewards: [],
+      coordinators: [],
+      jobTitles: []
+    };
+
+    if (!configSheet) return result;
+
+    var configData = configSheet.getDataRange().getValues();
+
+    // Read config columns (data starts row 3, index 2)
+    var colMap = {
+      articles:        CONFIG_COLS.ARTICLES,
+      issueCategories: CONFIG_COLS.ISSUE_CATEGORY,
+      steps:           CONFIG_COLS.GRIEVANCE_STEP,
+      managers:        CONFIG_COLS.MANAGERS,
+      stewards:        CONFIG_COLS.STEWARDS,
+      coordinators:    CONFIG_COLS.GRIEVANCE_COORDINATORS,
+      jobTitles:       CONFIG_COLS.JOB_TITLES
+    };
+
+    for (var key in colMap) {
+      if (!colMap.hasOwnProperty(key) || !colMap[key]) continue;
+      var colIdx = colMap[key] - 1;
+      for (var r = 2; r < configData.length; r++) {
+        var val = String(configData[r][colIdx] || '').trim();
+        if (val) result[key].push(val);
+      }
+    }
+
+    return result;
+  } catch (e) {
+    Logger.log('getGrievanceFormOptions error: ' + e.message);
+    return {};
+  }
+}
+
 /**
  * Standalone wrapper — run from Apps Script editor or menu to
  * re-create/repair the union events calendar.
@@ -3972,7 +4868,7 @@ function SETUP_DRIVE_FOLDERS() {
 function SETUP_CALENDAR() {
   var result = setupDashboardCalendar();
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) {}
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   var msg = result.success
     ? '✅ Calendar ready!\n\nCalendar: ' + result.calendarName +
       '\nID: ' + result.calendarId +

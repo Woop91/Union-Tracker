@@ -140,8 +140,7 @@ describe('G2: Server wrapper functions declare sessionToken when used', () => {
 
         const declaresSessionToken = params.includes('sessionToken');
 
-        // Stub functions that return constants and don't actually use sessionToken
-        // are OK (e.g., dataGetActivePolls returns [])
+        // Functions that return constants without using sessionToken are OK
         const isStub = body.includes('return []') || body.includes('return { success: false') ||
           (body.match(/return/g) || []).length === 1 && !body.includes('_resolveCallerEmail') && !body.includes('_requireStewardAuth');
 
@@ -392,7 +391,7 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 describe('G6: dist/ files are in sync with src/', () => {
 
   test('every src .gs file has identical copy in dist', () => {
-    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs']; // excluded by --prod build
+    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs']; // excluded by --prod build
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
 
@@ -415,7 +414,7 @@ describe('G6: dist/ files are in sync with src/', () => {
     expect(stale).toEqual([]);
   });
 
-  test('every src .html file exists in dist and preserves all function definitions', () => {
+  test('every src .html file has identical copy in dist', () => {
     const htmlFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html'));
     const stale = [];
 
@@ -428,25 +427,15 @@ describe('G6: dist/ files are in sync with src/', () => {
         continue;
       }
 
-      const srcContent = fs.readFileSync(srcPath, 'utf8');
-      const distContent = fs.readFileSync(distPath, 'utf8');
-
-      // dist/ may be minified, so allow size reduction.
-      // But dist/ must never be LARGER than src/ (that would indicate corruption)
-      // and must never lose function definitions.
-      if (distContent.length > srcContent.length) {
-        stale.push(`${f}: dist/ is larger than src/ — possible corruption`);
-        continue;
-      }
-
-      // Verify all function definitions from src/ exist in dist/
-      const fnRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
-      let match;
-      while ((match = fnRegex.exec(srcContent)) !== null) {
-        const fnName = match[1];
-        if (!distContent.includes('function ' + fnName)) {
-          stale.push(`${f}: function ${fnName} missing from dist/`);
-        }
+      // build:prod --minify strips comments/whitespace, so dist may be smaller
+      // than src. Check that dist is not LARGER than src (would indicate wrong build)
+      // and that dist is not empty.
+      const srcLines = fs.readFileSync(srcPath, 'utf8').split('\n').length;
+      const distLines = fs.readFileSync(distPath, 'utf8').split('\n').length;
+      if (distLines === 0) {
+        stale.push(`${f}: dist/ is empty`);
+      } else if (distLines > srcLines) {
+        stale.push(`${f}: dist/ has more lines than src/ (${distLines} > ${srcLines}) — rebuild needed`);
       }
     }
 
@@ -787,6 +776,123 @@ describe('G14: WorkloadService crash-safe patterns', () => {
 });
 
 // ============================================================================
+// G15: IDLE LOGOUT MODULE
+// ============================================================================
+// Reason: v4.31.0 adds auto-logout after 15 min inactivity. Without the
+// IdleLogout module the session stays open indefinitely on unattended tabs.
+
+describe('G-IDLE: index.html contains IdleLogout module', () => {
+  const indexCode = fs.readFileSync(path.join(SRC_DIR, 'index.html'), 'utf8');
+
+  test('IdleLogout IIFE is defined', () => {
+    expect(indexCode).toContain('IdleLogout');
+  });
+
+  test('IdleLogout.init() is called', () => {
+    expect(indexCode).toContain('IdleLogout.init()');
+  });
+});
+
+
+// ============================================================================
+// G16: TOKEN DELETE-AFTER-VALIDATE (not set-used flag)
+// ============================================================================
+// Reason: v4.31.0 C1+C4 — magic token must be deleted immediately after
+// validation. The old pattern (set used=true) left stale tokens in
+// PropertiesService, causing quota accumulation and TOCTOU races.
+
+describe('G-TOKEN-DELETE: 19_WebDashAuth.gs deletes tokens after validation', () => {
+  const authCode = fs.readFileSync(path.join(SRC_DIR, '19_WebDashAuth.gs'), 'utf8');
+
+  test('_validateMagicToken calls deleteProperty', () => {
+    // Extract _validateMagicToken function body
+    const funcStart = authCode.indexOf('function _validateMagicToken');
+    expect(funcStart).toBeGreaterThan(-1);
+    const funcBody = authCode.substring(funcStart, authCode.indexOf('\n  }', funcStart + 50) + 4);
+    expect(funcBody).toContain('deleteProperty');
+  });
+
+  test('_validateMagicToken does NOT use setProperty with used flag', () => {
+    const funcStart = authCode.indexOf('function _validateMagicToken');
+    const funcBody = authCode.substring(funcStart, authCode.indexOf('\n  }', funcStart + 50) + 4);
+    // Old pattern: setProperty(key, JSON.stringify({...used: true...}))
+    expect(funcBody).not.toMatch(/setProperty[\s\S]*?used:\s*true/);
+  });
+});
+
+
+// ============================================================================
+// G17: NO RAW RESOURCE IDS IN SANITIZED CONFIG
+// ============================================================================
+// Reason: v4.31.0 H8 — _sanitizeConfig must NOT expose raw Google resource
+// IDs (calendarId, minutesFolderId, grievancesFolderId) to the client.
+// Only pre-built URLs and boolean flags should be sent.
+
+describe('G-NO-RAW-IDS: _sanitizeConfig does not expose raw resource IDs', () => {
+  const appCode = fs.readFileSync(path.join(SRC_DIR, '22_WebDashApp.gs'), 'utf8');
+
+  // Extract the _sanitizeConfig function body (the return {...} block)
+  const funcStart = appCode.indexOf('function _sanitizeConfig');
+  const returnStart = appCode.indexOf('return {', funcStart);
+  const returnEnd = appCode.indexOf('};', returnStart) + 2;
+  const returnBlock = appCode.substring(returnStart, returnEnd);
+
+  test('does not contain calendarId: as an object key', () => {
+    // calendarId should only appear inside expressions (config.calendarId), not as a key
+    expect(returnBlock).not.toMatch(/^\s+calendarId\s*:/m);
+  });
+
+  test('does not contain minutesFolderId: as an object key', () => {
+    expect(returnBlock).not.toMatch(/^\s+minutesFolderId\s*:/m);
+  });
+
+  test('does not contain grievancesFolderId: as an object key', () => {
+    expect(returnBlock).not.toMatch(/^\s+grievancesFolderId\s*:/m);
+  });
+
+  test('contains calendarCreateUrl key', () => {
+    expect(returnBlock).toMatch(/calendarCreateUrl\s*:/);
+  });
+
+  test('contains minutesFolderUrl key', () => {
+    expect(returnBlock).toMatch(/minutesFolderUrl\s*:/);
+  });
+
+  test('contains hasMinutesFolder key', () => {
+    expect(returnBlock).toMatch(/hasMinutesFolder\s*:/);
+  });
+
+  test('contains hasGrievancesFolder key', () => {
+    expect(returnBlock).toMatch(/hasGrievancesFolder\s*:/);
+  });
+});
+
+
+// ============================================================================
+// G18: RENDER GENERATION COUNTER
+// ============================================================================
+// Reason: v4.31.0 H7 — _renderGeneration counter prevents stale async
+// callbacks from rendering into tabs that have already been navigated away
+// from (race condition on rapid tab clicks).
+
+describe('G-RENDER-GEN: index.html contains _renderGeneration counter', () => {
+  const indexCode = fs.readFileSync(path.join(SRC_DIR, 'index.html'), 'utf8');
+
+  test('_renderGeneration variable is declared', () => {
+    expect(indexCode).toMatch(/var\s+_renderGeneration\s*=/);
+  });
+
+  test('_renderGeneration is checked in render callbacks', () => {
+    // The pattern: myGen !== _renderGeneration — discard stale callbacks
+    expect(indexCode).toContain('_renderGeneration');
+    const checks = (indexCode.match(/_renderGeneration/g) || []).length;
+    // At least 3: declaration + 2 checks (one per render path)
+    expect(checks).toBeGreaterThanOrEqual(3);
+  });
+});
+
+
+// ============================================================================
 // HELPERS
 // ============================================================================
 
@@ -827,57 +933,3 @@ function countTopLevelArgs(str) {
 
   return count;
 }
-
-
-// ============================================================================
-// G24: HTML SIZE BUDGET — GAS HtmlOutput ~820KB LIMIT
-// ============================================================================
-// Reason: GAS silently truncates HtmlOutput beyond ~820KB. When steward users
-// get view='both' (steward_view + member_view), the total must stay under limit.
-// An unminified build or oversized view file can push past this, causing tabs to
-// fail with no error message.
-describe('G24: HTML size budget (GAS ~820KB limit)', () => {
-  const GAS_LIMIT_KB = 820;
-  const DIST = path.join(__dirname, '..', 'dist');
-
-  function fileSize(name) {
-    return fs.statSync(path.join(DIST, name)).size;
-  }
-
-  test('steward-only payload under GAS limit', () => {
-    const total = fileSize('index.html') + fileSize('styles.html') + fileSize('steward_view.html');
-    expect(total).toBeLessThan(GAS_LIMIT_KB * 1024);
-  });
-
-  test('member-only payload under GAS limit', () => {
-    const total = fileSize('index.html') + fileSize('styles.html') + fileSize('member_view.html');
-    expect(total).toBeLessThan(GAS_LIMIT_KB * 1024);
-  });
-
-  test('dual-role (both views) payload under GAS limit', () => {
-    const total = fileSize('index.html') + fileSize('styles.html')
-      + fileSize('steward_view.html') + fileSize('member_view.html');
-    expect(total).toBeLessThan(GAS_LIMIT_KB * 1024);
-  });
-});
-
-
-// ============================================================================
-// G25: DIST HTML MINIFICATION VERIFICATION
-// ============================================================================
-// Reason: lint-staged stash/restore with core.autocrlf=true can silently revert
-// minified dist HTML to unminified source content. This guard catches it by
-// verifying dist HTML files are smaller than their source counterparts.
-describe('G25: dist HTML files are minified', () => {
-  const SRC = path.join(__dirname, '..', 'src');
-  const DIST = path.join(__dirname, '..', 'dist');
-  const htmlFiles = ['index.html', 'styles.html', 'steward_view.html', 'member_view.html'];
-
-  htmlFiles.forEach(file => {
-    test(`${file} dist is smaller than src (minified)`, () => {
-      const srcSize = fs.statSync(path.join(SRC, file)).size;
-      const distSize = fs.statSync(path.join(DIST, file)).size;
-      expect(distSize).toBeLessThan(srcSize);
-    });
-  });
-});

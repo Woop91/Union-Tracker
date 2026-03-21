@@ -2,26 +2,35 @@
  * ============================================================================
  * 11_CommandHub.gs - STRATEGIC COMMAND CENTER
  * ============================================================================
- * STATUS: Production Ready / Harmonized / High-Performance
  *
- * v4.0 UNIFIED ARCHITECTURE:
- * - Single-File Modular Build (Virtual Files: Constants, UI, Performance, Security, DevTools)
- * - Global Scope Rule: All functions share CONFIG object
+ * WHAT THIS FILE DOES:
+ *   Strategic Command Center — consolidated access point for all advanced
+ *   steward features. Provides getCommandCenterConfig() which lazy-loads
+ *   configuration to avoid load-order issues. Houses strategic intelligence
+ *   functions: hot zone analysis, rising stars identification, hostility
+ *   reports, bargaining cheat sheets, and cross-module command routing.
  *
- * FEATURES:
- * - Security: Audit Log & Sabotage Protection (>15 cells)
- * - Performance: Batch Array Processing (No-Lag Architecture up to 5,000 members)
- * - Workflow: Stage-Gate Case Tracking & Auto-PDF Generation
- * - Production: Nuke/Seed Isolation & UI Self-Hiding (PRODUCTION_MODE)
- * - Accessibility: Mobile/Pocket View & Search Engine
- * - Legal: Signature-Ready PDF Merge & Auto-Drive Archiving
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Uses lazy initialization (getCommandCenterConfig returns a new object
+ *   each call) to avoid the GAS load-order problem where constants from
+ *   other files might not be defined yet. 60+ commands reflect the feature
+ *   depth of the system — collision is managed by a verb-noun naming
+ *   convention. COMMAND_CONFIG provides system-wide settings (system name,
+ *   email prefixes, footer text) used by security alerts and email templates.
  *
- * CURRENT PHASE: Pre-Production (verifying ID generation & Mobile View logic)
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   The Command Center menu stops working. Strategic intelligence reports
+ *   (hot zones, rising stars) fail. COMMAND_CONFIG is referenced by
+ *   00_Security.gs for email subjects/footers, so security alert emails
+ *   will fall back to default text.
  *
- * NOTE: This file provides consolidated access to Strategic Command Center
- * features. Core implementations are in their respective module files.
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, column constants).
+ *   Used by 00_Security.gs (COMMAND_CONFIG for email templates), menu items
+ *   in 03_, and strategic analysis features.
  *
- * @version 4.7.0
+ * @version 4.31.0
+ * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
 
@@ -48,47 +57,14 @@ function getCommandCenterConfig() {
   };
 }
 
-// Legacy COMMAND_CENTER_CONFIG — uses lazy getters so help content and
-// dynamic fields are only resolved when first accessed (not at load time).
-// @deprecated Use getCommandCenterConfig() or COMMAND_CONFIG instead. Kept for backward compatibility.
-var COMMAND_CENTER_CONFIG = {
-  SYSTEM_NAME: "Strategic Command Center",
-  get LOG_SHEET_NAME()    { return typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG ? SHEETS.GRIEVANCE_LOG : 'Grievance Log'; },
-  get DIR_SHEET_NAME()    { return typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR ? SHEETS.MEMBER_DIR : 'Member Directory'; },
-  get AUDIT_SHEET_NAME()  { return typeof SHEETS !== 'undefined' && SHEETS.AUDIT_LOG ? SHEETS.AUDIT_LOG : '_Audit_Log'; },
-  get TEMPLATE_ID()       { return COMMAND_CONFIG.TEMPLATE_ID; },
-  get ARCHIVE_FOLDER_ID() { return COMMAND_CONFIG.ARCHIVE_FOLDER_ID; },
-  get CHIEF_STEWARD_EMAIL() { return COMMAND_CONFIG.CHIEF_STEWARD_EMAIL; },
-  get UNIT_CODES()        { return COMMAND_CONFIG.UNIT_CODES; },
-  THEME: {
-    HEADER_BG: '#1e293b',
-    HEADER_TEXT: '#ffffff',
-    ALT_ROW: '#f8fafc',
-    FONT: 'Roboto',
-    FONT_SIZE: 10
-  }
-};
+// CODE-02: COMMAND_CENTER_CONFIG removed — deprecated since v4.4.0, zero callers.
+// Use getCommandCenterConfig() or COMMAND_CONFIG instead.
 
 // CODE-01: createCommandCenterMenu() removed — deprecated since v4.4.0, zero callers.
 
 // ============================================================================
 // NAVIGATION SHORTCUTS (v4.0)
 // ============================================================================
-
-/**
- * Quick navigation to Executive Dashboard
- */
-function navigateToDashboard() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.DASHBOARD);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  } else {
-    SpreadsheetApp.getUi().alert('Dashboard sheet not found. Use the Dashboards menu for modal dashboards.');
-  }
-}
-
-// navigateToMobileView removed — dead code cleanup v4.25.11
 
 /**
  * v4.6 Pocket View Navigation
@@ -305,9 +281,6 @@ function toggleMobileView() {
 // v4.0 HIGH-PERFORMANCE DATA ENGINE
 // ============================================================================
 
-
-// generateMissingMemberIDsBatch removed — dead code cleanup v4.25.11
-
 /**
  * v4.0 Refresh Member View
  * Reloads the Member Directory view without changing column visibility.
@@ -325,9 +298,6 @@ function refreshMemberView() {
   SpreadsheetApp.flush();
   ss.toast('✅ View refreshed.', COMMAND_CONFIG.SYSTEM_NAME, 2);
 }
-
-// verifyIDGenerationEngine removed — dead code cleanup v4.25.11
-
 /**
  * v4.0 Status Report
  * Displays comprehensive system status for the Unified Master Engine.
@@ -406,13 +376,6 @@ function showV4StatusReport() {
 function isProductionMode() {
   return PropertiesService.getScriptProperties().getProperty('PRODUCTION_MODE') === 'true';
 }
-
-// enableProductionMode removed — dead code cleanup v4.25.11
-
-// disableProductionMode removed — dead code cleanup v4.25.11
-
-// NUKE_DATABASE removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // NUKE HELPER FUNCTIONS - Documentation & Tab Colors
 // ============================================================================
@@ -451,8 +414,8 @@ function cleanupDocumentationTabs_(ss) {
       var data = sheet.getDataRange().getValues();
       var rowsToUpdate = [];
 
-      // Find rows that contain demo-related content
-      for (var i = 0; i < data.length; i++) {
+      // Find rows that contain demo-related content (skip header row)
+      for (var i = 1; i < data.length; i++) {
         var rowText = data[i].join(' ');
         var shouldClean = demoPatterns.some(function(pattern) {
           return pattern.test(rowText);
@@ -513,7 +476,7 @@ function addRepoLinkToFAQ_(ss) {
     var repoUrl = getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '';
     faqSheet.getRange(linkRow + 2, 1).setValue(repoUrl);
     faqSheet.getRange(linkRow + 2, 1)
-      .setFontColor(SHEET_COLORS.LINK_PRIMARY)
+      .setFontColor('#1a73e8')
       .setFontWeight('bold');
 
     // Add instructions
@@ -617,9 +580,6 @@ function applyTabColors() {
   applyTabColors_(ss);
   ss.toast('Tab colors applied!', 'Success', 3);
 }
-
-// applyConfigSectionColors removed — dead code cleanup v4.25.11
-
 /**
  * Darkens a hex color by a percentage
  * @param {string} color - Hex color (e.g., '#e3f2fd')
@@ -642,19 +602,9 @@ function darkenColor_(color, percent) {
 // ============================================================================
 // DIAGNOSTIC & REPAIR FUNCTIONS
 // ============================================================================
-
-// showDiagnosticReport removed — dead code cleanup v4.25.11
-
-// repairDashboardWithUI removed — dead code cleanup v4.25.11
-
-// syncToCalendar removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // BATCH PROCESSING WRAPPERS
 // ============================================================================
-
-// updateMemberBatch removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // QUICK ACTION FUNCTIONS
 // ============================================================================
@@ -845,41 +795,8 @@ function navigateToMember(memberId) {
 // GEMINI v4.0 UNIFIED MASTER ENGINE - LEGACY CONFIG MAPPING
 // ============================================================================
 
-/**
- * Gemini v4.0 Legacy CONFIG Object
- * Maps emoji-prefixed sheet names for backwards compatibility with
- * standalone single-file deployments.
- *
- * This CONFIG mirrors the Gemini v4.0 unified architecture while
- * maintaining compatibility with the modular SHEETS/COMMAND_CONFIG constants.
- */
-// @deprecated Use COMMAND_CONFIG (01_Core.gs) instead. Kept for backward compatibility with standalone deployments.
-var GEMINI_CONFIG = {
-  SYSTEM_NAME: "Strategic Command Center",
-  // Legacy emoji-prefixed sheet names (for standalone deployments)
-  LOG_SHEET_NAME: "📋 Grievance Log",
-  DIR_SHEET_NAME: "👤 Member Directory",
-  AUDIT_SHEET_NAME: "🛡️ Audit Log",
-  CONFIG_SHEET_NAME: "⚙️ Config",
-  DASHBOARD_NAME: "📊 Dashboard",
-  MOBILE_VIEW_NAME: "📱 Mobile View",
-  // These are read from Config sheet in modular build
-  TEMPLATE_ID: '',
-  ARCHIVE_FOLDER_ID: '',
-  CHIEF_STEWARD_EMAIL: '',
-  // Default unit codes (can be overridden in Config sheet)
-  UNIT_CODES: { "Main Station": "MS", "Field Ops": "FO", "Health": "HC" },
-  THEME: {
-    HEADER_BG: '#1e293b',
-    HEADER_TEXT: '#ffffff',
-    ALT_ROW: '#f8fafc',
-    FONT: 'Roboto'
-  },
-  // Production mode check
-  get PRODUCTION_MODE() {
-    return PropertiesService.getScriptProperties().getProperty('PRODUCTION_MODE') === 'true';
-  }
-};
+// CODE-03: GEMINI_CONFIG removed — deprecated since v4.4.0, zero callers after migration.
+// Use COMMAND_CONFIG (01_Core.gs) instead.
 
 // ============================================================================
 // GEMINI v4.0 LEGAL & PDF SIGNATURE ENGINE
@@ -928,9 +845,6 @@ function createGrievancePDF(folder, data) {
 
   return pdf;
 }
-
-// sendGeminiEscalationAlert removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // GEMINI v4.0 SCALING MODULES - OCR & SENTIMENT HOOKS
 // ============================================================================
@@ -1043,7 +957,7 @@ function wger(fileId, options) {
     };
 
   } catch (e) {
-    console.error('WGER OCR error: ' + e.message);
+    Logger.log('WGER OCR error: ' + e.message);
     logAuditEvent('OCR_ERROR', {
       fileId: fileId,
       error: e.message
@@ -1137,7 +1051,7 @@ function performCloudVisionOCR_(imageBlob, mode, options) {
     var responseText = response.getContentText();
 
     if (responseCode !== 200) {
-      console.error('Cloud Vision API error: ' + responseText);
+      Logger.log('Cloud Vision API error: ' + responseText);
       return {
         success: false,
         message: 'Cloud Vision API returned error code: ' + responseCode
@@ -1164,7 +1078,7 @@ function performCloudVisionOCR_(imageBlob, mode, options) {
     };
 
   } catch (e) {
-    console.error('Cloud Vision OCR error: ' + e.message);
+    Logger.log('Cloud Vision OCR error: ' + e.message);
     return {
       success: false,
       message: 'Cloud Vision API call failed: ' + e.message
@@ -1313,7 +1227,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
         }
       } catch (e) {
         // Date parsing failed, skip
-        console.log('Date parsing failed for: ' + dateMatch[1] + ' - ' + e.message);
+        Logger.log('Date parsing failed for: ' + dateMatch[1] + ' - ' + e.message);
       }
     }
 
@@ -1375,12 +1289,10 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
  * @returns {Object} Unit health analysis result
  */
 function calculateUnitHealth(unitName) {
-  var _ss = SpreadsheetApp.getActiveSpreadsheet();
-
   // Count grievances for this unit
   var grievanceCount = getGrievanceCountForUnit(unitName);
 
-  // Get recent survey average (placeholder - connect to Typeform/SurveyMonkey)
+  // Get recent survey average from Member Satisfaction sheet
   var surveyScore = getRecentSurveyAverage(unitName);
 
   var result = {
@@ -1507,7 +1419,7 @@ function showUnitHealthReport() {
   }
 
   if (units.length === 0) {
-    units = Object.keys(GEMINI_CONFIG.UNIT_CODES);
+    units = Object.keys(COMMAND_CONFIG.UNIT_CODES);
   }
 
   var report = '📊 UNIT HEALTH ANALYSIS REPORT\n';
@@ -1552,9 +1464,6 @@ function showUnitHealthReport() {
 // ============================================================================
 // GEMINI v4.0 APPLY SYSTEM THEME (UI Refresh)
 // ============================================================================
-
-// APPLY_GEMINI_THEME removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // ANALYTICS & INSIGHTS FUNCTIONS (v4.0 Scaling)
 // ============================================================================
@@ -1974,9 +1883,6 @@ function testOCRConnection() {
     return errorResponse('Connection test failed: ' + e.message);
   }
 }
-
-// getOCRStatus removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SEARCH PRECEDENTS (v4.1 - Historical Grievance Outcomes)
 // ============================================================================
@@ -2187,8 +2093,6 @@ function searchPrecedentsData(query, outcomeFilter) {
   return results.slice(0, 50);
 }
 
-
-
 /**
  * ============================================================================
  * STRATEGIC COMMAND CENTER - MEMBER PORTAL SERVICE (v4.5.0)
@@ -2234,9 +2138,6 @@ function safetyValveScrub(data) {
              .replace(ssnRegex, "[REDACTED ID]")
              .replace(emailRegex, "[REDACTED EMAIL]");
 }
-
-// scrubObjectPII removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // DATA FETCHING FUNCTIONS - Portal Support
 // ============================================================================
@@ -2275,7 +2176,6 @@ function getSecureGrievanceStats_() {
         stats.resolved++;
         break;
       case 'Settled':
-        stats.won++;
         stats.resolved++;
         break;
       case 'Withdrawn':
@@ -2427,7 +2327,7 @@ function getContractPdfUrl_() {
       var url = configSheet.getRange(3, CONFIG_COLS.ORG_WEBSITE).getValue();
       if (url) return url;
     }
-  } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   return '#';
 }
 
@@ -2443,7 +2343,7 @@ function getResourceDriveUrl_() {
       var folderId = configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).getValue();
       if (folderId) return 'https://drive.google.com/drive/folders/' + folderId;
     }
-  } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   return '#';
 }
 

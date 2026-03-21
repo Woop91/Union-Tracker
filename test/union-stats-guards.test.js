@@ -351,11 +351,11 @@ describe('G22: Untracked metrics are conditionally displayed', () => {
     }
   });
 
-  test('backend engagement stats marks resourceDownloads as reserved', () => {
+  test('backend engagement stats returns live resourceDownloads', () => {
     const dsCode = read('21_WebDashDataService.gs');
     const body = extractFunctionBody(dsCode, 'dataGetEngagementStats');
-    // Backend should have a comment indicating this is not tracked
-    expect(body).toMatch(/resourceDownloads.*0|Not currently tracked/);
+    // Backend should read resourceDownloads from DataService.getResourceClickTotal()
+    expect(body).toMatch(/resourceDownloads.*getResourceClickTotal/);
   });
 });
 

@@ -1,3 +1,33 @@
+/**
+ * ============================================================================
+ * 10c_FormHandlers.gs — Google Form Configuration & Submission Handlers
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Google Form configuration objects and form submission handlers.
+ *   GRIEVANCE_FORM_CONFIG maps Google Form field entry IDs to Member Directory
+ *   and Grievance Log columns. CONTACT_FORM_CONFIG maps form fields for member
+ *   contact info updates. Form URLs are read from Config sheet at runtime,
+ *   not hardcoded.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Google Form entry IDs are Google's internal field identifiers (e.g.,
+ *   entry.272049116) — they're unique per form and don't change unless the form
+ *   is recreated. The config objects serve as a mapping layer between form fields
+ *   and sheet columns. Form URLs in Config sheet allow admins to swap forms
+ *   without code changes. Default URLs in the config objects are empty fallbacks.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Form submissions won't map to the correct sheet columns. New grievances
+ *   filed via Google Form will have data in wrong columns. Contact info updates
+ *   from forms will fail. Pre-filled form links will be broken.
+ *
+ * DEPENDENCIES:
+ *   Depends on: 01_Core.gs (CONFIG_COLS, MEMBER_COLS, GRIEVANCE_COLS)
+ *   Used by:    08c_FormsAndNotifications.gs (buildPreFilledGrievanceForm),
+ *               form trigger handlers
+ */
+
 // ============================================================================
 // FORM CONFIGURATIONS
 // ============================================================================
@@ -77,10 +107,6 @@ var CONTACT_FORM_CONFIG = {
 // FORM CONFIGURATION HELPERS
 // ============================================================================
 
-// getFormFieldIds_ removed — dead code cleanup v4.25.11
-
-// saveFormFieldIds_ removed — dead code cleanup v4.25.11
-
 /**
  * Get current user's steward info from Member Directory
  * @private
@@ -114,10 +140,6 @@ function getCurrentStewardInfo_(ss) {
 // ============================================================================
 // GRIEVANCE FORM SUBMISSION HANDLER
 // ============================================================================
-
-// getExistingGrievanceIds_ removed — dead code cleanup v4.25.11
-
-// createGrievanceFolderFromData_ removed — dead code cleanup v4.25.11
 
 /**
  * Sanitize folder name by removing invalid characters
@@ -173,9 +195,6 @@ function shareWithCoordinators_(folder) {
  * Set up the grievance form submission trigger
  * Run this once to enable automatic processing of form submissions
  */
-
-// testGrievanceFormSubmission removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // MEMBER SATISFACTION SURVEY FORM HANDLER
 // ============================================================================
@@ -223,19 +242,7 @@ function refreshMemberDirectoryFormulas() {
   ss.toast('Member Directory refreshed!', '✅ Success', 3);
 }
 
-/**
- * @deprecated v4.3.2 - Dashboard sheet is deprecated. Launches Interactive Dashboard modal.
- */
-function rebuildDashboard() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Dashboard sheets are now modal-based. Opening Interactive Dashboard...', '📊 Dashboard', 3);
-
-  // Refresh hidden sheet formulas and sync data (still useful)
-  refreshAllHiddenFormulas();
-
-  // Launch the Interactive Dashboard modal instead of rebuilding sheet
-  showInteractiveDashboardTab();
-}
+// rebuildDashboard() removed v4.31.2 — use showStewardDashboard()
 
 /**
  * Refresh all formulas and sync all data
@@ -251,16 +258,4 @@ function refreshAllFormulas() {
 // ============================================================================
 // VIEW CONTROLS - Timeline Simplification
 // ============================================================================
-
-// simplifyTimelineView removed — dead code cleanup v4.25.11
-
-// showFullTimelineView removed — dead code cleanup v4.25.11
-
-// setupTimelineColumnGroups removed — dead code cleanup v4.25.11
-
-// applyStepHighlighting removed — dead code cleanup v4.25.11
-
-// freezeKeyColumns removed — dead code cleanup v4.25.11
-
-// unfreezeAllColumns removed — dead code cleanup v4.25.11
 

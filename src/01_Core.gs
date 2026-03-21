@@ -37,6 +37,22 @@ var ERROR_LEVEL = {
 };
 
 /**
+ * Structured error codes for client-consumable error classification
+ * @enum {string}
+ */
+var ERROR_CODES = {
+  UNKNOWN: 'UNKNOWN',
+  AUTH_EXPIRED: 'AUTH_EXPIRED',
+  AUTH_REQUIRED: 'AUTH_REQUIRED',
+  NOT_FOUND: 'NOT_FOUND',
+  LOCK_TIMEOUT: 'LOCK_TIMEOUT',
+  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+  VALIDATION: 'VALIDATION',
+  SHEET_UNAVAILABLE: 'SHEET_UNAVAILABLE',
+  DUPLICATE: 'DUPLICATE'
+};
+
+/**
  * Error handler configuration
  */
 var ERROR_CONFIG = {
@@ -50,9 +66,6 @@ var ERROR_CONFIG = {
 // ============================================================================
 // CORE ERROR HANDLING
 // ============================================================================
-
-// withErrorHandling removed — dead code cleanup v4.25.11
-
 /**
  * Creates a standardized success response object
  * @param {*} [data] - Optional response data
@@ -67,10 +80,11 @@ function successResponse(data, message) {
  * Creates a standardized error response object
  * @param {string} error - Error message
  * @param {string} [context] - Context where error occurred
- * @returns {{success: false, error: string, context: string}}
+ * @param {string} [errorCode] - Structured error code from ERROR_CODES enum
+ * @returns {{success: false, error: string, context: string, errorCode: string}}
  */
-function errorResponse(error, context) {
-  return { success: false, error: error || 'An unexpected error occurred', context: context || '' };
+function errorResponse(error, context, errorCode) {
+  return { success: false, error: error || 'An unexpected error occurred', context: context || '', errorCode: errorCode || ERROR_CODES.UNKNOWN };
 }
 
 /**
@@ -343,9 +357,6 @@ function validateRequiredSheets() {
     missing: missing
   };
 }
-
-// runStartupValidation removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // API VERSIONING
 // ============================================================================
@@ -361,19 +372,9 @@ var API_VERSION = {
   toString: function() { return COMMAND_CONFIG.VERSION; }
 };
 
-// getApiVersion removed — dead code cleanup v4.25.11
-
-// isVersionCompatible removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // ERROR LOG VIEWER
 // ============================================================================
-
-// showErrorLog removed — dead code cleanup v4.25.11
-
-// clearErrorLog removed — dead code cleanup v4.25.11
-
-
 
 /**
  * Dashboard - Constants and Configuration
@@ -405,7 +406,7 @@ var API_VERSION = {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.30.2",
+  VERSION: "4.33.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -503,7 +504,7 @@ function getDriveRootFolderName_() {
         return _cachedDriveRootName_;
       }
     }
-  } catch (_e) {}
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   _cachedDriveRootName_ = DRIVE_CONFIG.ROOT_FOLDER_FALLBACK;
   return _cachedDriveRootName_;
 }
@@ -531,9 +532,7 @@ function getOrgNameFromConfig_() {
         return _cachedOrgName;
       }
     }
-  } catch (_e) {
-    // Fallback silently during initialization or when spreadsheet is unavailable
-  }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   _cachedOrgName = 'Union Dashboard';
   return _cachedOrgName;
 }
@@ -572,9 +571,7 @@ function getLocalNumberFromConfig_() {
         return _cachedLocalNumber;
       }
     }
-  } catch (_e) {
-    // Fallback silently during initialization or when spreadsheet is unavailable
-  }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   _cachedLocalNumber = '';
   return _cachedLocalNumber;
 }
@@ -589,18 +586,18 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.30.2';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.33.0';
   var parts = ver.split('.');
   return {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
-    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 29,
-    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
+    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 31,
+    PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 1,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-15',
-    CODENAME: 'Split View',
-    codename: 'Split View'
+    BUILD_DATE: '2026-03-20',
+    CODENAME: 'Public Dashboard Removal',
+    codename: 'Public Dashboard Removal'
   };
 })();
 
@@ -611,12 +608,17 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.31.1', date: '2026-03-20', codename: 'Public Dashboard Removal', changes: 'Remove orphaned 04e_PublicDashboard.gs (~3K lines). File was never routed via doGet and confirmed no public dashboard will exist. Deleted: src/04e_PublicDashboard.gs, dist/04e_PublicDashboard.gs, test/04e_PublicDashboard.test.js. Removed from build.js file list and architecture/auth-denial/UIService test file lists. XSS threshold in architecture.test.js lowered from 130 to 10 (04e contributed ~122 false positives). Updated all documentation references across AI_REFERENCE.md, CODE_REVIEW.md, DEVELOPER_GUIDE.md, FEATURES.md, README.md, CONTRIBUTING.md, QUICK_DEPLOY.md, presentation.html. Changelog entries in VERSION_HISTORY preserved as historical record.' },
+  { version: '4.32.0', date: '2026-03-19', codename: 'Workforce Mobility Survey', changes: 'New survey Section 13 (WORKFORCE_RETENTION) and Section 13A (WORKFORCE_LEAVING) added to quarterly member survey. Section 13 (always shown, 4 questions): q80 likelihood to stay (radio: Very Likely–Very Unlikely), q81 exploring outside DDS (radio-branch — Yes triggers 13A), q84 union addressing retention factors (slider-10), q86 optional open text. Section 13A (conditional on q81=Yes, 2 questions): q82 types of opportunities outside DDS (checkbox, max 2: MA state transfer | leaving state service | private | non-profit/education | not sure), q83 reasons for leaving (checkbox, max 3: Pay & Benefits | Workload | Management | Limited Advancement or Transfer Opportunities | Work-Life Balance | RTO Policy | Burnout | Culture | Other — transfer awareness from former q85 folded into this option). Standalone q85 removed. Looker: Workforce Retention Avg, Likelihood to Stay, Exploring Outside DDS columns added to both _Looker_Satisfaction and _Looker_Anon_Satisfaction headers and refresh functions. getSatisfactionSummary() workforce section added. Section colors: WORKFORCE_RETENTION #e8f4f8, WORKFORCE_LEAVING #fdecea. Always active (not toggled). Visible to all dashboard roles.' },
+  { version: '4.31.0', date: '2026-03-17', codename: 'Security Hardening', changes: 'Security: magic token immediate-delete (TOCTOU fix), session token error handling, bootstrap admin audit logging, resource IDs removed from client config. Reliability: email index cache invalidation, Drive sharing fatal errors, preload race guard, layout render generation counter, timer/observer cleanup. Features: 15min auto-logout with 2min warning modal, Chart.js SRI integrity hash. Perf: glow animation transform/opacity, keyboard handler dedup. Removed ~1385 lines deprecated Interactive Dashboard code.' },
+  { version: '4.30.2', date: '2026-03-17', codename: 'Contact Log Name Matching', changes: 'Contact Log stores member name (col 9). Autocomplete triggers at 1 char. By Member tab gets autocomplete. Recent contacts display member name.' },
   { version: '4.28.7', date: '2026-03-15', codename: 'Gmail Scope Test + Auth Sweep', changes: 'Fix gmailAppAccessible test (gmail.send has no side-effect-free probe). Fix testRunnerEndpointsGated false failure (SSO bypasses null-token rejection). 4 new authsweep tests for wq/qa/tl/fs endpoints. Full auth sweep: 100+ endpoints verified, 10 scopes confirmed, no auth gaps.' },
   { version: '4.28.2', date: '2026-03-14', codename: 'Union Stats + Tab Reviews', changes: 'Tab review merge: Polls — null sessionToken fixed in 5 client calls, server-side dues gate, rate limiting, confirmation dialog, 30+ new tests. POMS — steward routing fix, description correction, auth check on getPOMSReferenceHtml. Union Stats — member-safe grievance/hot-spots endpoints, membership sub-tab enrichment, client-side caching, engagement KPI fix, redundant sheet read fix, showLoading consistency, dataAssignSteward auth fix, 8 structural guard tests. Workload — crash-safe refresh, atomic rate limiting, dynamic bar chart scaling, WT_CAT_KEY_LABELS, auto-save draft, last-submitted indicator, 44 new tests.' },
   { version: '4.26.0', date: '2026-03-13', codename: 'Diagnostics + Quick Setup Menu + Contrast Fix', changes: 'Fix #5: TestRunner controls card contrast upgraded (accent border, card background, stronger shadow). Fix #7: Case Analytics deprecated menu item removed (showInteractiveDashboardTab). Fix #14: New Quick Setup (All Init/Sync) consolidated admin menu with all initialize, trigger install, sync, refresh, and setup functions in one place. Fix #15/#16: Workload Archive removed from DIAGNOSE_SETUP skipKeys so diagnostics detects it and repair creates it via setupHiddenSheets. Fix #17: TestRunner.fail already exists; MEMBER_COLS.ROLE (col 44) needs sheet column addition; remaining test failures are deployment-related — run clasp push.' },
   { version: '4.25.15', date: '2026-03-13', codename: 'Survey UX + Insights Enrichment + Menu Consolidation', changes: 'TestRunner dark-mode contrast fix. Survey default scope changed to location. Quick Setup & Sync duplicate menu removed (35 lines). Proximity badge pills on nearby survey members. Prev/Next pagination replaces Show All buttons. Enhanced participation stats (new member completion fraction, declining avg rate). withdrawnCount added to getGrievanceStats. newMembersLast90 + byHireMonth added to getMembershipStats. New insight cards: OVERDUE CASES, NEW MEMBERS, overtime averages, employment mix. Hash-based detail navigation with browser back-button support.' },
   { version: '4.25.12', date: '2026-03-12', codename: 'Function Cohesion Phase 2', changes: 'Inline lock patterns replaced with withScriptLock_() in 6 functions (addMember, updateMember, startNewGrievance, advanceGrievanceStep, bulkUpdateGrievanceStatus, resolveGrievance). Centralized ID validators isGrievanceId_()/isMemberId_() replace 10+ inline regex checks across 04c, 04d, 04e, 05, 09. Hardcoded grievance status strings replaced with GRIEVANCE_STATUS constants and GRIEVANCE_CLOSED_STATUSES across 03, 04e, 06, 07, 08b, 09, 11, 12, 17. onEdit() if/else chain replaced with EventBus dispatch via emitEditEvent() — all sheet-specific handlers now route through priority-ordered EventBus subscribers. ThemeEngine consolidated in auth_view.html and error_view.html. Dashboard entry points deprecated (showExecutiveDashboard → showStewardDashboard, showInteractiveDashboardTab → showStewardDashboard).' },
   { version: '4.25.11', date: '2026-03-12', codename: 'Function Cohesion & Process Consistency', changes: 'Comprehensive cohesion review and refactoring. UX fixes: badge refresh added to qaSubmitQuestion (member_view.html), missing withFailureHandler added to 3 steward task creation paths (steward_view.html). Auth fixes: QA moderation wrappers (qaModerateQuestion, qaModerateAnswer, qaGetFlaggedContent, qaResolveQuestion) now return consistent {success:false} objects instead of null; sessionToken passed to checkWebAppAuthorization in dataUpdateProfile and qaResolveQuestion; deprecated poll stubs (dataGetActivePolls/dataSubmitPollVote/dataAddPoll) now enforce auth gates. Cohesion: extracted maskObjectPII_() shared helper to replace 3 identical PII masking loops in 00_Security.gs (secureLog, sendSecurityAlertEmail_, queueSecurityDigestEvent_); sendDailySecurityDigest now routes through safeSendEmail_() instead of direct MailApp.sendEmail; shared fmtDateShort_() and hashEmail_() helpers in 01_Core.gs replace duplicate private definitions in QAForum, TimelineService, FailsafeService.' },
+  { version: '4.30.0', date: '2026-03-16', codename: 'Review Findings Implementation', changes: 'All 3 code review findings implemented (61 total, 41 addressed). Phase 1: removed 213 dead-code stub comments, 22 console.error→Logger.log fixes, removed redundant EventBus init from onOpenDeferred_ (~200ms saved), 3 lock-failure sites now logged, 5 auth-error return types standardized. Phase 2: 130 empty catch blocks now log errors, addToConfigDropdown_ lock-protected, TimelineService 2-min in-memory cache, CorrelationEngine config-gated (Enable Correlation Engine), member profile batch setValue (11→2 API calls), QA Forum notification outside lock scope. Phase 3: Grievance archive split (_Archive_Grievances sheet, stats/hotspots/history read both active+archive, 10-min archive cache TTL), 6 calc sheets deprecated, audit log auto-archival (archiveOldAuditLogs_ + dailyAuditArchive trigger wrapper), lazy-load verified. Phase 4: getConfigValue_ fallback parameter, EventBus sheetKeyMap cached at module level, audit logging throttled (1/sec/user), column map cache TTL 6h→2h, _getSheetSafe global helper.' },
   { version: '4.25.11', date: '2026-03-12', codename: 'Web App Test Suites', changes: '9 new GAS-native test suites in 31_WebAppTests.gs covering all web app modules: webapp (doGet routing, templates, diagnoseWebApp), configrd (ConfigReader completeness, validation, JSON output), portal (PortalSheets 0-indexed column constants, sheet setup), weeklyq (WeeklyQuestions API, poll frequency, pool count), workload (WorkloadService categories, health status, sub-categories), qaforum (QAForum API, pagination, flagged content), timeline (TimelineService events, categories), failsafe (FailsafeService digest config, diagnostics), endpoints (comprehensive data/wq/qa/tl/fs wrapper existence + write endpoint null-token rejection). Total: 20 suites, ~170 tests. All read-only.' },
   { version: '4.25.11', date: '2026-03-12', codename: 'Seed Data Expansion & Survey UX', changes: 'New seedQAForumData() seeds 10 realistic Q&A questions with 15 answers (mix of steward and member responses, anonymous posts, upvotes). Added to SEED_PHASE_3. Member seed data now assigns 2-3 random office days (comma-separated multi-select) instead of 1. Survey Tracking: individual member participation progress bars (snapped to 5% chunks) showing lifetime completion rate with color coding (green >= 80%, yellow >= 50%, red < 50%). getPendingSurveyMembers() now returns allMembers array with totalCompleted/totalMissed stats. Loading indicator replaced: spinner removed, skeleton placeholder UI (pulsing cards/rows) for subtler loading state.' },
   { version: '4.25.10', date: '2026-03-11', codename: 'Web App Diagnostics & Parallel Render', changes: 'Parallel view rendering in index.html (steward + member views load concurrently). Nav tab reorder: Feedback moved to Admin section, stewarddirectory removed from member sidebar. diagnoseWebApp() 14-step diagnostic function in 22_WebDashApp.gs for debugging app loading issues. memberId added to profile data in 21_WebDashDataService.gs. Workload sheet diagnostics in 28_FailsafeService.gs. Enhanced error reporting: null-guard on fatalErr.stack, actual error message shown in bootstrap screen instead of generic failure.' },
@@ -696,9 +698,6 @@ var VERSION_HISTORY = [
   { version: '3.6.0', date: '2025-12-20', codename: 'Data Managers',                              changes: 'Member and Grievance data manager refactor, improved validation' },
   { version: '2.0.0', date: '2025-11-15', codename: 'Modular Architecture',                       changes: 'Split monolith into modular source files, build system, UI/business logic separation' }
 ];
-
-// getVersionDate removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SHEET NAMES
 // ============================================================================
@@ -715,6 +714,7 @@ var SHEETS = {
   CONFIG: 'Config',
   MEMBER_DIR: 'Member Directory',
   GRIEVANCE_LOG: 'Grievance Log',
+  GRIEVANCE_ARCHIVE: '_Archive_Grievances', // v4.30.0 — closed/resolved cases, very hidden
   // Dashboard sheets
   // @deprecated v4.3.2 - Dashboard sheet is deprecated. Use modal dashboards instead.
   // Access via: Union Hub > Dashboards menu. Use removeDeprecatedTabs() to remove.
@@ -761,7 +761,6 @@ var SHEETS = {
   // NOTE: GRIEVANCE_TRACKER alias removed in v4.25.9 (FIX-CORE-02) — all 22
   //   callers migrated to canonical SHEETS.GRIEVANCE_LOG. Sheet is unchanged.
   MEMBER_DIRECTORY: 'Member Directory',
-  REPORTS: '💼 Dashboard',
   // Workload Tracker sheets (18_WorkloadTracker.gs)
   WORKLOAD_VAULT:     'Workload Vault',      // hidden — raw submissions with email
   WORKLOAD_REPORTING: 'Workload Reporting',  // visible — anonymized ledger
@@ -791,10 +790,8 @@ var SHEETS = {
 };
 
 /**
- * @deprecated v4.25.7 — Use SHEETS directly. This alias exists only for backward
- * compatibility and will be removed in a future major version.
+ * @deprecated v4.25.7 — Removed in v4.33.0. Use SHEETS directly.
  */
-var SHEET_NAMES = SHEETS;
 
 /**
  * Hidden sheets used for calculations (prefixed with underscore)
@@ -1035,9 +1032,6 @@ function installHiddenSheetEnforcerTrigger() {
 
   Logger.log('Installed hourly hidden-sheet enforcer trigger');
 }
-
-// removeHiddenSheetEnforcerTrigger removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
 // ============================================================================
@@ -1443,7 +1437,9 @@ var CONFIG_HEADER_MAP_ = [
   // Set to 'yes' to enable the All Members scope option in the Broadcast tab
   { key: 'BROADCAST_SCOPE_ALL',      header: 'Broadcast: Allow All Members Scope' },
   // Test runner (v4.25.2) — email address for failure notifications from scheduled test runs
-  { key: 'TEST_NOTIFY_EMAIL',        header: 'Test Runner Notify Email' }
+  { key: 'TEST_NOTIFY_EMAIL',        header: 'Test Runner Notify Email' },
+  // Correlation Engine (v4.30.0) — set to 'yes' to enable the correlation/insights engine
+  { key: 'ENABLE_CORRELATION',       header: 'Enable Correlation Engine' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -2085,7 +2081,7 @@ function syncColumnMaps() {
 // columns, onEdit would silently use wrong positions until the next onOpen.
 //
 // Solution: syncColumnMaps() persists resolved positions to CacheService
-// (6-hour TTL).  loadCachedColumnMaps_() restores them cheaply in onEdit.
+// (2-hour TTL).  loadCachedColumnMaps_() restores them cheaply in onEdit.
 // ============================================================================
 
 /** Cache key for persisted column maps */
@@ -2110,7 +2106,7 @@ function persistColumnMaps_() {
       FEEDBACK_COLS: FEEDBACK_COLS,
       CHECKLIST_COLS: CHECKLIST_COLS
     };
-    CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 21600); // 6 hours
+    CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 7200); // 2 hours
   } catch (_e) {
     // CacheService unavailable — degrade silently; defaults are still valid
     // for sheets created by this code.
@@ -2237,9 +2233,6 @@ function getColumnLetter(columnNumber) {
   }
   return letter;
 }
-
-// getColumnNumber removed — dead code cleanup v4.25.11
-
 /**
  * Safe accessor for numeric fields — returns the value as-is when it's a
  * number (including 0), and '' for null/undefined/empty-string.
@@ -2252,10 +2245,6 @@ function numericField_(value) {
   if (value === null || value === undefined || value === '') return '';
   return value;
 }
-
-// mapMemberRow removed — dead code cleanup v4.25.11
-
-// mapGrievanceRow removed — dead code cleanup v4.25.11
 
 /**
  * Get all member header labels in order — auto-derived from MEMBER_HEADER_MAP_
@@ -2451,7 +2440,7 @@ function getDeadlineRules() {
       };
     }
   } catch (e) {
-    console.log('Error reading deadline config: ' + e.message);
+    Logger.log('Error reading deadline config: ' + e.message);
   }
   // Fallback to defaults
   return {
@@ -2462,9 +2451,6 @@ function getDeadlineRules() {
     ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
   };
 }
-
-// DEADLINE_RULES removed — dead code cleanup v4.25.11 (use getDeadlineRules() instead)
-
 /**
  * Dashboard sheet layout configuration.
  * All cell references for the Dashboard sheet are centralized here.
@@ -2548,6 +2534,18 @@ var BATCH_LIMITS = {
   CACHE_EXPIRATION_SECONDS: 21600     // 6 hours cache expiration
 };
 
+/**
+ * Scale thresholds — triggers adaptive behavior as sheet row counts grow.
+ * Health monitor in _getCachedSheetData logs warnings at WARN and switches
+ * to paginated mode at THROTTLE. Frontend adapts via dataGetSheetHealth.
+ * @const {Object}
+ */
+var SCALE_THRESHOLDS = {
+  WARN_ROWS:       5000,   // Log warning — sheet approaching performance limits
+  THROTTLE_ROWS:   7000,   // Switch to paginated mode automatically
+  CRITICAL_ROWS:   8000    // Log critical alert — manual intervention recommended
+};
+
 // ============================================================================
 // JOB METADATA FIELDS - Maps Member Directory fields to Config dropdown sources
 // ============================================================================
@@ -2566,9 +2564,6 @@ var JOB_METADATA_FIELDS = [
   { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
   { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
 ];
-
-// getJobMetadataField removed — dead code cleanup v4.25.11
-
 /**
  * Get job metadata field config by member column number
  * @param {number} memberCol - The member column number
@@ -2785,9 +2780,6 @@ var ACTION_TYPE_CONFIG = [
   { value: 'Accommodation', label: 'ADA/Reasonable Accommodation', icon: '♿', usesGrievanceSteps: false, color: '#06B6D4' },
   { value: 'Other Admin', label: 'Other Administrative Action', icon: '📝', usesGrievanceSteps: false, color: '#64748B' }
 ];
-
-// getActionTypeConfig removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // CHECKLIST CONFIGURATION
 // ============================================================================
@@ -3027,9 +3019,6 @@ function getChecklistTemplate(actionType, issueCategory) {
   // Return default template for this action type
   return templates['_default'] || [];
 }
-
-// generateSequentialId removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // MOBILE OPTIMIZATION UTILITIES
 // ============================================================================
@@ -3303,77 +3292,6 @@ function getMobileOptimizedHead() {
 var GRIEVANCE_ID_PATTERN = /^G/i;
 /** @const {RegExp} Member IDs start with 'M' (case-insensitive) */
 var MEMBER_ID_PATTERN = /^M/i;
-
-/**
- * Centralized sheet styling colors — single source of truth for all setBackground/setFontColor calls.
- * Google Sheets API doesn't support CSS variables, but centralizing here makes branding changes a single-file edit.
- */
-var SHEET_COLORS = {
-  // Header backgrounds (dark)
-  HEADER_NAVY: '#1a1a2e',
-  HEADER_BLUE: '#0d47a1',
-  HEADER_SLATE: '#1e293b',
-  HEADER_SLATE_MED: '#334155',
-  HEADER_DARK_BLUE: '#1a365d',
-  HEADER_DARK_RED: '#7F1D1D',
-  HEADER_DARK_PURPLE: '#5B21B6',
-  HEADER_DARK_BLUE_ALT: '#1E40AF',
-
-  // Status indicators
-  STATUS_SUCCESS: '#059669',
-  STATUS_WARNING: '#FBBF24',
-  STATUS_ERROR: '#DC2626',
-  STATUS_ERROR_DARK: '#C62828',
-  STATUS_INFO: '#3B82F6',
-  STATUS_DISABLED: '#6B7280',
-  STATUS_PURPLE: '#7C3AED',
-
-  // Light backgrounds (pastel/tinted)
-  BG_WHITE: '#ffffff',
-  BG_LIGHT_GRAY: '#F9FAFB',
-  BG_VERY_LIGHT_GRAY: '#F3F4F6',
-  BG_OFF_WHITE: '#f8fafc',
-  BG_LIGHT_BLUE: '#E0E7FF',
-  BG_LIGHT_BLUE_ALT: '#e3f2fd',
-  BG_PALE_BLUE: '#F0F9FF',
-  BG_EXTRA_PALE_BLUE: '#EFF6FF',
-  BG_LINK_BLUE: '#e8f0fe',
-  BG_LIGHT_GREEN: '#E8F5E9',
-  BG_PALE_GREEN: '#D1FAE5',
-  BG_GREEN_ALT: '#C8E6C9',
-  BG_MINT: '#ECFDF5',
-  BG_LIGHT_RED: '#FEE2E2',
-  BG_LIGHT_RED_ALT: '#FFCDD2',
-  BG_PINK: '#FFE2E2',
-  BG_LIGHT_YELLOW: '#FEF3C7',
-  BG_PALE_YELLOW: '#FFF9C4',
-  BG_EXTRA_PALE_YELLOW: '#fffde7',
-  BG_CREAM: '#fff8e1',
-  BG_LIGHT_ORANGE: '#FFE0B2',
-  BG_WARM: '#FFF3E0',
-  BG_LIGHT_PURPLE: '#FAF5FF',
-  BG_SLATE_LIGHT: '#F1F5F9',
-
-  // Text colors
-  TEXT_WHITE: '#ffffff',
-  TEXT_GRAY: '#6B7280',
-  TEXT_LIGHT_GRAY: '#9CA3AF',
-  TEXT_DARK_GREEN: '#065F46',
-  TEXT_GREEN: '#2e7d32',
-  TEXT_GREEN_ALT: '#166534',
-  TEXT_GREEN_DARK: '#1B5E20',
-  TEXT_DARK_RED: '#B71C1C',
-  TEXT_RED: '#c62828',
-  TEXT_DARK_ORANGE: '#92400E',
-  TEXT_ORANGE: '#E65100',
-  TEXT_YELLOW_DARK: '#F57F17',
-  TEXT_BROWN: '#78350F',
-  TEXT_MED_GRAY: '#666666',
-
-  // Link colors
-  LINK_PRIMARY: '#1a73e8',
-  LINK_SECONDARY: '#1155cc'
-};
 
 /**
  * Returns true if the value looks like a valid Grievance ID.

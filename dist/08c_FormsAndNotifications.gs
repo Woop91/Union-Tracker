@@ -1,3 +1,36 @@
+/**
+ * ============================================================================
+ * 08c_FormsAndNotifications.gs - Form URLs, Pre-filling, and Notifications
+ * ============================================================================
+ *
+ * WHAT THIS FILE DOES:
+ *   Form URL management, form pre-filling, notification system, and deadline
+ *   alerts. getFormUrlFromConfig() reads form URLs from Config sheet.
+ *   buildPreFilledGrievanceForm() generates pre-populated Google Form URLs.
+ *   Notification functions send email alerts for deadlines, escalations, and
+ *   overdue items.
+ *
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Form URLs are stored in Config sheet (not hardcoded) so admins can swap
+ *   Google Forms without code changes. Pre-filling speeds up grievance filing
+ *   by auto-populating member info from the directory. Config data starts at
+ *   row 3 (row 1=section headers, row 2=column headers) — a common source of
+ *   off-by-one bugs documented in COLUMN_ISSUES_LOG.md.
+ *
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Grievance forms can't be pre-filled — stewards must manually enter all
+ *   fields. Deadline notifications stop — stewards miss filing deadlines.
+ *   Email alerts for overdue items fail silently.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, CONFIG_COLS, GRIEVANCE_COLS, MEMBER_COLS),
+ *   00_Security.gs (safeSendEmail_). Used by menu items, daily trigger in
+ *   10_Main.gs, and form submission handlers in 10c.
+ *
+ * @fileoverview Form management and notification functions
+ * @requires 01_Core.gs, 00_Security.gs
+ */
+
 // NOTE(F42): Form submission volume is acceptable for typical union usage (~100-5000 members).
 // No throttling is needed at current scale.
 
@@ -13,6 +46,7 @@
 function getFormUrlFromConfig(formType) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) { Logger.log('Config sheet not found'); return ''; }
 
   var configCol, defaultUrl;
 
@@ -83,9 +117,6 @@ function buildGrievanceFormUrl_(memberData, stewardData) {
 
   return baseUrl + '?usp=pp_url&' + params.join('&');
 }
-
-// saveFormUrlsToConfig removed — dead code cleanup v4.25.11
-
 /**
  * Silent version - used during CREATE_DASHBOARD setup
  * @param {Spreadsheet} ss - The spreadsheet object
@@ -107,8 +138,8 @@ function saveFormUrlsToConfig_silent(ss) {
   configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
   configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
 
-  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor(SHEET_COLORS.LINK_SECONDARY).setFontLine('underline');
-  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor(SHEET_COLORS.LINK_SECONDARY).setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
 }
 
 // ============================================================================
@@ -390,15 +421,9 @@ function onContactFormSubmit(e) {
     throw error;
   }
 }
-
-// setupContactFormTrigger removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // GRIEVANCE FORM TRIGGER SETUP
 // ============================================================================
-
-// setupGrievanceFormTrigger removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SATISFACTION SURVEY HANDLER
 // ============================================================================
@@ -485,7 +510,7 @@ function onSatisfactionFormSubmit(e) {
       '⚠️ Google Form survey trigger is deprecated. Use the member webapp to submit surveys.',
       'Deprecated Trigger', 8
     );
-  } catch(_ui) {}
+  } catch (_ui) { Logger.log('_ui: ' + (_ui.message || _ui)); }
 }
 
 /**
@@ -604,7 +629,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
         SpreadsheetApp.getUi().ButtonSet.OK
       );
     }
-    console.log('auditAndRemoveSatisfactionTrigger: no stale trigger found.');
+    Logger.log('auditAndRemoveSatisfactionTrigger: no stale trigger found.');
     return false;
   }
 
@@ -619,13 +644,13 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
       ui.ButtonSet.YES_NO
     );
     if (resp !== ui.Button.YES) {
-      console.log('auditAndRemoveSatisfactionTrigger: user declined removal.');
+      Logger.log('auditAndRemoveSatisfactionTrigger: user declined removal.');
       return false;
     }
   }
 
   ScriptApp.deleteTrigger(found);
-  console.log('auditAndRemoveSatisfactionTrigger: stale trigger removed successfully.');
+  Logger.log('auditAndRemoveSatisfactionTrigger: stale trigger removed successfully.');
   if (!autoDelete) {
     SpreadsheetApp.getUi().alert(
       'Trigger Removed',
@@ -636,8 +661,6 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
   }
   return true;
 }
-
-
 /**
  * ============================================================================
  * 08h_NotificationEngine.gs - Notification and Alert System
@@ -990,16 +1013,9 @@ function sendStewardDeadlineAlerts() {
   return emailsSent;
 }
 
-// sendStewardAlertsNow removed — dead code cleanup v4.25.11
-
-// configureAlertSettings removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // SURVEY EMAIL DISTRIBUTION
 // ============================================================================
-
-// sendRandomSurveyEmails removed — dead code cleanup v4.25.11
-
 /**
  * Execute sending random survey emails
  * @param {Object} opts - Options {count, subject, excludeDays}
@@ -1025,6 +1041,7 @@ function executeSendRandomSurveyEmails(opts) {
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
   if (!memberSheet) throw new Error('Member Directory not found');
+  if (!configSheet) throw new Error('Config sheet not found');
 
   // Get all members with valid emails
   var memberData = memberSheet.getDataRange().getValues();
@@ -1046,7 +1063,7 @@ function executeSendRandomSurveyEmails(opts) {
         }
       });
     }
-  } catch(_e) { /* No log yet */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   var cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - opts.excludeDays);
@@ -1199,11 +1216,6 @@ function getCurrentQuarter() {
   var quarter = Math.floor(now.getMonth() / 3) + 1;
   return now.getFullYear() + '-Q' + quarter;
 }
-
-// getQuarterFromDate removed — dead code cleanup v4.25.11
-
-
-
 // ============================================================================
 // SURVEY COMPLETION TRACKING
 // ============================================================================
@@ -1384,7 +1396,7 @@ function startNewSurveyRound() {
     Logger.log('startNewSurveyRound: No tracking data found');
     try {
       SpreadsheetApp.getUi().alert('No survey tracking data found. Run "Populate Survey Tracking" first.');
-    } catch (_e) { /* headless */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     return;
   }
 
@@ -1418,7 +1430,7 @@ function startNewSurveyRound() {
       'New survey round started. ' + updates.length + ' members reset to Not Completed.',
       'Survey Tracking', 5
     );
-  } catch (_e) { /* headless */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 }
 
 /**
@@ -1430,6 +1442,7 @@ function sendSurveyCompletionReminders() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) { Logger.log('Config sheet not found'); }
 
   if (!trackingSheet || trackingSheet.getLastRow() < 2) {
     Logger.log('sendSurveyCompletionReminders: No tracking data');
@@ -1441,7 +1454,7 @@ function sendSurveyCompletionReminders() {
   if (configSheet && configSheet.getLastRow() >= 3) {
     try {
       surveyUrl = configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '';
-    } catch (_e) { /* no portal URL configured */ }
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   }
 
   var data = trackingSheet.getDataRange().getValues();
@@ -1668,7 +1681,7 @@ function getSurveyQuestions() {
   try {
     var cached = CacheService.getScriptCache().get(CACHE_KEY);
     if (cached) return JSON.parse(cached);
-  } catch(_ce) {}
+  } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
 
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1795,7 +1808,7 @@ function getSurveyQuestions() {
     };
 
     // Cache 5 minutes
-    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(result), 300); } catch(_ce) {}
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(result), 300); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
 
     return result;
 
@@ -1819,7 +1832,7 @@ function getSatisfactionColMap_() {
   try {
     var cached = CacheService.getScriptCache().get(CACHE_KEY);
     if (cached) return JSON.parse(cached);
-  } catch(_ce) {}
+  } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
 
   try {
     var satSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SATISFACTION);
@@ -1832,7 +1845,7 @@ function getSatisfactionColMap_() {
       if (key) map[key] = i + 1;
     });
 
-    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(map), 300); } catch(_ce) {}
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(map), 300); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
     return map;
 
   } catch(e) {
@@ -1877,15 +1890,15 @@ function syncSatisfactionSheetColumns_(activeQuestions) {
       satSheet.getRange(1, nextCol)
         .setValue(q.id)
         .setFontWeight('bold')
-        .setBackground(SHEET_COLORS.LINK_PRIMARY)
-        .setFontColor(SHEET_COLORS.BG_WHITE);
+        .setBackground('#1a73e8')
+        .setFontColor('#ffffff');
       satSheet.setColumnWidth(nextCol, 55);
       colMap[q.id] = nextCol;
       nextCol++;
     });
 
     // Invalidate cache so next call re-reads the updated headers
-    try { CacheService.getScriptCache().remove('satisfactionColMap_v1'); } catch(_ce) {}
+    try { CacheService.getScriptCache().remove('satisfactionColMap_v1'); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
 
     Logger.log('syncSatisfactionSheetColumns_: Added ' + missing.length + ' column(s): ' + missing.map(function(q){return q.id;}).join(', '));
     return colMap;
@@ -2032,7 +2045,7 @@ function submitSurveyResponse(callerEmail, responses) {
               }
             }
           }
-        } catch(_ex) {}
+        } catch (_ex) { Logger.log('_ex: ' + (_ex.message || _ex)); }
 
         var memberIdHash = memberId ? hashForVault_(memberId) : '';
         var vaultRow = new Array(8).fill('');
@@ -2067,8 +2080,8 @@ function submitSurveyResponse(callerEmail, responses) {
       }
 
       // ── Update period response count + invalidate summary cache ────────
-      try { incrementPeriodResponseCount_(periodId); } catch(_ex) {}
-      try { CacheService.getScriptCache().remove('satisfactionSummary_' + periodId); } catch(_ex) {}
+      try { incrementPeriodResponseCount_(periodId); } catch (_ex) { Logger.log('_ex: ' + (_ex.message || _ex)); }
+      try { CacheService.getScriptCache().remove('satisfactionSummary_' + periodId); } catch (_ex) { Logger.log('_ex: ' + (_ex.message || _ex)); }
 
       return { success: true, message: 'Thank you — your anonymous response has been recorded.' };
 
@@ -2078,8 +2091,6 @@ function submitSurveyResponse(callerEmail, responses) {
     }
   }, 30);
 }
-
-
 // ============================================================================
 // SATISFACTION COLS COMPATIBILITY SHIM — v4.23.1
 // ============================================================================

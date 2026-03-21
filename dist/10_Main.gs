@@ -1,27 +1,40 @@
 /**
  * ============================================================================
- * 10_Main.gs - Dashboard Entry Point & Triggers
+ * 10_Main.gs — THE Entry Point & Triggers
  * ============================================================================
  *
- * This is the main entry point for the Union Steward Dashboard.
- * It contains trigger functions and coordinates between all modules.
+ * WHAT THIS FILE DOES:
+ *   THE entry point for the entire application. Contains the three main GAS
+ *   trigger functions:
+ *     1. onOpen()       — Simple trigger that creates the menu bar when the
+ *                         spreadsheet opens. Clears caches so fresh config is loaded.
+ *     2. onEdit(e)      — Simple trigger that fires on cell edits. Dispatches
+ *                         to EventBus for decoupled handling.
+ *     3. dailyTrigger() — Installable trigger that runs nightly maintenance
+ *                         (deadline alerts, data sync, security digest).
+ *   Also contains cleanUpOnOpenTrigger_() for trigger hygiene.
  *
- * Module Architecture:
- * - 01_Core.gs       : Configuration and constants (single source of truth)
- * - 03_UIComponents.gs : Dialogs, sidebars, and UI components
- * - 04_GrievanceManager.gs : Grievance lifecycle management
- * - 05_Integrations.gs : Drive, Calendar, and email services
- * - 06_Maintenance.gs : Admin tools and diagnostics
- * - 08a_SheetSetup.gs : Hidden sheet and formula logic
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   onOpen is a GAS "simple trigger" which runs with restricted authorization —
+ *   it CANNOT call ScriptApp, MailApp, GmailApp, or any OAuth service (violations
+ *   cause silent failure). That's why onOpen ONLY creates menus and clears caches.
+ *   All deferred work runs via installable triggers. The prior onOpen approach used
+ *   a self-deleting deferred trigger which had a race condition (the finally block
+ *   deleted the trigger before it fired). Fix: deferred work is now in standalone
+ *   installable triggers set up via Admin menu.
  *
- * Build Instructions:
- * During development, keep files separate. Use build.js to merge all files
- * into ConsolidatedDashboard.gs for deployment:
- *   node build.js
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   If onOpen fails: no menus appear, users can't access any features through
+ *   the UI. If onEdit fails: real-time updates (status changes, auto-formatting)
+ *   stop. If dailyTrigger fails: deadline alerts, email notifications, and
+ *   security digests stop sending.
+ *
+ * DEPENDENCIES:
+ *   Depends on: 03_UIComponents.gs (createDashboardMenu), 15_EventBus.gs
+ *               (EventBus.emit), DevMenu.gs (buildDevMenu, optional)
+ *   Used by:    GAS runtime — called automatically by Google Apps Script
  *
  * @fileoverview Main entry point and trigger functions
- * @version 4.7.0
- * @author Dashboard Team
  */
 
 // ============================================================================
@@ -48,7 +61,7 @@ function onOpen() {
     createDashboardMenu();
     if (typeof buildDevMenu === 'function') buildDevMenu();
   } catch (error) {
-    console.error('Error in onOpen:', error);
+    Logger.log('Error in onOpen:', error);
   }
 }
 
@@ -66,7 +79,7 @@ function cleanUpOnOpenTrigger_() {
       }
     }
   } catch (e) {
-    console.log('Trigger cleanup error: ' + e.message);
+    Logger.log('Trigger cleanup error: ' + e.message);
   }
 }
 
@@ -84,7 +97,7 @@ function onOpenDeferred_() {
         ScriptApp.deleteTrigger(triggers[t]);
       }
     }
-  } catch (_e) { /* skip cleanup if unavailable */ }
+  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
@@ -98,13 +111,13 @@ function onOpenDeferred_() {
     try {
       syncColumnMaps();
     } catch (syncError) {
-      console.log('Column sync skipped: ' + syncError.message);
+      Logger.log('Column sync skipped: ' + syncError.message);
     }
 
     try {
       ensureAllSheetColumns_();
     } catch (colError) {
-      console.log('Column check skipped: ' + colError.message);
+      Logger.log('Column check skipped: ' + colError.message);
     }
 
     try {
@@ -112,24 +125,18 @@ function onOpenDeferred_() {
         applyTabColors_(ss);
       }
     } catch (tabError) {
-      console.log('Tab colors not applied: ' + tabError.message);
+      Logger.log('Tab colors not applied: ' + tabError.message);
     }
 
     try {
       enforceHiddenSheets();
     } catch (hideError) {
-      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+      Logger.log('Hidden sheet enforcement skipped: ' + hideError.message);
     }
 
-    // Initialize EventBus subscribers so the bus is ready for event routing.
-    // onEdit() dispatches via emitEditEvent(e) → EventBus subscribers.
-    try {
-      if (typeof registerEventBusSubscribers === 'function') {
-        registerEventBusSubscribers();
-      }
-    } catch (busError) {
-      console.log('EventBus registration skipped: ' + busError.message);
-    }
+    // EventBus subscribers are NOT registered here — GAS runs each trigger
+    // invocation in an isolated context, so onEdit() re-registers on every call.
+    // Registering here wastes ~200ms on spreadsheet open for no benefit.
 
     ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
   } catch (deferredErr) {
@@ -162,14 +169,14 @@ function onEdit(e) {
     // Restore column positions that syncColumnMaps() resolved in onOpen().
     // Without this, each onEdit execution would start with array-order defaults
     // which are wrong if a user manually reordered columns.
-    try { loadCachedColumnMaps_(); } catch (_cacheErr) { /* use defaults */ }
+    try { loadCachedColumnMaps_(); } catch (_cacheErr) { Logger.log('_cacheErr: ' + (_cacheErr.message || _cacheErr)); }
 
     // Ensure EventBus subscribers are registered for this execution context.
     // GAS runs each trigger invocation in an isolated context — global state
     // from onOpenDeferred_ doesn't persist into onEdit executions.
     try {
       if (typeof registerEventBusSubscribers === 'function') registerEventBusSubscribers();
-    } catch (_busErr) { /* proceed with fallback */ }
+    } catch (_busErr) { Logger.log('_busErr: ' + (_busErr.message || _busErr)); }
 
     var sheet = e.range.getSheet();
     var sheetName = sheet.getName();
@@ -198,7 +205,7 @@ function onEdit(e) {
       try {
         onEditMultiSelect(e);
       } catch (multiSelectError) {
-        console.log('MultiSelect handler error: ' + multiSelectError.message);
+        Logger.log('MultiSelect handler error: ' + multiSelectError.message);
       }
     }
 
@@ -214,7 +221,7 @@ function onEdit(e) {
     }
 
   } catch (error) {
-    console.error('Error in onEdit:', error);
+    Logger.log('Error in onEdit:', error);
   }
 }
 
@@ -241,9 +248,7 @@ function onSelectionChange(e) {
     if (typeof onSelectionChangeMultiSelect === 'function') {
       onSelectionChangeMultiSelect(e);
     }
-  } catch (_err) {
-    // Silent — selection-change triggers must not surface errors
-  }
+  } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
 }
 
 /**
@@ -288,9 +293,7 @@ function handleSecurityAudit_(e) {
       var chiefEmail = '';
       try {
         chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
-      } catch (_configError) {
-        // Config not available
-      }
+      } catch (_configError) { Logger.log('_configError: ' + (_configError.message || _configError)); }
 
       // L-41: MailApp methods are not available in simple trigger context.
       // Wrap the entire email block (including quota check) in try/catch
@@ -352,7 +355,7 @@ function handleSecurityAudit_(e) {
 
   } catch (auditError) {
     // Silently fail - don't break user's edit for audit logging
-    console.log('Audit log error: ' + auditError.message);
+    Logger.log('Audit log error: ' + auditError.message);
   }
 }
 
@@ -398,7 +401,7 @@ function applyAutoStyleToRow_(sheet, row) {
       }
     }
   } catch (styleError) {
-    console.log('Auto-style error: ' + styleError.message);
+    Logger.log('Auto-style error: ' + styleError.message);
   }
 }
 
@@ -451,7 +454,7 @@ function handleStageGateWorkflow_(e) {
       }
     }
   } catch (workflowError) {
-    console.log('Workflow error: ' + workflowError.message);
+    Logger.log('Workflow error: ' + workflowError.message);
   }
 }
 
@@ -468,7 +471,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    console.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
+    Logger.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
     return;
   }
 
@@ -482,7 +485,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
     MailApp.sendEmail(chiefStewardEmail, subject, body);
     SpreadsheetApp.getActiveSpreadsheet().toast('Escalation alert sent to Chief Steward', 'Alert Sent', 3);
   } catch (emailError) {
-    console.log('Escalation email error: ' + emailError.message);
+    Logger.log('Escalation email error: ' + emailError.message);
   }
 }
 
@@ -493,22 +496,23 @@ function sendEscalationAlert_(memberName, caseID, status) {
  * @returns {string} The value from the Config sheet, or empty string if not found
  * @private
  */
-function getConfigValue_(columnNum) {
+function getConfigValue_(columnNum, fallback) {
+  var fb = arguments.length >= 2 ? fallback : '';
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
     if (!configSheet) {
-      console.log('Config sheet not found');
-      return '';
+      Logger.log('Config sheet not found');
+      return fb;
     }
 
     // Config values are typically in row 3 (row 1 = section headers, row 2 = column headers)
     var value = configSheet.getRange(3, columnNum).getValue();
-    return value ? String(value).trim() : '';
+    return value ? String(value).trim() : fb;
   } catch (e) {
-    console.log('Error reading config value: ' + e.message);
-    return '';
+    Logger.log('Error reading config value col ' + columnNum + ': ' + e.message);
+    return fb;
   }
 }
 
@@ -527,7 +531,7 @@ function getEscalationStatuses_() {
       if (values.length > 0) return values;
     }
   } catch (e) {
-    console.log('Error reading escalation statuses: ' + e.message);
+    Logger.log('Error reading escalation statuses: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -549,15 +553,12 @@ function getEscalationSteps_() {
       if (values.length > 0) return values;
     }
   } catch (e) {
-    console.log('Error reading escalation steps: ' + e.message);
+    Logger.log('Error reading escalation steps: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
   return COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
 }
-
-// getUnitCodes_ removed — dead code cleanup v4.25.11
-
 /**
  * Handles edits to the Grievance Log sheet
  * Uses dynamic column references from GRIEVANCE_COLS
@@ -629,7 +630,7 @@ function handleGrievanceEdit(e) {
         syncSingleGrievanceToCalendar(grievanceId);
       }
     } catch (settingsError) {
-      console.log('Settings error in handleGrievanceEdit: ' + settingsError.message);
+      Logger.log('Settings error in handleGrievanceEdit: ' + settingsError.message);
     }
   }
 
@@ -872,7 +873,7 @@ function syncDropdownToConfig_(e, sheetName) {
   // (handles pastes, programmatic setValue, and multi-cell edits)
   var newValue = e.value;
   if (!newValue && e.range && e.range.getNumRows() === 1 && e.range.getNumColumns() === 1) {
-    try { newValue = e.range.getValue(); } catch (_) { /* skip */ }
+    try { newValue = e.range.getValue(); } catch (_) { Logger.log('_: ' + (_.message || _)); }
   }
   if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
   newValue = newValue.trim();
@@ -1018,7 +1019,7 @@ function dailyTrigger() {
         meetingStatusResult = updateMeetingStatuses();
       }
     } catch (e) {
-      console.error('Meeting status update error:', e);
+      Logger.log('Meeting status update error:', e);
     }
 
     // Process meeting doc notifications (agenda 3 days before, notes 1 day before, publish 1 day after)
@@ -1028,7 +1029,7 @@ function dailyTrigger() {
         meetingDocResult = processMeetingDocNotifications();
       }
     } catch (e) {
-      console.error('Meeting doc notification error:', e);
+      Logger.log('Meeting doc notification error:', e);
     }
 
     // Cleanup expired meeting check-in records (>90 days old)
@@ -1036,7 +1037,7 @@ function dailyTrigger() {
     try {
       meetingRowsCleaned = cleanupExpiredMeetings();
     } catch (e) {
-      console.error('Meeting cleanup error:', e);
+      Logger.log('Meeting cleanup error:', e);
     }
 
     // Log the trigger run
@@ -1052,7 +1053,7 @@ function dailyTrigger() {
     });
 
   } catch (error) {
-    console.error('Error in dailyTrigger:', error);
+    Logger.log('Error in dailyTrigger:', error);
   }
 }
 
@@ -1069,10 +1070,6 @@ function initializeDashboard() {
   // with headers, formatting, validations, and hidden calculation sheets
   CREATE_DASHBOARD();
 }
-
-// setupTriggers removed — dead code cleanup v4.25.11
-
-// removeTriggers removed — dead code cleanup v4.25.11
 
 // ============================================================================
 // HELP & DOCUMENTATION
@@ -1583,9 +1580,6 @@ function showHelpDialog() {
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
-
-// getVersionInfo removed — dead code cleanup v4.25.11
-
 /**
  * Updates a grievance with new data
  * @param {string} grievanceId - The grievance ID
@@ -1596,6 +1590,7 @@ function updateGrievance(grievanceId, updates) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!sheet) return errorResponse('Grievance Log sheet not found');
     const data = sheet.getDataRange().getValues();
 
     let rowIndex = -1;
@@ -1633,7 +1628,7 @@ function updateGrievance(grievanceId, updates) {
     return { success: true, message: 'Grievance updated successfully' };
 
   } catch (error) {
-    console.error('Error updating grievance:', error);
+    Logger.log('Error updating grievance:', error);
     return errorResponse(error.message);
   }
 }
@@ -1898,27 +1893,25 @@ function addNewMember(memberData) {
     };
 
   } catch (error) {
-    console.error('Error adding member:', error);
+    Logger.log('Error adding member:', error);
     return errorResponse(error.message);
   }
 }
-
-// startGrievanceForMember removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // IMPORT/EXPORT DIALOGS (Added to fix missing menu functions)
 // ============================================================================
-
-// showImportDialog removed — dead code cleanup v4.25.11
-
 /**
- * Imports members from text (CSV format)
+ * @deprecated v4.25.11 — Use importMembersBatch() instead (02_DataManagers.gs).
+ * Legacy CSV text import with no callers. Kept for backward compatibility.
  * @param {string} text - CSV formatted text
  * @returns {Object} Result with count of imported members
  */
 function importMembersFromText(text) {
+  var userEmail = Session.getActiveUser().getEmail();
+  if (!userEmail) return { success: false, count: 0, message: 'Authentication required.' };
+  return withScriptLock_(function() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIRECTORY);
+  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
     throw new Error('Member Directory sheet not found');
@@ -1960,10 +1953,8 @@ function importMembersFromText(text) {
   }
 
   return { success: true, count: imported };
+  });
 }
-
-// showExportDialog removed — dead code cleanup v4.25.11
-
 /**
  * Exports member directory to specified format
  * @param {string} format - Export format (csv, email, print)

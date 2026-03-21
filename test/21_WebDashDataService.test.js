@@ -49,7 +49,14 @@ beforeEach(() => {
     DataService._invalidateSheetCache('Grievance Log');
     DataService._invalidateSheetCache('Member Directory');
   }
+  // Reset spreadsheet singleton so mock changes take effect
+  if (typeof DataService !== 'undefined' && DataService._resetSSCache) {
+    DataService._resetSSCache();
+  }
   setupSheets();
+  // Re-mock auth helpers that loadSources overwrites with real implementations
+  global._resolveCallerEmail = jest.fn(() => 'member@test.com');
+  global._requireStewardAuth = jest.fn(() => 'steward@test.com');
 });
 
 // ============================================================================
@@ -1211,5 +1218,40 @@ describe('_getMemberBatchData memberTaskCount', () => {
     const memberBatchMatch = src.match(/function _getMemberBatchData[\s\S]*?return \{[\s\S]*?\};/);
     expect(memberBatchMatch).not.toBeNull();
     expect(memberBatchMatch[0]).toContain('memberTaskCount');
+  });
+});
+
+// ============================================================================
+// v4.31.0 — H1: _invalidateSheetCache clears _emailIndex for MEMBER_SHEET
+// ============================================================================
+
+describe('v4.31.0 H1: _invalidateSheetCache clears _emailIndex', () => {
+  test('_invalidateSheetCache source clears _emailIndex when called with Member Directory', () => {
+    // Structural test: verify the source code nulls _emailIndex on MEMBER_SHEET invalidation
+    const fs = require('fs');
+    const src = fs.readFileSync(require('path').join(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8');
+    const funcStart = src.indexOf('function _invalidateSheetCache');
+    expect(funcStart).toBeGreaterThan(-1);
+    const funcEnd = src.indexOf('\n  }', funcStart + 10) + 4;
+    const funcBody = src.substring(funcStart, funcEnd);
+    // Must contain _emailIndex = null
+    expect(funcBody).toContain('_emailIndex = null');
+    // Must be conditional on MEMBER_SHEET
+    expect(funcBody).toContain('MEMBER_SHEET');
+  });
+
+  test('findUserByEmail works after _invalidateSheetCache (integration)', () => {
+    // First, populate the email index by calling findUserByEmail
+    const user1 = DataService.findUserByEmail('member@test.com');
+    expect(user1).not.toBeNull();
+
+    // Invalidate and re-setup with different data
+    DataService._invalidateSheetCache('Member Directory');
+    if (DataService._resetSSCache) DataService._resetSSCache();
+    setupSheets();
+
+    // Should still work after cache invalidation
+    const user2 = DataService.findUserByEmail('member@test.com');
+    expect(user2).not.toBeNull();
   });
 });

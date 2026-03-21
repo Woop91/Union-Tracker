@@ -626,7 +626,7 @@ describe('Magic token security', function () {
     expect(result).toBeNull();
   });
 
-  test('token is marked used after first validate', function () {
+  test('token is deleted after first validate (C1+C4: immediate delete)', function () {
     var props = PropertiesService.getScriptProperties();
     props.setProperty('MAGIC_TOKEN_markused', JSON.stringify({
       email: 'user@test.com',
@@ -644,9 +644,9 @@ describe('Magic token security', function () {
     expect(result).not.toBeNull();
     expect(result.email).toBe('user@test.com');
 
-    // Token should now be marked as used
-    var stored = JSON.parse(props.getProperty('MAGIC_TOKEN_markused'));
-    expect(stored.used).toBe(true);
+    // v4.31.0 C1+C4: Token should be DELETED (not marked used)
+    var stored = props.getProperty('MAGIC_TOKEN_markused');
+    expect(stored).toBeNull();
   });
 
   test('expired token is deleted from properties', function () {
@@ -694,5 +694,107 @@ describe('Magic token security', function () {
     expect(data.created).toBeDefined();
     expect(data.created).toBeGreaterThanOrEqual(before);
     expect(data.created).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+// ============================================================================
+// v4.31.0 — C1+C4: Token validation deletes token (not set-used)
+// ============================================================================
+
+describe('v4.31.0 C1+C4: Token validation uses deleteProperty', function () {
+
+  test('magic token is deleted (not marked used) after successful validation', function () {
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('MAGIC_TOKEN_deltest', JSON.stringify({
+      email: 'user@test.com',
+      expiry: Date.now() + 3600000,
+      created: Date.now(),
+      used: false
+    }));
+    // Disable SSO
+    Session.getActiveUser = jest.fn(function () {
+      return { getEmail: jest.fn(function () { return ''; }) };
+    });
+
+    var result = Auth.resolveUser({ parameter: { token: 'deltest' } });
+    expect(result).not.toBeNull();
+    expect(result.email).toBe('user@test.com');
+
+    // Token should be DELETED, not still present with used=true
+    var stored = props.getProperty('MAGIC_TOKEN_deltest');
+    expect(stored).toBeNull();
+  });
+
+  test('expired magic token is deleted on validation attempt', function () {
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('MAGIC_TOKEN_expdeltest', JSON.stringify({
+      email: 'user@test.com',
+      expiry: Date.now() - 1000,
+      created: Date.now() - 100000,
+      used: false
+    }));
+    Session.getActiveUser = jest.fn(function () {
+      return { getEmail: jest.fn(function () { return ''; }) };
+    });
+
+    Auth.resolveUser({ parameter: { token: 'expdeltest' } });
+    expect(props.getProperty('MAGIC_TOKEN_expdeltest')).toBeNull();
+  });
+});
+
+// ============================================================================
+// v4.31.0 — C3: createSessionToken returns error on storage failure
+// ============================================================================
+
+describe('v4.31.0 C3: createSessionToken error on PropertiesService write failure', function () {
+
+  test('returns error object when PropertiesService write fails', function () {
+    // Make setProperty throw to simulate quota exceeded
+    var origGetScriptProps = PropertiesService.getScriptProperties;
+    PropertiesService.getScriptProperties = jest.fn(function () {
+      return {
+        getProperty: jest.fn(function () { return null; }),
+        setProperty: jest.fn(function () { throw new Error('Quota exceeded'); }),
+        deleteProperty: jest.fn(),
+        getProperties: jest.fn(function () { return {}; })
+      };
+    });
+
+    var result = Auth.createSessionToken('user@test.com');
+    expect(result).toBeDefined();
+    expect(result.error).toBeDefined();
+    expect(result.message).toBeDefined();
+
+    // Restore
+    PropertiesService.getScriptProperties = origGetScriptProps;
+  });
+});
+
+// ============================================================================
+// v4.31.0 — M9: cleanupExpiredTokens calls recordSecurityEvent on quota warning
+// ============================================================================
+
+describe('v4.31.0 M9: cleanupExpiredTokens quota escalation', function () {
+
+  test('calls recordSecurityEvent when quota exceeds 400KB', function () {
+    // Mock recordSecurityEvent
+    global.recordSecurityEvent = jest.fn();
+
+    // Populate ScriptProperties with enough data to exceed 400KB
+    var props = PropertiesService.getScriptProperties();
+    // Create a large payload that will exceed 400KB when serialized
+    var bigValue = new Array(50001).join('x'); // ~50KB string
+    for (var i = 0; i < 10; i++) {
+      props.setProperty('PADDING_' + i, bigValue);
+    }
+
+    Auth.cleanupExpiredTokens();
+
+    expect(global.recordSecurityEvent).toHaveBeenCalled();
+    var call = global.recordSecurityEvent.mock.calls[0];
+    expect(call[0]).toBe('QUOTA_WARNING');
+
+    // Cleanup
+    delete global.recordSecurityEvent;
   });
 });

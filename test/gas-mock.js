@@ -342,12 +342,15 @@ global.ScriptApp = {
 };
 
 // --- LockService ---
+let _lockShouldFail = false;
 global.LockService = {
   getScriptLock: jest.fn(() => ({
-    tryLock: jest.fn(() => true),
-    waitLock: jest.fn(),
+    tryLock: jest.fn(() => !_lockShouldFail),
+    waitLock: jest.fn(() => { if (_lockShouldFail) throw new Error('Could not obtain lock'); }),
     releaseLock: jest.fn()
-  }))
+  })),
+  _mockLockFailure: function() { _lockShouldFail = true; },
+  _mockLockSuccess: function() { _lockShouldFail = false; }
 };
 
 // --- UrlFetchApp ---
@@ -363,5 +366,9 @@ global.UrlFetchApp = {
 // test wrapper functions in 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.
 global._resolveCallerEmail = jest.fn(() => 'test@example.com');
 global._requireStewardAuth = jest.fn(() => 'steward@example.com');
+
+// --- Retry helper (defined in 06_Maintenance.gs) ---
+// In tests, executeWithRetry just calls the function directly (no retry delay).
+global.executeWithRetry = jest.fn(function (fn) { return fn(); });
 
 module.exports = { createMockRange, createMockSheet, createMockSpreadsheet, createMockProtection };

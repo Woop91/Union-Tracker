@@ -1,21 +1,33 @@
 // DEV_ONLY: Excluded from production builds via --prod flag in build.js
 /**
  * ============================================================================
- * 07_DevTools.gs - DEVELOPER TOOLS - DELETE THIS FILE BEFORE PRODUCTION
+ * 07_DevTools.gs - DEVELOPER TOOLS (Development Only)
  * ============================================================================
  *
- * This file contains demo data seeding and nuclear cleanup functions.
- * These are for DEVELOPMENT AND TESTING ONLY.
+ * WHAT THIS FILE DOES:
+ *   Development-only demo data seeding (SEED_TEST_DATA) and cleanup
+ *   (NUKE_SEEDED_DATA). Creates realistic fake members, grievances, and
+ *   survey data for testing. NUKE removes ALL seeded data without touching
+ *   manually entered records.
  *
- * BEFORE GOING LIVE:
- * 1. Run NUKE_SEEDED_DATA() to clear all test data
- * 2. Delete this entire file from the Apps Script editor
- * 3. The Demo menu will automatically disappear on next refresh
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Excluded from production builds via --prod flag in build.js. The
+ *   onOpen() guard `typeof buildDevMenu === 'function'` ensures production
+ *   deployments never show the demo menu. isDemoSafeToRun_() prevents
+ *   accidental execution if the file somehow makes it to production. Demo
+ *   mode can be permanently disabled via Script Properties.
  *
- * Once deleted, all seed/nuke functions will be gone and stewards
- * cannot accidentally trigger a data wipe.
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Development testing is impaired — developers must manually create test
+ *   data. No production impact since this file is excluded from production
+ *   builds. If the NUKE function is broken, seeded data must be manually
+ *   deleted row by row.
  *
- * @version 4.13.0
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, column constants), 02_DataManagers.gs
+ *   (addMember, createGrievance). Never used in production. Used only by
+ *   DevMenu.gs and developer testing.
+ *
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -77,9 +89,6 @@ function trackSeededMemberId(memberId) {
     props.setProperty('SEEDED_MEMBER_IDS', ids.join(','));
   }
 }
-
-// trackSeededGrievanceId removed — dead code cleanup v4.25.11
-
 /**
  * Get all tracked seeded member IDs
  * @returns {Object} Object with member IDs as keys for quick lookup
@@ -1756,6 +1765,27 @@ function seedContactLogData() {
   Logger.log('Seeded ' + rows.length + ' contact log entries');
 }
 
+/**
+ * Standalone entry point to seed contact log data independently.
+ * Can be run from the script editor or menu without running a full seed phase.
+ */
+function SEED_CONTACT_LOG() {
+  if (!isDemoSafeToRun_()) return;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet || memberSheet.getLastRow() < 2) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory is empty. Please seed members first.');
+    return;
+  }
+
+  seedContactLogData();
+
+  var clSheet = ss.getSheetByName(SHEETS.CONTACT_LOG);
+  var count = clSheet ? Math.max(clSheet.getLastRow() - 1, 0) : 0;
+  SpreadsheetApp.getUi().alert('Contact Log seeded with ' + count + ' entries.');
+}
+
 // ============================================================================
 // SEED: CALENDAR EVENTS
 // ============================================================================
@@ -2382,7 +2412,7 @@ function seedStewardTasksData() {
   var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
   if (!sheet) {
     sheet = ss.insertSheet(SHEETS.STEWARD_TASKS);
-    sheet.getRange(1, 1, 1, 12).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed', 'Assignee Type', 'Assigned By']]);
+    sheet.getRange(1, 1, 1, 10).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed']]);
     sheet.hideSheet();
   }
 
@@ -2397,23 +2427,19 @@ function seedStewardTasksData() {
 
   var now = new Date();
   var tasks = [
-    ['ST_SEED_1', ownerEmail, 'Follow up on scheduling grievance', 'Check if the Step I response has been received', '', 'high', 'open', new Date(now.getTime() + 3 * 86400000), now, '', 'steward', ''],
-    ['ST_SEED_2', ownerEmail, 'Prepare for bargaining meeting', 'Compile member feedback and workload data for negotiation prep', '', 'high', 'open', new Date(now.getTime() + 7 * 86400000), now, '', 'steward', ''],
-    ['ST_SEED_3', ownerEmail, 'Contact new members', 'Reach out to 5 new members who joined this month', '', 'medium', 'open', new Date(now.getTime() + 5 * 86400000), now, '', 'steward', ''],
-    ['ST_SEED_4', ownerEmail, 'Submit weekly workload report', 'Compile and submit caseload numbers to the workload committee', '', 'medium', 'open', new Date(now.getTime() + 2 * 86400000), now, '', 'steward', ''],
-    ['ST_SEED_5', ownerEmail, 'Review contract language on overtime', 'Research Articles 12 and 15 for upcoming overtime dispute', '', 'low', 'open', new Date(now.getTime() + 14 * 86400000), now, '', 'steward', ''],
-    ['ST_SEED_6', ownerEmail, 'Organize Know Your Rights session', 'Book room and prepare materials for next month Weingarten rights training', '', 'medium', 'open', new Date(now.getTime() + 21 * 86400000), now, '', 'steward', ''],
-    ['ST_SEED_7', ownerEmail, 'Update member contact info', 'Three members reported new phone numbers — update directory', '', 'low', 'completed', new Date(now.getTime() - 2 * 86400000), new Date(now.getTime() - 5 * 86400000), new Date(now.getTime() - 2 * 86400000), 'steward', ''],
-    ['ST_SEED_8', ownerEmail, 'File safety complaint for Building B', 'Document the HVAC issues and file with Health & Safety Committee', '', 'high', 'completed', new Date(now.getTime() - 1 * 86400000), new Date(now.getTime() - 7 * 86400000), new Date(now.getTime() - 1 * 86400000), 'steward', ''],
+    ['ST_SEED_1', ownerEmail, 'Follow up on scheduling grievance', 'Check if the Step I response has been received', '', 'high', 'open', new Date(now.getTime() + 3 * 86400000), now, ''],
+    ['ST_SEED_2', ownerEmail, 'Prepare for bargaining meeting', 'Compile member feedback and workload data for negotiation prep', '', 'high', 'open', new Date(now.getTime() + 7 * 86400000), now, ''],
+    ['ST_SEED_3', ownerEmail, 'Contact new members', 'Reach out to 5 new members who joined this month', '', 'medium', 'open', new Date(now.getTime() + 5 * 86400000), now, ''],
+    ['ST_SEED_4', ownerEmail, 'Submit weekly workload report', 'Compile and submit caseload numbers to the workload committee', '', 'medium', 'open', new Date(now.getTime() + 2 * 86400000), now, ''],
+    ['ST_SEED_5', ownerEmail, 'Review contract language on overtime', 'Research Articles 12 and 15 for upcoming overtime dispute', '', 'low', 'open', new Date(now.getTime() + 14 * 86400000), now, ''],
+    ['ST_SEED_6', ownerEmail, 'Organize Know Your Rights session', 'Book room and prepare materials for next month Weingarten rights training', '', 'medium', 'open', new Date(now.getTime() + 21 * 86400000), now, ''],
+    ['ST_SEED_7', ownerEmail, 'Update member contact info', 'Three members reported new phone numbers — update directory', '', 'low', 'completed', new Date(now.getTime() - 2 * 86400000), new Date(now.getTime() - 5 * 86400000), new Date(now.getTime() - 2 * 86400000)],
+    ['ST_SEED_8', ownerEmail, 'File safety complaint for Building B', 'Document the HVAC issues and file with Health & Safety Committee', '', 'high', 'completed', new Date(now.getTime() - 1 * 86400000), new Date(now.getTime() - 7 * 86400000), new Date(now.getTime() - 1 * 86400000)],
   ];
 
-  sheet.getRange(2, 1, tasks.length, 12).setValues(tasks);
+  sheet.getRange(2, 1, tasks.length, 10).setValues(tasks);
   Logger.log('Seeded ' + tasks.length + ' steward tasks');
 }
-
-// ============================================================================
-// SEED: POLLS — removed v4.24.0 (FlashPolls replaced by _Weekly_Questions in 24_WeeklyQuestions.gs)
-// ============================================================================
 
 // ============================================================================
 // SEED: MEETING MINUTES
@@ -2508,35 +2534,75 @@ function seedMeetingCheckinData() {
     'Contract Enforcement Workshop', 'Know Your Rights Lunch & Learn',
     'Executive Board Meeting', 'Legislative Action Planning', 'Member Appreciation Event'
   ];
-  var durations = ['45 min', '1 hr', '1.5 hr', '2 hr', '30 min'];
+  var durations = [0.5, 0.75, 1, 1.5, 2];
+
+  // Helper to build a full 16-column row matching MEETING_CHECKIN_COLS
+  function buildCheckinRow(id, meetingName, meetingDate, meetingType, memberId, memberName, checkinTime, email, meetingTime, duration, status, notify, calEventId, notesUrl, agendaUrl, agendaStewards) {
+    var row = [];
+    for (var ci = 0; ci < 16; ci++) { row.push(''); }
+    row[MEETING_CHECKIN_COLS.MEETING_ID - 1] = id;
+    row[MEETING_CHECKIN_COLS.MEETING_NAME - 1] = meetingName;
+    row[MEETING_CHECKIN_COLS.MEETING_DATE - 1] = meetingDate;
+    row[MEETING_CHECKIN_COLS.MEETING_TYPE - 1] = meetingType;
+    row[MEETING_CHECKIN_COLS.MEMBER_ID - 1] = memberId || '';
+    row[MEETING_CHECKIN_COLS.MEMBER_NAME - 1] = memberName || '';
+    row[MEETING_CHECKIN_COLS.CHECKIN_TIME - 1] = checkinTime || '';
+    row[MEETING_CHECKIN_COLS.EMAIL - 1] = email || '';
+    row[MEETING_CHECKIN_COLS.MEETING_TIME - 1] = meetingTime || '';
+    row[MEETING_CHECKIN_COLS.MEETING_DURATION - 1] = duration || '';
+    row[MEETING_CHECKIN_COLS.EVENT_STATUS - 1] = status || '';
+    row[MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] = notify || '';
+    row[MEETING_CHECKIN_COLS.CALENDAR_EVENT_ID - 1] = calEventId || '';
+    row[MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] = notesUrl || '';
+    row[MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] = agendaUrl || '';
+    row[MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] = agendaStewards || '';
+    return row;
+  }
 
   var rows = [];
+
+  // --- Past meetings (completed, with check-in records) ---
   for (var c = 0; c < 10; c++) {
     var daysAgo = Math.floor(Math.random() * 60) + 1;
     var meetingDate = new Date(now.getTime() - daysAgo * 86400000);
-    meetingDate.setHours(17, 0, 0, 0);
-    var checkinTime = new Date(meetingDate.getTime() - Math.floor(Math.random() * 600000)); // 0-10 min early
+    meetingDate.setHours(0, 0, 0, 0);
+    var checkinTime = new Date(meetingDate.getTime() + 17 * 3600000 - Math.floor(Math.random() * 600000)); // ~5pm, 0-10 min early
     var email = emails[Math.floor(Math.random() * emails.length)];
-    var name = meetingNames[Math.floor(Math.random() * meetingNames.length)];
+    var mName = meetingNames[Math.floor(Math.random() * meetingNames.length)];
     var firstName = email.split('.')[0] || 'Member';
     firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
-    rows.push([
-      'MC_SEED_' + (c + 1),       // Meeting ID
-      name,                         // Meeting Name
-      meetingDate,                  // Meeting Date
-      meetingTypes[Math.floor(Math.random() * meetingTypes.length)], // Meeting Type
-      email,                        // Email
-      firstName,                    // Member Name
-      checkinTime,                  // Check-in Time
-      durations[Math.floor(Math.random() * durations.length)], // Duration
-      '',                           // Notes Doc URL
-      '',                           // Agenda Doc URL
-    ]);
+    rows.push(buildCheckinRow(
+      'MC_SEED_' + (c + 1), mName, meetingDate,
+      meetingTypes[Math.floor(Math.random() * meetingTypes.length)],
+      '', firstName, checkinTime, email,
+      '17:00', durations[Math.floor(Math.random() * durations.length)], MEETING_STATUS.COMPLETED,
+      '', '', '', '', ''
+    ));
   }
 
-  sheet.getRange(2, 1, rows.length, 10).setValues(rows);
-  Logger.log('Seeded ' + rows.length + ' meeting check-in records');
+  // --- TODAY'S meetings: Active and eligible for check-in ---
+  var todayDate = new Date(now);
+  todayDate.setHours(0, 0, 0, 0);
+
+  // Meeting 1: Open Town Hall — active now, long duration so it stays open
+  rows.push(buildCheckinRow(
+    'MC_SEED_TODAY_1', 'Open Town Hall — Sign In to Test!', todayDate,
+    'Town Hall', '', '', '', '',
+    '00:01', 23, MEETING_STATUS.ACTIVE,
+    '', '', '', '', ''
+  ));
+
+  // Meeting 2: Steward Huddle — also active today
+  rows.push(buildCheckinRow(
+    'MC_SEED_TODAY_2', 'Weekly Steward Huddle', todayDate,
+    'Committee Meeting', '', '', '', '',
+    '08:00', 10, MEETING_STATUS.SCHEDULED,
+    '', '', '', '', ''
+  ));
+
+  sheet.getRange(2, 1, rows.length, 16).setValues(rows);
+  Logger.log('Seeded ' + rows.length + ' meeting check-in records (including 2 active today)');
 }
 
 // ============================================================================
@@ -2815,8 +2881,6 @@ function seedQAForumData() {
 
   Logger.log('Seeded ' + questionRows.length + ' questions and ' + answerRows.length + ' answers in QA Forum');
 }
-
-
 // ============================================================================
 // SEED: MEMBER TASKS
 // ============================================================================
@@ -3545,13 +3609,6 @@ var Assert = {
 };
 
 // ==================== TEST HELPERS ====================
-
-// isLargeDataset removed — dead code cleanup v4.25.11
-
-// createTestMember removed — dead code cleanup v4.25.11
-
-// cleanupTestData removed — dead code cleanup v4.25.11
-
 // ==================== UNIT TESTS ====================
 
 function testMemberColsConstants() {
@@ -3638,9 +3695,6 @@ function testOpenRateRange() {
 }
 
 // ==================== TEST RUNNER ====================
-
-// getTestFunctionRegistry removed — dead code cleanup v4.25.11
-
 // ==================== VALIDATION FRAMEWORK ====================
 
 var VALIDATION_PATTERNS = {
@@ -3694,13 +3748,6 @@ function validateRequired(value, fieldName) {
   if (value === null || value === undefined || value === '') throw new Error(fieldName + ' is required');
   return value;
 }
-
-// checkDuplicateMemberID removed — dead code cleanup v4.25.11
-
-// checkDuplicateGrievanceID removed — dead code cleanup v4.25.11
-
-// checkMemberIdExists removed — dead code cleanup v4.25.11
-
 /**
  * Validate all grievances to ensure Member IDs exist in Member Directory
  * @returns {Array} Array of issues found
@@ -3814,6 +3861,7 @@ function installValidationTrigger() {
 
 function onEditValidation(e) {
   if (!e || !e.range) return;
+  try {
   var sheet = e.range.getSheet();
   var name = sheet.getName();
   if (name !== SHEETS.MEMBER_DIR && name !== SHEETS.GRIEVANCE_LOG) return;
@@ -3831,9 +3879,8 @@ function onEditValidation(e) {
       else { e.range.clearNote(); e.range.setBackground(null); if (r.formatted !== val) e.range.setValue(r.formatted); }
     }
   }
+  } catch (err) { Logger.log('onEditValidation error: ' + (err.message || err)); }
 }
-
-
 
 /**
  * ============================================================================
@@ -4150,9 +4197,6 @@ function runQuickTests() {
     SpreadsheetApp.getActiveSpreadsheet().toast('❌ Test failed: ' + e.message, 'Tests', 5);
   }
 }
-
-// generateTestReport removed — dead code cleanup v4.25.11
-
 // ============================================================================
 // EXTENDED TEST CASES - CONSTANTS
 // ============================================================================
@@ -4611,4 +4655,3 @@ function hasProperty_(obj, prop) {
 // TEST DASHBOARD UI
 // ============================================================================
 
-// showTestDashboard removed — dead code cleanup v4.25.11

@@ -1,221 +1,290 @@
 <script>
+
 function renderAuth(container) {
-if (typeof UnifiedTheme !== 'undefined') {
-UnifiedTheme.apply();
-} else if (typeof ThemeEngine !== 'undefined') {
-ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
+ // Apply user's saved theme (isDark, navTheme, activeRole all from localStorage via AppState)
+ if (typeof UnifiedTheme !== 'undefined' && typeof AppState !== 'undefined') {
+ UnifiedTheme.apply();
+ } else if (typeof ThemeEngine !== 'undefined') {
+ ThemeEngine.applyTheme(ThemeEngine.getTheme('member', true));
+ }
+
+ showAuthChoose(container);
 }
-showAuthChoose(container);
-}
+
 function showAuthChoose(container) {
-container.innerHTML = '';
-var wrapper = el('div', { className: 'auth-container fade-in' });
-var logo = el('div', {
-className: 'auth-logo',
-style: {
-background: 'linear-gradient(135deg, hsl(' + CONFIG.accentHue + ', 70%, 55%), hsl(' + (CONFIG.accentHue + 30) + ', 70%, 65%))',
-fontSize: CONFIG.logoInitials.length > 2 ? '14px' : '22px',
-boxShadow: '0 6px 20px hsla(' + CONFIG.accentHue + ', 70%, 55%, 0.4)',
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'auth-container fade-in' });
+
+ 
+ var logo = el('div', {
+ className: 'auth-logo',
+ style: {
+  background: 'linear-gradient(135deg, hsl(' + CONFIG.accentHue + ', 70%, 55%), hsl(' + (CONFIG.accentHue + 30) + ', 70%, 65%))',
+  fontSize: CONFIG.logoInitials.length > 2 ? '14px' : '22px',
+  boxShadow: '0 6px 20px hsla(' + CONFIG.accentHue + ', 70%, 55%, 0.4)',
+ }
+ }, CONFIG.logoInitials);
+ wrapper.appendChild(logo);
+
+ 
+ wrapper.appendChild(el('div', { className: 'auth-title' }, CONFIG.orgName));
+ wrapper.appendChild(el('div', { className: 'auth-subtitle' }, 'Grievance Tracker & Member Portal'));
+
+ 
+ wrapper.appendChild(el('div', { style: { height: '32px' } }));
+
+ 
+ var ssoError = (PAGE_DATA && PAGE_DATA.error) || null;
+
+ var googleBtn = el('button', {
+ className: 'btn btn-google',
+ onClick: function() {
+  if (!WEB_APP_URL) { showAuthError(container, 'Web app URL not available. Please reload the page.'); return; }
+  // Show loading state so the button doesn't look dead
+  googleBtn.disabled = true;
+  googleBtn.innerHTML = '<div class="spinner" style="margin-right:16px;vertical-align:middle"></div> Connecting to Google\u2026';
+  
+  window.top.location.href = WEB_APP_URL + '?sso=1';
+ }
+ });
+ googleBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Continue with Google';
+ wrapper.appendChild(googleBtn);
+
+ 
+ if (ssoError === 'loggedout') {
+ var logoutMsg = el('div', {
+  style: { fontSize: '13px', color: 'var(--success)', marginTop: '8px', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(52, 211, 153, 0.1)', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.2)' }
+ }, 'Signed out successfully.');
+ wrapper.appendChild(logoutMsg);
+ }
+
+ 
+ if (ssoError === 'sso_failed') {
+ var ssoMsg = el('div', {
+  style: { fontSize: '12px', color: 'var(--danger)', marginTop: '8px', textAlign: 'center', lineHeight: '1.5' }
+ }, 'Google sign-in requires you to be logged into a Google account in this browser. Try the email link option instead.');
+ wrapper.appendChild(ssoMsg);
+ }
+
+ 
+ var divider = el('div', { className: 'auth-divider' });
+ divider.appendChild(el('div', { className: 'auth-divider-line' }));
+ divider.appendChild(el('span', { className: 'auth-divider-text' }, 'or'));
+ divider.appendChild(el('div', { className: 'auth-divider-line' }));
+ wrapper.appendChild(divider);
+
+ 
+ var emailBtn = el('button', {
+ className: 'btn btn-secondary',
+ onClick: function() { showAuthEmail(container); }
+ }, '\u2709\uFE0F  Email me a sign-in link');
+ wrapper.appendChild(emailBtn);
+
+ 
+ var footer = el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' } });
+ footer.textContent = 'Your role (' + CONFIG.stewardLabel.toLowerCase() + ' or ' + CONFIG.memberLabel.toLowerCase() + ') is determined automatically from the directory.';
+ wrapper.appendChild(footer);
+
+ container.appendChild(wrapper);
 }
-}, CONFIG.logoInitials);
-wrapper.appendChild(logo);
-wrapper.appendChild(el('div', { className: 'auth-title' }, CONFIG.orgName));
-wrapper.appendChild(el('div', { className: 'auth-subtitle' }, 'Grievance Tracker & Member Portal'));
-wrapper.appendChild(el('div', { style: { height: '32px' } }));
-var ssoError = (PAGE_DATA && PAGE_DATA.error) || null;
-var googleBtn = el('button', {
-className: 'btn btn-google',
-onClick: function() {
-if (!WEB_APP_URL) { showAuthError(container, 'Web app URL not available. Please reload the page.'); return; }
-googleBtn.disabled = true;
-googleBtn.innerHTML = '<div class="spinner" style="margin-right:16px;vertical-align:middle"></div> Connecting to Google\u2026';
-window.top.location.href = WEB_APP_URL + '?sso=1';
-}
-});
-googleBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Continue with Google';
-wrapper.appendChild(googleBtn);
-if (ssoError === 'loggedout') {
-var logoutMsg = el('div', {
-style: { fontSize: '13px', color: 'var(--success)', marginTop: '8px', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'var(--success-bg, rgba(52, 211, 153, 0.1))', borderRadius: '8px', border: '1px solid var(--success-border, rgba(52, 211, 153, 0.2))' }
-}, 'Signed out successfully.');
-wrapper.appendChild(logoutMsg);
-}
-if (ssoError === 'sso_failed') {
-var ssoMsg = el('div', {
-style: { fontSize: '12px', color: 'var(--danger)', marginTop: '8px', textAlign: 'center', lineHeight: '1.5' }
-}, 'Google sign-in requires you to be logged into a Google account in this browser. Try the email link option instead.');
-wrapper.appendChild(ssoMsg);
-}
-var divider = el('div', { className: 'auth-divider' });
-divider.appendChild(el('div', { className: 'auth-divider-line' }));
-divider.appendChild(el('span', { className: 'auth-divider-text' }, 'or'));
-divider.appendChild(el('div', { className: 'auth-divider-line' }));
-wrapper.appendChild(divider);
-var emailBtn = el('button', {
-className: 'btn btn-secondary',
-onClick: function() { showAuthEmail(container); }
-}, '\u2709\uFE0F  Email me a sign-in link');
-wrapper.appendChild(emailBtn);
-var footer = el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' } });
-footer.textContent = 'Your role (' + CONFIG.stewardLabel.toLowerCase() + ' or ' + CONFIG.memberLabel.toLowerCase() + ') is determined automatically from the directory.';
-wrapper.appendChild(footer);
-container.appendChild(wrapper);
-}
+
 function showAuthEmail(container) {
-container.innerHTML = '';
-var wrapper = el('div', { className: 'auth-container fade-in' });
-var back = el('button', {
-style: { color: 'var(--accent)', fontSize: '13px', marginBottom: '20px', textAlign: 'left', fontFamily: 'var(--fontBody)' },
-onClick: function() { showAuthChoose(container); }
-}, '\u2190 Back');
-wrapper.appendChild(back);
-wrapper.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left' } }, 'Sign in with email'));
-wrapper.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px', marginBottom: '24px', lineHeight: '1.5' } }, "We'll send a secure link. No password needed."));
-var inputLabel = el('label', { htmlFor: 'auth-email-input', style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'Email address');
-wrapper.appendChild(inputLabel);
-var emailInput = el('input', {
-id: 'auth-email-input',
-className: 'auth-input',
-type: 'email',
-placeholder: 'you@example.com',
-autocomplete: 'email',
-});
-wrapper.appendChild(emailInput);
-var rememberMe = { value: false };
-var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' } });
-var track = el('div', {
-className: 'auth-toggle-track',
-style: { background: 'var(--border, rgba(128,128,128,0.3))' }
-});
-var thumb = el('div', {
-className: 'auth-toggle-thumb',
-style: { left: '2px' }
-});
-track.appendChild(thumb);
-toggleContainer.appendChild(track);
-toggleContainer.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'Remember this device (' + CONFIG.cookieDurationDays + ' days)'));
-toggleContainer.addEventListener('click', function() {
-rememberMe.value = !rememberMe.value;
-track.style.background = rememberMe.value ? 'var(--accent)' : 'var(--border, rgba(128,128,128,0.3))';
-thumb.style.left = rememberMe.value ? '18px' : '2px';
-});
-wrapper.appendChild(toggleContainer);
-var submitBtn = el('button', {
-className: 'btn btn-primary',
-style: { marginTop: '8px', opacity: '0.5' },
-onClick: function() {
-var email = emailInput.value.trim();
-if (!email || email.indexOf('@') === -1) return;
-showAuthSending(container, email, rememberMe.value);
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'auth-container fade-in' });
+
+ 
+ var back = el('button', {
+ style: { color: 'var(--accent)', fontSize: '13px', marginBottom: '20px', textAlign: 'left', fontFamily: 'var(--fontBody)' },
+ onClick: function() { showAuthChoose(container); }
+ }, '\u2190 Back');
+ wrapper.appendChild(back);
+
+ wrapper.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left' } }, 'Sign in with email'));
+ wrapper.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px', marginBottom: '24px', lineHeight: '1.5' } }, "We'll send a secure link. No password needed."));
+
+ 
+ var inputLabel = el('label', { htmlFor: 'auth-email-input', style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'Email address');
+ wrapper.appendChild(inputLabel);
+
+ var emailInput = el('input', {
+ id: 'auth-email-input',
+ className: 'auth-input',
+ type: 'email',
+ placeholder: 'you@example.com',
+ autocomplete: 'email',
+ });
+ wrapper.appendChild(emailInput);
+
+ 
+ var rememberMe = { value: false };
+ var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' } });
+
+ var track = el('div', {
+ className: 'auth-toggle-track',
+ style: { background: 'var(--border, #333)' }
+ });
+ var thumb = el('div', {
+ className: 'auth-toggle-thumb',
+ style: { left: '2px' }
+ });
+ track.appendChild(thumb);
+ toggleContainer.appendChild(track);
+ toggleContainer.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'Remember this device (' + CONFIG.cookieDurationDays + ' days)'));
+
+ toggleContainer.addEventListener('click', function() {
+ rememberMe.value = !rememberMe.value;
+ track.style.background = rememberMe.value ? 'var(--accent)' : 'var(--border, #333)';
+ thumb.style.left = rememberMe.value ? '18px' : '2px';
+ });
+ wrapper.appendChild(toggleContainer);
+
+ 
+ var submitBtn = el('button', {
+ className: 'btn btn-primary',
+ style: { marginTop: '8px', opacity: '0.5' },
+ onClick: function() {
+  var email = emailInput.value.trim();
+  if (!email || email.indexOf('@') === -1) return;
+  showAuthSending(container, email, rememberMe.value);
+ }
+ }, 'Send sign-in link');
+ wrapper.appendChild(submitBtn);
+
+ 
+ emailInput.addEventListener('input', function() {
+ var valid = emailInput.value.indexOf('@') > 0;
+ submitBtn.style.opacity = valid ? '1' : '0.5';
+ });
+
+ 
+ emailInput.addEventListener('keydown', function(e) {
+ if (e.key === 'Enter') submitBtn.click();
+ });
+
+ container.appendChild(wrapper);
+ emailInput.focus();
 }
-}, 'Send sign-in link');
-wrapper.appendChild(submitBtn);
-emailInput.addEventListener('input', function() {
-var valid = emailInput.value.indexOf('@') > 0;
-submitBtn.style.opacity = valid ? '1' : '0.5';
-});
-emailInput.addEventListener('keydown', function(e) {
-if (e.key === 'Enter') submitBtn.click();
-});
-container.appendChild(wrapper);
-emailInput.focus();
-}
+
 function showAuthSending(container, email, rememberMe) {
-container.innerHTML = '';
-var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
-var spinner = el('div', { className: 'spinner', style: { marginBottom: '16px' } });
-wrapper.appendChild(spinner);
-wrapper.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Sending sign-in link...'));
-container.appendChild(wrapper);
-google.script.run
-.withSuccessHandler(function(result) {
-if (result && result.success) {
-showAuthSent(container, email, rememberMe);
-} else if (result) {
-showAuthError(container, result.message || 'An unknown error occurred.', email);
-} else {
-showAuthError(container, 'No response from server. The web app may need to be re-deployed. Please contact your administrator.', email);
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
+
+ var spinner = el('div', { className: 'spinner', style: { marginBottom: '16px' } });
+ wrapper.appendChild(spinner);
+ wrapper.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Sending sign-in link...'));
+
+ container.appendChild(wrapper);
+
+ 
+ google.script.run
+ .withSuccessHandler(function(result) {
+  if (result && result.success) {
+  showAuthSent(container, email, rememberMe);
+  } else if (result) {
+  showAuthError(container, result.message || 'An unknown error occurred.', email);
+  } else {
+  
+  showAuthError(container, 'No response from server. The web app may need to be re-deployed. Please contact your administrator.', email);
+  }
+ })
+ .withFailureHandler(function(err) {
+  
+  
+  
+  var msg = (err && err.message) ? err.message : '';
+  if (!msg || msg === 'Error' || msg === 'ScriptError') {
+  msg = 'Unable to connect to the server. ';
+  msg += 'This is often caused by a stale browser cache. ';
+  msg += 'Please clear your browser cache or try in an incognito/private window.';
+  }
+  showAuthError(container, msg, email);
+ })
+ .authSendMagicLink(email, rememberMe);
 }
-})
-.withFailureHandler(function(err) {
-var msg = (err && err.message) ? err.message : '';
-if (!msg || msg === 'Error' || msg === 'ScriptError') {
-msg = 'Unable to connect to the server. ';
-msg += 'This is often caused by a stale browser cache. ';
-msg += 'Please clear your browser cache or try in an incognito/private window.';
-}
-showAuthError(container, msg, email);
-})
-.authSendMagicLink(email, rememberMe);
-}
+
 function showAuthSent(container, email, rememberMe) {
-container.innerHTML = '';
-var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
-wrapper.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '\u2709\uFE0F'));
-wrapper.appendChild(el('div', { className: 'auth-title' }, 'Check your email'));
-var desc = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6' } });
-desc.appendChild(document.createTextNode('Sign-in link sent to'));
-desc.appendChild(document.createElement('br'));
-desc.appendChild(el('span', { style: { color: 'var(--accent)', fontWeight: '600' } }, email));
-wrapper.appendChild(desc);
-var tips = el('div', {
-style: { marginTop: '14px', fontSize: '11px', color: 'var(--muted)', lineHeight: '1.7', maxWidth: '300px' }
-});
-tips.innerHTML = 'Check your spam/junk folder if you don\'t see it.';
-wrapper.appendChild(tips);
-var info = el('div', {
-className: 'card card-glass',
-style: { marginTop: '16px', fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6', textAlign: 'center', maxWidth: '280px' }
-});
-info.appendChild(document.createTextNode('Link expires in '));
-info.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '600' } }, CONFIG.magicLinkExpiryDays + ' days'));
-info.appendChild(document.createTextNode('.'));
-if (rememberMe) {
-info.appendChild(document.createElement('br'));
-info.appendChild(document.createTextNode("You'll stay signed in for "));
-info.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '600' } }, CONFIG.cookieDurationDays + ' days'));
-info.appendChild(document.createTextNode('.'));
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
+
+ wrapper.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '\u2709\uFE0F'));
+ wrapper.appendChild(el('div', { className: 'auth-title' }, 'Check your email'));
+
+ var desc = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6' } });
+ desc.appendChild(document.createTextNode('Sign-in link sent to'));
+ desc.appendChild(document.createElement('br'));
+ desc.appendChild(el('span', { style: { color: 'var(--accent)', fontWeight: '600' } }, email));
+ wrapper.appendChild(desc);
+
+ 
+ var tips = el('div', {
+ style: { marginTop: '14px', fontSize: '11px', color: 'var(--muted)', lineHeight: '1.7', maxWidth: '300px' }
+ });
+ tips.innerHTML = 'Check your spam/junk folder if you don\'t see it.';
+ wrapper.appendChild(tips);
+
+ var info = el('div', {
+ className: 'card card-glass',
+ style: { marginTop: '16px', fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6', textAlign: 'center', maxWidth: '280px' }
+ });
+ info.appendChild(document.createTextNode('Link expires in '));
+ info.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '600' } }, CONFIG.magicLinkExpiryDays + ' days'));
+ info.appendChild(document.createTextNode('.'));
+ if (rememberMe) {
+ info.appendChild(document.createElement('br'));
+ info.appendChild(document.createTextNode("You'll stay signed in for "));
+ info.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '600' } }, CONFIG.cookieDurationDays + ' days'));
+ info.appendChild(document.createTextNode('.'));
+ }
+ wrapper.appendChild(info);
+
+ 
+ var actions = el('div', { style: { display: 'flex', gap: '16px', marginTop: '20px', alignItems: 'center' } });
+ var resendBtn = el('button', {
+ style: { color: 'var(--muted)', fontSize: '13px', fontWeight: '600', opacity: '0.5', cursor: 'default' },
+ }, 'Resend (30s)');
+ resendBtn.disabled = true;
+ actions.appendChild(resendBtn);
+
+ 
+ var countdown = 30;
+ var timer = setInterval(function() {
+ countdown--;
+ if (countdown <= 0) {
+  clearInterval(timer);
+  resendBtn.textContent = 'Resend';
+  resendBtn.style.color = 'var(--accent)';
+  resendBtn.style.opacity = '1';
+  resendBtn.style.cursor = 'pointer';
+  resendBtn.disabled = false;
+  resendBtn.onclick = function() { showAuthSending(container, email, rememberMe); };
+ } else {
+  resendBtn.textContent = 'Resend (' + countdown + 's)';
+ }
+ }, 1000);
+
+ actions.appendChild(el('button', {
+ style: { color: 'var(--muted)', fontSize: '13px' },
+ onClick: function() { clearInterval(timer); showAuthEmail(container); }
+ }, 'Different email'));
+ wrapper.appendChild(actions);
+
+ container.appendChild(wrapper);
 }
-wrapper.appendChild(info);
-var actions = el('div', { style: { display: 'flex', gap: '16px', marginTop: '20px', alignItems: 'center' } });
-var resendBtn = el('button', {
-style: { color: 'var(--muted)', fontSize: '13px', fontWeight: '600', opacity: '0.5', cursor: 'default' },
-}, 'Resend (30s)');
-resendBtn.disabled = true;
-actions.appendChild(resendBtn);
-var countdown = 30;
-var timer = setInterval(function() {
-countdown--;
-if (countdown <= 0) {
-clearInterval(timer);
-resendBtn.textContent = 'Resend';
-resendBtn.style.color = 'var(--accent)';
-resendBtn.style.opacity = '1';
-resendBtn.style.cursor = 'pointer';
-resendBtn.disabled = false;
-resendBtn.onclick = function() { showAuthSending(container, email, rememberMe); };
-} else {
-resendBtn.textContent = 'Resend (' + countdown + 's)';
-}
-}, 1000);
-actions.appendChild(el('button', {
-style: { color: 'var(--muted)', fontSize: '13px' },
-onClick: function() { clearInterval(timer); showAuthEmail(container); }
-}, 'Different email'));
-wrapper.appendChild(actions);
-container.appendChild(wrapper);
-}
+
 function showAuthError(container, message, email) {
-container.innerHTML = '';
-var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
-wrapper.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '\u26A0\uFE0F'));
-wrapper.appendChild(el('div', { className: 'auth-title' }, 'Something went wrong'));
-wrapper.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6', maxWidth: '300px' } }, message));
-wrapper.appendChild(el('button', {
-className: 'btn btn-primary',
-style: { marginTop: '24px', maxWidth: '280px' },
-onClick: function() { showAuthChoose(container); }
-}, 'Try again'));
-container.appendChild(wrapper);
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
+
+ wrapper.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '\u26A0\uFE0F'));
+ wrapper.appendChild(el('div', { className: 'auth-title' }, 'Something went wrong'));
+ wrapper.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6', maxWidth: '300px' } }, message));
+
+ wrapper.appendChild(el('button', {
+ className: 'btn btn-primary',
+ style: { marginTop: '24px', maxWidth: '280px' },
+ onClick: function() { showAuthChoose(container); }
+ }, 'Try again'));
+
+ container.appendChild(wrapper);
 }
 </script>

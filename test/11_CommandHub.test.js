@@ -1,7 +1,7 @@
 /**
  * Tests for 11_CommandHub.gs
  *
- * Covers COMMAND_CENTER_CONFIG, GEMINI_CONFIG, darkenColor_,
+ * Covers deprecated config removal, darkenColor_,
  * safetyValveScrub, isProductionMode,
  * getCommandCenterConfig, and UI smoke tests.
  */
@@ -21,61 +21,22 @@ loadSources([
 ]);
 
 // ============================================================================
-// COMMAND_CENTER_CONFIG constant
+// Deprecated config removal verification
 // ============================================================================
 
-describe('COMMAND_CENTER_CONFIG', () => {
-  test('is defined', () => {
-    expect(COMMAND_CENTER_CONFIG).toBeDefined();
+describe('deprecated config removal', () => {
+  test('COMMAND_CENTER_CONFIG is removed (was deprecated)', () => {
+    expect(typeof COMMAND_CENTER_CONFIG).toBe('undefined');
   });
 
-  test('has SYSTEM_NAME', () => {
-    expect(COMMAND_CENTER_CONFIG.SYSTEM_NAME).toBe('Strategic Command Center');
+  test('GEMINI_CONFIG is removed (was deprecated)', () => {
+    expect(typeof GEMINI_CONFIG).toBe('undefined');
   });
 
-  test('has LOG_SHEET_NAME', () => {
-    expect(typeof COMMAND_CENTER_CONFIG.LOG_SHEET_NAME).toBe('string');
-    expect(COMMAND_CENTER_CONFIG.LOG_SHEET_NAME.length).toBeGreaterThan(0);
-  });
-
-  test('has DIR_SHEET_NAME', () => {
-    expect(typeof COMMAND_CENTER_CONFIG.DIR_SHEET_NAME).toBe('string');
-  });
-
-  test('has THEME with expected keys', () => {
-    expect(COMMAND_CENTER_CONFIG.THEME).toBeDefined();
-    expect(COMMAND_CENTER_CONFIG.THEME.HEADER_BG).toBeDefined();
-    expect(COMMAND_CENTER_CONFIG.THEME.HEADER_TEXT).toBeDefined();
-    expect(COMMAND_CENTER_CONFIG.THEME.ALT_ROW).toBeDefined();
-    expect(COMMAND_CENTER_CONFIG.THEME.FONT).toBeDefined();
-  });
-});
-
-// ============================================================================
-// GEMINI_CONFIG constant
-// ============================================================================
-
-describe('GEMINI_CONFIG', () => {
-  test('is defined', () => {
-    expect(GEMINI_CONFIG).toBeDefined();
-  });
-
-  test('has SYSTEM_NAME matching COMMAND_CENTER_CONFIG', () => {
-    expect(GEMINI_CONFIG.SYSTEM_NAME).toBe(COMMAND_CENTER_CONFIG.SYSTEM_NAME);
-  });
-
-  test('has legacy emoji-prefixed sheet names', () => {
-    expect(GEMINI_CONFIG.LOG_SHEET_NAME).toContain('Grievance Log');
-    expect(GEMINI_CONFIG.DIR_SHEET_NAME).toContain('Member Directory');
-  });
-
-  test('has UNIT_CODES object', () => {
-    expect(typeof GEMINI_CONFIG.UNIT_CODES).toBe('object');
-  });
-
-  test('has THEME object', () => {
-    expect(GEMINI_CONFIG.THEME).toBeDefined();
-    expect(GEMINI_CONFIG.THEME.HEADER_BG).toBe('#1e293b');
+  test('COMMAND_CONFIG is the canonical config', () => {
+    expect(COMMAND_CONFIG).toBeDefined();
+    expect(COMMAND_CONFIG.SYSTEM_NAME).toBeDefined();
+    expect(COMMAND_CONFIG.UNIT_CODES).toBeDefined();
   });
 });
 
@@ -241,19 +202,4 @@ describe('getCommandCenterConfig', () => {
 // UI function smoke tests
 // ============================================================================
 
-describe('navigateToDashboard (smoke test)', () => {
-  test('sets active sheet when dashboard exists', () => {
-    const dashboardSheet = createMockSheet(SHEETS.DASHBOARD || 'Dashboard');
-    const ss = createMockSpreadsheet([dashboardSheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
-
-    expect(() => navigateToDashboard()).not.toThrow();
-  });
-
-  test('does not throw when dashboard sheet is missing', () => {
-    const ss = createMockSpreadsheet([]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
-
-    expect(() => navigateToDashboard()).not.toThrow();
-  });
-});
+// navigateToDashboard removed v4.33.0 — deprecated Dashboard sheet cleaned up

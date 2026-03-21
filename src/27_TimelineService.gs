@@ -3,23 +3,53 @@
  * 27_TimelineService.gs - Timeline of Events Module
  * ============================================================================
  *
- * Chronological event timeline with Google Calendar and Drive integration.
+ * WHAT THIS FILE DOES:
+ *   Chronological event timeline with Google Calendar and Drive integration.
+ *   Stewards create timeline events (meetings, announcements, milestones,
+ *   actions, decisions) that appear in the SPA activity feed. Events can be
+ *   linked to Calendar events and Drive documents. Supports inline editing,
+ *   meeting minutes linking, pagination, and dynamic categories. Two hidden
+ *   sheets:
+ *     _Timeline_Events     — event records (12 columns)
+ *     _Timeline_Categories — steward-managed category list
  *
- * Sheets:
- *   _Timeline_Events     — event records (12 columns), hidden
- *   _Timeline_Categories — steward-managed category list (1 column), hidden
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Categories are fully dynamic — driven by _Timeline_Categories sheet
+ *   rather than hardcoded, so each union can customize their event types.
+ *   In-memory cache (2-minute TTL) prevents redundant sheet reads for
+ *   rapidly accessed timeline data. Default categories (meeting,
+ *   announcement, milestone, action, decision, other) are seeded on first
+ *   init but can be modified.
  *
- * Categories are fully dynamic — driven by _Timeline_Categories sheet.
- * Stewards manage categories via the Timeline > Categories sub-tab.
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   The SPA timeline tab shows no events. New events can't be created.
+ *   Calendar links and Drive document links are broken. If the cache fails,
+ *   every timeline view triggers a sheet read (slow but functional).
  *
- * @fileoverview Timeline Service IIFE module
- * @version 4.26.0
- * @requires 01_Core.gs, 06_Maintenance.gs
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS), CalendarApp, DriveApp (GAS built-ins).
+ *   Used by SPA timeline views and event management features.
+ *
+ * @version 4.31.0
  */
 
 var TimelineService = (function () {
 
   var DEFAULT_CATEGORIES = ['meeting', 'announcement', 'milestone', 'action', 'decision', 'other'];
+
+  // ── In-memory cache (2-min TTL) ──────────────────────────────────────
+  var _tlCache = {};
+  var _TL_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+  function _cacheGet(key) {
+    var entry = _tlCache[key];
+    if (entry && (Date.now() - entry.ts) < _TL_CACHE_TTL) return entry.val;
+    delete _tlCache[key];
+    return undefined;
+  }
+  function _cacheSet(key, val) { _tlCache[key] = { val: val, ts: Date.now() }; }
+  function _cacheInvalidate() { _tlCache = {}; }
+  // ─────────────────────────────────────────────────────────────────────
 
   function initTimelineSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -53,6 +83,8 @@ var TimelineService = (function () {
   }
 
   function getCategories() {
+    var cached = _cacheGet('categories');
+    if (cached) return cached;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return DEFAULT_CATEGORIES.slice();
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_CATEGORIES);
@@ -64,7 +96,9 @@ var TimelineService = (function () {
       var c = String(row[0] || '').trim().toLowerCase();
       if (c) cats.push(c);
     });
-    return cats.length ? cats : DEFAULT_CATEGORIES.slice();
+    var result = cats.length ? cats : DEFAULT_CATEGORIES.slice();
+    _cacheSet('categories', result);
+    return result;
   }
 
   function addCategory(stewardEmail, category) {
@@ -78,6 +112,7 @@ var TimelineService = (function () {
     var existing = getCategories();
     if (existing.indexOf(cat) !== -1) return { success: false, message: 'Category already exists.' };
     sheet.appendRow([cat]);
+    _cacheInvalidate();
     logAuditEvent('TIMELINE_CATEGORY_ADDED', 'Category "' + cat + '" added by ' + stewardEmail);
     return { success: true, category: cat };
   }
@@ -93,6 +128,7 @@ var TimelineService = (function () {
     for (var i = 0; i < data.length; i++) {
       if (String(data[i][0] || '').trim().toLowerCase() === cat) {
         sheet.deleteRow(i + 2);
+        _cacheInvalidate();
         logAuditEvent('TIMELINE_CATEGORY_DELETED', 'Category "' + cat + '" deleted by ' + stewardEmail);
         return { success: true };
       }
@@ -101,6 +137,8 @@ var TimelineService = (function () {
   }
 
   function getTimelineYears() {
+    var cached = _cacheGet('years');
+    if (cached) return cached;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return [];
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
@@ -110,7 +148,9 @@ var TimelineService = (function () {
     data.forEach(function (row) {
       if (row[0] instanceof Date) yearsSet[row[0].getFullYear()] = true;
     });
-    return Object.keys(yearsSet).map(Number).sort(function (a, b) { return b - a; });
+    var result = Object.keys(yearsSet).map(Number).sort(function (a, b) { return b - a; });
+    _cacheSet('years', result);
+    return result;
   }
 
   function getTimelineEvents(page, pageSize, year, category) {
@@ -184,6 +224,7 @@ var TimelineService = (function () {
         data.calendarEventId || '', driveIds, driveNames,
         data.meetingMinutesId || '', stewardEmail.toLowerCase().trim(), now, now
       ]);
+      _cacheInvalidate();
       logAuditEvent('TIMELINE_EVENT_ADDED', 'Event ' + id + ' by ' + stewardEmail);
       return { success: true, eventId: id };
     } finally {
@@ -210,6 +251,7 @@ var TimelineService = (function () {
         }
         if (updates.meetingMinutesId !== undefined) sheet.getRange(i + 1, 9).setValue(String(updates.meetingMinutesId || ''));
         sheet.getRange(i + 1, 12).setValue(new Date());
+        _cacheInvalidate();
         logAuditEvent('TIMELINE_EVENT_UPDATED', 'Event ' + eventId + ' updated by ' + stewardEmail);
         return { success: true };
       }
@@ -227,6 +269,7 @@ var TimelineService = (function () {
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] === eventId) {
         sheet.deleteRow(i + 1);
+        _cacheInvalidate();
         logAuditEvent('TIMELINE_EVENT_DELETED', 'Event ' + eventId + ' deleted by ' + stewardEmail);
         return { success: true };
       }
@@ -342,8 +385,6 @@ var TimelineService = (function () {
   };
 
 })();
-
-
 // ═══════════════════════════════════════
 // GLOBAL WRAPPERS
 // ═══════════════════════════════════════

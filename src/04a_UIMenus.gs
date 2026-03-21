@@ -266,12 +266,6 @@ function getVisualControlPanelHtml() {
           <button class="action-btn btn-primary" onclick="refreshDashboard()">
             🔄 Refresh Dashboard
           </button>
-          <button class="action-btn btn-secondary" onclick="goToSheet('💼 Dashboard')">
-            📊 Open Executive Dashboard
-          </button>
-          <button class="action-btn btn-secondary" onclick="goToSheet('🎯 Custom View')">
-            🎯 Open Custom View
-          </button>
         </div>
 
         <div class="status-bar" id="statusBar">
@@ -335,11 +329,6 @@ function getVisualControlPanelHtml() {
  * Helper functions for navigation
  * Note: Dashboards are now modal-based for better UX
  */
-/** @deprecated Use showStewardDashboard() directly. Kept for menu backward compat. */
-function showExecutiveDashboard() {
-  showStewardDashboard();
-}
-
 function showStewardDirectory() {
   // Navigate to Member Directory filtered by stewards
   navigateToSheet(SHEETS.MEMBER_DIR);
@@ -387,9 +376,6 @@ function showStewardDirectory() {
 /**
  * Resets all visible sheets to default styling
  */
-
-// refreshVisualsSimple_ removed — dead code cleanup v4.25.11
-
 /**
  * Refreshes all visual elements, data calculations, and alerts
  * Main entry point for Force Global Refresh menu item
@@ -695,6 +681,3 @@ function getMultiSelectHtml(items, callback) {
 // ============================================================================
 // SIDEBAR
 // ============================================================================
-
-// showDashboardSidebar removed — dead code cleanup v4.25.11
-

@@ -3,23 +3,37 @@
  * 25_WorkloadService.gs - Workload Tracker Backend (SPA-only, SSO auth)
  * ============================================================================
  *
- * Full-featured workload tracking for the web dashboard SPA.
- * Uses SSO session identity (no PIN) via 19_WebDashAuth.gs.
+ * WHAT THIS FILE DOES:
+ *   Full-featured workload tracking backend for the web dashboard SPA. Tracks
+ *   8 workload categories (priority cases, pending cases, unread docs, todo
+ *   items, sent referrals, CE activities, assistance requests, aged cases)
+ *   plus overtime hours, leave tracking, and sub-categories. Uses SSO identity
+ *   (no PIN) via 19_WebDashAuth.gs. 5 hidden sheets:
+ *     "Workload Vault"       — raw submissions
+ *     "Workload Reporting"   — anonymized ledger
+ *     "Workload Reminders"   — email reminder prefs
+ *     "Workload UserMeta"    — sharing start dates (reciprocity)
+ *     "Workload Archive"     — data older than 24 months
  *
- * Replaces 18_WorkloadTracker.gs with correct column alignment,
- * full sub-category support, privacy reciprocity, overtime,
- * leave tracking, and enhanced analytics.
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   Privacy reciprocity model — stewards only see each other's workload data
+ *   from the date they started sharing their own. This prevents "lurking"
+ *   (viewing others without contributing). 24-month data retention with
+ *   automatic archiving keeps the vault sheet manageable. Rate limiting
+ *   (10 submissions/hour, 20 history requests/hour) prevents abuse.
+ *   0-indexed VAULT_COLS match the portal convention for getValues() arrays.
  *
- * Sheet Structure:
- *   "Workload Vault"       (hidden)  -- raw 24-column submissions
- *   "Workload Reporting"   (visible) -- anonymized ledger
- *   "Workload Reminders"   (hidden)  -- email reminder prefs
- *   "Workload UserMeta"    (hidden)  -- sharing start dates (reciprocity)
- *   "Workload Archive"     (hidden)  -- data older than 24 months
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Stewards can't log or view workload data. The SPA workload tab shows
+ *   nothing. If archiving breaks, the vault sheet grows unbounded (performance
+ *   degrades). If rate limiting breaks, a script could spam submissions.
  *
- * @version 4.13.0
- * @requires 01_Core.gs   (SHEETS constants)
- * @requires 06_Maintenance.gs (logAuditEvent)
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS), 19_WebDashAuth.gs (SSO identity),
+ *   LockService (concurrency). Used by SPA workload views and email
+ *   reminder triggers.
+ *
+ * @version 4.31.0
  */
 
 var WorkloadService = (function() {
@@ -239,7 +253,7 @@ var WorkloadService = (function() {
             }
           }
           subCatSummary = parts.join(', ');
-        } catch (_e) { /* skip */ }
+        } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
 
       // Format leave dates
@@ -282,8 +296,8 @@ var WorkloadService = (function() {
         report.getRange(1, 1, reportRows.length, header.length).setValues(reportRows);
         report.getRange(1, 1, 1, header.length)
           .setFontWeight('bold')
-          .setBackground(SHEET_COLORS.HEADER_BLUE)
-          .setFontColor(SHEET_COLORS.BG_WHITE);
+          .setBackground('#0d47a1')
+          .setFontColor('#ffffff');
         report.setFrozenRows(1);
 
         // Clear leftover rows beyond new data (if sheet previously had more rows)
@@ -295,11 +309,11 @@ var WorkloadService = (function() {
         // Pastel color coding
         if (reportRows.length > 1) {
           var numData = reportRows.length - 1;
-          report.getRange(2, 1, numData, 2).setBackground(SHEET_COLORS.BG_SLATE_LIGHT);
-          report.getRange(2, 3, numData, 8).setBackground(SHEET_COLORS.BG_MINT);
-          report.getRange(2, 11, numData, 2).setBackground(SHEET_COLORS.BG_LIGHT_YELLOW);
-          report.getRange(2, 13, numData, 2).setBackground(SHEET_COLORS.BG_LIGHT_PURPLE);
-          report.getRange(2, 15, numData, 2).setBackground(SHEET_COLORS.BG_LIGHT_RED);
+          report.getRange(2, 1, numData, 2).setBackground('#F1F5F9');
+          report.getRange(2, 3, numData, 8).setBackground('#ECFDF5');
+          report.getRange(2, 11, numData, 2).setBackground('#FEF3C7');
+          report.getRange(2, 13, numData, 2).setBackground('#FAF5FF');
+          report.getRange(2, 15, numData, 2).setBackground('#FEE2E2');
         }
       }
     } catch (writeErr) {
@@ -355,7 +369,7 @@ var WorkloadService = (function() {
         'Privacy', 'On Plan', 'Overtime Hours'
       ]);
       vault.getRange(1, 1, 1, VAULT_COL_COUNT)
-        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_NAVY).setFontColor(SHEET_COLORS.BG_WHITE);
+        .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
       vault.setFrozenRows(1);
     } else {
       // Existing sheet — expand headers if needed (handles migration from 12-col)
@@ -391,7 +405,7 @@ var WorkloadService = (function() {
         'Anon Level', 'Workflow'
       ]);
       report.getRange(1, 1, 1, 16)
-        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_BLUE).setFontColor(SHEET_COLORS.BG_WHITE);
+        .setFontWeight('bold').setBackground('#0d47a1').setFontColor('#ffffff');
       report.setFrozenRows(1);
     }
 
@@ -401,7 +415,7 @@ var WorkloadService = (function() {
       reminders = ss.insertSheet(SHEETS.WORKLOAD_REMINDERS);
       reminders.appendRow(['Email', 'Enabled', 'Frequency', 'Day', 'Time', 'Last Sent']);
       reminders.getRange(1, 1, 1, 6)
-        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_NAVY).setFontColor(SHEET_COLORS.BG_WHITE);
+        .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
       reminders.setFrozenRows(1);
       setSheetVeryHidden_(reminders); // H-12: API-level hide
     }
@@ -412,7 +426,7 @@ var WorkloadService = (function() {
       userMeta = ss.insertSheet(SHEETS.WORKLOAD_USERMETA);
       userMeta.appendRow(['Email', 'Sharing Start Date', 'Created Date']);
       userMeta.getRange(1, 1, 1, 3)
-        .setFontWeight('bold').setBackground(SHEET_COLORS.HEADER_NAVY).setFontColor(SHEET_COLORS.BG_WHITE);
+        .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
       userMeta.setFrozenRows(1);
       setSheetVeryHidden_(userMeta); // H-12: API-level hide
     }
@@ -480,10 +494,10 @@ var WorkloadService = (function() {
       var tz = _getTimezone();
       var leaveStart = '', leaveEnd = '';
       if (formData.leave_start) {
-        try { leaveStart = Utilities.formatDate(new Date(formData.leave_start), tz, 'MM/dd/yyyy'); } catch(_e) {}
+        try { leaveStart = Utilities.formatDate(new Date(formData.leave_start), tz, 'MM/dd/yyyy'); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
       if (formData.leave_end) {
-        try { leaveEnd = Utilities.formatDate(new Date(formData.leave_end), tz, 'MM/dd/yyyy'); } catch(_e) {}
+        try { leaveEnd = Utilities.formatDate(new Date(formData.leave_end), tz, 'MM/dd/yyyy'); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
 
       // Build 24-column row
@@ -733,7 +747,7 @@ var WorkloadService = (function() {
               subCatTotals[cKey][sKey] += sVal;
             }
           }
-        } catch (_e) { /* skip */ }
+        } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
     }
 
@@ -861,7 +875,7 @@ var WorkloadService = (function() {
     var currentDay = dayNames[now.getDay()];
 
     var portalUrl = '';
-    try { portalUrl = ScriptApp.getService().getUrl() || ''; } catch (_e) { /* non-fatal */ }
+    try { portalUrl = ScriptApp.getService().getUrl() || ''; } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     for (var i = 1; i < data.length; i++) {
       try {
@@ -955,7 +969,7 @@ var WorkloadService = (function() {
       }
       ui.alert('Backup Created', 'Saved to Google Drive:\n' + fileName, ui.ButtonSet.OK);
     } catch (err) {
-      console.error('createWorkloadBackup error:', err);
+      Logger.log('createWorkloadBackup error:', err);
       ui.alert('Backup Failed', 'Error: ' + err.message, ui.ButtonSet.OK);
     }
   }
@@ -1056,15 +1070,25 @@ var WorkloadService = (function() {
       return;
     }
     try {
-      vault.clearContents();
-      vault.getRange(1, 1, finalData.length, header.length).setValues(finalData);
-    } catch (writeErr) {
-      Logger.log('cleanVault: write failed after clear — data may be lost: ' + writeErr.message);
+      // Copy-on-write: validate finalData by writing to a staging range below current data
+      var stagingStartRow = vault.getLastRow() + 2;
+      vault.getRange(stagingStartRow, 1, finalData.length, header.length).setValues(finalData);
+      // Staging write succeeded — now clear and swap
       try {
-        vault.getRange(1, 1, data.length, header.length).setValues(data);
-      } catch (_recoveryErr) {
-        Logger.log('cleanVault: recovery also failed: ' + _recoveryErr.message);
+        vault.clearContents();
+        vault.getRange(1, 1, finalData.length, header.length).setValues(finalData);
+      } catch (swapErr) {
+        Logger.log('cleanVault: swap failed after staging — attempting restore: ' + swapErr.message);
+        try {
+          vault.clearContents();
+          vault.getRange(1, 1, data.length, header.length).setValues(data);
+        } catch (recoveryErr) {
+          Logger.log('cleanVault: recovery also failed: ' + recoveryErr.message);
+          handleError(recoveryErr, 'cleanVault: data loss — swap and recovery both failed', ERROR_LEVEL.CRITICAL);
+        }
       }
+    } catch (stagingErr) {
+      Logger.log('cleanVault: staging write failed — original data untouched: ' + stagingErr.message);
     } finally {
       lock.releaseLock();
     }
@@ -1084,7 +1108,7 @@ var WorkloadService = (function() {
     var lines = ['WorkloadService v' + CONFIG.version + '\n'];
     for (var i = 0; i < sheetNames.length; i++) {
       var name = sheetNames[i];
-      var s = ss.getSheetByName(name);
+      var s = ss.getSheetByName(name);  // null if sheet doesn't exist — handled below
       var exists = !!s;
       var rows = exists ? Math.max(0, s.getLastRow() - 1) : 0;
       lines.push((exists ? '\u2713 ' : '\u2717 ') + name + (exists ? ' (' + rows + ' records)' : ' \u2014 missing'));

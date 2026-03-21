@@ -1,19 +1,38 @@
 /**
- * 13_MemberSelfService.gs - Member Self-Service Portal
+ * ============================================================================
+ * 13_MemberSelfService.gs - MEMBER SELF-SERVICE PORTAL
+ * ============================================================================
  *
- * This module provides PIN-based authentication for members to:
- * - Look up their own information
- * - Update their contact information
- * - View their grievance claims
+ * WHAT THIS FILE DOES:
+ *   Member Self-Service Portal with PIN authentication. Members authenticate
+ *   with a 6-digit PIN (SHA-256 hashed before storage) to view their own
+ *   info, update contact details, and check grievance status. Features: PIN
+ *   generation, rate limiting (5 failed attempts per 15 minutes), audit
+ *   logging of all access, and members can ONLY see their own data.
  *
- * Security Features:
- * - PINs are hashed using SHA-256 before storage
- * - Rate limiting on failed PIN attempts (5 attempts per 15 minutes)
- * - All access and changes are audit logged
- * - Members can only view/edit their own data
+ * WHY IT EXISTS / DESIGN DECISIONS:
+ *   PIN-based auth was chosen over Google SSO for the self-service portal
+ *   because many union members use shared workplace computers and may not
+ *   have Google accounts. PINs are simpler for non-technical users. SHA-256
+ *   hashing ensures even if the sheet is compromised, PINs can't be read.
+ *   Rate limiting prevents brute-force attacks. validateSelfServiceInput_()
+ *   validates all input fields using isValidSafeString() to prevent injection.
  *
- * @version 4.7.0
+ * WHAT HAPPENS IF THIS FILE BREAKS:
+ *   Members can't log in to the self-service portal. PIN verification fails.
+ *   Contact info updates from members stop working. If the hashing is broken,
+ *   PINs are stored in plaintext (security vulnerability). If rate limiting
+ *   breaks, brute-force PIN guessing becomes possible.
+ *
+ * DEPENDENCIES:
+ *   Depends on 01_Core.gs (SHEETS, MEMBER_COLS),
+ *   00_Security.gs (isValidSafeString, secureLog).
+ *   Used by 14_MeetingCheckIn.gs (authenticateMember, verifyPIN, hashPIN),
+ *   the SPA self-service view, and menu items.
+ *
+ * @version 4.31.0
  * @license Free for use by non-profit collective bargaining groups and unions
+ * ============================================================================
  */
 
 /**
@@ -530,9 +549,6 @@ function clearPINAttempts(memberId) {
 // ============================================================================
 // MEMBER AUTHENTICATION
 // ============================================================================
-
-// getMemberIdByEmail removed — dead code cleanup v4.25.11
-
 /**
  * Authenticate a member with their ID and PIN
  * @param {string} memberId - The member ID
@@ -765,9 +781,6 @@ function generateMemberPINForSteward(memberId) {
     message: 'PIN generated successfully. Please provide this PIN to the member securely.'
   };
 }
-
-// resetMemberPIN removed — dead code cleanup v4.25.11
-
 /**
  * Show dialog for generating member PIN
  */
@@ -1292,7 +1305,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
     // Email-based lookup (SPA context) — verify caller authorization
     var email = String(sessionTokenOrEmail).trim().toLowerCase();
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { /* web app context */ }
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
     // If caller email is available, verify they match or have elevated role
     if (callerEmail && callerEmail !== email) {
@@ -1364,10 +1377,10 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
  * C-AUTH-4: Resolves identity server-side — never accepts client-supplied email.
  * @returns {Object} { success: boolean, history: Array }
  */
-function dataGetMemberGrievanceHistoryPortal() {
-  var e = (typeof _resolveCallerEmail === 'function') ? _resolveCallerEmail() : '';
+function dataGetMemberGrievanceHistoryPortal(sessionToken) {
+  var e = (typeof _resolveCallerEmail === 'function') ? _resolveCallerEmail(sessionToken) : '';
   if (!e) {
-    try { e = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_err) {}
+    try { e = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
   }
   return e ? getMemberGrievanceHistory(e) : { success: false, history: [], error: 'Not authenticated.' };
 }
@@ -1847,7 +1860,3 @@ function getMemberSelfServicePortalHtml() {
 // ============================================================================
 // WEB APP INTEGRATION
 // ============================================================================
-
-// getMemberSelfServicePortal removed — dead code cleanup v4.25.11
-
-// showSelfServicePortalUrl removed — dead code cleanup v4.25.11
