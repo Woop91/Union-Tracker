@@ -57,6 +57,25 @@ function initMemberView(container) {
 }
 
 // ═══════════════════════════════════════
+// VCARD HELPER
+// ═══════════════════════════════════════
+
+function _generateVCard(name, email, phone, org, title) {
+  var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (name || '') + '\n';
+  if (email) vcf += 'EMAIL:' + email + '\n';
+  if (phone) vcf += 'TEL:' + phone + '\n';
+  if (org) vcf += 'ORG:' + org + '\n';
+  if (title) vcf += 'TITLE:' + title + '\n';
+  vcf += 'END:VCARD';
+  var blob = new Blob([vcf], { type: 'text/vcard' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url;
+  a.download = (name || 'contact').replace(/\s+/g, '_') + '.vcf';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════
 // MEMBER HEADER (shared across all member pages)
 // ═══════════════════════════════════════
 
@@ -408,19 +427,31 @@ function _renderGrievanceFeedbackPrompt(container, pending) {
     var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' } });
     row.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text)', fontWeight: '500' } }, cat.label));
 
-    var stars = el('div', { style: { display: 'flex', gap: '4px' } });
+    var stars = el('div', { role: 'radiogroup', 'aria-label': cat.label + ' rating', style: { display: 'flex', gap: '4px' } });
     for (var s = 1; s <= 5; s++) {
       (function(score) {
-        var star = el('span', {
-          style: { fontSize: '20px', cursor: 'pointer', color: 'var(--muted)', transition: 'color 0.15s' },
-          onClick: function() {
+        var starLabel = score === 1 ? '1 star' : score + ' stars';
+        var selectStar = function() {
             ratings[cat.key] = score;
             // Update stars
             var allStars = stars.querySelectorAll('span');
             for (var si = 0; si < allStars.length; si++) {
               allStars[si].style.color = si < score ? 'var(--warning)' : 'var(--muted)';
               allStars[si].textContent = si < score ? '\u2605' : '\u2606';
+              allStars[si].setAttribute('aria-checked', si < score ? 'true' : 'false');
             }
+        };
+        var star = el('span', {
+          role: 'radio',
+          tabIndex: 0,
+          'aria-checked': 'false',
+          'aria-label': starLabel,
+          style: { fontSize: '22px', cursor: 'pointer', color: 'var(--muted)', transition: 'color 0.15s', padding: '6px', minWidth: '36px', minHeight: '36px', textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+          onClick: selectStar,
+          onKeyDown: function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectStar(); }
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); var next = star.nextElementSibling; if (next) next.focus(); }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); var prev = star.previousElementSibling; if (prev) prev.focus(); }
           }
         }, '\u2606');
         stars.appendChild(star);
@@ -788,7 +819,9 @@ function _showGrievanceIntakeForm(parentContent) {
     var title = fields.title.value.trim();
     var category = fields.category.value;
     var description = fields.description.value.trim();
-    if (!title) { statusMsg.textContent = 'Please enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+    if (!title) { statusMsg.textContent = 'Please enter a title.'; statusMsg.style.color = 'var(--danger)'; fields.title.style.borderColor = 'var(--danger)'; return; }
+    if (!category) { statusMsg.textContent = 'Please select a category.'; statusMsg.style.color = 'var(--danger)'; fields.category.style.borderColor = 'var(--danger)'; return; }
+    if (!description) { statusMsg.textContent = 'Please enter a description.'; statusMsg.style.color = 'var(--danger)'; fields.description.style.borderColor = 'var(--danger)'; return; }
     submitBtn.textContent = 'Submitting...'; submitBtn.disabled = true;
     serverCall().withSuccessHandler(function(r) {
       if (r && r.success) {
@@ -1096,18 +1129,9 @@ function renderStewardContact(appContainer) {
         btnRow.appendChild(el('button', {
           className: 'btn btn-secondary', style: { width: 'auto', flex: '1', fontSize: '12px', padding: '8px' },
           onClick: function() {
-            var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (info.name || '') + '\n';
-            if (info.email) vcf += 'EMAIL:' + info.email + '\n';
-            if (info.phone) vcf += 'TEL:' + info.phone + '\n';
-            if (info.workLocation) vcf += 'ORG:' + (CONFIG.orgName || '') + ';' + info.workLocation + '\n';
-            if (info.unit) vcf += 'TITLE:' + CONFIG.stewardLabel + ' - ' + info.unit + '\n';
-            vcf += 'END:VCARD';
-            var blob = new Blob([vcf], { type: 'text/vcard' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a'); a.href = url;
-            a.download = (info.name || 'steward').replace(/\s+/g, '_') + '.vcf';
-            document.body.appendChild(a); a.click();
-            document.body.removeChild(a); URL.revokeObjectURL(url);
+            _generateVCard(info.name, info.email, info.phone,
+              info.workLocation ? (CONFIG.orgName || '') + ';' + info.workLocation : null,
+              info.unit ? CONFIG.stewardLabel + ' - ' + info.unit : null);
           }
         }, '💾 Save Contact'));
         btnRow.appendChild(el('button', {
@@ -1171,7 +1195,7 @@ function _showStewardPicker(targetSection) {
           e.stopPropagation();
           selectBtn.textContent = '…'; selectBtn.disabled = true;
           serverCall().withSuccessHandler(function(result) {
-            if (result && result.success) _handleTabNav('member', 'stewarddirectory');
+            if (result && result.success) { _invalidateTabCache('home'); _handleTabNav('member', 'home'); }
           }).withFailureHandler(function() {
             selectBtn.textContent = 'Select'; selectBtn.disabled = false;
           }).dataMemberAssignSteward(SESSION_TOKEN, s.email);
@@ -1302,7 +1326,7 @@ function _renderMemberDirectory(target) {
       listArea.appendChild(cardContainer);
 
       // Pagination controls area
-      var pagRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', gap: '8px' } });
+      var pagRow = el('div', { role: 'navigation', 'aria-label': 'Pagination', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', gap: '8px' } });
       listArea.appendChild(pagRow);
 
       function _renderPage() {
@@ -1337,7 +1361,8 @@ function _renderMemberDirectory(target) {
           if (s.officeDays) {
             var odRow = el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' } });
             var inOffice = inOfficeToday(s);
-            odRow.innerHTML = '\uD83D\uDCC5 In-office: ' + safeText(s.officeDays) + (inOffice ? ' <span style="color:var(--success);font-weight:600">\u25CF In today</span>' : '');
+            odRow.textContent = '\uD83D\uDCC5 In-office: ' + s.officeDays;
+            if (inOffice) { var badge = document.createElement('span'); badge.style.cssText = 'color:var(--success);font-weight:600'; badge.textContent = ' \u25CF In today'; odRow.appendChild(badge); }
             details.appendChild(odRow);
           }
           if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px', textDecoration: 'none' } }, '\u2709\uFE0F ' + s.email));
@@ -1351,18 +1376,9 @@ function _renderMemberDirectory(target) {
             className: 'btn btn-secondary', style: { width: 'auto', flex: '1', fontSize: '11px', padding: '7px 10px' },
             onClick: function(e) {
               e.stopPropagation();
-              var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (s.name || '') + '\n';
-              if (s.email) vcf += 'EMAIL:' + s.email + '\n';
-              if (s.phone) vcf += 'TEL:' + s.phone + '\n';
-              if (s.workLocation) vcf += 'ORG:' + (CONFIG.orgName || '') + ';' + s.workLocation + '\n';
-              if (s.unit) vcf += 'TITLE:' + CONFIG.stewardLabel + ' - ' + s.unit + '\n';
-              vcf += 'END:VCARD';
-              var blob = new Blob([vcf], { type: 'text/vcard' });
-              var url = URL.createObjectURL(blob);
-              var a = document.createElement('a'); a.href = url;
-              a.download = (s.name || 'steward').replace(/\s+/g, '_') + '.vcf';
-              document.body.appendChild(a); a.click();
-              document.body.removeChild(a); URL.revokeObjectURL(url);
+              _generateVCard(s.name, s.email, s.phone,
+                s.workLocation ? (CONFIG.orgName || '') + ';' + s.workLocation : null,
+                s.unit ? CONFIG.stewardLabel + ' - ' + s.unit : null);
             }
           }, '\uD83D\uDCBE Save Contact'));
 
@@ -1379,8 +1395,18 @@ function _renderMemberDirectory(target) {
 
           details.appendChild(btnRow);
           card.appendChild(details);
-          card.addEventListener('click', function() {
-            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+          topRow.setAttribute('role', 'button');
+          topRow.setAttribute('tabindex', '0');
+          topRow.setAttribute('aria-expanded', 'false');
+          topRow.setAttribute('aria-label', (s.name || 'Steward') + ', tap to expand');
+          var _toggleCard = function() {
+            var expanded = details.style.display !== 'none';
+            details.style.display = expanded ? 'none' : 'block';
+            topRow.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+          };
+          card.addEventListener('click', _toggleCard);
+          topRow.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _toggleCard(); }
           });
           cardContainer.appendChild(card);
         });
@@ -1393,21 +1419,21 @@ function _renderMemberDirectory(target) {
         // Previous button
         if (_currentPage > 0) {
           pagRow.appendChild(el('button', {
-            className: 'btn btn-secondary', style: { fontSize: '12px', padding: '8px 16px' },
+            className: 'btn btn-secondary', 'aria-label': 'Previous page', style: { fontSize: '12px', padding: '8px 16px' },
             onClick: function() { _currentPage--; _renderPage(); cardContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
           }, '\u2190 Previous'));
         } else {
           pagRow.appendChild(el('span'));
         }
 
-        // Page indicator
-        pagRow.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } },
+        // Page indicator (aria-live so screen readers announce page changes)
+        pagRow.appendChild(el('span', { 'aria-live': 'polite', style: { fontSize: '12px', color: 'var(--muted)' } },
           (start + 1) + '\u2013' + end + ' of ' + filtered.length));
 
         // Next button
         if (_currentPage < totalPages - 1) {
           pagRow.appendChild(el('button', {
-            className: 'btn btn-secondary', style: { fontSize: '12px', padding: '8px 16px' },
+            className: 'btn btn-secondary', 'aria-label': 'Next page', style: { fontSize: '12px', padding: '8px 16px' },
             onClick: function() { _currentPage++; _renderPage(); cardContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
           }, 'Next \u2192'));
         } else {
@@ -1525,6 +1551,10 @@ function renderMemberResources(appContainer) {
       filtered.forEach(function(r, idx) {
         var card = el('div', {
           className: 'card card-glass res-card card-clickable card-fade-in',
+          role: 'button',
+          tabIndex: 0,
+          'aria-expanded': 'false',
+          'aria-label': (r.title || 'Resource') + ', tap to expand',
           style: { animationDelay: (idx * 50) + 'ms' }
         });
 
@@ -1583,14 +1613,20 @@ function renderMemberResources(appContainer) {
         //   the assignment) → multiple server calls per expand. Worst case:
         //   inflated click counts. Non-destructive. Fix: check console for
         //   JS errors in this handler.
-        card.addEventListener('click', function() {
+        var _toggleResCard = function() {
           var wasExpanded = card.classList.contains('expanded');
           card.classList.toggle('expanded');
-          hint.textContent = card.classList.contains('expanded') ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
+          var isNowExpanded = card.classList.contains('expanded');
+          hint.textContent = isNowExpanded ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
+          card.setAttribute('aria-expanded', isNowExpanded ? 'true' : 'false');
           if (!wasExpanded && !card._tracked) {
             card._tracked = true;
             serverCall().withSuccessHandler(function() {}).withFailureHandler(function() {}).dataLogResourceClick(SESSION_TOKEN, r.id, r.title);
           }
+        };
+        card.addEventListener('click', _toggleResCard);
+        card.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _toggleResCard(); }
         });
 
         cardsWrap.appendChild(card);
@@ -1655,10 +1691,12 @@ function renderUpdateProfile(appContainer) {
 
       var form = el('div');
       var inputs = {};
+      var _profileIdMap = { street: 'profile-street', city: 'profile-city', state: 'profile-state', zip: 'profile-zip', workLocation: 'profile-location', officeDays: 'profile-officedays' };
       fields.forEach(function(f) {
+        var fieldId = _profileIdMap[f.key] || ('profile-' + f.key);
         var group = el('div', { className: 'form-group' });
-        group.appendChild(el('label', { className: 'form-label' }, f.label));
-        var input = el('input', { className: 'form-input', value: f.value || '', placeholder: f.label });
+        group.appendChild(el('label', { className: 'form-label', htmlFor: fieldId }, f.label));
+        var input = el('input', { id: fieldId, className: 'form-input', value: f.value || '', placeholder: f.label });
         inputs[f.key] = input;
         group.appendChild(input);
         form.appendChild(group);
@@ -1669,7 +1707,16 @@ function renderUpdateProfile(appContainer) {
 
       var saveBtn = el('button', { className: 'btn btn-primary', onClick: function() {
         var updates = {};
-        for (var k in inputs) updates[k] = inputs[k].value;
+        for (var k in inputs) updates[k] = inputs[k].value.trim();
+        // Validate zip code and state
+        if (updates.zip && !/^\d{5}(-\d{4})?$/.test(updates.zip)) {
+          statusMsg.textContent = 'Zip code must be 5 digits (or 5+4 format).'; statusMsg.style.color = 'var(--danger)';
+          inputs.zip.style.borderColor = 'var(--danger)'; return;
+        }
+        if (updates.state && !/^[A-Za-z]{2}$/.test(updates.state)) {
+          statusMsg.textContent = 'State must be a 2-letter abbreviation.'; statusMsg.style.color = 'var(--danger)';
+          inputs.state.style.borderColor = 'var(--danger)'; return;
+        }
         saveBtn.textContent = 'Saving...';
         saveBtn.disabled = true;
         serverCall().withSuccessHandler(function(result) {
@@ -1755,7 +1802,7 @@ function renderMemberNotifications(appContainer) {
 
         // Dismiss button only shown for Dismissible mode
         if (n.dismissMode !== 'Timed') {
-          var dismissBtn = el('button', { className: 'notif-dismiss', onClick: function() {
+          var dismissBtn = el('button', { className: 'notif-dismiss', 'aria-label': 'Dismiss notification', onClick: function() {
             dismissBtn.textContent = '...';
             dismissBtn.disabled = true;
             serverCall().withSuccessHandler(function(r) {
@@ -1849,7 +1896,7 @@ function renderMemberMore(appContainer) {
       var item = el('div', {
         className: 'more-menu-item',
         style: isLocked ? { opacity: '0.6' } : {},
-        onClick: function() { try { m.action(); } catch(e) { console.error('More menu error (' + m.label + '):', e); alert('Failed to open ' + m.label + '. Please try again.'); } }
+        onClick: function() { try { m.action(); } catch(e) { console.error('More menu error (' + m.label + '):', e); item.style.borderColor = 'var(--danger)'; item.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to open. Please try again.')); } }
       });
 
       // Icon wrapper — allows lock badge positioning
@@ -5651,7 +5698,7 @@ function renderMinutesPage(appContainer) {
 //
 // IF THIS BREAKS:
 // - dataGetMemberTasks fails → withFailureHandler shows "Failed to load tasks".
-// - dataCompleteMemberTask fails → alert("Failed to complete task").
+// - dataCompleteMemberTask fails → inline error message on the task card.
 // - _refreshNavBadges call after completion updates steward-side badge counts
 //   since completing a member task changes the steward's open task totals.
 //   If missing, steward sees stale badge counts until next page load.
@@ -5717,18 +5764,23 @@ function renderMemberTasks(appContainer) {
           if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.length > 100 ? task.description.substring(0, 100) + '\u2026' : task.description));
 
           if (task.status !== 'completed') {
-            var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
+            var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' } });
+            var taskErr = el('span', { style: { fontSize: '11px', color: 'var(--danger)', marginLeft: '6px' } });
             actions.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
               onClick: function() {
+                if (!confirm('Mark "' + (task.title || 'this task') + '" as complete?')) return;
                 serverCall().withSuccessHandler(function() {
                   // Notify steward-side badge counts — member completing a task
                   // changes the steward's open/overdue task totals.
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                   _invalidateTabCache('mytasks'); _handleTabNav('member', 'mytasks');
-                }).withFailureHandler(function() { alert('Failed to complete task. Please try again.'); }).dataCompleteMemberTask(SESSION_TOKEN, task.id);
+                }).withFailureHandler(function() {
+                  taskErr.textContent = 'Failed to complete task.';
+                }).dataCompleteMemberTask(SESSION_TOKEN, task.id);
               }
             }, '\u2705 Complete'));
+            actions.appendChild(taskErr);
             card.appendChild(actions);
           }
           subContent.appendChild(card);

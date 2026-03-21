@@ -42,6 +42,7 @@ function showAuthChoose(container) {
 
   var googleBtn = el('button', {
     className: 'btn btn-google',
+    'aria-label': 'Sign in with Google',
     onClick: function() {
       if (!WEB_APP_URL) { showAuthError(container, 'Web app URL not available. Please reload the page.'); return; }
       // Show loading state so the button doesn't look dead
@@ -99,6 +100,7 @@ function showAuthEmail(container) {
   // Back button
   var back = el('button', {
     style: { color: 'var(--accent)', fontSize: '13px', marginBottom: '20px', textAlign: 'left', fontFamily: 'var(--fontBody)' },
+    'aria-label': 'Go back',
     onClick: function() { showAuthChoose(container); }
   }, '\u2190 Back');
   wrapper.appendChild(back);
@@ -121,7 +123,7 @@ function showAuthEmail(container) {
 
   // Remember me toggle
   var rememberMe = { value: false };
-  var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' } });
+  var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' }, role: 'switch', 'aria-checked': 'false', tabIndex: 0 });
 
   var track = el('div', {
     className: 'auth-toggle-track',
@@ -135,10 +137,15 @@ function showAuthEmail(container) {
   toggleContainer.appendChild(track);
   toggleContainer.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'Remember this device (' + CONFIG.cookieDurationDays + ' days)'));
 
-  toggleContainer.addEventListener('click', function() {
+  function _toggleRememberMe() {
     rememberMe.value = !rememberMe.value;
     track.style.background = rememberMe.value ? 'var(--accent)' : 'var(--border, #333)';
     thumb.style.left = rememberMe.value ? '18px' : '2px';
+    toggleContainer.setAttribute('aria-checked', String(rememberMe.value));
+  }
+  toggleContainer.addEventListener('click', _toggleRememberMe);
+  toggleContainer.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _toggleRememberMe(); }
   });
   wrapper.appendChild(toggleContainer);
 
@@ -148,7 +155,7 @@ function showAuthEmail(container) {
     style: { marginTop: '8px', opacity: '0.5' },
     onClick: function() {
       var email = emailInput.value.trim();
-      if (!email || email.indexOf('@') === -1) return;
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
       showAuthSending(container, email, rememberMe.value);
     }
   }, 'Send sign-in link');
@@ -156,7 +163,7 @@ function showAuthEmail(container) {
 
   // Enable button on valid input
   emailInput.addEventListener('input', function() {
-    var valid = emailInput.value.indexOf('@') > 0;
+    var valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
     submitBtn.style.opacity = valid ? '1' : '0.5';
   });
 

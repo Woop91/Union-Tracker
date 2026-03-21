@@ -97,7 +97,7 @@ function _stewardHeader(container, title, subtitle) {
   if (!isSidebarLayout()) {
     // All stewards can switch to member view (every steward is also a member)
     headerRight.appendChild(el('button', {
-      style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+      style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '8px 14px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', minHeight: '36px' },
       onClick: function() { AppState.activeRole = 'member'; initMemberView(document.getElementById('app')); }
     }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
@@ -283,7 +283,7 @@ function renderStewardDashboard(appContainer) {
     container.appendChild(caseListContainer);
 
     // FAB — opens broadcast
-    var fab = el('button', { className: 'fab', onClick: function() { _handleTabNav('steward', 'broadcast'); } }, '\uD83D\uDCE2');
+    var fab = el('button', { className: 'fab', 'aria-label': 'Quick broadcast', onClick: function() { _handleTabNav('steward', 'broadcast'); } }, '\uD83D\uDCE2');
     container.appendChild(fab);
   });
 }
@@ -474,11 +474,13 @@ function renderCaseList(container, filter) {
       // Expandable checklist (v4.16.0)
       var checklistArea = el('div', { style: { display: 'none', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } });
       var checklistLoaded = false;
+      card.setAttribute('aria-expanded', 'false');
       card.appendChild(checklistArea);
       card.addEventListener('click', function(ev) {
         ev.stopPropagation();
         var showing = checklistArea.style.display !== 'none';
         checklistArea.style.display = showing ? 'none' : 'block';
+        card.setAttribute('aria-expanded', String(!showing));
         if (!showing && !checklistLoaded) {
           checklistLoaded = true;
           _renderCaseChecklist(checklistArea, c.id);
@@ -1493,7 +1495,7 @@ function renderStewardNotifications(appContainer) {
     }
 
     var activeSubTab = 'inbox';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     function refreshSubTabs() {
@@ -1501,6 +1503,8 @@ function renderStewardNotifications(appContainer) {
       ['inbox', 'compose', 'manage'].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === tab),
           onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
         }, tab.charAt(0).toUpperCase() + tab.slice(1)));
       });
@@ -1864,7 +1868,7 @@ function renderStewardResources(appContainer) {
     var content = el('div', { className: 'content' });
 
     var activeSubTab = 'browse';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     function refreshSubTabs() {
@@ -1872,6 +1876,8 @@ function renderStewardResources(appContainer) {
       ['browse', 'manage'].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === tab),
           onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
         }, tab.charAt(0).toUpperCase() + tab.slice(1)));
       });
@@ -1970,6 +1976,7 @@ function renderStewardResources(appContainer) {
           card.appendChild(el('div', { className: 'res-card-title' }, r.title));
           card.appendChild(el('div', { className: 'res-card-summary' }, r.summary));
           var hint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Tap to read more \u25BE');
+          card.setAttribute('aria-expanded', 'false');
           card.appendChild(hint);
           var expandContent = el('div', { className: 'res-card-content' });
           if (r.content) expandContent.appendChild(el('div', null, r.content));
@@ -1986,7 +1993,9 @@ function renderStewardResources(appContainer) {
           card.appendChild(expandContent);
           card.addEventListener('click', function() {
             card.classList.toggle('expanded');
-            hint.textContent = card.classList.contains('expanded') ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
+            var isExpanded = card.classList.contains('expanded');
+            card.setAttribute('aria-expanded', String(isExpanded));
+            hint.textContent = isExpanded ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
           });
           cardsWrap.appendChild(card);
         });
@@ -2466,7 +2475,7 @@ function renderSurveyTracking(appContainer) {
         closedBar.appendChild(el('button', { className: 'btn btn-sm', style: { fontSize: '11px', padding: '3px 10px', marginLeft: '8px' }, onClick: function() {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) renderSurveyTracking(appContainer);
-            else alert('Error: ' + (r && r.message));
+            else { closedBar.textContent = ''; closedBar.appendChild(el('span', { style: { color: 'var(--danger)' } }, 'Error: ' + ((r && r.message) || 'Failed to open period.'))); }
           }).dataOpenNewSurveyPeriod(SESSION_TOKEN);
         } }, 'Open New Period'));
         periodBar.appendChild(closedBar);
@@ -2611,17 +2620,19 @@ function renderStewardMore(appContainer) {
     phoneRow.appendChild(phoneLabel);
 
     // Toggle switch
-    var toggleWrap = el('div', { style: { position: 'relative', width: '44px', height: '24px', flexShrink: '0' } });
+    var _sharePhoneInit = !!(CURRENT_USER && CURRENT_USER.sharePhone);
+    var toggleWrap = el('div', { role: 'switch', 'aria-checked': String(_sharePhoneInit), style: { position: 'relative', width: '44px', height: '24px', flexShrink: '0' } });
     var toggleInput = el('input', {
       type: 'checkbox',
-      style: { opacity: '0', width: '0', height: '0', position: 'absolute' },
-      checked: !!(CURRENT_USER && CURRENT_USER.sharePhone),
+      'aria-label': 'Share phone number with members',
+      style: { opacity: '0', position: 'absolute', width: '44px', height: '24px', cursor: 'pointer', zIndex: '2', margin: '0' },
+      checked: _sharePhoneInit,
     });
     var toggleTrack = el('div', {
       style: {
         position: 'absolute', top: '0', left: '0', right: '0', bottom: '0',
         borderRadius: '12px', cursor: 'pointer', transition: 'background 0.2s',
-        background: (CURRENT_USER && CURRENT_USER.sharePhone) ? 'var(--accent)' : 'var(--surface)',
+        background: _sharePhoneInit ? 'var(--accent)' : 'var(--surface)',
         border: '1px solid var(--border)',
       }
     });
@@ -2659,8 +2670,10 @@ function renderStewardMore(appContainer) {
       toggleThumb.style.left = val ? '23px' : '3px';
       toggleThumb.style.background = val ? '#fff' : 'var(--muted)';
       statusLabel.textContent = val ? 'ON' : 'OFF';
+      toggleWrap.setAttribute('aria-checked', String(val));
+      toggleInput.checked = val;
     }
-    toggleTrack.addEventListener('click', function() {
+    function _doToggle() {
       var newVal = !_currentVal;
       _currentVal = newVal;
       _applyToggleVisuals(newVal);
@@ -2688,7 +2701,9 @@ function renderStewardMore(appContainer) {
         saveRow.style.display = 'block';
         setTimeout(function() { saveRow.style.display = 'none'; }, 3000);
       }).dataUpdateProfile(SESSION_TOKEN, { sharePhone: newVal ? 'Yes' : 'No' });
-    });
+    }
+    toggleTrack.addEventListener('click', _doToggle);
+    toggleInput.addEventListener('change', function() { toggleInput.checked = _currentVal; _doToggle(); });
 
     content.appendChild(phoneCard);
     // ─────────────────────────────────────────────────────────────────────
@@ -2733,7 +2748,7 @@ function renderStewardMore(appContainer) {
         content.appendChild(el('div', { style: { height: '1px', background: 'var(--border)', margin: '8px 0' } }));
         return;
       }
-      var item = el('div', { className: 'more-menu-item', onClick: function() { try { m.action(); } catch(e) { console.error('More menu error (' + m.label + '):', e); alert('Failed to open ' + m.label + '. Please try again.'); } } });
+      var item = el('div', { className: 'more-menu-item', onClick: function() { try { m.action(); } catch(e) { console.error('More menu error (' + m.label + '):', e); item.style.borderColor = 'var(--danger)'; item.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to open. Please try again.')); } } });
       item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
       var text = el('div', { style: { flex: '1' } });
       text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
@@ -2798,7 +2813,7 @@ function renderContactLog(appContainer) {
 
     // Sub-tabs — default to 'recent', order: Recent → By Member → Log
     var activeSubTab = 'recent';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     function refreshSubTabs() {
@@ -2806,6 +2821,8 @@ function renderContactLog(appContainer) {
       ['recent', 'by member', 'log'].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === tab),
           onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
         }, tab.charAt(0).toUpperCase() + tab.slice(1)));
       });
@@ -3047,7 +3064,7 @@ function renderStewardTasks(appContainer) {
     var content = el('div', { className: 'content' });
 
     var activeSubTab = 'open';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     function refreshSubTabs() {
@@ -3055,6 +3072,8 @@ function renderStewardTasks(appContainer) {
       ['open', 'completed', 'new task', 'member tasks'].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === tab),
           onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
         }, tab.charAt(0).toUpperCase() + tab.slice(1)));
       });
@@ -3115,20 +3134,21 @@ function _renderTaskList(container, statusFilter) {
       if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
 
       if (task.status !== 'completed') {
-        var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' } });
+        var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' } });
+        var taskErrSpan = el('span', { style: { fontSize: '11px', color: 'var(--danger)' } });
 
         // Complete button
-        (function(t) {
+        (function(t, errEl) {
           actions.appendChild(el('button', {
             style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
             onClick: function() {
               serverCall().withSuccessHandler(function() {
                 if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                 _invalidateTabCache('tasks'); _handleTabNav('steward', 'tasks');
-              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataCompleteTask(SESSION_TOKEN, t.id);
+              }).withFailureHandler(function() { errEl.textContent = 'Failed to complete task.'; }).dataCompleteTask(SESSION_TOKEN, t.id);
             }
           }, '\u2705 Complete'));
-        })(task);
+        })(task, taskErrSpan);
 
         // Edit button — toggles inline edit form
         (function(t, cardEl) {
@@ -3150,28 +3170,32 @@ function _renderTaskList(container, statusFilter) {
               priSel.appendChild(o);
             });
             var dueIn = el('input', { className: 'form-input', type: 'date', style: { fontSize: '12px' }, value: t.dueDate || '' });
+            var editStatus = el('div', { style: { fontSize: '11px', color: 'var(--danger)', minHeight: '14px' } });
             var saveBtn = el('button', {
               className: 'btn btn-primary', style: { fontSize: '11px', padding: '4px 12px' },
               onClick: function() {
+                editStatus.textContent = '';
                 var updates = { title: titleIn.value.trim(), priority: priSel.value, dueDate: dueIn.value };
-                if (!updates.title) { alert('Title required.'); return; }
+                if (!updates.title) { editStatus.textContent = 'Title required.'; titleIn.style.borderColor = 'var(--danger)'; return; }
                 serverCall().withSuccessHandler(function(r) {
                   if (r && r.success) {
                     if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                     _handleTabNav('steward', 'tasks');
-                  } else { alert('Update failed.'); }
-                }).withFailureHandler(function() { alert('Update failed.'); }).dataUpdateTask(SESSION_TOKEN, t.id, updates);
+                  } else { editStatus.textContent = 'Update failed.'; }
+                }).withFailureHandler(function() { editStatus.textContent = 'Update failed.'; }).dataUpdateTask(SESSION_TOKEN, t.id, updates);
               }
             }, 'Save');
             editForm.appendChild(titleIn);
             editForm.appendChild(priSel);
             editForm.appendChild(dueIn);
             editForm.appendChild(saveBtn);
+            editForm.appendChild(editStatus);
             cardEl.appendChild(editForm);
           };
           actions.appendChild(editBtn);
         })(task, card);
 
+        actions.appendChild(taskErrSpan);
         card.appendChild(actions);
       }
       container.appendChild(card);
@@ -3256,6 +3280,7 @@ function _renderStewardMemberTasks(container) {
       if (task.status !== 'completed') {
         var mActions = el('div', { style: { marginTop: '8px' } });
         (function(t) {
+          var mErrSpan = el('span', { style: { fontSize: '11px', color: 'var(--danger)', display: 'block', marginTop: '4px' } });
           mActions.appendChild(el('button', {
             style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
             onClick: function() {
@@ -3264,11 +3289,12 @@ function _renderStewardMemberTasks(container) {
                 if (r && r.success) {
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                   _handleTabNav('steward', 'tasks');
-                } else { alert('Failed to complete task.'); }
-              }).withFailureHandler(function() { alert('Failed to complete task.'); }).dataStaffCompleteMemberTask(SESSION_TOKEN, t.id);
+                } else { mErrSpan.textContent = 'Failed to complete task.'; }
+              }).withFailureHandler(function() { mErrSpan.textContent = 'Failed to complete task.'; }).dataStaffCompleteMemberTask(SESSION_TOKEN, t.id);
             }
           }, '\u2705 Complete for member'));
         })(task);
+        mActions.appendChild(mErrSpan);
         card.appendChild(mActions);
       }
       container.appendChild(card);
@@ -4034,7 +4060,7 @@ function renderSearchPage(appContainer) {
             if (r.type === 'member' && typeof _handleTabNav === 'function') {
               _handleTabNav(role, 'members');
             } else if (r.type === 'grievance' && typeof _handleTabNav === 'function') {
-              _handleTabNav(role, role === 'steward' ? 'cases' : 'cases');
+              _handleTabNav(role, 'cases');
             }
           };
           resultsContainer.appendChild(card);
@@ -4272,6 +4298,7 @@ function renderStewardDirectoryPage(appContainer) {
           card.appendChild(topRow);
 
           // Expandable details
+          card.setAttribute('aria-expanded', 'false');
           var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
           if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, '\u2709\uFE0F ' + s.email));
           if (s.phone) details.appendChild(el('a', { href: 'tel:' + s.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '4px' } }, '\uD83D\uDCDE ' + s.phone));
@@ -4302,7 +4329,9 @@ function renderStewardDirectoryPage(appContainer) {
           card.appendChild(details);
 
           card.addEventListener('click', function() {
-            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+            var isHidden = details.style.display === 'none';
+            details.style.display = isHidden ? 'block' : 'none';
+            card.setAttribute('aria-expanded', String(isHidden));
           });
           listArea.appendChild(card);
         });
@@ -4355,15 +4384,22 @@ function _renderCaseChecklist(container, caseId) {
     Object.keys(grouped).forEach(function(cat) {
       checklistContent.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '10px 0 4px', fontWeight: '600' } }, cat));
       grouped[cat].forEach(function(item) {
+        var cb = el('input', {
+          type: 'checkbox',
+          checked: !!item.completed,
+          'aria-label': item.itemText,
+          style: { width: '16px', height: '16px', accentColor: 'var(--success)', cursor: 'pointer', flexShrink: '0' }
+        });
+        var label = el('span', { style: { fontSize: '12px', color: item.completed ? 'var(--muted)' : 'var(--text)', textDecoration: item.completed ? 'line-through' : 'none', flex: '1' } }, item.itemText);
         var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', cursor: 'pointer' },
-          onClick: function() {
+          onClick: function(ev) {
+            ev.preventDefault();
             var newState = !item.completed;
             cb.style.opacity = '0.4';
             serverCall().withSuccessHandler(function(result) {
               if (result && result.success) {
                 item.completed = newState;
-                cb.textContent = newState ? '\u2611' : '\u2610';
-                cb.style.color = newState ? 'var(--success)' : 'var(--muted)';
+                cb.checked = newState;
                 label.style.textDecoration = newState ? 'line-through' : 'none';
                 label.style.color = newState ? 'var(--muted)' : 'var(--text)';
                 // Refresh progress
@@ -4377,9 +4413,7 @@ function _renderCaseChecklist(container, caseId) {
             }).withFailureHandler(function() { cb.style.opacity = '1'; }).dataToggleChecklistItem(SESSION_TOKEN, item.checklistId, !item.completed);
           }
         });
-        var cb = el('span', { style: { fontSize: '16px', color: item.completed ? 'var(--success)' : 'var(--muted)', cursor: 'pointer' } }, item.completed ? '\u2611' : '\u2610');
         row.appendChild(cb);
-        var label = el('span', { style: { fontSize: '12px', color: item.completed ? 'var(--muted)' : 'var(--text)', textDecoration: item.completed ? 'line-through' : 'none', flex: '1' } }, item.itemText);
         row.appendChild(label);
         if (item.required) row.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--danger)', fontWeight: '600' } }, 'REQ'));
         checklistContent.appendChild(row);
@@ -4411,7 +4445,7 @@ function renderManagePolls(appContainer) {
     var content = el('div', { className: 'content' });
 
     var activeSubTab = 'live';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     function refreshSubTabs() {
@@ -4423,6 +4457,8 @@ function renderManagePolls(appContainer) {
       ].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === tab.id),
           onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderSub(); }
         }, tab.label));
       });
@@ -4690,7 +4726,7 @@ function renderStewardMinutes(appContainer) {
     var content = el('div', { className: 'content' });
 
     var activeSubTab = 'recent';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     function switchToRecent() { activeSubTab = 'recent'; refreshSubTabs(); renderSub(); }
@@ -4700,6 +4736,8 @@ function renderStewardMinutes(appContainer) {
       ['recent', 'add'].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === tab),
           onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSub(); }
         }, tab.charAt(0).toUpperCase() + tab.slice(1)));
       });
@@ -4906,7 +4944,7 @@ function renderFeedbackPage(appContainer, role) {
     var content = el('div', { className: 'content' });
 
     var activeSubTab = 'submit';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     function refreshSubTabs() {
@@ -4915,6 +4953,8 @@ function renderFeedbackPage(appContainer, role) {
         var key = tab === 'my submissions' ? 'history' : tab;
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === key ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === key),
           onClick: function() { activeSubTab = key; refreshSubTabs(); renderSub(); }
         }, tab.charAt(0).toUpperCase() + tab.slice(1)));
       });
@@ -5249,8 +5289,7 @@ function renderTestRunnerPage(appContainer) {
           var sid = _allSuiteIds[idx];
           statusEl.textContent = '\u23F3 Running suite ' + (idx + 1) + '/' + _allSuiteIds.length + ' (' + sid + ')...';
           statusEl.style.color = 'var(--text-secondary)';
-          google.script.run
-            .withSuccessHandler(function(resp) {
+          serverCall().withSuccessHandler(function(resp) {
               if (resp && resp.success && resp.results) {
                 var r = resp.results;
                 mergedResults.duration += r.duration || 0;
@@ -5263,15 +5302,13 @@ function renderTestRunnerPage(appContainer) {
               }
               idx++;
               runNextSuite();
-            })
-            .withFailureHandler(function(err) {
+            }).withFailureHandler(function(err) {
               mergedResults.suites.push({ name: sid, tests: [], passed: 0, failed: 1, skipped: 0, duration: 0, error: (err && err.message) || String(err) });
               mergedResults.summary.total++;
               mergedResults.summary.failed++;
               idx++;
               runNextSuite();
-            })
-            .dataRunTests(SESSION_TOKEN, sid);
+            }).dataRunTests(SESSION_TOKEN, sid);
         }
         runNextSuite();
       }
@@ -5320,8 +5357,7 @@ function renderTestRunnerPage(appContainer) {
         runFilterBtn.disabled = true;
         statusEl.textContent = '⏳ Running ' + suite + ' suite...';
         resultsContainer.innerHTML = '';
-        google.script.run
-          .withSuccessHandler(function(resp) {
+        serverCall().withSuccessHandler(function(resp) {
             runFilterBtn.disabled = false;
             if (resp && resp.success) {
               _renderTestResults(resultsContainer, resp.results, statusEl);
@@ -5329,13 +5365,11 @@ function renderTestRunnerPage(appContainer) {
               statusEl.textContent = '❌ ' + ((resp && resp.error) || 'Failed');
               statusEl.style.color = 'var(--danger)';
             }
-          })
-          .withFailureHandler(function(err) {
+          }).withFailureHandler(function(err) {
             runFilterBtn.disabled = false;
             statusEl.textContent = '❌ Error: ' + ((err && err.message) || err);
             statusEl.style.color = 'var(--danger)';
-          })
-          .dataRunTests(SESSION_TOKEN, suite);
+          }).dataRunTests(SESSION_TOKEN, suite);
       }
     }, 'Run Suite');
     ctrlCard.appendChild(runFilterBtn);
@@ -5348,13 +5382,10 @@ function renderTestRunnerPage(appContainer) {
       className: 'btn',
       style: { padding: '8px 12px', fontSize: '13px', cursor: 'pointer' },
       onClick: function() {
-        google.script.run
-          .withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
             if (r && r.success) trigStatus.textContent = '🕐 Daily 6AM';
             else trigStatus.textContent = '❌ Failed';
-          })
-          .withFailureHandler(function() { trigStatus.textContent = '❌ Failed'; })
-          .dataManageTestTrigger(SESSION_TOKEN, 'setup');
+          }).withFailureHandler(function() { trigStatus.textContent = '❌ Failed'; }).dataManageTestTrigger(SESSION_TOKEN, 'setup');
       }
     }, '🕐 Enable Daily');
     ctrlCard.appendChild(setupTrigBtn);
@@ -5363,13 +5394,10 @@ function renderTestRunnerPage(appContainer) {
       className: 'btn',
       style: { padding: '8px 12px', fontSize: '13px', cursor: 'pointer' },
       onClick: function() {
-        google.script.run
-          .withSuccessHandler(function(r) {
+        serverCall().withSuccessHandler(function(r) {
             if (r && r.success) trigStatus.textContent = 'No trigger';
             else trigStatus.textContent = '❌ Failed';
-          })
-          .withFailureHandler(function() { trigStatus.textContent = '❌ Failed'; })
-          .dataManageTestTrigger(SESSION_TOKEN, 'remove');
+          }).withFailureHandler(function() { trigStatus.textContent = '❌ Failed'; }).dataManageTestTrigger(SESSION_TOKEN, 'remove');
       }
     }, 'Disable');
     ctrlCard.appendChild(rmTrigBtn);
@@ -5390,20 +5418,17 @@ function renderTestRunnerPage(appContainer) {
     container.appendChild(content);
 
     // Load last results on page open
-    google.script.run
-      .withSuccessHandler(function(resp) {
+    serverCall().withSuccessHandler(function(resp) {
         if (resp && resp.success && resp.results) {
           _renderTestResults(resultsContainer, resp.results, statusEl);
         } else {
           statusEl.textContent = 'No test results yet — click "Run All Tests" to start.';
           statusEl.style.color = 'var(--text-secondary)';
         }
-      })
-      .withFailureHandler(function() {
+      }).withFailureHandler(function() {
         statusEl.textContent = 'Could not load results.';
         statusEl.style.color = 'var(--text-secondary)';
-      })
-      .dataGetTestResults(SESSION_TOKEN);
+      }).dataGetTestResults(SESSION_TOKEN);
   });
 }
 
@@ -5542,7 +5567,7 @@ function renderStewardTimelinePage(appContainer) {
 
     var content = el('div', { className: 'content' });
     var activeSubTab = 'timeline';
-    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
     var subContent = el('div');
 
     var filterYear = '';
@@ -5584,6 +5609,8 @@ function renderStewardTimelinePage(appContainer) {
       ].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          role: 'tab',
+          'aria-selected': String(activeSubTab === tab.id),
           onClick: function() { activeSubTab = tab.id; currentPage = 1; refreshSubTabs(); renderTLSubContent(); }
         }, tab.label));
       });
@@ -5710,11 +5737,13 @@ function renderStewardTimelinePage(appContainer) {
             if (isLong) {
               var expanded = false;
               var toggleBtn = el('button', {
+                'aria-expanded': 'false',
                 style: { fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', marginTop: '2px' },
                 onClick: function() {
                   expanded = !expanded;
                   descEl.textContent = expanded ? evt.description : evt.description.substring(0, TRUNCATE) + '\u2026';
                   toggleBtn.textContent = expanded ? 'Show less' : 'Show more';
+                  toggleBtn.setAttribute('aria-expanded', String(expanded));
                 }
               }, 'Show more');
               card.appendChild(toggleBtn);
@@ -5752,7 +5781,7 @@ function renderStewardTimelinePage(appContainer) {
               delBtn.disabled = true; delBtn.textContent = 'Deleting\u2026';
               serverCall().withSuccessHandler(function(r) {
                 if (r && r.success) { currentPage = 1; tlContainer = null; _loadEvents(cont, listArea); }
-                else { delBtn.disabled = false; delBtn.textContent = 'Delete'; alert((r && r.message) || 'Delete failed.'); }
+                else { delBtn.disabled = false; delBtn.textContent = 'Delete'; var _e = el('div',{style:{fontSize:'11px',color:'var(--danger)',marginTop:'4px'}},((r && r.message) || 'Delete failed.')); acts.appendChild(_e); }
               }).withFailureHandler(function() {
                 delBtn.disabled = false; delBtn.textContent = 'Delete';
               }).tlDeleteTimelineEvent(SESSION_TOKEN, evt.id);
@@ -6012,7 +6041,7 @@ function renderStewardTimelinePage(appContainer) {
               onClick: function() {
                 if (!confirm('Remove category \u201C' + cat + '\u201D?')) return;
                 serverCall().withSuccessHandler(function(r) {
-                  if (r && r.success) _loadCats(); else alert((r && r.message) || 'Delete failed.');
+                  if (r && r.success) _loadCats(); else { row.appendChild(el('span',{style:{fontSize:'11px',color:'var(--danger)',marginLeft:'6px'}},((r && r.message) || 'Delete failed.'))); }
                 }).tlDeleteCategory(SESSION_TOKEN, cat);
               }
             }, 'Remove'));
