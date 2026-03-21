@@ -1,6 +1,6 @@
-# Strategic Command Center
+# SolidBase
 
-**Version 4.30.0** | Union Steward Dashboard for Google Sheets
+**Version 4.30.0** | SolidBase — Built for the collective.
 
 A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 43-file modular architecture, 8 HTML templates, and a full SPA web dashboard. 2,900+ automated tests across 58 suites.
 
@@ -71,8 +71,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/SolidBase.git
+   cd SolidBase
    ```
 
 2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
@@ -97,8 +97,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone and install:**
 
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/SolidBase.git
+   cd SolidBase
    npm install
    ```
 
@@ -106,7 +106,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 
    ```bash
    clasp login
-   clasp create --type sheets --title "Union Dashboard"
+   clasp create --type sheets --title "SolidBase Directory"
    ```
 
 3. **Build and deploy:**
@@ -534,8 +534,8 @@ These sheets power the auto-updating columns. You don't need to edit them.
 ### Setup
 
 ```bash
-git clone https://github.com/Woop91/DDS-Dashboard.git
-cd DDS-Dashboard
+git clone https://github.com/Woop91/SolidBase.git
+cd SolidBase
 npm install
 ```
 

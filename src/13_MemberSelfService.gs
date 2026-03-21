@@ -828,7 +828,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -923,7 +923,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -992,7 +992,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {

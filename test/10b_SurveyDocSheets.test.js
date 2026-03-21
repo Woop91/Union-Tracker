@@ -33,13 +33,13 @@ describe('10b function existence', () => {
 });
 
 describe('Notification sheet uses dynamic email', () => {
-  test('createNotificationsSheet does not hardcode massability.org', () => {
+  test('createNotificationsSheet does not hardcode org-specific email', () => {
     const fs = require('fs');
     const path = require('path');
     const code = fs.readFileSync(
       path.resolve(__dirname, '..', 'src', '10b_SurveyDocSheets.gs'), 'utf8'
     );
-    // Should use systemEmail variable, not hardcoded
+    // Should use systemEmail variable, not hardcoded org email
     expect(code).not.toContain("'system@massability.org'");
   });
 });

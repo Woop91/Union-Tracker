@@ -36,7 +36,7 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 ### High-Level Structure
 
 ```
-DDS-Dashboard/
+SolidBase/
 ├── src/                    # 45 source files (.gs) + 8 HTML
 ├── test/                   # Jest unit tests (2,900+ tests across 58 suites)
 ├── dist/                   # Build output (auto-generated)

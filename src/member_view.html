@@ -1466,7 +1466,7 @@ function renderMemberResources(appContainer) {
       { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
       { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
     ];
-    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     quickLinks.forEach(function(r) {
       if (!r.url) return;

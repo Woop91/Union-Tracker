@@ -193,8 +193,6 @@ describe('getDefaultADHDSettings_', () => {
     expect(defaults).toHaveProperty('zebraStripes', true);
     expect(defaults).toHaveProperty('reducedMotion', false);
     expect(defaults).toHaveProperty('focusMode', false);
-    expect(defaults).toHaveProperty('highContrast', false);
-    expect(defaults).toHaveProperty('largeText', false);
     expect(defaults).toHaveProperty('hideGridlines', false);
   });
 

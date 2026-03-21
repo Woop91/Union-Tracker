@@ -1,7 +1,7 @@
 {
-  "name": "union-steward-dashboard",
+  "name": "solidbase",
   "version": "4.33.0",
-  "description": "Modular Union Steward Dashboard for Google Sheets",
+  "description": "SolidBase — Built for the collective.",
   "main": "build.js",
   "scripts": {
     "build": "node build.js",
@@ -19,13 +19,12 @@
     "deploy:dev": "npm run lint && npm run build && clasp push --force",
     "open": "clasp open",
     "prepare": "husky",
-    "sync-org-chart": "node scripts/sync-org-chart.js",
     "check:scopes": "node scripts/check-scope-change.js"
   },
   "keywords": [
     "google-apps-script",
     "google-sheets",
-    "union",
+    "solidbase",
     "grievance",
     "dashboard"
   ],
@@ -46,7 +45,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Woop91/DDS-Dashboard"
+    "url": "https://github.com/Woop91/SolidBase"
   },
   "lint-staged": {
     "src/**/*.gs": [

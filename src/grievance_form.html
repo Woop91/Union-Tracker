@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DDS Optimized Grievance — MassAbility DDS / Local 509</title>
+<title>Grievance Form — SolidBase</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -288,7 +288,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 <body>
 
 <div class="toolbar">
-  <span>DDS Optimized Grievance — Local 509 &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
+  <span>Optimized Grievance &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
   <button class="tbtn go" onclick="doEmail()">&#9993; Email</button>
   <button class="tbtn" onclick="window.print()">&#9113; Print&thinsp;/&thinsp;Save PDF</button>
   <button class="tbtn" onclick="doClear()">&#10005; Clear</button>
@@ -321,7 +321,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
         </select>
       </div>
       <div style="text-align:left;">
-        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong>509</strong>
+        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong>&nbsp;</strong>
       </div>
     </div>
   </div>
@@ -341,7 +341,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <div class="irow">
     <label for="agency" class="lbl">AGENCY:</label>
-    <input id="agency" class="fi" type="text" style="width:1.3in;" value="MassAbility DDS" readonly title="Agency is fixed for this form">
+    <input id="agency" class="fi" type="text" style="width:1.3in;" value="SolidBase" readonly title="Agency is fixed for this form">
     <span class="lbl" style="margin-left:6px;">REGION:</span>
     <select id="region" class="fi" style="width:1.3in;" onchange="autoFillLocation()">
       <option value=""></option>
@@ -504,7 +504,7 @@ function buildBody(){
   const sep="\u2500".repeat(66);
   const w1=v("w1date"),w2=v("w2date");
   return[
-    "GRIEVANCE REPORT \u2014 LOCAL 509 / SEIU",
+    "GRIEVANCE REPORT",
     "=".repeat(66),
     "GRIEVANT(S)      : "+dash(v("grievant")),
     "JOB TITLE        : "+dash(v("jobtitle")),
@@ -515,7 +515,7 @@ function buildBody(){
     "MANAGER(S)       : "+dash([v("managers"),v("managers2")].filter(Boolean).join(", ")),
     "ARTICLE(S)       : "+dash(v("articles")),
     "STEP #           : "+dash(v("step")),
-    "BARGAINING UNIT  : 509",
+    "BARGAINING UNIT  : ",
     "",sep,
     "STATEMENT OF VIOLATION:",
     ([v("statement"),v("statement2")].filter(Boolean).join("\n"))||"(not provided)",
@@ -541,7 +541,7 @@ function buildBody(){
 function doEmail(){
   const to=prompt("Recipient email address:");
   if(!to)return;
-  const sub=encodeURIComponent("DDS Optimized Grievance \u2014 "+(v("grievant")||"Grievant")+" \u2014 Local 509");
+  const sub=encodeURIComponent("Optimized Grievance \u2014 "+(v("grievant")||"Grievant"));
   window.location.href="mailto:"+to+"?subject="+sub+"&body="+encodeURIComponent(buildBody());
   showToast("Opening email client\u2026");
 }
@@ -554,7 +554,7 @@ function doClear(){
   });
   document.querySelectorAll("select.fi").forEach(el=>el.selectedIndex=0);
   document.getElementById("step").value="1";
-  document.getElementById("agency").value="MassAbility DDS";
+  document.getElementById("agency").value="SolidBase";
   syncManagers();
   document.getElementById("managers2").value="";
   ["sig1gdate","sig1sdate","sig2gdate","sig2sdate","sig3gdate","sig3sdate"]

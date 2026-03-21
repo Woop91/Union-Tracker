@@ -47,7 +47,7 @@ function doGet(e) {
   if (e.parameter && e.parameter.page === 'esign') {
     try {
       return HtmlService.createHtmlOutputFromFile('esign')
-        .setTitle('Grievance E-Signature — Local 509');
+        .setTitle('Grievance E-Signature');
     } catch (esignErr) {
       Logger.log('doGet esign error: ' + esignErr.message);
       return _serveFatalError('E-Signature page unavailable.');

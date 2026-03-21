@@ -1,4 +1,4 @@
-# CLAUDE.md — DDS-Dashboard
+# CLAUDE.md — SolidBase
 
 ## ⛔ CRITICAL RULES — READ FIRST
 
@@ -21,19 +21,14 @@
 
 ## Permissions
 
-Claude has **full access** to **DDS-Dashboard** and **Union-Tracker** repos (local + remote). For anything outside, ask user.
+Claude has **full access** to the **SolidBase** repo (local + remote). For anything outside, ask user.
 
-## Repos & Sync
+## Repo
 
-- **DDS-Dashboard** (private): `Main` (production), `staging` (pre-deploy mirror)
-- **Union-Tracker** (public): Mirror. `Main`, `staging`
-- DDS Script ID: `[REDACTED]`
-- UT Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
-- **DDS Script ID must NEVER appear in UT** (public repo)
-- DDS and UT are identical. Drift = bug.
+- **SolidBase** (public): `Main` (production), `staging` (pre-deploy mirror)
+- SB Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 **Commit order:** Main first → merge to staging. Never commit directly to staging.
-**Sync flow:** `DDS Main → DDS staging` and `DDS Main → UT Main → UT staging`.
 
 **Version tracking:** Semver on every commit. Update `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
 
@@ -134,4 +129,4 @@ Canonical: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are ou
 - `CHANGELOG.md` — Version history
 - `FEATURES.md` — Feature docs
 - `DEVELOPER_GUIDE.md` — Developer onboarding
-- `SYNC-LOG.md` — DDS↔UT sync history
+- `SYNC-LOG.md` — Sync history

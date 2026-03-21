@@ -30,8 +30,8 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/Union-Tracker.git
+   cd Union-Tracker
    ```
 
 2. **Install dependencies**
@@ -48,21 +48,6 @@ Please be respectful and constructive in all interactions. We're all working tow
    ```bash
    npm run build
    ```
-
-### Environment Variables
-
-Some helper scripts require a `.env` file in the repo root:
-
-| Variable | Used by | Purpose |
-|----------|---------|---------|
-| `GITHUB_509D_TOKEN` | `scripts/sync-org-chart.js` | GitHub PAT for syncing the org chart between repos |
-
-Create a `.env` file (already in `.gitignore`) with:
-```
-GITHUB_509D_TOKEN=ghp_your_token_here
-```
-
-This is only needed if you run `npm run sync:org-chart`. It is **not** required for building, testing, or deploying.
 
 ## Project Structure
 

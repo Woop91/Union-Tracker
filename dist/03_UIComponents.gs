@@ -2050,7 +2050,7 @@ function sendMemberDashboardLink() {
       COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
-      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
+      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your SolidBase Access", body);
       ui.alert('Dashboard access link sent to ' + email);
     } catch (e) {
       ui.alert('Error sending email: ' + e.message);

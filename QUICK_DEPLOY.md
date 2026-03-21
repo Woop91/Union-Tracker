@@ -27,8 +27,8 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 ### Step 1: Get the Files
 
 ```bash
-git clone https://github.com/Woop91/DDS-Dashboard.git
-cd DDS-Dashboard/src
+git clone https://github.com/Woop91/SolidBase.git
+cd SolidBase/src
 ```
 
 ### Step 2: Create a New Google Sheet
@@ -160,10 +160,10 @@ Your dashboard is fully operational.
 If you prefer automated deployment:
 
 ```bash
-cd DDS-Dashboard
+cd SolidBase
 npm install
 clasp login
-clasp create --type sheets --title "Union Dashboard"
+clasp create --type sheets --title "SolidBase"
 clasp push
 ```
 

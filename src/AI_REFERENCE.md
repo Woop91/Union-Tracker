@@ -1,4 +1,4 @@
-# AI REFERENCE DOCUMENT — DDS-Dashboard
+# AI REFERENCE DOCUMENT — SolidBase
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
 # Last updated: 2026-03-16
@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | DDS↔Union-Tracker sync flow, Workload Tracker exclusion registry |
+| 3 | **SYNC-LOG.md** | Sync flow, Workload Tracker exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -29,15 +29,13 @@ Read these files **in this order** when onboarding to this codebase:
 ## 🏗️ PROJECT OVERVIEW
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
-**Repo:** `Woop91/DDS-Dashboard` (private). Default branch: `Main` (capital M).
-**Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
+**Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users) at MassAbility DDS (SEIU 509).
+**Target users:** Union stewards (power users) and members (casual users).
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED]`
-**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -203,7 +201,7 @@ Features: Material Design UI, Weingarten Rights, live steward search, PII scrubb
 | 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
 | 2026-02-23 | GitHub token `ghp_FTE8...` expired | Token rotated | User generated new token | ✅ |
 | 2026-02-23 | Token `ghp_q3Zd...` lacked `repo` scope | Wrong scope selected | User generated third token with correct scope | ✅ |
-| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
+| 2026-02-25 | Memory had default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
 | 2026-02-25 | Expired token `ghp_FTE8...` still in memory | Token rotated but memory stale | Updated memory to `ghp_7MY0...` | ✅ |
 
 ---

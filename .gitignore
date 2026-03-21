@@ -27,7 +27,7 @@ npm-debug.log*
 # Environment files
 .env
 .env.local
-Union-Tracker/
+SolidBase/
 
 # Temporary previews
 spinner-preview.html

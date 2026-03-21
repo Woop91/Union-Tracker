@@ -1,4 +1,4 @@
-<!-- POMS Smart Search v4.1 — DDS Resource (SPA-embedded) -->
+<!-- POMS Smart Search v4.1 — SPA-embedded -->
 <style>
 /* ─── POMS TOKENS (Light default) ─────────────────────────── */
 .poms-root{
@@ -611,7 +611,7 @@ function pexportCSV(){
 function prenderHdr(){
   var h=$('poms-hdr');h.innerHTML='';
   var row=pel('div','','');row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px';
-  row.innerHTML='<span style="font-size:20px">📘</span><div style="flex:1"><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div><a href="https://github.com/Woop91/509D/raw/main/dds-resources/POMS_Flowcharts_Desk_Reference.pdf" target="_blank" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-size:10px;font-weight:600;white-space:nowrap;min-height:32px">📥 PDF</a>';
+  row.innerHTML='<span style="font-size:20px">📘</span><div style="flex:1"><h2>POMS Reference</h2><span class="p-sub">'+POMS_DATA.length+' sections · Flowcharts · Ratings</span></div>';
   h.appendChild(row);
 
   // Tab pills

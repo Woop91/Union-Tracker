@@ -662,7 +662,7 @@ describe('G11: poms_reference.html integrity', () => {
     }).not.toThrow();
   });
 
-  test('no DDS Apps Script ID present', () => {
+  test('no private Apps Script ID present', () => {
     const code = fs.readFileSync(pomsPath, 'utf8');
     expect(code).not.toContain('18hHHX');
   });
@@ -672,21 +672,20 @@ describe('G11: poms_reference.html integrity', () => {
 // ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
-// files that get synced to the public Union-Tracker repo.
+// Reason: Private Apps Script ID (18hHHX...) must never appear in source files.
 
 describe('G12: No sensitive ID leaks', () => {
-  const DDS_SCRIPT_ID_PREFIX = '18hHHX';
+  const PRIVATE_SCRIPT_ID_PREFIX = '18hHHX';
   const srcFiles = fs.readdirSync(SRC_DIR);
 
-  // AI_REFERENCE.md legitimately contains Script IDs in the private DDS repo;
-  // in public Union-Tracker the ID is redacted so this guard still protects there.
+  // AI_REFERENCE.md legitimately contains Script IDs;
+  // the private ID is redacted so this guard still protects.
   const G12_EXCLUDES = ['AI_REFERENCE.md'];
 
   srcFiles.filter(f => !G12_EXCLUDES.includes(f)).forEach(file => {
-    test(`src/${file} does not contain DDS Script ID`, () => {
+    test(`src/${file} does not contain private Script ID`, () => {
       const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
-      expect(code).not.toContain(DDS_SCRIPT_ID_PREFIX);
+      expect(code).not.toContain(PRIVATE_SCRIPT_ID_PREFIX);
     });
   });
 });

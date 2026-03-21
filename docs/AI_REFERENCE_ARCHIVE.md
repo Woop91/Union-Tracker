@@ -14,7 +14,7 @@ for reference. For current project context, see AI_REFERENCE.md.
 - **Deleted stale branches:** `dev` (1 behind Main, 0 ahead), `staging` (1 behind Main, 0 ahead). No unique content lost.
 - **Version alignment:** `package.json` updated from 4.10.0 → 4.18.1 to match `VERSION_INFO` in `01_Core.gs`.
 - **CLAUDE.md updated:** Replaced multi-branch workflow with single-branch `Main` policy. Added mandatory version tagging, parity enforcement, and no-assumptions policy.
-- **Sync flow simplified:** `DDS Main → UT Main` (direct, no intermediate staging).
+- **Sync flow simplified:** `Main → UT Main` (direct, no intermediate staging).
 
 ### Errors Found & Fixed
 - **package.json drift:** Was stuck at 4.10.0 while code was at 4.18.1. Root cause: version bump in `01_Core.gs` and `CHANGELOG.md` but `package.json` was never updated after v4.10.0. Fixed by updating to 4.18.1.
@@ -27,27 +27,27 @@ for reference. For current project context, see AI_REFERENCE.md.
 - **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values.
 - **Single branch: Main only.** Never create dev/staging/feature branches.
 - **Version bump is mandatory** on every code change: `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
-- **DDS Script ID must NEVER appear in Union-Tracker** (public repo).
+- **Private Script ID must NEVER appear in Union-Tracker** (public repo).
 - **Read before act.** Never assume repo state, file contents, or function behavior.
 
 ## 2026-02-28 — Workflow Correction (v4.18.2)
 
 ### Error Found & Corrected
 - **Previous action (v4.18.1) incorrectly deleted UT staging and dev branches.** The user's intended workflow requires UT `staging` as the Claude-managed sync target, with `dev` and `Main` being user-managed. UT staging and dev branches were recreated from current Main (in full parity).
-- **Root cause:** Claude assumed "ALL REPOS IN PARITY" meant single-branch everywhere. User clarification revealed the correct flow: `DDS Main → UT staging → [user] → UT dev → UT Main`.
+- **Root cause:** Claude assumed "ALL REPOS IN PARITY" meant single-branch everywhere. User clarification revealed the correct flow: `Main → UT staging → [user] → UT dev → UT Main`.
 
 ### Actions Taken
 - Recreated UT `staging` and `dev` branches (both starting from current Main = v4.18.1, so in parity)
 - Updated CLAUDE.md in both repos with correct sync flow diagram
 - Added Code Review rules: no false "FIXED" claims, full codebase pattern search, no inflated scores
-- Clarified: DDS = single branch (Main only), UT = 3 branches (staging=Claude, dev/Main=user)
+- Clarified: Source = single branch (Main only), UT = 3 branches (staging=Claude, dev/Main=user)
 - Added fallback handoff protocol: timestamped notes for follow-on agents
 
 ## 2026-02-28 — Final Branch Simplification
 
 ### Actions Taken
 - Deleted UT `staging` and `dev` branches (confirmed Main was not behind either — 0 behind staging, 1 ahead of dev)
-- Reverted sync flow to direct: `DDS Main → UT Main`
+- Reverted sync flow to direct: `Main → UT Main`
 - Updated CLAUDE.md in both repos to reflect single-branch policy on both repos
 
 ## 2026-03-05 — Dashboard Bug Fixes (v4.18.2 batch)
@@ -1066,14 +1066,14 @@ Contract Article → Know Your Rights → Grievance Process → Forms & Template
 
 ---
 
-## v4.22.6 — MADDS Org Chart Default (2026-03-06)
+## v4.22.6 — Org Chart Default (2026-03-06)
 
-**Change summary:** Replaced `src/org_chart.html` with the MADDS (Main Internal Breakout) chart sourced from the `Woop91/509d` repository (`org-chart/MADDS.html`, last updated 2026-03-01). This is now the default Org Chart view for both DDS-Dashboard and Union-Tracker.
+**Change summary:** Replaced `src/org_chart.html` with an organizational chart. This is now the default Org Chart view for Union-Tracker.
 
-**Source:** `509d/org-chart/MADDS.html` — Full SEIU Local 509 organizational chart including: President → Officers → Chief of Staff → Directors → Coordinators → Public Sector Chapters (MassAbility expanded by default) → Other Chapters. Also contains Role Descriptions, Financial Overview, Staff Directory & Compensation, Career Paths, and Chapter Advisors & Internal Organizers sections.
+**Source:** Organizational chart including: President, Officers, Chief of Staff, Directors, Coordinators, Chapters. Also contains Role Descriptions, Financial Overview, Staff Directory & Compensation, Career Paths, and Chapter Advisors & Internal Organizers sections.
 
 **Embedding approach (critical — do not revert):**
-The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the following conversions were made:
+The org chart is a standalone HTML page. To embed it in the GAS SPA, the following conversions were made:
 - `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>` tags stripped; content wrapped in `<div class="madds-embed">`
 - CSS `:root {}` → `.madds-embed {}` (scopes CSS variables, prevents collision with app vars)
 - `html, body {}` → `.madds-embed {}`; `body {}` → `.madds-embed {}`
@@ -1087,37 +1087,28 @@ The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the follo
 **No server-side changes required.** The existing `getOrgChartHtml()` in `22_WebDashApp.gs` continues to serve `org_chart` via `HtmlService.createHtmlOutputFromFile('org_chart').getContent()`. The `renderOrgChart()` function in `index.html` is unchanged.
 
 **Files changed:**
-- `src/org_chart.html` — Replaced with MADDS chart fragment (3,266 lines)
+- `src/org_chart.html` — Replaced with org chart fragment (3,266 lines)
 - `src/01_Core.gs` — Added v4.22.6 changelog entry; updated VERSION to "4.22.6"
 
 **⚠️ RULES:**
 - Do NOT rename `org_chart.html` — the GAS server function is hardcoded to `'org_chart'` filename.
-- If updating MADDS.html from the 509d repo, re-run the scoping conversions above — do NOT paste the raw standalone HTML directly.
+- If updating the org chart source, re-run the scoping conversions above — do NOT paste the raw standalone HTML directly.
 - Keep `.madds-embed` as the wrapper class and `#madds-mode-toggle` as the toggle ID.
-- The 509d repo is the source of truth for the chart content; the converted fragment lives in DDS-Dashboard and Union-Tracker `src/`.
 
 ---
 
 ## [2026-03-07] Org Chart Sync Script Added
 
 ### Change
-Added `scripts/sync-org-chart.js` — a Node.js script that fetches `MADDS.html`
-from the private `Woop91/509d` repo (GitHub Contents API) and transforms it into
-the SPA-compatible `src/org_chart.html` used by DDS-Dashboard.
-
-### Wire-up
-- `package.json` → `"sync-org-chart": "node scripts/sync-org-chart.js"` (manual, not pre-deploy)
-- Requires `.env` at repo root with `GITHUB_509D_TOKEN=ghp_...` (gitignored)
-
-### Problem Solved
-`org_chart.html` was a manually synced copy of `509d/MADDS.html` with no automation.
-Any update to the 509d chart required a manual copy + transform + redeploy.
+Added `scripts/sync-org-chart.js` — a Node.js script that fetched the org chart source
+and transformed it into the SPA-compatible `src/org_chart.html`.
+(Script has since been removed; org_chart.html is now a placeholder.)
 
 ### Transformations Applied (in order)
 1. Strip leading block comment
 2. Strip `<!DOCTYPE>` / `<html>` opening tags
 3. Strip preamble inside `<head>` (`<meta>`, `<title>`, Google Fonts `<link>`)
-   ⚠️ NOTE: In MADDS.html, `<head>` wraps the entire `<style>` block (closes AFTER `</style>`).
+   ⚠️ NOTE: In the source HTML, `<head>` wraps the entire `<style>` block (closes AFTER `</style>`).
    Must NOT use `<head>...</head>` greedy match — would delete all CSS.
    Strip individual tags instead, then strip `</head>` separately.
 4. CSS scope: `:root {` → `.madds-embed {`
@@ -1180,11 +1171,8 @@ Sender email = 'system', Sender name = 'Q&A Forum'.
 
 ### [2026-03-07] sync-org-chart.js v2 — Multi-repo, All Branches
 
-Updated to commit org_chart.html to all branches of both repos:
-- `DDS-Dashboard` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
-- `Union-Tracker` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
-
-MADDS is now the sole org chart. Skip logic prevents empty commits when file is unchanged.
+Updated to commit org_chart.html to all branches.
+(Script has since been removed; org_chart.html is now a placeholder.)
 Uses git clone to temp dir (GitHub Contents API returns 403 on write for these repos).
 
 ---
@@ -1868,8 +1856,8 @@ Extract the JavaScript from each HTML view file into separate `.gs` files (e.g.,
   - `src/01_Core.gs` / `dist/01_Core.gs` — Version entry 4.24.8
 - **Architecture**: Same lazy-load pattern as org chart — `google.script.run.getPOMSReferenceHtml()` fetches HTML, injected into container, `<script>` tags re-executed. Container set to `height:calc(100vh-56px)` for full-page POMS app experience.
 - **CSS Scoping**: All POMS styles prefixed with `p-` or `poms-` to avoid SPA conflicts. No `:root` vars. No `body` selectors.
-- **Security**: No DDS Script ID in poms_reference.html (verified grep)
-- **Sync**: DDS Main → UT staging (commit 1945f90). DDS Script ID check clean.
+- **Security**: No private Script ID in poms_reference.html (verified grep)
+- **Sync**: Main → UT staging (commit 1945f90). Private Script ID check clean.
 
 ---
 
@@ -2055,7 +2043,7 @@ Failsafe page button
 - **Sidebar group headers**: Added `{ group: 'Label' }` support to `_getSidebarTabs()` in `src/index.html`. Renderer at ~line 459 now handles `tab.group` alongside `tab.divider`.
 - **CSS**: Added `.sidebar-group-label` style in `src/styles.html` (10px uppercase, letter-spacing 1.2px, `--text-secondary` color).
 - **Three named groups** introduced across both roles:
-  - **DDS**: POMS Ref., Workload Tracker
+  - **Tools**: POMS Ref., Workload Tracker
   - **Resources**: Insights (steward) / Union Stats (member), Resources, Org. Chart, Q&A Forum
   - **Activity**: Tasks / My Tasks, Events, Timeline
 - **Steward Workload Tracker**: Added `workload` tab to steward sidebar and steward switch case in `_handleTabNav()`. `renderWorkloadTracker()` in `src/member_view.html` made role-aware via `AppState.activeRole`, using `_stewardHeader` or `_memberHeader` dynamically.
@@ -2069,12 +2057,12 @@ Failsafe page button
 
 ### ⚠️ Union-Tracker Note
 - WorkloadTracker typeof guards still needed in UT for 3 files (pre-existing issue, not introduced here).
-- These changes must be synced DDS Main → UT staging per standard flow.
+- These changes must be synced Main → UT staging per standard flow.
 
 ## Tab Regroup v2 — Intent-Based Groups (2026-03-09)
 
 ### Supersedes
-Previous DDS/Resources/Activity grouping replaced same day with intent-based groups.
+Previous Tools/Resources/Activity grouping replaced same day with intent-based groups.
 
 ### New Group Structure (both roles)
 - **Ungrouped top**: Core daily work (Cases, Members/Directory, Contact Log)
@@ -2339,7 +2327,7 @@ Every bug from the 2026-03-08/09 session would have been caught by automated tes
 ### Design Rationale
 - **Failure-only**: Daily success emails are noise. If you want proof tests ran, check the SPA panel.
 - **Config tab over hardcoded**: Follows "everything dynamic" rule. Admins can change the email without code changes.
-- **Quota guard**: MassAbility DDS uses MailApp for other notifications too — don't compete for the 100/day limit.
+- **Quota guard**: The app uses MailApp for other notifications too — don't compete for the 100/day limit.
 - **HTML + plain-text**: HTML renders in Gmail/Outlook; plain-text is the fallback for text-only clients.
 
 ## v4.25.3 — Deadline Config Completeness (2026-03-09)
@@ -2838,7 +2826,7 @@ No tests existed to verify email services were accessible before the bug was rep
 - `21_WebDashDataService.gs:568,575,642,649` — Fallback sheet name strings
 - `21_WebDashDataService.gs:1525,3000` — `'Contact Log'`
 - `08a_SheetSetup.gs:373-374`, `21_WebDashDataService.gs:1685-1686` — Column indices 11, 12
-- `10b_SurveyDocSheets.gs:1992,2007` — `system@massability.org`
+- `10b_SurveyDocSheets.gs:1992,2007` — `system@example.org`
 
 ### See
 - `docs/archived-reviews/COMPREHENSIVE_AUDIT_2026-03-10.md` for the full report with all findings, evidence, and recommendations.
@@ -2855,7 +2843,7 @@ No tests existed to verify email services were accessible before the bug was rep
 - ✅ 60/60 data endpoints authenticated
 - ✅ 0 duplicate function names
 - ✅ src/dist parity perfect
-- ✅ DDS Script ID absent from source
+- ✅ No hardcoded Script IDs in source
 - ⚠️ 142 orphaned/dead functions identified
 - ⚠️ 32 getSheetByName calls without null guard
 - ⚠️ 5 data-write functions without lock protection
@@ -2868,7 +2856,7 @@ No tests existed to verify email services were accessible before the bug was rep
 1. `06_Maintenance.gs:3365` — `'_Archive_Grievances'` (needs SHEETS constant)
 2. `21_WebDashDataService.gs:568,575,642,649` — fallback sheet name strings
 3. `21_WebDashDataService.gs:1525,3000` — `'Contact Log'` hardcoded
-4. `10b_SurveyDocSheets.gs:1992,2007` — `'system@massability.org'`
+4. `10b_SurveyDocSheets.gs:1992,2007` — hardcoded system email
 
 ### Data Functions Missing Lock Protection
 1. `syncMemberGrievanceData()` — 02_DataManagers.gs:338
@@ -2890,7 +2878,7 @@ No tests existed to verify email services were accessible before the bug was rep
 | C-2c | Removed redundant `'Grievance Log'` / `'Member Directory'` fallbacks | `21_WebDashDataService.gs:568,575,642,649` |
 | C-2d | `'Contact Log'` → `CONTACT_SHEET_TAB_` global constant | `21_WebDashDataService.gs:19,1435,1526,3001` |
 | C-3 | Hardcoded column indices 11/12 → named variables | `08a_SheetSetup.gs:373-374`, `21_WebDashDataService.gs:1685-1686` |
-| H-1 | `system@massability.org` → `getConfigValue_(CONFIG_COLS.MAIN_CONTACT_EMAIL)` | `10b_SurveyDocSheets.gs:1992,2007` |
+| H-1 | `system@example.org` → `getConfigValue_(CONFIG_COLS.MAIN_CONTACT_EMAIL)` | `10b_SurveyDocSheets.gs:1992,2007` |
 | H-2 | Added ⚠️ AUTH REQUIRED comment on poll stubs | `21_WebDashDataService.gs:3089-3093` |
 | M-5 | Synced `package.json` version to `4.25.7` (matches `COMMAND_CONFIG.VERSION`) | `package.json:3` |
 
@@ -2932,7 +2920,7 @@ Total: 54 test suites, 2,744 tests passing (previously 41 suites, 2,446 tests).
 
 ## 🔍 CONTRACT AUDIT + FIXES — 2026-03-11 (v4.25.9, Batch 3)
 
-### Verified Contract: SEIU Local 509 Unit 8 CBA (2024–2026), Article 23
+### Verified Contract: Sample CBA, Article 23
 Source: MA DOC Grievance Policy 270.03 for Bargaining Units 8 & 10 (July 2025).
 
 **Actual Unit 8 Grievance Deadlines (calendar days unless noted):**
