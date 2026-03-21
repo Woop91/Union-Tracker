@@ -236,6 +236,13 @@ function createConfigSheet(ss) {
     sheet.getRange(3, CONFIG_COLS.BROADCAST_SCOPE_ALL).setDataValidation(broadcastScopeRule);
   }
 
+  // Retention thresholds (v4.33.1) — days before auto-archival via dailyTrigger()
+  // Grievance Archive Days: closed grievances older than this are moved to _Archive_Grievances.
+  // Audit Log Archive Days: audit entries older than this are exported to Drive CSV and pruned.
+  // Both default to 90 days. Set to a higher value (e.g. 180, 365) to retain longer.
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_ARCHIVE_DAYS, [90], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.AUDIT_ARCHIVE_DAYS, [90], isExistingSheet);
+
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
 

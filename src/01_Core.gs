@@ -491,7 +491,7 @@ var VERSION_HISTORY = [
   { version: '4.23.1', date: '2026-03-07', codename: 'System-Wide Session Token Auth Fix', changes: 'SYSTEMIC FIX: All 42+ server wrapper functions that call _requireStewardAuth() or _resolveCallerEmail() now accept sessionToken as first parameter. Root cause: getActiveUser() returns empty in Execute-as-Me webapp for magic link / session token users — every steward operation was silently broken for non-SSO auth. Server: sessionToken param added to all wrappers across 21_WebDashDataService.gs (36 functions), 08e_SurveyEngine.gs (2), 24_WeeklyQuestions.gs (8), 26_QAForum.gs (4), 27_TimelineService.gs (5). Direct Session.getActiveUser() calls in wq wrappers replaced with _resolveCallerEmail(sessionToken). Client: steward_view.html + member_view.html updated to pass SESSION_TOKEN instead of CURRENT_USER.email to all server calls. Q1 fix: server echoes back session token in pageData for method=session users (22_WebDashApp.gs). CLIENT: SESSION_TOKEN now reads PAGE_DATA.sessionToken || localStorage fallback. dataToggleChecklistItem double-paren syntax error fixed.' },
   { version: '4.23.0', date: '2026-03-07', codename: 'Dynamic Survey Schema', changes: 'Option B fully dynamic survey schema. New sheet: 📋 Survey Questions (16 cols: Question ID, Section, Section Key, Section Title, Question Text, Type, Required, Active, Options, Branch Parent, Branch Value, Branch Target, Max Selections, Slider Min/Max, Notes). Owner edits Question Text, Active, Options, Slider Labels, Notes directly — no deployment needed. Adding a new row to Survey Questions auto-creates a new column in 📊 Member Satisfaction on next submission. Setting Active=N deactivates a question. Satisfaction sheet rebuilt with dynamic headers: Timestamp | Period ID | Survey Version | q1 | q2 … qN. New functions: createSurveyQuestionsSheet() (seeds 67 questions, color-coded by section, non-destructive on re-run), getSatisfactionColMap_() (runtime header→col lookup, 5-min cache), syncSatisfactionSheetColumns_() (auto-appends missing question columns), clearSurveyQuestionsCache() (menu-callable). Rewrites: getSurveyQuestions() reads from sheet with 5-min cache; submitSurveyResponse() builds row via col map not hardcoded positions; getSatisfactionSummary() groups questions dynamically by Section Key. 04c and 04d updated to use getSatisfactionColMap_(). SATISFACTION_COLS kept as deprecated reference. New constants: SHEETS.SURVEY_QUESTIONS, SURVEY_QUESTIONS_COLS, SATISFACTION_PREFIX. Wired into CREATE_DASHBOARD setup and initSurveyEngine().' },
   { version: '4.22.7', date: '2026-03-07', codename: 'Survey Form URL Deprecation Cleanup', changes: 'Full removal of SATISFACTION_FORM_URL / satisfactionFormUrl / surveyFormUrl across 8 files. Deprecated since v4.21.0 (Google Form integration replaced by native webapp survey), now fully removed. 01_Core.gs: constant replaced with comment. 08c: satisfaction case removed from getFormUrlFromConfig(); saveFormUrlsToConfig_silent() no longer writes/formats satisfaction URL; sendSurveyCompletionReminders() now reads MOBILE_DASHBOARD_URL (member portal) instead of form URL. 04c: satisfactionForm removed from resource links; range now stops at ORG_WEBSITE. 04e: surveyUrl now reads MOBILE_DASHBOARD_URL. 05_Integrations: satisfactionForm removed from resource links, double-semicolon typo fixed. 11_CommandHub: Form Links color section removed. 20_WebDashConfigReader: satisfactionFormUrl line removed. 21_WebDashDataService: surveyFormUrl removed from resource links response. 22_WebDashApp: surveyFormUrl removed from sanitized config. member_view.html: dead else-if fallback branch removed from survey banner onClick handler.' },
-  { version: '4.22.6', date: '2026-03-06', codename: 'MADDS Org Chart Default', changes: 'Replace org_chart.html with org chart. Conversion: CSS scoped to .madds-embed wrapper, :root vars moved into .madds-embed scope, body/body.light → .madds-embed/.madds-embed.light, #mode-toggle renamed #madds-mode-toggle, toggleMode() renamed maddstoggleMode() to avoid SPA collisions, Google Fonts loaded dynamically. Serves same HTML fragment via existing getOrgChartHtml() in 22_WebDashApp.gs — no server-side changes required.' },
+  { version: '4.22.6', date: '2026-03-06', codename: 'Org Chart Default', changes: 'Replace org_chart.html with org chart. Conversion: CSS scoped to .madds-embed wrapper, :root vars moved into .madds-embed scope, body/body.light → .madds-embed/.madds-embed.light, #mode-toggle renamed #madds-mode-toggle, toggleMode() renamed maddstoggleMode() to avoid SPA collisions, Google Fonts loaded dynamically. Serves same HTML fragment via existing getOrgChartHtml() in 22_WebDashApp.gs — no server-side changes required.' },
   { version: '4.22.6', date: '2026-03-06', codename: 'Events Sentinel Propagation Fix', changes: 'Bug fix: home widget events section crashed when getUpcomingEvents returned a sentinel object ({_notConfigured} or {_calNotFound}) — events.length on a plain object returns undefined, rendering "undefined" in KPI counter and crashing forEach. Added Array.isArray guard before rendering and before DataCache.set. DataCache.set now only caches actual arrays; sentinel objects are dropped, preventing the bad value from poisoning the client-side cache on subsequent home re-renders.' },
   { version: '4.22.4', date: '2026-03-06', codename: 'Events Access & Calendar Targeting', changes: 'Events tab dues gate removed — any authenticated member can view events regardless of dues status. More menu Events item lock icon removed. Create Event button URL now includes &src=calendarId param so new events land on the union calendar, not the steward personal calendar. No structural changes to backend auth — dataGetUpcomingEvents still requires valid session.' },
   { version: '4.22.3', date: '2026-03-06', codename: 'Events Tab Hardening', changes: 'Bug fix: ISO date formatter in Add-to-Calendar URLs changed from .replace(\".000Z\",\"Z\") to .replace(/\\.\\d+Z$/,\"Z\") — handles any millisecond value (was silently broken for non-.000 ms values). Bug fix: CalendarApp.getCalendarById() returning null now returns {_calNotFound:true} sentinel instead of [] — distinguishes typo/permission error from genuinely empty calendar. Frontend handles _calNotFound with diagnostic message. Bug fix: Add-to-Calendar URL now includes &details= param (ev.description) in both home widget and Events page — was silently omitted. Feature: Steward Events page now shows \"Manage in Google Calendar\" and \"Create Event\" action buttons when a calendarId is configured. _sanitizeConfig in 22_WebDashApp.gs now exposes calendarId (non-sensitive) so frontend can conditionally show management links.' },
@@ -1252,7 +1252,12 @@ var CONFIG_HEADER_MAP_ = [
   // Test runner (v4.25.2) — email address for failure notifications from scheduled test runs
   { key: 'TEST_NOTIFY_EMAIL',        header: 'Test Runner Notify Email' },
   // Correlation Engine (v4.30.0) — set to 'yes' to enable the correlation/insights engine
-  { key: 'ENABLE_CORRELATION',       header: 'Enable Correlation Engine' }
+  { key: 'ENABLE_CORRELATION',       header: 'Enable Correlation Engine' },
+  // Retention thresholds (v4.33.1) — days before auto-archival; defaults applied if blank
+  // GRIEVANCE_ARCHIVE_DAYS: closed grievances older than this are moved to _Archive_Grievances
+  { key: 'GRIEVANCE_ARCHIVE_DAYS',   header: 'Grievance Archive Days' },
+  // AUDIT_ARCHIVE_DAYS: audit log entries older than this are exported to Drive CSV + pruned
+  { key: 'AUDIT_ARCHIVE_DAYS',       header: 'Audit Log Archive Days' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -2190,17 +2195,17 @@ var GRIEVANCE_OUTCOMES = {
  * Actual values are loaded from Config sheet at runtime via getDeadlineRules().
  *
  * SOURCE: Sample CBA, Article 23 / Grievance
- * Policy 270.03 for Bargaining Units 8 & 10 (July 2025 edition).
+ * Policy reference for default step deadlines.
  *
- * CONTRACT SUMMARY FOR UNIT 8 (only 2 steps + arbitration):
+ * CONTRACT SUMMARY (only 2 steps + arbitration):
  *   Filing:        21 calendar days from incident
  *   Step I resp:   30 calendar days (21 if meeting held)
  *   Step II appeal: 10 BUSINESS days from Step I decision  ← note: business days
  *   Step II resp:  30 calendar days (21 if conference held)
  *   Arbitration:   30 calendar days from Step II
- *   NOTE: Unit 8 CBA has NO Step III — goes Step I → Step II → Arbitration.
+ *   NOTE: Default has NO Step III — goes Step I → Step II → Arbitration.
  *         STEP_3_* fields below are retained for configurability but are not
- *         required by this CBA.  If your local contract differs, override via
+ *         required by this default.  If your local contract differs, override via
  *         the Config sheet.
  *
  * FIX-CORE-01 (v4.25.9): Corrected STEP_1_RESPONSE (7→30), STEP_2_APPEAL

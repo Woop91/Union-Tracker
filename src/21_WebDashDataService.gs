@@ -4288,8 +4288,10 @@ var DataService = (function () {
     if (!email) return null;
     email = email.toLowerCase().trim();
 
-    // 1. Get closed grievances for this member
-    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    // 1. Get closed grievances for this member — use combined active+archive so
+    //    cases that were recently auto-archived (archiveClosedGrievances runs daily)
+    //    still generate a feedback prompt within the 14-day window.
+    var cached = _getAllGrievanceData();
     if (!cached) return null;
     var data = cached.data;
     var colMap = cached.colMap;
@@ -4363,8 +4365,10 @@ var DataService = (function () {
       if (isNaN(val) || val < 1 || val > 5) return { success: false, message: 'Ratings must be 1-5.' };
     }
 
-    // Verify this grievance belongs to this member and is closed
-    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    // Verify this grievance belongs to this member and is closed.
+    // Use combined active+archive so members can still submit feedback
+    // on cases that have been auto-archived after the 90-day threshold.
+    var cached = _getAllGrievanceData();
     if (!cached) return { success: false, message: 'Could not read grievances.' };
     var data = cached.data;
     var colMap = cached.colMap;

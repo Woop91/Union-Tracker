@@ -2,7 +2,7 @@
  * Tests for 03_UIComponents.gs
  *
  * Covers: showToast, showConfirmation, showAlert, navigateToSheet,
- * getDefaultADHDSettings_, getADHDSettings, saveADHDSettings,
+ * getDefaultComfortViewSettings_, getComfortViewSettings, saveComfortViewSettings,
  * isMobileContext, createDashboardMenu.
  */
 
@@ -182,14 +182,14 @@ describe('navigateToSheet', () => {
 });
 
 // ============================================================================
-// getDefaultADHDSettings_
+// getDefaultComfortViewSettings_
 // ============================================================================
 
-describe('getDefaultADHDSettings_', () => {
+describe('getDefaultComfortViewSettings_', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('returns an object with expected default properties', () => {
-    const defaults = getDefaultADHDSettings_();
+    const defaults = getDefaultComfortViewSettings_();
     expect(defaults).toHaveProperty('zebraStripes', true);
     expect(defaults).toHaveProperty('reducedMotion', false);
     expect(defaults).toHaveProperty('focusMode', false);
@@ -199,28 +199,28 @@ describe('getDefaultADHDSettings_', () => {
   });
 
   test('zebraStripes defaults to true', () => {
-    const defaults = getDefaultADHDSettings_();
+    const defaults = getDefaultComfortViewSettings_();
     expect(defaults.zebraStripes).toBe(true);
   });
 
   test('focusMode defaults to false', () => {
-    const defaults = getDefaultADHDSettings_();
+    const defaults = getDefaultComfortViewSettings_();
     expect(defaults.focusMode).toBe(false);
   });
 
   test('returns a fresh object each time (not shared reference)', () => {
-    const a = getDefaultADHDSettings_();
-    const b = getDefaultADHDSettings_();
+    const a = getDefaultComfortViewSettings_();
+    const b = getDefaultComfortViewSettings_();
     expect(a).not.toBe(b);
     expect(a).toEqual(b);
   });
 });
 
 // ============================================================================
-// getADHDSettings
+// getComfortViewSettings
 // ============================================================================
 
-describe('getADHDSettings', () => {
+describe('getComfortViewSettings', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('returns saved settings from PropertiesService', () => {
@@ -232,9 +232,9 @@ describe('getADHDSettings', () => {
       largeText: true,
       hideGridlines: true
     };
-    setupUserPropertiesMock({ adhdSettings: JSON.stringify(savedSettings) });
+    setupUserPropertiesMock({ comfortViewSettings: JSON.stringify(savedSettings) });
 
-    const result = getADHDSettings();
+    const result = getComfortViewSettings();
     expect(result.zebraStripes).toBe(false);
     expect(result.reducedMotion).toBe(true);
     expect(result.focusMode).toBe(true);
@@ -243,26 +243,26 @@ describe('getADHDSettings', () => {
   test('returns defaults when no settings are saved', () => {
     setupUserPropertiesMock({});
 
-    const result = getADHDSettings();
-    const defaults = getDefaultADHDSettings_();
+    const result = getComfortViewSettings();
+    const defaults = getDefaultComfortViewSettings_();
     expect(result).toEqual(defaults);
   });
 });
 
 // ============================================================================
-// saveADHDSettings
+// saveComfortViewSettings
 // ============================================================================
 
-describe('saveADHDSettings', () => {
+describe('saveComfortViewSettings', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('saves settings as JSON to PropertiesService', () => {
     const mockProps = setupUserPropertiesMock({});
     const settings = { zebraStripes: true, focusMode: true };
 
-    saveADHDSettings(settings);
+    saveComfortViewSettings(settings);
     expect(mockProps.setProperty).toHaveBeenCalledWith(
-      'adhdSettings',
+      'comfortViewSettings',
       JSON.stringify(settings)
     );
   });

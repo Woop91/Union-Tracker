@@ -272,21 +272,31 @@ function handleSecurityAudit_(e) {
     if (numCells > 15 && !e.value && rangeIsEmpty) {
       alertMessage = 'MASS_DELETION_ALERT';
 
-      // L-41: MailApp methods are not available in simple trigger context (onEdit).
-      // Email alerting removed — audit logging below covers sabotage detection.
-
-      // Log to console for visibility (PII-safe)
-      secureLog('SabotageDetection', 'Mass deletion detected', {
+      // L-41: MailApp.sendEmail() is unavailable in simple trigger context (onEdit).
+      // Immediate email send is impossible here. Fix (v4.33.1): explicitly queue the
+      // event for the daily security digest so admins receive email within 24 hours.
+      // recordSecurityEvent(CRITICAL) calls sendSecurityAlertEmail_() which silently
+      // fails in this context — so we ALSO queue directly here.
+      var deletionDetails = {
         email: userEmail,
         sheet: range.getSheet().getName(),
+        range: range.getA1Notation(),
         cellsAffected: numCells
-      });
+      };
 
-      // Record through centralized security event system
+      // Log to console for visibility (PII-safe)
+      secureLog('SabotageDetection', 'Mass deletion detected', deletionDetails);
+
+      // Queue for 24h digest via PropertiesService (works in simple trigger context)
+      if (typeof queueSecurityDigestEvent_ === 'function') {
+        queueSecurityDigestEvent_('MASS_DELETION', 'Mass deletion of ' + numCells + ' cells in ' + range.getSheet().getName(), deletionDetails);
+      }
+
+      // Record through centralized security event system (audit log + attempt immediate email)
       if (typeof recordSecurityEvent === 'function') {
         recordSecurityEvent('MASS_DELETION', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.CRITICAL : 'CRITICAL',
           'Mass deletion of ' + numCells + ' cells detected in ' + range.getSheet().getName(),
-          { email: userEmail, sheet: range.getSheet().getName(), range: range.getA1Notation(), cellsAffected: numCells });
+          deletionDetails);
       }
     }
 
@@ -998,6 +1008,71 @@ function dailyTrigger() {
       Logger.log('Meeting cleanup error:', e);
     }
 
+    // ── v4.33.1 DAILY MAINTENANCE: previously orphaned functions now wired ──
+
+    // Read retention thresholds from Config tab — defaults to 90 days if blank/invalid.
+    // Admins can change these in the Config tab (Grievance Archive Days / Audit Log Archive Days).
+    var grievanceArchiveDays = 90;
+    var auditArchiveDays = 90;
+    try {
+      if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined') {
+        var gDays = parseInt(getConfigValue_(CONFIG_COLS.GRIEVANCE_ARCHIVE_DAYS), 10);
+        var aDays = parseInt(getConfigValue_(CONFIG_COLS.AUDIT_ARCHIVE_DAYS), 10);
+        if (!isNaN(gDays) && gDays > 0) grievanceArchiveDays = gDays;
+        if (!isNaN(aDays) && aDays > 0) auditArchiveDays = aDays;
+      }
+    } catch (e) {
+      Logger.log('Could not read archive threshold from Config, using defaults: ' + e.message);
+    }
+
+    // Auto-archive closed grievances older than configured days
+    // archiveClosedGrievances() existed since v4.30.0 but was never called from a trigger.
+    var archiveResult = { archived: 0 };
+    try {
+      if (typeof archiveClosedGrievances === 'function') {
+        archiveResult = archiveClosedGrievances(grievanceArchiveDays) || archiveResult;
+        if (archiveResult.archived > 0) {
+          Logger.log('dailyTrigger: auto-archived ' + archiveResult.archived + ' closed grievances');
+        }
+      }
+    } catch (e) {
+      Logger.log('Auto-archive grievances error: ' + e.message);
+    }
+
+    // Archive old audit log entries to Drive CSV
+    // dailyAuditArchive() existed since v4.30.0 but was never called from a trigger.
+    var auditArchiveResult = { archived: 0 };
+    try {
+      if (typeof archiveOldAuditLogs_ === 'function') {
+        auditArchiveResult = archiveOldAuditLogs_(auditArchiveDays) || auditArchiveResult;
+      }
+    } catch (e) {
+      Logger.log('Audit log archive error: ' + e.message);
+    }
+
+    // Send daily security digest (batched HIGH/CRITICAL events from the last 24h)
+    // sendDailySecurityDigest() existed since v4.8.1 but was never wired to a trigger.
+    // NOTE: CRITICAL events logged by sabotage detection (onEdit simple trigger) cannot
+    // send email immediately (MailApp unavailable in simple triggers). They are queued
+    // here and emailed via the digest so admins are notified within 24h.
+    try {
+      if (typeof sendDailySecurityDigest === 'function') {
+        sendDailySecurityDigest();
+      }
+    } catch (e) {
+      Logger.log('Security digest error: ' + e.message);
+    }
+
+    // Cleanup expired auth session tokens (removes tokens older than TTL)
+    // authCleanupExpiredTokens() existed since v4.22.9 but was never wired.
+    try {
+      if (typeof authCleanupExpiredTokens === 'function') {
+        authCleanupExpiredTokens();
+      }
+    } catch (e) {
+      Logger.log('Auth token cleanup error: ' + e.message);
+    }
+
     // Log the trigger run
     logAuditEvent('DAILY_TRIGGER', {
       timestamp: new Date().toISOString(),
@@ -1007,7 +1082,9 @@ function dailyTrigger() {
       meetingDocAgendaSent: meetingDocResult.agendaSent,
       meetingDocNotesSent: meetingDocResult.notesSent,
       meetingDocNotesPublished: meetingDocResult.notesPublished,
-      meetingRowsCleaned: meetingRowsCleaned
+      meetingRowsCleaned: meetingRowsCleaned,
+      grievancesArchived: archiveResult.archived,
+      auditEntriesArchived: auditArchiveResult.archived || 0
     });
 
   } catch (error) {

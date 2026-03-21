@@ -20,7 +20,7 @@ describe('04b function existence', () => {
     'showQuickCaptureNotepad',
     'getImportDialogHtml_', 'processMemberImport',
     'parseCSVLine_', 'mapImportColumns_',
-    'showBreakReminder', 'showADHDControlPanel',
+    'showBreakReminder', 'showComfortViewControlPanel',
     'showThemeManager', 'showSmartDashboard', 'getSmartDashboardHtml'
   ];
 

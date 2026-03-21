@@ -283,3 +283,26 @@ See `PHASE2_PLAN.md` for details.
 
 All historical entries (v4.18.1–v4.25.9 bug fixes, feature implementations, migration notes)
 have been archived to `docs/AI_REFERENCE_ARCHIVE.md`. Refer there for past development context.
+
+---
+
+## REFACTOR LOG — ADHD → ComfortView rename (2026-03-21)
+
+**Reason:** Internal function names using `ADHD` were inconsistent with the user-facing "Comfort View" branding.
+
+**Files changed:** `src/03_UIComponents.gs`, `src/04b_AccessibilityFeatures.gs`, `src/07_DevTools.gs`, `src/10b_SurveyDocSheets.gs`, `dist/`
+
+**Rename map:**
+| Old | New |
+|---|---|
+| `getADHDSettings` | `getComfortViewSettings` |
+| `getDefaultADHDSettings_` | `getDefaultComfortViewSettings_` |
+| `saveADHDSettings` | `saveComfortViewSettings` |
+| `applyADHDSettings` | `applyComfortViewSettings` |
+| `resetADHDSettings` | `resetComfortViewSettings` |
+| `toggleGridlinesADHD` | `toggleGridlinesComfortView` |
+| `setupADHDDefaults` | `setupComfortViewDefaults` |
+| `showADHDControlPanel` | `showComfortViewControlPanel` |
+| `'adhdSettings'` (prop key) | `'comfortViewSettings'` |
+
+**DATA MIGRATION NOTE:** Any existing users who had `adhdSettings` stored in PropertiesService will lose their saved Comfort View preferences on next load. They will fall back to `getDefaultComfortViewSettings_()`. This is acceptable one-time cost — defaults are safe.
