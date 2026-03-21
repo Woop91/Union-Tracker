@@ -5,7 +5,7 @@
  *
  * WHAT THIS FILE DOES:
  *   GAS-native web app test suites — comprehensive coverage of all SPA
- *   modules. 9 test suites: webapp (doGet routing), configrd (ConfigReader),
+ *   modules. 8 test suites: webapp (doGet routing), configrd (ConfigReader),
  *   portal (PortalSheets 0-indexed validation), weeklyq (WeeklyQuestions
  *   API), qaforum (QAForum), timeline
  *   (TimelineService), failsafe (FailsafeService), endpoints (all

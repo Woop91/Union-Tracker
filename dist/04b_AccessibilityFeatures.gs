@@ -76,7 +76,7 @@ function getCommonStyles() {
         color: white;
       }
       .btn-primary:hover {
-        background: #1557b0;
+        background: ${SHEET_COLORS.DIALOG_ACCENT_DARK};
       }
       .btn-secondary {
         background: #f1f3f4;
@@ -210,18 +210,8 @@ function getCommonStyles() {
  * Features for neurodivergent users + theme customization
  */
 
-// Theme Configuration — delegates to THEME_PRESETS (03_UIComponents.gs) for unified keys
-var THEME_CONFIG = {
-  THEMES: {
-    'default': { name: 'Dark Slate', icon: '🌑', headerBackground: '#1e293b' },
-    'union-blue': { name: 'Union Blue', icon: '💙', headerBackground: '#1e40af' },
-    'forest': { name: 'Forest Green', icon: '💚', headerBackground: '#166534' },
-    'midnight': { name: 'Midnight Purple', icon: '💜', headerBackground: '#581c87' },
-    'crimson': { name: 'Crimson', icon: '❤️', headerBackground: '#991b1b' },
-    'ocean': { name: 'Ocean Teal', icon: '🌊', headerBackground: '#115e59' }
-  },
-  DEFAULT_THEME: 'default'
-};
+// Theme Configuration — THEME_PRESETS in 03_UIComponents.gs is the single source of truth.
+// showThemeManager() below delegates to showThemePresetPicker() for unified UI.
 
 // ==================== COMFORT VIEW SETTINGS ====================
 
@@ -446,11 +436,11 @@ function getImportDialogHtml_() {
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Roboto", Arial, sans-serif; padding: 20px; background: #f5f5f5; }' +
     '.container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }' +
-    'h2 { color: #1a73e8; margin-bottom: 15px; font-size: 18px; }' +
+    'h2 { color: ' + SHEET_COLORS.DIALOG_ACCENT + '; margin-bottom: 15px; font-size: 18px; }' +
     '.section { margin-bottom: 20px; }' +
     '.section-title { font-weight: bold; color: #333; margin-bottom: 8px; font-size: 14px; }' +
     'textarea { width: 100%; height: 200px; border: 2px solid #e0e0e0; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; resize: vertical; }' +
-    'textarea:focus { border-color: #1a73e8; outline: none; }' +
+    'textarea:focus { border-color: ' + SHEET_COLORS.DIALOG_ACCENT + '; outline: none; }' +
     '.format-hint { background: #e8f0fe; padding: 12px; border-radius: 6px; font-size: 12px; color: #1967d2; margin-bottom: 15px; }' +
     '.format-hint code { background: #fff; padding: 2px 6px; border-radius: 3px; }' +
     '.preview { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; max-height: 150px; overflow-y: auto; font-size: 12px; display: none; }' +
@@ -458,14 +448,14 @@ function getImportDialogHtml_() {
     '.preview-row:last-child { border-bottom: none; }' +
     '.btn-row { display: flex; gap: 10px; margin-top: 15px; }' +
     'button { padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; }' +
-    '.btn-primary { background: #1a73e8; color: white; }' +
-    '.btn-primary:hover { background: #1557b0; }' +
+    '.btn-primary { background: ' + SHEET_COLORS.DIALOG_ACCENT + '; color: white; }' +
+    '.btn-primary:hover { background: ' + SHEET_COLORS.DIALOG_ACCENT_DARK + '; }' +
     '.btn-secondary { background: #f1f3f4; color: #5f6368; }' +
     '.btn-secondary:hover { background: #e8eaed; }' +
     '.status { padding: 10px; border-radius: 6px; margin-top: 10px; display: none; }' +
     '.status.success { background: #e6f4ea; color: #137333; }' +
     '.status.error { background: #fce8e6; color: #c5221f; }' +
-    '.count { font-weight: bold; color: #1a73e8; }' +
+    '.count { font-weight: bold; color: ' + SHEET_COLORS.DIALOG_ACCENT + '; }' +
     '</style></head><body>' +
     '<div class="container">' +
     '<h2>📥 Import Members from CSV</h2>' +
@@ -686,7 +676,7 @@ function showBreakReminder() {
 function showComfortViewControlPanel() {
   var settings = getComfortViewSettings();
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8;border-bottom:3px solid #1a73e8;padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid #1a73e8}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:#1a73e8;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:#1557b0}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.toggleZebraStripes();setTimeout(function(){location.reload()},1000)">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.toggleGridlinesComfortView();setTimeout(function(){location.reload()},1000)">' + (settings.gridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom:3px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.toggleZebraStripes();setTimeout(function(){location.reload()},1000)">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.toggleGridlinesComfortView();setTimeout(function(){location.reload()},1000)">' + (settings.gridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, '♿ Comfort View Panel');
 }
@@ -695,19 +685,12 @@ function showComfortViewControlPanel() {
  * Opens the Theme Manager dialog for selecting and applying sheet themes.
  * @returns {void}
  */
+/**
+ * Theme Manager — delegates to the unified showThemePresetPicker() in 03_UIComponents.gs.
+ * Kept as a named function because Comfort View menu references it by name.
+ */
 function showThemeManager() {
-  var current = getCurrentTheme();
-  var themeCards = Object.keys(THEME_CONFIG.THEMES).map(function(key) {
-    var t = THEME_CONFIG.THEMES[key];
-    return '<div style="background:#f8f9fa;padding:15px;border-radius:8px;cursor:pointer;border:3px solid ' + (current === key ? '#1a73e8' : 'transparent') + '" onclick="select(\'' + key + '\')">' +
-      '<div style="font-size:32px;text-align:center">' + t.icon + '</div>' +
-      '<div style="text-align:center;font-weight:bold">' + t.name + '</div>' +
-      '<div style="height:20px;background:' + t.headerBackground + ';border-radius:4px;margin-top:10px"></div></div>';
-  }).join('');
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;margin:5px}button.sec{background:#6c757d}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0}</style></head><body><div class="container"><h2>🎨 Theme Manager</h2><div class="grid">' + themeCards + '</div><button onclick="apply()">✅ Apply Theme</button><button class="sec" onclick="google.script.host.close()">Close</button></div><script>var sel="' + current + '";function select(k){sel=k;document.querySelectorAll(".grid>div").forEach(function(d){d.style.border="3px solid transparent"});event.currentTarget.style.border="3px solid #1a73e8"}function apply(){google.script.run.withSuccessHandler(function(){alert("Theme applied!");google.script.host.close()}).applyThemePreset(sel)}</script></body></html>'
-  ).setWidth(450).setHeight(500);
-  SpreadsheetApp.getUi().showModalDialog(html, '🎨 Theme Manager');
+  showThemePresetPicker();
 }
 
 // ==================== SETUP DEFAULTS ====================
@@ -766,7 +749,7 @@ function getSmartDashboardHtml() {
     '.container{padding:15px;max-width:1200px;margin:0 auto}' +
 
     // Header - responsive
-    '.header{background:linear-gradient(135deg,#1a73e8,#1557b0);color:white;padding:20px;text-align:center}' +
+    '.header{background:linear-gradient(135deg,' + SHEET_COLORS.DIALOG_ACCENT + ',' + SHEET_COLORS.DIALOG_ACCENT_DARK + ');color:white;padding:20px;text-align:center}' +
     '.header h1{font-size:clamp(18px,5vw,28px);margin-bottom:5px}' +
     '.header .subtitle{font-size:clamp(12px,3vw,14px);opacity:0.9}' +
     '.device-badge{display:inline-block;padding:4px 12px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:11px;margin-top:8px}' +
@@ -775,7 +758,7 @@ function getSmartDashboardHtml() {
     '.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}' +
     '.stat-card{background:white;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center;transition:transform 0.2s}' +
     '.stat-card:hover{transform:translateY(-2px)}' +
-    '.stat-value{font-size:clamp(24px,6vw,36px);font-weight:bold;color:#1a73e8}' +
+    '.stat-value{font-size:clamp(24px,6vw,36px);font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + '}' +
     '.stat-label{font-size:clamp(11px,2.5vw,13px);color:#666;text-transform:uppercase;margin-top:5px}' +
 
     // Section titles
@@ -793,9 +776,9 @@ function getSmartDashboardHtml() {
     '.action-desc{font-size:12px;color:#666;margin-top:2px}' +
 
     // FAB (Floating Action Button)
-    '.fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:#1a73e8;color:white;' +
+    '.fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;' +
     'border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:1000}' +
-    '.fab:hover{background:#1557b0}' +
+    '.fab:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}' +
 
     // Desktop-only elements
     '.desktop-only{display:none}' +

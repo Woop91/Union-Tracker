@@ -282,8 +282,7 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
-      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
-      )
+      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger'))
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
@@ -820,7 +819,7 @@ function toggleDarkMode() {
   );
 }
 // ============================================================================
-// COMFORT VIEW / Comfort View SETTINGS
+// COMFORT VIEW SETTINGS
 // ============================================================================
 
 /**
@@ -1136,19 +1135,19 @@ function showMobileDashboard() {
   var stats = getMobileDashboardStats();
   var html = HtmlService.createHtmlOutput(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;padding:0;margin:0;background:#f5f5f5}' +
-    '.header{background:linear-gradient(135deg,#1a73e8,#1557b0);color:white;padding:clamp(14px,4vw,20px);padding-top:calc(clamp(14px,4vw,20px) + env(safe-area-inset-top,0px))}' +
+    '.header{background:linear-gradient(135deg,' + SHEET_COLORS.DIALOG_ACCENT + ',' + SHEET_COLORS.DIALOG_ACCENT_DARK + ');color:white;padding:clamp(14px,4vw,20px);padding-top:calc(clamp(14px,4vw,20px) + env(safe-area-inset-top,0px))}' +
     '.header h1{margin:0;font-size:clamp(20px,5vw,24px)}.header .subtitle{font-size:clamp(12px,3vw,14px);opacity:0.9}' +
     '.container{padding:clamp(10px,3vw,15px);padding-bottom:80px}' +
     '.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(8px,2vw,12px);margin-bottom:20px}' +
     '.stat-card{background:white;padding:clamp(14px,3.5vw,20px);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center}' +
-    '.stat-value{font-size:clamp(24px,7vw,32px);font-weight:bold;color:#1a73e8}' +
+    '.stat-value{font-size:clamp(24px,7vw,32px);font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + '}' +
     '.stat-label{font-size:clamp(10px,2.8vw,13px);color:#666;text-transform:uppercase;margin-top:4px}' +
     '.section-title{font-size:clamp(14px,3.8vw,16px);font-weight:600;color:#333;margin:20px 0 12px;padding-left:5px}' +
     '.action-btn{background:white;border:none;padding:clamp(12px,3.5vw,16px);margin-bottom:10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);width:100%;text-align:left;display:flex;align-items:center;gap:clamp(10px,3vw,15px);font-size:clamp(13px,3.5vw,15px);cursor:pointer;min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + '}' +
     '.action-btn:active{transform:scale(0.98)}' +
     '.action-icon{font-size:clamp(20px,5vw,24px);width:clamp(36px,9vw,40px);height:clamp(36px,9vw,40px);display:flex;align-items:center;justify-content:center;background:#e8f0fe;border-radius:10px;flex-shrink:0}' +
     '.action-label{font-weight:500}.action-desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}' +
-    '.fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));right:20px;width:56px;height:56px;background:#1a73e8;color:white;border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:100}' +
+    '.fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));right:20px;width:56px;height:56px;background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:100}' +
     '@media(max-width:360px){.stats{grid-template-columns:1fr 1fr;gap:6px}.stat-card{padding:10px}.container{padding:8px;padding-bottom:80px}}' +
     '</style></head><body>' +
     '<div class="header"><h1>📱 Dashboard</h1><div class="subtitle">Mobile View</div></div>' +
@@ -1232,20 +1231,20 @@ function showMobileGrievanceList() {
     '<style>' +
     '*{box-sizing:border-box}' +
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}' +
-    '.header{background:#1a73e8;color:white;padding:15px;position:sticky;top:0;z-index:100}' +
+    '.header{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;padding:15px;position:sticky;top:0;z-index:100}' +
     '.header h2{margin:0;font-size:clamp(18px,4vw,24px)}' +
     '.search{width:100%;padding:clamp(10px,2.5vw,14px);border:none;border-radius:8px;font-size:clamp(14px,3vw,16px);margin-top:10px}' +
     '.filters{display:flex;overflow-x:auto;padding:10px;background:white;gap:8px;-webkit-overflow-scrolling:touch}' +
     '.filter{padding:clamp(6px,1.5vw,10px) clamp(12px,3vw,18px);border-radius:20px;background:#f0f0f0;white-space:nowrap;cursor:pointer;font-size:clamp(12px,2.5vw,14px);border:none;min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + ';display:flex;align-items:center}' +
-    '.filter.active{background:#1a73e8;color:white}' +
+    '.filter.active{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white}' +
     '.list{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}' +
     '.card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}' +
     '.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}' +
-    '.card-id{font-weight:bold;color:#1a73e8;font-size:clamp(14px,3vw,16px)}' +
+    '.card-id{font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + ';font-size:clamp(14px,3vw,16px)}' +
     '.card-status{padding:4px 10px;border-radius:12px;font-size:clamp(10px,2vw,12px);font-weight:bold;background:#e8f0fe}' +
     '.card-row{font-size:clamp(12px,2.5vw,14px);margin:5px 0;color:#666}' +
     '.pagination{display:flex;justify-content:center;align-items:center;gap:12px;padding:16px;background:white;border-top:1px solid #e0e0e0;position:sticky;bottom:0}' +
-    '.pg-btn{padding:10px 20px;border-radius:8px;border:1px solid #1a73e8;color:#1a73e8;background:white;font-size:14px;cursor:pointer;min-height:44px}' +
+    '.pg-btn{padding:10px 20px;border-radius:8px;border:1px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';color:' + SHEET_COLORS.DIALOG_ACCENT + ';background:white;font-size:14px;cursor:pointer;min-height:44px}' +
     '.pg-btn:disabled{opacity:.4;cursor:default}' +
     '.pg-info{font-size:13px;color:#666}' +
     '@media (min-width:768px){.list{grid-template-columns:repeat(2,1fr)}}' +
@@ -1279,17 +1278,17 @@ function showMobileUnifiedSearch() {
     '<style>' +
     '*{box-sizing:border-box}' +
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}' +
-    '.header{background:linear-gradient(135deg,#1a73e8,#1557b0);color:white;padding:15px}' +
+    '.header{background:linear-gradient(135deg,' + SHEET_COLORS.DIALOG_ACCENT + ',' + SHEET_COLORS.DIALOG_ACCENT_DARK + ');color:white;padding:15px}' +
     '.header h2{margin:0 0 12px 0;font-size:clamp(18px,4vw,22px)}' +
     '.search-container{position:relative}' +
     '.search-input{width:100%;padding:clamp(12px,3vw,16px) clamp(12px,3vw,16px) clamp(12px,3vw,16px) 45px;border:none;border-radius:10px;font-size:clamp(14px,3vw,16px);background:white}' +
     '.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px}' +
     '.tabs{display:flex;background:white;border-bottom:1px solid #e0e0e0}' +
     '.tab{flex:1;padding:clamp(10px,2.5vw,14px);text-align:center;font-size:clamp(12px,2.5vw,14px);font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + '}' +
-    '.tab.active{color:#1a73e8;border-bottom-color:#1a73e8}' +
+    '.tab.active{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom-color:' + SHEET_COLORS.DIALOG_ACCENT + '}' +
     '.results{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}' +
     '.result-card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}' +
-    '.result-title{font-weight:bold;color:#1a73e8;margin-bottom:5px;font-size:clamp(14px,3vw,16px)}' +
+    '.result-title{font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + ';margin-bottom:5px;font-size:clamp(14px,3vw,16px)}' +
     '.result-detail{font-size:clamp(11px,2.5vw,13px);color:#666;margin:3px 0}' +
     '.empty-state{text-align:center;padding:60px;color:#999;grid-column:1/-1}' +
     '@media (min-width:768px){.results{grid-template-columns:repeat(2,1fr)}}' +
@@ -1472,51 +1471,52 @@ function showMemberQuickActions(row) {
     // JS executes, so &apos; → ' which breaks single-quoted string delimiters.
     // JSON.stringify() produces a double-quoted JS string with correct escape sequences.
     var memberIdJs = JSON.stringify(memberId);
-    emailButtons =
-      '<div class="section-header">📨 Email Options</div>' +
-      '<button class="action-btn" onclick="google.script.run.composeEmailForMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ' + escapeHtml(email) + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(' + memberIdJs + ');google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>';
+    emailButtons = `<div class="section-header">📨 Email Options</div>
+      <button class="action-btn" onclick="google.script.run.composeEmailForMember(${memberIdJs});google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ${escapeHtml(email)}</div></span></button>
+      <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(${memberIdJs});google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>
+      <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(${memberIdJs});google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>
+      <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(${memberIdJs});google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>`;
   }
 
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}' +
-    '.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}' +
-    'h2{color:#1a73e8;display:flex;align-items:center;gap:10px;font-size:clamp(16px,4.5vw,20px)}' +
-    '.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px}' +
-    '.name{font-size:clamp(15px,4vw,18px);font-weight:bold}' +
-    '.id{color:#666;font-size:clamp(12px,3vw,14px)}' +
-    '.status{margin-top:10px}' +
-    '.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:clamp(10px,2.8vw,12px);font-weight:bold}' +
-    '.open{background:#ffebee;color:#c62828}' +
-    '.none{background:#e8f5e9;color:#2e7d32}' +
-    '.actions{display:flex;flex-direction:column;gap:10px}' +
-    '.action-btn{display:flex;align-items:center;gap:12px;padding:clamp(12px,3vw,15px);border:none;border-radius:8px;cursor:pointer;font-size:clamp(13px,3.5vw,14px);text-align:left;background:#f8f9fa;min-height:44px}' +
-    '.action-btn:hover{background:#e8f4fd}' +
-    '.icon{font-size:clamp(20px,5vw,24px)}' +
-    '.title{font-weight:bold}' +
-    '.desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}' +
-    '.section-header{font-weight:bold;color:#1a73e8;margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0;font-size:clamp(12px,3vw,14px)}' +
-    '.close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer;min-height:44px;font-size:clamp(13px,3.5vw,14px)}' +
-    '</style></head><body><div class="container">' +
-    '<h2>⚡ Quick Actions</h2>' +
-    '<div class="info">' +
-    '<div class="name">' + escapeHtml(name) + '</div>' +
-    '<div class="id">' + escapeHtml(memberId) + ' | ' + escapeHtml(email || 'No email') + '</div>' +
-    '<div class="status">' + (hasOpen === 'Yes' ? '<span class="badge open">🔴 Has Open Grievance</span>' : '<span class="badge none">🟢 No Open Grievances</span>') + '</div>' +
-    '</div>' +
-    '<div class="actions">' +
-    '<div class="section-header">📋 Member Actions</div>' +
-    '<button class="action-btn" onclick="google.script.run.openGrievanceFormForMember(' + row + ');google.script.host.close()"><span class="icon">📋</span><span><div class="title">Start New Grievance</div><div class="desc">Create a grievance for this member</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
-    '<button class="action-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(memberId) + ');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + escapeHtml(memberId) + '</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(' + JSON.stringify(memberId) + ')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
-    emailButtons +
-    '</div>' +
-    '<button class="close" onclick="google.script.host.close()">Close</button>' +
-    '</div></body></html>'
+  var memberIdJson = JSON.stringify(memberId);
+  var html = HtmlService.createHtmlOutput(`<!DOCTYPE html><html><head><base target="_top">
+    ${getMobileOptimizedHead()}
+    <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}
+    .container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}
+    h2{color:${SHEET_COLORS.DIALOG_ACCENT};display:flex;align-items:center;gap:10px;font-size:clamp(16px,4.5vw,20px)}
+    .info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px}
+    .name{font-size:clamp(15px,4vw,18px);font-weight:bold}
+    .id{color:#666;font-size:clamp(12px,3vw,14px)}
+    .status{margin-top:10px}
+    .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:clamp(10px,2.8vw,12px);font-weight:bold}
+    .open{background:#ffebee;color:#c62828}
+    .none{background:#e8f5e9;color:#2e7d32}
+    .actions{display:flex;flex-direction:column;gap:10px}
+    .action-btn{display:flex;align-items:center;gap:12px;padding:clamp(12px,3vw,15px);border:none;border-radius:8px;cursor:pointer;font-size:clamp(13px,3.5vw,14px);text-align:left;background:#f8f9fa;min-height:44px}
+    .action-btn:hover{background:#e8f4fd}
+    .icon{font-size:clamp(20px,5vw,24px)}
+    .title{font-weight:bold}
+    .desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}
+    .section-header{font-weight:bold;color:${SHEET_COLORS.DIALOG_ACCENT};margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0;font-size:clamp(12px,3vw,14px)}
+    .close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer;min-height:44px;font-size:clamp(13px,3.5vw,14px)}
+    </style></head><body><div class="container">
+    <h2>⚡ Quick Actions</h2>
+    <div class="info">
+      <div class="name">${escapeHtml(name)}</div>
+      <div class="id">${escapeHtml(memberId)} | ${escapeHtml(email || 'No email')}</div>
+      <div class="status">${hasOpen === 'Yes' ? '<span class="badge open">🔴 Has Open Grievance</span>' : '<span class="badge none">🟢 No Open Grievances</span>'}</div>
+    </div>
+    <div class="actions">
+      <div class="section-header">📋 Member Actions</div>
+      <button class="action-btn" onclick="google.script.run.openGrievanceFormForMember(${row});google.script.host.close()"><span class="icon">📋</span><span><div class="title">Start New Grievance</div><div class="desc">Create a grievance for this member</div></span></button>
+      <button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(${memberIdJson});google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>
+      <button class="action-btn" onclick="navigator.clipboard.writeText(${memberIdJson});alert('Copied!')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">${escapeHtml(memberId)}</div></span></button>
+      <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+'\\n'+r.folderUrl)}else{alert('Error: '+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(${memberIdJson})"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>
+      ${emailButtons}
+    </div>
+    <button class="close" onclick="google.script.host.close()">Close</button>
+    </div></body></html>`
   ).setWidth(400).setHeight(email ? 650 : 400);
   SpreadsheetApp.getUi().showModalDialog(html, 'Member Quick Actions');
 }
@@ -1546,55 +1546,68 @@ function showGrievanceQuickActions(row) {
   // Build email button (only if member has email)
   var emailStatusBtn = '';
   if (memberEmail) {
-    emailStatusBtn =
-      '<div class="section-header">📨 Communication</div>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ' + escapeHtml(String(memberEmail)) + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>';
+    var gIdJson = JSON.stringify(grievanceId);
+    var mIdJson = JSON.stringify(memberId);
+    emailStatusBtn = `<div class="section-header">📨 Communication</div>
+      <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(${gIdJson});google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ${escapeHtml(String(memberEmail))}</div></span></button>
+      <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(${mIdJson});google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>
+      <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(${mIdJson});google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>`;
   }
 
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}' +
-    '.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}' +
-    'h2{color:#DC2626;font-size:clamp(16px,4.5vw,20px)}' +
-    '.info{background:#fff5f5;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;border-left:4px solid #DC2626}' +
-    '.gid{font-size:clamp(15px,4vw,18px);font-weight:bold}' +
-    '.gmem{color:#666;font-size:clamp(12px,3vw,14px)}' +
-    '.gstatus{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}' +
-    '.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:clamp(10px,2.8vw,12px);font-weight:bold}' +
-    '.actions{display:flex;flex-direction:column;gap:10px}' +
-    '.action-btn{display:flex;align-items:center;gap:12px;padding:clamp(12px,3vw,15px);border:none;border-radius:8px;cursor:pointer;font-size:clamp(13px,3.5vw,14px);text-align:left;background:#f8f9fa;min-height:44px}' +
-    '.action-btn:hover{background:#fff5f5}' +
-    '.icon{font-size:clamp(20px,5vw,24px)}' +
-    '.title{font-weight:bold}' +
-    '.desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}' +
-    '.section-header{font-weight:bold;color:#DC2626;margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0;font-size:clamp(12px,3vw,14px)}' +
-    '.divider{height:1px;background:#e0e0e0;margin:10px 0}' +
-    '.status-section{margin-top:15px;padding:clamp(10px,3vw,15px);background:#f8f9fa;border-radius:8px}' +
-    '.status-section h4{margin:0 0 10px;font-size:clamp(13px,3.5vw,15px)}' +
-    'select{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;min-height:44px}' +
-    '.close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer;min-height:44px;font-size:clamp(13px,3.5vw,14px)}' +
-    '</style></head><body><div class="container">' +
-    '<h2>⚡ Grievance Actions</h2>' +
-    '<div class="info">' +
-    '<div class="gid">' + escapeHtml(grievanceId) + '</div>' +
-    '<div class="gmem">' + escapeHtml(name) + ' (' + escapeHtml(memberId) + ')' + (memberEmail ? ' - ' + escapeHtml(memberEmail) : '') + '</div>' +
-    '<div class="gstatus">' +
-    '<span class="badge">' + escapeHtml(status) + '</span>' +
-    '<span class="badge">' + escapeHtml(step) + '</span>' +
-    (daysTo !== null && daysTo !== '' ? '<span class="badge" style="background:' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '⚠️ Overdue' : '📅 ' + escapeHtml(String(daysTo)) + ' days') + '</span>' : '') +
-    '</div></div>' +
-    '<div class="actions">' +
-    '<div class="section-header">📋 Case Management</div>' +
-    '<button class="action-btn" onclick="google.script.run.syncSingleGrievanceToCalendar(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📅</span><span><div class="title">Sync to Calendar</div><div class="desc">Add deadlines to Google Calendar</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.setupDriveFolderForGrievance(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📁</span><span><div class="title">Setup Drive Folder</div><div class="desc">Create document folder</div></span></button>' +
-    '<button class="action-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(grievanceId) + ');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Grievance ID</div><div class="desc">' + escapeHtml(grievanceId) + '</div></span></button>' +
-    emailStatusBtn +
-    '</div>' +
-    (isOpen ? '<div class="status-section"><h4>Quick Status Update</h4><select id="statusSelect"><option value="">-- Select --</option><option value="Open">Open</option><option value="Pending Info">Pending Info</option><option value="Settled">Settled</option><option value="Withdrawn">Withdrawn</option><option value="Won">Won</option><option value="Denied">Denied</option><option value="Closed">Closed</option></select><button class="action-btn" style="margin-top:10px" onclick="var s=document.getElementById(\'statusSelect\').value;if(!s){alert(\'Select status\');return}google.script.run.withSuccessHandler(function(){alert(\'Updated!\');google.script.host.close()}).quickUpdateGrievanceStatus(' + row + ',s)"><span class="icon">✓</span><span><div class="title">Update Status</div></span></button></div>' : '') +
-    '<button class="close" onclick="google.script.host.close()">Close</button>' +
-    '</div></body></html>'
+  var grievanceIdJson = JSON.stringify(grievanceId);
+  var daysOverdue = daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0);
+  var daysBadge = daysTo !== null && daysTo !== ''
+    ? '<span class="badge" style="background:' + (daysOverdue ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysOverdue ? '⚠️ Overdue' : '📅 ' + escapeHtml(String(daysTo)) + ' days') + '</span>'
+    : '';
+  var statusSection = isOpen
+    ? `<div class="status-section"><h4>Quick Status Update</h4>
+       <select id="statusSelect"><option value="">-- Select --</option><option value="Open">Open</option><option value="Pending Info">Pending Info</option><option value="Settled">Settled</option><option value="Withdrawn">Withdrawn</option><option value="Won">Won</option><option value="Denied">Denied</option><option value="Closed">Closed</option></select>
+       <button class="action-btn" style="margin-top:10px" onclick="var s=document.getElementById('statusSelect').value;if(!s){alert('Select status');return}google.script.run.withSuccessHandler(function(){alert('Updated!');google.script.host.close()}).quickUpdateGrievanceStatus(${row},s)"><span class="icon">✓</span><span><div class="title">Update Status</div></span></button></div>`
+    : '';
+
+  var html = HtmlService.createHtmlOutput(`<!DOCTYPE html><html><head><base target="_top">
+    ${getMobileOptimizedHead()}
+    <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}
+    .container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}
+    h2{color:#DC2626;font-size:clamp(16px,4.5vw,20px)}
+    .info{background:#fff5f5;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;border-left:4px solid #DC2626}
+    .gid{font-size:clamp(15px,4vw,18px);font-weight:bold}
+    .gmem{color:#666;font-size:clamp(12px,3vw,14px)}
+    .gstatus{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+    .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:clamp(10px,2.8vw,12px);font-weight:bold}
+    .actions{display:flex;flex-direction:column;gap:10px}
+    .action-btn{display:flex;align-items:center;gap:12px;padding:clamp(12px,3vw,15px);border:none;border-radius:8px;cursor:pointer;font-size:clamp(13px,3.5vw,14px);text-align:left;background:#f8f9fa;min-height:44px}
+    .action-btn:hover{background:#fff5f5}
+    .icon{font-size:clamp(20px,5vw,24px)}
+    .title{font-weight:bold}
+    .desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}
+    .section-header{font-weight:bold;color:#DC2626;margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0;font-size:clamp(12px,3vw,14px)}
+    .status-section{margin-top:15px;padding:clamp(10px,3vw,15px);background:#f8f9fa;border-radius:8px}
+    .status-section h4{margin:0 0 10px;font-size:clamp(13px,3.5vw,15px)}
+    select{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;min-height:44px}
+    .close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer;min-height:44px;font-size:clamp(13px,3.5vw,14px)}
+    </style></head><body><div class="container">
+    <h2>⚡ Grievance Actions</h2>
+    <div class="info">
+      <div class="gid">${escapeHtml(grievanceId)}</div>
+      <div class="gmem">${escapeHtml(name)} (${escapeHtml(memberId)})${memberEmail ? ' - ' + escapeHtml(memberEmail) : ''}</div>
+      <div class="gstatus">
+        <span class="badge">${escapeHtml(status)}</span>
+        <span class="badge">${escapeHtml(step)}</span>
+        ${daysBadge}
+      </div>
+    </div>
+    <div class="actions">
+      <div class="section-header">📋 Case Management</div>
+      <button class="action-btn" onclick="google.script.run.syncSingleGrievanceToCalendar(${grievanceIdJson});google.script.host.close()"><span class="icon">📅</span><span><div class="title">Sync to Calendar</div><div class="desc">Add deadlines to Google Calendar</div></span></button>
+      <button class="action-btn" onclick="google.script.run.setupDriveFolderForGrievance(${grievanceIdJson});google.script.host.close()"><span class="icon">📁</span><span><div class="title">Setup Drive Folder</div><div class="desc">Create document folder</div></span></button>
+      <button class="action-btn" onclick="navigator.clipboard.writeText(${grievanceIdJson});alert('Copied!')"><span class="icon">📋</span><span><div class="title">Copy Grievance ID</div><div class="desc">${escapeHtml(grievanceId)}</div></span></button>
+      ${emailStatusBtn}
+    </div>
+    ${statusSection}
+    <button class="close" onclick="google.script.host.close()">Close</button>
+    </div></body></html>`
   ).setWidth(400).setHeight(memberEmail ? 750 : 550);
   SpreadsheetApp.getUi().showModalDialog(html, 'Grievance Quick Actions');
 }
@@ -1647,7 +1660,7 @@ function composeEmailForMember(memberId) {
       var name = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
       if (!email) { SpreadsheetApp.getUi().alert('No email on file.'); return; }
       var html = HtmlService.createHtmlOutput(
-        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px;font-size:clamp(12px,3vw,14px)}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;min-height:44px}textarea{min-height:180px}input:focus,textarea:focus{outline:none;border-color:#1a73e8}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:clamp(13px,3.5vw,14px);border:none;border-radius:4px;cursor:pointer;flex:1;min-height:44px}.primary{background:#1a73e8;color:white}.secondary{background:#6c757d;color:white}@media(max-width:480px){.buttons{flex-direction:column}}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + escapeHtml(name) + '</strong> (' + escapeHtml(memberId) + ')<br>' + escapeHtml(email) + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail(' + JSON.stringify(email) + ',s,m,' + JSON.stringify(memberId) + ')}</script></body></html>'
+        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';font-size:clamp(16px,4.5vw,20px)}.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px;font-size:clamp(12px,3vw,14px)}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;min-height:44px}textarea{min-height:180px}input:focus,textarea:focus{outline:none;border-color:' + SHEET_COLORS.DIALOG_ACCENT + '}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:clamp(13px,3.5vw,14px);border:none;border-radius:4px;cursor:pointer;flex:1;min-height:44px}.primary{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white}.secondary{background:#6c757d;color:white}@media(max-width:480px){.buttons{flex-direction:column}}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + escapeHtml(name) + '</strong> (' + escapeHtml(memberId) + ')<br>' + escapeHtml(email) + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail(' + JSON.stringify(email) + ',s,m,' + JSON.stringify(memberId) + ')}</script></body></html>'
       ).setWidth(600).setHeight(500);
       SpreadsheetApp.getUi().showModalDialog(html, '📧 Compose Email');
       return;
@@ -1977,7 +1990,7 @@ function showMemberGrievanceHistory(memberId) {
     return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === GRIEVANCE_STATUS.OPEN ? '#f44336' : '#4caf50') + '"><strong>' + escapeHtml(g.id) + '</strong><br><span style="color:#666">Status: ' + escapeHtml(g.status) + ' | Step: ' + escapeHtml(g.step) + '</span><br><span style="color:#888;font-size:12px">' + escapeHtml(g.issue) + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + escapeHtml(memberId) + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === GRIEVANCE_STATUS.OPEN; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== GRIEVANCE_STATUS.OPEN; }).length + '</div>' + list + '</body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + escapeHtml(memberId) + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === GRIEVANCE_STATUS.OPEN; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== GRIEVANCE_STATUS.OPEN; }).length + '</div>' + list + '</body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, 'Grievance History - ' + memberId);
 }
@@ -2724,109 +2737,122 @@ function getBulkActionsDialogHtml_(selectedCount, selectedRows) {
   var countStr = escapeHtml(String(selectedCount));
   var rowsJson = JSON.stringify(selectedRows || []);
 
-  return '<!DOCTYPE html><html><head><base target="_top">' +
-    getMobileOptimizedHead() +
-    '<style>' +
-    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
-    'body { font-family: "Google Sans", -apple-system, BlinkMacSystemFont, sans-serif; background: #f9fafb; }' +
-    '.container { padding: 24px; max-width: 560px; margin: 0 auto; }' +
-    '.count-badge { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #7C3AED, #5B21B6);' +
-    '  color: white; padding: 10px 20px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-bottom: 20px; }' +
-    '.count-badge .num { font-size: 22px; }' +
-    '.no-selection { text-align: center; padding: 40px 20px; color: #6B7280; }' +
-    '.no-selection p { margin-top: 12px; font-size: 14px; }' +
-    '.action-card { display: flex; align-items: center; gap: 16px; background: white; border: 1px solid #E5E7EB;' +
-    '  border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }' +
-    '.action-card:hover { border-color: #7C3AED; box-shadow: 0 2px 8px rgba(124,58,237,0.15); transform: translateY(-1px); }' +
-    '.action-card .icon { font-size: 28px; flex-shrink: 0; }' +
-    '.action-card .info { flex: 1; }' +
-    '.action-card .title { font-size: 15px; font-weight: 600; color: #1F2937; }' +
-    '.action-card .desc { font-size: 13px; color: #6B7280; margin-top: 2px; }' +
-    '.spinner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;' +
-    '  background: rgba(255,255,255,0.85); z-index: 999; justify-content: center; align-items: center; flex-direction: column; }' +
-    '.spinner { width: 40px; height: 40px; border: 4px solid #E5E7EB; border-top: 4px solid #7C3AED;' +
-    '  border-radius: 50%; animation: spin 0.8s linear infinite; }' +
-    '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }' +
-    '.spinner-text { margin-top: 12px; color: #6B7280; font-size: 14px; }' +
-    '.result-banner { padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; display: none; }' +
-    '.result-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }' +
-    '.result-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }' +
-    '.email-form { display: none; background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-top: 16px; }' +
-    '.email-form label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }' +
-    '.email-form input, .email-form textarea { width: 100%; padding: 10px 12px; border: 1px solid #E5E7EB;' +
-    '  border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 12px; }' +
-    '.email-form textarea { min-height: 100px; resize: vertical; }' +
-    '.btn-row { display: flex; gap: 10px; justify-content: flex-end; }' +
-    '.btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }' +
-    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
-    '.btn-secondary { background: #f3f4f6; color: #374151; }' +
-    '.btn:hover { opacity: 0.9; }' +
-    '.footer-bar { display: flex; justify-content: flex-end; margin-top: 20px; }' +
-    '</style></head><body>' +
-    '<div class="container">' +
-    '<div class="count-badge"><span class="num">' + countStr + '</span> row(s) selected</div>' +
-    (selectedCount === 0
-      ? '<div class="no-selection"><div style="font-size:48px">&#x1F4CB;</div>' +
-        '<p>No rows are currently selected.<br>Use the checkbox column in the Grievance Log,<br>or use the menu: Select All Open Cases.</p></div>'
-      : '<div id="actionCards">' +
-        '<div class="action-card" onclick="doFlag()">' +
-        '<div class="icon">&#x1F6A9;</div><div class="info"><div class="title">Flag Selected</div>' +
-        '<div class="desc">Set Message Alert to TRUE for all selected grievances</div></div></div>' +
-        '<div class="action-card" onclick="showEmailForm()">' +
-        '<div class="icon">&#x1F4E7;</div><div class="info"><div class="title">Email Selected Members</div>' +
-        '<div class="desc">Send an email to members linked to selected grievances</div></div></div>' +
-        '<div class="action-card" onclick="doExport()">' +
-        '<div class="icon">&#x1F4E4;</div><div class="info"><div class="title">Export Selected as CSV</div>' +
-        '<div class="desc">Export selected rows and email CSV to yourself</div></div></div>' +
-        '</div>' +
-        '<div class="email-form" id="emailForm">' +
-        '<label for="emailSubject">Subject</label>' +
-        '<input type="text" id="emailSubject" placeholder="Enter email subject...">' +
-        '<label for="emailBody">Message</label>' +
-        '<textarea id="emailBody" placeholder="Enter email body..."></textarea>' +
-        '<div class="btn-row">' +
-        '<button class="btn btn-secondary" onclick="hideEmailForm()">Cancel</button>' +
-        '<button class="btn btn-primary" onclick="doEmail()">Send Emails</button>' +
-        '</div></div>') +
-    '<div class="result-banner" id="resultBanner"></div>' +
-    '<div class="spinner-overlay" id="spinnerOverlay">' +
-    '<div class="spinner"></div><div class="spinner-text" id="spinnerText">Processing...</div></div>' +
-    '<div class="footer-bar"><button class="btn btn-secondary" onclick="google.script.host.close()">Close</button></div>' +
-    '</div>' +
-    '<script>' +
-    'var selectedRows = ' + rowsJson + ';' +
-    'var selectedCount = ' + countStr + ';' +
-    'function showSpinner(msg) { document.getElementById("spinnerText").textContent = msg || "Processing...";' +
-    '  document.getElementById("spinnerOverlay").style.display = "flex"; }' +
-    'function hideSpinner() { document.getElementById("spinnerOverlay").style.display = "none"; }' +
-    'function showResult(msg, isError) { var b = document.getElementById("resultBanner");' +
-    '  b.textContent = msg; b.className = "result-banner " + (isError ? "result-error" : "result-success"); b.style.display = "block"; }' +
-    'function showEmailForm() { document.getElementById("emailForm").style.display = "block"; }' +
-    'function hideEmailForm() { document.getElementById("emailForm").style.display = "none"; }' +
-    'function doFlag() {' +
-    '  if (!confirm("Flag " + selectedCount + " selected grievance(s) with Message Alert?")) return;' +
-    '  showSpinner("Flagging selected grievances...");' +
-    '  google.script.run.withSuccessHandler(function(r) { hideSpinner();' +
-    '    if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }' +
-    '  }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true);' +
-    '  }).bulkFlagGrievances(selectedRows); }' +
-    'function doEmail() {' +
-    '  var subj = document.getElementById("emailSubject").value.trim();' +
-    '  var body = document.getElementById("emailBody").value.trim();' +
-    '  if (!subj || !body) { alert("Please enter both a subject and message body."); return; }' +
-    '  if (!confirm("Send email to members of " + selectedCount + " selected grievance(s)?")) return;' +
-    '  showSpinner("Sending emails...");' +
-    '  google.script.run.withSuccessHandler(function(r) { hideSpinner(); hideEmailForm();' +
-    '    if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }' +
-    '  }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true);' +
-    '  }).bulkEmailGrievanceMembers(selectedRows, subj, body); }' +
-    'function doExport() {' +
-    '  if (!confirm("Export " + selectedCount + " selected grievance(s) as CSV and email to you?")) return;' +
-    '  showSpinner("Exporting CSV...");' +
-    '  google.script.run.withSuccessHandler(function(r) { hideSpinner();' +
-    '    if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }' +
-    '  }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true);' +
-    '  }).bulkExportGrievancesToCsv(selectedRows); }' +
-    '</script>' +
-    '</body></html>';
+  var actionCards = selectedCount === 0
+    ? `<div class="no-selection"><div style="font-size:48px">&#x1F4CB;</div>
+       <p>No rows are currently selected.<br>Use the checkbox column in the Grievance Log,<br>or use the menu: Select All Open Cases.</p></div>`
+    : `<div id="actionCards">
+       <div class="action-card" onclick="doFlag()">
+         <div class="icon">&#x1F6A9;</div><div class="info"><div class="title">Flag Selected</div>
+         <div class="desc">Set Message Alert to TRUE for all selected grievances</div></div></div>
+       <div class="action-card" onclick="showEmailForm()">
+         <div class="icon">&#x1F4E7;</div><div class="info"><div class="title">Email Selected Members</div>
+         <div class="desc">Send an email to members linked to selected grievances</div></div></div>
+       <div class="action-card" onclick="doExport()">
+         <div class="icon">&#x1F4E4;</div><div class="info"><div class="title">Export Selected as CSV</div>
+         <div class="desc">Export selected rows and email CSV to yourself</div></div></div>
+       </div>
+       <div class="email-form" id="emailForm">
+         <label for="emailSubject">Subject</label>
+         <input type="text" id="emailSubject" placeholder="Enter email subject...">
+         <label for="emailBody">Message</label>
+         <textarea id="emailBody" placeholder="Enter email body..."></textarea>
+         <div class="btn-row">
+           <button class="btn btn-secondary" onclick="hideEmailForm()">Cancel</button>
+           <button class="btn btn-primary" onclick="doEmail()">Send Emails</button>
+         </div>
+       </div>`;
+
+  return `<!DOCTYPE html><html><head><base target="_top">
+    ${getMobileOptimizedHead()}
+    <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Google Sans", -apple-system, BlinkMacSystemFont, sans-serif; background: #f9fafb; }
+    .container { padding: 24px; max-width: 560px; margin: 0 auto; }
+    .count-badge { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #7C3AED, #5B21B6);
+      color: white; padding: 10px 20px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-bottom: 20px; }
+    .count-badge .num { font-size: 22px; }
+    .no-selection { text-align: center; padding: 40px 20px; color: #6B7280; }
+    .no-selection p { margin-top: 12px; font-size: 14px; }
+    .action-card { display: flex; align-items: center; gap: 16px; background: white; border: 1px solid #E5E7EB;
+      border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
+    .action-card:hover { border-color: #7C3AED; box-shadow: 0 2px 8px rgba(124,58,237,0.15); transform: translateY(-1px); }
+    .action-card .icon { font-size: 28px; flex-shrink: 0; }
+    .action-card .info { flex: 1; }
+    .action-card .title { font-size: 15px; font-weight: 600; color: #1F2937; }
+    .action-card .desc { font-size: 13px; color: #6B7280; margin-top: 2px; }
+    .spinner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.85); z-index: 999; justify-content: center; align-items: center; flex-direction: column; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #E5E7EB; border-top: 4px solid #7C3AED;
+      border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .spinner-text { margin-top: 12px; color: #6B7280; font-size: 14px; }
+    .result-banner { padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; display: none; }
+    .result-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .result-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .email-form { display: none; background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-top: 16px; }
+    .email-form label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    .email-form input, .email-form textarea { width: 100%; padding: 10px 12px; border: 1px solid #E5E7EB;
+      border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 12px; }
+    .email-form textarea { min-height: 100px; resize: vertical; }
+    .btn-row { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }
+    .btn-secondary { background: #f3f4f6; color: #374151; }
+    .btn:hover { opacity: 0.9; }
+    .footer-bar { display: flex; justify-content: flex-end; margin-top: 20px; }
+    </style></head><body>
+    <div class="container">
+    <div class="count-badge"><span class="num">${countStr}</span> row(s) selected</div>
+    ${actionCards}
+    <div class="result-banner" id="resultBanner"></div>
+    <div class="spinner-overlay" id="spinnerOverlay">
+      <div class="spinner"></div><div class="spinner-text" id="spinnerText">Processing...</div>
+    </div>
+    <div class="footer-bar"><button class="btn btn-secondary" onclick="google.script.host.close()">Close</button></div>
+    </div>
+    <script>
+    var selectedRows = ${rowsJson};
+    var selectedCount = ${countStr};
+    function showSpinner(msg) {
+      document.getElementById("spinnerText").textContent = msg || "Processing...";
+      document.getElementById("spinnerOverlay").style.display = "flex";
+    }
+    function hideSpinner() { document.getElementById("spinnerOverlay").style.display = "none"; }
+    function showResult(msg, isError) {
+      var b = document.getElementById("resultBanner");
+      b.textContent = msg;
+      b.className = "result-banner " + (isError ? "result-error" : "result-success");
+      b.style.display = "block";
+    }
+    function showEmailForm() { document.getElementById("emailForm").style.display = "block"; }
+    function hideEmailForm() { document.getElementById("emailForm").style.display = "none"; }
+    function doFlag() {
+      if (!confirm("Flag " + selectedCount + " selected grievance(s) with Message Alert?")) return;
+      showSpinner("Flagging selected grievances...");
+      google.script.run.withSuccessHandler(function(r) {
+        hideSpinner();
+        if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }
+      }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true); }).bulkFlagGrievances(selectedRows);
+    }
+    function doEmail() {
+      var subj = document.getElementById("emailSubject").value.trim();
+      var body = document.getElementById("emailBody").value.trim();
+      if (!subj || !body) { alert("Please enter both a subject and message body."); return; }
+      if (!confirm("Send email to members of " + selectedCount + " selected grievance(s)?")) return;
+      showSpinner("Sending emails...");
+      google.script.run.withSuccessHandler(function(r) {
+        hideSpinner(); hideEmailForm();
+        if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }
+      }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true); }).bulkEmailGrievanceMembers(selectedRows, subj, body);
+    }
+    function doExport() {
+      if (!confirm("Export " + selectedCount + " selected grievance(s) as CSV and email to you?")) return;
+      showSpinner("Exporting CSV...");
+      google.script.run.withSuccessHandler(function(r) {
+        hideSpinner();
+        if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }
+      }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true); }).bulkExportGrievancesToCsv(selectedRows);
+    }
+    </script>
+    </body></html>`;
 }

@@ -1979,7 +1979,7 @@ function installAutoSyncTrigger() {
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
     'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:8px}' +
-    'h2{color:#1a73e8;margin-top:0}' +
+    'h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';margin-top:0}' +
     '.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px}' +
     '.section h4{margin:0 0 10px;color:#333}' +
     '.option{display:flex;align-items:center;margin:8px 0}' +
@@ -1988,7 +1988,7 @@ function installAutoSyncTrigger() {
     '.info{background:#e8f4fd;padding:12px;border-radius:8px;font-size:13px;margin-bottom:15px}' +
     '.buttons{display:flex;gap:10px;margin-top:20px}' +
     'button{padding:12px 20px;border:none;border-radius:4px;cursor:pointer}' +
-    '.primary{background:#1a73e8;color:white;flex:1}' +
+    '.primary{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;flex:1}' +
     '.secondary{background:#e0e0e0;flex:1}' +
     '.warning{background:#fff3cd;padding:10px;border-radius:4px;font-size:12px;color:#856404}' +
     '</style></head><body><div class="container">' +

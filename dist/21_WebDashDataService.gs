@@ -6062,6 +6062,7 @@ function dataGetSheetHealth(sessionToken) {
   try { return DataService.getSheetHealth(); } catch (e) { Logger.log('dataGetSheetHealth error: ' + e.message); return { members: { rows: 0, status: 'ok' }, grievances: { rows: 0, status: 'ok' } }; }
 }
 
+
 // ═══════════════════════════════════════
 // WELCOME EXPERIENCE (PHASE2)
 // Uses PropertiesService to track first-visit state per user.
@@ -6327,3 +6328,4 @@ function dataGetCorrelationSummary(sessionToken) {
     return { success: true, summary: { total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, topInsights: [], actionableCount: 0, disabled: true } };
   }
 }
+

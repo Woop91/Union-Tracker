@@ -886,6 +886,6 @@ function padRight(str, len) {
  *
  * Note: onGrievanceFormSubmit() is defined in 05_Integrations.gs
  *
- * @author SolidBase Development Team
+ * @author Union Local Development Team
  * @version 4.33.0
  */

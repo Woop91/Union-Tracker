@@ -47,6 +47,9 @@ function extractIds(code, startPattern) {
 // ============================================================================
 // G8: SIDEBAR TABS → ROUTE HANDLERS
 // ============================================================================
+// Historical context (pre-SolidBase): shared tabs had missing routing.
+// causing it to fall through to default (renderStewardDashboard).
+// Fix: shared tabs are now handled before the role switch.
 // This test ensures every sidebar tab ID maps to a handler somewhere.
 
 describe('G8: Every sidebar tab has a route handler', () => {
@@ -97,7 +100,8 @@ describe('G8: Every sidebar tab has a route handler', () => {
 // ============================================================================
 // G9: MOBILE MORE MENU PARITY
 // ============================================================================
-// Mobile More menus must include all sidebar tabs (no desktop-only features).
+// Historical context: some tabs were in sidebar (desktop) but missing from
+// More menus (mobile), so mobile users could not access them.
 
 describe('G9: Mobile More menus cover all sidebar tabs', () => {
   const indexCode = read('index.html');
@@ -161,7 +165,6 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
       renderStewardContact: ['contact', 'stewarddirectory'],
       renderUpdateProfile: ['profile'],
       renderMemberResources: ['resources'],
-      renderWorkloadTracker: ['workload'],
       renderPollsPage: ['polls'],
       renderSurveyResultsPage: ['survey'],
       renderUnionStatsPage: ['unionstats'],
@@ -303,7 +306,6 @@ describe('G11: _ensureAllSheetsInternal covers all feature sheets', () => {
       'initFailsafeSheet':         ['FAILSAFE_CONFIG'],
       'initWeeklyQuestionSheets':  ['WEEKLY_QUESTIONS', 'WEEKLY_RESPONSES', 'QUESTION_POOL'],
       'initPortalSheets':          [], // portal sheets not in SHEETS constant
-      'initWorkloadTrackerSheets': ['WORKLOAD_VAULT', 'WORKLOAD_REPORTING', 'WORKLOAD_REMINDERS', 'WORKLOAD_USERMETA'],
       'setupHiddenSheets':         [], // hidden calc sheets
       'createResourcesSheet':      ['RESOURCES'],
       'createResourceConfigSheet': ['RESOURCE_CONFIG'],
@@ -707,8 +709,10 @@ describe('G21: My Tasks tab integrity', () => {
 // ============================================================================
 // G18: SHARED TABS ROUTE FOR BOTH ROLES
 // ============================================================================
-// This guard ensures any tab referenced by BOTH views is routed before the
-// role-specific switch blocks (i.e., as a shared tab).
+// Historical context: shared tabs need consistent routing.
+// but _handleTabNav only handled it for role === 'member'. Stewards were silently
+// redirected to their dashboard. This guard ensures any tab referenced by BOTH
+// views is routed before the role-specific switch blocks (i.e., as a shared tab).
 
 describe('G18: Shared tabs route for both roles', () => {
   const indexCode = read('index.html');
@@ -838,9 +842,6 @@ describe('G19: More menu items have route handlers', () => {
 });
 
 
-// G20: POMS description accuracy — removed from SolidBase (org-specific feature)
-
-
 // ============================================================================
 // G21: MEMBER DUES-GATED TABS HAVE _isDuesPaying() GUARD
 // ============================================================================
@@ -892,7 +893,16 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
   });
 });
 
-// G22: Workload Tracker — removed from SolidBase (org-specific feature)
+// ============================================================================
+// G22: Workload Tracker frontend invariants
+// ============================================================================
+
+// SolidBase: G22 Workload Tracker frontend invariants — SKIPPED
+// WorkloadService and all workload frontend code (WT_CATEGORIES, WT_CAT_KEY_LABELS,
+// draft auto-save, etc.) are excluded from SolidBase as org-specific features.
+describe.skip('G22 — Workload Tracker frontend invariants [SolidBase: excluded]', () => {
+  test.skip('placeholder', () => {});
+});
 
 
 // ============================================================================
@@ -933,7 +943,6 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  // renderPOMSReference removed from SolidBase (org-specific feature)
 });
 
 // Helper: extract a function body by name (brace-counting)
@@ -1008,7 +1017,6 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  // poms early-return test removed from SolidBase (org-specific feature)
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');

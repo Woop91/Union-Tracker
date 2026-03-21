@@ -674,7 +674,7 @@ function fixDataQualityIssues() {
     '.fix-option{background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;display:flex;align-items:center}' +
     '.fix-option input{margin-right:10px}' +
     'button{padding:12px 24px;border:none;border-radius:4px;cursor:pointer;margin:5px}' +
-    '.primary{background:#1a73e8;color:white}' +
+    '.primary{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white}' +
     '.secondary{background:#e0e0e0}' +
     '</style></head><body><div class="container">' +
     '<h2>⚠️ Data Quality Issues</h2>' +

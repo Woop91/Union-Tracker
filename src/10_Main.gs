@@ -2020,13 +2020,13 @@ function showFindMemberDialog() {
       <style>
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
         .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
-        h2 { color: #1a73e8; margin-top: 0; }
+        h2 { color: ${SHEET_COLORS.DIALOG_ACCENT}; margin-top: 0; }
         .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
         .field { margin: 15px 0; }
         .field label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
         .field input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
         button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
-        .primary { background: #1a73e8; color: white; }
+        .primary { background: ${SHEET_COLORS.DIALOG_ACCENT}; color: white; }
         .secondary { background: #e0e0e0; color: #333; }
         .button-row { margin-top: 20px; }
         .results { margin-top: 15px; max-height: 200px; overflow-y: auto; }

@@ -46,7 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Webapp performance: production minification** — `build:prod` now enables `--minify` by default, reducing HTML/CSS/JS payload by ~150KB (13-26% per file).
 - **Webapp performance: non-blocking font loading** — Google Fonts stylesheet loads asynchronously via `media="print"` pattern, eliminating render-blocking CSS.
 - **Webapp performance: spreadsheet singleton** — DataService caches `getActiveSpreadsheet()` per execution, eliminating ~19 redundant IPC calls per server request.
-- **Webapp performance: lazy-view HTML caching** — `getOrgChartHtml()` now caches rendered HTML in CacheService (6-hour, version-keyed TTL), avoiding repeated `HtmlService.createHtmlOutputFromFile()` calls.
+- **Webapp performance: lazy-view HTML caching** — `getOrgChartHtml()` and `getPOMSReferenceHtml()` now cache rendered HTML in CacheService (6-hour, version-keyed TTL), avoiding repeated `HtmlService.createHtmlOutputFromFile()` calls.
 
 ## [4.30.1] - 2026-03-17
 
@@ -151,6 +151,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - **Polls: null sessionToken in 5 client calls** — `wqGetHistory`, `wqSubmitPoolQuestion` (member), `wqClosePoll`, `wqSetStewardQuestion`, `wqSetPollFrequency`, `wqGetHistory` (steward) now pass `SESSION_TOKEN` instead of `null`, fixing broken auth for magic-link users
 - **Polls: redundant page variable** in member and steward poll history pagination removed; nav buttons now call `loadPage()` directly
+- **POMS tab broken for stewards** — routing guard in `_handleTabNav` was `role === 'member'` only; stewards clicking POMS were silently redirected to dashboard. Now a shared tab for both roles.
+- **POMS description incorrect** — "Postal Operations Manual" corrected to "Program Operations Manual System" in both `steward_view.html` and `member_view.html`.
 - **Union Stats auth mismatch** — Grievances and Hot Spots sub-tabs were silently broken for non-steward members; created `dataGetMemberGrievanceStats` / `dataGetMemberGrievanceHotSpots` endpoints using `_resolveCallerEmail` (any authenticated member)
 - **Engagement KPI** — hidden Resource Downloads card when value is 0 (not currently tracked)
 - **Redundant sheet read** — `dataGetEngagementStats` no longer re-reads Member Directory for membership trends
@@ -173,6 +175,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Tests: 44 new workload tests** — Expanded from 19 to 63 tests covering rate limiting (atomic, per-email, case-insensitive), history shape/filtering/sorting, sub-category JSON parsing, CSV export, structural invariants
 - **Tests: G14 deploy guard** — Source-level checks ensuring crash-safe refresh pattern and atomic rate limiting are maintained
 - **Tests: G18 SPA integrity** — 10 frontend invariant tests: WT_CAT_KEY_LABELS definition, bar chart dynamic max, auto-save/draft/restore functions, last-submitted indicator, category alignment
+
+### Security
+- **Auth check added to `getPOMSReferenceHtml()`** — now verifies `Session.getActiveUser().getEmail()` before serving content.
 
 ### Changed
 - Frequency button active-state update uses class toggle instead of re-applying inline styles

@@ -121,8 +121,8 @@ function _renderStewardFeedbackCard(container, fb) {
 
   // Header row
   var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
-  header.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, 'Your Feedback Scores'));
-  header.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, fb.totalFeedback + ' rating' + (fb.totalFeedback !== 1 ? 's' : '')));
+  header.appendChild(el('div', { className: 'display-title-sm' }, 'Your Feedback Scores'));
+  header.appendChild(el('div', { className: 'text-xs-muted' }, fb.totalFeedback + ' rating' + (fb.totalFeedback !== 1 ? 's' : '')));
   card.appendChild(header);
 
   // Score bars
@@ -178,36 +178,24 @@ function renderStewardDashboard(appContainer) {
 
     // KPIs — show org-wide fallback if steward has 0 assigned cases
     var kpis = AppState.kpis || {};
-    var kpiGrid = el('div', { className: 'kpi-grid' });
     var isOrgFallback = (kpis.totalCases || 0) === 0;
 
     if (isOrgFallback) {
       // Fetch org-wide stats asynchronously, update KPIs when ready
-      var kpiItems = [
-        { label: 'Org Cases', value: '...', color: null },
-        { label: 'Org Overdue', value: '...', color: null },
-        { label: 'Org Due <7d', value: '...', color: null },
+      var kpiGrid = renderKPIStrip(container, [
+        { label: 'Org Cases', value: '...' },
+        { label: 'Org Overdue', value: '...' },
+        { label: 'Org Due <7d', value: '...' },
         { label: 'Org Resolved', value: '...', color: 'var(--success)' },
-      ];
-      kpiItems.forEach(function(kpi) {
-        var card = el('div', { className: 'kpi-card' });
-        card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-        var val = el('div', { className: 'kpi-value' }, kpi.value);
-        if (kpi.color) val.style.color = kpi.color;
-        card.appendChild(val);
-        kpiGrid.appendChild(card);
-      });
-      container.appendChild(kpiGrid);
+      ]);
 
       // Subtext
-      var orgNote = el('div', { style: { textAlign: 'center', fontSize: '11px', color: 'var(--muted)', marginTop: '-6px', marginBottom: '10px' } }, '(no cases assigned to you — showing org-wide)');
-      container.appendChild(orgNote);
+      container.appendChild(el('div', { style: { textAlign: 'center', fontSize: '11px', color: 'var(--muted)', marginTop: '-6px', marginBottom: '10px' } }, '(no cases assigned to you \u2014 showing org-wide)'));
 
       // Fill in org-wide stats
       serverCall().withSuccessHandler(function(stats) {
         var cards = kpiGrid.querySelectorAll('.kpi-value');
         if (!stats || !stats.available) {
-          // Graceful fallback — show 0 instead of leaving "..." placeholder
           if (cards[0]) cards[0].textContent = '0';
           if (cards[1]) cards[1].textContent = '0';
           if (cards[2]) cards[2].textContent = '0';
@@ -227,21 +215,12 @@ function renderStewardDashboard(appContainer) {
         if (cards[3]) cards[3].textContent = '\u2014';
       }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
-      var kpiItems = [
+      renderKPIStrip(container, [
         { label: 'My Cases', value: kpis.totalCases || 0 },
         { label: 'Overdue', value: kpis.overdue || 0, color: kpis.overdue > 0 ? 'var(--danger)' : null },
         { label: 'Due <7d', value: kpis.dueSoon || 0, color: kpis.dueSoon > 0 ? 'var(--warning)' : null },
         { label: 'Resolved', value: kpis.resolved || 0, color: 'var(--success)' },
-      ];
-      kpiItems.forEach(function(kpi) {
-        var card = el('div', { className: 'kpi-card' });
-        card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-        var val = el('div', { className: 'kpi-value' }, String(kpi.value));
-        if (kpi.color) val.style.color = kpi.color;
-        card.appendChild(val);
-        kpiGrid.appendChild(card);
-      });
-      container.appendChild(kpiGrid);
+      ]);
     }
 
     // Grievance feedback summary (v4.32.0)
@@ -434,7 +413,7 @@ function renderCaseList(container, filter) {
         agencyCharts.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load agency stats.'));
       }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
+      container.appendChild(el('div', { className: 'empty-state-lg' },
         'No ' + filter + ' cases.'));
     }
     return;
@@ -453,8 +432,8 @@ function renderCaseList(container, filter) {
       var statusClass = c.status || 'active';
       var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
 
-      var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
-      var leftGroup = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+      var topRow = el('div', { className: 'flex-between-center' });
+      var leftGroup = el('div', { className: 'flex-row' });
       leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
       leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
       topRow.appendChild(leftGroup);
@@ -638,20 +617,11 @@ function _renderBulkMembers(content, appContainer, _prefetchedStats) {
       // KPI strip
       var myCount = members.filter(function(m) { return m.assignedSteward && m.assignedSteward.toLowerCase() === CURRENT_USER.email.toLowerCase(); }).length;
       var activeGrievances = members.filter(function(m) { return m.hasOpenGrievance; }).length;
-      var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
-      [
+      renderKPIStrip(content, [
         { label: 'Total', value: members.length },
         { label: 'Active Cases', value: activeGrievances, color: activeGrievances > 0 ? 'var(--warning)' : null },
         { label: 'My Assigned', value: myCount, color: 'var(--accent)' },
-      ].forEach(function(kpi) {
-        var card = el('div', { className: 'kpi-card' });
-        card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-        var val = el('div', { className: 'kpi-value' }, String(kpi.value));
-        if (kpi.color) val.style.color = kpi.color;
-        card.appendChild(val);
-        kpiStrip.appendChild(card);
-      });
-      content.appendChild(kpiStrip);
+      ], { columns: 3 });
 
       // OPT-6: If stats already arrived from parallel call, render chart now
       if (_prefetchedStats && _prefetchedStats.byLocation && typeof ChartHelper !== 'undefined') {
@@ -759,7 +729,7 @@ function _renderBulkMembers(content, appContainer, _prefetchedStats) {
       var userMsg = isNetwork
         ? 'Connection lost — could not reach the server. Check your internet and try again.'
         : 'Failed to load members. Try refreshing.';
-      var errorWrap = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+      var errorWrap = el('div', { className: 'empty-state-lg' });
       errorWrap.appendChild(el('div', { style: { color: isNetwork ? 'var(--warning)' : 'var(--danger)', marginBottom: '12px' } }, userMsg));
       var retryBtn = el('button', {
         style: { padding: '8px 20px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px' },
@@ -875,7 +845,7 @@ function _renderPaginatedMembers(content, appContainer, counts, _prefetchedStats
     pager.appendChild(prevBtn);
     var startItem = (page - 1) * _pageSize + 1;
     var endItem = Math.min(page * _pageSize, total);
-    pager.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } },
+    pager.appendChild(el('span', { className: 'text-sm-muted' },
       startItem + '\u2013' + endItem + ' of ' + total + ' (page ' + page + '/' + totalPages + ')'));
     var nextBtn = el('button', {
       className: 'btn', disabled: page >= totalPages,
@@ -892,8 +862,6 @@ function _renderPaginatedMembers(content, appContainer, counts, _prefetchedStats
 
 // ─── Shared KPI + chart helpers ───
 function _renderMemberKPIs(container, total, activeGrievances, myCount) {
-  var cols = myCount !== null ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
-  var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: cols } });
   var kpis = [
     { label: 'Total', value: total },
     { label: 'Active Cases', value: activeGrievances, color: activeGrievances > 0 ? 'var(--warning)' : null },
@@ -901,15 +869,7 @@ function _renderMemberKPIs(container, total, activeGrievances, myCount) {
   if (myCount !== null) {
     kpis.push({ label: 'My Assigned', value: myCount, color: 'var(--accent)' });
   }
-  kpis.forEach(function(kpi) {
-    var card = el('div', { className: 'kpi-card' });
-    card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-    var val = el('div', { className: 'kpi-value' }, String(kpi.value));
-    if (kpi.color) val.style.color = kpi.color;
-    card.appendChild(val);
-    kpiStrip.appendChild(card);
-  });
-  container.appendChild(kpiStrip);
+  renderKPIStrip(container, kpis, { columns: kpis.length });
 }
 
 function _renderStatsChart(container, stats) {
@@ -997,7 +957,7 @@ function renderFilteredMembers(container, members, query) {
       onClick: function() { _memberListPage--; renderFilteredMembers(container, members, query); },
     }, '\u2190 Prev');
     pager.appendChild(prevBtn);
-    pager.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } },
+    pager.appendChild(el('span', { className: 'text-sm-muted' },
       (start + 1) + '\u2013' + Math.min(start + _memberPageSize, filtered.length) + ' of ' + filtered.length));
     var nextBtn = el('button', {
       className: 'btn', disabled: _memberListPage >= totalPages - 1,
@@ -1039,14 +999,14 @@ function _showMemberDetail(container, itemEl, member) {
   ];
   infoFields.forEach(function(f) {
     var pair = el('div', { style: { minWidth: '100px' } });
-    pair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, f.label));
+    pair.appendChild(el('div', { className: 'text-label' }, f.label));
     pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
     infoRow.appendChild(pair);
   });
   panel.appendChild(infoRow);
 
   // Action buttons
-  var btnRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  var btnRow = el('div', { className: 'flex-wrap-gap' });
   var actionArea = el('div', { style: { marginTop: '8px' } });
 
   // ── Full Profile ──────────────────────────────────────────────────────────
@@ -1072,7 +1032,7 @@ function _showMemberDetail(container, itemEl, member) {
           ];
           extraFields.forEach(function(f) {
             var pair = el('div', { style: { minWidth: '100px' } });
-            pair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, f.label));
+            pair.appendChild(el('div', { className: 'text-label' }, f.label));
             pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
             extraRow.appendChild(pair);
           });
@@ -1080,7 +1040,7 @@ function _showMemberDetail(container, itemEl, member) {
           // Links to Members/LastName, FirstName/ — steward-only workspace, never shared with member
           if (profile.memberAdminFolderUrl) {
             var folderPair = el('div', { style: { minWidth: '100px' } });
-            folderPair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Member Folder'));
+            folderPair.appendChild(el('div', { className: 'text-label' }, 'Member Folder'));
             var folderLink = el('a', {
               href: profile.memberAdminFolderUrl,
               target: '_blank',
@@ -1135,8 +1095,8 @@ function _showMemberDetail(container, itemEl, member) {
       var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
       form.appendChild(statusMsg);
 
-      var btnRowInner = el('div', { style: { display: 'flex', gap: '6px' } });
-      var submitBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px' },
+      var btnRowInner = el('div', { className: 'flex-gap-6' });
+      var submitBtn = el('button', { className: 'btn btn-primary text-sm',
         onClick: function() {
           submitBtn.disabled = true;
           statusMsg.textContent = 'Logging...';
@@ -1160,7 +1120,7 @@ function _showMemberDetail(container, itemEl, member) {
             .dataLogMemberContact(SESSION_TOKEN, member.email, selectedType, notesInput.value.trim(), '');
         }
       }, 'Log');
-      var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
+      var cancelBtn = el('button', { className: 'btn text-sm', onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
       btnRowInner.appendChild(submitBtn);
       btnRowInner.appendChild(cancelBtn);
       form.appendChild(btnRowInner);
@@ -1176,7 +1136,7 @@ function _showMemberDetail(container, itemEl, member) {
       var form = el('div', { style: { borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' } });
       form.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '\uD83D\uDD14 Send Notification — ' + (member.name || member.email)));
 
-      var subjectInput = el('input', { className: 'form-input', placeholder: 'Subject...', style: { marginBottom: '6px' } });
+      var subjectInput = el('input', { className: 'form-input mb-6', placeholder: 'Subject...' });
       var bodyInput = el('textarea', { className: 'msg-textarea', placeholder: 'Message body...', style: { minHeight: '70px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' } });
       form.appendChild(subjectInput);
       form.appendChild(bodyInput);
@@ -1184,8 +1144,8 @@ function _showMemberDetail(container, itemEl, member) {
       var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
       form.appendChild(statusMsg);
 
-      var btnRowInner = el('div', { style: { display: 'flex', gap: '6px' } });
-      var sendBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px' },
+      var btnRowInner = el('div', { className: 'flex-gap-6' });
+      var sendBtn = el('button', { className: 'btn btn-primary text-sm',
         onClick: function() {
           if (!subjectInput.value.trim() || !bodyInput.value.trim()) {
             statusMsg.textContent = 'Subject and body required.';
@@ -1214,7 +1174,7 @@ function _showMemberDetail(container, itemEl, member) {
             .dataSendDirectMessage(SESSION_TOKEN, member.email, subjectInput.value.trim(), bodyInput.value.trim());
         }
       }, 'Send');
-      var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
+      var cancelBtn = el('button', { className: 'btn text-sm', onClick: function() { actionArea.innerHTML = ''; } }, 'Cancel');
       btnRowInner.appendChild(sendBtn);
       btnRowInner.appendChild(cancelBtn);
       form.appendChild(btnRowInner);
@@ -1403,13 +1363,13 @@ function renderBroadcast(appContainer) {
         locationCheckboxes.appendChild(allLocBtn);
         opts.locations.forEach(function(loc) { buildCheckboxPill(locationCheckboxes, loc, selectedLocations); });
       } else {
-        locationCheckboxes.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No location data available'));
+        locationCheckboxes.appendChild(el('span', { className: 'text-sm-muted' }, 'No location data available'));
       }
 
       if (opts.officeDays.length > 0) {
         opts.officeDays.forEach(function(day) { buildCheckboxPill(daysCheckboxes, day, selectedDays); });
       } else {
-        daysCheckboxes.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No office day data available'));
+        daysCheckboxes.appendChild(el('span', { className: 'text-sm-muted' }, 'No office day data available'));
       }
 
       // Dues paying filter — shown only if column exists in the sheet
@@ -1424,7 +1384,7 @@ function renderBroadcast(appContainer) {
     // ── Subject line ──────────────────────────────────────
     var subjectGroup = el('div', { className: 'form-group' });
     subjectGroup.appendChild(el('label', { className: 'form-label' }, 'Subject'));
-    var subjectHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Leave blank to use the default auto-generated subject.');
+    var subjectHint = el('div', { className: 'text-xs-muted-mb-4' }, 'Leave blank to use the default auto-generated subject.');
     subjectGroup.appendChild(subjectHint);
     var subjectInput = el('input', {
       type: 'text',
@@ -1493,28 +1453,12 @@ function renderStewardNotifications(appContainer) {
       if (badge) badge.remove();
     }
 
-    var activeSubTab = 'inbox';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      ['inbox', 'compose', 'manage'].forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === tab),
-          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
-      });
-    }
-
-    function renderSubContent() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'inbox') _renderNotifInbox(subContent);
-      else if (activeSubTab === 'compose') _renderNotifCompose(subContent);
-      else _renderNotifManage(subContent);
-    }
+    var _st = createSubTabs([
+      { id: 'inbox', label: 'Inbox', render: function(c) { _renderNotifInbox(c); } },
+      { id: 'compose', label: 'Compose', render: function(c) { _renderNotifCompose(c); } },
+      { id: 'manage', label: 'Manage', render: function(c) { _renderNotifManage(c); } }
+    ]);
+    var subTabBar = _st.bar, subContent = _st.content;
 
     // --- Inbox: same as member notification list ---
     function _renderNotifInbox(target) {
@@ -1625,7 +1569,7 @@ function renderStewardNotifications(appContainer) {
       }
 
       function buildIndividualPicker() {
-        var searchInput = el('input', { className: 'form-input', placeholder: 'Search members...', style: { marginBottom: '8px' } });
+        var searchInput = el('input', { className: 'form-input mb-8', placeholder: 'Search members...' });
         var listWrap = el('div', { style: { maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' } });
         recipientArea.appendChild(searchInput);
         recipientArea.appendChild(listWrap);
@@ -1691,10 +1635,10 @@ function renderStewardNotifications(appContainer) {
       var selectedDismissMode = 'Dismissible';
       var dismissModeGroup = el('div', { className: 'form-group' });
       dismissModeGroup.appendChild(el('label', { className: 'form-label' }, 'Dismiss Mode'));
-      var dismissHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } },
+      var dismissHint = el('div', { className: 'text-xs-muted-mb-8' },
         'Dismissible: member can close it permanently. Timed: auto-expires on set date, no dismiss button shown.');
       dismissModeGroup.appendChild(dismissHint);
-      var dmBar = el('div', { style: { display: 'flex', gap: '8px' } });
+      var dmBar = el('div', { className: 'flex-gap-8' });
       var dismissibleBtn = el('button', { className: 'filter-tab active', onClick: function() {
         selectedDismissMode = 'Dismissible';
         dismissibleBtn.className = 'filter-tab active';
@@ -1849,8 +1793,6 @@ function renderStewardNotifications(appContainer) {
       }).getAllWebAppNotifications(SESSION_TOKEN);
     }
 
-    refreshSubTabs();
-    renderSubContent();
     content.appendChild(subTabBar);
     content.appendChild(subContent);
     container.appendChild(content);
@@ -1866,27 +1808,11 @@ function renderStewardResources(appContainer) {
     _stewardHeader(container, 'Resources', 'Browse and manage content');
     var content = el('div', { className: 'content' });
 
-    var activeSubTab = 'browse';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      ['browse', 'manage'].forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === tab),
-          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
-      });
-    }
-
-    function renderSubContent() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'browse') _renderResourceBrowse(subContent);
-      else _renderResourceManage(subContent);
-    }
+    var _st = createSubTabs([
+      { id: 'browse', label: 'Browse', render: function(c) { _renderResourceBrowse(c); } },
+      { id: 'manage', label: 'Manage', render: function(c) { _renderResourceManage(c); } }
+    ]);
+    var subTabBar = _st.bar, subContent = _st.content;
 
     // --- Browse: same as member hub but steward audience ---
     function _renderResourceBrowse(target) {
@@ -1908,9 +1834,9 @@ function renderStewardResources(appContainer) {
           }
         });
         item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-        var tg = el('div', { style: { flex: '1' } });
-        tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-        tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+        var tg = el('div', { className: 'flex-1' });
+        tg.appendChild(el('div', { className: 'display-section' }, r.label));
+        tg.appendChild(el('div', { className: 'text-xs-muted' }, r.sub));
         item.appendChild(tg);
         item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
         target.appendChild(item);
@@ -1919,7 +1845,7 @@ function renderStewardResources(appContainer) {
       // Know Your Rights section
       var hubSection = el('div', { style: { marginTop: '20px' } });
       hubSection.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)', marginBottom: '12px' } }, 'Know Your Rights'));
-      var searchInput = el('input', { className: 'search-input form-input', placeholder: 'Search resources...', style: { marginBottom: '8px' } });
+      var searchInput = el('input', { className: 'search-input form-input mb-8', placeholder: 'Search resources...' });
       hubSection.appendChild(searchInput);
       var pillsWrap = el('div', { className: 'res-pills' });
       hubSection.appendChild(pillsWrap);
@@ -1974,7 +1900,7 @@ function renderStewardResources(appContainer) {
           card.appendChild(el('span', { className: 'notif-type-badge notif-type-announcement', style: { fontSize: '10px', marginBottom: '6px' } }, r.category));
           card.appendChild(el('div', { className: 'res-card-title' }, r.title));
           card.appendChild(el('div', { className: 'res-card-summary' }, r.summary));
-          var hint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Tap to read more \u25BE');
+          var hint = el('div', { className: 'text-xs-muted-mt-8' }, 'Tap to read more \u25BE');
           card.setAttribute('aria-expanded', 'false');
           card.appendChild(hint);
           var expandContent = el('div', { className: 'res-card-content' });
@@ -1988,7 +1914,7 @@ function renderStewardResources(appContainer) {
             });
             expandContent.appendChild(resLink);
           }
-          if (r.dateAdded) expandContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Added: ' + r.dateAdded));
+          if (r.dateAdded) expandContent.appendChild(el('div', { className: 'text-xs-muted-mt-8' }, 'Added: ' + r.dateAdded));
           card.appendChild(expandContent);
           card.addEventListener('click', function() {
             card.classList.toggle('expanded');
@@ -2028,7 +1954,7 @@ function renderStewardResources(appContainer) {
         }
       }).withFailureHandler(function() {}).getWebAppResourceLinks();
 
-      var addBtn = el('button', { className: 'btn btn-primary', style: { marginBottom: '12px' }, onClick: function() {
+      var addBtn = el('button', { className: 'btn btn-primary mb-12', onClick: function() {
         showResourceForm(null);
       }}, '+ Add Resource');
       listWrap.appendChild(addBtn);
@@ -2144,7 +2070,7 @@ function renderStewardResources(appContainer) {
         var visGroup = el('div', { className: 'form-group' });
         visGroup.appendChild(el('label', { className: 'form-label' }, 'Visible'));
         var visVal = existing ? (existing.visible ? 'Yes' : 'No') : 'Yes';
-        var visBar = el('div', { style: { display: 'flex', gap: '8px' } });
+        var visBar = el('div', { className: 'flex-gap-8' });
         var visYes = el('button', { className: 'filter-tab' + (visVal === 'Yes' ? ' active' : ''), onClick: function() { visVal = 'Yes'; visYes.className = 'filter-tab active'; visNo.className = 'filter-tab'; }}, 'Yes');
         var visNo = el('button', { className: 'filter-tab' + (visVal === 'No' ? ' active' : ''), onClick: function() { visVal = 'No'; visNo.className = 'filter-tab active'; visYes.className = 'filter-tab'; }}, 'No');
         visBar.appendChild(visYes);
@@ -2156,7 +2082,7 @@ function renderStewardResources(appContainer) {
         var audGroup = el('div', { className: 'form-group' });
         audGroup.appendChild(el('label', { className: 'form-label' }, 'Audience'));
         var audVal = (existing && existing.audience) || 'All';
-        var audBar = el('div', { style: { display: 'flex', gap: '8px' } });
+        var audBar = el('div', { className: 'flex-gap-8' });
         var audBtns = {};
         ['All', 'Members', 'Stewards'].forEach(function(a) {
           audBtns[a] = el('button', { className: 'filter-tab' + (audVal === a ? ' active' : ''), onClick: function() {
@@ -2171,7 +2097,7 @@ function renderStewardResources(appContainer) {
         var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
         formWrap.appendChild(statusMsg);
 
-        var btnRow = el('div', { style: { display: 'flex', gap: '8px' } });
+        var btnRow = el('div', { className: 'flex-gap-8' });
         var saveBtn = el('button', { className: 'btn btn-primary', onClick: function() {
           if (!fields.title.value.trim()) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
           saveBtn.textContent = 'Saving...';
@@ -2217,8 +2143,6 @@ function renderStewardResources(appContainer) {
       }
     }
 
-    refreshSubTabs();
-    renderSubContent();
     content.appendChild(subTabBar);
     content.appendChild(subContent);
     container.appendChild(content);
@@ -2236,19 +2160,19 @@ function renderSurveyTracking(appContainer) {
     container.appendChild(content);
 
     // Period status bar
-    var periodBar = el('div', { style: { marginBottom: '14px' } });
+    var periodBar = el('div', { className: 'mb-14' });
     content.appendChild(periodBar);
 
     // Scope filter tabs
-    var scopeWrap = el('div', { style: { marginBottom: '14px' } });
+    var scopeWrap = el('div', { className: 'mb-14' });
     content.appendChild(scopeWrap);
 
     // KPI summary area
-    var kpiWrap = el('div', { style: { marginBottom: '14px' } });
+    var kpiWrap = el('div', { className: 'mb-14' });
     content.appendChild(kpiWrap);
 
     // Stats area
-    var statsWrap = el('div', { style: { marginBottom: '14px' } });
+    var statsWrap = el('div', { className: 'mb-14' });
     content.appendChild(statsWrap);
 
     // Tracking list area
@@ -2276,15 +2200,15 @@ function renderSurveyTracking(appContainer) {
 
         // ── Overall progress bar ───────────────────────────────────────
         if (total > 0) {
-          var progCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '10px' } });
+          var progCard = el('div', { className: 'card p-16-mb-10' });
           var progHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
-          progHeader.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, 'Response Rate'));
+          progHeader.appendChild(el('div', { className: 'display-title-sm' }, 'Response Rate'));
           progHeader.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '700', color: rate >= 80 ? 'var(--success)' : rate >= 50 ? 'var(--warning)' : 'var(--danger)' } }, rate + '%'));
           progCard.appendChild(progHeader);
 
           // Overall progress bar — hero size (.prog-track--lg = 10px)
           var barColor = rate >= 80 ? 'prog-fill--success' : rate >= 50 ? 'prog-fill--warning' : 'prog-fill--danger';
-          var barBg = el('div', { className: 'prog-track prog-track--lg', style: { marginBottom: '8px' } });
+          var barBg = el('div', { className: 'prog-track prog-track--lg mb-8' });
           barBg.appendChild(el('div', { className: 'prog-fill ' + barColor, style: { width: rate + '%' } }));
           progCard.appendChild(barBg);
 
@@ -2360,7 +2284,7 @@ function renderSurveyTracking(appContainer) {
           if (!hasAny || summary.responseCount < 5) return;
 
           kpiWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Section Averages (1\u201310)'));
-          var kpiRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+          var kpiRow = el('div', { className: 'flex-wrap-gap' });
           sectionKeys.forEach(function(key) {
             var s = sections[key];
             if (!s || s.avg === null) return;
@@ -2375,7 +2299,7 @@ function renderSurveyTracking(appContainer) {
 
         // ── No data ───────────────────────────────────────────────────────
         if (!total) {
-          dataWrap.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No survey tracking data. Open a period and populate tracking.'));
+          dataWrap.appendChild(el('div', { className: 'empty-state-sm' }, 'No survey tracking data. Open a period and populate tracking.'));
           return;
         }
 
@@ -2412,7 +2336,7 @@ function renderSurveyTracking(appContainer) {
         // ── Render nearby members section ────
         if (nearbyMembers.length > 0) {
           dataWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', margin: '12px 0 6px' } }, '\uD83D\uDCCD Nearby \u2014 Pending (' + nearbyMembers.length + ')'));
-          dataWrap.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } }, 'Members at your location with overlapping office days'));
+          dataWrap.appendChild(el('div', { className: 'text-xs-muted-mb-8' }, 'Members at your location with overlapping office days'));
           var nearbyContainer = el('div');
           _surveyPaginate(nearbyContainer, nearbyMembers, true);
           dataWrap.appendChild(nearbyContainer);
@@ -2452,7 +2376,7 @@ function renderSurveyTracking(appContainer) {
 
       }).withFailureHandler(function() {
         dataWrap.innerHTML = '';
-        dataWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load survey data.'));
+        dataWrap.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load survey data.'));
       }).dataGetStewardSurveyTracking(SESSION_TOKEN, scope);
     }
 
@@ -2465,7 +2389,7 @@ function renderSurveyTracking(appContainer) {
 
       if (period) {
         var pBar = el('div', { className: 'card', style: { padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)' } });
-        pBar.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)' } }, '\uD83D\uDCCB ' + (period.name || period.id)));
+        pBar.appendChild(el('div', { className: 'text-sm-text' }, '\uD83D\uDCCB ' + (period.name || period.id)));
         pBar.appendChild(el('span', { style: { fontSize: '11px', background: 'var(--success)', color: '#fff', padding: '2px 8px', borderRadius: '20px' } }, 'Active'));
         periodBar.appendChild(pBar);
       } else {
@@ -2509,36 +2433,12 @@ function renderSurveyTracking(appContainer) {
 
 // Helper: paginated survey member list with Prev/Next controls
 function _surveyPaginate(container, items, showProximity) {
-  var PAGE_SIZE = 20;
-  var page = 0;
-  var totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-
-  var listArea = el('div');
-  var navRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: '12px' } });
-  var prevBtn = el('button', { className: 'btn btn-sm', style: { fontSize: '11px', padding: '4px 12px' } }, '\u2190 Prev');
-  var pageLabel = el('span', { style: { color: 'var(--muted)', fontSize: '11px' } });
-  var nextBtn = el('button', { className: 'btn btn-sm', style: { fontSize: '11px', padding: '4px 12px' } }, 'Next \u2192');
-
-  function render() {
-    listArea.innerHTML = '';
-    var start = page * PAGE_SIZE;
-    items.slice(start, start + PAGE_SIZE).forEach(function(m) { _renderSurveyMemberItem(listArea, m, showProximity); });
-    pageLabel.textContent = 'Page ' + (page + 1) + ' of ' + totalPages + ' (' + items.length + ' total)';
-    prevBtn.disabled = page === 0;
-    nextBtn.disabled = page >= totalPages - 1;
-    prevBtn.style.visibility = totalPages <= 1 ? 'hidden' : '';
-    nextBtn.style.visibility = totalPages <= 1 ? 'hidden' : '';
-    pageLabel.style.display = totalPages <= 1 ? 'none' : '';
-  }
-  prevBtn.onclick = function() { if (page > 0) { page--; render(); } };
-  nextBtn.onclick = function() { if (page < totalPages - 1) { page++; render(); } };
-
-  container.appendChild(listArea);
-  navRow.appendChild(prevBtn);
-  navRow.appendChild(pageLabel);
-  navRow.appendChild(nextBtn);
-  if (items.length > PAGE_SIZE) container.appendChild(navRow);
-  render();
+  var pg = createPaginator({
+    items: items,
+    pageSize: 20,
+    renderItem: function(listArea, m) { _renderSurveyMemberItem(listArea, m, showProximity); }
+  });
+  container.appendChild(pg.container);
 }
 
 // Helper: render a survey member item with progress bar and details
@@ -2587,7 +2487,7 @@ function _renderSurveyMemberItem(parentEl, m, showProximity) {
     var pRate = m.participationRate;
     var pColorClass = pRate >= 70 ? 'prog-fill--success' : pRate >= 40 ? 'prog-fill--warning' : 'prog-fill--danger';
     partRow.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', minWidth: '60px' } }, 'History: ' + pRate + '%'));
-    var partBg = el('div', { className: 'prog-track prog-track--sm', style: { flex: '1' } });
+    var partBg = el('div', { className: 'prog-track prog-track--sm flex-1' });
     partBg.appendChild(el('div', { className: 'prog-fill ' + pColorClass, style: { width: pRate + '%' } }));
     partRow.appendChild(partBg);
     partRow.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', minWidth: '40px', textAlign: 'right' } }, m.totalCompleted + '/' + (m.totalCompleted + m.totalMissed)));
@@ -2613,9 +2513,9 @@ function renderStewardMore(appContainer) {
     var phoneCard = el('div', { className: 'card card-glass', style: { padding: '14px 16px', marginBottom: '14px' } });
     var phoneRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
     phoneRow.appendChild(el('span', { style: { fontSize: '18px', flexShrink: '0' } }, '📞'));
-    var phoneLabel = el('div', { style: { flex: '1' } });
-    phoneLabel.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, 'Share My Phone Number'));
-    phoneLabel.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px' } }, 'Allow members to see your phone in the directory'));
+    var phoneLabel = el('div', { className: 'flex-1' });
+    phoneLabel.appendChild(el('div', { className: 'display-section' }, 'Share My Phone Number'));
+    phoneLabel.appendChild(el('div', { className: 'text-xs-muted-mt-2' }, 'Allow members to see your phone in the directory'));
     phoneRow.appendChild(phoneLabel);
 
     // Toggle switch
@@ -2747,7 +2647,7 @@ function renderStewardMore(appContainer) {
       }
       var item = el('div', { className: 'more-menu-item', onClick: function() { try { m.action(); } catch(e) { console.error('More menu error (' + m.label + '):', e); item.style.borderColor = 'var(--danger)'; item.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to open. Please try again.')); } } });
       item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
-      var text = el('div', { style: { flex: '1' } });
+      var text = el('div', { className: 'flex-1' });
       text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
       text.appendChild(el('div', { className: 'more-menu-desc' }, m.desc));
       item.appendChild(text);
@@ -2809,33 +2709,13 @@ function renderContactLog(appContainer) {
     var content = el('div', { className: 'content' });
 
     // Sub-tabs — default to 'recent', order: Recent → By Member → Log
-    var activeSubTab = 'recent';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      ['recent', 'by member', 'log'].forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === tab),
-          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
-      });
-    }
-
-    function renderSubContent() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'log') _renderContactForm(subContent);
-      else if (activeSubTab === 'recent') _renderRecentContacts(subContent);
-      else _renderContactByMember(subContent);
-    }
-
-    refreshSubTabs();
-    renderSubContent();
-    content.appendChild(subTabBar);
-    content.appendChild(subContent);
+    var _st = createSubTabs([
+      { id: 'recent', label: 'Recent', render: function(c) { _renderRecentContacts(c); } },
+      { id: 'by member', label: 'By Member', render: function(c) { _renderContactByMember(c); } },
+      { id: 'log', label: 'Log', render: function(c) { _renderContactForm(c); } }
+    ]);
+    content.appendChild(_st.bar);
+    content.appendChild(_st.content);
     container.appendChild(content);
   });
 }
@@ -2844,72 +2724,23 @@ function _renderContactForm(container) {
   var typeIcons = { 'Phone': '\uD83D\uDCDE', 'Email': '\u2709\uFE0F', 'In Person': '\uD83D\uDC64', 'Text': '\uD83D\uDCAC' };
   container.appendChild(el('h3', { className: 'section-title' }, 'Log a Contact'));
 
-  var memberGroup = el('div', { className: 'form-group', style: { position: 'relative' } });
-  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
-  var memberInput = el('input', { className: 'form-input', placeholder: 'Type name or email...' });
-  memberGroup.appendChild(memberInput);
-  var acDropdown = el('div', { className: 'contact-log-ac-dropdown', style: {
-    position: 'absolute', top: '100%', left: '0', right: '0', zIndex: '50',
-    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
-    maxHeight: '200px', overflowY: 'auto', display: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-  }});
-  memberGroup.appendChild(acDropdown);
-  container.appendChild(memberGroup);
-
-  // Typeahead for member email + name
-  var _acMembers = null;
-  var _selectedMemberName = '';
-  function _loadAcMembers(cb) {
-    if (_acMembers) { cb(_acMembers); return; }
-    serverCall()
-      .withSuccessHandler(function(m) { _acMembers = m || []; cb(_acMembers); })
-      .withFailureHandler(function() { _acMembers = []; cb(_acMembers); })
-      .dataGetAllMembers(SESSION_TOKEN);
-  }
-  memberInput.addEventListener('input', function() {
-    _selectedMemberName = ''; // reset on manual typing
-    var q = memberInput.value.toLowerCase().trim();
-    if (q.length < 1) { acDropdown.style.display = 'none'; return; }
-    _loadAcMembers(function(members) {
-      acDropdown.innerHTML = '';
-      var matches = members.filter(function(m) {
-        return (m.name || '').toLowerCase().indexOf(q) !== -1 ||
-               (m.email || '').toLowerCase().indexOf(q) !== -1;
-      }).slice(0, 8);
-      if (matches.length === 0) { acDropdown.style.display = 'none'; return; }
-      matches.forEach(function(m) {
-        var item = el('div', { style: {
-          padding: '8px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)',
-          borderBottom: '1px solid var(--border)'
-        }, onClick: function() {
-          memberInput.value = m.email;
-          _selectedMemberName = m.name || '';
-          acDropdown.style.display = 'none';
-        }});
-        item.appendChild(el('div', { style: { fontWeight: '600' } }, m.name || ''));
-        item.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px' } }, m.email));
-        item.addEventListener('mouseenter', function() { item.style.background = 'var(--accentBg)'; });
-        item.addEventListener('mouseleave', function() { item.style.background = 'transparent'; });
-        acDropdown.appendChild(item);
-      });
-      acDropdown.style.display = 'block';
-    });
+  var _memberAc = createAutocomplete({
+    placeholder: 'Type name or email...',
+    loadData: function(cb) {
+      serverCall()
+        .withSuccessHandler(function(m) { cb(m || []); })
+        .withFailureHandler(function() { cb([]); })
+        .dataGetAllMembers(SESSION_TOKEN);
+    },
+    onSelect: function() {}
   });
-  // Use a named handler so duplicate listeners are automatically deduped by the browser
-  if (!window._contactLogAcDismiss) {
-    window._contactLogAcDismiss = function(e) {
-      var dd = document.querySelector('.contact-log-ac-dropdown');
-      if (dd && dd.style.display !== 'none') {
-        var grp = dd.parentNode;
-        if (grp && !grp.contains(e.target)) dd.style.display = 'none';
-      }
-    };
-    document.addEventListener('click', window._contactLogAcDismiss);
-  }
+  _memberAc.wrapper.insertBefore(el('label', { className: 'form-label' }, 'Member Email'), _memberAc.wrapper.firstChild);
+  container.appendChild(_memberAc.wrapper);
+  var memberInput = _memberAc.input;
 
   var typeGroup = el('div', { className: 'form-group' });
   typeGroup.appendChild(el('label', { className: 'form-label' }, 'Contact Type'));
-  var typeRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  var typeRow = el('div', { className: 'flex-wrap-gap' });
   var selectedType = 'Phone';
   Object.keys(typeIcons).forEach(function(t) {
     var btn = el('button', {
@@ -2932,7 +2763,7 @@ function _renderContactForm(container) {
   notesGroup.appendChild(notesInput);
   container.appendChild(notesGroup);
 
-  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  var statusMsg = el('div', { className: 'status-msg' });
   container.appendChild(statusMsg);
 
   container.appendChild(el('button', {
@@ -2944,8 +2775,8 @@ function _renderContactForm(container) {
       serverCall().withSuccessHandler(function(r) {
         statusMsg.textContent = r && r.success ? 'Contact logged!' : 'Error logging contact.';
         statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
-        if (r && r.success) { memberInput.value = ''; notesInput.value = ''; _selectedMemberName = ''; }
-      }).dataLogMemberContact(SESSION_TOKEN, email, selectedType, notesInput.value.trim(), '', _selectedMemberName);
+        if (r && r.success) { _memberAc.clear(); notesInput.value = ''; }
+      }).dataLogMemberContact(SESSION_TOKEN, email, selectedType, notesInput.value.trim(), '', (_memberAc.getSelected() && _memberAc.getSelected().name) || '');
     }
   }, 'Log Contact'));
 }
@@ -2955,17 +2786,17 @@ function _renderRecentContacts(container) {
   serverCall().withSuccessHandler(function(log) {
     container.innerHTML = '';
     if (!log || log.length === 0) {
-      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No contacts logged yet.'));
+      container.appendChild(el('div', { className: 'empty-state-sm' }, 'No contacts logged yet.'));
       return;
     }
     log.slice(0, 20).forEach(function(entry) {
       var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px' } });
-      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
-      top.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, entry.memberName || (entry.memberEmail ? entry.memberEmail.split('@')[0] : '')));
-      top.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date));
+      var top = el('div', { className: 'flex-between' });
+      top.appendChild(el('span', { className: 'display-section' }, entry.memberName || (entry.memberEmail ? entry.memberEmail.split('@')[0] : '')));
+      top.appendChild(el('span', { className: 'text-xs-muted' }, entry.date));
       card.appendChild(top);
       card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)' } }, entry.type));
-      if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+      if (entry.notes) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, entry.notes));
       container.appendChild(card);
     });
   }).dataGetStewardContactLog(SESSION_TOKEN);
@@ -2973,53 +2804,18 @@ function _renderRecentContacts(container) {
 
 function _renderContactByMember(container) {
   container.appendChild(el('h3', { className: 'section-title' }, 'Look Up by Member'));
-  var searchGroup = el('div', { className: 'form-group', style: { position: 'relative' } });
-  var searchInput = el('input', { className: 'form-input', placeholder: 'Type name or email...' });
-  searchGroup.appendChild(searchInput);
-  var bmDropdown = el('div', { className: 'contact-log-ac-dropdown', style: {
-    position: 'absolute', top: '100%', left: '0', right: '0', zIndex: '50',
-    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
-    maxHeight: '200px', overflowY: 'auto', display: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-  }});
-  searchGroup.appendChild(bmDropdown);
-  container.appendChild(searchGroup);
-
-  // Autocomplete for by-member search
-  var _bmMembers = null;
-  function _loadBmMembers(cb) {
-    if (_bmMembers) { cb(_bmMembers); return; }
-    serverCall()
-      .withSuccessHandler(function(m) { _bmMembers = m || []; cb(_bmMembers); })
-      .withFailureHandler(function() { _bmMembers = []; cb(_bmMembers); })
-      .dataGetAllMembers(SESSION_TOKEN);
-  }
-  searchInput.addEventListener('input', function() {
-    var q = searchInput.value.toLowerCase().trim();
-    if (q.length < 1) { bmDropdown.style.display = 'none'; return; }
-    _loadBmMembers(function(members) {
-      bmDropdown.innerHTML = '';
-      var matches = members.filter(function(m) {
-        return (m.name || '').toLowerCase().indexOf(q) !== -1 ||
-               (m.email || '').toLowerCase().indexOf(q) !== -1;
-      }).slice(0, 8);
-      if (matches.length === 0) { bmDropdown.style.display = 'none'; return; }
-      matches.forEach(function(m) {
-        var item = el('div', { style: {
-          padding: '8px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)',
-          borderBottom: '1px solid var(--border)'
-        }, onClick: function() {
-          searchInput.value = m.email;
-          bmDropdown.style.display = 'none';
-        }});
-        item.appendChild(el('div', { style: { fontWeight: '600' } }, m.name || ''));
-        item.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px' } }, m.email));
-        item.addEventListener('mouseenter', function() { item.style.background = 'var(--accentBg)'; });
-        item.addEventListener('mouseleave', function() { item.style.background = 'transparent'; });
-        bmDropdown.appendChild(item);
-      });
-      bmDropdown.style.display = 'block';
-    });
+  var _bmAc = createAutocomplete({
+    placeholder: 'Type name or email...',
+    loadData: function(cb) {
+      serverCall()
+        .withSuccessHandler(function(m) { cb(m || []); })
+        .withFailureHandler(function() { cb([]); })
+        .dataGetAllMembers(SESSION_TOKEN);
+    },
+    onSelect: function() {}
   });
+  container.appendChild(_bmAc.wrapper);
+  var searchInput = _bmAc.input;
 
   var resultArea = el('div', { style: { marginTop: '10px' } });
   container.appendChild(resultArea);
@@ -3040,10 +2836,10 @@ function _renderContactByMember(container) {
           var card = el('div', { className: 'card', style: { padding: '10px 14px', marginBottom: '4px' } });
           var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between' } });
           topRow.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600' } }, entry.type));
-          topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date));
+          topRow.appendChild(el('span', { className: 'text-xs-muted' }, entry.date));
           card.appendChild(topRow);
           if (entry.memberName) card.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginTop: '2px' } }, entry.memberName));
-          if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+          if (entry.notes) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, entry.notes));
           resultArea.appendChild(card);
         });
       }).dataGetMemberContactHistory(SESSION_TOKEN, email);
@@ -3060,33 +2856,14 @@ function renderStewardTasks(appContainer) {
     _stewardHeader(container, 'Tasks');
     var content = el('div', { className: 'content' });
 
-    var activeSubTab = 'open';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      ['open', 'completed', 'new task', 'member tasks'].forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === tab),
-          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
-      });
-    }
-
-    function renderSubContent() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'new task') _renderNewTaskForm(subContent, function() { activeSubTab = 'open'; refreshSubTabs(); renderSubContent(); });
-      else if (activeSubTab === 'member tasks') _renderStewardMemberTasks(subContent);
-      else _renderTaskList(subContent, activeSubTab === 'completed' ? 'completed' : null);
-    }
-
-    refreshSubTabs();
-    renderSubContent();
-    content.appendChild(subTabBar);
-    content.appendChild(subContent);
+    var _st = createSubTabs([
+      { id: 'open', label: 'Open', render: function(c) { _renderTaskList(c, null); } },
+      { id: 'completed', label: 'Completed', render: function(c) { _renderTaskList(c, 'completed'); } },
+      { id: 'new task', label: 'New Task', render: function(c) { _renderNewTaskForm(c, function() { _st.switchTo('open'); }); } },
+      { id: 'member tasks', label: 'Member Tasks', render: function(c) { _renderStewardMemberTasks(c); } }
+    ]);
+    content.appendChild(_st.bar);
+    content.appendChild(_st.content);
     container.appendChild(content);
   });
 }
@@ -3098,37 +2875,28 @@ function _renderTaskList(container, statusFilter) {
     var filtered = statusFilter ? tasks.filter(function(t) { return t.status === statusFilter; }) : tasks.filter(function(t) { return t.status !== 'completed'; });
 
     if (filtered.length === 0) {
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, statusFilter === 'completed' ? 'No completed tasks.' : 'No open tasks. Create one!'));
+      container.appendChild(el('div', { className: 'empty-state' }, statusFilter === 'completed' ? 'No completed tasks.' : 'No open tasks. Create one!'));
       return;
     }
 
     // KPI strip
     var highPri = filtered.filter(function(t) { return t.priority === 'high'; }).length;
     var overdue = filtered.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
-    var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '10px' } });
-    [
+    renderKPIStrip(container, [
       { label: 'Total', value: filtered.length },
       { label: 'High Priority', value: highPri, color: highPri > 0 ? 'var(--danger)' : null },
       { label: 'Overdue', value: overdue, color: overdue > 0 ? 'var(--warning)' : null },
-    ].forEach(function(kpi) {
-      var card = el('div', { className: 'kpi-card' });
-      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
-      if (kpi.color) val.style.color = kpi.color;
-      card.appendChild(val);
-      kpiStrip.appendChild(card);
-    });
-    container.appendChild(kpiStrip);
+    ], { columns: 3, marginBottom: '10px' });
 
     filtered.forEach(function(task) {
       var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
       var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
-      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
-      top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, task.title));
+      var top = el('div', { className: 'flex-between' });
+      top.appendChild(el('div', { className: 'display-section' }, task.title));
       if (task.dueDate) top.appendChild(el('span', { style: { fontSize: '10px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, task.dueDate));
       card.appendChild(top);
-      if (task.memberEmail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, task.memberEmail.split('@')[0]));
-      if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+      if (task.memberEmail) card.appendChild(el('div', { className: 'text-xs-muted' }, task.memberEmail.split('@')[0]));
+      if (task.description) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, task.description.substring(0, 100)));
 
       if (task.status !== 'completed') {
         var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' } });
@@ -3159,14 +2927,14 @@ function _renderTaskList(container, statusFilter) {
             if (editForm) { editForm.remove(); editForm = null; editBtn.textContent = '\u270F\uFE0F Edit'; return; }
             editBtn.textContent = 'Cancel';
             editForm = el('div', { style: { marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' } });
-            var titleIn = el('input', { className: 'form-input', style: { fontSize: '12px' }, value: t.title });
-            var priSel = el('select', { className: 'form-select', style: { fontSize: '12px' } });
+            var titleIn = el('input', { className: 'form-input text-sm', value: t.title });
+            var priSel = el('select', { className: 'form-select text-sm' });
             ['high', 'medium', 'low'].forEach(function(p) {
               var o = el('option', { value: p }, p.charAt(0).toUpperCase() + p.slice(1));
               if (p === t.priority) o.selected = true;
               priSel.appendChild(o);
             });
-            var dueIn = el('input', { className: 'form-input', type: 'date', style: { fontSize: '12px' }, value: t.dueDate || '' });
+            var dueIn = el('input', { className: 'form-input text-sm', type: 'date', value: t.dueDate || '' });
             var editStatus = el('div', { style: { fontSize: '11px', color: 'var(--danger)', minHeight: '14px' } });
             var saveBtn = el('button', {
               className: 'btn btn-primary', style: { fontSize: '11px', padding: '4px 12px' },
@@ -3241,39 +3009,30 @@ function _renderStewardMemberTasks(container) {
   serverCall().withSuccessHandler(function(tasks) {
     container.innerHTML = '';
     if (!tasks || tasks.length === 0) {
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No member tasks assigned yet.'));
+      container.appendChild(el('div', { className: 'empty-state' }, 'No member tasks assigned yet.'));
       return;
     }
 
     // KPI strip — summary counts at the top of the member tasks sub-tab
     var openTasks = tasks.filter(function(t) { return t.status !== 'completed'; });
     var completedTasks = tasks.filter(function(t) { return t.status === 'completed'; });
-    var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '10px' } });
-    [
+    renderKPIStrip(container, [
       { label: 'Total Assigned', value: tasks.length },
       { label: 'Open', value: openTasks.length, color: openTasks.length > 0 ? 'var(--accent)' : null },
       { label: 'Completed', value: completedTasks.length, color: completedTasks.length > 0 ? 'var(--success)' : null }
-    ].forEach(function(kpi) {
-      var card = el('div', { className: 'kpi-card' });
-      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
-      if (kpi.color) val.style.color = kpi.color;
-      card.appendChild(val);
-      kpiStrip.appendChild(card);
-    });
-    container.appendChild(kpiStrip);
+    ], { columns: 3, marginBottom: '10px' });
 
     tasks.forEach(function(task) {
       var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
       var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
-      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
-      top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, task.title));
+      var top = el('div', { className: 'flex-between' });
+      top.appendChild(el('div', { className: 'display-section' }, task.title));
       var statusColor = task.status === 'completed' ? 'var(--success)' : 'var(--accent)';
       top.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', color: statusColor, background: statusColor + '18', padding: '2px 8px', borderRadius: '8px' } }, task.status));
       card.appendChild(top);
-      if (task.memberEmail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Assigned to: ' + task.memberEmail.split('@')[0]));
+      if (task.memberEmail) card.appendChild(el('div', { className: 'text-xs-muted' }, 'Assigned to: ' + task.memberEmail.split('@')[0]));
       if (task.dueDate) card.appendChild(el('div', { style: { fontSize: '11px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, 'Due: ' + task.dueDate));
-      if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+      if (task.description) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, task.description.substring(0, 100)));
       if (task.status !== 'completed') {
         var mActions = el('div', { style: { marginTop: '8px' } });
         (function(t) {
@@ -3298,7 +3057,7 @@ function _renderStewardMemberTasks(container) {
     });
   }).withFailureHandler(function() {
     container.innerHTML = '';
-    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load member tasks.'));
+    container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load member tasks.'));
   }).dataGetStewardAssignedMemberTasks(SESSION_TOKEN);
 }
 
@@ -3388,7 +3147,7 @@ function _renderNewTaskForm(container, onCreated) {
   dueGroup.appendChild(dueInput);
   container.appendChild(dueGroup);
 
-  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  var statusMsg = el('div', { className: 'status-msg' });
   container.appendChild(statusMsg);
 
   container.appendChild(el('button', {
@@ -3554,7 +3313,7 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
 }
 
 function _renderMembershipInsights(container, ms, showDetail) {
-  var section = el('div', { style: { marginBottom: '16px' } });
+  var section = el('div', { className: 'mb-16' });
   section.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
     color: 'var(--text)', marginBottom: '12px',
@@ -3763,14 +3522,14 @@ function _renderFiledVsResolved(container, stats) {
 // Helper: renders a detailed breakdown list for drill-down views
 function _renderInsightDetailList(panel, items, color) {
   if (!items || items.length === 0) {
-    panel.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No data available.'));
+    panel.appendChild(el('div', { className: 'empty-state-sm' }, 'No data available.'));
     return;
   }
   var maxCount = Math.max.apply(null, items.map(function(i) { return i.count || 0; }));
   items.forEach(function(item) {
     var row = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '12px' } });
     var labelEl = el('div', { style: { flex: '1', minWidth: '0' } });
-    labelEl.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, item.label));
+    labelEl.appendChild(el('div', { className: 'display-section' }, item.label));
     // Progress bar — sm (4px) relative-to-max chart bar
     var pct = maxCount > 0 ? Math.round(((item.count || 0) / maxCount) * 100) : 0;
     var barBg = el('div', { className: 'prog-track prog-track--sm', style: { marginTop: '4px' } });
@@ -3783,7 +3542,7 @@ function _renderInsightDetailList(panel, items, color) {
 }
 
 function _renderPerformanceSection(container, perfData, showDetail) {
-  var section = el('div', { style: { marginBottom: '16px' } });
+  var section = el('div', { className: 'mb-16' });
   section.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
     color: 'var(--text)', marginBottom: '12px',
@@ -3853,7 +3612,7 @@ function _renderPerformanceSection(container, perfData, showDetail) {
 // ═══════════════════════════════════════
 
 function _renderSatisfactionSection(container, trends, showDetail) {
-  var section = el('div', { style: { marginBottom: '16px' } });
+  var section = el('div', { className: 'mb-16' });
   section.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
     color: 'var(--text)', marginBottom: '12px',
@@ -3881,23 +3640,23 @@ function _renderSatisfactionSection(container, trends, showDetail) {
   overallCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '32px', fontWeight: '700', color: scoreColor } }, String(trends.overall)));
   var overallInfo = el('div');
   overallInfo.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '600' } }, 'Overall Score'));
-  overallInfo.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, trends.responseCount + ' responses'));
+  overallInfo.appendChild(el('div', { className: 'text-xs-muted' }, trends.responseCount + ' responses'));
   if (showDetail) overallInfo.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--accent)', marginTop: '4px' } }, 'Tap for details \u2192'));
   overallCard.appendChild(overallInfo);
   section.appendChild(overallCard);
 
   // Horizontal bar chart of categories
   if (typeof ChartHelper !== 'undefined' && trends.categories.length > 0) {
-    var chartCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+    var chartCard = el('div', { className: 'card card-glass p-16' });
     var labels = trends.categories.map(function(c) { return c.name; });
     var data = trends.categories.map(function(c) { return c.avg; });
     ChartHelper.createHorizontalBarChart(chartCard, 'insights-satisfaction-chart', labels, data);
     section.appendChild(chartCard);
   } else if (trends.categories.length > 0) {
     // Fallback: simple bars
-    var barsCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+    var barsCard = el('div', { className: 'card card-glass p-16' });
     trends.categories.forEach(function(cat) {
-      var row = el('div', { style: { marginBottom: '10px' } });
+      var row = el('div', { className: 'mb-10' });
       var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '3px' } });
       header.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--text)' } }, cat.name));
       header.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '600', color: cat.avg >= 7 ? 'var(--success)' : cat.avg >= 5 ? 'var(--warning)' : 'var(--danger)' } }, String(cat.avg)));
@@ -3966,7 +3725,7 @@ function renderSearchPage(appContainer) {
         }
         var results = res.results || [];
         if (results.length === 0) {
-          resultsContainer.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No results found for "' + safeText(q) + '".'));
+          resultsContainer.appendChild(el('div', { className: 'empty-state' }, 'No results found for "' + safeText(q) + '".'));
           return;
         }
         // Result count
@@ -3983,11 +3742,11 @@ function renderSearchPage(appContainer) {
           var typeColor = r.type === 'member' ? 'var(--info)' : 'var(--warning)';
           var typeLabel = r.type === 'member' ? 'MEMBER' : 'CASE';
           header.appendChild(el('span', { style: { fontSize: '9px', fontWeight: '700', padding: '2px 6px', borderRadius: '6px', background: typeColor, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.5px' } }, typeLabel));
-          header.appendChild(el('span', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, safeText(r.title || '')));
+          header.appendChild(el('span', { className: 'display-section' }, safeText(r.title || '')));
           card.appendChild(header);
 
-          if (r.subtitle) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, safeText(r.subtitle)));
-          if (r.detail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px' } }, safeText(r.detail)));
+          if (r.subtitle) card.appendChild(el('div', { className: 'text-sm-muted' }, safeText(r.subtitle)));
+          if (r.detail) card.appendChild(el('div', { className: 'text-xs-muted-mt-2' }, safeText(r.detail)));
 
           // Navigate on click
           card.onclick = function() {
@@ -4022,7 +3781,7 @@ function renderSearchPage(appContainer) {
 
 function _renderCorrelationInsights(container, summary, showDetail) {
   container.innerHTML = '';
-  var section = el('div', { style: { marginBottom: '16px' } });
+  var section = el('div', { className: 'mb-16' });
 
   // Section header
   var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' } });
@@ -4048,7 +3807,7 @@ function _renderCorrelationInsights(container, summary, showDetail) {
   items.forEach(function(item) {
     var card = el('div', { className: 'card card-glass', style: { padding: '12px', textAlign: 'center' } });
     card.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '700', color: item.color } }, String(item.value)));
-    card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, item.label));
+    card.appendChild(el('div', { className: 'text-label' }, item.label));
     grid.appendChild(card);
   });
   section.appendChild(grid);
@@ -4068,10 +3827,10 @@ function _renderCorrelationInsights(container, summary, showDetail) {
         fontSize: '11px', fontWeight: '700', color: '#fff', background: badgeColor,
       }}, 'r=' + rAbs));
 
-      var info = el('div', { style: { flex: '1' } });
+      var info = el('div', { className: 'flex-1' });
       info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, ins.title));
       if (ins.insight) {
-        info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px' } }, ins.insight));
+        info.appendChild(el('div', { className: 'text-xs-muted-mt-2' }, ins.insight));
       }
       row.appendChild(info);
       listCard.appendChild(row);
@@ -4093,7 +3852,7 @@ function _renderCorrelationInsights(container, summary, showDetail) {
               var alertHeader = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } });
               var sevColor = alert.severity === 'high' ? 'var(--danger)' : 'var(--warning)';
               alertHeader.appendChild(el('span', { className: 'material-icons', style: { fontSize: '18px', color: sevColor } }, alert.icon || 'trending_up'));
-              alertHeader.appendChild(el('span', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, alert.title));
+              alertHeader.appendChild(el('span', { className: 'display-section' }, alert.title));
               if (alert.actionable) {
                 alertHeader.appendChild(el('span', { style: { fontSize: '9px', padding: '2px 6px', borderRadius: '8px', background: sevColor, color: '#fff', fontWeight: '600' } }, 'ACTION'));
               }
@@ -4128,7 +3887,7 @@ function renderStewardDirectoryPage(appContainer) {
     serverCall().withSuccessHandler(function(stewards) {
       content.innerHTML = '';
       if (!stewards || stewards.length === 0) {
-        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
+        content.appendChild(el('div', { className: 'empty-state' }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
         return;
       }
 
@@ -4222,12 +3981,12 @@ function renderStewardDirectoryPage(appContainer) {
           });
           var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
           topRow.appendChild(el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase()));
-          var info = el('div', { style: { flex: '1' } });
-          info.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, s.name || s.email));
+          var info = el('div', { className: 'flex-1' });
+          info.appendChild(el('div', { className: 'display-title-sm' }, s.name || s.email));
           var meta = [];
           if (s.workLocation) meta.push(s.workLocation);
           if (s.unit) meta.push(s.unit);
-          info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
+          info.appendChild(el('div', { className: 'text-xs-muted' }, meta.join(' \u00B7 ')));
           topRow.appendChild(info);
           card.appendChild(topRow);
 
@@ -4236,7 +3995,7 @@ function renderStewardDirectoryPage(appContainer) {
           var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
           if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, '\u2709\uFE0F ' + s.email));
           if (s.phone) details.appendChild(el('a', { href: 'tel:' + s.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '4px' } }, '\uD83D\uDCDE ' + s.phone));
-          if (s.officeDays) details.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, '\uD83D\uDCC5 In-office: ' + s.officeDays));
+          if (s.officeDays) details.appendChild(el('div', { className: 'text-xs-muted-mb-6' }, '\uD83D\uDCC5 In-office: ' + s.officeDays));
 
           // vCard download button
           details.appendChild(el('button', {
@@ -4273,7 +4032,7 @@ function renderStewardDirectoryPage(appContainer) {
       renderList('', '');
     }).withFailureHandler(function() {
       content.innerHTML = '';
-      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load directory.'));
+      content.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load directory.'));
     }).dataGetStewardDirectory(SESSION_TOKEN);
   });
 }
@@ -4301,7 +4060,7 @@ function _renderCaseChecklist(container, caseId) {
     var completed = items.filter(function(i) { return i.completed; }).length;
     var pct = Math.round((completed / items.length) * 100);
     var progRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } });
-    var progBar = el('div', { className: 'prog-track prog-track--md', style: { flex: '1' } });
+    var progBar = el('div', { className: 'prog-track prog-track--md flex-1' });
     progBar.appendChild(el('div', { className: 'prog-fill' + (pct === 100 ? ' prog-fill--success' : ''), style: { width: pct + '%' } }));
     progRow.appendChild(progBar);
     progRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)', whiteSpace: 'nowrap' } }, completed + '/' + items.length + ' (' + pct + '%)'));
@@ -4378,37 +4137,13 @@ function renderManagePolls(appContainer) {
     _stewardHeader(container, 'Polls', 'Create polls · view community results');
     var content = el('div', { className: 'content' });
 
-    var activeSubTab = 'live';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      [
-        { id: 'live',   label: 'This Week' },
-        { id: 'create', label: 'Create Poll' },
-        { id: 'past',   label: 'History' },
-      ].forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === tab.id),
-          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderSub(); }
-        }, tab.label));
-      });
-    }
-
-    function renderSub() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'live')   _renderLivePollsSteward(subContent);
-      if (activeSubTab === 'create') _renderCreateStewardPoll(subContent);
-      if (activeSubTab === 'past')   _renderPollHistorySteward(subContent);
-    }
-
-    refreshSubTabs();
-    renderSub();
-    content.appendChild(subTabBar);
-    content.appendChild(subContent);
+    var _st = createSubTabs([
+      { id: 'live',   label: 'This Week', render: function(c) { _renderLivePollsSteward(c); } },
+      { id: 'create', label: 'Create Poll', render: function(c) { _renderCreateStewardPoll(c); } },
+      { id: 'past',   label: 'History', render: function(c) { _renderPollHistorySteward(c); } }
+    ]);
+    content.appendChild(_st.bar);
+    content.appendChild(_st.content);
     container.appendChild(content);
   });
 }
@@ -4418,15 +4153,15 @@ function _renderLivePollsSteward(container) {
   serverCall().withSuccessHandler(function(data) {
     container.innerHTML = '';
     if (!data || !data.questions || data.questions.length === 0) {
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls this week. Create one in the "Create Poll" tab.'));
+      container.appendChild(el('div', { className: 'empty-state-13' }, 'No active polls this week. Create one in the "Create Poll" tab.'));
       return;
     }
-    container.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '🔒 Votes are anonymous — individual responses are never stored'));
+    container.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 Votes are anonymous — individual responses are never stored'));
     data.questions.forEach(function(q) {
       var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '10px' } });
       var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' } });
       var titleCol = el('div');
-      titleCol.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, q.text));
+      titleCol.appendChild(el('div', { className: 'display-title-sm' }, q.text));
       titleCol.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', marginTop: '2px' } },
         q.source === 'community' ? '🌐 Community poll (random draw)' : '🗳️ ' + (CONFIG.stewardLabel || 'Steward') + ' poll'));
       topRow.appendChild(titleCol);
@@ -4450,7 +4185,7 @@ function _renderLivePollsSteward(container) {
       (q.options || []).forEach(function(opt, i) {
         var count = counts[opt] || 0;
         var pct = total > 0 ? Math.round((count / total) * 100) : 0;
-        var row = el('div', { style: { marginBottom: '6px' } });
+        var row = el('div', { className: 'mb-6' });
         var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' } });
         header.appendChild(el('span', { style: { color: 'var(--text)' } }, opt));
         header.appendChild(el('span', { style: { color: 'var(--muted)' } }, pct + '%  (' + count + ')'));
@@ -4460,12 +4195,12 @@ function _renderLivePollsSteward(container) {
         row.appendChild(bar);
         card.appendChild(row);
       });
-      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, total + ' anonymous vote' + (total !== 1 ? 's' : '')));
+      card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, total + ' anonymous vote' + (total !== 1 ? 's' : '')));
       container.appendChild(card);
     });
   }).withFailureHandler(function() {
     container.innerHTML = '';
-    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
+    container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load polls.'));
   }).wqGetActiveQuestions(SESSION_TOKEN);
 }
 
@@ -4477,13 +4212,13 @@ function _renderCreateStewardPoll(container) {
       '📋 Good polls: neutral framing, one concept, balanced options, 2–5 choices. Avoid leading questions.'));
   }
 
-  var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+  var formCard = el('div', { className: 'card card-glass p-16' });
   formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, "Create This Week's " + (CONFIG.stewardLabel || 'Steward') + ' Poll'));
-  formCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Replaces any existing steward poll for this week. The community poll is drawn automatically from the member pool each Monday.'));
+  formCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Replaces any existing steward poll for this week. The community poll is drawn automatically from the member pool each Monday.'));
 
   var questionInput = el('textarea', { className: 'msg-textarea', placeholder: 'Poll question…', style: { minHeight: '70px', marginBottom: '10px' } });
   formCard.appendChild(questionInput);
-  formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, 'Answer options (2–5):'));
+  formCard.appendChild(el('div', { className: 'text-xs-muted-mb-6' }, 'Answer options (2–5):'));
   var optBuilder = typeof _buildOptionInputs === 'function' ? _buildOptionInputs(formCard, null) : null;
 
   var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '18px', marginBottom: '8px' } });
@@ -4512,7 +4247,7 @@ function _renderCreateStewardPoll(container) {
   freqCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '10px' } }, 'How often should new polls be posted? Affects both the steward poll and community pool draw.'));
 
   var freqStatus = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '6px' } });
-  var freqBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  var freqBtns = el('div', { className: 'flex-wrap-gap' });
 
   serverCall().withSuccessHandler(function(currentFreq) {
     ['weekly', 'biweekly', 'monthly'].forEach(function(freq) {
@@ -4553,7 +4288,7 @@ function _renderCreateStewardPoll(container) {
   serverCall().withSuccessHandler(function(count) {
     var poolCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginTop: '14px' } });
     poolCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, '🌐 Community Poll Pool'));
-    poolCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } },
+    poolCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' },
       (count || 0) + ' question' + (count !== 1 ? 's' : '') + ' in the pool. One is drawn randomly each period — you cannot select which one. Use this to release the community poll now without waiting for the Monday trigger.'));
 
     var drawStatus = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '6px' } });
@@ -4607,7 +4342,7 @@ function _renderPollHistorySteward(container) {
     serverCall().withSuccessHandler(function(data) {
       container.innerHTML = '';
       if (!data || !data.questions || data.questions.length === 0) {
-        container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, p > 1 ? 'No more history.' : 'No past polls.'));
+        container.appendChild(el('div', { className: 'empty-state-13' }, p > 1 ? 'No more history.' : 'No past polls.'));
         return;
       }
       data.questions.forEach(function(q) {
@@ -4624,7 +4359,7 @@ function _renderPollHistorySteward(container) {
             var pct = Math.round((count / total) * 100);
             var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
             row.appendChild(el('div', { style: { width: '120px', fontSize: '11px', color: 'var(--muted)', flexShrink: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, opt));
-            var bar = el('div', { className: 'prog-track prog-track--md', style: { flex: '1' } });
+            var bar = el('div', { className: 'prog-track prog-track--md flex-1' });
             bar.appendChild(el('div', { className: 'prog-fill', style: { width: pct + '%' } }));
             row.appendChild(bar);
             row.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text)', width: '36px', textAlign: 'right' } }, pct + '%'));
@@ -4632,7 +4367,7 @@ function _renderPollHistorySteward(container) {
           });
           card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', marginTop: '4px' } }, total + ' votes'));
         } else {
-          card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'No votes'));
+          card.appendChild(el('div', { className: 'text-xs-muted' }, 'No votes'));
         }
         container.appendChild(card);
       });
@@ -4644,7 +4379,7 @@ function _renderPollHistorySteward(container) {
       }
     }).withFailureHandler(function() {
       container.innerHTML = '';
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load history.'));
+      container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load history.'));
     }).wqGetHistory(SESSION_TOKEN, p, 15);
   }
   loadPage(1);
@@ -4659,34 +4394,12 @@ function renderStewardMinutes(appContainer) {
     _stewardHeader(container, 'Meeting Minutes', 'Post and manage meeting notes');
     var content = el('div', { className: 'content' });
 
-    var activeSubTab = 'recent';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
-    function switchToRecent() { activeSubTab = 'recent'; refreshSubTabs(); renderSub(); }
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      ['recent', 'add'].forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === tab),
-          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSub(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
-      });
-    }
-
-    function renderSub() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'recent') _renderMinutesList(subContent);
-      else _renderAddMinutes(subContent, switchToRecent);
-    }
-
-    refreshSubTabs();
-    renderSub();
-    content.appendChild(subTabBar);
-    content.appendChild(subContent);
+    var _st = createSubTabs([
+      { id: 'recent', label: 'Recent', render: function(c) { _renderMinutesList(c); } },
+      { id: 'add', label: 'Add', render: function(c) { _renderAddMinutes(c, function() { _st.switchTo('recent'); }); } }
+    ]);
+    content.appendChild(_st.bar);
+    content.appendChild(_st.content);
     container.appendChild(content);
   });
 }
@@ -4699,7 +4412,7 @@ function _renderMinutesList(container) {
   serverCall().withSuccessHandler(function(minutes) {
     container.innerHTML = '';
     if (!minutes || minutes.length === 0) {
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting minutes yet.'));
+      container.appendChild(el('div', { className: 'empty-state-13' }, 'No meeting minutes yet.'));
       return;
     }
 
@@ -4738,8 +4451,8 @@ function _renderMinutesList(container) {
       slice.forEach(function(m) {
         var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
         var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
-        header.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.title));
-        header.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, m.meetingDate));
+        header.appendChild(el('span', { className: 'display-title-sm' }, m.title));
+        header.appendChild(el('span', { className: 'text-xs-muted' }, m.meetingDate));
         card.appendChild(header);
         if (m.bullets) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5', whiteSpace: 'pre-wrap' } }, m.bullets));
 
@@ -4761,7 +4474,7 @@ function _renderMinutesList(container) {
       var prevBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '12px', opacity: page === 0 ? '0.3' : '1', pointerEvents: page === 0 ? 'none' : 'auto' },
         onClick: function() { renderPage(page - 1); }
       }, '← Prev');
-      var pageLabel = el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Page ' + (page + 1) + ' of ' + totalPages);
+      var pageLabel = el('span', { className: 'text-xs-muted' }, 'Page ' + (page + 1) + ' of ' + totalPages);
       var nextBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '12px', opacity: page >= totalPages - 1 ? '0.3' : '1', pointerEvents: page >= totalPages - 1 ? 'none' : 'auto' },
         onClick: function() { renderPage(page + 1); }
       }, 'Next →');
@@ -4781,7 +4494,7 @@ function _renderMinutesList(container) {
     renderPage(0);
   }).withFailureHandler(function() {
     container.innerHTML = '';
-    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load minutes.'));
+    container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load minutes.'));
   }).dataGetMeetingMinutes(SESSION_TOKEN, 100);
 }
 
@@ -4795,7 +4508,7 @@ function _renderAddMinutes(container, onSaveSuccess) {
 
   var TITLE_MAX = 200, BULLETS_MAX = 2000, FULL_MAX = 5000;
 
-  var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+  var formCard = el('div', { className: 'card card-glass p-16' });
   formCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '12px' } }, 'Add Meeting Minutes'));
 
   var titleInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Meeting title...', maxLength: TITLE_MAX, style: { marginBottom: '2px', minHeight: '36px' } });
@@ -4816,7 +4529,7 @@ function _renderAddMinutes(container, onSaveSuccess) {
   var dateInput = el('input', { type: 'date', className: 'msg-textarea', value: todayStr, style: { marginBottom: '8px', minHeight: '36px' } });
   formCard.appendChild(dateInput);
 
-  formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Key points (bullet format)'));
+  formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Key points (bullet format)'));
   var bulletsInput = el('textarea', { className: 'msg-textarea', placeholder: '- Point 1\n- Point 2\n- Point 3', maxLength: BULLETS_MAX, style: { marginBottom: '2px', minHeight: '80px' } });
   formCard.appendChild(bulletsInput);
   var bulletsCount = el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'right', marginBottom: '8px' } }, '0 / ' + BULLETS_MAX);
@@ -4827,7 +4540,7 @@ function _renderAddMinutes(container, onSaveSuccess) {
     bulletsCount.style.color = len >= BULLETS_MAX ? 'var(--danger)' : 'var(--muted)';
   });
 
-  formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Full minutes (optional)'));
+  formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Full minutes (optional)'));
   var fullInput = el('textarea', { className: 'msg-textarea', placeholder: 'Detailed meeting notes...', maxLength: FULL_MAX, style: { marginBottom: '2px', minHeight: '120px' } });
   formCard.appendChild(fullInput);
   var fullCount = el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'right', marginBottom: '10px' } }, '0 / ' + FULL_MAX);
@@ -4877,51 +4590,30 @@ function renderFeedbackPage(appContainer, role) {
     else _memberHeader(container, 'Feedback', 'Report bugs or suggest features');
     var content = el('div', { className: 'content' });
 
-    var activeSubTab = 'submit';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      ['submit', 'my submissions'].forEach(function(tab) {
-        var key = tab === 'my submissions' ? 'history' : tab;
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === key ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === key),
-          onClick: function() { activeSubTab = key; refreshSubTabs(); renderSub(); }
-        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
-      });
-    }
-
-    function renderSub() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'submit') _renderFeedbackForm(subContent);
-      else _renderMyFeedback(subContent);
-    }
-
-    refreshSubTabs();
-    renderSub();
-    content.appendChild(subTabBar);
-    content.appendChild(subContent);
+    var _st = createSubTabs([
+      { id: 'submit', label: 'Submit', render: function(c) { _renderFeedbackForm(c); } },
+      { id: 'history', label: 'My Submissions', render: function(c) { _renderMyFeedback(c); } }
+    ]);
+    content.appendChild(_st.bar);
+    content.appendChild(_st.content);
     container.appendChild(content);
   });
 }
 
 function _renderFeedbackForm(container) {
-  var formCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+  var formCard = el('div', { className: 'card card-glass p-16' });
 
   var categorySelect = el('select', { className: 'msg-textarea', style: { marginBottom: '8px', minHeight: '36px' } });
   ['Bug', 'Feature', 'Improvement', 'Documentation', 'Other'].forEach(function(cat) {
     categorySelect.appendChild(el('option', { value: cat }, cat));
   });
-  formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Category'));
+  formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Category'));
   formCard.appendChild(categorySelect);
 
   var priorityBar = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '10px' } });
   var selectedPriority = 'Medium';
   ['Low', 'Medium', 'High'].forEach(function(p) {
-    var btn = el('button', { className: 'sub-tab' + (p === 'Medium' ? ' active' : ''), style: { flex: '1' },
+    var btn = el('button', { className: 'sub-tab' + (p === 'Medium' ? ' active' : '') + ' flex-1',
       onClick: function() {
         selectedPriority = p;
         priorityBar.querySelectorAll('.sub-tab').forEach(function(b) { b.classList.remove('active'); });
@@ -4930,7 +4622,7 @@ function _renderFeedbackForm(container) {
     }, p);
     priorityBar.appendChild(btn);
   });
-  formCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Priority'));
+  formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Priority'));
   formCard.appendChild(priorityBar);
 
   var titleInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Brief title...', style: { marginBottom: '8px', minHeight: '36px' } });
@@ -4971,17 +4663,17 @@ function _renderMyFeedback(container) {
   serverCall().withSuccessHandler(function(items) {
     container.innerHTML = '';
     if (!items || items.length === 0) {
-      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No feedback submitted yet.'));
+      container.appendChild(el('div', { className: 'empty-state-13' }, 'No feedback submitted yet.'));
       return;
     }
     items.forEach(function(item) {
       var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '8px' } });
       var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } });
-      topRow.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, item.title));
+      topRow.appendChild(el('span', { className: 'display-section' }, item.title));
       var statusColor = item.status === 'New' ? 'var(--info)' : item.status === 'In Progress' ? 'var(--warning)' : item.status === 'Resolved' ? 'var(--success)' : 'var(--muted)';
       topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', color: statusColor, background: statusColor + '18', padding: '2px 8px', borderRadius: '8px' } }, item.status));
       card.appendChild(topRow);
-      var meta = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } });
+      var meta = el('div', { className: 'text-xs-muted-mb-4' });
       meta.textContent = item.category + ' \u00B7 ' + item.priority + ' \u00B7 ' + item.date;
       card.appendChild(meta);
       if (item.description) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4' } }, item.description.substring(0, 200)));
@@ -4990,7 +4682,7 @@ function _renderMyFeedback(container) {
     });
   }).withFailureHandler(function() {
     container.innerHTML = '';
-    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load feedback.'));
+    container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load feedback.'));
   }).dataGetMyFeedback(SESSION_TOKEN); // email resolved server-side (v4.24.1)
 }
 
@@ -5004,10 +4696,10 @@ function renderFailsafePage(appContainer) {
     var content = el('div', { className: 'content' });
 
     // Card 1: Bulk Member Export
-    var exportCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    var exportCard = el('div', { className: 'card p-16-mb-12' });
     exportCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Bulk Member Export'));
-    exportCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Send every member their personal data summary via email. Includes grievances and assigned tasks.'));
-    var exportStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+    exportCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Send every member their personal data summary via email. Includes grievances and assigned tasks.'));
+    var exportStatus = el('div', { className: 'status-msg' });
     exportCard.appendChild(exportStatus);
     exportCard.appendChild(el('button', {
       className: 'btn btn-primary',
@@ -5024,10 +4716,10 @@ function renderFailsafePage(appContainer) {
     content.appendChild(exportCard);
 
     // Card 2: Manual Backup
-    var backupCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    var backupCard = el('div', { className: 'card p-16-mb-12' });
     backupCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Manual CSV Backup'));
-    backupCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Create CSV backups of critical sheets (Member Directory, Grievances, Tasks, etc.) in your Google Drive.'));
-    var backupStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+    backupCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Create CSV backups of critical sheets (Member Directory, Grievances, Tasks, etc.) in your Google Drive.'));
+    var backupStatus = el('div', { className: 'status-msg' });
     backupCard.appendChild(backupStatus);
     backupCard.appendChild(el('button', {
       className: 'btn btn-primary',
@@ -5044,12 +4736,12 @@ function renderFailsafePage(appContainer) {
     content.appendChild(backupCard);
 
     // Card 3: Trigger Management
-    var triggerCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    var triggerCard = el('div', { className: 'card p-16-mb-12' });
     triggerCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Automated Triggers'));
-    triggerCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Install or remove automated triggers for daily digest checks and weekly Drive backups.'));
-    var triggerStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+    triggerCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Install or remove automated triggers for daily digest checks and weekly Drive backups.'));
+    var triggerStatus = el('div', { className: 'status-msg' });
     triggerCard.appendChild(triggerStatus);
-    var triggerBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    var triggerBtns = el('div', { className: 'flex-wrap-gap' });
     triggerBtns.appendChild(el('button', {
       className: 'btn btn-primary',
       onClick: function() {
@@ -5077,7 +4769,7 @@ function renderFailsafePage(appContainer) {
     // Card 4: Initialize Missing Sheets
     var initCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px', borderLeft: '3px solid var(--warning)' } });
     initCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, '🔧 Initialize Missing Sheets'));
-    initCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Creates any missing sheets that newer features depend on (Timeline, Q&A Forum, Tasks, Notifications, etc.). Non-destructive — existing sheets with data are never touched. Run this if tabs show errors.'));
+    initCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Creates any missing sheets that newer features depend on (Timeline, Q&A Forum, Tasks, Notifications, etc.). Non-destructive — existing sheets with data are never touched. Run this if tabs show errors.'));
     var initStatus = el('div', { style: { fontSize: '12px', minHeight: '20px' }, 'aria-live': 'polite', role: 'status' });
     initCard.appendChild(initStatus);
     initCard.appendChild(el('button', {
@@ -5104,9 +4796,9 @@ function renderFailsafePage(appContainer) {
     content.appendChild(initCard);
 
     // Card 5: System Diagnostic
-    var diagCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    var diagCard = el('div', { className: 'card p-16-mb-12' });
     diagCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, '🔍 System Diagnostic'));
-    diagCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Check which sheets exist, auth status, and identify missing dependencies that cause "Something went wrong" errors.'));
+    diagCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Check which sheets exist, auth status, and identify missing dependencies that cause "Something went wrong" errors.'));
     var diagResult = el('div', { style: { fontSize: '12px', minHeight: '20px' }, 'aria-live': 'polite', role: 'status' });
     diagCard.appendChild(diagResult);
     diagCard.appendChild(el('button', {
@@ -5144,7 +4836,7 @@ function renderFailsafePage(appContainer) {
     // Card 6: Restore from Drive Backup (v4.33.0)
     var restoreCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px', borderLeft: '3px solid var(--danger)' } });
     restoreCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Restore from Backup'));
-    restoreCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Restore a sheet from a Drive CSV backup. Creates a safety backup of the current data before overwriting. Requires the Google Drive File ID and exact sheet name.'));
+    restoreCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Restore a sheet from a Drive CSV backup. Creates a safety backup of the current data before overwriting. Requires the Google Drive File ID and exact sheet name.'));
     var restoreStatus = el('div', { style: { fontSize: '12px', minHeight: '20px' }, 'aria-live': 'polite', role: 'status' });
     var restoreFileId = el('input', { type: 'text', placeholder: 'Drive File ID of CSV backup', style: { width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: '12px', marginBottom: '6px', boxSizing: 'border-box' } });
     var restoreSheetName = el('input', { type: 'text', placeholder: 'Sheet name (e.g. Member Directory)', style: { width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: '12px', marginBottom: '8px', boxSizing: 'border-box' } });
@@ -5499,10 +5191,6 @@ function renderStewardTimelinePage(appContainer) {
     container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Timeline')));
 
     var content = el('div', { className: 'content' });
-    var activeSubTab = 'timeline';
-    var subTabBar = el('div', { className: 'sub-tabs', role: 'tablist' });
-    var subContent = el('div');
-
     var filterYear = '';
     var filterCategory = '';
     var currentPage = 1;
@@ -5532,30 +5220,13 @@ function renderStewardTimelinePage(appContainer) {
     }
 
     // ── Sub-tab renderer ──────────────────────────────────────────────────
-    function refreshSubTabs() {
-      subTabBar.innerHTML = '';
-      [
-        { id: 'timeline',   label: 'Timeline' },
-        { id: 'add',        label: 'Add Event' },
-        { id: 'import',     label: 'Import' },
-        { id: 'categories', label: 'Categories' }
-      ].forEach(function(tab) {
-        subTabBar.appendChild(el('button', {
-          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
-          role: 'tab',
-          'aria-selected': String(activeSubTab === tab.id),
-          onClick: function() { activeSubTab = tab.id; currentPage = 1; refreshSubTabs(); renderTLSubContent(); }
-        }, tab.label));
-      });
-    }
-
-    function renderTLSubContent() {
-      subContent.innerHTML = '';
-      if (activeSubTab === 'add')        { _renderAddEventForm(subContent); return; }
-      if (activeSubTab === 'import')     { _renderImportForm(subContent); return; }
-      if (activeSubTab === 'categories') { _renderCategoriesTab(subContent); return; }
-      _renderTimeline(subContent);
-    }
+    var _st = createSubTabs([
+      { id: 'timeline',   label: 'Timeline', render: function(c) { _renderTimeline(c); } },
+      { id: 'add',        label: 'Add Event', render: function(c) { _renderAddEventForm(c); } },
+      { id: 'import',     label: 'Import', render: function(c) { _renderImportForm(c); } },
+      { id: 'categories', label: 'Categories', render: function(c) { _renderCategoriesTab(c); } }
+    ], { onSwitch: function() { currentPage = 1; } });
+    var subTabBar = _st.bar, subContent = _st.content;
 
     // ── Timeline list ─────────────────────────────────────────────────────
     function _renderTimeline(cont) {
@@ -5634,10 +5305,10 @@ function renderStewardTimelinePage(appContainer) {
 
         if (!result || !result.events || result.events.length === 0) {
           if (currentPage === 1) {
-            var empty = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
-            empty.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCDC'));
+            var empty = el('div', { className: 'empty-state-lg' });
+            empty.appendChild(el('div', { className: 'emoji-lg' }, '\uD83D\uDCDC'));
             empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No timeline events yet'));
-            empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'Use \u201CAdd Event\u201D to create the first entry.'));
+            empty.appendChild(el('div', { className: 'text-base-muted' }, 'Use \u201CAdd Event\u201D to create the first entry.'));
             listArea.appendChild(empty);
           }
           return;
@@ -5656,8 +5327,8 @@ function renderStewardTimelinePage(appContainer) {
 
           var card = el('div', { className: 'card', style: { padding: '12px 16px' } });
 
-          var titleRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
-          titleRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, evt.title));
+          var titleRow = el('div', { className: 'flex-between-center' });
+          titleRow.appendChild(el('div', { className: 'display-section' }, evt.title));
           titleRow.appendChild(el('span', { className: 'category-badge ' + (evt.category || 'other') }, evt.category || 'other'));
           card.appendChild(titleRow);
 
@@ -5746,7 +5417,7 @@ function renderStewardTimelinePage(appContainer) {
       }).withFailureHandler(function() {
         if (currentPage === 1) {
           listArea.innerHTML = '';
-          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
+          listArea.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load timeline.'));
         }
       }).tlGetTimelineEvents(SESSION_TOKEN, currentPage, PAGE_SIZE, filterYear || null, filterCategory || null);
     }
@@ -5756,10 +5427,10 @@ function renderStewardTimelinePage(appContainer) {
       if (actsEl.parentNode) actsEl.parentNode.removeChild(actsEl);
       var editForm = el('div', { style: { borderTop: '1px solid var(--border)', marginTop: '10px', paddingTop: '10px' } });
 
-      var titleInput = el('input', { className: 'form-input', value: evt.title, style: { marginBottom: '6px' } });
+      var titleInput = el('input', { className: 'form-input mb-6', value: evt.title });
 
       // UTC-safe date: use eventDateRaw ms but interpret in UTC to avoid timezone day-shift
-      var dateInput = el('input', { className: 'form-input', type: 'date', style: { marginBottom: '6px' } });
+      var dateInput = el('input', { className: 'form-input mb-6', type: 'date' });
       if (evt.eventDateRaw) {
         var d = new Date(evt.eventDateRaw);
         var yr = d.getUTCFullYear();
@@ -5771,7 +5442,7 @@ function renderStewardTimelinePage(appContainer) {
       var descInput = el('textarea', { className: 'msg-textarea', style: { minHeight: '60px', marginBottom: '6px' } });
       descInput.value = evt.description || '';
 
-      var catSelect = el('select', { className: 'form-select', style: { marginBottom: '8px' } });
+      var catSelect = el('select', { className: 'form-select mb-8' });
       cachedCategories.forEach(function(c) {
         var opt = el('option', { value: c }, c.charAt(0).toUpperCase() + c.slice(1));
         if (c === evt.category) opt.selected = true;
@@ -5779,18 +5450,18 @@ function renderStewardTimelinePage(appContainer) {
       });
 
       // Meeting Minutes Doc ID / URL field
-      var minutesInput = el('input', { className: 'form-input', placeholder: 'Doc ID or docs.google.com URL', style: { marginBottom: '8px' } });
+      var minutesInput = el('input', { className: 'form-input mb-8', placeholder: 'Doc ID or docs.google.com URL' });
       minutesInput.value = evt.meetingMinutesId || '';
 
       // Drive file attach (add-only)
-      var driveHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Add Drive URLs or file IDs (one per line). Existing files are kept.');
+      var driveHint = el('div', { className: 'text-xs-muted-mb-4' }, 'Add Drive URLs or file IDs (one per line). Existing files are kept.');
       var driveInput = el('textarea', { className: 'msg-textarea', placeholder: 'https://drive.google.com/file/d/... or raw ID', style: { minHeight: '44px', fontFamily: 'var(--fontMono, monospace)', fontSize: '11px', marginBottom: '8px' } });
 
       var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '6px' } });
-      var btnRow = el('div', { style: { display: 'flex', gap: '6px' } });
+      var btnRow = el('div', { className: 'flex-gap-6' });
 
       btnRow.appendChild(el('button', {
-        className: 'btn btn-primary', style: { fontSize: '12px' },
+        className: 'btn btn-primary text-sm',
         onClick: function() {
           var t = titleInput.value.trim();
           if (!t) { statusMsg.textContent = 'Title required.'; statusMsg.style.color = 'var(--danger)'; return; }
@@ -5831,21 +5502,21 @@ function renderStewardTimelinePage(appContainer) {
       }, 'Save'));
 
       btnRow.appendChild(el('button', {
-        className: 'btn', style: { fontSize: '12px' },
+        className: 'btn text-sm',
         onClick: function() { card.removeChild(editForm); card.appendChild(actsEl); }
       }, 'Cancel'));
 
-      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Title'));
+      editForm.appendChild(el('div', { className: 'form-label mb-4' }, 'Title'));
       editForm.appendChild(titleInput);
-      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Date'));
+      editForm.appendChild(el('div', { className: 'form-label mb-4' }, 'Date'));
       editForm.appendChild(dateInput);
-      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Description'));
+      editForm.appendChild(el('div', { className: 'form-label mb-4' }, 'Description'));
       editForm.appendChild(descInput);
-      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Category'));
+      editForm.appendChild(el('div', { className: 'form-label mb-4' }, 'Category'));
       editForm.appendChild(catSelect);
-      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Meeting Minutes (optional)'));
+      editForm.appendChild(el('div', { className: 'form-label mb-4' }, 'Meeting Minutes (optional)'));
       editForm.appendChild(minutesInput);
-      editForm.appendChild(el('div', { className: 'form-label', style: { marginBottom: '4px' } }, 'Attach Drive Files (optional)'));
+      editForm.appendChild(el('div', { className: 'form-label mb-4' }, 'Attach Drive Files (optional)'));
       editForm.appendChild(driveHint);
       editForm.appendChild(driveInput);
       editForm.appendChild(statusMsg);
@@ -5882,7 +5553,7 @@ function renderStewardTimelinePage(appContainer) {
       var minutesInput = el('input', { className: 'form-input', placeholder: 'Doc ID or docs.google.com URL (optional)' });
       _formGroup(cont, 'Meeting Minutes (optional)', minutesInput);
 
-      var driveHint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Paste Drive share URLs or file IDs, one per line.');
+      var driveHint = el('div', { className: 'text-xs-muted-mb-4' }, 'Paste Drive share URLs or file IDs, one per line.');
       var driveInput = el('textarea', { className: 'msg-textarea', placeholder: 'https://drive.google.com/file/d/... or raw ID', style: { minHeight: '50px', fontFamily: 'var(--fontMono, monospace)', fontSize: '11px' } });
       var driveGroup = el('div', { className: 'form-group' });
       driveGroup.appendChild(el('label', { className: 'form-label' }, 'Drive Files (optional)'));
@@ -5890,7 +5561,7 @@ function renderStewardTimelinePage(appContainer) {
       driveGroup.appendChild(driveInput);
       cont.appendChild(driveGroup);
 
-      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+      var statusMsg = el('div', { className: 'status-msg' });
       cont.appendChild(statusMsg);
 
       cont.appendChild(el('button', {
@@ -5913,7 +5584,7 @@ function renderStewardTimelinePage(appContainer) {
               statusMsg.textContent = 'Event created!'; statusMsg.style.color = 'var(--success)';
               titleInput.value = ''; descInput.value = ''; dateInput.value = '';
               driveInput.value = ''; minutesInput.value = '';
-              setTimeout(function() { activeSubTab = 'timeline'; refreshSubTabs(); renderTLSubContent(); }, 800);
+              setTimeout(function() { _st.switchTo('timeline'); }, 800);
             } else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
           }).tlAddTimelineEvent(SESSION_TOKEN, {
             title: title, eventDate: dateInput.value || '',
@@ -5928,14 +5599,14 @@ function renderStewardTimelinePage(appContainer) {
     // ── Import form ───────────────────────────────────────────────────────
     function _renderImportForm(cont) {
       cont.appendChild(el('h3', { className: 'section-title' }, 'Import from Google Calendar'));
-      cont.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Import events from your Google Calendar. Already-imported events are skipped.'));
+      cont.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Import events from your Google Calendar. Already-imported events are skipped.'));
 
       var startInput = el('input', { className: 'form-input', type: 'date' });
       _formGroup(cont, 'Start Date', startInput);
       var endInput = el('input', { className: 'form-input', type: 'date' });
       _formGroup(cont, 'End Date', endInput);
 
-      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+      var statusMsg = el('div', { className: 'status-msg' });
       cont.appendChild(statusMsg);
 
       cont.appendChild(el('button', {
@@ -5954,9 +5625,9 @@ function renderStewardTimelinePage(appContainer) {
     // ── Categories management ─────────────────────────────────────────────
     function _renderCategoriesTab(cont) {
       cont.appendChild(el('h3', { className: 'section-title' }, 'Manage Categories'));
-      cont.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Add or remove event categories. Removing a category does not change existing events.'));
+      cont.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Add or remove event categories. Removing a category does not change existing events.'));
 
-      var listArea = el('div', { style: { marginBottom: '16px' } });
+      var listArea = el('div', { className: 'mb-16' });
       cont.appendChild(listArea);
 
       function _loadCats() {
@@ -5968,7 +5639,7 @@ function renderStewardTimelinePage(appContainer) {
           if (!cats || !cats.length) { listArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'No categories found.')); return; }
           cats.forEach(function(cat) {
             var row = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: '6px', background: 'var(--surfaceAlt)', marginBottom: '4px' } });
-            row.appendChild(el('span', { className: 'category-badge ' + cat, style: { fontSize: '12px' } }, cat.charAt(0).toUpperCase() + cat.slice(1)));
+            row.appendChild(el('span', { className: 'category-badge text-sm ' + cat }, cat.charAt(0).toUpperCase() + cat.slice(1)));
             row.appendChild(el('button', {
               style: { fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', cursor: 'pointer' },
               onClick: function() {
@@ -5988,7 +5659,7 @@ function renderStewardTimelinePage(appContainer) {
       _loadCats();
 
       var addRow = el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } });
-      var newCatInput = el('input', { className: 'form-input', placeholder: 'New category name', style: { flex: '1' } });
+      var newCatInput = el('input', { className: 'form-input flex-1', placeholder: 'New category name' });
       var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginTop: '6px' } });
       addRow.appendChild(newCatInput);
       addRow.appendChild(el('button', {
@@ -6007,8 +5678,6 @@ function renderStewardTimelinePage(appContainer) {
       cont.appendChild(statusMsg);
     }
 
-    refreshSubTabs();
-    renderTLSubContent();
     content.appendChild(subTabBar);
     content.appendChild(subContent);
     container.appendChild(content);
@@ -6048,82 +5717,46 @@ function renderNewGrievanceForm(appContainer) {
     var searchCard = el('div', { className: 'card', style: { marginBottom: '16px', padding: '16px' } });
     searchCard.appendChild(el('div', { className: 'form-label', style: { marginBottom: '8px', fontWeight: '600' } }, 'Member'));
 
-    var searchWrapper = el('div', { style: { position: 'relative' } });
-    var searchInput = el('input', {
-      className: 'form-input',
+    // Eager-load members for preselection + autocomplete
+    var _grMemberCache = null;
+    function _grLoadMembers(cb) {
+      if (_grMemberCache) { cb(_grMemberCache); return; }
+      serverCall().withSuccessHandler(function(result) {
+        _grMemberCache = result && result.success !== false
+          ? (Array.isArray(result) ? result : (result.members || []))
+          : [];
+        cb(_grMemberCache);
+      }).withFailureHandler(function() {
+        _grMemberCache = [];
+        searchCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)' } }, 'Failed to load members.'));
+        cb(_grMemberCache);
+      }).dataGetAllMembers(SESSION_TOKEN);
+    }
+    // Pre-fetch for preselection
+    _grLoadMembers(function() { if (selectedMember) _selectMember(selectedMember); });
+
+    var _grAc = createAutocomplete({
       placeholder: 'Type to search members by name or email\u2026',
-      style: { width: '100%', boxSizing: 'border-box' },
-      autocomplete: 'off'
-    });
-    var resultsDropdown = el('div', {
-      style: {
-        position: 'absolute', top: '100%', left: '0', right: '0', maxHeight: '220px', overflowY: 'auto',
-        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0 0 8px 8px',
-        zIndex: '100', display: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+      debounceMs: 200,
+      minQuery: 2,
+      maxResults: 15,
+      loadData: _grLoadMembers,
+      renderItem: function(m) {
+        var row = el('div', { style: { padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)' } });
+        row.appendChild(el('div', { style: { fontWeight: '500', color: 'var(--text)' } }, m.name || m.email));
+        var meta = [m.workLocation, m.jobTitle].filter(Boolean).join(' \u00B7 ');
+        if (meta) row.appendChild(el('div', { className: 'text-xs-muted' }, meta));
+        return row;
+      },
+      onSelect: function(m) {
+        selectedMember = m;
+        _selectMember(m);
+        _grAc.input.value = '';
       }
     });
+    var searchInput = _grAc.input;
 
     var selectedMemberDisplay = el('div', { style: { display: 'none', marginTop: '10px', padding: '10px 14px', background: 'var(--accentBg)', borderRadius: '8px', border: '1px solid var(--accentBorder)' } });
-
-    // Fetch all members for search
-    var allMembersCache = [];
-    serverCall().withSuccessHandler(function(result) {
-      if (result && result.success !== false) {
-        allMembersCache = Array.isArray(result) ? result : (result.members || []);
-      }
-      // If preselected, populate
-      if (selectedMember) {
-        _selectMember(selectedMember);
-      }
-    }).withFailureHandler(function() {
-      searchCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)' } }, 'Failed to load members.'));
-    }).dataGetAllMembers(SESSION_TOKEN);
-
-    // Type-ahead search
-    var _searchTimeout = null;
-    searchInput.addEventListener('input', function() {
-      clearTimeout(_searchTimeout);
-      _searchTimeout = setTimeout(function() {
-        var q = searchInput.value.trim().toLowerCase();
-        resultsDropdown.innerHTML = '';
-        if (q.length < 2) { resultsDropdown.style.display = 'none'; return; }
-
-        var matches = allMembersCache.filter(function(m) {
-          var name = (m.name || '').toLowerCase();
-          var email = (m.email || '').toLowerCase();
-          return name.indexOf(q) !== -1 || email.indexOf(q) !== -1;
-        }).slice(0, 15);
-
-        if (matches.length === 0) {
-          resultsDropdown.style.display = 'none';
-          return;
-        }
-
-        matches.forEach(function(m) {
-          var item = el('div', {
-            style: { padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)' },
-            onClick: function() {
-              selectedMember = m;
-              _selectMember(m);
-              resultsDropdown.style.display = 'none';
-              searchInput.value = '';
-            }
-          });
-          item.appendChild(el('div', { style: { fontWeight: '500', color: 'var(--text)' } }, m.name || m.email));
-          var meta = [m.workLocation, m.jobTitle].filter(Boolean).join(' \u00B7 ');
-          if (meta) item.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta));
-          item.addEventListener('mouseenter', function() { item.style.background = 'var(--raised)'; });
-          item.addEventListener('mouseleave', function() { item.style.background = 'transparent'; });
-          resultsDropdown.appendChild(item);
-        });
-        resultsDropdown.style.display = '';
-      }, 200);
-    });
-
-    // Close dropdown on blur (with delay for click)
-    searchInput.addEventListener('blur', function() {
-      setTimeout(function() { resultsDropdown.style.display = 'none'; }, 200);
-    });
 
     function _selectMember(m) {
       selectedMember = m;
@@ -6155,16 +5788,14 @@ function renderNewGrievanceForm(appContainer) {
       fields.forEach(function(f) {
         if (!f.value) return;
         var cell = el('div');
-        cell.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, f.label));
-        cell.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)' } }, String(f.value)));
+        cell.appendChild(el('div', { className: 'text-label' }, f.label));
+        cell.appendChild(el('div', { className: 'text-sm-text' }, String(f.value)));
         infoGrid.appendChild(cell);
       });
       selectedMemberDisplay.appendChild(infoGrid);
     }
 
-    searchWrapper.appendChild(searchInput);
-    searchWrapper.appendChild(resultsDropdown);
-    searchCard.appendChild(searchWrapper);
+    searchCard.appendChild(_grAc.wrapper);
     searchCard.appendChild(selectedMemberDisplay);
     content.appendChild(searchCard);
 
@@ -6278,7 +5909,7 @@ function renderNewGrievanceForm(appContainer) {
       formFieldsContainer.appendChild(advToggle);
 
       var advSection = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
-      advSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } }, 'These fields override auto-populated values on the PDF form.'));
+      advSection.appendChild(el('div', { className: 'text-xs-muted-mb-8' }, 'These fields override auto-populated values on the PDF form.'));
 
       // Job Title override
       var jtGroup = el('div', { className: 'form-group' });
@@ -6373,7 +6004,7 @@ function renderNewGrievanceForm(appContainer) {
       });
 
       if (emailRecipients.length === 0) {
-        emailCheckboxes.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Select a member first to see email options.'));
+        emailCheckboxes.appendChild(el('div', { className: 'text-xs-muted' }, 'Select a member first to see email options.'));
       }
     }
 
@@ -6386,7 +6017,7 @@ function renderNewGrievanceForm(appContainer) {
     var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '20px', marginBottom: '8px' } });
     actionCard.appendChild(statusMsg);
 
-    var btnRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    var btnRow = el('div', { className: 'flex-wrap-gap' });
 
     // Preview button
     var previewBtn = el('button', {
@@ -6517,7 +6148,7 @@ function renderNewGrievanceForm(appContainer) {
               var folderLink = el('a', { href: r.driveFolderUrl, target: '_blank', style: { fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCC2 Open Case Folder in Drive');
               previewArea.appendChild(folderLink);
             }
-            previewArea.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'The member has been notified that their signature is needed. Once signed, you will be notified and can email the document.'));
+            previewArea.appendChild(el('div', { className: 'text-xs-muted-mt-8' }, 'The member has been notified that their signature is needed. Once signed, you will be notified and can email the document.'));
 
             // Handle email sending if recipients were selected
             var checkedRecipients = emailRecipients.filter(function(r) { return r.checked && r.email; });

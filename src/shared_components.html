@@ -1,0 +1,402 @@
+<script>
+/**
+ * Shared UI Components — v4.34.0
+ * Reusable rendering utilities built on el() DOM builder.
+ * Eliminates duplicated KPI strips, sub-tab bars, autocomplete, and pagination.
+ */
+
+// ═══════════════════════════════════════
+// KPI STRIP
+// ═══════════════════════════════════════
+
+/**
+ * Renders a KPI strip into the given container.
+ * @param {HTMLElement} container - Parent element to append into
+ * @param {Array<{label:string, value:string|number, color?:string}>} items - KPI data
+ * @param {Object} [options]
+ * @param {number} [options.columns] - Grid columns (default: items.length)
+ * @param {string} [options.marginBottom] - Bottom margin (e.g. '10px')
+ * @returns {HTMLElement} The kpi-grid element (for async updates via querySelectorAll('.kpi-value'))
+ */
+function renderKPIStrip(container, items, options) {
+  options = options || {};
+  var cols = options.columns || items.length;
+  var style = { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' };
+  if (options.marginBottom) style.marginBottom = options.marginBottom;
+  var strip = el('div', { className: 'kpi-grid', style: style });
+
+  items.forEach(function(kpi) {
+    var card = el('div', { className: 'kpi-card' });
+    card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+    var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+    if (kpi.color) val.style.color = kpi.color;
+    card.appendChild(val);
+    strip.appendChild(card);
+  });
+
+  container.appendChild(strip);
+  return strip;
+}
+
+
+// ═══════════════════════════════════════
+// SUB-TAB BAR
+// ═══════════════════════════════════════
+
+/**
+ * Creates a sub-tab bar with content switching.
+ * @param {Array<{id:string, label:string, render:function(HTMLElement)}>} tabDefs
+ *   Tab definitions. Each must have id, label, and render(container) callback.
+ * @param {Object} [options]
+ * @param {string} [options.defaultTab] - Initial active tab id (default: first tab)
+ * @param {function(string)} [options.onSwitch] - Called after tab switch with new tab id
+ * @returns {{bar:HTMLElement, content:HTMLElement, switchTo:function(string), getActiveTab:function():string}}
+ */
+function createSubTabs(tabDefs, options) {
+  options = options || {};
+  var activeTab = options.defaultTab || tabDefs[0].id;
+  var bar = el('div', { className: 'sub-tabs', role: 'tablist' });
+  var content = el('div');
+
+  function refresh() {
+    bar.innerHTML = '';
+    tabDefs.forEach(function(tab) {
+      bar.appendChild(el('button', {
+        className: 'sub-tab' + (activeTab === tab.id ? ' active' : ''),
+        role: 'tab',
+        'aria-selected': String(activeTab === tab.id),
+        onClick: function() { switchTo(tab.id); }
+      }, tab.label));
+    });
+  }
+
+  function switchTo(tabId) {
+    activeTab = tabId;
+    refresh();
+    content.innerHTML = '';
+    var tab = null;
+    for (var i = 0; i < tabDefs.length; i++) {
+      if (tabDefs[i].id === tabId) { tab = tabDefs[i]; break; }
+    }
+    if (tab && tab.render) tab.render(content);
+    if (options.onSwitch) options.onSwitch(tabId);
+  }
+
+  refresh();
+  // Render initial tab content
+  var first = null;
+  for (var i = 0; i < tabDefs.length; i++) {
+    if (tabDefs[i].id === activeTab) { first = tabDefs[i]; break; }
+  }
+  if (first && first.render) first.render(content);
+
+  return {
+    bar: bar,
+    content: content,
+    switchTo: switchTo,
+    getActiveTab: function() { return activeTab; }
+  };
+}
+
+
+// ═══════════════════════════════════════
+// AUTOCOMPLETE
+// ═══════════════════════════════════════
+
+/**
+ * Creates a typeahead autocomplete input.
+ * @param {Object} options
+ * @param {string} [options.placeholder] - Input placeholder text
+ * @param {function(function(Array))} options.loadData - Async data loader: call cb(items)
+ * @param {function(Object,string):boolean} [options.filterFn] - Filter predicate (item, query). Default: name+email substring match
+ * @param {function(Object):HTMLElement} [options.renderItem] - Custom item renderer. Default: name + email two-line
+ * @param {function(Object)} options.onSelect - Called when user selects an item
+ * @param {number} [options.maxResults] - Max dropdown items (default: 8)
+ * @param {number} [options.debounceMs] - Debounce delay in ms (default: 0)
+ * @param {number} [options.minQuery] - Min chars before search (default: 1)
+ * @returns {{wrapper:HTMLElement, input:HTMLElement, getSelected:function():Object|null, clear:function()}}
+ */
+function createAutocomplete(options) {
+  var maxResults = options.maxResults || 8;
+  var debounceMs = options.debounceMs || 0;
+  var minQuery = options.minQuery || 1;
+  var selected = null;
+  var _cache = null;
+  var _timer = null;
+
+  var wrapper = el('div', { className: 'form-group', style: { position: 'relative' } });
+  var input = el('input', {
+    className: 'form-input',
+    placeholder: options.placeholder || 'Type to search...',
+    autocomplete: 'off'
+  });
+  wrapper.appendChild(input);
+
+  var dropdown = el('div', { className: 'ac-dropdown', style: {
+    position: 'absolute', top: '100%', left: '0', right: '0', zIndex: '50',
+    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+    maxHeight: '200px', overflowY: 'auto', display: 'none',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+  }});
+  wrapper.appendChild(dropdown);
+
+  // Default filter: substring on name + email
+  var filterFn = options.filterFn || function(item, q) {
+    return (item.name || '').toLowerCase().indexOf(q) !== -1 ||
+           (item.email || '').toLowerCase().indexOf(q) !== -1;
+  };
+
+  // Default item renderer
+  var renderItem = options.renderItem || function(item) {
+    var row = el('div', { style: {
+      padding: '8px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)',
+      borderBottom: '1px solid var(--border)'
+    }});
+    row.appendChild(el('div', { style: { fontWeight: '600' } }, item.name || ''));
+    row.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px' } }, item.email || ''));
+    return row;
+  };
+
+  function loadAndFilter(q) {
+    function doFilter(data) {
+      dropdown.innerHTML = '';
+      var matches = data.filter(function(item) { return filterFn(item, q); });
+      if (maxResults) matches = matches.slice(0, maxResults);
+      if (matches.length === 0) { dropdown.style.display = 'none'; return; }
+
+      matches.forEach(function(item) {
+        var row = renderItem(item);
+        row.addEventListener('click', function() {
+          selected = item;
+          input.value = item.email || item.name || '';
+          dropdown.style.display = 'none';
+          if (options.onSelect) options.onSelect(item);
+        });
+        row.addEventListener('mouseenter', function() { row.style.background = 'var(--accentBg)'; });
+        row.addEventListener('mouseleave', function() { row.style.background = 'transparent'; });
+        dropdown.appendChild(row);
+      });
+      dropdown.style.display = 'block';
+    }
+
+    if (_cache) { doFilter(_cache); return; }
+    options.loadData(function(data) {
+      _cache = data || [];
+      doFilter(_cache);
+    });
+  }
+
+  input.addEventListener('input', function() {
+    selected = null;
+    var q = input.value.toLowerCase().trim();
+    if (q.length < minQuery) { dropdown.style.display = 'none'; return; }
+    if (debounceMs > 0) {
+      clearTimeout(_timer);
+      _timer = setTimeout(function() { loadAndFilter(q); }, debounceMs);
+    } else {
+      loadAndFilter(q);
+    }
+  });
+
+  // Dismiss on outside click
+  input.addEventListener('blur', function() {
+    setTimeout(function() { dropdown.style.display = 'none'; }, 200);
+  });
+
+  return {
+    wrapper: wrapper,
+    input: input,
+    getSelected: function() { return selected; },
+    clear: function() { selected = null; input.value = ''; dropdown.style.display = 'none'; }
+  };
+}
+
+
+// ═══════════════════════════════════════
+// PAGINATION
+// ═══════════════════════════════════════
+
+/**
+ * Creates a client-side paginator for a list of items.
+ * @param {Object} options
+ * @param {Array} options.items - Full item array
+ * @param {number} [options.pageSize] - Items per page (default: 20)
+ * @param {function(HTMLElement, Object, number)} options.renderItem - Render one item into container
+ * @param {string} [options.emptyText] - Text when no items (default: 'No items.')
+ * @param {string} [options.buttonStyle] - CSS class for buttons: 'btn-ghost' or 'btn-secondary' (default: 'btn-ghost')
+ * @param {boolean} [options.scrollOnNav] - Scroll to top on page change (default: false)
+ * @returns {{container:HTMLElement, setItems:function(Array), goToPage:function(number), getPage:function():number}}
+ */
+function createPaginator(options) {
+  var items = options.items || [];
+  var pageSize = options.pageSize || 20;
+  var currentPage = 0;
+  var btnClass = 'btn ' + (options.buttonStyle || 'btn-ghost');
+
+  var listArea = el('div');
+  var pagerArea = el('div', { style: { marginTop: '12px' } });
+  var container = el('div');
+  container.appendChild(listArea);
+  container.appendChild(pagerArea);
+
+  function render() {
+    listArea.innerHTML = '';
+    var totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+    if (currentPage >= totalPages) currentPage = totalPages - 1;
+    if (currentPage < 0) currentPage = 0;
+
+    var start = currentPage * pageSize;
+    var slice = items.slice(start, start + pageSize);
+
+    if (slice.length === 0) {
+      listArea.appendChild(el('div', {
+        style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: '13px' }
+      }, options.emptyText || 'No items.'));
+    } else {
+      slice.forEach(function(item, i) {
+        options.renderItem(listArea, item, start + i);
+      });
+    }
+
+    // Pager controls
+    pagerArea.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    var pagerRow = el('div', { style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      gap: '8px', marginBottom: '6px'
+    }});
+
+    var atFirst = currentPage === 0;
+    var atLast = currentPage >= totalPages - 1;
+
+    var prevBtn = el('button', {
+      className: btnClass,
+      'aria-label': 'Previous page',
+      style: { fontSize: '12px', opacity: atFirst ? '0.3' : '1', pointerEvents: atFirst ? 'none' : 'auto' },
+      onClick: function() { goToPage(currentPage - 1); }
+    }, '\u2190 Prev');
+
+    var pageLabel = el('span', {
+      'aria-live': 'polite',
+      className: 'text-xs-muted'
+    }, 'Page ' + (currentPage + 1) + ' of ' + totalPages);
+
+    var nextBtn = el('button', {
+      className: btnClass,
+      'aria-label': 'Next page',
+      style: { fontSize: '12px', opacity: atLast ? '0.3' : '1', pointerEvents: atLast ? 'none' : 'auto' },
+      onClick: function() { goToPage(currentPage + 1); }
+    }, 'Next \u2192');
+
+    pagerRow.appendChild(prevBtn);
+    pagerRow.appendChild(pageLabel);
+    pagerRow.appendChild(nextBtn);
+    pagerArea.appendChild(pagerRow);
+  }
+
+  function goToPage(page) {
+    currentPage = page;
+    render();
+    if (options.scrollOnNav && listArea.scrollIntoView) {
+      listArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function setItems(newItems) {
+    items = newItems || [];
+    currentPage = 0;
+    render();
+  }
+
+  render();
+
+  return {
+    container: container,
+    listArea: listArea,
+    pagerArea: pagerArea,
+    setItems: setItems,
+    goToPage: goToPage,
+    getPage: function() { return currentPage; },
+    render: render
+  };
+}
+
+/**
+ * Creates a server-side paginator that calls a load function per page.
+ * @param {Object} options
+ * @param {number} [options.pageSize] - Items per page (default: 50)
+ * @param {function(number, number, function({items:Array, page:number, totalPages:number, total:number}))} options.loadPage
+ *   Called with (page, pageSize, callback). 1-indexed pages.
+ * @param {function(HTMLElement, Array)} options.renderItems - Render the items array into container
+ * @param {string} [options.emptyText] - Text when no items
+ * @returns {{container:HTMLElement, loadPage:function(number)}}
+ */
+function createServerPaginator(options) {
+  var pageSize = options.pageSize || 50;
+  var listArea = el('div');
+  var pagerArea = el('div');
+  var container = el('div');
+  container.appendChild(listArea);
+  container.appendChild(pagerArea);
+
+  function renderPager(page, totalPages, total) {
+    pagerArea.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    var pagerRow = el('div', { style: {
+      display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '12px 0'
+    }});
+
+    var atFirst = page <= 1;
+    var atLast = page >= totalPages;
+
+    pagerRow.appendChild(el('button', {
+      className: 'btn', disabled: atFirst,
+      'aria-label': 'Previous page',
+      style: { fontSize: '12px', padding: '6px 14px', opacity: atFirst ? '0.4' : '1' },
+      onClick: function() { loadPage(page - 1); }
+    }, '\u2190 Prev'));
+
+    var startItem = (page - 1) * pageSize + 1;
+    var endItem = Math.min(page * pageSize, total);
+    pagerRow.appendChild(el('span', {
+      'aria-live': 'polite',
+      className: 'text-sm-muted'
+    }, startItem + '\u2013' + endItem + ' of ' + total + ' (page ' + page + '/' + totalPages + ')'));
+
+    pagerRow.appendChild(el('button', {
+      className: 'btn', disabled: atLast,
+      'aria-label': 'Next page',
+      style: { fontSize: '12px', padding: '6px 14px', opacity: atLast ? '0.4' : '1' },
+      onClick: function() { loadPage(page + 1); }
+    }, 'Next \u2192'));
+
+    pagerArea.appendChild(pagerRow);
+  }
+
+  function loadPage(page) {
+    listArea.innerHTML = '';
+    showLoading(listArea, 'list');
+    options.loadPage(page, pageSize, function(result) {
+      listArea.innerHTML = '';
+      if (!result || !result.items || result.items.length === 0) {
+        listArea.appendChild(el('div', {
+          style: { color: 'var(--muted)', padding: '16px 0', textAlign: 'center' }
+        }, options.emptyText || 'No matches.'));
+        renderPager(0, 0, 0);
+        return;
+      }
+      options.renderItems(listArea, result.items);
+      renderPager(result.page, result.totalPages, result.total);
+    });
+  }
+
+  return {
+    container: container,
+    listArea: listArea,
+    pagerArea: pagerArea,
+    loadPage: loadPage
+  };
+}
+</script>

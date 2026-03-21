@@ -6,7 +6,7 @@
  * WHAT THIS FILE DOES:
  *   Data resilience system with scheduled email digests and Google Drive CSV
  *   backups. Members can opt into periodic email digests of their grievance/
- *   task data. Automatic weekly Drive backups export key sheets as
+ *   workload/task data. Automatic weekly Drive backups export key sheets as
  *   CSV files to a SolidBase_Backups folder. Maintains maximum 52 backup
  *   files (~1 year of weekly backups per sheet).
  *
@@ -278,7 +278,31 @@ var FailsafeService = (function () {
       } catch (e) { Logger.log('Digest grievance error: ' + e.message); }
     }
 
-    // Workload — removed from SolidBase (org-specific feature)
+    // Workload
+    if (config.includeWorkload) {
+      try {
+        var wSheet = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
+        if (wSheet && wSheet.getLastRow() > 1) {
+          var wData = wSheet.getDataRange().getValues();
+          var wHeaders = wData[0];
+          var memberEntries = [];
+          var emailCol = -1;
+          for (var h = 0; h < wHeaders.length; h++) {
+            if (String(wHeaders[h]).toLowerCase().indexOf('email') !== -1) { emailCol = h; break; }
+          }
+          if (emailCol !== -1) {
+            for (var w = 1; w < wData.length; w++) {
+              if (String(wData[w][emailCol]).toLowerCase().trim() === email.toLowerCase().trim()) {
+                memberEntries.push(wData[w]);
+              }
+            }
+          }
+          if (memberEntries.length > 0) {
+            sections.push('<h3>Workload History (' + memberEntries.length + ' entries)</h3><p>You have ' + memberEntries.length + ' workload submissions on file.</p>');
+          }
+        }
+      } catch (e) { Logger.log('Digest workload error: ' + e.message); }
+    }
 
     // Tasks
     if (config.includeTasks && typeof DataService !== 'undefined') {
@@ -300,7 +324,7 @@ var FailsafeService = (function () {
 
     var html = '<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">';
     html += '<h2 style="color: #1a73e8;">SolidBase Digest</h2>';
-    html += '<p style="color: #666;">Here is your latest data summary from SolidBase.</p><hr>';
+    html += '<p style="color: #666;">Here is your latest data summary from the SolidBase.</p><hr>';
     html += sections.join('<hr>');
     html += '<hr><p style="font-size: 12px; color: #999;">This is an automated digest. Manage your preferences in the Dashboard under Profile &gt; Email Digest Settings.</p>';
     html += '</body></html>';
@@ -377,6 +401,7 @@ var FailsafeService = (function () {
     var sheetsToBackup = [
       SHEETS.MEMBER_DIR,
       SHEETS.GRIEVANCE_LOG,
+      SHEETS.WORKLOAD_VAULT,
       SHEETS.STEWARD_TASKS,
       SHEETS.CONTACT_LOG
     ];
@@ -786,6 +811,11 @@ function fsDiagnostic(sessionToken) {
     'Member Satisfaction': SHEETS.SATISFACTION,
     'Survey Questions': SHEETS.SURVEY_QUESTIONS,
     'Failsafe Config': SHEETS.FAILSAFE_CONFIG,
+    'Workload Vault': SHEETS.WORKLOAD_VAULT,
+    'Workload Reporting': SHEETS.WORKLOAD_REPORTING,
+    'Workload Archive': SHEETS.WORKLOAD_ARCHIVE,
+    'Workload Reminders': SHEETS.WORKLOAD_REMINDERS,
+    'Workload UserMeta': SHEETS.WORKLOAD_USERMETA,
     'Audit Log': SHEETS.AUDIT_LOG,
     'Meeting Check-In Log': SHEETS.MEETING_CHECKIN_LOG,
     'Steward Performance': SHEETS.STEWARD_PERFORMANCE_CALC,

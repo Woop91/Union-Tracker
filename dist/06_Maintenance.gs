@@ -305,7 +305,7 @@ function UPDATE_ALL_SHEETS() {
       '🔄 Update All Sheets',
       'This will update every tab in the spreadsheet:\n\n' +
       '• Update headers on Config, Member Directory, Grievance Log\n' +
-      '• Ensure all feature sheets exist (QA, Timeline, etc.)\n' +
+      '• Ensure all feature sheets exist (QA, Timeline, Workload, etc.)\n' +
       '• Refresh hidden calculation sheets & formulas\n' +
       '• Reapply data validations (dropdowns)\n' +
       '• Re-enforce hidden sheet protection\n' +

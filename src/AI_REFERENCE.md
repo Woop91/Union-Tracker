@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | Sync flow, sync history |
+| 3 | **SYNC-LOG.md** | SolidBase sync sync flow, Workload Tracker exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -29,13 +29,15 @@ Read these files **in this order** when onboarding to this codebase:
 ## 🏗️ PROJECT OVERVIEW
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
-**Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
+**Repo:** `Woop91/SolidBase` (private). Default branch: `Main` (capital M).
+**Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users).
+**Target users:** Union stewards (power users) and members (casual users) at Organization (Union).
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**Apps Script ID:** `[REDACTED]
+**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -75,7 +77,7 @@ src/*.gs (42 files) + src/*.html (7 files)
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
-| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, weekly questions |
+| `19_-25_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, workload service |
 | `26_` | Q&A Forum | Steward-member Q&A with steward-only answers, resolve/reopen |
 | `27_` | Timeline Service | Activity feed with inline edit, pagination, calendar links |
 | `28_` | Failsafe Service | Security & reliability guardrails |
@@ -104,6 +106,7 @@ doGet(e)
 ├── ?page=links    → Links page
 ├── ?page=selfservice → Member self-service (Google auth or PIN)
 ├── ?page=portal   → Public portal
+├── ?page=workload → Workload tracker
 ├── ?page=checkin  → Meeting check-in (v4.11.0)
 ├── ?page=resources → SPA with resources tab pre-selected (v4.11.0)
 ├── ?page=notifications → SPA with notifications tab pre-selected (v4.12.0)
@@ -222,6 +225,7 @@ Records **why** architectural choices were made, so future LLMs don't undo them.
 | 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
 | 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
 | 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
+| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). 18_ later removed; 25_ is the sole workload module. |
 
 ---
 
@@ -275,3 +279,95 @@ See `PHASE2_PLAN.md` for details.
 
 All historical entries (v4.18.1–v4.25.9 bug fixes, feature implementations, migration notes)
 have been archived to `docs/AI_REFERENCE_ARCHIVE.md`. Refer there for past development context.
+
+---
+
+## SESSION: 2026-03-21 — Orphaned Function Audit & Archive Fix
+
+### Changes Made
+
+**v4.33.1 — Function Audit & Daily Trigger Wiring**
+
+**Files modified:**
+- `src/10_Main.gs` — `dailyTrigger()` and `handleSecurityAudit_()`
+- `src/21_WebDashDataService.gs` — `getPendingGrievanceFeedback()`, `submitGrievanceFeedback()`
+
+---
+
+### 1. `dailyTrigger()` — 4 orphaned functions wired (`10_Main.gs`)
+
+**Problem:** Four maintenance functions existed and were fully implemented but were never called from any trigger. They ran only if manually invoked.
+
+| Function | Origin | Effect of being orphaned |
+|---|---|---|
+| `archiveClosedGrievances(90)` | `06_Maintenance.gs` v4.30.0 | Closed grievances accumulated in active sheet forever |
+| `dailyAuditArchive()` | `06_Maintenance.gs` v4.30.0 | Audit log grew unbounded; no Drive CSV backups |
+| `sendDailySecurityDigest()` | `00_Security.gs` v4.8.1 | Security digest never sent; CRITICAL events silently discarded |
+| `authCleanupExpiredTokens()` | `19_WebDashAuth.gs` v4.22.9 | Expired session tokens accumulated in PropertiesService |
+
+**Fix:** Each function now called inside `dailyTrigger()` with `typeof` guard + `try/catch`.
+
+---
+
+### 2. Mass deletion email alert fixed (`10_Main.gs` — `handleSecurityAudit_()`)
+
+**Problem:** `onEdit` is a GAS simple trigger. `MailApp.sendEmail()` is unavailable in this context. `recordSecurityEvent(CRITICAL)` called `sendSecurityAlertEmail_()` which silently failed. The CRITICAL event was logged to audit but **never emailed**. Additionally, `queueSecurityDigestEvent_()` only runs for HIGH severity — CRITICAL events never entered the queue at all.
+
+**Fix:** `handleSecurityAudit_()` now explicitly calls `queueSecurityDigestEvent_()` before `recordSecurityEvent()`. PropertiesService (used by the queue) works in simple trigger context. Admin receives email within 24h when `sendDailySecurityDigest()` runs in `dailyTrigger()`.
+
+---
+
+### 3. Archive data accessible to webapp statistics (`21_WebDashDataService.gs`)
+
+**Already using `_getAllGrievanceData()` (active + archive merged):**
+- `getMemberGrievanceHistory()` ✅
+- `getDashboardStats()` ✅
+- `getGrievanceHotspots()` ✅
+
+**Intentionally active-only (correct by design):**
+- `getStewardCases()` — shows open workload; closed/archived cases excluded intentionally
+- `getMemberGrievances()` — filters out closed statuses anyway; archive (closed-only) adds nothing
+
+**Fixed to use `_getAllGrievanceData()`:**
+- `getPendingGrievanceFeedback()` — needed archive because cases auto-archived within 14-day feedback window would silently drop the prompt
+- `submitGrievanceFeedback()` — needed archive to validate ownership of an archived closed case; without this, `'Grievance not found or not closed'` error for any archived case
+
+---
+
+### CORE RULE REMINDER
+- Everything dynamic — never hardcode sheet names, column indices, or config values
+- Never delete or overwrite manually entered data
+- Column identification by header name via `_findColumn(colMap, HEADERS.xxx)`
+- All mutations go to ACTIVE sheet only; statistics/reads use `_getAllGrievanceData()` for complete view
+- `archiveClosedGrievances()` threshold = 90 days (configurable via `daysOld` param)
+
+---
+
+## SESSION: 2026-03-21 (continued) — Config-driven retention thresholds
+
+### Changes Made
+
+**v4.33.2 — Dynamic archive thresholds via Config tab**
+
+**Files modified:**
+- `src/01_Core.gs` — `CONFIG_HEADER_MAP_`: added `GRIEVANCE_ARCHIVE_DAYS` + `AUDIT_ARCHIVE_DAYS`
+- `src/10a_SheetCreation.gs` — `createConfigSheet`: seeded both keys with default `90`
+- `src/10_Main.gs` — `dailyTrigger()`: reads both thresholds from Config before calling archive functions
+
+### How it works
+
+`dailyTrigger()` reads `CONFIG_COLS.GRIEVANCE_ARCHIVE_DAYS` and `CONFIG_COLS.AUDIT_ARCHIVE_DAYS`
+via `getConfigValue_()`. Falls back to 90 if blank, zero, or non-numeric.
+Passes values to `archiveClosedGrievances(grievanceArchiveDays)` and `archiveOldAuditLogs_(auditArchiveDays)` respectively.
+Admins change retention by editing the Config tab — no code change required.
+
+### Config tab entries
+
+| Header | Key | Default | Purpose |
+|---|---|---|---|
+| `Grievance Archive Days` | `GRIEVANCE_ARCHIVE_DAYS` | 90 | Days after closure before grievance moves to `_Archive_Grievances` |
+| `Audit Log Archive Days` | `AUDIT_ARCHIVE_DAYS` | 90 | Days before audit log entries are exported to Drive CSV and pruned |
+
+### CORE RULE REMINDER
+Everything dynamic — config values always read at runtime from Config tab.
+Never hardcode thresholds, deadlines, or durations.

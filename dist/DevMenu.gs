@@ -28,7 +28,7 @@
  *
  * DEPENDENCIES:
  *   Depends on every module's init/setup functions (initSurveyEngine,
- *   initWeeklyQuestionSheets, initWorkloadSheets, etc.). Used only in
+ *   initWeeklyQuestionSheets, etc.). Used only in
  *   development builds.
  *
  * @dev-only Excluded from production builds
@@ -229,6 +229,7 @@ function devWrap_InitPollSheets() {
   devWrap_('Initialize Poll Sheets', wqInitSheets);
 }
 
+/** Dev menu: initializes workload tracker sheets. */
 // ============================================================================
 // INDIVIDUAL WRAPPERS — Group 2: Refresh & Data Ops
 // ============================================================================
@@ -296,6 +297,7 @@ function devWrap_InstallWeeklyReminderTrigger() {
 function devWrap_InstallCommunityPollTrigger() {
   devWrap_('Install Community Poll Draw Trigger', setupCommunityPollTrigger);
 }
+
 
 /** Dev menu: installs the onOpen deferred trigger. */
 function devWrap_InstallOnOpenDeferred() {

@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>SolidBase — Built for the collective.</title>
+  <title>Dashboard</title>
 
   <!-- N1: Fonts — core only; theme-specific fonts lazy-loaded by UnifiedTheme -->
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
@@ -111,8 +111,17 @@
               var oldCache = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
               if (oldCache) {
                 var oldData = JSON.parse(oldCache);
-                if (oldData && oldData.data && JSON.stringify(oldData.data) === JSON.stringify(batch)) {
-                  return; // Data unchanged — SWR render is still valid
+                // OPT-SWR: Short-circuit diff — skip stringify for obvious mismatches
+                if (oldData && oldData.data) {
+                  var od = oldData.data;
+                  var lenMatch = Array.isArray(od) && Array.isArray(batch)
+                    ? od.length === batch.length
+                    : typeof od === 'object' && typeof batch === 'object'
+                      ? Object.keys(od).length === Object.keys(batch).length
+                      : true;
+                  if (lenMatch && JSON.stringify(od) === JSON.stringify(batch)) {
+                    return; // Data unchanged — SWR render is still valid
+                  }
                 }
               }
             } catch (_diffErr) { /* proceed with re-render */ }
@@ -3334,6 +3343,8 @@
       }
     });
   </script>
+
+  <?!= include('shared_components') ?>
 
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>

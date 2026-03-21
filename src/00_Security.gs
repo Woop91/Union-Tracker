@@ -646,7 +646,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     // Mask PII in details before including in email
     var safeDetails = maskObjectPII_(details, true);
 
-    var systemName = 'SolidBase';
+    var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }
@@ -770,7 +770,7 @@ function sendDailySecurityDigest() {
 
     if (recipients.length === 0) return;
 
-    var systemName = 'SolidBase';
+    var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }

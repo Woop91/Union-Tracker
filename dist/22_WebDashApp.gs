@@ -10,7 +10,7 @@
  *     (3) Route to correct view (auth_view for login, steward_view for
  *         stewards, member_view for members)
  *     (4) Config + user data injection into HTML template
- *   Deep-link support: ?page=<tab> opens specific SPA tab after auth.
+ *   Deep-link support: ?page=workload opens specific SPA tab after auth.
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
  *   "Execute as: Me" deployment means the script runs with the owner's
@@ -47,7 +47,7 @@ function doGet(e) {
   if (e.parameter && e.parameter.page === 'esign') {
     try {
       return HtmlService.createHtmlOutputFromFile('esign')
-        .setTitle('Grievance E-Signature');
+        .setTitle('Grievance E-Signature — Union Local');
     } catch (esignErr) {
       Logger.log('doGet esign error: ' + esignErr.message);
       return _serveFatalError('E-Signature page unavailable.');

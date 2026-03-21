@@ -193,8 +193,6 @@ describe('getDefaultComfortViewSettings_', () => {
     expect(defaults).toHaveProperty('zebraStripes', true);
     expect(defaults).toHaveProperty('reducedMotion', false);
     expect(defaults).toHaveProperty('focusMode', false);
-    expect(defaults).toHaveProperty('highContrast', false);
-    expect(defaults).toHaveProperty('largeText', false);
     expect(defaults).toHaveProperty('hideGridlines', false);
   });
 
@@ -228,8 +226,6 @@ describe('getComfortViewSettings', () => {
       zebraStripes: false,
       reducedMotion: true,
       focusMode: true,
-      highContrast: true,
-      largeText: true,
       hideGridlines: true
     };
     setupUserPropertiesMock({ comfortViewSettings: JSON.stringify(savedSettings) });

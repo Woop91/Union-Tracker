@@ -197,7 +197,7 @@ function setupDashboardCalendar() {
 
   // Derive calendar name from org name
   var orgName = getSystemName_();
-  var calendarName = (orgName && orgName !== 'SolidBase') ? orgName + ' Events' : 'SolidBase Events';
+  var calendarName = (orgName && orgName !== 'SolidBase') ? orgName + ' Events' : 'Union Events';
 
   // Try stored ID
   var storedId = props.getProperty('UNION_CALENDAR_ID');
@@ -1611,7 +1611,7 @@ function sendDeadlineReminders(daysAhead) {
 
     body += `</table>`;
     body += `<p style="margin-top: 20px; color: #666; font-size: 12px;">
-               This is an automated reminder from SolidBase.
+               This is an automated reminder from the SolidBase.
              </p>`;
 
     // Send email
@@ -2488,13 +2488,13 @@ function authorizeConstantContact() {
     '<style>' +
     'body{font-family:Arial,sans-serif;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:8px;max-width:500px}' +
-    'h2{color:#1a73e8;margin-top:0}' +
-    '.step{background:#f0f7ff;padding:15px;margin:12px 0;border-radius:8px;border-left:4px solid #1a73e8}' +
-    '.step-num{font-weight:bold;color:#1a73e8}' +
-    'a{color:#1a73e8;word-break:break-all}' +
+    'h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';margin-top:0}' +
+    '.step{background:#f0f7ff;padding:15px;margin:12px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}' +
+    '.step-num{font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + '}' +
+    'a{color:' + SHEET_COLORS.DIALOG_ACCENT + ';word-break:break-all}' +
     'input{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;margin:8px 0;font-size:14px}' +
-    'button{padding:12px 24px;background:#1a73e8;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px}' +
-    'button:hover{background:#1557b0}' +
+    'button{padding:12px 24px;background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px}' +
+    'button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}' +
     '.note{font-size:12px;color:#666;margin-top:12px}' +
     '</style>' +
     '<div class="container">' +
@@ -3966,7 +3966,7 @@ function generateGrievancePDF_(formData) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || '',
+      'agency':     formData.agency     || 'Organization',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4100,7 +4100,7 @@ function generateDraftGrievancePDF_(formData, grievanceId, documentHash) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || '',
+      'agency':     formData.agency     || 'Organization',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4185,7 +4185,7 @@ function generateSignedGrievancePDF_(formData, grievanceId, documentHash, sigBas
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || '',
+      'agency':     formData.agency     || 'Organization',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4505,7 +4505,7 @@ function submitGrievanceSignature(sigToken, sigBase64) {
       grievant:   memberName,
       jobtitle:   '', // from member dir if available
       startdate:  hireDateStr,
-      agency:     '',
+      agency:     'Organization',
       region:     regionVal,
       workloc:    workLoc,
       articles:   grievanceObj.articles,
@@ -4742,7 +4742,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
       grievant:   memberData.firstName + ' ' + memberData.lastName,
       jobtitle:   formOverrides.jobtitle || memberData.jobTitle,
       startdate:  formOverrides.startdate || hireDateStr,
-      agency:     formOverrides.agency || '',
+      agency:     formOverrides.agency || 'Organization',
       region:     formOverrides.region || regionVal,
       workloc:    formOverrides.workloc || memberData.workLocation,
       managers:   formOverrides.managers || memberData.manager || memberData.supervisor,
