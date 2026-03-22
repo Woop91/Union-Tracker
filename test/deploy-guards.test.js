@@ -467,8 +467,9 @@ describe('G7: All .gs files have valid JavaScript syntax', () => {
 // ============================================================================
 // G8: build.js file arrays match actual src/ contents
 // ============================================================================
-// Reason: HTML files added to src/ but NOT to the HTML_FILES array in build.js
-// would be deleted from dist/ on a fresh --prod build, breaking the tab at runtime.
+// Reason: poms_reference.html was added to src/ and dist/ but NOT to the
+// HTML_FILES array in build.js. A fresh --prod build would delete it from dist/,
+// breaking the POMS Reference tab at runtime.
 
 describe('G8: build.js file arrays match src/ contents', () => {
   const buildCode = fs.readFileSync(path.resolve(__dirname, '..', 'build.js'), 'utf8');
@@ -551,13 +552,21 @@ describe('G9: Nav tabs and handlers are in sync', () => {
     });
   });
 
+  // Member-only tabs (removed from steward nav)
+  const memberOnlyTabs = ['poms'];
+  memberOnlyTabs.forEach(tabId => {
+    test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
+      const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
+      expect(count).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
 
 
 // ============================================================================
 // G10: Lazy-loaded HTML files have server functions
 // ============================================================================
-// Reason: renderOrgChart calls google.script.run.getOrgChartHtml().
+// Reason: renderPOMSReference calls google.script.run.getPOMSReferenceHtml().
 // If the server function doesn't exist, the tab shows "Failed to load".
 
 describe('G10: Lazy-loaded views have matching server functions', () => {
@@ -567,7 +576,7 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   const codeOnly = indexCode.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // Find all HtmlService-pattern server functions: lines like
-  //   .getOrgChartHtml();
+  //   .getOrgChartHtml();  or  .getPOMSReferenceHtml();
   // These are the terminal call in a google.script.run chain.
   // Pattern: line has only whitespace, a dot, a function name, parens, semicolon
   const terminalCalls = codeOnly.match(/^\s+\.(\w+)\(\s*\)\s*;/gm) || [];
@@ -591,8 +600,9 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   });
 
   // Must find at least the known lazy-loaders
-  test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
+  test('detects lazy-loaded server functions (getOrgChartHtml, getPOMSReferenceHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
+    expect(serverFunctions.has('getPOMSReferenceHtml')).toBe(true);
   });
 
   [...serverFunctions].forEach(fn => {
@@ -603,18 +613,21 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 });
 
 
+// G11: poms_reference.html — excluded from SolidBase (DDS-only feature)
+
+
 // ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: SolidBase Apps Script ID (18hHHX...) must never appear in source
+// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
 // files that get synced to the public Union-Tracker repo.
 
 describe('G12: No sensitive ID leaks', () => {
   const DDS_SCRIPT_ID_PREFIX = '18hHHX';
   const srcFiles = fs.readdirSync(SRC_DIR);
 
-  // AI_REFERENCE.md may contain Script ID references (redacted in SolidBase);
-  // this guard ensures no unredacted IDs leak into other source files.
+  // AI_REFERENCE.md legitimately contains Script IDs in the private DDS repo;
+  // in public Union-Tracker the ID is redacted so this guard still protects there.
   const G12_EXCLUDES = ['AI_REFERENCE.md'];
 
   srcFiles.filter(f => !G12_EXCLUDES.includes(f)).forEach(file => {
@@ -679,6 +692,8 @@ describe('G13: Module load order is safe', () => {
   });
 });
 
+
+// G14: WorkloadService — excluded from SolidBase (DDS-only feature)
 
 // ============================================================================
 // G15: IDLE LOGOUT MODULE

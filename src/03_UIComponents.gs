@@ -95,6 +95,11 @@ function createDashboardMenu() {
       .addItem('📚 Search Precedents', 'showSearchPrecedents'))
 
     .addSeparator()
+    .addItem('💡 Submit Feedback', 'showSubmitFeedbackModal')
+    .addItem('🤝 Log Volunteer Hours', 'showLogVolunteerHoursModal')
+    .addItem('👥 Add Non-Member Contact', 'showAddContactModal')
+    .addItem('✅ Case Checklist Progress', 'showCaseProgressModal')
+    .addSeparator()
     .addItem('⚡ Quick Actions', 'showQuickActionsMenu')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addToUi();
@@ -112,6 +117,9 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('📅 Calendar & Meetings')
       .addItem('📝 Setup New Meeting', 'showSetupMeetingDialog')
       .addItem('✅ Open Meeting Check-In', 'showMeetingCheckInDialog')
+      .addItem('📅 Add New Event', 'showAddEventModal')
+      .addItem('📝 Add Meeting Minutes', 'showAddMinutesModal')
+      .addItem('📋 Take Attendance', 'showTakeAttendanceModal')
       .addSeparator()
       .addItem('🔗 Sync Deadlines', 'syncDeadlinesToCalendar')
       .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
@@ -125,11 +133,22 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('📁 Open Google Drive', 'openGoogleDrive'))
 
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData')
+      .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
+      .addSeparator()
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))
+
     .addSubMenu(ui.createMenu('📋 Surveys & Polls')
       .addItem('📂 Open New Survey Period', 'menuOpenNewSurveyPeriod')
       .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
+      .addItem('📊 View Survey Responses', 'showSurveyResponseViewer')
+      .addItem('📋 Edit Survey Question', 'showQuestionEditorModal')
       .addItem('🔔 Send Survey Reminders Now', 'sendSurveyCompletionReminders')
       .addSeparator()
+      .addItem('⚡ Create Weekly Question', 'showCreateWeeklyQuestionModal')
       .addItem('🏢 Toggle Return-to-Office Questions', 'menuToggleRTOSection')
       .addSeparator()
       .addItem('🔄 Draw Community Poll Now', 'autoSelectCommunityPoll'))
@@ -154,6 +173,7 @@ function createDashboardMenu() {
 
     .addSubMenu(ui.createMenu('🎨 Themes')
       .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
+      .addItem('🏛️ Apply Union Brand Theme (All Tabs)', 'applyUnionThemeToAllTabs')
       .addItem('🎨 Theme Presets', 'showThemePresetPicker')
       .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
       .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
@@ -166,11 +186,15 @@ function createDashboardMenu() {
   // MENU 3: Admin — Configuration & System Management
   // ============================================================================
   var adminMenu = ui.createMenu('🛠️ Admin')
+    .addItem('🏗️ Welcome / Setup Wizard', 'showWelcomeWizardModal')
+    .addItem('❓ Searchable Help Guide', 'showSearchableHelpModal')
+    .addSeparator()
     .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
     .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
     .addItem('🔧 Repair Dashboard', 'showRepairDialog')
     .addItem('🔄 Update All Sheets', 'UPDATE_ALL_SHEETS')
     .addItem('⚙️ Settings', 'showSettingsDialog')
+    .addItem('🛠️ Admin Settings', 'showAdminSettingsSidebar')
     .addSeparator()
 
     .addSubMenu(ui.createMenu('🔄 Data Sync')
@@ -229,6 +253,7 @@ function createDashboardMenu() {
       .addItem('--- INITIALIZE ALL ---', 'initializeDashboard')
       .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
       .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets')
+      .addItem('⚙️ Workload: Initialize Sheets', 'initWorkloadTrackerSheets')
       .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addSeparator()
@@ -237,6 +262,7 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
+      .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem')
       .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
       .addSeparator()
       .addItem('--- SYNC & REFRESH ---', 'syncAllData')
@@ -267,6 +293,7 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
       .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets')
+      .addItem('⚙️ Workload: Initialize Sheets', 'initWorkloadTrackerSheets')
       .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
       .addSeparator()
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
@@ -282,7 +309,9 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
-      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger'))
+      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
+      .addSeparator()
+      .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem'))
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
@@ -2051,7 +2080,7 @@ function sendMemberDashboardLink() {
       COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
-      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your SolidBase Access", body);
+      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
       ui.alert('Dashboard access link sent to ' + email);
     } catch (e) {
       ui.alert('Error sending email: ' + e.message);

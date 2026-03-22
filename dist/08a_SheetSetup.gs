@@ -238,6 +238,16 @@ function CREATE_DASHBOARD() {
     installHiddenSheetEnforcerTrigger();
     ss.toast('Hidden sheet enforcer installed', '🏗️ Progress', 2);
 
+    // Initialize Workload Tracker sheets (18_WorkloadTracker.gs)
+    if (typeof initWorkloadTrackerSheets === 'function') {
+      try {
+        initWorkloadTrackerSheets();
+        ss.toast('Workload Tracker sheets created', '🏗️ Progress', 2);
+      } catch (wtError) {
+        Logger.log('Workload tracker sheets skipped: ' + wtError.message);
+      }
+    }
+
     // Initialize Portal sheets (23_PortalSheets.gs) — member directory mirror, events, polls, etc.
     if (typeof initPortalSheets === 'function') {
       try {
@@ -569,6 +579,15 @@ function setupHiddenSheets(ss) {
     setSheetVeryHidden_(archGriev);
   }
 
+  // Workload Archive — created empty if missing (auto-populated by WorkloadService.archiveOldData)
+  if (typeof SHEETS !== 'undefined' && SHEETS.WORKLOAD_ARCHIVE) {
+    var wlArchive = ss.getSheetByName(SHEETS.WORKLOAD_ARCHIVE);
+    if (!wlArchive) {
+      wlArchive = ss.insertSheet(SHEETS.WORKLOAD_ARCHIVE);
+      wlArchive.getRange(1, 1).setValue('Workload Archive');
+      setSheetVeryHidden_(wlArchive);
+    }
+  }
 }
 
 /**

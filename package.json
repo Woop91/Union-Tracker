@@ -1,6 +1,6 @@
 {
   "name": "solidbase",
-  "version": "4.33.0",
+  "version": "4.34.0",
   "description": "SolidBase — Built for the collective.",
   "main": "build.js",
   "scripts": {

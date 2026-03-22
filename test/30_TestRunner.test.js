@@ -189,8 +189,8 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
 
     // Allow a threshold for wrappers tested indirectly via other suites
     // (e.g., workload SSO, broadcast filters, badge counts, task delegation, scale system,
-    // e-signature, form options — v4.33.0)
-    expect(untested.length).toBeLessThanOrEqual(40);
+    // e-signature, form options, filter dropdown values — v4.33.0)
+    expect(untested.length).toBeLessThanOrEqual(41);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {

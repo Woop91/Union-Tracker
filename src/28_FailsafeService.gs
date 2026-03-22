@@ -7,7 +7,7 @@
  *   Data resilience system with scheduled email digests and Google Drive CSV
  *   backups. Members can opt into periodic email digests of their grievance/
  *   workload/task data. Automatic weekly Drive backups export key sheets as
- *   CSV files to a SolidBase_Backups folder. Maintains maximum 52 backup
+ *   CSV files to a DDS_Dashboard_Backups folder. Maintains maximum 52 backup
  *   files (~1 year of weekly backups per sheet).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -35,7 +35,7 @@
 
 var FailsafeService = (function () {
 
-  var BACKUP_FOLDER_NAME = 'SolidBase_Backups';
+  var BACKUP_FOLDER_NAME = 'DDS_Dashboard_Backups';
   var MAX_BACKUP_FILES = 52; // ~1 year of weekly backups per sheet
 
   // ═══════════════════════════════════════
@@ -233,7 +233,7 @@ var FailsafeService = (function () {
             if (!stillDue) { continue; } // Another execution already sent
             MailApp.sendEmail({
               to: email,
-              subject: 'Your SolidBase Digest',
+              subject: 'Your Union Dashboard Digest',
               htmlBody: body,
               noReply: true
             });
@@ -323,8 +323,8 @@ var FailsafeService = (function () {
     if (sections.length === 0) return null;
 
     var html = '<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">';
-    html += '<h2 style="color: #1a73e8;">SolidBase Digest</h2>';
-    html += '<p style="color: #666;">Here is your latest data summary from the SolidBase.</p><hr>';
+    html += '<h2 style="color: #1a73e8;">Union Dashboard Digest</h2>';
+    html += '<p style="color: #666;">Here is your latest data summary from the Union Dashboard.</p><hr>';
     html += sections.join('<hr>');
     html += '<hr><p style="font-size: 12px; color: #999;">This is an automated digest. Manage your preferences in the Dashboard under Profile &gt; Email Digest Settings.</p>';
     html += '</body></html>';

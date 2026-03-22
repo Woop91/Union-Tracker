@@ -62,7 +62,8 @@ loadSources([
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
-  '29_Migrations.gs'
+  '29_Migrations.gs',
+  '32_AdminSettings.gs'
 ]);
 
 // ============================================================================
@@ -192,7 +193,8 @@ describe('A1: Build order integrity', () => {
     '05_Integrations.gs', '06_Maintenance.gs',
     '07_DevTools.gs', '08a_SheetSetup.gs', '08b_SearchAndCharts.gs',
     '08c_FormsAndNotifications.gs', '08d_AuditAndFormulas.gs', '08e_SurveyEngine.gs',
-    '09_Dashboards.gs', '10a_SheetCreation.gs', '10b_SurveyDocSheets.gs',
+    '09_Dashboards.gs', '09a_SheetFormatting.gs', '09b_TabModals.gs',
+    '10a_SheetCreation.gs', '10b_SurveyDocSheets.gs',
     '10c_FormHandlers.gs', '10d_SyncAndMaintenance.gs', '10_Main.gs',
     '11_CommandHub.gs', '12_Features.gs', '13_MemberSelfService.gs',
     '14_MeetingCheckIn.gs', '15_EventBus.gs', '16_DashboardEnhancements.gs',
@@ -201,7 +203,7 @@ describe('A1: Build order integrity', () => {
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
     '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_Migrations.gs', '30_TestRunner.gs',
-    '31_WebAppTests.gs', 'DevMenu.gs'
+    '31_WebAppTests.gs', '32_AdminSettings.gs', 'DevMenu.gs'
   ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {
@@ -590,7 +592,7 @@ describe('A9: UI tab routes have matching render functions', () => {
   while ((m = returnRouteRegex.exec(indexHtml)) !== null) {
     if (!routedFunctions.includes(m[1])) routedFunctions.push(m[1]);
   }
-  // Also catch direct handlers like renderOrgChart outside the switch.
+  // Also catch direct handlers like renderOrgChart, renderPOMSReference outside the switch.
   // Match: if (tabId === 'xxx') { ... renderFoo(app — but only top-level render calls
   // (not _renderDuesGate or other helpers that start with _)
   const directRouteRegex = /if\s*\(tabId\s*===\s*'[^']+'\)\s*\{[^}]*?\b(render[A-Z]\w+)\s*\(/g;
@@ -603,23 +605,12 @@ describe('A9: UI tab routes have matching render functions', () => {
   });
 
   // Each routed function must be defined SOMEWHERE in the HTML files
-  // (any of the SPA HTML files, including shared_components.html, auth_view.html, error_view.html)
-  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'shared_components.html', 'auth_view.html', 'error_view.html'].map(f => {
-    const fp = path.resolve(__dirname, '..', 'src', f);
-    return fs.existsSync(fp) ? fs.readFileSync(fp, 'utf8') : '';
-  }).join('\n');
-
-  // SolidBase exclusions: renderEventsPage is routed in index.html but the
-  // function was removed along with WorkloadService/POMS org-specific features.
-  // The route falls through harmlessly (empty pane) and will be wired when
-  // a SolidBase-specific events page is implemented.
-  const solidBaseExcluded = new Set(['renderEventsPage']);
+  // (any of the SPA HTML files, including auth_view.html and error_view.html)
+  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html'].map(f =>
+    fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
+  ).join('\n');
 
   routedFunctions.forEach(fn => {
-    if (solidBaseExcluded.has(fn)) {
-      test.skip(`${fn}() is defined (routed from _handleTabNav) [SolidBase: not yet implemented]`, () => {});
-      return;
-    }
     test(`${fn}() is defined (routed from _handleTabNav)`, () => {
       const defRegex = new RegExp('function\\s+' + fn + '\\s*\\(');
       expect(allHtml).toMatch(defRegex);
@@ -778,10 +769,10 @@ describe('A11: Server-exposed functions have auth checks', () => {
 // ============================================================================
 // A11b: CLIENT-CALLABLE HTML ENDPOINTS HAVE AUTH CHECKS
 // ============================================================================
-// Bug (2026-03-14): getOrgChartHtml() served HTML content without any
-// authentication — any anonymous caller could invoke it. All client-callable
-// functions in 22_WebDashApp.gs that return HTML content must verify
-// Session.getActiveUser().getEmail() before serving.
+// Bug (2026-03-14): getPOMSReferenceHtml() and getOrgChartHtml() served HTML
+// content without any authentication — any anonymous caller could invoke them.
+// All client-callable functions in 22_WebDashApp.gs that return HTML content
+// must verify Session.getActiveUser().getEmail() before serving.
 
 describe('A11b: Client-callable HTML endpoints have auth checks', () => {
   const webAppSrc = fs.readFileSync(
@@ -789,7 +780,7 @@ describe('A11b: Client-callable HTML endpoints have auth checks', () => {
   );
 
   // HTML-serving endpoints that must have auth
-  const htmlEndpoints = ['getOrgChartHtml'];
+  const htmlEndpoints = ['getOrgChartHtml', 'getPOMSReferenceHtml'];
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() checks Session.getActiveUser before serving content`, () => {
@@ -1137,8 +1128,10 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
   const nonDataServiceWrappers = [
     'dataMarkWelcomeDismissed',        // writes directly to PropertiesService
     'dataGetEngagementStats',          // reads live sheet data directly
+    'dataGetWorkloadSummaryStats',     // reads live sheet data directly
     'dataSendDirectMessage',           // sends email + Drive log directly (calls DataService helpers deeper than 12-line window)
     'dataEnsureSheetsIfNeeded',        // calls _ensureAllSheetsInternal() + PropertiesService directly (fire-and-forget init)
+    'dataGetPomsReference',            // returns POMS reference data directly (static dataset, no DataService needed)
     'dataApplyColorTheme',             // saves theme to UserProperties directly (unified theme system)
     'dataGetMyEngagementScore',        // standalone: reads multiple sheets for per-member private score
     'dataGetGrievanceForSigning',      // delegates to getGrievanceForSigning() (sigToken-based auth)

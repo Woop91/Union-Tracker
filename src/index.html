@@ -392,9 +392,9 @@
       // ── Per-tab accent colors (used by blob/shatter/liquid themes) ──
       var TAB_COLORS = {
         cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-        tasks: '#f59e0b', home: '#ff3366',
+        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-        resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
         polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
         events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
         testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -2063,8 +2063,10 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { group: 'Reference' },
+        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
         { group: 'Community' },
@@ -2410,6 +2412,46 @@
       });
     }
 
+    /**
+     * POMS Reference — loads poms_reference.html lazily, same pattern as org chart.
+     * Contains 78 POMS sections, 17 flowcharts, search, ratings, bookmarks, notes.
+     */
+    function renderPOMSReference(appContainer, role) {
+      var mySwitch = _navSwitchId;
+      var myGen = _renderGeneration; // H7: capture render generation at request time
+      renderPageLayout(appContainer, role, 'poms', function(container) {
+        showLoading(container);
+        // Set container to fill height for POMS app shell
+        container.style.height = 'calc(100vh - 56px)';
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+        google.script.run
+          .withSuccessHandler(function(html) {
+            if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; // user already navigated away
+            container.innerHTML = '';
+            var wrap = el('div');
+            wrap.style.height = '100%';
+            wrap.innerHTML = html;
+            container.appendChild(wrap);
+            // Re-execute <script> tags from poms_reference.html
+            wrap.querySelectorAll('script').forEach(function(old) {
+              try {
+                var s = document.createElement('script');
+                s.textContent = old.textContent;
+                old.parentNode.replaceChild(s, old);
+              } catch (scriptErr) {
+                console.error('POMS script re-execution failed:', scriptErr);
+              }
+            });
+          })
+          .withFailureHandler(function(err) {
+            container.innerHTML = '';
+            container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load POMS Reference.'));
+          })
+          .getPOMSReferenceHtml();
+      });
+    }
+
     // ═══════════════════════════════════════
     // TAB PANE CACHE — keeps rendered tab panes alive in the DOM (display:none).
     // On revisit, just show the pane — zero DOM rebuild, zero server calls.
@@ -2581,6 +2623,15 @@
         _navProgressDone();
         return;
       }
+      if (tabId === 'poms') {
+        _hideAllVisiblePanes();
+        _splitRenderTarget = 'primary';
+        renderPOMSReference(app, role);
+        _activePane = _layoutCache.content;
+        _navProgressDone();
+        return;
+      }
+
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 
@@ -2712,6 +2763,7 @@
           case 'cases': return renderMyCases;
           case 'profile': return renderUpdateProfile;
           case 'resources': return renderMemberResources;
+          case 'workload': return renderWorkloadTracker;
           case 'weeklyq': // legacy deep-link
           case 'polls': return renderPollsPage;
           case 'survey': return renderSurveyResultsPage;
@@ -2749,6 +2801,7 @@
           case 'feedback': return function(a) { renderFeedbackPage(a, 'steward'); };
           case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
           case 'timeline': return renderStewardTimelinePage;
+          case 'workload': return renderWorkloadTracker;
           case 'failsafe': return renderFailsafePage;
           case 'search': return renderSearchPage;
           case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;

@@ -3090,6 +3090,199 @@ button:focus-visible, [role="button"]:focus-visible {
 .p-16-mb-12 { padding: 16px; margin-bottom: 12px; }
 
 /* ═══════════════════════════════════════
+   FINDER PANELS (permanently open filter modals)
+   ═══════════════════════════════════════ */
+.finder-panel {
+  background: var(--surface);
+  border: 1px solid var(--accentBorder);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.finder-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--accentBg), transparent);
+  border-bottom: 1px solid var(--border);
+}
+.finder-panel-title {
+  font-family: var(--fontDisplay);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.finder-panel-badge {
+  font-family: var(--fontBody);
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accentBg);
+  border: 1px solid var(--accentBorder);
+  border-radius: 12px;
+  padding: 2px 10px;
+}
+.finder-panel-body {
+  padding: 12px 16px;
+}
+.finder-panel-body .search-input {
+  margin-bottom: 10px;
+}
+
+/* Filter criterion rows */
+.filter-criteria-list {
+  margin-bottom: 8px;
+}
+.filter-criterion-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.filter-criterion-row:last-child { border-bottom: none; }
+.filter-priority-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.filter-arrow-btn {
+  width: 20px;
+  height: 16px;
+  font-size: 8px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+.filter-arrow-btn:hover { color: var(--accent); border-color: var(--accentBorder); }
+.filter-arrow-btn:disabled { opacity: 0.3; cursor: default; }
+.filter-criterion-label {
+  min-width: 90px;
+  font-family: var(--fontBody);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.filter-criterion-control {
+  flex: 1;
+  min-width: 0;
+}
+.filter-criterion-control select,
+.filter-criterion-control input {
+  width: 100%;
+  font-size: 0.75rem;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--fontBody);
+}
+.filter-criterion-control select:focus,
+.filter-criterion-control input:focus { border-color: var(--accent); outline: none; }
+.filter-remove-btn {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.filter-remove-btn:hover { color: var(--danger); background: rgba(255,0,0,0.08); }
+.filter-add-btn {
+  font-family: var(--fontBody);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accentBg);
+  border: 1px solid var(--accentBorder);
+  border-radius: 8px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 4px;
+}
+.filter-add-btn:hover { background: var(--accent); color: #fff; }
+
+/* Smart checklist section */
+.checklist-section {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.checklist-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.checklist-section-title {
+  font-family: var(--fontDisplay);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.checklist-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+.checklist-member-row:last-child { border-bottom: none; }
+.checklist-member-row input[type="checkbox"] {
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+.checklist-member-info { flex: 1; min-width: 0; }
+.checklist-member-name { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.checklist-member-meta { font-size: 0.6875rem; color: var(--muted); }
+.checklist-assign-select {
+  font-size: 0.6875rem;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--fontBody);
+  max-width: 130px;
+}
+.checklist-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* Mobile: stack filter rows */
+@media (max-width: 639px) {
+  .filter-criterion-row { flex-wrap: wrap; }
+  .filter-criterion-label { min-width: auto; }
+  .filter-priority-arrows { flex-direction: row; }
+  .finder-panel-body { padding: 8px 12px; }
+  .checklist-assign-select { max-width: 100px; }
+}
+
+/* ═══════════════════════════════════════
    PRINT STYLESHEET
    ═══════════════════════════════════════ */
 @media print {

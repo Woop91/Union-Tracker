@@ -44,6 +44,8 @@ const BUILD_ORDER = [
   '08d_AuditAndFormulas.gs',
   '08e_SurveyEngine.gs',
   '09_Dashboards.gs',
+  '09a_SheetFormatting.gs',
+  '09b_TabModals.gs',
   '10a_SheetCreation.gs',
   '10b_SurveyDocSheets.gs',
   '10c_FormHandlers.gs',
@@ -57,6 +59,7 @@ const BUILD_ORDER = [
   '16_DashboardEnhancements.gs',
   '17_CorrelationEngine.gs',
   // Web-dashboard SPA modules (load after all core modules)
+  // NOTE: 25_WorkloadService.gs and poms_reference.html are excluded from SolidBase
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -69,6 +72,7 @@ const BUILD_ORDER = [
   '29_Migrations.gs',
   '30_TestRunner.gs',
   '31_WebAppTests.gs',
+  '32_AdminSettings.gs',
   'DevMenu.gs',
 ];
 
@@ -85,6 +89,7 @@ const HTML_FILES = [
   'org_chart.html',
   'grievance_form.html',
   'esign.html',
+  'AdminSettings.html',
 ];
 
 /**

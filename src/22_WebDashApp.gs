@@ -47,7 +47,7 @@ function doGet(e) {
   if (e.parameter && e.parameter.page === 'esign') {
     try {
       return HtmlService.createHtmlOutputFromFile('esign')
-        .setTitle('Grievance E-Signature — Union Local');
+        .setTitle('Grievance E-Signature — Local 509');
     } catch (esignErr) {
       Logger.log('doGet esign error: ' + esignErr.message);
       return _serveFatalError('E-Signature page unavailable.');
@@ -407,6 +407,30 @@ function getOrgChartHtml() {
   } catch (e) {
     Logger.log('getOrgChartHtml error: ' + e.message);
     return '<div class="empty-state">Org chart could not be loaded.</div>';
+  }
+}
+
+/**
+ * Client-callable: Returns the POMS Reference HTML for lazy-loading.
+ * Loaded on-demand when the user navigates to the POMS Reference tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
+ */
+function getPOMSReferenceHtml() {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (!email) return '<div class="empty-state">Authentication required.</div>';
+    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_poms_ref_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    Logger.log('getPOMSReferenceHtml error: ' + e.message);
+    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
   }
 }
 

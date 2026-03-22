@@ -75,7 +75,8 @@ function _prefetchInsights() {
         hotSpots: batch.hotSpots || [],
         perf: batch.perf || [],
         sat: batch.sat || { categories: [] },
-        memberStats: batch.memberStats || null
+        memberStats: batch.memberStats || null,
+        workload: batch.workload || { available: false }
       };
     }).withFailureHandler(function() { /* optional prefetch — ignore errors */ }).dataGetInsightsBatch(SESSION_TOKEN);
   }, 3000);
@@ -231,33 +232,16 @@ function renderStewardDashboard(appContainer) {
       _renderStewardFeedbackCard(fbSlot, fb);
     }).withFailureHandler(function() { /* non-critical */ }).dataGetStewardFeedbackSummary(SESSION_TOKEN);
 
-    // Filter bar
-    var filter = 'all';
-    var filterBar = el('div', { className: 'filter-bar' });
-    var overdueCount = AppState.cases.filter(function(c) { return c.status === 'overdue'; }).length;
-    var filters = [
-      { key: 'all', label: 'All ' + AppState.cases.length },
-      { key: 'overdue', label: 'Overdue ' + overdueCount },
-      { key: 'active', label: 'Active' },
-    ];
-
-    filters.forEach(function(f) {
-      var tab = el('button', {
-        className: 'filter-tab' + (filter === f.key ? ' active' : ''),
-        onClick: function() {
-          filter = f.key;
-          renderCaseList(caseListContainer, filter);
-          filterBar.querySelectorAll('.filter-tab').forEach(function(t, i) {
-            t.className = 'filter-tab' + (filters[i].key === filter ? ' active' : '');
-          });
-        }
-      }, f.label);
-      filterBar.appendChild(tab);
-    });
-    container.appendChild(filterBar);
-
+    // Finder panel (permanently open filter modal)
+    var finderSlot = el('div', { className: 'content' });
     var caseListContainer = el('div', { className: 'content' });
-    renderCaseList(caseListContainer, filter);
+    _renderCasesFinderPanel(finderSlot, AppState.cases, function(filtered) {
+      renderCaseList(caseListContainer, filtered, true);
+    });
+    container.appendChild(finderSlot);
+
+    // Initial render with all cases
+    renderCaseList(caseListContainer, AppState.cases, true);
     container.appendChild(caseListContainer);
 
     // FAB — opens broadcast
@@ -365,17 +349,158 @@ function _dismissWelcome(cardEl) {
   serverCall().withFailureHandler(function(e) { console.error(e.message); }).dataMarkWelcomeDismissed(SESSION_TOKEN);
 }
 
-function renderCaseList(container, filter) {
+// ═══════════════════════════════════════
+// CASES FINDER PANEL (permanently open filter modal)
+// ═══════════════════════════════════════
+
+function _renderCasesFinderPanel(container, cases, onFilterChange) {
+  var TERMINAL = ['resolved', 'won', 'denied', 'settled', 'withdrawn', 'closed'];
+  var filterState = { search: '', status: 'all', step: '', unit: '' };
+
+  var panel = el('div', { className: 'finder-panel', role: 'region', 'aria-label': 'Case filter controls' });
+
+  // Header
+  var header = el('div', { className: 'finder-panel-header' });
+  header.appendChild(el('div', { className: 'finder-panel-title' }, 'Case Finder'));
+  var badge = el('div', { className: 'finder-panel-badge', 'aria-live': 'polite' }, cases.length + ' cases');
+  header.appendChild(badge);
+  panel.appendChild(header);
+
+  // Body
+  var body = el('div', { className: 'finder-panel-body' });
+
+  // Search input
+  var searchInput = el('input', {
+    className: 'search-input',
+    placeholder: 'Search by case ID or member name\u2026',
+    'aria-label': 'Search cases',
+    role: 'searchbox'
+  });
+  body.appendChild(searchInput);
+
+  // Status pills
+  var overdueCount = cases.filter(function(c) { return c.status === 'overdue'; }).length;
+  var activeCount = cases.filter(function(c) { return c.status !== 'overdue' && TERMINAL.indexOf(c.status) === -1; }).length;
+  var resolvedCount = cases.filter(function(c) { return TERMINAL.indexOf(c.status) !== -1; }).length;
+  var statusDefs = [
+    { key: 'all', label: 'All ' + cases.length },
+    { key: 'overdue', label: 'Overdue ' + overdueCount },
+    { key: 'active', label: 'Active ' + activeCount },
+    { key: 'resolved', label: 'Resolved ' + resolvedCount },
+  ];
+  var pillBar = el('div', { className: 'filter-bar', style: { padding: '0', marginBottom: '10px' } });
+  function _renderStatusPills() {
+    pillBar.innerHTML = '';
+    statusDefs.forEach(function(s) {
+      pillBar.appendChild(el('button', {
+        className: 'filter-tab' + (filterState.status === s.key ? ' active' : ''),
+        onClick: function() { filterState.status = s.key; _renderStatusPills(); _fireChange(); }
+      }, s.label));
+    });
+  }
+  _renderStatusPills();
+  body.appendChild(pillBar);
+
+  // Filter dropdowns row
+  var filterRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' } });
+
+  // Step dropdown
+  var steps = {};
+  cases.forEach(function(c) { if (c.step) steps[c.step] = true; });
+  var stepKeys = Object.keys(steps).sort();
+  if (stepKeys.length > 1) {
+    var stepSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '5px 8px' }, 'aria-label': 'Filter by step' });
+    stepSelect.appendChild(el('option', { value: '' }, 'All Steps'));
+    stepKeys.forEach(function(s) { stepSelect.appendChild(el('option', { value: s }, s)); });
+    stepSelect.addEventListener('change', function() { filterState.step = stepSelect.value; _fireChange(); });
+    filterRow.appendChild(stepSelect);
+  }
+
+  // Unit dropdown
+  var units = {};
+  cases.forEach(function(c) { if (c.unit) units[c.unit] = true; });
+  var unitKeys = Object.keys(units).sort();
+  if (unitKeys.length > 1) {
+    var unitSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '5px 8px' }, 'aria-label': 'Filter by unit' });
+    unitSelect.appendChild(el('option', { value: '' }, 'All Units'));
+    unitKeys.forEach(function(u) { unitSelect.appendChild(el('option', { value: u }, u)); });
+    unitSelect.addEventListener('change', function() { filterState.unit = unitSelect.value; _fireChange(); });
+    filterRow.appendChild(unitSelect);
+  }
+
+  if (filterRow.children.length > 0) body.appendChild(filterRow);
+
+  panel.appendChild(body);
+  container.appendChild(panel);
+
+  // Debounced search
+  var _searchTimer = null;
+  searchInput.addEventListener('input', function() {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(function() { filterState.search = searchInput.value.trim().toLowerCase(); _fireChange(); }, 150);
+  });
+
+  function _fireChange() {
+    var filtered = _applyCaseFilters(cases, filterState);
+    badge.textContent = filtered.length + ' of ' + cases.length + ' cases';
+    onFilterChange(filtered, filterState);
+  }
+}
+
+function _applyCaseFilters(cases, state) {
+  var TERMINAL = ['resolved', 'won', 'denied', 'settled', 'withdrawn', 'closed'];
+  var result = cases;
+
+  // Status filter
+  if (state.status === 'overdue') {
+    result = result.filter(function(c) { return c.status === 'overdue'; });
+  } else if (state.status === 'active') {
+    result = result.filter(function(c) { return c.status !== 'overdue' && TERMINAL.indexOf(c.status) === -1; });
+  } else if (state.status === 'resolved') {
+    result = result.filter(function(c) { return TERMINAL.indexOf(c.status) !== -1; });
+  }
+
+  // Step filter
+  if (state.step) {
+    result = result.filter(function(c) { return c.step === state.step; });
+  }
+
+  // Unit filter
+  if (state.unit) {
+    result = result.filter(function(c) { return c.unit === state.unit; });
+  }
+
+  // Search
+  if (state.search) {
+    var q = state.search;
+    result = result.filter(function(c) {
+      return (c.id || '').toLowerCase().indexOf(q) !== -1
+        || (c.memberName || '').toLowerCase().indexOf(q) !== -1
+        || (c.memberEmail || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  return result;
+}
+
+function renderCaseList(container, filterOrCases, isFiltered) {
   container.innerHTML = '';
   var TERMINAL = ['resolved', 'won', 'denied', 'settled', 'withdrawn', 'closed'];
-  var cases = AppState.cases;
-  if (filter === 'overdue') {
-    cases = cases.filter(function(c) { return c.status === 'overdue'; });
-  } else if (filter === 'active') {
-    // Active = not terminal AND not overdue (catches open/new/pending/step-i/in-progress etc.)
-    cases = cases.filter(function(c) {
-      return c.status !== 'overdue' && TERMINAL.indexOf(c.status) === -1;
-    });
+
+  // Support both legacy string filter and pre-filtered array
+  var cases;
+  if (isFiltered) {
+    cases = filterOrCases;
+  } else {
+    var filter = filterOrCases;
+    cases = AppState.cases;
+    if (filter === 'overdue') {
+      cases = cases.filter(function(c) { return c.status === 'overdue'; });
+    } else if (filter === 'active') {
+      cases = cases.filter(function(c) {
+        return c.status !== 'overdue' && TERMINAL.indexOf(c.status) === -1;
+      });
+    }
   }
 
   if (cases.length === 0) {
@@ -543,6 +668,503 @@ function _swapBottomNav() {
 // renderBottomNav() — consolidated to index.html (v4.26.1)
 
 // ═══════════════════════════════════════
+// MEMBERS FINDER PANEL (permanently open filter modal)
+// ═══════════════════════════════════════
+
+var _MEMBER_FILTER_DEFS = [
+  { id: 'location', label: 'Work Location', type: 'select', field: 'workLocation' },
+  { id: 'officeDays', label: 'Office Days', type: 'text', field: 'officeDays' },
+  { id: 'unit', label: 'Unit', type: 'select', field: 'unit' },
+  { id: 'steward', label: 'Assigned Steward', type: 'select', field: 'assignedSteward' },
+  { id: 'dues', label: 'Dues Status', type: 'select', field: 'duesPaying', options: [{ v: 'true', l: 'Dues Paying' }, { v: 'false', l: 'Not Paying' }] },
+  { id: 'grievance', label: 'Has Open Case', type: 'select', field: 'hasOpenGrievance', options: [{ v: 'true', l: 'Yes' }, { v: 'false', l: 'No' }] },
+];
+
+function _renderMemberFinderPanel(container, members, onFilterChange) {
+  var filterState = { search: '', criteria: [] }; // criteria: [{id, value}]
+
+  var panel = el('div', { className: 'finder-panel', role: 'region', 'aria-label': 'Member filter controls' });
+
+  // Header
+  var header = el('div', { className: 'finder-panel-header' });
+  header.appendChild(el('div', { className: 'finder-panel-title' }, 'Member Finder'));
+  var badge = el('div', { className: 'finder-panel-badge', 'aria-live': 'polite' }, members.length + ' members');
+  header.appendChild(badge);
+  panel.appendChild(header);
+
+  // Body
+  var body = el('div', { className: 'finder-panel-body' });
+
+  // Search input
+  var searchInput = el('input', {
+    className: 'search-input',
+    placeholder: 'Search by name, email, or location\u2026',
+    'aria-label': 'Search members',
+    role: 'searchbox'
+  });
+  body.appendChild(searchInput);
+
+  // Criteria list
+  var criteriaList = el('div', { className: 'filter-criteria-list' });
+  body.appendChild(criteriaList);
+
+  // Add filter button area
+  var addRow = el('div');
+  body.appendChild(addRow);
+
+  // Distinct values cache
+  var _distinctValues = {};
+  function _getDistinct(field) {
+    if (_distinctValues[field]) return _distinctValues[field];
+    var vals = {};
+    members.forEach(function(m) {
+      var v = m[field];
+      if (v !== undefined && v !== null && v !== '') vals[String(v)] = true;
+    });
+    _distinctValues[field] = Object.keys(vals).sort();
+    return _distinctValues[field];
+  }
+
+  function _renderCriteriaRows() {
+    criteriaList.innerHTML = '';
+    filterState.criteria.forEach(function(crit, idx) {
+      var def = null;
+      for (var d = 0; d < _MEMBER_FILTER_DEFS.length; d++) {
+        if (_MEMBER_FILTER_DEFS[d].id === crit.id) { def = _MEMBER_FILTER_DEFS[d]; break; }
+      }
+      if (!def) return;
+
+      var row = el('div', { className: 'filter-criterion-row' });
+
+      // Priority arrows
+      var arrows = el('div', { className: 'filter-priority-arrows' });
+      var upBtn = el('button', {
+        className: 'filter-arrow-btn', disabled: idx === 0,
+        'aria-label': 'Move ' + def.label + ' filter up',
+        onClick: function() {
+          if (idx > 0) { var tmp = filterState.criteria[idx - 1]; filterState.criteria[idx - 1] = filterState.criteria[idx]; filterState.criteria[idx] = tmp; _renderCriteriaRows(); _fireChange(); }
+        }
+      }, '\u25B2');
+      var downBtn = el('button', {
+        className: 'filter-arrow-btn', disabled: idx === filterState.criteria.length - 1,
+        'aria-label': 'Move ' + def.label + ' filter down',
+        onClick: function() {
+          if (idx < filterState.criteria.length - 1) { var tmp = filterState.criteria[idx + 1]; filterState.criteria[idx + 1] = filterState.criteria[idx]; filterState.criteria[idx] = tmp; _renderCriteriaRows(); _fireChange(); }
+        }
+      }, '\u25BC');
+      arrows.appendChild(upBtn);
+      arrows.appendChild(downBtn);
+      row.appendChild(arrows);
+
+      // Label
+      row.appendChild(el('div', { className: 'filter-criterion-label' }, def.label));
+
+      // Control
+      var ctrlWrap = el('div', { className: 'filter-criterion-control' });
+      if (def.type === 'select') {
+        var sel = el('select', { 'aria-label': 'Filter value for ' + def.label });
+        sel.appendChild(el('option', { value: '' }, 'All'));
+        var opts = def.options || _getDistinct(def.field).map(function(v) { return { v: v, l: v }; });
+        opts.forEach(function(o) {
+          var opt = el('option', { value: o.v || o }, o.l || o);
+          if (crit.value === (o.v || o)) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', function() { crit.value = sel.value; _fireChange(); });
+        ctrlWrap.appendChild(sel);
+      } else {
+        var inp = el('input', { type: 'text', value: crit.value || '', placeholder: 'e.g. Monday, Tuesday', 'aria-label': 'Filter value for ' + def.label });
+        var _inpTimer = null;
+        inp.addEventListener('input', function() { clearTimeout(_inpTimer); _inpTimer = setTimeout(function() { crit.value = inp.value.trim(); _fireChange(); }, 150); });
+        ctrlWrap.appendChild(inp);
+      }
+      row.appendChild(ctrlWrap);
+
+      // Remove button
+      row.appendChild(el('button', {
+        className: 'filter-remove-btn', 'aria-label': 'Remove ' + def.label + ' filter',
+        onClick: function() { filterState.criteria.splice(idx, 1); _renderCriteriaRows(); _renderAddButton(); _fireChange(); }
+      }, '\u2715'));
+
+      criteriaList.appendChild(row);
+    });
+  }
+
+  function _renderAddButton() {
+    addRow.innerHTML = '';
+    var usedIds = {};
+    filterState.criteria.forEach(function(c) { usedIds[c.id] = true; });
+    var available = _MEMBER_FILTER_DEFS.filter(function(d) { return !usedIds[d.id]; });
+    if (available.length === 0) return;
+
+    var addBtn = el('button', { className: 'filter-add-btn' }, '+ Add Filter');
+    addBtn.addEventListener('click', function() {
+      // Replace button with a select
+      addRow.innerHTML = '';
+      var addSel = el('select', { className: 'form-select', style: { fontSize: '12px', padding: '5px 8px', width: 'auto' } });
+      addSel.appendChild(el('option', { value: '' }, '-- Choose filter --'));
+      available.forEach(function(d) { addSel.appendChild(el('option', { value: d.id }, d.label)); });
+      addSel.addEventListener('change', function() {
+        if (addSel.value) {
+          filterState.criteria.push({ id: addSel.value, value: '' });
+          _renderCriteriaRows();
+          _renderAddButton();
+          _fireChange();
+        }
+      });
+      addRow.appendChild(addSel);
+      // Cancel link
+      addRow.appendChild(el('button', {
+        style: { fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', marginLeft: '8px', cursor: 'pointer' },
+        onClick: function() { _renderAddButton(); }
+      }, 'Cancel'));
+    });
+    addRow.appendChild(addBtn);
+  }
+
+  _renderAddButton();
+  panel.appendChild(body);
+  container.appendChild(panel);
+
+  // Debounced search
+  var _searchTimer = null;
+  searchInput.addEventListener('input', function() {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(function() { filterState.search = searchInput.value.trim().toLowerCase(); _fireChange(); }, 150);
+  });
+
+  function _fireChange() {
+    var filtered = _applyMemberFilters(members, filterState);
+    badge.textContent = filtered.length + ' of ' + members.length + ' members';
+    onFilterChange(filtered);
+  }
+
+  return { panel: panel, getState: function() { return filterState; }, getFiltered: function() { return _applyMemberFilters(members, filterState); } };
+}
+
+function _applyMemberFilters(members, state) {
+  var result = members.slice();
+
+  // Text search
+  if (state.search) {
+    var q = state.search;
+    result = result.filter(function(m) {
+      return (m.name || '').toLowerCase().indexOf(q) !== -1
+        || (m.email || '').toLowerCase().indexOf(q) !== -1
+        || (m.workLocation || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  // Apply each criterion as AND filter
+  state.criteria.forEach(function(crit) {
+    if (!crit.value) return;
+    var def = null;
+    for (var d = 0; d < _MEMBER_FILTER_DEFS.length; d++) {
+      if (_MEMBER_FILTER_DEFS[d].id === crit.id) { def = _MEMBER_FILTER_DEFS[d]; break; }
+    }
+    if (!def) return;
+
+    if (def.id === 'dues') {
+      var wantPaying = crit.value === 'true';
+      result = result.filter(function(m) { return wantPaying ? m.duesPaying !== false : m.duesPaying === false; });
+    } else if (def.id === 'grievance') {
+      var wantCase = crit.value === 'true';
+      result = result.filter(function(m) { return wantCase ? !!m.hasOpenGrievance : !m.hasOpenGrievance; });
+    } else if (def.type === 'text') {
+      var terms = crit.value.toLowerCase().split(/[,;\s]+/).filter(Boolean);
+      result = result.filter(function(m) {
+        var val = (m[def.field] || '').toLowerCase();
+        return terms.some(function(t) { return val.indexOf(t) !== -1; });
+      });
+    } else {
+      result = result.filter(function(m) { return String(m[def.field] || '') === crit.value; });
+    }
+  });
+
+  // Sort by criteria priority order (first criterion = primary sort key)
+  if (state.criteria.length > 0) {
+    var sortCriteria = state.criteria.filter(function(c) { return c.value; });
+    if (sortCriteria.length > 0) {
+      result.sort(function(a, b) {
+        for (var i = 0; i < sortCriteria.length; i++) {
+          var def = null;
+          for (var d = 0; d < _MEMBER_FILTER_DEFS.length; d++) {
+            if (_MEMBER_FILTER_DEFS[d].id === sortCriteria[i].id) { def = _MEMBER_FILTER_DEFS[d]; break; }
+          }
+          if (!def) continue;
+          var aVal = String(a[def.field] || '');
+          var bVal = String(b[def.field] || '');
+          var cmp = aVal.localeCompare(bVal);
+          if (cmp !== 0) return cmp;
+        }
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    } else {
+      result.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    }
+  } else {
+    result.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  }
+
+  return result;
+}
+
+// ═══════════════════════════════════════
+// SMART CHECKLIST — generate, assign, save as tasks
+// ═══════════════════════════════════════
+
+function _renderSmartChecklist(container, finderRef) {
+  var section = el('div', { className: 'checklist-section' });
+
+  // Collapsible header
+  var expanded = false;
+  var toggle = el('span', { className: 'text-sm-muted' }, '\u25BE');
+  var headerRow = el('div', {
+    className: 'checklist-section-header',
+    onClick: function() { expanded = !expanded; bodyWrap.style.display = expanded ? 'block' : 'none'; toggle.textContent = expanded ? '\u25B4' : '\u25BE'; }
+  });
+  var titleWrap = el('div', { className: 'flex-row' });
+  titleWrap.appendChild(el('div', { className: 'checklist-section-title' }, 'Smart Checklist'));
+  titleWrap.appendChild(toggle);
+  headerRow.appendChild(titleWrap);
+  section.appendChild(headerRow);
+
+  var bodyWrap = el('div', { style: { display: 'none' } });
+
+  // Generate button
+  var genBtn = el('button', { className: 'btn btn-primary', style: { width: '100%', fontSize: '12px', padding: '9px', marginBottom: '10px' }, onClick: _generateChecklist }, 'Generate Checklist from Filters');
+  bodyWrap.appendChild(genBtn);
+
+  var checklistArea = el('div');
+  bodyWrap.appendChild(checklistArea);
+
+  section.appendChild(bodyWrap);
+  container.appendChild(section);
+
+  var _stewardList = null;
+  var _checklistMembers = [];
+
+  function _generateChecklist() {
+    var filtered = finderRef.getFiltered();
+    if (filtered.length === 0) {
+      checklistArea.innerHTML = '';
+      checklistArea.appendChild(el('div', { className: 'empty-state-sm', style: { fontSize: '12px' } }, 'No members match current filters. Adjust filters and try again.'));
+      return;
+    }
+
+    _checklistMembers = filtered.map(function(m) { return { member: m, checked: true, assignedTo: '' }; });
+    genBtn.textContent = 'Regenerate (' + filtered.length + ' members)';
+
+    // Load stewards for assignment
+    if (!_stewardList) {
+      DataCache.cachedCall('stewardDirectory', 'dataGetStewardDirectory', [SESSION_TOKEN], function(stewards) {
+        _stewardList = stewards || [];
+        _renderChecklistUI();
+      }, function() { _stewardList = []; _renderChecklistUI(); }, 120000);
+    } else {
+      _renderChecklistUI();
+    }
+  }
+
+  function _renderChecklistUI() {
+    checklistArea.innerHTML = '';
+
+    // Actions bar
+    var actionsTop = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' } });
+    actionsTop.appendChild(el('button', {
+      className: 'filter-add-btn', style: { fontSize: '11px' },
+      onClick: function() { _checklistMembers.forEach(function(c) { c.checked = true; }); _renderChecklistUI(); }
+    }, 'Select All'));
+    actionsTop.appendChild(el('button', {
+      className: 'filter-add-btn', style: { fontSize: '11px' },
+      onClick: function() { _checklistMembers.forEach(function(c) { c.checked = false; }); _renderChecklistUI(); }
+    }, 'Deselect All'));
+    if (_stewardList && _stewardList.length > 1) {
+      actionsTop.appendChild(el('button', {
+        className: 'filter-add-btn', style: { fontSize: '11px' },
+        onClick: function() { _autoDistribute(); _renderChecklistUI(); }
+      }, 'Auto-Distribute'));
+    }
+    checklistArea.appendChild(actionsTop);
+
+    // Member rows (paginated to 50 max visible)
+    var visibleMax = 50;
+    var showing = Math.min(_checklistMembers.length, visibleMax);
+    for (var i = 0; i < showing; i++) {
+      (function(idx) {
+        var item = _checklistMembers[idx];
+        var row = el('div', { className: 'checklist-member-row' });
+
+        // Checkbox
+        var cb = el('input', { type: 'checkbox' });
+        cb.checked = item.checked;
+        cb.addEventListener('change', function() { item.checked = cb.checked; });
+        row.appendChild(cb);
+
+        // Info
+        var info = el('div', { className: 'checklist-member-info' });
+        info.appendChild(el('div', { className: 'checklist-member-name' }, item.member.name || item.member.email));
+        var metaParts = [];
+        if (item.member.workLocation) metaParts.push(item.member.workLocation);
+        if (item.member.officeDays) metaParts.push(item.member.officeDays);
+        if (metaParts.length) info.appendChild(el('div', { className: 'checklist-member-meta' }, metaParts.join(' \xB7 ')));
+        row.appendChild(info);
+
+        // Steward assignment select
+        if (_stewardList && _stewardList.length > 0) {
+          var assignSel = el('select', { className: 'checklist-assign-select', 'aria-label': 'Assign to steward' });
+          assignSel.appendChild(el('option', { value: '' }, 'Unassigned'));
+          _stewardList.forEach(function(s) {
+            var opt = el('option', { value: s.email }, s.name || s.email.split('@')[0]);
+            if (item.assignedTo === s.email) opt.selected = true;
+            assignSel.appendChild(opt);
+          });
+          assignSel.addEventListener('change', function() { item.assignedTo = assignSel.value; });
+          row.appendChild(assignSel);
+        }
+
+        checklistArea.appendChild(row);
+      })(i);
+    }
+
+    if (_checklistMembers.length > visibleMax) {
+      checklistArea.appendChild(el('div', { className: 'text-xs-muted', style: { textAlign: 'center', padding: '6px 0' } },
+        'Showing ' + visibleMax + ' of ' + _checklistMembers.length + '. Save to create tasks for all.'));
+    }
+
+    // Summary + save
+    var checkedCount = _checklistMembers.filter(function(c) { return c.checked; }).length;
+    var summary = el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '8px' } },
+      checkedCount + ' of ' + _checklistMembers.length + ' members selected');
+    checklistArea.appendChild(summary);
+
+    var saveActions = el('div', { className: 'checklist-actions' });
+    var taskTitleInput = el('input', {
+      type: 'text', value: 'Contact', placeholder: 'Task title prefix\u2026',
+      style: { flex: '1', fontSize: '12px', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', minWidth: '120px' },
+      'aria-label': 'Task title prefix'
+    });
+    saveActions.appendChild(taskTitleInput);
+    var saveBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px', padding: '8px 16px' }, onClick: function() { _saveAsTasks(taskTitleInput.value.trim()); } }, 'Save as Tasks');
+    saveActions.appendChild(saveBtn);
+    checklistArea.appendChild(saveActions);
+
+    // Status area
+    var statusArea = el('div', { style: { fontSize: '12px', minHeight: '20px', marginTop: '6px' } });
+    checklistArea.appendChild(statusArea);
+    checklistArea._statusArea = statusArea;
+  }
+
+  // Balanced hybrid: location-match first, then round-robin leftovers.
+  // If any steward exceeds 150% of fair share, redistribute overflow.
+  function _autoDistribute() {
+    if (!_stewardList || _stewardList.length === 0) return;
+    var checked = _checklistMembers.filter(function(c) { return c.checked; });
+    if (checked.length === 0) return;
+
+    var stewards = _stewardList.slice();
+    var fairShare = Math.ceil(checked.length / stewards.length);
+    var maxCap = Math.ceil(fairShare * 1.5);
+
+    // Build steward location index
+    var stewardByLoc = {};
+    stewards.forEach(function(s) {
+      var loc = (s.workLocation || '').trim().toLowerCase();
+      if (loc) {
+        if (!stewardByLoc[loc]) stewardByLoc[loc] = [];
+        stewardByLoc[loc].push(s.email);
+      }
+    });
+
+    // Track assignment counts
+    var counts = {};
+    stewards.forEach(function(s) { counts[s.email] = 0; });
+
+    var unmatched = [];
+
+    // Pass 1: location-match (assign member to a steward at same location if under cap)
+    checked.forEach(function(item) {
+      var loc = (item.member.workLocation || '').trim().toLowerCase();
+      var candidates = loc ? stewardByLoc[loc] : null;
+      var assigned = false;
+      if (candidates) {
+        // Pick the least-loaded steward at this location
+        var best = null;
+        var bestCount = Infinity;
+        candidates.forEach(function(email) {
+          if (counts[email] < maxCap && counts[email] < bestCount) {
+            best = email;
+            bestCount = counts[email];
+          }
+        });
+        if (best) {
+          item.assignedTo = best;
+          counts[best]++;
+          assigned = true;
+        }
+      }
+      if (!assigned) unmatched.push(item);
+    });
+
+    // Pass 2: round-robin unmatched members to least-loaded stewards
+    unmatched.forEach(function(item) {
+      var minEmail = stewards[0].email;
+      var minCount = counts[minEmail];
+      stewards.forEach(function(s) {
+        if (counts[s.email] < minCount) { minEmail = s.email; minCount = counts[s.email]; }
+      });
+      item.assignedTo = minEmail;
+      counts[minEmail]++;
+    });
+  }
+
+  function _saveAsTasks(titlePrefix) {
+    var toSave = _checklistMembers.filter(function(c) { return c.checked; });
+    if (toSave.length === 0) return;
+    if (!titlePrefix) titlePrefix = 'Contact';
+
+    var statusArea = checklistArea._statusArea;
+    statusArea.style.color = 'var(--accent)';
+    statusArea.textContent = 'Saving 0 of ' + toSave.length + ' tasks\u2026';
+
+    var saved = 0;
+    var errors = 0;
+
+    function _saveNext(idx) {
+      if (idx >= toSave.length) {
+        statusArea.style.color = errors > 0 ? 'var(--warning)' : 'var(--success)';
+        statusArea.textContent = saved + ' task' + (saved !== 1 ? 's' : '') + ' created' + (errors > 0 ? ' (' + errors + ' failed)' : '') + '.';
+        if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+        return;
+      }
+
+      var item = toSave[idx];
+      var title = '[Checklist] ' + titlePrefix + ' ' + (item.member.name || item.member.email);
+      var desc = 'Auto-generated from Smart Checklist.';
+      if (item.member.workLocation) desc += ' Location: ' + item.member.workLocation + '.';
+      if (item.member.officeDays) desc += ' Office days: ' + item.member.officeDays + '.';
+      var idemKey = _genIdemKey();
+
+      serverCall()
+        .withSuccessHandler(function(r) {
+          if (r && r.success) saved++;
+          else errors++;
+          statusArea.textContent = 'Saving ' + (idx + 1) + ' of ' + toSave.length + ' tasks\u2026';
+          _saveNext(idx + 1);
+        })
+        .withFailureHandler(function() {
+          errors++;
+          statusArea.textContent = 'Saving ' + (idx + 1) + ' of ' + toSave.length + ' tasks\u2026';
+          _saveNext(idx + 1);
+        })
+        .dataCreateTask(SESSION_TOKEN, title, desc, item.member.email || '', 'normal', '', item.assignedTo || '', idemKey);
+    }
+
+    _saveNext(0);
+  }
+}
+
+// ═══════════════════════════════════════
 // MEMBERS TAB (scale-aware: bulk-load < threshold, server-paginated above)
 // ═══════════════════════════════════════
 
@@ -567,16 +1189,16 @@ function renderStewardMembers(appContainer) {
     var _statsCacheKey = 'stewardMemberStats_' + (CURRENT_USER && CURRENT_USER.email || '');
     function _onStatsLoaded(stats) {
       _prefetchedStats = stats;
-      // If members already rendered, insert chart now
-      var searchEl = content.querySelector('.search-input');
-      if (searchEl && stats && stats.byLocation && typeof ChartHelper !== 'undefined') {
+      // If members already rendered, insert chart before the finder panel
+      var finderEl = content.querySelector('.finder-panel');
+      if (finderEl && stats && stats.byLocation && typeof ChartHelper !== 'undefined') {
         var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
         var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
         locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
         var lLabels = Object.keys(stats.byLocation);
         var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
         ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
-        content.insertBefore(locCard, searchEl);
+        content.insertBefore(locCard, finderEl);
       }
     }
     if (typeof DataCache !== 'undefined') {
@@ -634,93 +1256,20 @@ function _renderBulkMembers(content, appContainer, _prefetchedStats) {
         content.appendChild(locCard);
       }
 
-      // Sort & Filter controls
-      var controlRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } });
-      var sortSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
-      [{ v: 'name-az', l: 'Name A-Z' }, { v: 'name-za', l: 'Name Z-A' }, { v: 'location', l: 'Location' }].forEach(function(o) {
-        sortSelect.appendChild(el('option', { value: o.v }, o.l));
-      });
-      controlRow.appendChild(sortSelect);
-
-      var filterSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
-      filterSelect.appendChild(el('option', { value: 'nearby' }, 'My Location'));
-      filterSelect.appendChild(el('option', { value: 'all' }, 'All Members'));
-      filterSelect.appendChild(el('option', { value: 'assigned' }, 'Assigned to Me'));
-      filterSelect.appendChild(el('option', { value: 'grievance' }, 'Has Open Case'));
-      var locs = {};
-      members.forEach(function(m) { if (m.workLocation) locs[m.workLocation] = true; });
-      Object.keys(locs).sort().forEach(function(loc) {
-        filterSelect.appendChild(el('option', { value: 'loc:' + loc }, loc));
-      });
-      controlRow.appendChild(filterSelect);
-      content.appendChild(controlRow);
-
-      // Search — OPT-10: debounce filter/sort re-renders
-      var _memberFilterTimer = null;
-      function debouncedRerender() {
-        clearTimeout(_memberFilterTimer);
-        _memberFilterTimer = setTimeout(rerender, 150);
-      }
-      var searchInput = el('input', {
-        className: 'search-input',
-        placeholder: 'Search members...',
-        onInput: debouncedRerender
-      });
-      content.appendChild(searchInput);
-
+      // Member Finder Panel (permanently open filter modal)
       var listArea = el('div');
+      var finderRef = _renderMemberFinderPanel(content, members, function(filtered) {
+        _memberListPage = 0;
+        renderFilteredMembers(listArea, filtered, '');
+      });
       content.appendChild(listArea);
 
-      sortSelect.addEventListener('change', debouncedRerender);
-      filterSelect.addEventListener('change', debouncedRerender);
+      // Smart checklist section
+      _renderSmartChecklist(content, finderRef);
 
-      function rerender() {
-        _memberListPage = 0;
-        var q = searchInput.value.toLowerCase();
-        var sortKey = sortSelect.value;
-        var filterKey = filterSelect.value;
-        var filtered = members.slice();
-        if (q) {
-          filtered = filtered.filter(function(m) {
-            return (m.name || '').toLowerCase().indexOf(q) !== -1 ||
-                   (m.email || '').toLowerCase().indexOf(q) !== -1 ||
-                   (m.workLocation || '').toLowerCase().indexOf(q) !== -1;
-          });
-        }
-        if (filterKey === 'nearby') {
-          // Filter to same work location and overlapping office days
-          var myLoc = (CURRENT_USER && CURRENT_USER.workLocation || '').toLowerCase();
-          var myDays = (CURRENT_USER && CURRENT_USER.officeDays || '').toLowerCase().split(/[,;\s]+/).filter(Boolean);
-          filtered = filtered.filter(function(m) {
-            if (!myLoc) return true; // No location info — show all
-            return (m.workLocation || '').toLowerCase() === myLoc;
-          });
-          // Sort by office day overlap (most overlap first)
-          filtered.sort(function(a, b) {
-            var aDays = (a.officeDays || '').toLowerCase().split(/[,;\s]+/);
-            var bDays = (b.officeDays || '').toLowerCase().split(/[,;\s]+/);
-            var aOverlap = myDays.length > 0 ? aDays.filter(function(d) { return myDays.indexOf(d) !== -1; }).length : 0;
-            var bOverlap = myDays.length > 0 ? bDays.filter(function(d) { return myDays.indexOf(d) !== -1; }).length : 0;
-            return bOverlap - aOverlap || (a.name || '').localeCompare(b.name || '');
-          });
-        } else if (filterKey === 'assigned') {
-          filtered = filtered.filter(function(m) { return m.assignedSteward && m.assignedSteward.toLowerCase() === CURRENT_USER.email.toLowerCase(); });
-        } else if (filterKey === 'grievance') {
-          filtered = filtered.filter(function(m) { return m.hasOpenGrievance; });
-        } else if (filterKey.indexOf('loc:') === 0) {
-          var loc = filterKey.substring(4);
-          filtered = filtered.filter(function(m) { return m.workLocation === loc; });
-        }
-        if (filterKey !== 'nearby') {
-          filtered.sort(function(a, b) {
-            if (sortKey === 'name-za') return (b.name || '').localeCompare(a.name || '');
-            if (sortKey === 'location') return (a.workLocation || '').localeCompare(b.workLocation || '');
-            return (a.name || '').localeCompare(b.name || '');
-          });
-        }
-        renderFilteredMembers(listArea, filtered, '');
-      }
-      rerender();
+      // Initial render
+      _memberListPage = 0;
+      renderFilteredMembers(listArea, members, '');
     }
     function _onMembersFailed(err) {
       content.innerHTML = '';
@@ -1821,7 +2370,7 @@ function renderStewardResources(appContainer) {
         { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
         { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
       ];
-      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
       quickLinks.forEach(function(r) {
         if (!r.url) return;
@@ -2609,8 +3158,10 @@ function renderStewardMore(appContainer) {
     var menuItems = [
       { group: 'Manage' },
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
       { group: 'Reference' },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('steward', 'poms'); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
       { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
       { group: 'Community' },
@@ -3200,12 +3751,12 @@ function renderInsightsPage(appContainer) {
     var cacheAge = cache ? (Date.now() - (cache.ts || 0)) : Infinity;
 
     if (cache && cacheAge < CACHE_TTL) {
-      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats, cache.workload);
       return;
     }
     if (cache) {
       // Stale: render stale immediately, refresh in background
-      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats, cache.workload);
     } else {
       showLoading(content);
     }
@@ -3218,20 +3769,22 @@ function renderInsightsPage(appContainer) {
       var perfData = batch.perf || (cache && cache.perf) || [];
       var satData = batch.sat || (cache && cache.sat) || { categories: [] };
       var memberStatsData = batch.memberStats || (cache && cache.memberStats) || null;
-      AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData, memberStats: memberStatsData };
-      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData);
+      var workloadData = batch.workload || (cache && cache.workload) || { available: false };
+      AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData, memberStats: memberStatsData, workload: workloadData };
+      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData);
     }).withFailureHandler(function() {
       var statsData = (cache && cache.stats) || { available: false };
       var hotSpotsData = (cache && cache.hotSpots) || [];
       var perfData = (cache && cache.perf) || [];
       var satData = (cache && cache.sat) || { categories: [] };
       var memberStatsData = (cache && cache.memberStats) || null;
-      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData);
+      var workloadData = (cache && cache.workload) || { available: false };
+      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData);
     }).dataGetInsightsBatch(SESSION_TOKEN);
   });
 }
 
-function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData) {
+function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData) {
   content.innerHTML = '';
   // Detail panel for drill-down views
   var detailPanel = el('div', { style: { display: 'none', marginBottom: '16px' } });
@@ -3298,6 +3851,7 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
     _renderFiledVsResolved(mainContent, statsData);
   }
   if (memberStatsData && memberStatsData.available) _renderMembershipInsights(mainContent, memberStatsData, showDetail);
+  if (workloadData && (workloadData.success || workloadData.data)) _renderWorkloadInsights(mainContent, workloadData, showDetail);
   if (perfData && perfData.length > 0) _renderPerformanceSection(mainContent, perfData, showDetail);
   if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(mainContent, satData, showDetail);
 
@@ -3371,6 +3925,66 @@ function _renderMembershipInsights(container, ms, showDetail) {
       _renderInsightDetailList(panel, unitEntries, 'var(--warning)');
     });
   }));
+
+  section.appendChild(grid);
+  container.appendChild(section);
+}
+
+function _renderWorkloadInsights(container, wl, showDetail) {
+  // Workload data is nested: { success, data: { totalSubmissions, members, categories, averages } }
+  var d = (wl && wl.data) || wl || {};
+  if (!d || (!d.totalSubmissions && !d.categories)) return;
+
+  var section = el('div', { className: 'mb-16' });
+  section.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
+    color: 'var(--text)', marginBottom: '12px',
+  }}, 'Workload Overview'));
+
+  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '12px' } });
+
+  var totalSubmissions = d.totalSubmissions || 0;
+  var memberCount = d.members || 0;
+  grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+  }));
+
+  // Extract averages from the data — averages keys are CATEGORY_LABELS values
+  var avgs = d.averages || {};
+  var avgPriority = parseFloat(avgs['Priority Cases']) || 0;
+  var avgPending = parseFloat(avgs['Pending Cases']) || 0;
+  var avgAged = parseFloat(avgs['Aged Cases']) || 0;
+
+  grid.appendChild(_insightCard('AVG PRIORITY CASES', avgPriority > 5 ? 'var(--danger)' : 'var(--success)', String(avgPriority), 'Per steward average', function() {
+    if (showDetail) showDetail('Workload Breakdown', function(panel) {
+      // Build items from all category averages
+      var items = [];
+      for (var key in avgs) {
+        items.push({ label: key + ' (avg)', count: parseFloat(avgs[key]) || 0 });
+      }
+      items.sort(function(a, b) { return b.count - a.count; });
+      _renderInsightDetailList(panel, items, 'var(--info)');
+      var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
+        if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+      }}, 'View Workload Tracker \u2192');
+      panel.appendChild(navBtn);
+    });
+  }));
+
+  grid.appendChild(_insightCard('AVG PENDING', avgPending > 10 ? 'var(--warning)' : 'var(--success)', String(avgPending), 'Cases awaiting action'));
+  grid.appendChild(_insightCard('AVG AGED CASES', avgAged > 3 ? 'var(--danger)' : 'var(--success)', String(avgAged), 'Cases 60+ days old'));
+
+  // Overtime and employment mix from workload data
+  var avgOvertime = parseFloat(avgs['Overtime Hours']) || 0;
+  if (avgOvertime > 0) {
+    grid.appendChild(_insightCard('AVG OVERTIME', avgOvertime > 10 ? 'var(--danger)' : 'var(--warning)', String(avgOvertime) + 'h', 'Hours per steward'));
+  }
+  var avgFTE = parseFloat(avgs['Full-Time Employees']) || parseFloat(avgs['FTE Count']) || 0;
+  var avgPTE = parseFloat(avgs['Part-Time Employees']) || parseFloat(avgs['PTE Count']) || 0;
+  if (avgFTE > 0 || avgPTE > 0) {
+    var mixRatio = avgFTE > 0 ? Math.round((avgFTE / (avgFTE + avgPTE)) * 100) : 0;
+    grid.appendChild(_insightCard('EMPLOYMENT MIX', 'var(--accent)', mixRatio + '% FT', 'FT: ' + avgFTE + ' / PT: ' + avgPTE + ' avg'));
+  }
 
   section.appendChild(grid);
   container.appendChild(section);
@@ -4698,7 +5312,7 @@ function renderFailsafePage(appContainer) {
     // Card 1: Bulk Member Export
     var exportCard = el('div', { className: 'card p-16-mb-12' });
     exportCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Bulk Member Export'));
-    exportCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Send every member their personal data summary via email. Includes grievances and assigned tasks.'));
+    exportCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Send every member their personal data summary via email. Includes grievances, workload, and assigned tasks.'));
     var exportStatus = el('div', { className: 'status-msg' });
     exportCard.appendChild(exportStatus);
     exportCard.appendChild(el('button', {
@@ -4888,7 +5502,7 @@ function renderTestRunnerPage(appContainer) {
     var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--card)', border: '2px solid var(--accent)', boxShadow: '0 2px 12px rgba(0,0,0,0.4)' } });
 
     // Run All sequentially — runs each suite one at a time to avoid GAS 6-min limit
-    var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'webapp', 'configrd', 'portal', 'weeklyq', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
+    var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'webapp', 'configrd', 'portal', 'weeklyq', 'workload', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
     var runAllBtn = el('button', {
       className: 'btn btn-primary',
       style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
@@ -4962,6 +5576,7 @@ function renderTestRunnerPage(appContainer) {
       { value: 'configrd', label: 'ConfigReader' },
       { value: 'portal', label: 'Portal Sheets' },
       { value: 'weeklyq', label: 'Weekly Questions' },
+      { value: 'workload', label: 'Workload Service' },
       { value: 'qaforum', label: 'QA Forum' },
       { value: 'timeline', label: 'Timeline Service' },
       { value: 'failsafe', label: 'Failsafe Service' },

@@ -121,7 +121,7 @@ function onOpenDeferred_() {
     // invocation in an isolated context, so onEdit() re-registers on every call.
     // Registering here wastes ~200ms on spreadsheet open for no benefit.
 
-    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F SolidBase', 3);
+    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
   } catch (deferredErr) {
     Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
     if (typeof logAuditEvent === 'function') {

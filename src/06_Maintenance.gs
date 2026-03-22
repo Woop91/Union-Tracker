@@ -390,6 +390,7 @@ function UPDATE_ALL_SHEETS() {
     { name: 'Function Checklist', fn: function() { createFunctionChecklistSheet_(); } },
     { name: 'Contact Log', fn: function() { _ensureContactLogSheet(ss); } },
     { name: 'Steward Tasks', fn: function() { _ensureStewardTasksSheet(ss); } },
+    { name: 'Workload Tracker', fn: function() { if (typeof initWorkloadTrackerSheets === 'function') initWorkloadTrackerSheets(); } },
     { name: 'Portal Sheets', fn: function() { if (typeof initPortalSheets === 'function') initPortalSheets(); } },
     { name: 'Weekly Questions', fn: function() { if (typeof WeeklyQuestions !== 'undefined' && typeof WeeklyQuestions.initWeeklyQuestionSheets === 'function') WeeklyQuestions.initWeeklyQuestionSheets(); } },
     { name: 'QA Forum', fn: function() { if (typeof QAForum !== 'undefined' && typeof QAForum.initQAForumSheets === 'function') QAForum.initQAForumSheets(); } },

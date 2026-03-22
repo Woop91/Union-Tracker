@@ -21,14 +21,12 @@
 
 ## Permissions
 
-Claude has **full access** to **SolidBase** repo (local + remote). For anything outside, ask user.
+Claude has **full access** to the **SolidBase** repo (local + remote). For anything outside, ask user.
 
 ## Repos & Sync
 
 - **SolidBase** (public): `Main` (production)
-- DDS Script ID: `[REDACTED — see .clasp.json]`
-- SolidBase Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
-- Synced from DDS-Dashboard (private source of truth). See SYNC-LOG.md for exclusion rules.
+- Apps Script ID: `[REDACTED — see .clasp.json]`
 
 **Version tracking:** Semver on every commit. Update `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
 
@@ -129,4 +127,4 @@ Canonical: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are ou
 - `CHANGELOG.md` — Version history
 - `FEATURES.md` — Feature docs
 - `DEVELOPER_GUIDE.md` — Developer onboarding
-- `SYNC-LOG.md` — SolidBase sync history
+- `SYNC-LOG.md` — Upstream sync history

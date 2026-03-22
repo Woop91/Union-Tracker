@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+      min-height: 100vh;
+      color: #F8FAFC;
+      font-size: 13px;
+    }
+    .sidebar { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Tab bar ────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      overflow-x: auto;
+      background: rgba(0,0,0,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      flex-shrink: 0;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      padding: 10px 8px;
+      border: none;
+      background: none;
+      color: #94A3B8;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      font-family: inherit;
+      text-align: center;
+      flex: 1;
+      min-width: 0;
+    }
+    .tab-btn:hover { color: #CBD5E1; }
+    .tab-btn.active { color: #A78BFA; border-bottom-color: #7C3AED; }
+    .tab-icon { display: block; font-size: 16px; margin-bottom: 2px; }
+
+    /* ── Content area ──────────────────────────── */
+    .content { flex: 1; overflow-y: auto; padding: 12px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Section / field styles ─────────────────── */
+    .section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .field { margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #E2E8F0;
+      margin-bottom: 2px;
+    }
+    .field-desc {
+      font-size: 10px;
+      color: #64748B;
+      margin-bottom: 5px;
+      line-height: 1.3;
+    }
+    .field-note {
+      font-size: 10px;
+      color: #F59E0B;
+      margin-top: 3px;
+      font-style: italic;
+    }
+    .field-input {
+      width: 100%;
+      padding: 7px 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      color: #F8FAFC;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field-input:focus { border-color: #7C3AED; }
+    .field-input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .field-input.dirty { border-color: #F59E0B; }
+
+    /* ── Toggle switch ─────────────────────────── */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .toggle-info { flex: 1; margin-right: 10px; }
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #475569;
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px; width: 18px;
+      left: 3px; bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    input:checked + .slider { background: #7C3AED; }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    /* ── List editor ───────────────────────────── */
+    .list-editor { margin-top: 4px; }
+    .list-items {
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 6px;
+    }
+    .list-item {
+      display: flex;
+      align-items: center;
+      padding: 5px 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 5px;
+      margin-bottom: 3px;
+      gap: 6px;
+    }
+    .list-item-text {
+      flex: 1;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .list-remove {
+      background: none;
+      border: none;
+      color: #EF4444;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+      line-height: 1;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+    .list-remove:hover { opacity: 1; }
+    .list-add-row {
+      display: flex;
+      gap: 4px;
+    }
+    .list-add-input {
+      flex: 1;
+      padding: 6px 8px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 5px;
+      color: #F8FAFC;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+    }
+    .list-add-input:focus { border-color: #7C3AED; }
+    .list-add-btn {
+      padding: 6px 12px;
+      background: linear-gradient(135deg, #7C3AED, #5B21B6);
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.1s;
+    }
+    .list-add-btn:hover { transform: scale(1.05); }
+
+    /* ── Footer ────────────────────────────────── */
+    .footer {
+      flex-shrink: 0;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.3);
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .save-btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      background: linear-gradient(135deg, #7C3AED, #5B21B6);
+      color: white;
+    }
+    .save-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.4); }
+    .save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .status-bar {
+      margin-top: 8px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 11px;
+      display: none;
+    }
+    .status-bar.success { display: block; background: rgba(16,185,129,0.2); color: #10B981; }
+    .status-bar.error { display: block; background: rgba(239,68,68,0.2); color: #EF4444; }
+
+    /* ── Loading overlay ───────────────────────── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: #94A3B8;
+      font-size: 13px;
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #7C3AED;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Sensitive mask ─────────────────────────── */
+    .sensitive-notice {
+      padding: 8px 10px;
+      background: rgba(245,158,11,0.15);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #F59E0B;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <!-- Tab bar (populated by JS) -->
+    <div class="tab-bar" id="tabBar"></div>
+
+    <!-- Content area -->
+    <div class="content" id="content">
+      <div class="loading" id="loadingState">
+        <div class="spinner"></div>
+        Loading settings...
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <button class="save-btn" id="saveBtn" onclick="saveCurrentTab()" disabled>Save Changes</button>
+      <div class="status-bar" id="statusBar"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ──────────────────────────────────────
+    var _schema = [];
+    var _settings = {};
+    var _isOwner = false;
+    var _activeTab = '';
+    var _dirty = {};        // { tabId: Set of dirty field keys }
+    var _listDirty = {};    // { configColKey: true } for modified lists
+    var _saving = false;
+
+    // ── Initialization ─────────────────────────────
+    google.script.run
+      .withSuccessHandler(onSettingsLoaded)
+      .withFailureHandler(onLoadError)
+      .adminGetSettings();
+
+    function onSettingsLoaded(result) {
+      if (!result || !result.success) {
+        document.getElementById('loadingState').textContent = result ? result.error : 'Failed to load';
+        return;
+      }
+      _schema = result.schema;
+      _settings = result.settings;
+      _isOwner = result.isOwner;
+      renderTabs();
+      renderAllPanels();
+      document.getElementById('loadingState').style.display = 'none';
+      // Activate first tab
+      if (_schema.length > 0) switchTab(_schema[0].id);
+    }
+
+    function onLoadError(err) {
+      document.getElementById('loadingState').textContent = 'Error: ' + (err.message || err);
+    }
+
+    // ── Tab rendering ──────────────────────────────
+    function renderTabs() {
+      var bar = document.getElementById('tabBar');
+      bar.innerHTML = '';
+      for (var i = 0; i < _schema.length; i++) {
+        var tab = _schema[i];
+        var btn = document.createElement('button');
+        btn.className = 'tab-btn';
+        btn.setAttribute('data-tab', tab.id);
+        var iconSpan = document.createElement('span');
+        iconSpan.className = 'tab-icon';
+        iconSpan.textContent = tab.icon;
+        btn.appendChild(iconSpan);
+        btn.appendChild(document.createTextNode(tab.label));
+        btn.addEventListener('click', (function(id) {
+          return function() { switchTab(id); };
+        })(tab.id));
+        bar.appendChild(btn);
+      }
+    }
+
+    function switchTab(tabId) {
+      _activeTab = tabId;
+      // Update tab buttons
+      var btns = document.querySelectorAll('.tab-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.toggle('active', btns[i].getAttribute('data-tab') === tabId);
+      }
+      // Show/hide panels
+      var panels = document.querySelectorAll('.tab-panel');
+      for (var j = 0; j < panels.length; j++) {
+        panels[j].classList.toggle('active', panels[j].id === 'panel-' + tabId);
+      }
+      updateSaveButton();
+    }
+
+    // ── Panel rendering ────────────────────────────
+    function renderAllPanels() {
+      var content = document.getElementById('content');
+      for (var i = 0; i < _schema.length; i++) {
+        var tab = _schema[i];
+        var panel = document.createElement('div');
+        panel.className = 'tab-panel';
+        panel.id = 'panel-' + tab.id;
+
+        // Check if this tab has sensitive fields and user is not owner
+        var hasSensitive = false;
+        for (var s = 0; s < tab.fields.length; s++) {
+          if (tab.fields[s].sensitive) { hasSensitive = true; break; }
+        }
+        if (hasSensitive && !_isOwner) {
+          var notice = document.createElement('div');
+          notice.className = 'sensitive-notice';
+          notice.textContent = '\uD83D\uDD12 Some fields are restricted to the spreadsheet owner.';
+          panel.appendChild(notice);
+        }
+
+        var section = document.createElement('div');
+        section.className = 'section';
+
+        for (var f = 0; f < tab.fields.length; f++) {
+          var field = tab.fields[f];
+          section.appendChild(renderField(tab.id, field));
+        }
+
+        panel.appendChild(section);
+        content.appendChild(panel);
+      }
+    }
+
+    function renderField(tabId, field) {
+      var wrapper = document.createElement('div');
+      wrapper.className = 'field';
+      wrapper.id = 'field-' + field.key;
+
+      var isMasked = field.sensitive && !_isOwner;
+      var isDisabled = field.readOnly || isMasked;
+
+      if (field.type === 'toggle') {
+        return renderToggle(tabId, field, isDisabled);
+      }
+
+      if (field.type === 'list') {
+        return renderListEditor(tabId, field, isMasked);
+      }
+
+      // Label
+      var label = document.createElement('div');
+      label.className = 'field-label';
+      label.textContent = field.label;
+      if (field.readOnly) label.textContent += ' (read-only)';
+      if (isMasked) label.textContent += ' \uD83D\uDD12';
+      wrapper.appendChild(label);
+
+      // Description
+      var desc = document.createElement('div');
+      desc.className = 'field-desc';
+      desc.textContent = field.desc;
+      wrapper.appendChild(desc);
+
+      // Input
+      var input = document.createElement('input');
+      input.className = 'field-input';
+      input.setAttribute('data-key', field.key);
+      input.setAttribute('data-tab', tabId);
+
+      if (field.type === 'number') {
+        input.type = 'number';
+        if (field.min !== undefined) input.min = field.min;
+        if (field.max !== undefined) input.max = field.max;
+      } else if (field.type === 'email') {
+        input.type = 'email';
+      } else if (field.type === 'url') {
+        input.type = 'url';
+        input.placeholder = 'https://...';
+      } else {
+        input.type = 'text';
+      }
+
+      var val = _settings[field.key] || '';
+      input.value = val;
+      input.disabled = isDisabled;
+
+      // Track dirty state on input
+      input.addEventListener('input', (function(key, tid, origVal) {
+        return function(e) {
+          if (!_dirty[tid]) _dirty[tid] = {};
+          if (e.target.value !== origVal) {
+            _dirty[tid][key] = true;
+            e.target.classList.add('dirty');
+          } else {
+            delete _dirty[tid][key];
+            e.target.classList.remove('dirty');
+          }
+          updateSaveButton();
+        };
+      })(field.key, tabId, val));
+
+      wrapper.appendChild(input);
+
+      // Note
+      if (field.note) {
+        var note = document.createElement('div');
+        note.className = 'field-note';
+        note.textContent = field.note;
+        wrapper.appendChild(note);
+      }
+
+      return wrapper;
+    }
+
+    // ── Toggle field ───────────────────────────────
+    function renderToggle(tabId, field, isDisabled) {
+      var wrapper = document.createElement('div');
+      wrapper.className = 'field';
+      wrapper.id = 'field-' + field.key;
+
+      var row = document.createElement('div');
+      row.className = 'toggle-row';
+
+      var info = document.createElement('div');
+      info.className = 'toggle-info';
+      var lbl = document.createElement('div');
+      lbl.className = 'field-label';
+      lbl.textContent = field.label;
+      info.appendChild(lbl);
+      var desc = document.createElement('div');
+      desc.className = 'field-desc';
+      desc.textContent = field.desc;
+      info.appendChild(desc);
+      row.appendChild(info);
+
+      var toggle = document.createElement('label');
+      toggle.className = 'toggle-switch';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = 'toggle-' + field.key;
+      cb.checked = (_settings[field.key] || '').toLowerCase() === 'yes';
+      cb.disabled = isDisabled;
+      cb.addEventListener('change', (function(key, tid) {
+        return function() {
+          if (!_dirty[tid]) _dirty[tid] = {};
+          _dirty[tid][key] = true;
+          updateSaveButton();
+        };
+      })(field.key, tabId));
+      toggle.appendChild(cb);
+      var slider = document.createElement('span');
+      slider.className = 'slider';
+      toggle.appendChild(slider);
+      row.appendChild(toggle);
+
+      wrapper.appendChild(row);
+      return wrapper;
+    }
+
+    // ── List editor ────────────────────────────────
+    function renderListEditor(tabId, field, isMasked) {
+      var wrapper = document.createElement('div');
+      wrapper.className = 'field';
+      wrapper.id = 'field-' + field.key;
+
+      var label = document.createElement('div');
+      label.className = 'field-label';
+      label.textContent = field.label;
+      if (isMasked) label.textContent += ' \uD83D\uDD12';
+      wrapper.appendChild(label);
+
+      var desc = document.createElement('div');
+      desc.className = 'field-desc';
+      desc.textContent = field.desc;
+      wrapper.appendChild(desc);
+
+      if (isMasked) {
+        var masked = document.createElement('div');
+        masked.className = 'field-desc';
+        masked.textContent = 'Restricted to spreadsheet owner';
+        masked.style.color = '#F59E0B';
+        wrapper.appendChild(masked);
+        return wrapper;
+      }
+
+      var editor = document.createElement('div');
+      editor.className = 'list-editor';
+
+      var itemsContainer = document.createElement('div');
+      itemsContainer.className = 'list-items';
+      itemsContainer.id = 'list-' + field.key;
+
+      var values = _settings[field.key] || [];
+      for (var i = 0; i < values.length; i++) {
+        itemsContainer.appendChild(createListItem(field.key, tabId, values[i]));
+      }
+      editor.appendChild(itemsContainer);
+
+      // Add row
+      var addRow = document.createElement('div');
+      addRow.className = 'list-add-row';
+      var addInput = document.createElement('input');
+      addInput.className = 'list-add-input';
+      addInput.id = 'add-input-' + field.key;
+      addInput.placeholder = 'Add new item...';
+      addInput.addEventListener('keydown', (function(key, tid) {
+        return function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); addListItem(key, tid); }
+        };
+      })(field.key, tabId));
+      addRow.appendChild(addInput);
+
+      var addBtn = document.createElement('button');
+      addBtn.className = 'list-add-btn';
+      addBtn.textContent = '+';
+      addBtn.addEventListener('click', (function(key, tid) {
+        return function() { addListItem(key, tid); };
+      })(field.key, tabId));
+      addRow.appendChild(addBtn);
+
+      editor.appendChild(addRow);
+
+      // Note
+      if (field.note) {
+        var note = document.createElement('div');
+        note.className = 'field-note';
+        note.textContent = field.note;
+        editor.appendChild(note);
+      }
+
+      wrapper.appendChild(editor);
+      return wrapper;
+    }
+
+    function createListItem(fieldKey, tabId, value) {
+      var item = document.createElement('div');
+      item.className = 'list-item';
+      var text = document.createElement('span');
+      text.className = 'list-item-text';
+      text.textContent = value;
+      item.appendChild(text);
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'list-remove';
+      removeBtn.textContent = '\u00D7';
+      removeBtn.title = 'Remove';
+      removeBtn.addEventListener('click', function() {
+        item.parentNode.removeChild(item);
+        _listDirty[fieldKey] = true;
+        if (!_dirty[tabId]) _dirty[tabId] = {};
+        _dirty[tabId][fieldKey] = true;
+        updateSaveButton();
+      });
+      item.appendChild(removeBtn);
+      return item;
+    }
+
+    function addListItem(fieldKey, tabId) {
+      var input = document.getElementById('add-input-' + fieldKey);
+      var val = input.value.trim();
+      if (!val) return;
+
+      // Check for duplicates
+      var container = document.getElementById('list-' + fieldKey);
+      var existing = container.querySelectorAll('.list-item-text');
+      for (var i = 0; i < existing.length; i++) {
+        if (existing[i].textContent === val) {
+          input.value = '';
+          showStatus('Duplicate: "' + val + '" already exists', 'error');
+          return;
+        }
+      }
+
+      container.appendChild(createListItem(fieldKey, tabId, val));
+      input.value = '';
+      _listDirty[fieldKey] = true;
+      if (!_dirty[tabId]) _dirty[tabId] = {};
+      _dirty[tabId][fieldKey] = true;
+      updateSaveButton();
+    }
+
+    function getListValues(fieldKey) {
+      var container = document.getElementById('list-' + fieldKey);
+      if (!container) return [];
+      var items = container.querySelectorAll('.list-item-text');
+      var vals = [];
+      for (var i = 0; i < items.length; i++) {
+        vals.push(items[i].textContent);
+      }
+      return vals;
+    }
+
+    // ── Save logic ─────────────────────────────────
+    function updateSaveButton() {
+      var btn = document.getElementById('saveBtn');
+      var hasDirty = _dirty[_activeTab] && Object.keys(_dirty[_activeTab]).length > 0;
+      btn.disabled = !hasDirty || _saving;
+    }
+
+    function saveCurrentTab() {
+      if (_saving) return;
+      _saving = true;
+      var btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      hideStatus();
+
+      var tabDirty = _dirty[_activeTab] || {};
+      var dirtyKeys = Object.keys(tabDirty);
+      if (dirtyKeys.length === 0) { resetSaveBtn(); return; }
+
+      // Separate list fields from single-value fields
+      var singleChanges = {};
+      var listSaves = [];
+
+      for (var i = 0; i < dirtyKeys.length; i++) {
+        var key = dirtyKeys[i];
+        if (_listDirty[key]) {
+          listSaves.push(key);
+        } else {
+          // Read current value from the input
+          var input = document.querySelector('[data-key="' + key + '"]');
+          if (input) {
+            singleChanges[key] = input.value;
+          }
+          // Check toggles
+          var toggle = document.getElementById('toggle-' + key);
+          if (toggle) {
+            singleChanges[key] = toggle.checked ? 'yes' : 'no';
+          }
+        }
+      }
+
+      var pendingOps = 0;
+      var errors = [];
+
+      function checkDone() {
+        pendingOps--;
+        if (pendingOps <= 0) {
+          _saving = false;
+          if (errors.length > 0) {
+            showStatus(errors.join('; '), 'error');
+          } else {
+            showStatus('Settings saved successfully', 'success');
+            // Clear dirty state for this tab
+            _dirty[_activeTab] = {};
+            // Clear dirty styling
+            var dirtyInputs = document.querySelectorAll('.field-input.dirty');
+            for (var d = 0; d < dirtyInputs.length; d++) {
+              dirtyInputs[d].classList.remove('dirty');
+            }
+            // Clear list dirty flags
+            for (var k = 0; k < listSaves.length; k++) {
+              delete _listDirty[listSaves[k]];
+            }
+          }
+          resetSaveBtn();
+        }
+      }
+
+      // Save single-value fields
+      if (Object.keys(singleChanges).length > 0) {
+        pendingOps++;
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (!result.success) errors.push(result.error);
+            checkDone();
+          })
+          .withFailureHandler(function(err) {
+            errors.push(err.message || 'Save failed');
+            checkDone();
+          })
+          .adminSaveSettings(singleChanges);
+      }
+
+      // Save list fields
+      for (var j = 0; j < listSaves.length; j++) {
+        pendingOps++;
+        (function(listKey) {
+          var vals = getListValues(listKey);
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (!result.success) errors.push(result.error);
+              checkDone();
+            })
+            .withFailureHandler(function(err) {
+              errors.push(listKey + ': ' + (err.message || 'Save failed'));
+              checkDone();
+            })
+            .adminSaveListValues(listKey, vals);
+        })(listSaves[j]);
+      }
+
+      // If nothing to save (edge case)
+      if (pendingOps === 0) { resetSaveBtn(); }
+    }
+
+    function resetSaveBtn() {
+      var btn = document.getElementById('saveBtn');
+      btn.textContent = 'Save Changes';
+      _saving = false;
+      updateSaveButton();
+    }
+
+    // ── Status bar ─────────────────────────────────
+    function showStatus(msg, type) {
+      var bar = document.getElementById('statusBar');
+      bar.textContent = msg;
+      bar.className = 'status-bar ' + type;
+      if (type === 'success') {
+        setTimeout(hideStatus, 4000);
+      }
+    }
+
+    function hideStatus() {
+      var bar = document.getElementById('statusBar');
+      bar.className = 'status-bar';
+    }
+  </script>
+</body>
+</html>
