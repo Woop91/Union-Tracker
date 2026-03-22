@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # TODO: Verify these SHAs match the latest release tags before merging.
-      # Pin actions to commit SHAs to prevent supply-chain attacks on mutable tags.
+      # SHAs verified 2026-03-20. Pinned to commit SHAs to prevent supply-chain attacks.
+      # Latest major: checkout@v6, setup-node@v6 — upgrade tracked separately.
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 

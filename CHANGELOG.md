@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.34.1] - 2026-03-21
+
+### Fixed
+- **Theme sync: org chart & POMS** — Embedded org_chart.html and poms_reference.html now follow the app's dark/light toggle via class toggling on `.madds-embed` and `.poms-root`. Live toggle via `UnifiedTheme.apply()` also propagates to embedded components.
+- **esign.html hardcoded colors** — 7 hardcoded hex values replaced with CSS custom properties (`--accentHover`, `--accentMuted`, `--badge-pending-bg/text`, `--badge-signed-bg/text`, `--canvas-bg`) with dark mode overrides in `prefers-color-scheme` media query.
+- **OS theme detection** — First-visit default now respects `prefers-color-scheme` instead of always defaulting to dark mode. Once user explicitly toggles, localStorage takes precedence.
+- **Modal overlay theme-awareness** — `.wt-modal-overlay` uses `var(--overlay-bg)` scoped by `[data-theme-mode]` (light=0.35, dark=0.55) instead of hardcoded `rgba(0,0,0,0.55)`.
+- **Offline banner** — Uses `var(--danger, #ef4444)` instead of hardcoded `#ef4444` in both CSS and inline style.
+- **Dist parity CI failure** — `minifyHtml()` in build.js now normalizes `\r\n` → `\n` before regex processing, ensuring identical output on Windows and Linux.
+
+### Removed
+- Dead code: unused `last7Keys` variable in analytics, orphaned `resourceDownloads` local computation (return object uses `DataService.getResourceClickTotal()`).
+- Dev-only files from dist/ (`07_DevTools.gs`, `30_TestRunner.gs`, `31_WebAppTests.gs`, `DevMenu.gs`) — dist/ now matches `build:prod` output.
+
 ## [4.32.1] - 2026-03-20
 
 ### Added

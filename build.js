@@ -59,7 +59,6 @@ const BUILD_ORDER = [
   '16_DashboardEnhancements.gs',
   '17_CorrelationEngine.gs',
   // Web-dashboard SPA modules (load after all core modules)
-  // NOTE: 25_WorkloadService.gs and poms_reference.html are excluded from SolidBase
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -152,6 +151,9 @@ function validate(gsFiles, htmlFiles) {
  * NOT a full minifier — for that, install html-minifier-terser.
  */
 function minifyHtml(content) {
+  // Normalize line endings to LF for consistent minification across Windows/Linux
+  content = content.replace(/\r\n/g, '\n');
+
   // Preserve GAS template tags by replacing them with placeholders
   var templates = [];
   content = content.replace(/<\?[!=]?[\s\S]*?\?>/g, function(match) {
@@ -293,11 +295,16 @@ const args = process.argv.slice(2);
 const shouldClean = args.includes('--clean');
 const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
+const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
-if (shouldClean) {
+if (validateOnly) {
+  // Validate syntax only — no file copying, no dist/ changes
+  validate(BUILD_ORDER, HTML_FILES);
+  console.log('Validation passed (--validate-only, no files written).');
+} else if (shouldClean) {
   clean();
 } else {
   const fileList = isProd

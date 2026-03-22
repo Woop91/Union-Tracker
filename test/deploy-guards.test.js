@@ -389,6 +389,12 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 
 describe('G6: dist/ files are in sync with src/', () => {
 
+  test('dist/ does not contain dev-only files (must be built with --prod)', () => {
+    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
+    const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
+    expect(found).toEqual([]);
+  });
+
   test('every src .gs file has identical copy in dist', () => {
     const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
@@ -467,9 +473,9 @@ describe('G7: All .gs files have valid JavaScript syntax', () => {
 // ============================================================================
 // G8: build.js file arrays match actual src/ contents
 // ============================================================================
-// Reason: poms_reference.html was added to src/ and dist/ but NOT to the
+// Reason: An HTML file was added to src/ and dist/ but NOT to the
 // HTML_FILES array in build.js. A fresh --prod build would delete it from dist/,
-// breaking the POMS Reference tab at runtime.
+// breaking the tab at runtime.
 
 describe('G8: build.js file arrays match src/ contents', () => {
   const buildCode = fs.readFileSync(path.resolve(__dirname, '..', 'build.js'), 'utf8');
@@ -553,7 +559,10 @@ describe('G9: Nav tabs and handlers are in sync', () => {
   });
 
   // Member-only tabs (removed from steward nav)
-  const memberOnlyTabs = ['poms'];
+  // NOTE: poms is org-specific and may be removed from nav entirely; skip if absent
+  const memberOnlyTabs = ['poms'].filter(tabId =>
+    tabIdMatches.some(m => m.includes(`'${tabId}'`))
+  );
   memberOnlyTabs.forEach(tabId => {
     test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
       const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
@@ -566,7 +575,7 @@ describe('G9: Nav tabs and handlers are in sync', () => {
 // ============================================================================
 // G10: Lazy-loaded HTML files have server functions
 // ============================================================================
-// Reason: renderPOMSReference calls google.script.run.getPOMSReferenceHtml().
+// Reason: Lazy-loaded views call server functions (e.g. getOrgChartHtml).
 // If the server function doesn't exist, the tab shows "Failed to load".
 
 describe('G10: Lazy-loaded views have matching server functions', () => {
@@ -576,7 +585,7 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   const codeOnly = indexCode.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // Find all HtmlService-pattern server functions: lines like
-  //   .getOrgChartHtml();  or  .getPOMSReferenceHtml();
+  //   .getOrgChartHtml();  or  .getSomeViewHtml();
   // These are the terminal call in a google.script.run chain.
   // Pattern: line has only whitespace, a dot, a function name, parens, semicolon
   const terminalCalls = codeOnly.match(/^\s+\.(\w+)\(\s*\)\s*;/gm) || [];
@@ -600,9 +609,12 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   });
 
   // Must find at least the known lazy-loaders
-  test('detects lazy-loaded server functions (getOrgChartHtml, getPOMSReferenceHtml)', () => {
+  test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
-    expect(serverFunctions.has('getPOMSReferenceHtml')).toBe(true);
+    // getPOMSReferenceHtml only exists when poms_reference.html is present
+    if (fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'))) {
+      expect(serverFunctions.has('getPOMSReferenceHtml')).toBe(true);
+    }
   });
 
   [...serverFunctions].forEach(fn => {
@@ -613,27 +625,83 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 });
 
 
-// G11: poms_reference.html — excluded from SolidBase (DDS-only feature)
+// ============================================================================
+// G11: poms_reference.html is self-contained and parseable
+// ============================================================================
+// Reason: poms_reference.html is loaded via HtmlService.createHtmlOutputFromFile
+// and injected into the SPA. If its <script> block has syntax errors, the entire
+// POMS tab fails silently.
+// NOTE: poms_reference.html is org-specific and may not exist in all repos.
+
+describe('G11: poms_reference.html integrity', () => {
+  const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
+  const pomsExists = fs.existsSync(pomsPath);
+
+  (pomsExists ? test : test.skip)('poms_reference.html exists', () => {
+    expect(fs.existsSync(pomsPath)).toBe(true);
+  });
+
+  (pomsExists ? test : test.skip)('POMS_DATA is available (lazy-loaded from server or inline)', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const match = code.match(/POMS_DATA\s*=\s*\[/);
+    expect(match).not.toBeNull();
+    const clientEntries = (code.match(/\{id:/g) || []).length;
+    if (clientEntries < 78) {
+      const svcPath = path.join(SRC_DIR, '21_WebDashDataService.gs');
+      const svcCode = fs.readFileSync(svcPath, 'utf8');
+      const serverEntries = (svcCode.match(/\{id:"/g) || []).length;
+      expect(serverEntries).toBeGreaterThanOrEqual(78);
+    }
+  });
+
+  (pomsExists ? test : test.skip)('contains FLOWS object with flowcharts', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const match = code.match(/FLOWS\s*=\s*\{/);
+    expect(match).not.toBeNull();
+    const charts = (code.match(/title:"/g) || []).length;
+    expect(charts).toBeGreaterThanOrEqual(17);
+  });
+
+  (pomsExists ? test : test.skip)('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
+      expect(code).toContain(`P.tab==='${tab}'`);
+    });
+  });
+
+  (pomsExists ? test : test.skip)('<script> block parses without syntax errors', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
+    expect(scriptMatch).not.toBeNull();
+    expect(() => {
+      new vm.Script(scriptMatch[1], { filename: 'poms_reference.html' });
+    }).not.toThrow();
+  });
+
+  (pomsExists ? test : test.skip)('no sensitive Script ID present', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    expect(code).not.toContain('18hHHX');
+  });
+});
 
 
 // ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
-// files that get synced to the public Union-Tracker repo.
+// Reason: Private Apps Script IDs (18hHHX...) must never appear in source
+// files that get synced to the public repo.
 
 describe('G12: No sensitive ID leaks', () => {
-  const DDS_SCRIPT_ID_PREFIX = '18hHHX';
+  const PRIVATE_SCRIPT_ID_PREFIX = '18hHHX';
   const srcFiles = fs.readdirSync(SRC_DIR);
 
-  // AI_REFERENCE.md legitimately contains Script IDs in the private DDS repo;
-  // in public Union-Tracker the ID is redacted so this guard still protects there.
+  // AI_REFERENCE.md may legitimately reference redacted IDs.
   const G12_EXCLUDES = ['AI_REFERENCE.md'];
 
   srcFiles.filter(f => !G12_EXCLUDES.includes(f)).forEach(file => {
-    test(`src/${file} does not contain DDS Script ID`, () => {
+    test(`src/${file} does not contain private Script ID`, () => {
       const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
-      expect(code).not.toContain(DDS_SCRIPT_ID_PREFIX);
+      expect(code).not.toContain(PRIVATE_SCRIPT_ID_PREFIX);
     });
   });
 });
@@ -693,7 +761,38 @@ describe('G13: Module load order is safe', () => {
 });
 
 
-// G14: WorkloadService — excluded from SolidBase (DDS-only feature)
+// NOTE: 25_WorkloadService.gs is org-specific and may not exist in all repos.
+const wsPath = path.join(SRC_DIR, '25_WorkloadService.gs');
+const wsExists = fs.existsSync(wsPath);
+
+describe('G14: WorkloadService crash-safe patterns', () => {
+  const wsCode = wsExists ? fs.readFileSync(wsPath, 'utf8') : '';
+
+  (wsExists ? test : test.skip)('_refreshReportingData does NOT clearContents before writing', () => {
+    // Extract the _refreshReportingData function body
+    const funcStart = wsCode.indexOf('function _refreshReportingData()');
+    expect(funcStart).toBeGreaterThan(-1);
+    const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
+    const funcBody = wsCode.substring(funcStart, funcEnd);
+
+    // The old antipattern: report.clearContents() before setValues
+    // New pattern: setValues first, then clearContent only for stale rows
+    expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
+  });
+
+  (wsExists ? test : test.skip)('rate limit uses atomic check-and-record pattern', () => {
+    // _checkAndRecordRateLimit should exist (replaces separate check + record)
+    expect(wsCode).toContain('function _checkAndRecordRateLimit');
+    // Old separate _recordRateLimitAttempt should NOT exist
+    expect(wsCode).not.toContain('function _recordRateLimitAttempt');
+    // No separate _recordSubmission call
+    expect(wsCode).not.toContain('function _recordSubmission');
+  });
+
+  (wsExists ? test : test.skip)('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
+    expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
+  });
+});
 
 // ============================================================================
 // G15: IDLE LOGOUT MODULE

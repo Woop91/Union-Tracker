@@ -127,7 +127,7 @@ describe('OC3: renderOrgChart script re-execution is reliable', () => {
 // ============================================================================
 // Bug: _initDesktopRan was set to true on first visit and never reset. When
 // the user navigated away and back, initDesktop() wouldn't run, leaving
-// MassAbility sub-sections in an incorrect state.
+// Agency sub-sections in an incorrect state.
 
 describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   test('org_chart.html declares _initDesktopRan on window (resets on re-execution)', () => {

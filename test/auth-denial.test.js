@@ -14,8 +14,14 @@
  * Run: npx jest test/auth-denial.test.js --verbose
  */
 
+const fs = require('fs');
+const path = require('path');
+
 require('./gas-mock');
 const { loadSources } = require('./load-source');
+
+// Optional source files that may not exist in all repo variants (e.g. SolidBase)
+const WS_EXISTS = fs.existsSync(path.resolve(__dirname, '..', 'src', '25_WorkloadService.gs'));
 
 // Mock globals before loading sources
 global.logAuditEvent = jest.fn();
@@ -61,11 +67,12 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
+  WS_EXISTS && '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
   '29_Migrations.gs',
-]);
+].filter(Boolean));
 
 // ============================================================================
 // Setup: Force auth denial for all tests

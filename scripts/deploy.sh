@@ -21,7 +21,7 @@ fi
 
 echo ""
 echo "═══════════════════════════════════════"
-echo "  Safe Deploy Pipeline"
+echo "  DDS/UT Safe Deploy Pipeline"
 echo "═══════════════════════════════════════"
 echo ""
 

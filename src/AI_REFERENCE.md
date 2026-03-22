@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | SolidBase sync sync flow, Workload Tracker exclusion registry |
+| 3 | **SYNC-LOG.md** | Upstream sync flow, Workload Tracker exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -29,15 +29,13 @@ Read these files **in this order** when onboarding to this codebase:
 ## 🏗️ PROJECT OVERVIEW
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
-**Repo:** `Woop91/SolidBase` (private). Default branch: `Main` (capital M).
-**Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
+**Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users) at Organization (Union).
+**Target users:** Union stewards (power users) and members (casual users).
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**Apps Script ID:** `[REDACTED]
-**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**Apps Script ID:** `[REDACTED — see .clasp.json]`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**

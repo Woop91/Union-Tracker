@@ -483,7 +483,7 @@ header p { font-size: 0.68rem; color: var(--mute); letter-spacing: 0.14em; text-
 
 footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
 
-/* Organizer region item (in MassAbility and chapter sections) */
+/* Organizer region item (in agency and chapter sections) */
 .org-item  { font-size: 0.65rem; padding: 2px 7px !important; line-height: 1.25 !important; margin: 0; }
 .org-region { color: var(--dim); font-size: 0.65rem; line-height: 1.2; }
 .org-name  { color: var(--teal); line-height: 1.2; }
@@ -693,13 +693,13 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
     margin-bottom: 1px;
   }
 
-  /* MassAbility expandable branch — constrain to available width */
+  /* Agency expandable branch — constrain to available width */
   .chapter-branch[data-expand="true"] {
     max-width: 100% !important;
     min-width: 0;
   }
 
-  /* MassAbility two-column flex → responsive horizontal flow */
+  /* Agency two-column flex → responsive horizontal flow */
   div[style*="display:flex;gap:8px;align-items:flex-start"] {
     flex-wrap: wrap !important;
     justify-content: center !important;
@@ -735,7 +735,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
   .leg-dot { width: 10px; height: 10px; }
 
   /* Detail sections: inline display:none in HTML is default.
-     JS pillToggle flips inline styles. initDesktop() expands MassAbility only on ≥601px. */
+     JS pillToggle flips inline styles. initDesktop() expands agency section only on ≥601px. */
 
   /* Card rows stack on mobile */
   .card-row {
@@ -791,7 +791,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
   /* Panel — single column, full width */
 
-  /* MassAbility two-column → stacked */
+  /* Agency two-column → stacked */
   div[style*="display:flex;gap:8px;align-items:flex-start"] {
     flex-direction: column !important;
     align-items: stretch !important;
@@ -837,7 +837,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
   /* Dave & Heidi cards — narrow ONLY on mobile */
   #dave-foley-card { min-width: 0 !important; max-width: min(55vw, 200px) !important; width: 55vw !important; }
-  #massability-card { min-width: 0 !important; max-width: min(50vw, 180px) !important; width: 50vw !important; }
+  #agency-card { min-width: 0 !important; max-width: min(50vw, 180px) !important; width: 50vw !important; }
 
   /* Increase text sizes to fill mobile width */
   .c-name { font-size: 1.1rem !important; }
@@ -925,7 +925,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 <div class="page">
 
 <header>
-  <h1>Local <span>509</span></h1>
+  <h1>Local <span>Union</span></h1>
   <p>Current Organizational Structure &mdash; Leadership &amp; Staff</p>
 </header>
 
@@ -952,7 +952,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
       <span class="c-badge">Executive</span>
       <div class="c-role">President</div>
       <div class="c-name">Dave Foley</div>
-      <a class="c-email" href="mailto:dfoley@seiu509.org">dfoley@seiu509.org</a>
+      <a class="c-email" href="mailto:dfoley@union.org">dfoley@union.org</a>
     </div>
   </div>
 </div>
@@ -986,7 +986,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <span class="c-badge">Finance</span>
             <div class="c-role">Treasurer</div>
             <div class="c-name">Kara Goodier</div>
-            <a class="c-email" href="mailto:kgoodier@seiu509.org">kgoodier@seiu509.org</a>
+            <a class="c-email" href="mailto:kgoodier@union.org">kgoodier@union.org</a>
           </div>
         </div>
       </div>
@@ -1001,7 +1001,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <span class="c-badge">Officer</span>
             <div class="c-role">Recording Secretary</div>
             <div class="c-name">Cynthia Davis</div>
-            <a class="c-email" href="mailto:cdavis@seiu509.org">cdavis@seiu509.org</a>
+            <a class="c-email" href="mailto:cdavis@union.org">cdavis@union.org</a>
           </div>
         </div>
       </div>
@@ -1023,7 +1023,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
       <span class="c-badge">Chief</span>
       <div class="c-role">Chief of Staff</div>
       <div class="c-name">Maddie Conway</div>
-      <a class="c-email-u" href="mailto:mconway@seiu509.org">mconway@seiu509.org</a>
+      <a class="c-email-u" href="mailto:mconway@union.org">mconway@union.org</a>
     </div>
   </div>
 </div>
@@ -1041,21 +1041,21 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <div class="card t2" style="text-align:center;">
           <span class="c-badge t2">MARC</span>
           <div class="c-name">Rick Page</div>
-          <a class="c-email-u" href="mailto:rpage@seiu509.org">rpage@seiu509.org</a>
+          <a class="c-email-u" href="mailto:rpage@union.org">rpage@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-marc',this)" aria-expanded="false">▶ staff</button>
           <div id="r-marc" class="rep-list">Matt M</div>
         </div>
         <div class="card t2" style="text-align:center;">
           <span class="c-badge t2">Organizing</span>
           <div class="c-name">Kathleen Collins</div>
-          <a class="c-email-u" href="mailto:kcollins@seiu509.org">kcollins@seiu509.org</a>
+          <a class="c-email-u" href="mailto:kcollins@union.org">kcollins@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-org',this)" aria-expanded="false">▶ staff</button>
           <div id="r-org" class="rep-list">Ted · DJ · Ninfa · Cynthia · Scott · Raya · Chris B</div>
         </div>
         <div class="card t2" style="text-align:center;">
           <span class="c-badge t2">Political &amp; Legislative</span>
           <div class="c-name">Dan Hoffer</div>
-          <a class="c-email" href="mailto:dhoffer@seiu509.org">dhoffer@seiu509.org</a>
+          <a class="c-email" href="mailto:dhoffer@union.org">dhoffer@union.org</a>
           <div class="p-sub-note">Endorsements: Alicia Goganian<br>COPE Rep: Orlando Peña</div>
           <button class="rep-btn" onclick="repToggle('r-pol',this)" aria-expanded="false">▶ staff</button>
           <div id="r-pol" class="rep-list">Joyce · Mary</div>
@@ -1063,22 +1063,22 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <div class="card t2" style="text-align:center;">
           <span class="c-badge t2">Admin &amp; Governance</span>
           <div class="c-name">Jenny Bauer</div>
-          <a class="c-email" href="mailto:jbauer@seiu509.org">jbauer@seiu509.org</a>
-          <a class="c-email" href="mailto:governance@seiu509.org" style="margin-top:2px;">governance@seiu509.org</a>
+          <a class="c-email" href="mailto:jbauer@union.org">jbauer@union.org</a>
+          <a class="c-email" href="mailto:governance@union.org" style="margin-top:2px;">governance@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-admin',this)" aria-expanded="false">▶ staff</button>
           <div id="r-admin" class="rep-list">Pat · Rachel · Anna M · Anne B · Jeff · Alex</div>
         </div>
         <div class="card t2" style="text-align:center;">
           <span class="c-badge t2">Communications</span>
           <div class="c-name">Natalia Berthet Garcia</div>
-          <a class="c-email-u" href="mailto:nberthetgarcia@seiu509.org">nberthetgarcia@seiu509.org</a>
+          <a class="c-email-u" href="mailto:nberthetgarcia@union.org">nberthetgarcia@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-comms',this)" aria-expanded="false">▶ staff</button>
           <div id="r-comms" class="rep-list">Mara · Trenton · Courtney · Jerry · Stephanie · Lyv</div>
         </div>
         <div class="card t2" style="text-align:center;">
           <span class="c-badge t2">Finance &amp; HR</span>
           <div class="c-name">Jay Heelon</div>
-          <a class="c-email-u" href="mailto:jheelon@seiu509.org">jheelon@seiu509.org</a>
+          <a class="c-email-u" href="mailto:jheelon@union.org">jheelon@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-fin',this)" aria-expanded="false">▶ staff</button>
           <div id="r-fin" class="rep-list">Iliana · Adri · Angel Kim · Alicia</div>
         </div>
@@ -1096,45 +1096,45 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <div class="card t3" style="text-align:center;">
           <span class="c-badge t3">Public Sector Lead</span>
           <div class="c-name">Mara Maldonado</div>
-          <a class="c-email" href="mailto:mmaldonado@seiu509.org">mmaldonado@seiu509.org</a>
+          <a class="c-email" href="mailto:mmaldonado@union.org">mmaldonado@union.org</a>
         </div>
         <div class="card t3" style="text-align:center;">
           <span class="c-badge t3">Field</span>
           <div class="c-name">Victor Yang</div>
-          <a class="c-email-u" href="mailto:vyang@seiu509.org">vyang@seiu509.org</a>
+          <a class="c-email-u" href="mailto:vyang@union.org">vyang@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-field',this)" aria-expanded="false">▶ staff</button>
           <div id="r-field" class="rep-list">Jim · Orlando · Godfrey · Lynne · Frank G · Tyrone · Karina · John · Jeremy · Santiago · William · Adrielle</div>
         </div>
         <div class="card t3" style="text-align:center;">
           <span class="c-badge t3">Data</span>
           <div class="c-name">Andy Santos</div>
-          <a class="c-email-u" href="mailto:asantos@seiu509.org">asantos@seiu509.org</a>
+          <a class="c-email-u" href="mailto:asantos@union.org">asantos@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-data',this)" aria-expanded="false">▶ staff</button>
           <div id="r-data" class="rep-list">MJ · Adrielle</div>
         </div>
         <div class="card t3" style="text-align:center;">
           <span class="c-badge t3">Private Sector</span>
           <div class="c-name">Lorelei Kluever</div>
-          <a class="c-email-u" href="mailto:lkluever@seiu509.org">lkluever@seiu509.org</a>
+          <a class="c-email-u" href="mailto:lkluever@union.org">lkluever@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-priv',this)" aria-expanded="false">▶ staff</button>
           <div id="r-priv" class="rep-list">Sherice · Jackie · Sam · Joanne · Melodie · Mike P · Tom</div>
         </div>
         <div class="card t3" style="text-align:center;">
           <span class="c-badge t3">Steward Coordinator</span>
           <div class="c-name" id="public-sector-card">Mark Belzowski</div>
-          <a class="c-email" href="mailto:mBelzowski@seiu509.org">mBelzowski@seiu509.org</a>
+          <a class="c-email" href="mailto:mBelzowski@union.org">mBelzowski@union.org</a>
           <button class="rep-btn" onclick="repToggle('r-pub',this)" aria-expanded="false">▶ staff</button>
           <div id="r-pub" class="rep-list">Ashley · Sarah F · Lindsey · Lee · Frankie M · Kerstin · Nikki · Community Organizer</div>
         </div>
         <div class="card t3" style="text-align:center;">
           <span class="c-badge t3">Higher Education</span>
           <div class="c-name">Marcelle Grair</div>
-          <a class="c-email" href="mailto:mgrair@seiu509.org">mgrair@seiu509.org</a>
+          <a class="c-email" href="mailto:mgrair@union.org">mgrair@union.org</a>
         </div>
         <div class="card t3" style="text-align:center;">
           <span class="c-badge t3">Family Child Care</span>
           <div class="c-name">Alejandra Tejeda</div>
-          <a class="c-email-u" href="mailto:atejeda@seiu509.org">atejeda@seiu509.org</a>
+          <a class="c-email-u" href="mailto:atejeda@union.org">atejeda@union.org</a>
         </div>
       </div>
     </div>
@@ -1150,16 +1150,16 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
   <div class="chapter-row">
 
-    <!-- ─── MASSABILITY (always visible, all sub-sections collapsed by default) ─── -->
+    <!-- ─── AGENCY (always visible, all sub-sections collapsed by default) ─── -->
     <div class="chapter-branch" data-expand="true" style="max-width:none;">
-      <div class="card tc ch-card" id="massability-card" >
-        <span class="c-badge tc">MassAbility</span>
-        <div style="font-size:0.52rem;color:var(--gold);margin:2px 0;letter-spacing:0.03em;">383 members · 93% density · DDS ≈ 149 of 383 (39%)</div>
+      <div class="card tc ch-card" id="agency-card" >
+        <span class="c-badge tc">Agency</span>
+        <div style="font-size:0.52rem;color:var(--gold);margin:2px 0;letter-spacing:0.03em;">383 members · 93% density</div>
         <div class="c-role">Chapter President</div>
         <div class="c-name">Heidi Freeman</div>
         
-        <a class="c-email" href="mailto:heidi.seiu509@gmail.com">heidi.seiu509@gmail.com</a>
-        <a class="c-email" href="mailto:mrc@seiu509.org" style="margin-top:2px;">mrc@seiu509.org</a>
+        <a class="c-email" href="mailto:heidi.union@gmail.com">heidi.union@gmail.com</a>
+        <a class="c-email" href="mailto:mrc@union.org" style="margin-top:2px;">mrc@union.org</a>
       </div>
       <div class="ch-vline"></div>
       <!-- Two columns: Executive Board | Stewards -->
@@ -1180,7 +1180,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           </div>
           <div class="sl-head">Officers</div>
           <div class="sl-item"><div class="officer-label">Sec. of Grievances</div>LaTonia Daigle
-            <span class="contact"><a href="mailto:lmdaigle.seiu509@gmail.com">lmdaigle.seiu509@gmail.com</a></span>
+            <span class="contact"><a href="mailto:lmdaigle.union@gmail.com">lmdaigle.union@gmail.com</a></span>
           </div>
           <div class="sl-item"><div class="officer-label">Recording Secretary</div>Aishea Henry
             <span class="contact"><a href="mailto:aisheahenry@gmail.com">aisheahenry@gmail.com</a></span>
@@ -1207,7 +1207,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div class="sl-item">Western (2) — Kwabena Tweneboa<span class="contact"><a href="mailto:kwabenaobom@gmail.com">kwabenaobom@gmail.com</a></span></div>
           </div>
 
-          <div class="sl-head">CEB DDS</div>
+          <div class="sl-head">CEB</div>
 
           <div class="sl-item">Worcester — Christa DaSilva<span class="contact"><a href="mailto:christarenee419@aol.com">christarenee419@aol.com</a></span></div>
           <div class="sl-item">At-Large (1) — Julie Pini<span class="contact"><a href="mailto:juliepini@ymail.com">juliepini@ymail.com</a></span></div>
@@ -1230,7 +1230,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <div class="staff-list" style="width:190px;">
           <div class="sl-title">Stewards</div>
 
-          <div class="sl-head">DDS</div>
+          <div class="sl-head">Agency</div>
           <div class="sl-item">Janel Aubry<span class="contact"><a href="mailto:janelaubry@gmail.com">janelaubry@gmail.com</a></span></div>
           <div class="sl-item">Jean Voltaire<span class="contact"><a href="tel:7813389382">(781) 338-9382</a><a href="mailto:jvoltaire1@yahoo.com">jvoltaire1@yahoo.com</a></span></div>
           <div class="sl-item">Wardis Vizcaino<span class="contact"><a href="tel:6177041478">(617) 704-1478</a><a href="mailto:wardis@pm.me">wardis@pm.me</a></span></div>
@@ -1275,7 +1275,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           </div>
           <div class="sl-head" id="ma-advisor-head">Chapter Advisor</div>
           <div class="sl-item org-name" id="ma-advisor-item">Jerry Levinsky
-            <span class="contact"><a href="mailto:jlevinsky@seiu509.org">jlevinsky@seiu509.org</a></span>
+            <span class="contact"><a href="mailto:jlevinsky@union.org">jlevinsky@union.org</a></span>
           </div>
           <div class="sl-head sl-head-flex">
             Internal Organizers
@@ -1311,7 +1311,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">89 members · 89% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Scott Rogers</div>
-            <a class="c-email" href="mailto:ist@seiu509.org">ist@seiu509.org</a>
+            <a class="c-email" href="mailto:ist@union.org">ist@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1346,7 +1346,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">144 members · 99% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Fernando Lazu</div>
-            <a class="c-email" href="mailto:eec@seiu509.org">eec@seiu509.org</a>
+            <a class="c-email" href="mailto:eec@union.org">eec@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1375,7 +1375,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">94 members · 93% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Bernie Noel</div>
-            <a class="c-email" href="mailto:dph@seiu509.org">dph@seiu509.org</a>
+            <a class="c-email" href="mailto:dph@union.org">dph@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1426,7 +1426,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">320 members · 89% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Pamela Thomas</div>
-            <a class="c-email" href="mailto:masshealth@seiu509.org">masshealth@seiu509.org</a>
+            <a class="c-email" href="mailto:masshealth@union.org">masshealth@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1476,7 +1476,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">265 members · 97% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Nancy Labrie</div>
-            <a class="c-email" href="mailto:doe@seiu509.org">doe@seiu509.org</a>
+            <a class="c-email" href="mailto:doe@union.org">doe@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1500,7 +1500,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">366 members · 93% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Amy Meinert</div>
-            <a class="c-email" href="mailto:dor@seiu509.org">dor@seiu509.org</a>
+            <a class="c-email" href="mailto:dor@union.org">dor@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1523,7 +1523,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">761 members · 92% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Jean McClure</div>
-            <a class="c-email" href="mailto:dmh@seiu509.org">dmh@seiu509.org</a>
+            <a class="c-email" href="mailto:dmh@union.org">dmh@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1540,15 +1540,15 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           </div>
         </div>
 
-        <!-- DDS -->
+        <!-- Chapter -->
         <div class="chapter-branch">
           <div class="card tc ch-card">
 
-            <span class="c-badge tc">DDS</span>
+            <span class="c-badge tc">Chapter</span>
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">997 members · 93% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Tina Simmerman</div>
-            <a class="c-email" href="mailto:dds@seiu509.org">dds@seiu509.org</a>
+            <a class="c-email" href="mailto:dds@union.org">dds@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1572,7 +1572,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">1,503 members · 90% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Antionette Hughes</div>
-            <a class="c-email" href="mailto:dta@seiu509.org">dta@seiu509.org</a>
+            <a class="c-email" href="mailto:dta@union.org">dta@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1595,7 +1595,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">2,968 members · 90% density</div>
             <div class="c-role">Chapter President</div>
             <div class="c-name">Katy Scammell</div>
-            <a class="c-email" href="mailto:dcf@seiu509.org">dcf@seiu509.org</a>
+            <a class="c-email" href="mailto:dcf@union.org">dcf@union.org</a>
           </div>
           <div class="ch-vline"></div>
           <div class="staff-list collapsed">
@@ -1628,7 +1628,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">657 members · 94% density</div>
           <div class="c-role">Chapter President</div>
           <div class="c-name">Kim Pepin</div>
-          <a class="c-email" href="mailto:elders@seiu509.org">elders@seiu509.org</a>
+          <a class="c-email" href="mailto:elders@union.org">elders@union.org</a>
         </div>
         <div class="ch-vline"></div>
         <div class="staff-list collapsed">
@@ -1651,7 +1651,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           <div style="font-size:0.52rem;color:var(--gold);margin:2px 0;letter-spacing:0.03em;">3,540 members · 53% density</div>
           <div class="c-role">Chapter President</div>
           <div class="c-name">Elizabeth Lemons</div>
-          <a class="c-email" href="mailto:elemons509@gmail.com">elemons509@gmail.com</a>
+          <a class="c-email" href="mailto:elemons.union@gmail.com">elemons.union@gmail.com</a>
         </div>
         <div class="ch-vline"></div>
         <div class="staff-list collapsed">
@@ -1674,7 +1674,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">1,407 members · 40% density</div>
           <div class="c-role">Chapter President</div>
           <div class="c-name">Celina Reyes</div>
-          <a class="c-email" href="mailto:fcc@seiu509.org">fcc@seiu509.org</a>
+          <a class="c-email" href="mailto:fcc@union.org">fcc@union.org</a>
         </div>
         <div class="ch-vline"></div>
         <div class="staff-list collapsed">
@@ -1696,7 +1696,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             <div style="font-size:0.5rem;color:var(--gold);margin:2px 0 1px;letter-spacing:0.02em;">6,807 members · 91% density</div>
           <div class="c-role">Chapter President</div>
           <div class="c-name">Greg Zeltt</div>
-          <a class="c-email" href="mailto:pshs_chapter@seiu509.org">pshs_chapter@seiu509.org</a>
+          <a class="c-email" href="mailto:pshs_chapter@union.org">pshs_chapter@union.org</a>
         </div>
         <div class="ch-vline"></div>
         <div class="staff-list collapsed">
@@ -1838,7 +1838,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <li>Deposit funds in bank in name of Local Union; co-sign with President</li>
         <li>Keep all membership records, application cards, admitted/suspended/expelled records</li>
         <li>Present annually a proposed detailed line-item budget including Chapter Budgets</li>
-        <li>Forward to SEIU International copies of annual reports and financial statements</li>
+        <li>Forward to International Union copies of annual reports and financial statements</li>
       </ul>
       <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>How to run:</strong> Same as President — nominated at October General Membership Meeting, 6 months good standing, secret ballot of entire Local membership.</div>
       <div class="duty-src">Source: Constitution Art. VIII §2</div>
@@ -2153,13 +2153,13 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
       <div class="c-role" style="margin-top:4px;">External Organizer</div>
       <div class="c-name">Duties &amp; Responsibilities</div>
       <ul class="duty-list">
-        <li>Organize new workplaces and bargaining units into Local 509</li>
+        <li>Organize new workplaces and bargaining units into the Local</li>
         <li>Lead new member campaigns, card drives, and election efforts</li>
         <li>Community outreach, coalition building, and public campaigns</li>
         <li>Reports to Director of External Organizing</li>
       </ul>
       <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> Hired by the President with JEB confirmation. Focused on growth — bringing new workers into the union.</div>
-      <div class="duty-src">Source: Union Job Descriptions; seiu509.org</div>
+      <div class="duty-src">Source: Union Job Descriptions</div>
     </div>
 
     <!-- DIRECTORS & COORDINATORS -->
@@ -2173,7 +2173,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <li>Promotions from organizer ranks subject to JEB confirmation</li>
       </ul>
       <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> Hired/promoted by the President with JEB confirmation. Career progression typically: Organizer → Lead Organizer → Coordinator → Director.</div>
-      <div class="duty-src">Source: Constitution Art. VIII §1; 509 Org Chart</div>
+      <div class="duty-src">Source: Constitution Art. VIII §1; Org Chart</div>
     </div>
 
     <!-- MARC (MEMBER ASSISTANCE RESOURCE CENTER) -->
@@ -2185,7 +2185,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <li>Centralized support for grievances, arbitrations, and complex legal/contractual issues</li>
         <li>Work with stewards and chapter officers on difficult cases across all chapters</li>
         <li>Provide research, legal analysis, and representation support</li>
-        <li>Accessible via <strong>(800) 632-8079</strong> or <a href="mailto:marc@seiu509.org" style="color:var(--blue);">marc@seiu509.org</a></li>
+        <li>Accessible via <strong>(800) 632-8079</strong> or <a href="mailto:marc@union.org" style="color:var(--blue);">marc@union.org</a></li>
       </ul>
       <div style="font-size:0.55rem;color:var(--teal);margin-top:4px;"><strong>Not elected.</strong> MARC staff hired by President with JEB confirmation. Typically senior organizers or specialists with deep grievance/arbitration experience.</div>
       <div class="duty-src">Source: Chapter Advisors &amp; Internal Organizers PDF</div>
@@ -2487,9 +2487,9 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           <tr><td style="padding:4px 8px;color:var(--txt);">Trenton Reich</td><td style="padding:4px 8px;">Internal Organizer</td><td style="padding:4px 8px;text-align:right;">$112,194</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">James Gander</td><td style="padding:4px 8px;">Internal Organizer</td><td style="padding:4px 8px;text-align:right;">$111,659</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Lorelei Kluever</td><td style="padding:4px 8px;">Private Sector Lead Org</td><td style="padding:4px 8px;text-align:right;">$107,465</td></tr>
-          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Jerrold Levinsky</td><td style="padding:4px 8px;">Internal Organizer <span style="color:var(--gold);font-size:0.52rem;">★ MassAbility Advisor</span></td><td style="padding:4px 8px;text-align:right;">$101,323</td></tr>
+          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Jerrold Levinsky</td><td style="padding:4px 8px;">Internal Organizer <span style="color:var(--gold);font-size:0.52rem;">★ Agency Advisor</span></td><td style="padding:4px 8px;text-align:right;">$101,323</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Courtney Kenney</td><td style="padding:4px 8px;">Internal Organizer</td><td style="padding:4px 8px;text-align:right;">$99,265</td></tr>
-          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);font-weight:700;">Marangely Maldonado</td><td style="padding:4px 8px;">Internal Organizer <span style="color:var(--gold);font-size:0.52rem;">★ MassAbility ("Mara")</span></td><td style="padding:4px 8px;text-align:right;">$96,634</td></tr>
+          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);font-weight:700;">Marangely Maldonado</td><td style="padding:4px 8px;">Internal Organizer <span style="color:var(--gold);font-size:0.52rem;">★ Agency ("Mara")</span></td><td style="padding:4px 8px;text-align:right;">$96,634</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Anne Balay</td><td style="padding:4px 8px;">Internal Organizer</td><td style="padding:4px 8px;text-align:right;">$93,671</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Godfrey Mpanga</td><td style="padding:4px 8px;">Internal Organizer</td><td style="padding:4px 8px;text-align:right;">$93,632</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Lynne Wyckoff</td><td style="padding:4px 8px;">Internal Organizer</td><td style="padding:4px 8px;text-align:right;">$92,605</td></tr>
@@ -2583,7 +2583,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Lindsey Duchac</td><td style="padding:4px 8px;">External Organizer</td><td style="padding:4px 8px;text-align:right;">$54,846</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Lisa Dunker</td><td style="padding:4px 8px;">External Organizer</td><td style="padding:4px 8px;text-align:right;">$39,440</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Miles Meth</td><td style="padding:4px 8px;">External Organizer</td><td style="padding:4px 8px;text-align:right;">$22,951</td></tr>
-          <tr><td style="padding:4px 8px;color:var(--txt);">Khadeejah Ahmad</td><td style="padding:4px 8px;">Internal Organizer <span style="color:var(--gold);font-size:0.52rem;">★ MassAbility</span> <span style="color:var(--dim);font-size:0.48rem;">(partial yr)</span></td><td style="padding:4px 8px;text-align:right;">$28,287</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--txt);">Khadeejah Ahmad</td><td style="padding:4px 8px;">Internal Organizer <span style="color:var(--gold);font-size:0.52rem;">★ Agency</span> <span style="color:var(--dim);font-size:0.48rem;">(partial yr)</span></td><td style="padding:4px 8px;text-align:right;">$28,287</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Anna Meier</td><td style="padding:4px 8px;">Internal Organizer <span style="color:var(--dim);font-size:0.48rem;">(partial yr)</span></td><td style="padding:4px 8px;text-align:right;">$26,388</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Victor Yang</td><td style="padding:4px 8px;">Director of Field Services <span style="color:var(--dim);font-size:0.48rem;">(partial yr)</span></td><td style="padding:4px 8px;text-align:right;">$40,044</td></tr>
         </tbody>
@@ -2608,10 +2608,10 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           <tr><td style="padding:4px 8px;color:var(--txt);">Jean McClure</td><td style="padding:4px 8px;">DMH Chapter President</td><td style="padding:4px 8px;text-align:right;">$6,002</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Scott Rogers</td><td style="padding:4px 8px;">IST Chapter President</td><td style="padding:4px 8px;text-align:right;">$5,928</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Joanna Laghetto</td><td style="padding:4px 8px;">DOE JEB Chapter President</td><td style="padding:4px 8px;text-align:right;">$5,238</td></tr>
-          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Tina Simmerman</td><td style="padding:4px 8px;">DDS JEB Chapter President</td><td style="padding:4px 8px;text-align:right;">$5,068</td></tr>
+          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Tina Simmerman</td><td style="padding:4px 8px;">Chapter President</td><td style="padding:4px 8px;text-align:right;">$5,068</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Amy Meinert</td><td style="padding:4px 8px;">DOR Chapter President</td><td style="padding:4px 8px;text-align:right;">$4,943</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Elizabeth Lemons</td><td style="padding:4px 8px;">Higher Ed Chapter President</td><td style="padding:4px 8px;text-align:right;">$4,762</td></tr>
-          <tr><td style="padding:4px 8px;color:var(--txt);font-weight:700;">Heidi Freeman</td><td style="padding:4px 8px;">MRC Chapter President <span style="color:var(--gold);font-size:0.52rem;">★ MassAbility</span></td><td style="padding:4px 8px;text-align:right;">$4,701</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--txt);font-weight:700;">Heidi Freeman</td><td style="padding:4px 8px;">MRC Chapter President <span style="color:var(--gold);font-size:0.52rem;">★ Agency</span></td><td style="padding:4px 8px;text-align:right;">$4,701</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Megan Dailey</td><td style="padding:4px 8px;">CCJ Chapter President</td><td style="padding:4px 8px;text-align:right;">$4,091</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Christopher Baratz</td><td style="padding:4px 8px;">MassHealth Chapter President</td><td style="padding:4px 8px;text-align:right;">$3,509</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Kimberly Pepin</td><td style="padding:4px 8px;">Elder Services Chapter President</td><td style="padding:4px 8px;text-align:right;">$3,200</td></tr>
@@ -2626,9 +2626,9 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           <tr><td style="padding:4px 8px;color:var(--txt);">Nicole Peterson</td><td style="padding:4px 8px;">JEB Member</td><td style="padding:4px 8px;text-align:right;">$87,790</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Amy Banelis</td><td style="padding:4px 8px;">PSHS JEB Member</td><td style="padding:4px 8px;text-align:right;">$50,679</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Sarah Lupish</td><td style="padding:4px 8px;">Higher Ed JEB Member</td><td style="padding:4px 8px;text-align:right;">$42,577</td></tr>
-          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Denisse Martinez-Pena</td><td style="padding:4px 8px;">MRC JEB Member <span style="color:var(--gold);font-size:0.52rem;">★ MassAbility</span></td><td style="padding:4px 8px;text-align:right;">$17,814</td></tr>
+          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Denisse Martinez-Pena</td><td style="padding:4px 8px;">MRC JEB Member <span style="color:var(--gold);font-size:0.52rem;">★ Agency</span></td><td style="padding:4px 8px;text-align:right;">$17,814</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Kara Goodier</td><td style="padding:4px 8px;">JEB Recording Secretary <span style="color:var(--dim);font-size:0.48rem;">→ now Treasurer</span></td><td style="padding:4px 8px;text-align:right;">$15,331</td></tr>
-          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Christopher Germaine</td><td style="padding:4px 8px;">DDS JEB Member/VP <span style="color:var(--gold);font-size:0.52rem;">★ DDS</span></td><td style="padding:4px 8px;text-align:right;">$5,416</td></tr>
+          <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Christopher Germaine</td><td style="padding:4px 8px;">JEB Member/VP</td><td style="padding:4px 8px;text-align:right;">$5,416</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Pamela Thomas</td><td style="padding:4px 8px;">MassHealth Regional VP</td><td style="padding:4px 8px;text-align:right;">$3,501</td></tr>
           <tr style="background:var(--surf);"><td style="padding:4px 8px;color:var(--txt);">Marianne Walles</td><td style="padding:4px 8px;">DFC Regional VP</td><td style="padding:4px 8px;text-align:right;">$2,681</td></tr>
           <tr><td style="padding:4px 8px;color:var(--txt);">Carlos Morel</td><td style="padding:4px 8px;">FCC JEB Member</td><td style="padding:4px 8px;text-align:right;">$1,800</td></tr>
@@ -2680,7 +2680,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
     <!-- FOLEY -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
       <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">David Foley — DOR JEB Member → President</div>
-      <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">10 years at Local 509 · $533 → $135,441 · Chapter officer to top elected leader</div>
+      <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">10 years at the Local · $533 → $135,441 · Chapter officer to top elected leader</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
           <tr style="background:var(--surf);"><td style="padding:2px 6px;">2015</td><td style="padding:2px 6px;">DOR JEB Member</td><td style="padding:2px 6px;text-align:right;">$533</td></tr>
@@ -2694,7 +2694,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
     <!-- GRAIR -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--teal);">
       <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--teal);">Marcelle Grair — Community Liaison → Chief of Staff</div>
-      <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">10 years at Local 509 · $19,837 → $123,457 · Rose through 4 distinct roles</div>
+      <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">10 years at the Local · $19,837 → $123,457 · Rose through 4 distinct roles</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
           <tr style="background:var(--surf);"><td style="padding:2px 6px;">2015–2018</td><td style="padding:2px 6px;">Community/Advocate Liaison</td><td style="padding:2px 6px;text-align:right;">$19,837–$82,919</td></tr>
@@ -2738,13 +2738,13 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
       </table>
     </div>
 
-    <!-- MASSABILITY PATHS -->
-    <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--gold);margin:18px 0 4px;">★ MassAbility-Connected Career Paths</div>
-    <div style="font-size:0.52rem;color:var(--dim);margin-bottom:10px;">MassAbility chapter: 383 members · 93% density · DDS ≈ 149 of 383 (39% of chapter)</div>
+    <!-- AGENCY PATHS -->
+    <div style="font-family:var(--ff-disp);font-size:0.9rem;color:var(--gold);margin:18px 0 4px;">★ Agency Career Paths</div>
+    <div style="font-size:0.52rem;color:var(--dim);margin-bottom:10px;">Agency chapter: 383 members · 93% density</div>
 
     <!-- FREEMAN -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
-      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Heidi Freeman — MRC JEB → Chapter President <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility</span></div>
+      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Heidi Freeman — MRC JEB → Chapter President <span style="font-size:0.55rem;color:var(--dim);">★ Agency</span></div>
       <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2019–2024 · $0 → $4,701 · Volunteer JEB member → elected chapter leader</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
@@ -2757,7 +2757,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
     <!-- GOODIER -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
-      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Kara Goodier — JEB Rec Sec/MRC JEB → Treasurer <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility connection</span></div>
+      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Kara Goodier — JEB Rec Sec/MRC JEB → Treasurer <span style="font-size:0.55rem;color:var(--dim);">★ Agency connection</span></div>
       <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2019–present · $8,622 → $15,331 → now Treasurer · Dual MRC JEB + JEB Rec Sec role</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
@@ -2770,7 +2770,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
     <!-- MARTINEZ-PENA -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
-      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Denisse Martinez-Pena — MRC JEB Member <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility</span></div>
+      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Denisse Martinez-Pena — MRC JEB Member <span style="font-size:0.55rem;color:var(--dim);">★ Agency</span></div>
       <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2021–2024 · $0 → $17,814 · Increasing engagement year-over-year</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
@@ -2783,7 +2783,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
     <!-- MALDONADO -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
-      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Marangely "Mara" Maldonado — Temp IO → IO <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility</span></div>
+      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Marangely "Mara" Maldonado — Temp IO → IO <span style="font-size:0.55rem;color:var(--dim);">★ Agency</span></div>
       <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2021–2024 · $42,587 → $96,634 · Converted from temporary to permanent organizer</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
@@ -2796,8 +2796,8 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
     <!-- LEVINSKY -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--gold);">
-      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Jerrold Levinsky — 14-Year Field Veteran <span style="font-size:0.55rem;color:var(--dim);">★ MassAbility Advisor</span></div>
-      <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2011–2024 · $55,404 → $101,323 · Public &amp; Private sector, now MassAbility advisor</div>
+      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--gold);">Jerrold Levinsky — 14-Year Field Veteran <span style="font-size:0.55rem;color:var(--dim);">★ Agency Advisor</span></div>
+      <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2011–2024 · $55,404 → $101,323 · Public &amp; Private sector, now agency advisor</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
           <tr style="background:var(--surf);"><td style="padding:2px 6px;">2011–2015</td><td style="padding:2px 6px;">Field Rep</td><td style="padding:2px 6px;text-align:right;">$55,404–$81,596</td></tr>
@@ -2826,11 +2826,11 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
     <!-- ARTHUR -->
     <div class="card desc" style="margin-bottom:10px;border-left:3px solid var(--teal);">
-      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--teal);">Tara Arthur — DDS JEB Member → Internal Organizer</div>
+      <div style="font-family:var(--ff-disp);font-size:0.78rem;color:var(--teal);">Tara Arthur — JEB Member → Internal Organizer</div>
       <div style="font-size:0.58rem;color:var(--dim);margin:4px 0 8px;">2017–2024 · $1,467 → $90,433 · Chapter volunteer to full-time staff</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
         <tbody style="color:var(--mute);">
-          <tr style="background:var(--surf);"><td style="padding:2px 6px;">2017–2018</td><td style="padding:2px 6px;">DDS JEB Member</td><td style="padding:2px 6px;text-align:right;">$1,467–$27,209</td></tr>
+          <tr style="background:var(--surf);"><td style="padding:2px 6px;">2017–2018</td><td style="padding:2px 6px;">JEB Member</td><td style="padding:2px 6px;text-align:right;">$1,467–$27,209</td></tr>
           <tr style="font-weight:700;"><td style="padding:2px 6px;">2019–2024</td><td style="padding:2px 6px;color:var(--teal);">Internal Organizer</td><td style="padding:2px 6px;text-align:right;">$83,895–$90,433</td></tr>
         </tbody>
       </table>
@@ -2944,12 +2944,12 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <tbody style="color:var(--mute);">
           <tr style="background:var(--surf);"><td style="padding:5px 10px;">Children &amp; Families (DCF)</td><td style="padding:5px 10px;color:var(--txt);">Mike Foster</td></tr>
           <tr><td style="padding:5px 10px;">Transitional Assistance (DTA) + Housing (DHCD)</td><td style="padding:5px 10px;color:var(--txt);">Jennifer Doe</td></tr>
-          <tr style="background:var(--surf);"><td style="padding:5px 10px;">Developmental Services (DDS)</td><td style="padding:5px 10px;color:var(--txt);">Mike Foster</td></tr>
+          <tr style="background:var(--surf);"><td style="padding:5px 10px;">Developmental Services</td><td style="padding:5px 10px;color:var(--txt);">Mike Foster</td></tr>
           <tr><td style="padding:5px 10px;">Mental Health (DMH)</td><td style="padding:5px 10px;color:var(--txt);">Mike Foster</td></tr>
           <tr style="background:var(--surf);"><td style="padding:5px 10px;">MassHealth</td><td style="padding:5px 10px;color:var(--txt);">Jennifer Doe</td></tr>
           <tr><td style="padding:5px 10px;">Public Safety (DOC, DYS, Parole)</td><td style="padding:5px 10px;color:var(--txt);">Mark Belzowski</td></tr>
           <tr style="background:var(--surf);"><td style="padding:5px 10px;">Institutional School Teachers (DOC/DESE ISTs)</td><td style="padding:5px 10px;color:var(--txt);">Mark Belzowski</td></tr>
-          <tr style="background:rgba(240,192,64,0.08);border-left:3px solid var(--gold);"><td style="padding:5px 10px;"><strong style="color:var(--gold);">MassAbility (formerly MRC)</strong></td><td style="padding:5px 10px;color:var(--gold);font-weight:700;">Jerry Levinsky</td></tr>
+          <tr style="background:rgba(240,192,64,0.08);border-left:3px solid var(--gold);"><td style="padding:5px 10px;"><strong style="color:var(--gold);">Agency (formerly MRC)</strong></td><td style="padding:5px 10px;color:var(--gold);font-weight:700;">Jerry Levinsky</td></tr>
           <tr style="background:var(--surf);"><td style="padding:5px 10px;">Commission for the Blind (MCB, MCDHH, DIA)</td><td style="padding:5px 10px;color:var(--txt);">Jerry Levinsky</td></tr>
           <tr><td style="padding:5px 10px;">Revenue / Child Support Enforcement</td><td style="padding:5px 10px;color:var(--txt);">Jennifer Doe &amp; Mark Belzowski</td></tr>
           <tr style="background:var(--surf);"><td style="padding:5px 10px;">Elementary &amp; Secondary Education (DESE)</td><td style="padding:5px 10px;color:var(--txt);">Khadeejah Ahmad</td></tr>
@@ -2959,9 +2959,9 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
       </table>
     </div>
 
-    <!-- MASSABILITY INTERNAL ORGANIZERS — HIGHLIGHTED -->
+    <!-- AGENCY INTERNAL ORGANIZERS — HIGHLIGHTED -->
     <div style="margin-top:24px;background:rgba(240,192,64,0.04);border:1px solid rgba(240,192,64,0.15);border-radius:8px;padding:16px;">
-      <div style="font-family:var(--ff-disp);font-size:1rem;color:var(--gold);margin-bottom:10px;">⭐ MassAbility — Internal Organizers by Office</div>
+      <div style="font-family:var(--ff-disp);font-size:1rem;color:var(--gold);margin-bottom:10px;">⭐ Agency — Internal Organizers by Office</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">
         <div style="background:var(--surf);border-radius:6px;padding:10px;">
           <div style="color:var(--teal);font-weight:700;font-size:0.72rem;margin-bottom:4px;">Jennifer Doe</div>
@@ -3020,9 +3020,9 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
             </div>
           </div>
 
-          <!-- DDS -->
+          <!-- Developmental Services -->
           <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:10px;">
-            <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Developmental Services (DDS)</div>
+            <div style="color:var(--blue);font-weight:700;font-size:0.72rem;margin-bottom:6px;">Developmental Services</div>
             <div style="font-size:0.6rem;color:var(--mute);line-height:1.7;">
               NE (Hogan Ctr, Lowell, Lawrence, Beverly, Wakefield, Acton + res.) → <span style="color:var(--teal);">Mark Belzowski</span><br>
               SE (Carver, Taunton, Fall River, Brockton, Hyannis, NB, Plymouth, Braintree + res.) → <span style="color:var(--teal);">Khadeejah Ahmad</span><br>
@@ -3129,7 +3129,7 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
       <div>📞 Main: <a href="tel:7748437509">774-843-7509</a></div>
       <div>📠 Fax: 508-485-8529</div>
       <div>📞 MARC: <a href="tel:8006328079">800-632-8079</a></div>
-      <div class="fc-em">✉ <a href="mailto:info@seiu509.org">info@seiu509.org</a></div>
+      <div class="fc-em">✉ <a href="mailto:info@union.org">info@union.org</a></div>
     </div>
   </div>
 
@@ -3147,12 +3147,12 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
     <div class="fc-label">Media Inquiries</div>
     <div class="fc-addr" style="font-family:var(--ff-disp);font-size:0.9rem;">Natalia Berthet Garcia</div>
     <div class="fc-line" style="color:var(--mute);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:7px;">Communications Director</div>
-    <div class="fc-line fc-em"><a href="mailto:nberthetgarcia@seiu509.org">nberthetgarcia@seiu509.org</a></div>
+    <div class="fc-line fc-em"><a href="mailto:nberthetgarcia@union.org">nberthetgarcia@union.org</a></div>
   </div>
 
 </div>
 
-<footer>Local 509 &mdash; Main Internal Breakout Chart &mdash; Personal Use Only</footer>
+<footer>Local Union &mdash; Main Internal Breakout Chart &mdash; Personal Use Only</footer>
 
 </div><!-- /page -->
 
@@ -3185,7 +3185,7 @@ window.repToggle = function(id, btn) {
   btn.setAttribute('aria-expanded', String(!open));
 };
 
-// MassAbility sub-section toggle
+// Agency sub-section toggle
 window.maToggle = function(id, showLabel, hideLabel, btn) {
   const el = document.getElementById(id);
   if (!el) return;

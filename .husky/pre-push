@@ -1,12 +1,23 @@
 #!/bin/sh
 # Pre-push hook
-# Runs before any git push to catch OAuth scope changes that require
-# web app re-authorization (v4.25.8 bug class prevention).
+# 1. OAuth scope change detection (all branches)
+# 2. Full test suite gate (Main and staging only)
+
+# Detect if pushing to a protected branch
+PROTECTED_PUSH=false
+while read local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/Main|refs/heads/staging)
+      PROTECTED_PUSH=true
+      PROTECTED_BRANCH=$(echo "$remote_ref" | sed 's|refs/heads/||')
+      ;;
+  esac
+done
 
 echo "Running pre-push checks..."
 echo ""
 
-echo "[1/1] Checking for OAuth scope changes..."
+echo "[1/2] Checking for OAuth scope changes..."
 node scripts/check-scope-change.js
 
 if [ $? -ne 0 ]; then
@@ -14,6 +25,23 @@ if [ $? -ne 0 ]; then
   echo "Push blocked. See above for required action."
   echo "Use 'git push --no-verify' to bypass if you have already re-authorized."
   exit 1
+fi
+
+if [ "$PROTECTED_PUSH" = true ]; then
+  echo ""
+  echo "[2/2] Pushing to $PROTECTED_BRANCH — running full test suite..."
+  echo ""
+  npm run test:unit
+
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "Push to $PROTECTED_BRANCH blocked: unit tests failed."
+    echo "Fix failing tests before pushing to $PROTECTED_BRANCH."
+    exit 1
+  fi
+else
+  echo ""
+  echo "[2/2] Feature branch push — skipping full test suite."
 fi
 
 echo ""

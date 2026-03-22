@@ -1,7 +1,7 @@
 {
-  "name": "solidbase",
-  "version": "4.34.0",
-  "description": "SolidBase — Built for the collective.",
+  "name": "union-steward-dashboard",
+  "version": "4.34.1",
+  "description": "Modular Union Steward Dashboard for Google Sheets",
   "main": "build.js",
   "scripts": {
     "build": "node build.js",
@@ -10,7 +10,7 @@
     "lint:fix": "eslint \"src/**/*.gs\" --fix",
     "test": "npm run lint && npm run build && jest --verbose",
     "test:unit": "jest --verbose",
-    "test:webapp": "jest test/19_WebDashAuth.test.js test/20_WebDashConfigReader.test.js test/21_WebDashDataService.test.js test/22_WebDashApp.test.js test/23_PortalSheets.test.js test/24_WeeklyQuestions.test.js test/26_QAForum.test.js test/27_TimelineService.test.js test/28_FailsafeService.test.js test/29_Migrations.test.js test/auth-denial.test.js test/negative-paths.test.js --verbose",
+    "test:webapp": "jest test/19_WebDashAuth.test.js test/20_WebDashConfigReader.test.js test/21_WebDashDataService.test.js test/22_WebDashApp.test.js test/23_PortalSheets.test.js test/24_WeeklyQuestions.test.js test/25_WorkloadService.test.js test/26_QAForum.test.js test/27_TimelineService.test.js test/28_FailsafeService.test.js test/29_Migrations.test.js test/auth-denial.test.js test/negative-paths.test.js --verbose",
     "coverage": "jest --coverage --verbose",
     "ci": "npm run clean && npm run lint && npm run build && npm run test:unit",
     "clean": "node build.js --clean",
@@ -19,12 +19,13 @@
     "deploy:dev": "npm run lint && npm run build && clasp push --force",
     "open": "clasp open",
     "prepare": "husky",
+    "sync-org-chart": "node scripts/sync-org-chart.js",
     "check:scopes": "node scripts/check-scope-change.js"
   },
   "keywords": [
     "google-apps-script",
     "google-sheets",
-    "solidbase",
+    "union",
     "grievance",
     "dashboard"
   ],

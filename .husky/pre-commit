@@ -15,16 +15,20 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Step 2: Build verification (validate-only: checks syntax without overwriting dist/)
+# Step 2: Rebuild dist/ with prod settings (ensures dist/ is always in sync)
+# TODO(human): Choose rebuild strategy for pre-commit hook
 echo ""
-echo "[2/3] Verifying build..."
-node build.js --validate-only > /dev/null 2>&1
+echo "[2/3] Rebuilding dist/..."
+node build.js --prod --minify > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
   echo ""
-  echo "Build failed. Run 'npm run build' to see details."
+  echo "Build failed. Run 'npm run build:prod' to see details."
   exit 1
 fi
+
+# Auto-stage rebuilt dist/ so the commit includes correct prod output
+git add dist/ > /dev/null 2>&1
 
 # Step 3: Deploy guards + SPA integrity (catches routing, auth, sheet, parity bugs)
 echo ""

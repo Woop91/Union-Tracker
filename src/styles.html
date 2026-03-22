@@ -2263,10 +2263,12 @@ button:focus-visible, [role="button"]:focus-visible {
 .wt-detail-btn:hover { background: var(--accentBg); }
 
 /* Sub-category modal overlay */
+[data-theme-mode="light"] { --overlay-bg: rgba(0,0,0,0.35); }
+[data-theme-mode="dark"]  { --overlay-bg: rgba(0,0,0,0.55); }
 .wt-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.55);
+  background: var(--overlay-bg, rgba(0,0,0,0.55));
   z-index: 200;
   display: flex;
   align-items: center;
@@ -3005,7 +3007,7 @@ button:focus-visible, [role="button"]:focus-visible {
   left: 0;
   right: 0;
   z-index: 999;
-  background: #ef4444;
+  background: var(--danger, #ef4444);
   color: #fff;
   text-align: center;
   padding: 6px 12px;

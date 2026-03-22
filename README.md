@@ -254,7 +254,7 @@ After that, you have **43 production `.gs` files + 8 `.html` files** and a clean
 - Multi-select dropdown editor for Grievance Log with checkbox UI
 
 ### Workload Tracker (v4.10.0)
-> **Note:** The Workload Tracker is not included in SolidBase. It is an org-specific feature available in the DDS-Dashboard source.
+> **Note:** The Workload Tracker is not included in SolidBase. It is an org-specific feature available in the upstream source.
 
 ### Resources Hub (v4.11.0)
 - Educational content hub with search, category pills, and expandable cards (`?page=resources`)

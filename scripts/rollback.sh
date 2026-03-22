@@ -6,7 +6,7 @@ set -euo pipefail
 SHA="${1:?Usage: rollback.sh <git-sha>}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-echo "=== SolidBase Rollback ==="
+echo "=== DDS Dashboard Rollback ==="
 echo "Target commit: $SHA"
 
 # Verify the SHA exists

@@ -12,6 +12,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// Optional source files that may not exist in all repo variants (e.g. SolidBase)
+const WS_EXISTS = fs.existsSync(path.resolve(__dirname, '..', 'src', '25_WorkloadService.gs'));
+
 require('./gas-mock');
 const { loadSources } = require('./load-source');
 
@@ -59,12 +62,13 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
+  WS_EXISTS && '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
   '29_Migrations.gs',
   '32_AdminSettings.gs'
-]);
+].filter(Boolean));
 
 // ============================================================================
 // A1: CROSS-FILE DEPENDENCY TESTS
@@ -201,10 +205,10 @@ describe('A1: Build order integrity', () => {
     '17_CorrelationEngine.gs', '19_WebDashAuth.gs',
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
-    '26_QAForum.gs', '27_TimelineService.gs',
+    WS_EXISTS && '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_Migrations.gs', '30_TestRunner.gs',
     '31_WebAppTests.gs', '32_AdminSettings.gs', 'DevMenu.gs'
-  ];
+  ].filter(Boolean);
 
   test('all source files in BUILD_ORDER exist on disk', () => {
     BUILD_ORDER.forEach(filename => {
@@ -458,7 +462,8 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-  ];
+    WS_EXISTS && '25_WorkloadService.gs',
+  ].filter(Boolean);
 
   webAppFiles.forEach(file => {
     test(`${file}: every getActiveSpreadsheet() call has a null guard`, () => {
@@ -996,13 +1001,14 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
+    WS_EXISTS && '25_WorkloadService.gs',
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
     '08c_FormsAndNotifications.gs',
     '10d_SyncAndMaintenance.gs',
     '12_Features.gs',
-  ];
+  ].filter(Boolean);
   const srcDir = path.resolve(__dirname, '..', 'src');
 
   lockFiles.forEach(file => {
@@ -1056,7 +1062,8 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-  ];
+    WS_EXISTS && '25_WorkloadService.gs',
+  ].filter(Boolean);
   const srcDir = path.resolve(__dirname, '..', 'src');
 
   // Extract named function bodies from a source string.

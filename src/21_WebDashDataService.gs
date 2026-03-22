@@ -1120,7 +1120,6 @@ var DataService = (function () {
 
       var last30Keys = [];
       for (var d = 0; d < 30; d++) last30Keys.push(_dateKey(d));
-      var last7Keys = last30Keys.slice(0, 7);
 
       // Collect all user sets per day, page views per day
       var allUsers30 = {};    // email -> count of distinct days
@@ -5623,20 +5622,6 @@ function dataGetEngagementStats(sessionToken) {
     } catch (_cl) { Logger.log('_cl: ' + (_cl.message || _cl)); }
 
     // ── Resource views (v4.32.1 — total clicks from _Resource_Click_Log) ────
-    // WHAT: Counts total rows in _Resource_Click_Log (each row = one resource
-    //   card expand event logged by dataLogResourceClick()).
-    // WHY TOTAL ROWS (not unique users): We want to measure overall engagement
-    //   volume, not just reach. A member viewing 5 resources is more engaged
-    //   than one who viewed 1. This matches weeklyQuestionVotes (also total rows).
-    // IF SHEET MISSING: _rows() returns [] → resourceDownloads stays 0.
-    //   The KPI card displays "0" — no error, just no data yet.
-    // IF THIS BREAKS: resourceDownloads = 0, KPI card shows "0". Non-destructive.
-    var resourceDownloads = 0;
-    try {
-      var rclRows = _rows(SHEETS.RESOURCE_CLICK_LOG || '_Resource_Click_Log');
-      resourceDownloads = rclRows.length;
-    } catch (_re) { Logger.log('_re: ' + (_re.message || _re)); }
-
     // ── Membership trends (last 6 months, by hire date) ─────────────────────
     var membershipTrends = [];
     try {
