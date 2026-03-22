@@ -114,6 +114,37 @@ function _stewardHeader(container, title, subtitle) {
 }
 
 // ═══════════════════════════════════════
+// MOBILE QUICK-ACCESS TOOLBAR (v4.39.0 — Feature 15)
+// ═══════════════════════════════════════
+
+/**
+ * Renders a horizontally-scrollable quick-action toolbar on mobile (<= 640px).
+ * Hidden on desktop. Uses el() for safe DOM construction.
+ * @param {HTMLElement} container - Parent container to append toolbar to.
+ */
+function _renderMobileQuickToolbar(container) {
+  if (window.innerWidth > 640) return; // Desktop: skip
+
+  var toolbar = el('div', { className: 'mobile-quick-toolbar' });
+
+  var actions = [
+    { icon: '\uD83D\uDD0D', label: 'Search', action: function() { _handleTabNav('steward', 'members'); } },
+    { icon: '\uD83D\uDCDE', label: 'Call', action: function() { _handleTabNav('steward', 'members'); } },
+    { icon: '\uD83D\uDCCB', label: 'New Case', action: function() { _handleTabNav('steward', 'cases'); } },
+    { icon: '\uD83D\uDCE2', label: 'Broadcast', action: function() { _handleTabNav('steward', 'broadcast'); } }
+  ];
+
+  actions.forEach(function(a) {
+    var btn = el('button', { className: 'mobile-quick-btn', onclick: a.action });
+    btn.appendChild(el('span', { className: 'quick-icon' }, a.icon));
+    btn.appendChild(el('span', {}, a.label));
+    toolbar.appendChild(btn);
+  });
+
+  container.appendChild(toolbar);
+}
+
+// ═══════════════════════════════════════
 // STEWARD FEEDBACK CARD (v4.32.0)
 // ═══════════════════════════════════════
 
@@ -172,10 +203,11 @@ function renderStewardDashboard(appContainer) {
   renderPageLayout(appContainer, 'steward', 'cases', function(container) {
     _stewardHeader(container, 'Cases', CURRENT_USER.name + ' \u00B7 ' + CURRENT_USER.unit);
 
-    // Welcome card placeholder — inserted before KPIs if first visit
-    var welcomeSlot = el('div');
-    container.appendChild(welcomeSlot);
-    _maybeShowWelcome(welcomeSlot, 'steward');
+    // v4.39.0 — Mobile quick-access toolbar (Feature 15)
+    _renderMobileQuickToolbar(container);
+
+    // Welcome card — localStorage-based, shows until user dismisses
+    _renderStewardWelcome(container);
 
     // KPIs — show org-wide fallback if steward has 0 assigned cases
     var kpis = AppState.kpis || {};
@@ -224,6 +256,44 @@ function renderStewardDashboard(appContainer) {
       ]);
     }
 
+    // Trend Alert Banner (v4.36.0)
+    var alertSlot = el('div');
+    container.appendChild(alertSlot);
+    serverCall().withSuccessHandler(function(alerts) {
+      if (!alerts || alerts.length === 0) return;
+      var alertCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '12px', border: '1px solid var(--warning, #eab308)', background: 'rgba(234, 179, 8, 0.05)' } });
+      alertCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--warning, #eab308)', marginBottom: '8px' } }, 'Trend Alerts (' + alerts.length + ')'));
+      alerts.forEach(function(alert) {
+        var row = el('div', { style: { padding: '8px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' } });
+        var info = el('div', { style: { flex: '1' } });
+        var severityColor = alert.severity === 'HIGH' ? 'var(--danger, #ef4444)' : alert.severity === 'CRITICAL' ? 'var(--danger, #ef4444)' : 'var(--warning, #eab308)';
+        info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, alert.title));
+        info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px', lineHeight: '1.4' } }, alert.message));
+        info.appendChild(el('span', { style: { display: 'inline-block', fontSize: '10px', fontWeight: '600', padding: '1px 6px', borderRadius: '8px', background: severityColor + '22', color: severityColor, marginTop: '4px' } }, alert.severity));
+        row.appendChild(info);
+        var actions = el('div', { style: { display: 'flex', gap: '4px', flexShrink: '0' } });
+        if (alert.status === 'Active') {
+          var ackBtn = el('button', { className: 'btn-sm btn-outline', style: { fontSize: '10px', padding: '3px 8px' }, onClick: function() {
+            serverCall().withSuccessHandler(function(res) {
+              if (res && res.success) { ackBtn.textContent = 'Acked'; ackBtn.disabled = true; ackBtn.style.color = 'var(--success, #22c55e)'; }
+            }).dataAcknowledgeTrendAlert(SESSION_TOKEN, alert.id);
+          } }, 'Ack');
+          actions.appendChild(ackBtn);
+        }
+        var resolveBtn = el('button', { className: 'btn-sm btn-outline', style: { fontSize: '10px', padding: '3px 8px' }, onClick: function() {
+          serverCall().withSuccessHandler(function(res) {
+            if (res && res.success) { row.style.opacity = '0.4'; resolveBtn.textContent = 'Resolved'; resolveBtn.disabled = true; }
+          }).dataResolveTrendAlert(SESSION_TOKEN, alert.id);
+        } }, 'Resolve');
+        actions.appendChild(resolveBtn);
+        row.appendChild(actions);
+        alertCard.appendChild(row);
+      });
+      alertSlot.appendChild(alertCard);
+    }).withFailureHandler(function() {
+      // Silent fail — alerts are non-critical
+    }).dataGetTrendAlerts(SESSION_TOKEN);
+
     // Grievance feedback summary (v4.32.0)
     var fbSlot = el('div');
     container.appendChild(fbSlot);
@@ -232,17 +302,13 @@ function renderStewardDashboard(appContainer) {
       _renderStewardFeedbackCard(fbSlot, fb);
     }).withFailureHandler(function() { /* non-critical */ }).dataGetStewardFeedbackSummary(SESSION_TOKEN);
 
-    // Finder panel (permanently open filter modal)
-    var finderSlot = el('div', { className: 'content' });
-    var caseListContainer = el('div', { className: 'content' });
-    _renderCasesFinderPanel(finderSlot, AppState.cases, function(filtered) {
-      renderCaseList(caseListContainer, filtered, true);
-    });
-    container.appendChild(finderSlot);
-
-    // Initial render with all cases
-    renderCaseList(caseListContainer, AppState.cases, true);
-    container.appendChild(caseListContainer);
+    // Sub-tabs: List (default) + Calendar (v4.34.0 — Feature 6)
+    var _st = createSubTabs([
+      { id: 'list', label: 'List', render: function(c) { _renderCasesListSubTab(c); } },
+      { id: 'calendar', label: 'Calendar', render: function(c) { _renderDeadlineCalendar(c); } }
+    ]);
+    container.appendChild(_st.bar);
+    container.appendChild(_st.content);
 
     // FAB — opens broadcast
     var fab = el('button', { className: 'fab', 'aria-label': 'Quick broadcast', onClick: function() { _handleTabNav('steward', 'broadcast'); } }, '\uD83D\uDCE2');
@@ -251,8 +317,331 @@ function renderStewardDashboard(appContainer) {
 }
 
 // ═══════════════════════════════════════
+// CASES LIST SUB-TAB (extracted for sub-tab pattern, v4.34.0)
+// ═══════════════════════════════════════
+
+/**
+ * Renders the case list sub-tab content (finder panel + case list).
+ * Extracted from renderStewardDashboard so it can live inside a sub-tab.
+ * @param {HTMLElement} target - Sub-tab content container
+ */
+function _renderCasesListSubTab(target) {
+  var finderSlot = el('div', { className: 'content' });
+  var caseListContainer = el('div', { className: 'content' });
+  _renderCasesFinderPanel(finderSlot, AppState.cases, function(filtered) {
+    renderCaseList(caseListContainer, filtered, true);
+  });
+  target.appendChild(finderSlot);
+
+  // Initial render with all cases
+  renderCaseList(caseListContainer, AppState.cases, true);
+  target.appendChild(caseListContainer);
+}
+
+// ═══════════════════════════════════════
+// DEADLINE CALENDAR VIEW (v4.34.0 — Feature 6)
+// ═══════════════════════════════════════
+
+/**
+ * Renders a month-view calendar showing case deadlines.
+ * Uses AppState.cases (already loaded) to plot deadline dots by color.
+ * @param {HTMLElement} container - Sub-tab content container
+ */
+function _renderDeadlineCalendar(container) {
+  var today = new Date();
+  var currentMonth = today.getMonth();
+  var currentYear = today.getFullYear();
+
+  var navBar = el('div', { className: 'calendar-nav' });
+  var monthLabel = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)' } });
+  var prevBtn = el('button', { className: 'btn btn-secondary', style: { padding: '4px 12px', fontSize: '14px' }, onclick: function() { changeMonth(-1); } }, '\u25C0');
+  var nextBtn = el('button', { className: 'btn btn-secondary', style: { padding: '4px 12px', fontSize: '14px' }, onclick: function() { changeMonth(1); } }, '\u25B6');
+  var todayBtn = el('button', { className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '12px', marginLeft: '8px' }, onclick: function() { currentMonth = today.getMonth(); currentYear = today.getFullYear(); renderMonth(); } }, 'Today');
+
+  var leftNav = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } });
+  leftNav.appendChild(prevBtn);
+  leftNav.appendChild(monthLabel);
+  leftNav.appendChild(todayBtn);
+  navBar.appendChild(leftNav);
+  navBar.appendChild(nextBtn);
+  container.appendChild(navBar);
+
+  var grid = el('div', { className: 'calendar-grid' });
+  container.appendChild(grid);
+
+  // Legend
+  var legend = el('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '8px', fontSize: '11px', color: 'var(--muted)' } });
+  var legendItems = [
+    { cls: 'overdue', label: 'Overdue' },
+    { cls: 'urgent', label: '\u22643 days' },
+    { cls: 'soon', label: '\u22647 days' },
+    { cls: 'safe', label: '>7 days' }
+  ];
+  legendItems.forEach(function(item) {
+    var lItem = el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } });
+    lItem.appendChild(el('span', { className: 'deadline-dot ' + item.cls }));
+    lItem.appendChild(el('span', {}, item.label));
+    legend.appendChild(lItem);
+  });
+  container.appendChild(legend);
+
+  function changeMonth(delta) {
+    currentMonth += delta;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderMonth();
+  }
+
+  /**
+   * Parses deadline from case data. Returns a Date or null.
+   * Handles both formatted date strings and deadlineDays offset.
+   */
+  function _parseDeadlineDate(c) {
+    if (c.deadline && c.deadline !== '\u2014' && c.deadline !== 'Overdue') {
+      var d = new Date(c.deadline);
+      if (!isNaN(d.getTime())) return d;
+    }
+    // Fallback: compute from deadlineDays relative to today
+    if (c.deadlineDays !== null && c.deadlineDays !== undefined) {
+      var computed = new Date();
+      computed.setDate(computed.getDate() + c.deadlineDays);
+      return computed;
+    }
+    return null;
+  }
+
+  function renderMonth() {
+    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    monthLabel.textContent = MONTHS[currentMonth] + ' ' + currentYear;
+
+    grid.innerHTML = '';
+
+    // Header row
+    DAYS.forEach(function(d) {
+      grid.appendChild(el('div', { className: 'calendar-header-cell' }, d));
+    });
+
+    // Compute month boundaries
+    var firstDay = new Date(currentYear, currentMonth, 1);
+    var lastDay = new Date(currentYear, currentMonth + 1, 0);
+    var startDayOfWeek = firstDay.getDay();
+    var daysInMonth = lastDay.getDate();
+
+    // Previous month fill
+    var prevMonthLast = new Date(currentYear, currentMonth, 0).getDate();
+
+    // Build deadline map: dateKey -> [{case, deadlineDays}]
+    var deadlineMap = {};
+    var cases = AppState.cases || [];
+    cases.forEach(function(c) {
+      var dlDate = _parseDeadlineDate(c);
+      if (!dlDate) return;
+      var key = dlDate.getFullYear() + '-' + (dlDate.getMonth() + 1) + '-' + dlDate.getDate();
+      if (!deadlineMap[key]) deadlineMap[key] = [];
+      deadlineMap[key].push(c);
+    });
+
+    // Total cells = startDayOfWeek + daysInMonth, rounded up to full weeks
+    var totalCells = startDayOfWeek + daysInMonth;
+    var rows = Math.ceil(totalCells / 7);
+    var totalGridCells = rows * 7;
+
+    for (var i = 0; i < totalGridCells; i++) {
+      var cell = el('div', { className: 'calendar-cell' });
+      var dateNum, isOtherMonth = false, cellDate;
+
+      if (i < startDayOfWeek) {
+        // Previous month
+        dateNum = prevMonthLast - startDayOfWeek + i + 1;
+        isOtherMonth = true;
+        cellDate = new Date(currentYear, currentMonth - 1, dateNum);
+      } else if (i >= startDayOfWeek + daysInMonth) {
+        // Next month
+        dateNum = i - startDayOfWeek - daysInMonth + 1;
+        isOtherMonth = true;
+        cellDate = new Date(currentYear, currentMonth + 1, dateNum);
+      } else {
+        // Current month
+        dateNum = i - startDayOfWeek + 1;
+        cellDate = new Date(currentYear, currentMonth, dateNum);
+      }
+
+      if (isOtherMonth) cell.className += ' other-month';
+
+      // Highlight today
+      if (cellDate.getFullYear() === today.getFullYear() &&
+          cellDate.getMonth() === today.getMonth() &&
+          cellDate.getDate() === today.getDate()) {
+        cell.className += ' today';
+      }
+
+      cell.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '2px' } }, String(dateNum)));
+
+      // Add deadline dots
+      var key = cellDate.getFullYear() + '-' + (cellDate.getMonth() + 1) + '-' + cellDate.getDate();
+      if (deadlineMap[key]) {
+        var dotsWrap = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '1px' } });
+        deadlineMap[key].forEach(function(c) {
+          var dotClass = 'safe';
+          if (c.deadlineDays !== null && c.deadlineDays !== undefined) {
+            if (c.deadlineDays < 0) dotClass = 'overdue';
+            else if (c.deadlineDays <= 3) dotClass = 'urgent';
+            else if (c.deadlineDays <= 7) dotClass = 'soon';
+          }
+          var dot = el('span', {
+            className: 'deadline-dot ' + dotClass,
+            title: c.id + ' \u2014 ' + (c.memberName || 'Unknown') + ' (' + (c.status || '') + ')'
+          });
+          dot.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            _showCalendarTooltip(dot, c);
+          });
+          dotsWrap.appendChild(dot);
+        });
+        cell.appendChild(dotsWrap);
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+
+  renderMonth();
+}
+
+/**
+ * Shows a tooltip/popover for a deadline dot on the calendar.
+ * @param {HTMLElement} dotEl - The deadline dot element
+ * @param {Object} caseData - The case data object
+ */
+function _showCalendarTooltip(dotEl, caseData) {
+  // Remove any existing tooltip
+  var existing = document.querySelector('.calendar-tooltip');
+  if (existing) existing.remove();
+
+  var tooltip = el('div', { className: 'calendar-tooltip card-glass', style: {
+    position: 'fixed', zIndex: '9999', padding: '10px 14px', borderRadius: '8px',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.2)', maxWidth: '220px', fontSize: '12px'
+  }});
+
+  tooltip.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--text)', marginBottom: '4px' } }, caseData.id));
+  tooltip.appendChild(el('div', { style: { color: 'var(--text)' } }, caseData.memberName || 'Unknown'));
+  tooltip.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px', marginTop: '2px' } },
+    (caseData.step || '') + (caseData.status ? ' \u00B7 ' + caseData.status : '')));
+  if (caseData.deadline && caseData.deadline !== '\u2014') {
+    tooltip.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px' } }, 'Deadline: ' + caseData.deadline));
+  }
+
+  document.body.appendChild(tooltip);
+
+  // Position near the dot
+  var rect = dotEl.getBoundingClientRect();
+  tooltip.style.top = (rect.bottom + 6) + 'px';
+  tooltip.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 230)) + 'px';
+
+  // Close on click outside
+  function closeTooltip(ev) {
+    if (!tooltip.contains(ev.target)) {
+      tooltip.remove();
+      document.removeEventListener('click', closeTooltip, true);
+    }
+  }
+  // Defer listener attachment so the current click doesn't immediately close it
+  setTimeout(function() {
+    document.addEventListener('click', closeTooltip, true);
+  }, 10);
+}
+
+// ═══════════════════════════════════════
 // WELCOME EXPERIENCE (steward)
 // ═══════════════════════════════════════
+
+/**
+ * Renders a localStorage-based welcome card with quick actions.
+ * Shows until the user explicitly dismisses it.
+ * @param {Element} container - Container element to insert the welcome card into
+ */
+function _renderStewardWelcome(container) {
+  // Check if dismissed via localStorage
+  try { if (localStorage.getItem('dds_steward_welcomed') === 'true') return; } catch (_e) { return; }
+
+  var card = el('div', {
+    className: 'card card-glass card-fade-in',
+    style: {
+      padding: '24px 20px',
+      margin: '0 0 14px',
+      background: 'linear-gradient(135deg, var(--accentBg), rgba(255,255,255,0.03))',
+      border: '1px solid var(--accentBorder)'
+    }
+  });
+
+  var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } });
+  header.appendChild(el('div', {
+    style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', fontWeight: '700', color: 'var(--text)' }
+  }, 'Welcome to the Dashboard'));
+  var dismissBtn = el('button', {
+    className: 'btn btn-ghost',
+    style: { fontSize: '12px' },
+    onClick: function () {
+      try { localStorage.setItem('dds_steward_welcomed', 'true'); } catch (_e) { /* sandbox */ }
+      card.style.opacity = '0';
+      card.style.transition = 'opacity 0.3s ease';
+      setTimeout(function () { card.remove(); }, 300);
+    }
+  }, '\u2715 Dismiss');
+  header.appendChild(dismissBtn);
+  card.appendChild(header);
+
+  card.appendChild(el('div', {
+    style: { color: 'var(--muted)', marginTop: '6px', marginBottom: '16px', fontSize: '14px' }
+  }, 'Here are some quick actions to get started:'));
+
+  // Quick action grid
+  var grid = el('div', {
+    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }
+  });
+
+  var quickActions = [
+    { icon: '\uD83D\uDCCB', label: 'View Cases', tab: 'cases' },
+    { icon: '\uD83D\uDC65', label: 'Member Directory', tab: 'members' },
+    { icon: '\uD83D\uDCCA', label: 'Insights', tab: 'insights' },
+    { icon: '\uD83D\uDCE2', label: 'Send Broadcast', tab: 'broadcast' },
+    { icon: '\u2753', label: 'Q&A Forum', tab: 'qaforum' },
+    { icon: '\uD83E\uDD1D', label: 'Mentorship', tab: 'mentorship' }
+  ];
+
+  quickActions.forEach(function (qa) {
+    var actionCard = el('div', {
+      className: 'card card-clickable',
+      style: {
+        padding: '12px',
+        textAlign: 'center',
+        cursor: 'pointer',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '10px'
+      },
+      onClick: function () { _handleTabNav('steward', qa.tab); }
+    });
+    actionCard.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '4px' } }, qa.icon));
+    actionCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '500' } }, qa.label));
+    grid.appendChild(actionCard);
+  });
+  card.appendChild(grid);
+
+  // "Don't show again" checkbox
+  var dontShow = el('label', {
+    style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', fontSize: '12px', color: 'var(--muted)', cursor: 'pointer' }
+  });
+  var checkbox = el('input', { type: 'checkbox', onChange: function () {
+    try { localStorage.setItem('dds_steward_welcomed', checkbox.checked ? 'true' : 'false'); } catch (_e) { /* sandbox */ }
+  }});
+  dontShow.appendChild(checkbox);
+  dontShow.appendChild(el('span', {}, "Don't show this again"));
+  card.appendChild(dontShow);
+
+  container.appendChild(card);
+}
 
 /**
  * Shows a welcome/onboarding card if it's the user's first visit.
@@ -559,13 +948,56 @@ function renderCaseList(container, filterOrCases, isFiltered) {
 
       var topRow = el('div', { className: 'flex-between-center' });
       var leftGroup = el('div', { className: 'flex-row' });
+
+      // Bulk-select checkbox (v4.32.0 — Feature 3)
+      var checkbox = el('input', {
+        type: 'checkbox',
+        className: 'bulk-select-cb',
+        'aria-label': 'Select case ' + c.id,
+        onclick: function(ev) {
+          ev.stopPropagation();
+          _updateBulkToolbar();
+        }
+      });
+      checkbox.dataset.caseId = c.id;
+      checkbox.dataset.memberEmail = c.memberEmail || '';
+      leftGroup.appendChild(checkbox);
       leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
       leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
       topRow.appendChild(leftGroup);
 
+      var rightGroup = el('div', { className: 'flex-row', style: { gap: '6px', alignItems: 'center' } });
       var deadlineSpan = el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: isOverdue ? 'var(--danger)' : 'var(--muted)', fontWeight: isOverdue ? '700' : '400' } });
       deadlineSpan.textContent = c.deadlineDays !== null ? c.deadlineDays + 'd' : '\u2014';
-      topRow.appendChild(deadlineSpan);
+      rightGroup.appendChild(deadlineSpan);
+      // Handoff notes button (v4.35.0)
+      var handoffBtn = el('button', {
+        className: 'icon-btn handoff-btn',
+        title: 'Handoff Notes',
+        'aria-label': 'Handoff notes for case ' + c.id,
+        onclick: function(ev) { ev.stopPropagation(); _toggleHandoffPanel(card, c.id); }
+      }, '\uD83D\uDCDD');
+      rightGroup.appendChild(handoffBtn);
+      // Case activity button (v4.34.0 — Feature 5)
+      var activityBtn = el('button', {
+        className: 'icon-btn handoff-btn',
+        title: 'Case Activity',
+        'aria-label': 'Activity log for case ' + c.id,
+        onclick: function(ev) { ev.stopPropagation(); _toggleActivityPanel(card, c.id); }
+      }, '\uD83D\uDCCA');
+      rightGroup.appendChild(activityBtn);
+      // Document checklist button (v4.36.0 — Feature 11)
+      var docBtn = el('button', {
+        className: 'icon-btn handoff-btn',
+        title: 'Document Checklist',
+        'aria-label': 'Document checklist for case ' + c.id,
+        onclick: function(ev) {
+          ev.stopPropagation();
+          _toggleDocChecklist(card, c.id, c.step, c.driveFolderId);
+        }
+      }, '\uD83D\uDCCB');
+      rightGroup.appendChild(docBtn);
+      topRow.appendChild(rightGroup);
       card.appendChild(topRow);
 
       var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
@@ -587,6 +1019,10 @@ function renderCaseList(container, filterOrCases, isFiltered) {
         if (!showing && !checklistLoaded) {
           checklistLoaded = true;
           _renderCaseChecklist(checklistArea, c.id);
+        }
+        // Check for escalation recommendation when expanding (v4.36.0 — Feature 14)
+        if (!showing) {
+          _checkEscalationRecommendation(card, c.id);
         }
       });
 
@@ -1771,8 +2207,17 @@ function _showMemberDetail(container, itemEl, member) {
     }
   }, '\uD83D\uDCDD Start Grievance');
 
+  // ── View Contact History (v4.36.0 — Feature 12) ──────────────────────────
+  var viewHistoryBtn = el('button', {
+    style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: '600', cursor: 'pointer' },
+    onClick: function() {
+      _showCommLogPanel(actionArea, member.email);
+    }
+  }, '\uD83D\uDCCB View Contact History');
+
   btnRow.appendChild(profileBtn);
   btnRow.appendChild(logContactBtn);
+  btnRow.appendChild(viewHistoryBtn);
   btnRow.appendChild(notifBtn);
   btnRow.appendChild(caseFolderBtn);
   btnRow.appendChild(startGrievanceBtn);
@@ -1780,6 +2225,125 @@ function _showMemberDetail(container, itemEl, member) {
   panel.appendChild(actionArea);
 
   itemEl.parentNode.insertBefore(panel, itemEl.nextSibling);
+}
+
+// ═══════════════════════════════════════
+// MEMBER COMMUNICATION LOG (v4.36.0 — Feature 12)
+// ═══════════════════════════════════════
+
+/**
+ * Toggles the communication history panel in the member detail view.
+ * Shows all logged contacts and allows logging new contacts inline.
+ * @param {HTMLElement} parentContainer - The action area container
+ * @param {string} memberEmail - Member email to query/log contacts for
+ */
+function _showCommLogPanel(parentContainer, memberEmail) {
+  var existing = parentContainer.querySelector('.comm-log-panel');
+  if (existing) { existing.remove(); return; }
+
+  var panel = el('div', { className: 'comm-log-panel', style: { borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' } });
+  panel.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' } }, '\uD83D\uDCCB Communication Log'));
+
+  // Log new contact form
+  var form = el('div', { style: { marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle, var(--border))' } });
+
+  var typeSelect = el('select', { className: 'form-input', style: { marginBottom: '6px' } });
+  ['email', 'call', 'meeting', 'text', 'other'].forEach(function(t) {
+    typeSelect.appendChild(el('option', { value: t }, t.charAt(0).toUpperCase() + t.slice(1)));
+  });
+  form.appendChild(typeSelect);
+
+  var subjectInput = el('input', { type: 'text', className: 'form-input', placeholder: 'Subject...', style: { marginBottom: '6px' } });
+  form.appendChild(subjectInput);
+
+  var notesInput = el('textarea', { className: 'msg-textarea', placeholder: 'Notes (optional)...', style: { minHeight: '50px', marginBottom: '6px', width: '100%', boxSizing: 'border-box' } });
+  form.appendChild(notesInput);
+
+  var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
+  form.appendChild(statusMsg);
+
+  var btnRowInner = el('div', { className: 'flex-gap-6' });
+  var logBtn = el('button', { className: 'btn btn-primary text-sm',
+    onClick: function() {
+      var subject = subjectInput.value.trim();
+      if (!subject) {
+        statusMsg.textContent = 'Subject is required.';
+        statusMsg.style.color = 'var(--danger)';
+        subjectInput.style.borderColor = '#ef4444';
+        return;
+      }
+      logBtn.disabled = true;
+      statusMsg.textContent = 'Logging...';
+      statusMsg.style.color = 'var(--muted)';
+      serverCall()
+        .withSuccessHandler(function(r) {
+          if (r && r.success) {
+            subjectInput.value = '';
+            notesInput.value = '';
+            subjectInput.style.borderColor = '';
+            statusMsg.textContent = '';
+            _loadCommHistory(historyContainer, memberEmail);
+          } else {
+            statusMsg.textContent = (r && r.message) || 'Error logging contact.';
+            statusMsg.style.color = 'var(--danger)';
+          }
+          logBtn.disabled = false;
+        })
+        .withFailureHandler(function() {
+          statusMsg.textContent = 'Failed. Try again.';
+          statusMsg.style.color = 'var(--danger)';
+          logBtn.disabled = false;
+        })
+        .dataLogCommunication(SESSION_TOKEN, memberEmail, typeSelect.value, subjectInput.value.trim(), notesInput.value.trim());
+    }
+  }, 'Log Contact');
+  btnRowInner.appendChild(logBtn);
+  form.appendChild(btnRowInner);
+  panel.appendChild(form);
+
+  // History section
+  var historyContainer = el('div', {});
+  panel.appendChild(historyContainer);
+  _loadCommHistory(historyContainer, memberEmail);
+
+  parentContainer.appendChild(panel);
+}
+
+/**
+ * Loads and renders communication history for a member.
+ * @param {HTMLElement} container - The container to render history into
+ * @param {string} memberEmail - Member email to query
+ */
+function _loadCommHistory(container, memberEmail) {
+  container.innerHTML = '';
+  showLoading(container);
+  serverCall()
+    .withSuccessHandler(function(log) {
+      container.innerHTML = '';
+      if (!log || log.length === 0) {
+        container.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'No communication history.'));
+        return;
+      }
+      log.forEach(function(entry) {
+        var typeIcon = { email: '\uD83D\uDCE7', call: '\uD83D\uDCDE', meeting: '\uD83E\uDD1D', text: '\uD83D\uDCAC' }[entry.type] || '\uD83D\uDCDD';
+        var node = el('div', { style: { display: 'flex', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border-subtle, var(--border))', fontSize: '13px' } });
+        node.appendChild(el('span', {}, typeIcon));
+        var info = el('div', { style: { flex: '1' } });
+        info.appendChild(el('div', { style: { fontWeight: '500', color: 'var(--text)' } }, entry.subject || '(No subject)'));
+        if (entry.notes) info.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '12px' } }, entry.notes));
+        var metaText = '';
+        try { metaText = new Date(entry.timestamp).toLocaleString(); } catch(_) { metaText = String(entry.timestamp || ''); }
+        if (entry.stewardEmail) metaText += ' \u00B7 ' + entry.stewardEmail;
+        info.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px', marginTop: '2px' } }, metaText));
+        node.appendChild(info);
+        container.appendChild(node);
+      });
+    })
+    .withFailureHandler(function() {
+      container.innerHTML = '';
+      container.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load contact history.'));
+    })
+    .dataGetCommunicationLog(SESSION_TOKEN, memberEmail);
 }
 
 // ═══════════════════════════════════════
@@ -2359,6 +2923,7 @@ function renderStewardResources(appContainer) {
 
     var _st = createSubTabs([
       { id: 'browse', label: 'Browse', render: function(c) { _renderResourceBrowse(c); } },
+      { id: 'articles', label: 'Contract Articles', render: function(c) { _renderKnowledgeBase(c); } },
       { id: 'manage', label: 'Manage', render: function(c) { _renderResourceManage(c); } }
     ]);
     var subTabBar = _st.bar, subContent = _st.content;
@@ -2696,6 +3261,258 @@ function renderStewardResources(appContainer) {
     content.appendChild(subContent);
     container.appendChild(content);
   });
+}
+
+// ═══════════════════════════════════════
+// KNOWLEDGE BASE — Contract Article Reference (v4.36.0 — Feature 13)
+// ═══════════════════════════════════════
+
+/**
+ * Renders the Knowledge Base sub-tab inside the Resources tab.
+ * Shows a search bar, optional "Add Article" button for stewards,
+ * and a list of contract articles fetched from the server.
+ */
+function _renderKnowledgeBase(container) {
+  // Add Article button (steward-only — always visible in steward view)
+  var addFormContainer = el('div', { style: { display: 'none' } });
+  var addBtn = el('button', {
+    className: 'btn btn-primary',
+    style: { marginBottom: '12px' },
+    onclick: function() {
+      var isVisible = addFormContainer.style.display !== 'none';
+      addFormContainer.style.display = isVisible ? 'none' : 'block';
+      addBtn.textContent = isVisible ? '+ Add Article' : 'Cancel';
+    }
+  }, '+ Add Article');
+  container.appendChild(addBtn);
+  _renderAddArticleForm(addFormContainer);
+  container.appendChild(addFormContainer);
+
+  // Search bar
+  var searchRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } });
+  var searchInput = el('input', { type: 'text', className: 'form-input search-input', placeholder: 'Search contract articles...' });
+  searchInput.style.flex = '1';
+  var searchBtn = el('button', {
+    className: 'btn btn-primary',
+    onclick: function() { _searchArticles(searchInput.value, resultsContainer); }
+  }, 'Search');
+  searchRow.appendChild(searchInput);
+  searchRow.appendChild(searchBtn);
+  container.appendChild(searchRow);
+
+  // Handle Enter key
+  searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') _searchArticles(searchInput.value, resultsContainer);
+  });
+
+  var resultsContainer = el('div');
+  container.appendChild(resultsContainer);
+
+  // Load all articles initially
+  _searchArticles('', resultsContainer);
+}
+
+/**
+ * Searches articles via the server and renders results into the container.
+ * @param {string} query - Search query (empty = all articles)
+ * @param {HTMLElement} container - Container to render results into
+ */
+function _searchArticles(query, container) {
+  container.innerHTML = '';
+  container.appendChild(el('div', { style: { color: 'var(--text-secondary, var(--muted))', padding: '12px' } }, 'Searching...'));
+
+  serverCall().withSuccessHandler(function(articles) {
+    container.innerHTML = '';
+    if (!articles || articles.length === 0) {
+      container.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary, var(--muted))', fontStyle: 'italic' } }, 'No articles found. Stewards can add articles using the "+ Add Article" button above.'));
+      return;
+    }
+
+    articles.forEach(function(article) {
+      var card = el('div', {
+        className: 'card card-clickable',
+        style: { padding: '14px', marginBottom: '8px', cursor: 'pointer' },
+        onclick: function() { _showArticleDetail(container, article.id); }
+      });
+      var header = el('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px' } });
+      header.appendChild(el('span', { style: { fontWeight: '700', fontSize: '14px', color: 'var(--accent)' } }, 'Art. ' + escapeHtml(String(article.articleNumber || ''))));
+      header.appendChild(el('span', { style: { fontWeight: '600', fontSize: '14px' } }, escapeHtml(String(article.title || ''))));
+      card.appendChild(header);
+
+      if (article.summary) {
+        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary, var(--muted))', marginTop: '4px' } }, escapeHtml(String(article.summary))));
+      }
+
+      if (article.tags) {
+        var tagRow = el('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' } });
+        String(article.tags).split(',').forEach(function(tag) {
+          tag = tag.trim();
+          if (tag) tagRow.appendChild(el('span', { style: { padding: '1px 6px', borderRadius: '4px', fontSize: '11px', background: 'var(--border-subtle, var(--border))' } }, escapeHtml(tag)));
+        });
+        card.appendChild(tagRow);
+      }
+
+      container.appendChild(card);
+    });
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { padding: '16px', color: 'var(--danger)' } }, 'Failed to search articles.'));
+  }).dataSearchKnowledgeBase(SESSION_TOKEN, query);
+}
+
+/**
+ * Shows the full detail view of a single knowledge base article.
+ * Replaces the parent container content and provides a back button.
+ * @param {HTMLElement} parentContainer - The results container to replace
+ * @param {string} articleId - The article ID to fetch
+ */
+function _showArticleDetail(parentContainer, articleId) {
+  parentContainer.innerHTML = '';
+  showLoading(parentContainer);
+
+  serverCall().withSuccessHandler(function(article) {
+    if (!article) {
+      parentContainer.innerHTML = '';
+      parentContainer.appendChild(el('div', { style: { padding: '16px', color: 'var(--danger)' } }, 'Article not found.'));
+      return;
+    }
+
+    parentContainer.innerHTML = '';
+
+    var backBtn = el('button', {
+      className: 'btn btn-ghost',
+      style: { marginBottom: '12px' },
+      onclick: function() {
+        // Go back to article list — re-render the parent with _renderKnowledgeBase
+        var grandParent = parentContainer.parentNode;
+        if (grandParent) {
+          grandParent.innerHTML = '';
+          _renderKnowledgeBase(grandParent);
+        }
+      }
+    }, '\u2190 Back to Articles');
+    parentContainer.appendChild(backBtn);
+
+    var detail = el('div', { className: 'card', style: { padding: '20px' } });
+    detail.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '4px' } }, 'Article ' + escapeHtml(String(article.articleNumber || ''))));
+    detail.appendChild(el('h2', { style: { fontSize: '18px', marginBottom: '12px' } }, escapeHtml(String(article.title || ''))));
+
+    if (article.summary) {
+      detail.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text-secondary, var(--muted))', marginBottom: '16px', fontStyle: 'italic' } }, escapeHtml(String(article.summary))));
+    }
+
+    if (article.fullText) {
+      detail.appendChild(el('div', { style: { fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' } }, escapeHtml(String(article.fullText))));
+    }
+
+    if (article.relatedGrievanceTypes) {
+      var relatedDiv = el('div', { style: { marginTop: '16px', fontSize: '13px' } });
+      relatedDiv.appendChild(el('span', { style: { fontWeight: '600' } }, 'Related Grievance Types: '));
+      relatedDiv.appendChild(el('span', {}, escapeHtml(String(article.relatedGrievanceTypes))));
+      detail.appendChild(relatedDiv);
+    }
+
+    if (article.tags) {
+      var tagRow = el('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '12px' } });
+      String(article.tags).split(',').forEach(function(tag) {
+        tag = tag.trim();
+        if (tag) tagRow.appendChild(el('span', { style: { padding: '2px 8px', borderRadius: '4px', fontSize: '11px', background: 'var(--border-subtle, var(--border))' } }, escapeHtml(tag)));
+      });
+      detail.appendChild(tagRow);
+    }
+
+    parentContainer.appendChild(detail);
+  }).withFailureHandler(function() {
+    parentContainer.innerHTML = '';
+    parentContainer.appendChild(el('div', { style: { padding: '16px', color: 'var(--danger)' } }, 'Failed to load article.'));
+  }).dataGetKnowledgeBaseArticle(SESSION_TOKEN, articleId);
+}
+
+/**
+ * Renders the "Add Article" form for stewards to create new knowledge base entries.
+ * @param {HTMLElement} container - Container to render the form into
+ */
+function _renderAddArticleForm(container) {
+  var form = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+  form.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '12px' } }, 'Add New Article'));
+
+  var fields = [
+    { id: 'kb-num', label: 'Article Number', placeholder: 'e.g., 12.3' },
+    { id: 'kb-title', label: 'Title', placeholder: 'Article title' },
+    { id: 'kb-summary', label: 'Summary', placeholder: 'Brief summary', tag: 'textarea' },
+    { id: 'kb-text', label: 'Full Text', placeholder: 'Full article text', tag: 'textarea' },
+    { id: 'kb-types', label: 'Related Grievance Types', placeholder: 'e.g., Discipline, Hours' },
+    { id: 'kb-tags', label: 'Tags', placeholder: 'comma-separated tags' }
+  ];
+
+  var inputs = {};
+  fields.forEach(function(f) {
+    var group = el('div', { className: 'form-group', style: { marginBottom: '8px' } });
+    group.appendChild(el('label', { className: 'form-label' }, f.label));
+    var inputAttrs = {
+      className: 'form-input',
+      placeholder: f.placeholder
+    };
+    if (f.tag === 'textarea') {
+      inputAttrs.style = { minHeight: '60px', resize: 'vertical', width: '100%' };
+    }
+    var input = el(f.tag || 'input', inputAttrs);
+    if (!f.tag) input.type = 'text';
+    // Prevent card click propagation on form inputs
+    input.addEventListener('click', function(ev) { ev.stopPropagation(); });
+    inputs[f.id] = input;
+    group.appendChild(input);
+    form.appendChild(group);
+  });
+
+  var saveBtn = el('button', {
+    className: 'btn btn-primary',
+    onclick: function() {
+      var num = inputs['kb-num'].value.trim();
+      var title = inputs['kb-title'].value.trim();
+      if (!num || !title) return;
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      serverCall().withSuccessHandler(function(r) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Article';
+        if (r && r.success) {
+          // Clear form fields
+          Object.keys(inputs).forEach(function(k) { inputs[k].value = ''; });
+          // Hide the form
+          container.style.display = 'none';
+          // Find and re-trigger the parent's add button text
+          var addBtnEl = container.previousSibling;
+          if (addBtnEl && addBtnEl.tagName === 'BUTTON') addBtnEl.textContent = '+ Add Article';
+          // Refresh the articles list — find the results container
+          var sibling = container.nextSibling;
+          while (sibling) {
+            // The results container is the last div child
+            var nextSib = sibling.nextSibling;
+            if (!nextSib) {
+              _searchArticles('', sibling);
+              break;
+            }
+            sibling = nextSib;
+          }
+        }
+      }).withFailureHandler(function() {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Article';
+      }).dataAddKnowledgeBaseArticle(
+        SESSION_TOKEN,
+        inputs['kb-num'].value.trim(),
+        inputs['kb-title'].value.trim(),
+        inputs['kb-summary'].value.trim(),
+        inputs['kb-text'].value.trim(),
+        inputs['kb-types'].value.trim(),
+        inputs['kb-tags'].value.trim()
+      );
+    }
+  }, 'Save Article');
+  form.appendChild(saveBtn);
+
+  container.appendChild(form);
 }
 
 // ═══════════════════════════════════════
@@ -3158,10 +3975,8 @@ function renderStewardMore(appContainer) {
     var menuItems = [
       { group: 'Manage' },
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
-      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
       { group: 'Reference' },
-      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('steward', 'poms'); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
       { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
       { group: 'Community' },
@@ -3784,6 +4599,131 @@ function renderInsightsPage(appContainer) {
   });
 }
 
+// ═══════════════════════════════════════
+// REPORT GENERATOR (v4.39.0 — Feature 17)
+// ═══════════════════════════════════════
+
+/**
+ * Renders a report generation card with date range picker and generate button.
+ * Uses el() for safe DOM construction, escapeHtml() for all text output.
+ * @param {HTMLElement} container - Parent container to append card to.
+ */
+function _renderReportGenerator(container) {
+  var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+  card.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Generate Report'));
+
+  // Date range picker
+  var dateRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' } });
+  var startInput = el('input', { type: 'date', className: 'form-input', style: { flex: '1', minWidth: '130px' } });
+  var endInput = el('input', { type: 'date', className: 'form-input', style: { flex: '1', minWidth: '130px' } });
+
+  // Default to last month
+  var now = new Date();
+  var lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  var endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  startInput.value = lastMonth.toISOString().split('T')[0];
+  endInput.value = endOfLastMonth.toISOString().split('T')[0];
+
+  dateRow.appendChild(el('label', { style: { fontSize: '13px' } }, 'From:'));
+  dateRow.appendChild(startInput);
+  dateRow.appendChild(el('label', { style: { fontSize: '13px' } }, 'To:'));
+  dateRow.appendChild(endInput);
+  card.appendChild(dateRow);
+
+  var previewContainer = el('div', {});
+
+  var genBtn = el('button', { className: 'btn btn-primary',
+    onclick: function() {
+      genBtn.disabled = true;
+      genBtn.textContent = 'Generating...';
+      var dateRange = { start: startInput.value, end: endInput.value };
+      serverCall().withSuccessHandler(function(result) {
+        genBtn.disabled = false;
+        genBtn.textContent = 'Generate Report';
+        if (!result || !result.success || !result.report) return;
+        _renderReportPreview(previewContainer, result.report);
+      }).withFailureHandler(function() {
+        genBtn.disabled = false;
+        genBtn.textContent = 'Generate Report';
+      }).dataGenerateMonthlyReport(SESSION_TOKEN, dateRange);
+    }
+  }, 'Generate Report');
+  card.appendChild(genBtn);
+  card.appendChild(previewContainer);
+  container.appendChild(card);
+}
+
+/**
+ * Renders a report preview with KPIs, category breakdown, and download button.
+ * Uses el() for safe DOM construction, escapeHtml() for all text output.
+ * @param {HTMLElement} container - Container to render preview into.
+ * @param {Object} report - Report object from ReportService.generateMonthlyReport.
+ */
+function _renderReportPreview(container, report) {
+  container.innerHTML = '';
+
+  var preview = el('div', { style: { marginTop: '16px' } });
+  preview.appendChild(el('h3', { style: { fontSize: '16px', marginBottom: '8px' } }, escapeHtml(report.title)));
+  preview.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' } }, 'Period: ' + escapeHtml(report.period)));
+
+  // Summary KPIs
+  var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px', marginBottom: '16px' } });
+  var stats = [
+    { label: 'Total', value: report.summary.totalCases },
+    { label: 'New', value: report.summary.newCases },
+    { label: 'Resolved', value: report.summary.resolved },
+    { label: 'Pending', value: report.summary.pending },
+    { label: 'Overdue', value: report.summary.overdue }
+  ];
+  stats.forEach(function(s) {
+    var kpi = el('div', { style: { textAlign: 'center', padding: '8px', background: 'var(--bg)', borderRadius: '8px' } });
+    kpi.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '700' } }, String(s.value)));
+    kpi.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, s.label));
+    kpis.appendChild(kpi);
+  });
+  preview.appendChild(kpis);
+
+  // By category breakdown
+  if (report.byCategory && Object.keys(report.byCategory).length > 0) {
+    preview.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px', marginBottom: '6px' } }, 'By Category'));
+    var catList = el('div', {});
+    for (var cat in report.byCategory) {
+      if (report.byCategory.hasOwnProperty(cat)) {
+        var catRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: '13px' } });
+        catRow.appendChild(el('span', {}, escapeHtml(cat)));
+        catRow.appendChild(el('span', { style: { fontWeight: '600' } }, String(report.byCategory[cat])));
+        catList.appendChild(catRow);
+      }
+    }
+    preview.appendChild(catList);
+  }
+
+  // Download as text
+  var downloadBtn = el('button', { className: 'btn btn-secondary', style: { marginTop: '12px' },
+    onclick: function() {
+      var text = report.title + '\nPeriod: ' + report.period + '\n\n';
+      text += 'Total: ' + report.summary.totalCases + '\n';
+      text += 'New: ' + report.summary.newCases + '\n';
+      text += 'Resolved: ' + report.summary.resolved + '\n';
+      text += 'Pending: ' + report.summary.pending + '\n';
+      text += 'Overdue: ' + report.summary.overdue + '\n';
+      if (report.byCategory && Object.keys(report.byCategory).length > 0) {
+        text += '\nBy Category:\n';
+        for (var c in report.byCategory) {
+          if (report.byCategory.hasOwnProperty(c)) text += '  ' + c + ': ' + report.byCategory[c] + '\n';
+        }
+      }
+      var blob = new Blob([text], { type: 'text/plain' });
+      var url = URL.createObjectURL(blob);
+      var a = el('a', { href: url, download: 'report-' + new Date().toISOString().split('T')[0] + '.txt', style: { display: 'none' } });
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+  }, 'Download Report');
+  preview.appendChild(downloadBtn);
+
+  container.appendChild(preview);
+}
+
 function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData) {
   content.innerHTML = '';
   // Detail panel for drill-down views
@@ -3844,6 +4784,9 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
   };
   window.addEventListener('hashchange', window._insightsHashHandler);
 
+  // v4.39.0 — Feature 17: Report generator at top of Insights
+  _renderReportGenerator(mainContent);
+
   if (!statsData || !statsData.available) {
     mainContent.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));
   } else {
@@ -3854,6 +4797,14 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
   if (workloadData && (workloadData.success || workloadData.data)) _renderWorkloadInsights(mainContent, workloadData, showDetail);
   if (perfData && perfData.length > 0) _renderPerformanceSection(mainContent, perfData, showDetail);
   if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(mainContent, satData, showDetail);
+
+  // Outcome Analytics — separate fetch, independent of correlation engine (v4.35.0)
+  var outcomePlaceholder = el('div', { id: 'outcome-analytics-section' });
+  mainContent.appendChild(outcomePlaceholder);
+  serverCall().withSuccessHandler(function(analytics) {
+    if (!analytics || analytics.error || !analytics.totalCases) return;
+    _renderOutcomeAnalytics(outcomePlaceholder, analytics, showDetail);
+  }).withFailureHandler(function() { /* silent — optional section */ }).dataGetOutcomeAnalytics(SESSION_TOKEN, null);
 
   // Correlation Engine — fetch separately to avoid slowing the main batch
   var corrPlaceholder = el('div', { id: 'correlation-insights-section' });
@@ -3928,6 +4879,99 @@ function _renderMembershipInsights(container, ms, showDetail) {
 
   section.appendChild(grid);
   container.appendChild(section);
+}
+
+// ═══════════════════════════════════════
+// PREDICTIVE WORKLOAD BALANCING (steward-only)
+// ═══════════════════════════════════════
+
+/**
+ * Renders workload prediction and rebalancing suggestion cards.
+ * Called from renderWorkloadTracker (in member_view.html) when role is steward.
+ * @param {Element} container - Container to append cards to
+ */
+function _renderWorkloadPredictions(container) {
+  // Prediction card
+  var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+  card.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Workload Predictions'));
+
+  var predictionContent = el('div');
+  card.appendChild(predictionContent);
+
+  serverCall().withSuccessHandler(function(pred) {
+    if (!pred) return;
+
+    var trendIcon = pred.trend === 'increasing' ? '\uD83D\uDCC8' : pred.trend === 'decreasing' ? '\uD83D\uDCC9' : '\u27A1\uFE0F';
+    var trendColor = pred.trend === 'increasing' ? '#ef4444' : pred.trend === 'decreasing' ? '#22c55e' : 'var(--muted)';
+
+    var row = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' } });
+
+    var currentBox = el('div', { style: { textAlign: 'center' } });
+    currentBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700' } }, String(pred.current)));
+    currentBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Current'));
+    row.appendChild(currentBox);
+
+    row.appendChild(el('span', { style: { fontSize: '20px', color: trendColor } }, trendIcon));
+
+    var predictedBox = el('div', { style: { textAlign: 'center' } });
+    predictedBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700', color: trendColor } }, String(pred.predicted)));
+    predictedBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Predicted'));
+    row.appendChild(predictedBox);
+
+    predictionContent.appendChild(row);
+
+    // Mini sparkline (CSS bars for history)
+    if (pred.history && pred.history.length > 0) {
+      var maxVal = Math.max.apply(null, pred.history) || 1;
+      var spark = el('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '2px', height: '40px', marginTop: '12px' } });
+      pred.history.forEach(function(v) {
+        var pct = Math.round((v / maxVal) * 100);
+        spark.appendChild(el('div', {
+          style: { flex: '1', height: pct + '%', background: 'var(--accent)', borderRadius: '2px 2px 0 0', minHeight: '2px' },
+          title: String(v) + ' items'
+        }));
+      });
+      predictionContent.appendChild(spark);
+      predictionContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Recent workload history'));
+    }
+  }).withFailureHandler(function() {
+    predictionContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load predictions.'));
+  }).dataGetWorkloadPrediction(SESSION_TOKEN, '');
+
+  container.appendChild(card);
+
+  // Rebalancing suggestions card
+  var rebalCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+  rebalCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Rebalancing Suggestions'));
+
+  var suggestContent = el('div');
+  rebalCard.appendChild(suggestContent);
+
+  serverCall().withSuccessHandler(function(suggestions) {
+    if (!suggestions || suggestions.length === 0) {
+      suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Workload is balanced across stewards.'));
+      return;
+    }
+    suggestions.forEach(function(s) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
+
+      var leftCol = el('div');
+      leftCol.appendChild(el('div', { style: { fontWeight: '500', fontSize: '14px' } }, escapeHtml(s.stewardEmail)));
+      leftCol.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, escapeHtml(s.suggestion)));
+      row.appendChild(leftCol);
+
+      var rightCol = el('div', { style: { textAlign: 'right', fontSize: '13px' } });
+      rightCol.appendChild(el('div', { style: { fontWeight: '600' } }, s.currentLoad + ' cases'));
+      rightCol.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'avg: ' + s.averageLoad));
+      row.appendChild(rightCol);
+
+      suggestContent.appendChild(row);
+    });
+  }).withFailureHandler(function() {
+    suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load suggestions.'));
+  }).dataGetRebalancingSuggestions(SESSION_TOKEN);
+
+  container.appendChild(rebalCard);
 }
 
 function _renderWorkloadInsights(container, wl, showDetail) {
@@ -4390,6 +5434,144 @@ function renderSearchPage(appContainer) {
 }
 
 // ═══════════════════════════════════════
+// OUTCOME ANALYTICS (v4.35.0)
+// ═══════════════════════════════════════
+
+/**
+ * Renders a simple CSS bar row (no chart library).
+ * @param {HTMLElement} container
+ * @param {string} label
+ * @param {number} value
+ * @param {number} maxValue
+ * @param {string} [color]
+ */
+function _renderOutcomeBar(container, label, value, maxValue, color) {
+  var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+  row.appendChild(el('div', { style: { width: '120px', fontSize: '13px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, escapeHtml(label)));
+  var barBg = el('div', { style: { flex: '1', height: '20px', background: 'var(--border-subtle, var(--border))', borderRadius: '4px', overflow: 'hidden' } });
+  var pct = maxValue > 0 ? Math.round((value / maxValue) * 100) : 0;
+  barBg.appendChild(el('div', { style: { width: pct + '%', height: '100%', background: color || 'var(--accent)', borderRadius: '4px', transition: 'width 0.3s ease' } }));
+  row.appendChild(barBg);
+  row.appendChild(el('span', { style: { fontSize: '13px', fontWeight: '500', minWidth: '30px' } }, String(value)));
+  container.appendChild(row);
+}
+
+/**
+ * Renders Grievance Outcome Analytics section on the Insights page.
+ * @param {HTMLElement} container - Placeholder element
+ * @param {Object} analytics - Data from getOutcomeAnalytics()
+ * @param {function} showDetail - Detail drill-down function
+ */
+function _renderOutcomeAnalytics(container, analytics, showDetail) {
+  container.innerHTML = '';
+  var section = el('div', { className: 'mb-16' });
+
+  // Section header
+  section.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
+    color: 'var(--text)', marginBottom: '12px'
+  }}, 'Grievance Outcome Analytics'));
+
+  // KPI strip
+  var winRate = analytics.resolved + analytics.denied > 0
+    ? Math.round((analytics.resolved / (analytics.resolved + analytics.denied)) * 100)
+    : 0;
+  renderKPIStrip(section, [
+    { label: 'Total Cases', value: _fmtNum(analytics.totalCases), color: 'var(--info)' },
+    { label: 'Win Rate', value: winRate + '%', color: winRate >= 50 ? 'var(--success)' : 'var(--warning)' },
+    { label: 'Avg Resolution', value: analytics.avgResolutionDays + 'd', color: 'var(--accent)' },
+    { label: 'Pending', value: _fmtNum(analytics.pending), color: 'var(--muted)' }
+  ], { columns: 4 });
+
+  // Top categories by case count (bar chart)
+  var catKeys = Object.keys(analytics.byCategory);
+  if (catKeys.length > 0) {
+    var catCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginTop: '12px' } });
+    catCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' } }, 'Top Categories by Case Count'));
+    // Sort by total descending, take top 5
+    catKeys.sort(function(a, b) { return analytics.byCategory[b].total - analytics.byCategory[a].total; });
+    var topCats = catKeys.slice(0, 5);
+    var maxCatCount = topCats.length > 0 ? analytics.byCategory[topCats[0]].total : 1;
+    topCats.forEach(function(cat) {
+      _renderOutcomeBar(catCard, cat, analytics.byCategory[cat].total, maxCatCount, 'var(--accent)');
+    });
+    section.appendChild(catCard);
+  }
+
+  // Steward performance table
+  var stewardKeys = Object.keys(analytics.bySteward);
+  if (stewardKeys.length > 0) {
+    var stewardCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginTop: '12px' } });
+    stewardCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' } }, 'Steward Performance'));
+
+    var table = el('div', { style: { overflowX: 'auto' } });
+    var tbl = el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' } });
+
+    // Header row
+    var thead = el('tr', { style: { borderBottom: '2px solid var(--border)' } });
+    ['Steward', 'Cases', 'Win Rate', 'Avg Days'].forEach(function(h) {
+      thead.appendChild(el('th', { style: { textAlign: 'left', padding: '6px 8px', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, h));
+    });
+    tbl.appendChild(thead);
+
+    // Sort stewards by case count descending
+    stewardKeys.sort(function(a, b) { return analytics.bySteward[b].total - analytics.bySteward[a].total; });
+
+    stewardKeys.forEach(function(name) {
+      var s = analytics.bySteward[name];
+      var sWinRate = s.won + s.lost > 0 ? Math.round((s.won / (s.won + s.lost)) * 100) : 0;
+      var sAvgDays = s.closedCount > 0 ? Math.round(s.totalDays / s.closedCount) : 0;
+
+      var row = el('tr', { style: { borderBottom: '1px solid var(--border)' } });
+      row.appendChild(el('td', { style: { padding: '6px 8px', fontWeight: '500' } }, escapeHtml(name)));
+      row.appendChild(el('td', { style: { padding: '6px 8px' } }, String(s.total)));
+      var rateCell = el('td', { style: { padding: '6px 8px', fontWeight: '600', color: sWinRate >= 50 ? 'var(--success)' : 'var(--warning)' } }, sWinRate + '%');
+      row.appendChild(rateCell);
+      row.appendChild(el('td', { style: { padding: '6px 8px' } }, sAvgDays > 0 ? sAvgDays + 'd' : '\u2014'));
+      tbl.appendChild(row);
+    });
+
+    table.appendChild(tbl);
+    stewardCard.appendChild(table);
+    section.appendChild(stewardCard);
+  }
+
+  // Drill-down detail view
+  if (showDetail && catKeys.length > 0) {
+    var viewAllBtn = el('button', { className: 'btn btn-sm', style: { marginTop: '8px', fontSize: '11px' }, onClick: function() {
+      showDetail('Outcome Analytics — Full Breakdown', function(panel) {
+        // Unit breakdown
+        var unitKeys = Object.keys(analytics.byUnit);
+        if (unitKeys.length > 0) {
+          panel.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px', marginTop: '8px' } }, 'By Unit'));
+          var unitCard = el('div', { className: 'card card-glass', style: { padding: '12px' } });
+          unitKeys.sort(function(a, b) { return analytics.byUnit[b].total - analytics.byUnit[a].total; });
+          var maxUnit = analytics.byUnit[unitKeys[0]].total;
+          unitKeys.forEach(function(u) {
+            _renderOutcomeBar(unitCard, u, analytics.byUnit[u].total, maxUnit, 'var(--info)');
+          });
+          panel.appendChild(unitCard);
+        }
+
+        // All categories (not just top 5)
+        if (catKeys.length > 5) {
+          panel.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px', marginTop: '16px' } }, 'All Categories'));
+          var allCatCard = el('div', { className: 'card card-glass', style: { padding: '12px' } });
+          var maxAllCat = analytics.byCategory[catKeys[0]].total;
+          catKeys.forEach(function(cat) {
+            _renderOutcomeBar(allCatCard, cat, analytics.byCategory[cat].total, maxAllCat, 'var(--accent)');
+          });
+          panel.appendChild(allCatCard);
+        }
+      });
+    }}, 'View Full Breakdown \u2192');
+    section.appendChild(viewAllBtn);
+  }
+
+  container.appendChild(section);
+}
+
+// ═══════════════════════════════════════
 // CORRELATION INSIGHTS (v4.33.0 — no PII)
 // ═══════════════════════════════════════
 
@@ -4649,6 +5831,335 @@ function renderStewardDirectoryPage(appContainer) {
       content.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load directory.'));
     }).dataGetStewardDirectory(SESSION_TOKEN);
   });
+}
+
+// ═══════════════════════════════════════
+// ESCALATION RECOMMENDATION — Automated Case Escalation (v4.36.0 — Feature 14)
+// ═══════════════════════════════════════
+
+/**
+ * Checks if a case should be escalated and displays a recommendation banner.
+ * Called when a case card is expanded. Only fetches once per card (checks for
+ * existing `.escalation-banner` element before making a server call).
+ * @param {HTMLElement} card - The case card element
+ * @param {string} caseId - The grievance/case ID
+ */
+function _checkEscalationRecommendation(card, caseId) {
+  // Don't show if already shown
+  if (card.querySelector('.escalation-banner')) return;
+
+  serverCall().withSuccessHandler(function(rec) {
+    if (!rec || !rec.shouldEscalate) return;
+
+    var colors = { high: '#ef4444', medium: '#f97316', low: '#eab308' };
+    var bgColors = { high: '#fef2f2', medium: '#fff7ed', low: '#fefce8' };
+    var confidence = String(rec.confidence || 'low');
+    var color = colors[confidence] || '#eab308';
+    var bgColor = bgColors[confidence] || '#fefce8';
+
+    var banner = el('div', { className: 'escalation-banner' });
+    banner.style.margin = '8px 0';
+    banner.style.padding = '10px 14px';
+    banner.style.borderRadius = '8px';
+    banner.style.border = '1px solid ' + color;
+    banner.style.background = bgColor;
+    banner.style.fontSize = '13px';
+
+    // Prevent card click from toggling when interacting with banner
+    banner.addEventListener('click', function(ev) { ev.stopPropagation(); });
+
+    var header = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', color: color } });
+    header.appendChild(el('span', {}, '\u26A1'));
+    header.appendChild(el('span', {}, 'Escalation Recommended (' + escapeHtml(confidence) + ' confidence)'));
+    banner.appendChild(header);
+
+    if (rec.suggestedStep) {
+      banner.appendChild(el('div', { style: { marginTop: '4px' } }, 'Suggested: escalate to ' + escapeHtml(String(rec.suggestedStep))));
+    }
+
+    // Expandable reasons
+    if (rec.reasons && rec.reasons.length > 0) {
+      var reasonsList = el('ul', { style: { margin: '6px 0 0 16px', padding: '0', fontSize: '12px' } });
+      rec.reasons.forEach(function(r) {
+        reasonsList.appendChild(el('li', { style: { marginBottom: '2px' } }, escapeHtml(String(r))));
+      });
+      banner.appendChild(reasonsList);
+    }
+
+    // Insert at the top of the card content (after the header rows, before panels)
+    var firstChild = card.querySelector('.handoff-panel') || card.querySelector('.activity-panel') || card.querySelector('.doc-checklist');
+    if (firstChild) {
+      card.insertBefore(banner, firstChild);
+    } else {
+      // Insert before the checklist area (the expandable div with borderTop)
+      var children = card.children;
+      for (var i = 0; i < children.length; i++) {
+        if (children[i].style.borderTop && children[i].style.display !== undefined) {
+          card.insertBefore(banner, children[i]);
+          return;
+        }
+      }
+      card.appendChild(banner);
+    }
+  }).withFailureHandler(function() {
+    // Silently fail — escalation recommendation is advisory
+  }).dataGetEscalationRecommendation(SESSION_TOKEN, caseId);
+}
+
+// ═══════════════════════════════════════
+// HANDOFF NOTES — Steward Shift Handoff (v4.35.0)
+// ═══════════════════════════════════════
+
+/**
+ * Toggles the handoff notes panel below a case card.
+ * If the panel already exists, it is removed (collapsed).
+ * Otherwise, a new panel is created, notes are fetched from the server,
+ * and an "Add Note" form is appended.
+ */
+function _toggleHandoffPanel(card, caseId) {
+  var existing = card.querySelector('.handoff-panel');
+  if (existing) { existing.remove(); return; }
+
+  var panel = el('div', { className: 'handoff-panel card-glass', style: { marginTop: '8px', padding: '12px', borderTop: '1px solid var(--border)' } });
+  panel.appendChild(el('div', { style: { fontWeight: '600', fontSize: '13px', marginBottom: '8px', color: 'var(--text)' } }, 'Handoff Notes'));
+
+  var notesContainer = el('div');
+  showLoading(notesContainer);
+  panel.appendChild(notesContainer);
+  card.appendChild(panel);
+
+  serverCall().withSuccessHandler(function(notes) {
+    notesContainer.innerHTML = '';
+    if (!notes || notes.length === 0) {
+      notesContainer.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'No handoff notes yet.'));
+    } else {
+      notes.forEach(function(note) {
+        var noteEl = el('div', { className: 'handoff-note', style: { padding: '8px 0', borderBottom: '1px solid var(--border-subtle, var(--border))', fontSize: '13px' } });
+        var meta = el('div', { style: { color: 'var(--muted)', fontSize: '11px', marginBottom: '2px' } });
+        meta.appendChild(el('span', {}, 'From: '));
+        meta.appendChild(el('strong', {}, note.fromSteward || 'Unknown'));
+        meta.appendChild(el('span', {}, ' \u2014 ' + (note.created ? new Date(note.created).toLocaleDateString() : '')));
+        noteEl.appendChild(meta);
+        noteEl.appendChild(el('div', { style: { color: 'var(--text)' } }, note.noteText || ''));
+        var archBtn = el('button', {
+          className: 'btn btn-secondary',
+          style: { fontSize: '11px', padding: '2px 8px', marginTop: '4px' },
+          onclick: function(ev) {
+            ev.stopPropagation();
+            _archiveHandoffNote(noteEl, note.id, caseId, card);
+          }
+        }, 'Archive');
+        noteEl.appendChild(archBtn);
+        notesContainer.appendChild(noteEl);
+      });
+    }
+    _renderAddNoteForm(panel, caseId, card);
+  }).withFailureHandler(function() {
+    notesContainer.innerHTML = '';
+    notesContainer.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load handoff notes.'));
+    _renderAddNoteForm(panel, caseId, card);
+  }).dataGetHandoffNotes(SESSION_TOKEN, caseId);
+}
+
+/**
+ * Renders the "Add Note" form at the bottom of a handoff panel.
+ */
+function _renderAddNoteForm(panel, caseId, card) {
+  var form = el('div', { style: { marginTop: '10px', borderTop: '1px solid var(--border-subtle, var(--border))', paddingTop: '10px' } });
+  var textarea = el('textarea', {
+    className: 'form-input',
+    placeholder: 'Leave a note for the next steward\u2026',
+    style: { width: '100%', minHeight: '60px', resize: 'vertical' },
+    'aria-label': 'Handoff note text'
+  });
+  textarea.addEventListener('click', function(ev) { ev.stopPropagation(); });
+  var addBtn = el('button', {
+    className: 'btn btn-primary',
+    style: { marginTop: '6px' },
+    onclick: function(ev) {
+      ev.stopPropagation();
+      var text = textarea.value.trim();
+      if (!text) return;
+      addBtn.disabled = true;
+      addBtn.textContent = 'Saving\u2026';
+      serverCall().withSuccessHandler(function(result) {
+        if (result && result.success) {
+          // Refresh panel by toggling off then on
+          var existingPanel = card.querySelector('.handoff-panel');
+          if (existingPanel) existingPanel.remove();
+          _toggleHandoffPanel(card, caseId);
+        } else {
+          addBtn.disabled = false;
+          addBtn.textContent = 'Add Note';
+        }
+      }).withFailureHandler(function() {
+        addBtn.disabled = false;
+        addBtn.textContent = 'Add Note';
+      }).dataAddHandoffNote(SESSION_TOKEN, caseId, text, '');
+    }
+  }, 'Add Note');
+  form.appendChild(textarea);
+  form.appendChild(addBtn);
+  panel.appendChild(form);
+}
+
+/**
+ * Archives a handoff note and removes it from the DOM.
+ */
+function _archiveHandoffNote(noteEl, noteId, caseId, card) {
+  noteEl.style.opacity = '0.5';
+  serverCall().withSuccessHandler(function(result) {
+    if (result && result.success) {
+      noteEl.remove();
+      // If no notes remain, refresh the panel to show the empty state
+      var panel = card.querySelector('.handoff-panel');
+      if (panel) {
+        var remaining = panel.querySelectorAll('.handoff-note');
+        if (remaining.length === 0) {
+          panel.remove();
+          _toggleHandoffPanel(card, caseId);
+        }
+      }
+    } else {
+      noteEl.style.opacity = '1';
+    }
+  }).withFailureHandler(function() {
+    noteEl.style.opacity = '1';
+  }).dataArchiveHandoffNote(SESSION_TOKEN, noteId);
+}
+
+// ═══════════════════════════════════════
+// CASE ACTIVITY LOG (v4.34.0 — Feature 5)
+// ═══════════════════════════════════════
+
+/**
+ * Toggles the case activity panel on a case card.
+ * If the panel is open, closes it. Otherwise, creates and populates it.
+ * @param {HTMLElement} card - The case card element
+ * @param {string} caseId - The grievance/case ID
+ */
+function _toggleActivityPanel(card, caseId) {
+  var existing = card.querySelector('.activity-panel');
+  if (existing) { existing.remove(); return; }
+
+  var panel = el('div', { className: 'activity-panel card-glass', style: { marginTop: '8px', padding: '12px', borderTop: '1px solid var(--border)' } });
+  panel.appendChild(el('div', { style: { fontWeight: '600', fontSize: '13px', marginBottom: '8px', color: 'var(--text)' } }, 'Case Activity'));
+
+  var timeline = el('div', { className: 'activity-timeline' });
+  showLoading(timeline);
+  panel.appendChild(timeline);
+  card.appendChild(panel);
+
+  // Prevent click from toggling the checklist
+  panel.addEventListener('click', function(ev) { ev.stopPropagation(); });
+
+  serverCall().withSuccessHandler(function(events) {
+    timeline.innerHTML = '';
+    if (!events || events.length === 0) {
+      timeline.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'No activity recorded yet.'));
+      return;
+    }
+    events.forEach(function(evt) {
+      var fieldLower = (evt.field || '').toLowerCase();
+      var actionLower = (evt.actionType || '').toLowerCase();
+      var icon = actionLower === 'create' ? '\u2795' :
+                 actionLower === 'escalate' ? '\u2B06\uFE0F' :
+                 fieldLower.indexOf('folder') !== -1 ? '\uD83D\uDCC1' :
+                 fieldLower.indexOf('email') !== -1 ? '\uD83D\uDCE7' :
+                 '\u270F\uFE0F';
+
+      var node = el('div', { className: 'activity-node', style: { display: 'flex', gap: '8px', padding: '6px 0', borderLeft: '2px solid var(--border-subtle, var(--border))', paddingLeft: '12px', marginLeft: '6px', fontSize: '13px' } });
+      node.appendChild(el('span', {}, icon));
+
+      var info = el('div', { style: { flex: '1' } });
+      info.appendChild(el('div', { style: { fontWeight: '500', color: 'var(--text)' } }, evt.field || evt.actionType || 'edit'));
+
+      if (evt.oldValue && evt.newValue) {
+        var changeDiv = el('div', { style: { color: 'var(--muted)', fontSize: '12px' } });
+        changeDiv.appendChild(el('span', {}, evt.oldValue));
+        changeDiv.appendChild(el('span', {}, ' \u2192 '));
+        changeDiv.appendChild(el('span', {}, evt.newValue));
+        info.appendChild(changeDiv);
+      } else if (evt.newValue) {
+        info.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '12px' } }, evt.newValue));
+      }
+
+      var metaText = '';
+      try { metaText = new Date(evt.timestamp).toLocaleString(); } catch (_) { metaText = String(evt.timestamp || ''); }
+      if (evt.userEmail) metaText += ' \u00B7 ' + evt.userEmail;
+      info.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px', marginTop: '2px' } }, metaText));
+
+      node.appendChild(info);
+      timeline.appendChild(node);
+    });
+  }).withFailureHandler(function() {
+    timeline.innerHTML = '';
+    timeline.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load activity log.'));
+  }).dataGetCaseActivityLog(SESSION_TOKEN, caseId);
+}
+
+// ═══════════════════════════════════════
+// DOCUMENT CHECKLIST PER GRIEVANCE STEP (v4.36.0 — Feature 11)
+// ═══════════════════════════════════════
+
+/**
+ * Toggles a document checklist panel on a case card.
+ * Shows which documents are required for the current step
+ * and whether each has been found in the case Drive folder.
+ * @param {HTMLElement} card - The case card element
+ * @param {string} caseId - The grievance/case ID
+ * @param {string} step - Current grievance step
+ * @param {string} folderId - Drive folder ID for this case (may be null)
+ */
+function _toggleDocChecklist(card, caseId, step, folderId) {
+  var existing = card.querySelector('.doc-checklist');
+  if (existing) { existing.remove(); return; }
+
+  var panel = el('div', { className: 'doc-checklist card-glass', style: { marginTop: '8px', padding: '12px' } });
+  panel.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '8px' } }, 'Document Checklist \u2014 ' + (step || 'Unknown Step')));
+
+  // Prevent click from toggling the case checklist
+  panel.addEventListener('click', function(ev) { ev.stopPropagation(); });
+
+  var listContainer = el('div', {});
+  showLoading(listContainer);
+  panel.appendChild(listContainer);
+
+  serverCall().withSuccessHandler(function(checklist) {
+    listContainer.innerHTML = '';
+    if (!checklist || checklist.length === 0) {
+      listContainer.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'No document requirements defined for this step.'));
+      return;
+    }
+
+    var found = 0;
+    checklist.forEach(function(item) {
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border-subtle, var(--border))' } });
+      row.appendChild(el('span', { style: { fontSize: '16px' } }, item.found ? '\u2705' : '\u274C'));
+      var label = el('div', { style: { flex: '1', fontSize: '13px' } });
+      label.appendChild(el('span', { style: { fontWeight: item.found ? '400' : '600' } }, item.name));
+      if (item.found && item.fileUrl) {
+        label.appendChild(el('a', { href: item.fileUrl, target: '_blank', style: { marginLeft: '8px', fontSize: '12px', color: 'var(--accent)' } }, 'View'));
+      }
+      row.appendChild(label);
+      listContainer.appendChild(row);
+      if (item.found) found++;
+    });
+
+    // Progress bar
+    var pct = Math.round((found / checklist.length) * 100);
+    var progress = el('div', { style: { marginTop: '10px' } });
+    progress.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px' } }, found + '/' + checklist.length + ' documents (' + pct + '%)'));
+    var barBg = el('div', { style: { height: '6px', background: 'var(--border-subtle, var(--border))', borderRadius: '3px', overflow: 'hidden' } });
+    barBg.appendChild(el('div', { style: { width: pct + '%', height: '100%', background: pct === 100 ? 'var(--success, #22c55e)' : 'var(--accent)', borderRadius: '3px', transition: 'width 0.3s' } }));
+    progress.appendChild(barBg);
+    listContainer.appendChild(progress);
+  }).withFailureHandler(function() {
+    listContainer.innerHTML = '';
+    listContainer.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, 'Failed to load document checklist.'));
+  }).dataGetDocumentChecklist(SESSION_TOKEN, caseId, step, folderId || '');
+
+  card.appendChild(panel);
 }
 
 // ═══════════════════════════════════════
@@ -5298,6 +6809,318 @@ function _renderMyFeedback(container) {
     container.innerHTML = '';
     container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load feedback.'));
   }).dataGetMyFeedback(SESSION_TOKEN); // email resolved server-side (v4.24.1)
+}
+
+// ═══════════════════════════════════════
+// ENGAGEMENT SCORE DASHBOARD (v4.36.0 — steward only)
+// ═══════════════════════════════════════
+
+function renderEngagementDashboard(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'engagement', function(container) {
+    _stewardHeader(container, 'Engagement', 'Member engagement scores across 5 dimensions');
+
+    var content = el('div', { className: 'content' });
+    showLoading(content, 'list');
+    container.appendChild(content);
+
+    var currentSort = 'composite';
+    var currentUnit = '';
+    var currentSearch = '';
+
+    function loadScoreboard(page) {
+      showLoading(content, 'list');
+      var opts = { page: page || 0, pageSize: 20, sortBy: currentSort, filterUnit: currentUnit, searchTerm: currentSearch };
+
+      serverCall().withSuccessHandler(function(result) {
+        content.innerHTML = '';
+        if (!result) { content.appendChild(el('div', { className: 'empty-state-lg' }, 'No engagement data. Click "Refresh Scores" to compute.')); return; }
+
+        // KPI strip
+        renderKPIStrip(content, [
+          { label: 'Avg Score', value: result.avgScore || 0, color: (result.avgScore || 0) >= 50 ? 'var(--success, #22c55e)' : 'var(--warning, #eab308)' },
+          { label: 'Top Unit', value: result.topUnit || '--' },
+          { label: 'Low (<30)', value: result.lowCount || 0, color: (result.lowCount || 0) > 0 ? 'var(--danger, #ef4444)' : 'var(--success, #22c55e)' },
+          { label: 'Total', value: result.totalRows || 0 }
+        ]);
+
+        // Controls bar
+        var controls = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', alignItems: 'center' } });
+        var searchInput = el('input', { type: 'text', className: 'form-input form-input-sm', placeholder: 'Search name or email...', value: currentSearch, style: { flex: '1', minWidth: '140px' } });
+        searchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { currentSearch = searchInput.value; loadScoreboard(0); } });
+        controls.appendChild(searchInput);
+
+        var sortSelect = el('select', { className: 'form-input form-input-sm', style: { width: 'auto' } });
+        ['composite', 'survey', 'meeting', 'qa', 'workload', 'contact', 'name'].forEach(function(s) {
+          var opt = el('option', { value: s }, s.charAt(0).toUpperCase() + s.slice(1));
+          if (s === currentSort) opt.selected = true;
+          sortSelect.appendChild(opt);
+        });
+        sortSelect.addEventListener('change', function() { currentSort = sortSelect.value; loadScoreboard(0); });
+        controls.appendChild(sortSelect);
+
+        var refreshBtn = el('button', { className: 'btn-sm btn-primary', onClick: function() {
+          refreshBtn.disabled = true; refreshBtn.textContent = 'Computing...';
+          serverCall().withSuccessHandler(function(res) {
+            if (res && res.success) { refreshBtn.textContent = 'Done (' + res.computed + ')'; loadScoreboard(0); }
+            else { refreshBtn.textContent = 'Failed'; refreshBtn.disabled = false; }
+          }).withFailureHandler(function() { refreshBtn.textContent = 'Failed'; refreshBtn.disabled = false; }).dataComputeEngagementScores(SESSION_TOKEN);
+        } }, 'Refresh Scores');
+        controls.appendChild(refreshBtn);
+        content.appendChild(controls);
+
+        if (!result.items || result.items.length === 0) {
+          content.appendChild(el('div', { className: 'empty-state-lg' }, 'No engagement scores found. Click "Refresh Scores" to compute.'));
+          return;
+        }
+
+        // Scoreboard table
+        result.items.forEach(function(member, idx) {
+          var card = el('div', { className: 'card card-glass card-fade-in', style: { padding: '10px 12px', marginBottom: '6px', animationDelay: (idx * 30) + 'ms' } });
+          var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } });
+          var nameEl = el('span', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, member.name || member.email);
+          topRow.appendChild(nameEl);
+          var scoreColor = member.composite >= 70 ? 'var(--success, #22c55e)' : member.composite >= 40 ? 'var(--warning, #eab308)' : 'var(--danger, #ef4444)';
+          var trendIcon = member.trend === 'up' ? '\u2191' : member.trend === 'down' ? '\u2193' : '\u2192';
+          topRow.appendChild(el('span', { style: { fontSize: '16px', fontWeight: '700', color: scoreColor } }, member.composite + ' ' + trendIcon));
+          card.appendChild(topRow);
+
+          if (member.unit) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, member.unit));
+
+          // 5 dimension bars
+          var dims = [
+            { label: 'Survey', value: member.survey, color: 'hsl(250,70%,68%)' },
+            { label: 'Meeting', value: member.meeting, color: 'hsl(200,70%,55%)' },
+            { label: 'Q&A', value: member.qa, color: 'hsl(150,60%,50%)' },
+            { label: 'Workload', value: member.workload, color: 'hsl(40,80%,55%)' },
+            { label: 'Contact', value: member.contact, color: 'hsl(340,65%,55%)' }
+          ];
+          dims.forEach(function(dim) {
+            var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' } });
+            row.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--muted)', width: '52px', textAlign: 'right', flexShrink: '0' } }, dim.label));
+            var barBg = el('div', { style: { flex: '1', height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' } });
+            barBg.appendChild(el('div', { style: { height: '100%', borderRadius: '2px', background: dim.color, width: dim.value + '%', transition: 'width 0.3s' } }));
+            row.appendChild(barBg);
+            row.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--muted)', width: '24px', flexShrink: '0' } }, String(dim.value)));
+            card.appendChild(row);
+          });
+          content.appendChild(card);
+        });
+
+        // Pager
+        var totalPages = Math.ceil(result.totalRows / result.pageSize);
+        if (totalPages > 1) {
+          var pager = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' } });
+          pager.appendChild(el('button', { className: 'btn-sm btn-outline', disabled: (opts.page || 0) === 0, onClick: function() { loadScoreboard((opts.page || 0) - 1); } }, 'Prev'));
+          pager.appendChild(el('span', { className: 'text-xs-muted' }, 'Page ' + ((opts.page || 0) + 1) + ' of ' + totalPages));
+          pager.appendChild(el('button', { className: 'btn-sm btn-outline', disabled: (opts.page || 0) >= totalPages - 1, onClick: function() { loadScoreboard((opts.page || 0) + 1); } }, 'Next'));
+          content.appendChild(pager);
+        }
+      }).withFailureHandler(function() {
+        content.innerHTML = '';
+        content.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load engagement data.'));
+      }).dataGetEngagementScoreboard(SESSION_TOKEN, opts);
+    }
+
+    loadScoreboard(0);
+  });
+}
+
+// ═══════════════════════════════════════
+// ACCESS LOG VIEWER (v4.36.0 — steward/admin)
+// ═══════════════════════════════════════
+
+function renderAccessLogPage(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'accesslog', function(container) {
+    _stewardHeader(container, 'Access Log', 'Who accessed what and when');
+
+    // ── Filter bar ──
+    var filterBar = el('div', { className: 'card card-glass', style: { padding: '12px', marginBottom: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-end' } });
+
+    // Date from
+    var dateFromGroup = el('div', { style: { flex: '1', minWidth: '120px' } });
+    dateFromGroup.appendChild(el('label', { className: 'form-label-sm' }, 'From'));
+    var dateFromInput = el('input', { type: 'date', className: 'form-input form-input-sm' });
+    dateFromGroup.appendChild(dateFromInput);
+    filterBar.appendChild(dateFromGroup);
+
+    // Date to
+    var dateToGroup = el('div', { style: { flex: '1', minWidth: '120px' } });
+    dateToGroup.appendChild(el('label', { className: 'form-label-sm' }, 'To'));
+    var dateToInput = el('input', { type: 'date', className: 'form-input form-input-sm' });
+    dateToGroup.appendChild(dateToInput);
+    filterBar.appendChild(dateToGroup);
+
+    // Event type dropdown
+    var typeGroup = el('div', { style: { flex: '1', minWidth: '140px' } });
+    typeGroup.appendChild(el('label', { className: 'form-label-sm' }, 'Event Type'));
+    var typeSelect = el('select', { className: 'form-input form-input-sm' });
+    typeSelect.appendChild(el('option', { value: '' }, 'All'));
+    typeGroup.appendChild(typeSelect);
+    filterBar.appendChild(typeGroup);
+
+    // Search
+    var searchGroup = el('div', { style: { flex: '2', minWidth: '160px' } });
+    searchGroup.appendChild(el('label', { className: 'form-label-sm' }, 'Search'));
+    var searchInput = el('input', { type: 'text', className: 'form-input form-input-sm', placeholder: 'Search events...' });
+    searchGroup.appendChild(searchInput);
+    filterBar.appendChild(searchGroup);
+
+    // Filter button
+    var filterBtn = el('button', { className: 'btn-sm btn-primary', style: { alignSelf: 'flex-end' }, onClick: function() { loadPage(0); } }, 'Filter');
+    filterBar.appendChild(filterBtn);
+
+    container.appendChild(filterBar);
+
+    // ── Results area ──
+    var content = el('div', { className: 'content' });
+    showLoading(content, 'list');
+    container.appendChild(content);
+
+    var pagerArea = el('div', { style: { padding: '8px 0' } });
+    container.appendChild(pagerArea);
+
+    var currentPage = 0;
+
+    function loadPage(page) {
+      currentPage = page;
+      showLoading(content, 'list');
+      pagerArea.innerHTML = '';
+
+      var opts = {
+        page: page,
+        pageSize: 20,
+        dateFrom: dateFromInput.value || undefined,
+        dateTo: dateToInput.value || undefined,
+        eventTypeFilter: typeSelect.value || undefined,
+        searchTerm: searchInput.value || undefined
+      };
+
+      serverCall().withSuccessHandler(function(result) {
+        content.innerHTML = '';
+        if (!result || !result.items || result.items.length === 0) {
+          content.appendChild(el('div', { className: 'empty-state-lg' }, 'No audit log entries found.'));
+          return;
+        }
+
+        // Populate event type dropdown on first load
+        if (typeSelect.options.length <= 1 && result.eventTypes) {
+          result.eventTypes.forEach(function(t) {
+            typeSelect.appendChild(el('option', { value: t }, t));
+          });
+        }
+
+        // Render table
+        var table = el('div', { style: { overflowX: 'auto' } });
+        var tbl = el('table', { className: 'data-table', style: { width: '100%', fontSize: '12px', borderCollapse: 'collapse' } });
+
+        // Header row
+        var thead = el('thead');
+        var hrow = el('tr');
+        ['Time', 'Event', 'User', 'Sheet', 'Field', 'Details'].forEach(function(h) {
+          hrow.appendChild(el('th', { style: { padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid var(--border)', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, h));
+        });
+        thead.appendChild(hrow);
+        tbl.appendChild(thead);
+
+        var tbody = el('tbody');
+        result.items.forEach(function(item) {
+          var row = el('tr', { style: { cursor: 'pointer', borderBottom: '1px solid var(--border)' } });
+
+          // Time
+          var ts = item.timestamp ? new Date(item.timestamp) : null;
+          var timeStr = ts ? ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + ts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '--';
+          row.appendChild(el('td', { style: { padding: '6px', whiteSpace: 'nowrap', fontSize: '11px', color: 'var(--muted)' } }, timeStr));
+
+          // Event type
+          var typeBadge = el('td', { style: { padding: '6px' } });
+          typeBadge.appendChild(el('span', { style: { display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '600', background: 'var(--accentBg)', color: 'var(--accent)' } }, item.eventType || item.actionType || '--'));
+          row.appendChild(typeBadge);
+
+          // User
+          row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--text)' } }, item.user || '--'));
+
+          // Sheet
+          row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.sheet || '--'));
+
+          // Field
+          row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.fieldName || '--'));
+
+          // Details (truncated, expandable)
+          var detailsTd = el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.newValue || '--');
+          row.appendChild(detailsTd);
+
+          // Click to expand details
+          var expanded = false;
+          row.addEventListener('click', function() {
+            expanded = !expanded;
+            if (expanded) {
+              detailsTd.style.whiteSpace = 'normal';
+              detailsTd.style.maxWidth = 'none';
+              detailsTd.style.wordBreak = 'break-all';
+              if (item.oldValue && item.oldValue !== '--') {
+                detailsTd.textContent = 'Old: ' + item.oldValue + '\nNew: ' + (item.newValue || '--');
+              }
+            } else {
+              detailsTd.style.whiteSpace = 'nowrap';
+              detailsTd.style.maxWidth = '200px';
+              detailsTd.textContent = item.newValue || '--';
+            }
+          });
+
+          tbody.appendChild(row);
+        });
+        tbl.appendChild(tbody);
+        table.appendChild(tbl);
+        content.appendChild(table);
+
+        // Pager
+        pagerArea.innerHTML = '';
+        var totalPages = Math.ceil(result.totalRows / result.pageSize);
+        if (totalPages > 1) {
+          var pager = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' } });
+          var prevBtn = el('button', { className: 'btn-sm btn-outline', disabled: page === 0, onClick: function() { loadPage(page - 1); } }, 'Prev');
+          var pageInfo = el('span', { className: 'text-xs-muted' }, 'Page ' + (page + 1) + ' of ' + totalPages + ' (' + result.totalRows + ' entries)');
+          var nextBtn = el('button', { className: 'btn-sm btn-outline', disabled: page >= totalPages - 1, onClick: function() { loadPage(page + 1); } }, 'Next');
+          pager.appendChild(prevBtn);
+          pager.appendChild(pageInfo);
+          pager.appendChild(nextBtn);
+          pagerArea.appendChild(pager);
+        }
+
+        // Export CSV button
+        var exportBtn = el('button', {
+          className: 'btn-sm btn-outline', style: { marginTop: '8px' },
+          onClick: function() {
+            var csv = 'Timestamp,Event Type,User,Sheet,Field,Old Value,New Value,Record ID\n';
+            result.items.forEach(function(item) {
+              csv += [item.timestamp, item.eventType, item.user, item.sheet, item.fieldName, item.oldValue, item.newValue, item.recordId]
+                .map(function(v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
+            });
+            var blob = new Blob([csv], { type: 'text/csv' });
+            var url = URL.createObjectURL(blob);
+            var a = el('a', { href: url, download: 'access-log-export.csv', style: { display: 'none' } });
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          }
+        }, 'Export Page as CSV');
+        pagerArea.appendChild(exportBtn);
+
+      }).withFailureHandler(function() {
+        content.innerHTML = '';
+        content.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load audit log.'));
+      }).dataGetAuditLog(SESSION_TOKEN, opts);
+    }
+
+    // Allow Enter key in search to trigger filter
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') loadPage(0);
+    });
+
+    // Initial load
+    loadPage(0);
+  });
 }
 
 // ═══════════════════════════════════════
@@ -6805,5 +8628,309 @@ function renderNewGrievanceForm(appContainer) {
 
     container.appendChild(content);
   });
+}
+
+// ═══════════════════════════════════════
+// BULK ACTIONS TOOLBAR (v4.32.0 — Feature 3)
+// ═══════════════════════════════════════
+
+function _updateBulkToolbar() {
+  var existing = document.getElementById('bulk-toolbar');
+  var selected = document.querySelectorAll('.bulk-select-cb:checked');
+
+  if (selected.length === 0) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  if (!existing) {
+    existing = el('div', { id: 'bulk-toolbar', className: 'bulk-toolbar', role: 'toolbar', 'aria-label': 'Bulk actions' });
+    document.body.appendChild(existing);
+  }
+  existing.innerHTML = ''; // Clear to rebuild
+
+  var countLabel = el('span', { style: { fontWeight: '600', fontSize: '13px' } }, selected.length + ' selected');
+
+  // Select All / Deselect All
+  var allCbs = document.querySelectorAll('.bulk-select-cb');
+  var toggleBtn = el('button', { className: 'btn btn-ghost', onclick: function() {
+    var allChecked = selected.length === allCbs.length;
+    allCbs.forEach(function(cb) { cb.checked = !allChecked; });
+    _updateBulkToolbar();
+  }}, selected.length === allCbs.length ? 'Deselect All' : 'Select All');
+
+  var statusBtn = el('button', { className: 'btn btn-primary', onclick: function() { _bulkStatusChange(selected); }}, 'Change Status');
+  var exportBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkExport(selected); }}, 'Export CSV');
+  var emailBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkEmail(selected); }}, 'Email');
+  var folderBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkCreateFolders(selected); }}, 'Create Folders');
+  var closeBtn = el('button', { className: 'btn btn-ghost', 'aria-label': 'Clear selection', onclick: function() {
+    document.querySelectorAll('.bulk-select-cb').forEach(function(cb) { cb.checked = false; });
+    _updateBulkToolbar();
+  }}, '\u2715');
+
+  [countLabel, toggleBtn, statusBtn, exportBtn, emailBtn, folderBtn, closeBtn].forEach(function(b) { existing.appendChild(b); });
+}
+
+function _getSelectedCaseIds(selected) {
+  var ids = [];
+  selected.forEach(function(cb) { if (cb.dataset.caseId) ids.push(cb.dataset.caseId); });
+  return ids;
+}
+
+function _getSelectedEmails(selected) {
+  var emails = [];
+  var seen = {};
+  selected.forEach(function(cb) {
+    var em = cb.dataset.memberEmail;
+    if (em && !seen[em]) { emails.push(em); seen[em] = true; }
+  });
+  return emails;
+}
+
+function _bulkStatusChange(selected) {
+  var newStatus = prompt('Enter new status for ' + selected.length + ' case(s):');
+  if (!newStatus) return;
+  var caseIds = _getSelectedCaseIds(selected);
+  function _doBulkUpdate() {
+    serverCall().withSuccessHandler(function(result) {
+      if (result && result.requires2FA) {
+        show2FAModal(function() { _doBulkUpdate(); }, { reason: 'Bulk status changes require email verification.' });
+        return;
+      }
+      if (result && result.success) {
+        alert('Updated ' + result.updated + ' case(s) to "' + newStatus + '".');
+        document.querySelectorAll('.bulk-select-cb').forEach(function(cb) { cb.checked = false; });
+        _updateBulkToolbar();
+        if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+        if (typeof _reloadStewardCases === 'function') _reloadStewardCases();
+      } else {
+        alert((result && result.message) || 'Bulk status update failed.');
+      }
+    }).withFailureHandler(function(err) {
+      alert('Error: ' + (err && err.message ? err.message : 'Unknown error'));
+    }).dataBulkUpdateStatus(SESSION_TOKEN, caseIds, newStatus);
+  }
+  _doBulkUpdate();
+}
+
+function _bulkExport(selected) {
+  var caseIds = _getSelectedCaseIds(selected);
+  function _doBulkExport() {
+    serverCall().withSuccessHandler(function(result) {
+      if (result && result.requires2FA) {
+        show2FAModal(function() { _doBulkExport(); }, { reason: 'Data exports require email verification for PII protection.' });
+        return;
+      }
+      if (result && result.success && result.csv) {
+        var blob = new Blob([result.csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = el('a', { href: url, download: 'cases-export.csv', style: { display: 'none' } });
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Export failed — no data returned.');
+      }
+    }).withFailureHandler(function(err) {
+      alert('Export error: ' + (err && err.message ? err.message : 'Unknown error'));
+    }).dataBulkExportCsv(SESSION_TOKEN, caseIds);
+  }
+  _doBulkExport();
+}
+
+function _bulkEmail(selected) {
+  var emails = _getSelectedEmails(selected);
+  if (!emails.length) { alert('No member emails found for selected cases.'); return; }
+  var subject = prompt('Email subject:');
+  if (!subject) return;
+  var body = prompt('Email body:');
+  if (body === null) return; // cancelled
+
+  serverCall().withSuccessHandler(function(result) {
+    if (result && result.success) {
+      alert('Sent ' + result.sent + ' email(s).');
+    } else {
+      alert((result && result.message) || 'Bulk email failed.');
+    }
+  }).withFailureHandler(function(err) {
+    alert('Email error: ' + (err && err.message ? err.message : 'Unknown error'));
+  }).dataBulkSendEmail(SESSION_TOKEN, emails, subject, body || '');
+}
+
+function _bulkCreateFolders(selected) {
+  var caseIds = _getSelectedCaseIds(selected);
+  if (!confirm('Create Drive folders for ' + caseIds.length + ' case(s)?')) return;
+
+  serverCall().withSuccessHandler(function(result) {
+    if (result && result.success) {
+      var msg = 'Created folders for ' + result.created + ' case(s).';
+      if (result.errors && result.errors.length) {
+        msg += '\nErrors:\n' + result.errors.join('\n');
+      }
+      alert(msg);
+    } else {
+      alert((result && result.message) || 'Bulk folder creation failed.');
+    }
+  }).withFailureHandler(function(err) {
+    alert('Folder error: ' + (err && err.message ? err.message : 'Unknown error'));
+  }).dataBulkCreateFolders(SESSION_TOKEN, caseIds);
+}
+
+// Helper: reload steward cases after bulk operations
+function _reloadStewardCases() {
+  serverCall().withSuccessHandler(function(result) {
+    if (result && result.success !== false) {
+      AppState.cases = result.cases || result || [];
+      // Re-render cases tab via tab nav
+      if (typeof _handleTabNav === 'function') {
+        _handleTabNav('steward', 'cases');
+      }
+    }
+  }).withFailureHandler(function() {}).dataGetStewardCases(SESSION_TOKEN);
+}
+
+// ═══════════════════════════════════════
+// MENTORSHIP PAIRING PAGE (v4.35.0)
+// Pair experienced stewards with new members
+// ═══════════════════════════════════════
+function renderMentorshipPage(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'mentorship', function(container) {
+    _stewardHeader(container, 'Mentorship', 'Pair experienced stewards with new members');
+
+    var content = el('div', { className: 'content' });
+
+    // Active Pairings section
+    var activeSection = el('div', { style: { marginBottom: '24px' } });
+    activeSection.appendChild(el('h3', { style: { fontSize: '16px', marginBottom: '12px' } }, 'Active Pairings'));
+    var activeList = el('div', { id: 'mentorship-active' });
+    activeList.appendChild(el('div', { style: { padding: '16px', color: 'var(--text-secondary)' } }, 'Loading...'));
+    activeSection.appendChild(activeList);
+    content.appendChild(activeSection);
+
+    // Suggestions section
+    var suggestSection = el('div');
+    suggestSection.appendChild(el('h3', { style: { fontSize: '16px', marginBottom: '12px' } }, 'Suggested Pairings'));
+    var suggestList = el('div', { id: 'mentorship-suggestions' });
+    suggestList.appendChild(el('div', { style: { padding: '16px', color: 'var(--text-secondary)' } }, 'Loading...'));
+    suggestSection.appendChild(suggestList);
+    content.appendChild(suggestSection);
+
+    container.appendChild(content);
+
+    // Load data
+    _loadMentorshipPairings(activeList);
+    _loadMentorshipSuggestions(suggestList);
+  });
+}
+
+function _loadMentorshipPairings(activeList) {
+  serverCall().withSuccessHandler(function(pairings) {
+    activeList.innerHTML = '';
+    if (!pairings || pairings.length === 0) {
+      activeList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } }, 'No active mentorship pairings.'));
+      return;
+    }
+    pairings.forEach(function(p) {
+      activeList.appendChild(_buildMentorshipCard(p));
+    });
+  }).withFailureHandler(function() {
+    activeList.innerHTML = '';
+    activeList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load mentorship pairings.'));
+  }).dataGetMentorshipPairings(SESSION_TOKEN);
+}
+
+function _buildMentorshipCard(p) {
+  var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '8px' } });
+
+  var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  var info = el('div');
+  info.appendChild(el('div', { style: { fontWeight: '600' } }, '\uD83C\uDF93 ' + escapeHtml(p.mentorEmail)));
+  info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, 'mentoring \u2192 ' + escapeHtml(p.menteeEmail)));
+  header.appendChild(info);
+
+  var statusColor = p.status === 'active' ? 'var(--success, #22c55e)' : 'var(--border-subtle)';
+  var statusTextColor = p.status === 'active' ? '#fff' : 'var(--text)';
+  header.appendChild(el('span', {
+    style: { padding: '2px 8px', borderRadius: '12px', fontSize: '12px', background: statusColor, color: statusTextColor }
+  }, escapeHtml(p.status)));
+  card.appendChild(header);
+
+  if (p.caseTypes) {
+    card.appendChild(el('div', { style: { fontSize: '13px', marginTop: '6px', color: 'var(--text-secondary)' } }, 'Focus: ' + escapeHtml(p.caseTypes)));
+  }
+
+  // Notes textarea
+  var notesArea = el('textarea', {
+    className: 'form-input',
+    placeholder: 'Add mentorship notes...',
+    value: p.notes || '',
+    style: { width: '100%', minHeight: '50px', marginTop: '8px', resize: 'vertical', fontSize: '13px' }
+  });
+  card.appendChild(notesArea);
+
+  var actions = el('div', { style: { display: 'flex', gap: '8px', marginTop: '8px' } });
+  actions.appendChild(el('button', {
+    className: 'btn btn-secondary',
+    style: { fontSize: '12px' },
+    onClick: function() {
+      serverCall().withSuccessHandler(function(r) {
+        if (r && r.success) notesArea.style.borderColor = 'var(--success, #22c55e)';
+      }).withFailureHandler(function() {
+        notesArea.style.borderColor = 'var(--danger, #ef4444)';
+      }).dataUpdateMentorshipNotes(SESSION_TOKEN, p.id, notesArea.value);
+    }
+  }, 'Save Notes'));
+  actions.appendChild(el('button', {
+    className: 'btn btn-ghost',
+    style: { fontSize: '12px' },
+    onClick: function() {
+      if (confirm('Close this mentorship pairing?')) {
+        serverCall().withSuccessHandler(function(r) {
+          if (r && r.success) card.remove();
+        }).dataCloseMentorshipPairing(SESSION_TOKEN, p.id);
+      }
+    }
+  }, 'Close Pairing'));
+  card.appendChild(actions);
+
+  return card;
+}
+
+function _loadMentorshipSuggestions(suggestList) {
+  serverCall().withSuccessHandler(function(suggestions) {
+    suggestList.innerHTML = '';
+    if (!suggestions || suggestions.length === 0) {
+      suggestList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } }, 'No suggestions available \u2014 all new stewards are already paired.'));
+      return;
+    }
+    suggestions.forEach(function(s) {
+      var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+      var info = el('div');
+      info.appendChild(el('div', { style: { fontWeight: '500' } }, escapeHtml(s.mentorEmail) + ' \u2192 ' + escapeHtml(s.menteeEmail)));
+      info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, escapeHtml(s.reason)));
+      card.appendChild(info);
+      card.appendChild(el('button', {
+        className: 'btn btn-primary',
+        style: { fontSize: '13px' },
+        onClick: function() {
+          serverCall().withSuccessHandler(function(r) {
+            if (r && r.success) {
+              card.style.opacity = '0.5';
+              var btn = card.querySelector('button');
+              if (btn) {
+                btn.textContent = 'Created!';
+                btn.disabled = true;
+              }
+            }
+          }).dataCreateMentorshipPairing(SESSION_TOKEN, s.mentorEmail, s.menteeEmail, '');
+        }
+      }, 'Create Pairing'));
+      suggestList.appendChild(card);
+    });
+  }).withFailureHandler(function() {
+    suggestList.innerHTML = '';
+    suggestList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load suggestions.'));
+  }).dataGetMentorshipSuggestions(SESSION_TOKEN);
 }
 </script>

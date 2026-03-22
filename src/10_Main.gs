@@ -1008,6 +1008,15 @@ function dailyTrigger() {
       Logger.log('Meeting cleanup error:', e);
     }
 
+    // v4.36.0 — Run trend alert detection
+    try {
+      if (typeof triggerDailyTrendDetection === 'function') {
+        triggerDailyTrendDetection();
+      }
+    } catch (e) {
+      Logger.log('Trend detection error: ' + e.message);
+    }
+
     // ── v4.33.1 DAILY MAINTENANCE: previously orphaned functions now wired ──
 
     // Read retention thresholds from Config tab — defaults to 90 days if blank/invalid.

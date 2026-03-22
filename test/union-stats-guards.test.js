@@ -93,6 +93,9 @@ describe('G17: member_view.html never calls steward-only endpoints', () => {
       'qaModerateAnswer',      // Gated by if (isSteward) in QA Forum UI
       'qaSubmitAnswer',        // Steward answers — gated by isSteward check
       'qaGetFlaggedContent',   // Moderation panel — only rendered for stewards
+      'dataGetRSVPSummary',         // Gated by if (role === 'steward') in renderEventsPage
+      'dataReconcileAttendance',    // Gated by if (role === 'steward') in renderEventsPage
+      'dataSendMeetingInvitations', // Gated by if (role === 'steward') in renderEventsPage
     ]);
 
     const violations = [];

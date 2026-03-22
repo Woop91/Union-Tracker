@@ -925,3 +925,135 @@ function getCorrelationSummary(isPII) {
 
   return JSON.stringify(summary);
 }
+
+// ============================================================================
+// GRIEVANCE OUTCOME ANALYTICS (v4.35.0)
+// ============================================================================
+
+/**
+ * Computes grievance outcome analytics: resolution times, win rates by category/steward/unit.
+ * Independent of the Correlation Engine config gate — this is a standalone analytics function.
+ * @param {Object} [filters] - Optional filters { category, steward, unit, dateRange }
+ * @returns {Object} Analytics data
+ */
+function getOutcomeAnalytics(filters) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { error: 'No spreadsheet.' };
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return { error: 'Sheet not found.' };
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { totalCases: 0, resolved: 0, avgResolutionDays: 0, byCategory: {}, bySteward: {}, byUnit: {} };
+
+  var headers = data[0];
+  var cols = {};
+  for (var c = 0; c < headers.length; c++) {
+    var h = String(headers[c]).toLowerCase().trim();
+    if (h === 'status') cols.status = c;
+    if (h === 'step' || h === 'current step') cols.step = c;
+    if (h === 'filed' || h === 'date filed') cols.filed = c;
+    if (h === 'date closed') cols.closed = c;
+    if (h === 'issue category' || h === 'category') cols.category = c;
+    if (h === 'assigned steward' || h === 'steward email') cols.steward = c;
+    if (h === 'unit') cols.unit = c;
+    if (h === 'resolution' || h === 'outcome') cols.resolution = c;
+  }
+
+  var analytics = {
+    totalCases: 0,
+    resolved: 0,
+    denied: 0,
+    pending: 0,
+    avgResolutionDays: 0,
+    byCategory: {},
+    bySteward: {},
+    byUnit: {},
+    resolutionTimes: [],
+    monthlyTrend: {}
+  };
+
+  var totalDays = 0;
+  var closedCount = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var status = String(data[i][cols.status] || '').toLowerCase();
+    var category = String(data[i][cols.category] || 'Uncategorized');
+    var steward = String(data[i][cols.steward] || 'Unassigned');
+    var unit = String(data[i][cols.unit] || 'Unknown');
+    var filed = cols.filed !== undefined ? data[i][cols.filed] : null;
+    var closed = cols.closed !== undefined ? data[i][cols.closed] : null;
+
+    // Apply filters
+    if (filters) {
+      if (filters.category && category.toLowerCase() !== String(filters.category).toLowerCase()) continue;
+      if (filters.steward && steward.toLowerCase() !== String(filters.steward).toLowerCase()) continue;
+      if (filters.unit && unit.toLowerCase() !== String(filters.unit).toLowerCase()) continue;
+    }
+
+    analytics.totalCases++;
+    var isWin = status === 'resolved' || status === 'settled' || status === 'won';
+    var isLoss = status === 'denied' || status === 'lost';
+
+    if (isWin) analytics.resolved++;
+    else if (isLoss) analytics.denied++;
+    else analytics.pending++;
+
+    // Resolution time
+    if ((isWin || isLoss) && filed instanceof Date && closed instanceof Date) {
+      var days = Math.ceil((closed - filed) / (1000 * 60 * 60 * 24));
+      if (days >= 0) {
+        totalDays += days;
+        closedCount++;
+        analytics.resolutionTimes.push(days);
+      }
+    }
+
+    // By category
+    if (!analytics.byCategory[category]) analytics.byCategory[category] = { total: 0, won: 0, lost: 0 };
+    analytics.byCategory[category].total++;
+    if (isWin) analytics.byCategory[category].won++;
+    if (isLoss) analytics.byCategory[category].lost++;
+
+    // By steward
+    if (!analytics.bySteward[steward]) analytics.bySteward[steward] = { total: 0, won: 0, lost: 0, totalDays: 0, closedCount: 0 };
+    analytics.bySteward[steward].total++;
+    if (isWin) analytics.bySteward[steward].won++;
+    if (isLoss) analytics.bySteward[steward].lost++;
+    if ((isWin || isLoss) && filed instanceof Date && closed instanceof Date) {
+      var sDays = Math.ceil((closed - filed) / (1000 * 60 * 60 * 24));
+      if (sDays >= 0) { analytics.bySteward[steward].totalDays += sDays; analytics.bySteward[steward].closedCount++; }
+    }
+
+    // By unit
+    if (!analytics.byUnit[unit]) analytics.byUnit[unit] = { total: 0, won: 0, lost: 0 };
+    analytics.byUnit[unit].total++;
+    if (isWin) analytics.byUnit[unit].won++;
+    if (isLoss) analytics.byUnit[unit].lost++;
+
+    // Monthly trend
+    if (filed instanceof Date) {
+      var monthKey = filed.getFullYear() + '-' + String(filed.getMonth() + 1).padStart(2, '0');
+      if (!analytics.monthlyTrend[monthKey]) analytics.monthlyTrend[monthKey] = { filed: 0, resolved: 0 };
+      analytics.monthlyTrend[monthKey].filed++;
+      if (isWin && closed instanceof Date) {
+        var closeMonth = closed.getFullYear() + '-' + String(closed.getMonth() + 1).padStart(2, '0');
+        if (!analytics.monthlyTrend[closeMonth]) analytics.monthlyTrend[closeMonth] = { filed: 0, resolved: 0 };
+        analytics.monthlyTrend[closeMonth].resolved++;
+      }
+    }
+  }
+
+  analytics.avgResolutionDays = closedCount > 0 ? Math.round(totalDays / closedCount) : 0;
+  return analytics;
+}
+
+/**
+ * Global wrapper for SPA — steward-only access to outcome analytics.
+ * @param {string} sessionToken - Session token
+ * @param {Object} [filters] - Optional filters { category, steward, unit }
+ * @returns {Object} Analytics data or safe empty on auth failure
+ */
+function dataGetOutcomeAnalytics(sessionToken, filters) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { totalCases: 0, resolved: 0, denied: 0, pending: 0, byCategory: {}, bySteward: {}, byUnit: {} };
+  return getOutcomeAnalytics(filters);
+}

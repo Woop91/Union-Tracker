@@ -436,7 +436,7 @@ describe('No hardcoded column indices (regression guard)', () => {
   });
 
   // Formula column letters should use getColumnLetter(), not hardcoded letters
-  const formulaFiles = ['10a_SheetCreation.gs', '10c_FormHandlers.gs', '12_Features.gs'];
+  const formulaFiles = ['10a_SheetCreation.gs', '10c_FormsAndSync.gs', '12_Features.gs'];
   formulaFiles.forEach(file => {
     test(`${file}: conditional format formulas use getColumnLetter(), not hardcoded $X2 letters`, () => {
       const content = fs.readFileSync(path.join(srcDir, file), 'utf8');

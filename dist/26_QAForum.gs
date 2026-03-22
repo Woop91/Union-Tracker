@@ -677,6 +677,20 @@ var QAForum = (function () {
     return count;
   }
 
+  /**
+   * Returns questions visible across all units (org-wide collaboration).
+   * All questions are shared — filtering is done client-side by unit badge.
+   * @param {string} userEmail - Caller's email for ownership detection.
+   * @param {number} [page] - Page number (1-based).
+   * @param {number} [pageSize] - Results per page.
+   * @param {string} [sort] - Sort order: 'recent' or 'popular'.
+   * @returns {{questions: Object[], total: number, page: number, pageSize: number}}
+   */
+  function getOrgWideQuestions(userEmail, page, pageSize, sort) {
+    // Reuse existing getQuestions but with showResolved=true to include all
+    return getQuestions(userEmail, page, pageSize, sort, true);
+  }
+
   // ═══════════════════════════════════════
   // Public API
   // ═══════════════════════════════════════
@@ -684,6 +698,7 @@ var QAForum = (function () {
   return {
     initQAForumSheets: initQAForumSheets,
     getQuestions: getQuestions,
+    getOrgWideQuestions: getOrgWideQuestions,
     getQuestionDetail: getQuestionDetail,
     getUnansweredCount: getUnansweredCount,
     submitQuestion: submitQuestion,
@@ -718,5 +733,7 @@ function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStew
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
 /** @param {string} sessionToken @param {string} questionId @returns {Object} Resolve result (owner or steward). */
 function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_) { Logger.log('_: ' + (_.message || _)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
+/** @param {string} sessionToken @param {number} [page] @param {number} [pageSize] @param {string} [sort] @returns {Object} Org-wide paginated question list. */
+function qaGetOrgWideQuestions(sessionToken, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getOrgWideQuestions(e, page, pageSize, sort); }
 /** @returns {void} Initializes Q&A forum sheets (no auth required — setup only). */
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

@@ -323,4 +323,154 @@ function createServerPaginator(options) {
  loadPage: loadPage
  };
 }
+
+function show2FAModal(onVerified, options) {
+ options = options || {};
+ var title = options.title || 'Verify Your Identity';
+ var reason = options.reason || 'This action requires email verification for security.';
+
+ 
+ var overlay = el('div', {
+ style: { position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.6)', zIndex: '9999', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }
+ });
+
+ var modal = el('div', {
+ style: { background: 'var(--cardBg, #1e1e1e)', borderRadius: '16px', padding: '28px 24px', maxWidth: '380px', width: '100%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }
+ });
+
+ modal.appendChild(el('div', { style: { fontSize: '36px', marginBottom: '12px' } }, '\uD83D\uDD12'));
+ modal.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' } }, title));
+ modal.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '16px', lineHeight: '1.5' } }, reason));
+
+ var statusArea = el('div', { style: { fontSize: '13px', color: 'var(--accent)', marginBottom: '12px', minHeight: '20px' } }, 'Sending verification code...');
+ modal.appendChild(statusArea);
+
+ var inputWrap = el('div', { style: { marginBottom: '16px' } });
+ var codeInput = el('input', {
+ type: 'text',
+ className: 'form-input',
+ placeholder: '000000',
+ maxLength: '6',
+ style: { textAlign: 'center', fontSize: '24px', letterSpacing: '6px', fontWeight: '700', padding: '12px', width: '100%', boxSizing: 'border-box' },
+ inputMode: 'numeric',
+ pattern: '[0-9]*',
+ autocomplete: 'one-time-code'
+ });
+ inputWrap.appendChild(codeInput);
+ modal.appendChild(inputWrap);
+
+ var btnRow = el('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } });
+
+ var verifyBtn = el('button', {
+ className: 'btn-primary',
+ style: { flex: '1', padding: '10px 20px', fontSize: '14px', fontWeight: '600', borderRadius: '8px' },
+ onClick: function() {
+  var code = codeInput.value.trim();
+  if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+  statusArea.textContent = 'Please enter a 6-digit code.';
+  statusArea.style.color = 'var(--danger, #ef4444)';
+  return;
+  }
+  verifyBtn.disabled = true;
+  verifyBtn.textContent = 'Verifying...';
+  statusArea.textContent = '';
+
+  serverCall().withSuccessHandler(function(res) {
+  if (res && res.success) {
+   statusArea.textContent = 'Verified!';
+   statusArea.style.color = 'var(--success, #22c55e)';
+   setTimeout(function() {
+   overlay.remove();
+   if (typeof onVerified === 'function') onVerified();
+   }, 500);
+  } else {
+   statusArea.textContent = (res && res.error) || 'Invalid code.';
+   statusArea.style.color = 'var(--danger, #ef4444)';
+   verifyBtn.disabled = false;
+   verifyBtn.textContent = 'Verify';
+   codeInput.value = '';
+   codeInput.focus();
+  }
+  }).withFailureHandler(function() {
+  statusArea.textContent = 'Verification failed. Try again.';
+  statusArea.style.color = 'var(--danger, #ef4444)';
+  verifyBtn.disabled = false;
+  verifyBtn.textContent = 'Verify';
+  }).dataVerify2FACode(SESSION_TOKEN, code);
+ }
+ }, 'Verify');
+
+ var cancelBtn = el('button', {
+ className: 'btn-outline',
+ style: { flex: '1', padding: '10px 20px', fontSize: '14px', borderRadius: '8px' },
+ onClick: function() { overlay.remove(); }
+ }, 'Cancel');
+
+ btnRow.appendChild(verifyBtn);
+ btnRow.appendChild(cancelBtn);
+ modal.appendChild(btnRow);
+
+ 
+ var resendArea = el('div', { style: { marginTop: '12px' } });
+ var resendLink = el('button', {
+ style: { background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline', padding: '0' },
+ onClick: function() {
+  resendLink.textContent = 'Sending...';
+  resendLink.disabled = true;
+  serverCall().withSuccessHandler(function(res) {
+  if (res && res.success) {
+   statusArea.textContent = 'New code sent!';
+   statusArea.style.color = 'var(--accent)';
+  } else {
+   statusArea.textContent = (res && res.error) || 'Failed to resend.';
+   statusArea.style.color = 'var(--danger, #ef4444)';
+  }
+  resendLink.textContent = 'Resend code';
+  resendLink.disabled = false;
+  }).withFailureHandler(function() {
+  statusArea.textContent = 'Failed to resend.';
+  statusArea.style.color = 'var(--danger, #ef4444)';
+  resendLink.textContent = 'Resend code';
+  resendLink.disabled = false;
+  }).dataRequest2FACode(SESSION_TOKEN);
+ }
+ }, 'Resend code');
+ resendArea.appendChild(resendLink);
+ modal.appendChild(resendArea);
+
+ overlay.appendChild(modal);
+ document.body.appendChild(overlay);
+
+ 
+ serverCall().withSuccessHandler(function(res) {
+ if (res && res.success) {
+  statusArea.textContent = 'Code sent to your email.';
+  statusArea.style.color = 'var(--accent)';
+  codeInput.focus();
+ } else {
+  statusArea.textContent = (res && res.error) || 'Failed to send code.';
+  statusArea.style.color = 'var(--danger, #ef4444)';
+ }
+ }).withFailureHandler(function() {
+ statusArea.textContent = 'Failed to send verification code.';
+ statusArea.style.color = 'var(--danger, #ef4444)';
+ }).dataRequest2FACode(SESSION_TOKEN);
+
+ 
+ codeInput.addEventListener('keydown', function(e) {
+ if (e.key === 'Enter') verifyBtn.click();
+ });
+}
+
+function withTwoFactor(serverFn, options) {
+ serverFn(function(result) {
+ if (result && result.requires2FA) {
+  show2FAModal(function() {
+  
+  serverFn(function() {}); 
+  }, options);
+ }
+ });
+}
+
 </script>

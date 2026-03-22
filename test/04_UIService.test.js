@@ -19,7 +19,7 @@ loadSources([
   '03_UIComponents.gs',
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
-  '04d_ExecutiveDashboard.gs'
+  '09_Dashboards.gs'
 ]);
 
 // ============================================================================

@@ -168,6 +168,12 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 .card-clickable { cursor: pointer; }
 .card-clickable:active { opacity: 0.85; }
+.card-clickable.kb-focus { outline: 2px solid var(--accent, #7C3AED); outline-offset: 2px; }
+#shortcut-help { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9998; display: flex; align-items: center; justify-content: center; }
+#shortcut-help .shortcut-card { background: var(--surface, #1e1e1e); border-radius: 14px; padding: 28px 32px; max-width: 420px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.4); color: var(--text, #e0e0e0); }
+#shortcut-help .shortcut-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,0.06)); }
+#shortcut-help .shortcut-row:last-child { border-bottom: none; }
+#shortcut-help kbd { display: inline-block; min-width: 24px; text-align: center; padding: 2px 8px; background: var(--raised, #2a2a2a); border: 1px solid var(--border, rgba(255,255,255,0.1)); border-radius: 5px; font-family: monospace; font-size: 13px; font-weight: 600; color: var(--accent, #7C3AED); }
 
 /* ═══════════════════════════════════════
    KPI GRID
@@ -3285,12 +3291,172 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 
 /* ═══════════════════════════════════════
+   HANDOFF NOTES (v4.35.0)
+   ═══════════════════════════════════════ */
+.handoff-panel { border-radius: 8px; }
+.handoff-btn {
+  width: 26px; height: 26px;
+  font-size: 13px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.handoff-note { transition: opacity 0.2s ease; }
+
+/* ═══════════════════════════════════════
+   ONBOARDING WIZARD
+   ═══════════════════════════════════════ */
+.onboarding-wizard {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.wizard-card {
+  max-width: 480px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: var(--raised);
+}
+.wizard-steps {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.wizard-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-subtle, var(--border));
+  transition: background 0.2s;
+}
+.wizard-step-dot.active {
+  background: var(--accent);
+}
+.wizard-step-dot.completed {
+  background: var(--success, #22c55e);
+}
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+}
+.wizard-actions .btn {
+  min-width: 90px;
+}
+.wizard-step-content {
+  min-height: 180px;
+}
+.wizard-step-title {
+  font-family: var(--fontDisplay);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  text-align: center;
+}
+.wizard-step-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════
+   BULK ACTIONS TOOLBAR (v4.32.0 — Feature 3)
+   ═══════════════════════════════════════ */
+.bulk-toolbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 20px; z-index: 1000;
+  background: var(--surface); border-top: 2px solid var(--accent);
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+  animation: slideUp 0.2s ease;
+}
+.bulk-toolbar .btn { font-size: 13px; padding: 6px 12px; }
+.bulk-select-cb { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; accent-color: var(--accent); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* ═══════════════════════════════════════
+   CASE ACTIVITY LOG (v4.34.0 — Feature 5)
+   ═══════════════════════════════════════ */
+.activity-panel { border-radius: 8px; }
+.activity-timeline { max-height: 300px; overflow-y: auto; }
+.activity-node:first-child { padding-top: 0; }
+
+/* ═══════════════════════════════════════
+   DEADLINE CALENDAR (v4.34.0 — Feature 6)
+   ═══════════════════════════════════════ */
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border-subtle, var(--border)); border-radius: 8px; overflow: hidden; }
+.calendar-cell { background: var(--surface); padding: 4px; min-height: 60px; font-size: 12px; }
+.calendar-cell.today { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.calendar-cell.other-month { opacity: 0.4; }
+.calendar-header-cell { background: var(--surface); padding: 6px; text-align: center; font-weight: 600; font-size: 12px; color: var(--muted); }
+.deadline-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 1px; cursor: pointer; }
+.deadline-dot.overdue { background: #ef4444; }
+.deadline-dot.urgent { background: #f97316; }
+.deadline-dot.soon { background: #eab308; }
+.deadline-dot.safe { background: #22c55e; }
+.calendar-nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+.calendar-tooltip { background: var(--surface); border: 1px solid var(--border); }
+
+/* ============================================================================
+   MOBILE-FIRST STEWARD ENHANCEMENTS (v4.39.0)
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Larger touch targets for field use */
+  .btn { min-height: 44px; min-width: 44px; font-size: 15px; }
+  .icon-btn { min-height: 44px; min-width: 44px; font-size: 18px; }
+  .form-input, .form-select { min-height: 44px; font-size: 16px; } /* 16px prevents iOS zoom */
+  .card-clickable { padding: 14px; }
+  .bulk-select-cb { width: 22px; height: 22px; }
+
+  /* Quick-access mobile toolbar */
+  .mobile-quick-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mobile-quick-toolbar::-webkit-scrollbar { display: none; }
+  .mobile-quick-btn {
+    flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 14px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--border-subtle);
+    font-size: 11px; cursor: pointer; min-width: 64px;
+  }
+  .mobile-quick-btn .quick-icon { font-size: 20px; }
+
+  /* Swipe hint on cards */
+  .card-clickable { position: relative; overflow: hidden; }
+
+  /* Full-width cards on mobile */
+  .card { border-radius: 8px; }
+
+  /* Stack calendar grid tighter */
+  .calendar-cell { min-height: 40px; padding: 2px; }
+  .deadline-dot { width: 6px; height: 6px; }
+}
+
+/* ═══════════════════════════════════════
    PRINT STYLESHEET
    ═══════════════════════════════════════ */
 @media print {
   .sidebar-nav, .bottom-nav, .nav-progress, .glow-bar,
   .crt-overlay, .crt-scan-beam, .crt-pixel-grid,
-  .fab-button, .idle-logout-overlay { display: none !important; }
+  .fab-button, .idle-logout-overlay, .bulk-toolbar { display: none !important; }
   .page-layout-content { margin: 0 !important; max-width: 100% !important; }
   body { background: #fff !important; color: #000 !important; }
   .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ccc !important; }

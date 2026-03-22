@@ -1399,5 +1399,94 @@ function formatDateMSS_(date) {
 }
 
 // ============================================================================
+// ONBOARDING WIZARD
+// ============================================================================
+
+/**
+ * Gets onboarding completion status for a member.
+ * @param {string} memberEmail
+ * @returns {Object} {hasPIN, hasContactInfo, hasNotificationPref, isComplete}
+ */
+function getOnboardingStatus_(memberEmail) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { hasPIN: false, hasContactInfo: false, hasNotificationPref: false, isComplete: false };
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) return { hasPIN: false, hasContactInfo: false, hasNotificationPref: false, isComplete: false };
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var emailCol = -1, pinCol = -1, phoneCol = -1, addressCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = String(headers[c]).toLowerCase().trim();
+    if (h === 'email' || h === 'email address') emailCol = c;
+    if (h === 'pin hash' || h === 'pin') pinCol = c;
+    if (h === 'phone' || h === 'phone number') phoneCol = c;
+    if (h === 'street address' || h === 'address') addressCol = c;
+  }
+
+  var target = String(memberEmail).trim().toLowerCase();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][emailCol]).trim().toLowerCase() === target) {
+      var hasPIN = pinCol >= 0 && String(data[i][pinCol]).trim().length > 0;
+      var hasPhone = phoneCol >= 0 && String(data[i][phoneCol]).trim().length > 0;
+      var hasAddress = addressCol >= 0 && String(data[i][addressCol]).trim().length > 0;
+      var hasContact = hasPhone || hasAddress;
+
+      // Check notification preferences
+      var hasNotifPref = false;
+      if (typeof DigestService !== 'undefined') {
+        var prefs = DigestService.getPreferences(memberEmail);
+        hasNotifPref = prefs.frequency !== 'immediate' || prefs.types !== 'all';
+      }
+
+      return {
+        hasPIN: hasPIN,
+        hasContactInfo: hasContact,
+        hasNotificationPref: hasNotifPref,
+        isComplete: hasPIN && hasContact
+      };
+    }
+  }
+  return { hasPIN: false, hasContactInfo: false, hasNotificationPref: false, isComplete: false };
+}
+
+/** Global wrapper — get onboarding status. */
+function dataGetOnboardingStatus(sessionToken) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { hasPIN: false, hasContactInfo: false, hasNotificationPref: false, isComplete: false };
+  return getOnboardingStatus_(e);
+}
+
+/** Global wrapper — complete an onboarding step. */
+function dataCompleteOnboardingStep(sessionToken, step, data) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { success: false, message: 'Not authenticated.' };
+
+  if (step === 'pin' && data && data.pin) {
+    // Use existing PIN assignment
+    if (typeof assignMemberPIN === 'function') {
+      return assignMemberPIN(e, { pin: data.pin });
+    }
+    return { success: false, message: 'PIN service unavailable.' };
+  }
+
+  if (step === 'contact' && data) {
+    // Use existing profile update
+    if (typeof updateMemberProfile === 'function') {
+      return updateMemberProfile(e, data);
+    }
+    return { success: false, message: 'Profile service unavailable.' };
+  }
+
+  if (step === 'notifications' && data) {
+    if (typeof DigestService !== 'undefined') {
+      return DigestService.setPreferences(e, data.frequency || 'immediate', data.types || 'all');
+    }
+    return { success: true }; // Silently succeed if digest service not yet available
+  }
+
+  return { success: false, message: 'Unknown step: ' + step };
+}
+
+// ============================================================================
 // WEB APP INTEGRATION
 // ============================================================================

@@ -5047,13 +5047,7 @@ function dataGetInsightsBatch(sessionToken) {
   try { result.perf = DataService.getAllStewardPerformance(); } catch (_e) { result.perf = []; Logger.log('InsightsBatch perf: ' + _e.message); }
   try { result.sat = DataService.getSatisfactionTrends(); } catch (_e) { result.sat = { categories: [] }; Logger.log('InsightsBatch sat: ' + _e.message); }
   try { result.memberStats = DataService.getMembershipStats(); } catch (_e) { result.memberStats = null; Logger.log('InsightsBatch memberStats: ' + _e.message); }
-  try {
-    if (typeof WorkloadService !== 'undefined' && WorkloadService.getDashboardDataSSO) {
-      result.workload = WorkloadService.getDashboardDataSSO(s);
-    } else {
-      result.workload = { available: false };
-    }
-  } catch (_e) { result.workload = { available: false }; Logger.log('InsightsBatch workload: ' + _e.message); }
+  result.workload = { available: false };
   return result;
 }
 
@@ -6431,6 +6425,49 @@ function dataWebCheckInMember(sessionToken, meetingId, pin) {
 }
 
 // ═══════════════════════════════════════
+// CASE ACTIVITY LOG (v4.34.0 — Feature 5)
+// ═══════════════════════════════════════
+
+/**
+ * Get case activity log from audit log. Steward-only.
+ * Returns all audit log entries whose Record ID matches caseId,
+ * sorted newest-first.
+ * @param {string} sessionToken
+ * @param {string} caseId
+ * @returns {Array<Object>} Array of activity events
+ */
+function dataGetCaseActivityLog(sessionToken, caseId) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return [];
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return [];
+  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+  if (!sheet) return [];
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  // Audit log columns (0-indexed): Timestamp(0), User Email(1), Sheet(2), Row(3),
+  // Column(4), Field Name(5), Old Value(6), New Value(7), Record ID(8), Action Type(9)
+  var targetId = String(caseId).trim();
+  var results = [];
+  for (var i = 1; i < data.length; i++) {
+    var recordId = String(data[i][AUDIT_LOG_COLS.RECORD_ID - 1] || '').trim();
+    if (recordId === targetId) {
+      results.push({
+        timestamp: data[i][AUDIT_LOG_COLS.TIMESTAMP - 1],
+        userEmail: String(data[i][AUDIT_LOG_COLS.USER_EMAIL - 1] || ''),
+        field: String(data[i][AUDIT_LOG_COLS.FIELD_NAME - 1] || ''),
+        oldValue: String(data[i][AUDIT_LOG_COLS.OLD_VALUE - 1] || ''),
+        newValue: String(data[i][AUDIT_LOG_COLS.NEW_VALUE - 1] || ''),
+        actionType: String(data[i][AUDIT_LOG_COLS.ACTION_TYPE - 1] || 'edit')
+      });
+    }
+  }
+  results.sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
+  return results;
+}
+
+// ═══════════════════════════════════════
 // DEADLINE CALENDAR WRAPPER (v4.33.0)
 // ═══════════════════════════════════════
 
@@ -6484,6 +6521,234 @@ function dataGetCorrelationSummary(sessionToken) {
     Logger.log('dataGetCorrelationSummary error: ' + e.message);
     return { success: true, summary: { total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, topInsights: [], actionableCount: 0, disabled: true } };
   }
+}
+
+// ═══════════════════════════════════════
+// ACCESS LOG VIEWER (v4.36.0)
+// ═══════════════════════════════════════
+
+/**
+ * Returns paginated, filtered audit log entries for the Access Log Viewer tab.
+ * PII is masked for non-admin callers.
+ * @param {string} sessionToken
+ * @param {Object} [options] - { page, pageSize, dateFrom, dateTo, userFilter, eventTypeFilter, searchTerm }
+ * @returns {Object} { items, totalRows, page, pageSize, eventTypes }
+ */
+function dataGetAuditLog(sessionToken, options) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { items: [], totalRows: 0, page: 0, pageSize: 20, eventTypes: [] };
+  options = options || {};
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { items: [], totalRows: 0, page: 0, pageSize: 20, eventTypes: [] };
+
+  // Log this access
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('ACCESS_LOG_VIEWED', { viewer: typeof maskEmail === 'function' ? maskEmail(s) : s });
+  }
+
+  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG) || ss.getSheetByName('_Audit_Log');
+  if (!sheet || sheet.getLastRow() < 2) return { items: [], totalRows: 0, page: 0, pageSize: 20, eventTypes: [] };
+
+  var page = Math.max(0, parseInt(options.page, 10) || 0);
+  var pageSize = Math.min(100, Math.max(10, parseInt(options.pageSize, 10) || 20));
+  var data = sheet.getRange(2, 1, Math.min(sheet.getLastRow() - 1, 5000), sheet.getLastColumn()).getValues();
+
+  // Determine if caller is admin (for PII visibility)
+  var isAdmin = false;
+  try {
+    if (typeof _adminIsAuthorized_ === 'function') isAdmin = _adminIsAuthorized_(s);
+    else isAdmin = (s === Session.getEffectiveUser().getEmail());
+  } catch (_) { /* ignore */ }
+
+  // Collect distinct event types and filter
+  var eventTypeSet = {};
+  var filtered = [];
+  var dateFrom = options.dateFrom ? new Date(options.dateFrom) : null;
+  var dateTo = options.dateTo ? new Date(options.dateTo) : null;
+  if (dateTo) dateTo.setHours(23, 59, 59, 999);
+  var userFilter = options.userFilter ? String(options.userFilter).toLowerCase().trim() : '';
+  var eventTypeFilter = options.eventTypeFilter ? String(options.eventTypeFilter).trim() : '';
+  var searchTerm = options.searchTerm ? String(options.searchTerm).toLowerCase().trim() : '';
+
+  // Process rows in reverse (newest first)
+  for (var i = data.length - 1; i >= 0; i--) {
+    var row = data[i];
+    var ts = row[0]; // Timestamp
+    var eventType = String(row[9] || row[1] || '').trim(); // ACTION_TYPE or EVENT_TYPE
+    var user = String(row[1] || '').trim(); // USER_EMAIL
+    var details = String(row[7] || row[3] || '').trim(); // NEW_VALUE or DETAILS
+
+    if (eventType) eventTypeSet[eventType] = true;
+
+    // Apply filters
+    if (dateFrom && ts instanceof Date && ts < dateFrom) continue;
+    if (dateTo && ts instanceof Date && ts > dateTo) continue;
+    if (userFilter && user.toLowerCase().indexOf(userFilter) === -1) continue;
+    if (eventTypeFilter && eventType !== eventTypeFilter) continue;
+    if (searchTerm && (user + ' ' + eventType + ' ' + details).toLowerCase().indexOf(searchTerm) === -1) continue;
+
+    // Mask PII for non-admins
+    var displayUser = user;
+    var displayDetails = details;
+    if (!isAdmin) {
+      if (typeof maskEmail === 'function' && user.indexOf('@') !== -1) displayUser = maskEmail(user);
+      if (typeof maskObjectPII_ === 'function') {
+        try {
+          var parsed = JSON.parse(details);
+          displayDetails = JSON.stringify(maskObjectPII_(parsed));
+        } catch (_) { /* not JSON, show as-is */ }
+      }
+    }
+
+    filtered.push({
+      timestamp: ts instanceof Date ? ts.toISOString() : String(ts),
+      eventType: eventType,
+      user: displayUser,
+      sheet: String(row[2] || '').trim(),
+      fieldName: String(row[5] || '').trim(),
+      oldValue: String(row[6] || '').substring(0, 200),
+      newValue: displayDetails.substring(0, 500),
+      recordId: String(row[8] || '').trim(),
+      actionType: eventType
+    });
+  }
+
+  var totalRows = filtered.length;
+  var start = page * pageSize;
+  var items = filtered.slice(start, start + pageSize);
+
+  return {
+    items: items,
+    totalRows: totalRows,
+    page: page,
+    pageSize: pageSize,
+    eventTypes: Object.keys(eventTypeSet).sort()
+  };
+}
+
+// ═══════════════════════════════════════
+// BULK ACTIONS (v4.32.0 — Feature 3)
+// ═══════════════════════════════════════
+
+/** Bulk update status for multiple grievances. Steward-only. */
+function dataBulkUpdateStatus(sessionToken, caseIds, newStatus) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, message: 'Steward access required.' };
+  if (!Array.isArray(caseIds) || !caseIds.length || !newStatus) return { success: false, message: 'Invalid parameters.' };
+
+  // v4.36.0 — 2FA required for bulk operations
+  if (typeof TwoFactorService !== 'undefined' && !TwoFactorService.hasValidSession(s)) {
+    return { success: false, requires2FA: true, message: 'Verification required for bulk operations.' };
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: false, message: 'No spreadsheet.' };
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return { success: false, message: 'Sheet not found.' };
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var idCol = -1, statusCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = String(headers[c]).toLowerCase().trim();
+    if (h === 'id' || h === 'grievance id') idCol = c;
+    if (h === 'status') statusCol = c;
+  }
+  if (idCol === -1 || statusCol === -1) return { success: false, message: 'Column not found.' };
+
+  var updated = 0;
+  var safeStatus = typeof escapeForFormula === 'function' ? escapeForFormula(newStatus) : newStatus;
+  for (var i = 1; i < data.length; i++) {
+    if (caseIds.indexOf(String(data[i][idCol]).trim()) !== -1) {
+      sheet.getRange(i + 1, statusCol + 1).setValue(safeStatus);
+      updated++;
+    }
+  }
+  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('BULK_STATUS_UPDATE', { count: updated, newStatus: newStatus, steward: s });
+  }
+  return { success: true, updated: updated };
+}
+
+/** Bulk export cases as CSV string. Steward-only. */
+function dataBulkExportCsv(sessionToken, caseIds) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, csv: '' };
+  if (!Array.isArray(caseIds) || !caseIds.length) return { success: false, csv: '' };
+
+  // v4.36.0 — 2FA required for PII export
+  if (typeof TwoFactorService !== 'undefined' && !TwoFactorService.hasValidSession(s)) {
+    return { success: false, requires2FA: true, message: 'Verification required for data export.' };
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: false, csv: '' };
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return { success: false, csv: '' };
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var idCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    if (String(headers[c]).toLowerCase().trim() === 'id' || String(headers[c]).toLowerCase().trim() === 'grievance id') { idCol = c; break; }
+  }
+  if (idCol === -1) return { success: false, csv: '' };
+
+  // Build CSV: headers + matching rows
+  var csv = headers.map(function(h) { return '"' + String(h).replace(/"/g, '""') + '"'; }).join(',') + '\n';
+  for (var i = 1; i < data.length; i++) {
+    if (caseIds.indexOf(String(data[i][idCol]).trim()) !== -1) {
+      csv += data[i].map(function(cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(',') + '\n';
+    }
+  }
+  return { success: true, csv: csv };
+}
+
+/** Bulk create Drive folders for cases. Steward-only. */
+function dataBulkCreateFolders(sessionToken, caseIds) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, message: 'Steward access required.' };
+  if (!Array.isArray(caseIds) || !caseIds.length) return { success: false, message: 'No cases selected.' };
+
+  var created = 0;
+  var errors = [];
+  for (var i = 0; i < caseIds.length; i++) {
+    try {
+      if (typeof setupDriveFolderForGrievance === 'function') {
+        setupDriveFolderForGrievance(caseIds[i]);
+        created++;
+      }
+    } catch (e) {
+      errors.push(caseIds[i] + ': ' + e.message);
+    }
+  }
+  return { success: true, created: created, errors: errors };
+}
+
+/** Bulk send email to members. Steward-only. */
+function dataBulkSendEmail(sessionToken, memberEmails, subject, body) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, message: 'Steward access required.' };
+  if (!Array.isArray(memberEmails) || !memberEmails.length || !subject) return { success: false, message: 'Invalid parameters.' };
+
+  var sent = 0;
+  var safeSubject = typeof escapeHtml === 'function' ? escapeHtml(subject) : subject;
+  var safeBody = typeof escapeHtml === 'function' ? escapeHtml(body || '') : (body || '');
+  var htmlBody = '<p>' + safeBody.replace(/\n/g, '<br>') + '</p>';
+
+  for (var i = 0; i < memberEmails.length; i++) {
+    try {
+      if (typeof safeSendEmail_ === 'function') {
+        safeSendEmail_({ to: memberEmails[i], subject: safeSubject, htmlBody: htmlBody });
+      } else if (MailApp.getRemainingDailyQuota() > 5) {
+        MailApp.sendEmail({ to: memberEmails[i], subject: safeSubject, htmlBody: htmlBody });
+      }
+      sent++;
+    } catch (e) {
+      Logger.log('Bulk email failed for ' + memberEmails[i] + ': ' + e.message);
+    }
+  }
+  return { success: true, sent: sent };
 }
 
 

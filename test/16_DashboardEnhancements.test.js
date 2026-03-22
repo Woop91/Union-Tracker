@@ -24,7 +24,7 @@ global.getUnifiedDashboardDataWithDateRange = jest.fn(() => getUnifiedDashboardD
 global.isTruthyValue = jest.fn(v => !!v);
 global.getUserRole_ = jest.fn(() => 'steward');
 
-loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '15_EventBus.gs', '16_DashboardEnhancements.gs']);
+loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '15_EventBus.gs', '09_Dashboards.gs']);
 
 // Singleton PropertiesService mocks — the source code and tests must share the
 // same jest.fn() instance so that spy.mock.calls reflects source-code calls.

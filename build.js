@@ -34,7 +34,6 @@ const BUILD_ORDER = [
   '03_UIComponents.gs',
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
-  '04d_ExecutiveDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
   '07_DevTools.gs',
@@ -44,21 +43,17 @@ const BUILD_ORDER = [
   '08d_AuditAndFormulas.gs',
   '08e_SurveyEngine.gs',
   '09_Dashboards.gs',
-  '09a_SheetFormatting.gs',
-  '09b_TabModals.gs',
   '10a_SheetCreation.gs',
   '10b_SurveyDocSheets.gs',
-  '10c_FormHandlers.gs',
-  '10d_SyncAndMaintenance.gs',
+  '10c_FormsAndSync.gs',
   '10_Main.gs',
   '11_CommandHub.gs',
   '12_Features.gs',
   '13_MemberSelfService.gs',
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
-  '16_DashboardEnhancements.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules (load after all core modules)
+  // Web-dashboard SPA modules (load after all DDS modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -68,10 +63,12 @@ const BUILD_ORDER = [
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
-  '29_Migrations.gs',
+  '29_TrendAlertService.gs',
+  '30_EngagementService.gs',
   '30_TestRunner.gs',
   '31_WebAppTests.gs',
   '32_AdminSettings.gs',
+  '33_NewFeatureServices.gs',
   'DevMenu.gs',
 ];
 
@@ -318,7 +315,7 @@ if (validateOnly) {
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
   // Current prod capacity: 42 .gs + 9 .html + 1 appsscript.json = 52 files
-  const GAS_FILE_WARN = 52;
+  const GAS_FILE_WARN = 50;
   const GAS_FILE_LIMIT = 60;
   const prodFileCount = fileList.filter(f => !PROD_EXCLUDE.includes(f)).length;
   const totalDeployFiles = prodFileCount + HTML_FILES.length + 1; // +1 for appsscript.json

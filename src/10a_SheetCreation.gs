@@ -224,8 +224,8 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, [5], isExistingSheet);
 
   // Broadcast: Allow All Members Scope — controls whether stewards can send to all members
-  // (not just their own assigned members). Default: 'no'. Set to 'yes' to enable.
-  seedConfigDefault_(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL, ['no'], isExistingSheet);
+  // (not just their own assigned members). Default: 'yes'. Set to 'no' to restrict.
+  seedConfigDefault_(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL, ['yes'], isExistingSheet);
   // Apply yes/no dropdown validation so admins get a picker instead of a free-text cell
   if (CONFIG_COLS.BROADCAST_SCOPE_ALL) {
     var broadcastScopeRule = SpreadsheetApp.newDataValidation()
@@ -234,6 +234,18 @@ function createConfigSheet(ss) {
       .setHelpText('yes = stewards can broadcast to all members. no = stewards can only broadcast to their assigned members.')
       .build();
     sheet.getRange(3, CONFIG_COLS.BROADCAST_SCOPE_ALL).setDataValidation(broadcastScopeRule);
+  }
+
+  // Correlation Engine — enables statistical correlation analysis on the Insights page.
+  // Default: 'yes'. Set to 'no' to disable (reduces compute on large datasets).
+  seedConfigDefault_(sheet, CONFIG_COLS.ENABLE_CORRELATION, ['yes'], isExistingSheet);
+  if (CONFIG_COLS.ENABLE_CORRELATION) {
+    var correlationRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['yes', 'no'], true)
+      .setAllowInvalid(false)
+      .setHelpText('yes = enable correlation analysis on Insights page. no = disable (reduces compute).')
+      .build();
+    sheet.getRange(3, CONFIG_COLS.ENABLE_CORRELATION).setDataValidation(correlationRule);
   }
 
   // Retention thresholds (v4.33.1) — days before auto-archival via dailyTrigger()

@@ -14,14 +14,8 @@
  * Run: npx jest test/auth-denial.test.js --verbose
  */
 
-const fs = require('fs');
-const path = require('path');
-
 require('./gas-mock');
 const { loadSources } = require('./load-source');
-
-// Optional source files that may not exist in all repo variants (e.g. SolidBase)
-const WS_EXISTS = fs.existsSync(path.resolve(__dirname, '..', 'src', '25_WorkloadService.gs'));
 
 // Mock globals before loading sources
 global.logAuditEvent = jest.fn();
@@ -39,7 +33,6 @@ loadSources([
   '03_UIComponents.gs',
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
-  '04d_ExecutiveDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
   '07_DevTools.gs',
@@ -51,15 +44,13 @@ loadSources([
   '09_Dashboards.gs',
   '10a_SheetCreation.gs',
   '10b_SurveyDocSheets.gs',
-  '10c_FormHandlers.gs',
-  '10d_SyncAndMaintenance.gs',
+  '10c_FormsAndSync.gs',
   '10_Main.gs',
   '11_CommandHub.gs',
   '12_Features.gs',
   '13_MemberSelfService.gs',
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
-  '16_DashboardEnhancements.gs',
   '17_CorrelationEngine.gs',
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
@@ -67,12 +58,11 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
-  WS_EXISTS && '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
-  '29_Migrations.gs',
-].filter(Boolean));
+  '33_NewFeatureServices.gs',
+]);
 
 // ============================================================================
 // Setup: Force auth denial for all tests

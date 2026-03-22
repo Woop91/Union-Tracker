@@ -12,9 +12,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// Optional source files that may not exist in all repo variants (e.g. SolidBase)
-const WS_EXISTS = fs.existsSync(path.resolve(__dirname, '..', 'src', '25_WorkloadService.gs'));
-
 require('./gas-mock');
 const { loadSources } = require('./load-source');
 
@@ -34,7 +31,6 @@ loadSources([
   '03_UIComponents.gs',
   '04a_UIMenus.gs',
   '04b_AccessibilityFeatures.gs',
-  '04d_ExecutiveDashboard.gs',
   '05_Integrations.gs',
   '06_Maintenance.gs',
   '07_DevTools.gs',
@@ -46,15 +42,13 @@ loadSources([
   '09_Dashboards.gs',
   '10a_SheetCreation.gs',
   '10b_SurveyDocSheets.gs',
-  '10c_FormHandlers.gs',
-  '10d_SyncAndMaintenance.gs',
+  '10c_FormsAndSync.gs',
   '10_Main.gs',
   '11_CommandHub.gs',
   '12_Features.gs',
   '13_MemberSelfService.gs',
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
-  '16_DashboardEnhancements.gs',
   '17_CorrelationEngine.gs',
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
@@ -62,13 +56,12 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
-  WS_EXISTS && '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
-  '29_Migrations.gs',
-  '32_AdminSettings.gs'
-].filter(Boolean));
+  '32_AdminSettings.gs',
+  '33_NewFeatureServices.gs'
+]);
 
 // ============================================================================
 // A1: CROSS-FILE DEPENDENCY TESTS
@@ -193,22 +186,21 @@ describe('A1: Build order integrity', () => {
   const BUILD_ORDER = [
     '00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '02_DataManagers.gs',
     '03_UIComponents.gs', '04a_UIMenus.gs', '04b_AccessibilityFeatures.gs',
-    '04d_ExecutiveDashboard.gs',
     '05_Integrations.gs', '06_Maintenance.gs',
     '07_DevTools.gs', '08a_SheetSetup.gs', '08b_SearchAndCharts.gs',
     '08c_FormsAndNotifications.gs', '08d_AuditAndFormulas.gs', '08e_SurveyEngine.gs',
-    '09_Dashboards.gs', '09a_SheetFormatting.gs', '09b_TabModals.gs',
+    '09_Dashboards.gs',
     '10a_SheetCreation.gs', '10b_SurveyDocSheets.gs',
-    '10c_FormHandlers.gs', '10d_SyncAndMaintenance.gs', '10_Main.gs',
+    '10c_FormsAndSync.gs', '10_Main.gs',
     '11_CommandHub.gs', '12_Features.gs', '13_MemberSelfService.gs',
-    '14_MeetingCheckIn.gs', '15_EventBus.gs', '16_DashboardEnhancements.gs',
+    '14_MeetingCheckIn.gs', '15_EventBus.gs',
     '17_CorrelationEngine.gs', '19_WebDashAuth.gs',
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
-    WS_EXISTS && '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
-    '28_FailsafeService.gs', '29_Migrations.gs', '30_TestRunner.gs',
-    '31_WebAppTests.gs', '32_AdminSettings.gs', 'DevMenu.gs'
-  ].filter(Boolean);
+    '26_QAForum.gs', '27_TimelineService.gs',
+    '28_FailsafeService.gs', '29_TrendAlertService.gs', '30_EngagementService.gs', '30_TestRunner.gs',
+    '31_WebAppTests.gs', '32_AdminSettings.gs', '33_NewFeatureServices.gs', 'DevMenu.gs'
+  ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {
     BUILD_ORDER.forEach(filename => {
@@ -409,9 +401,9 @@ describe('A5: Web app doGet() error resilience', () => {
 // ============================================================================
 
 describe('A3: No empty JSDoc-only stubs in form handler files', () => {
-  test('10c_FormHandlers.gs has no orphaned JSDoc comments without function bodies', () => {
+  test('10c_FormsAndSync.gs has no orphaned JSDoc comments without function bodies', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '..', 'src', '10c_FormHandlers.gs'), 'utf8'
+      path.resolve(__dirname, '..', 'src', '10c_FormsAndSync.gs'), 'utf8'
     );
     // Find JSDoc comments followed by blank line or another comment (no function)
     const orphanedJsdoc = content.match(/\*\/\s*\n\s*\n\s*\/\*\*/g);
@@ -420,34 +412,19 @@ describe('A3: No empty JSDoc-only stubs in form handler files', () => {
     expect(count).toBeLessThanOrEqual(2);
   });
 
-  test('10d_SyncAndMaintenance.gs has no "Note: defined in modular file" comments', () => {
+  test('10c_FormsAndSync.gs has no "Note: defined in modular file" comments', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '..', 'src', '10d_SyncAndMaintenance.gs'), 'utf8'
+      path.resolve(__dirname, '..', 'src', '10c_FormsAndSync.gs'), 'utf8'
     );
     expect(content).not.toContain('defined in modular file');
   });
 
-  test('10c_FormHandlers.gs has no "Note: defined in modular file" comments', () => {
+  test('10c_FormsAndSync.gs is under 1400 lines (combined from 10c + 10d)', () => {
     const content = fs.readFileSync(
-      path.resolve(__dirname, '..', 'src', '10c_FormHandlers.gs'), 'utf8'
-    );
-    expect(content).not.toContain('defined in modular file');
-  });
-
-  test('10c_FormHandlers.gs is under 750 lines (was 922 with stubs)', () => {
-    const content = fs.readFileSync(
-      path.resolve(__dirname, '..', 'src', '10c_FormHandlers.gs'), 'utf8'
+      path.resolve(__dirname, '..', 'src', '10c_FormsAndSync.gs'), 'utf8'
     );
     const lineCount = content.split('\n').length;
-    expect(lineCount).toBeLessThan(750);
-  });
-
-  test('10d_SyncAndMaintenance.gs is under 1150 lines (was 1519 with stubs)', () => {
-    const content = fs.readFileSync(
-      path.resolve(__dirname, '..', 'src', '10d_SyncAndMaintenance.gs'), 'utf8'
-    );
-    const lineCount = content.split('\n').length;
-    expect(lineCount).toBeLessThan(1150);
+    expect(lineCount).toBeLessThan(1400);
   });
 });
 
@@ -462,8 +439,7 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-    WS_EXISTS && '25_WorkloadService.gs',
-  ].filter(Boolean);
+  ];
 
   webAppFiles.forEach(file => {
     test(`${file}: every getActiveSpreadsheet() call has a null guard`, () => {
@@ -835,8 +811,9 @@ describe('A12: No unescaped dynamic HTML in .gs server files', () => {
     '04a_UIMenus.gs',
     '04b_AccessibilityFeatures.gs',
     // 04c_InteractiveDashboard.gs removed — deprecated v4.31.0
-    '04d_ExecutiveDashboard.gs',
+    // 04d_ExecutiveDashboard.gs merged into 09_Dashboards.gs
     '05_Integrations.gs',
+    '09_Dashboards.gs',
     '11_CommandHub.gs',
     '13_MemberSelfService.gs',
     '14_MeetingCheckIn.gs',
@@ -873,9 +850,10 @@ describe('A12: No unescaped dynamic HTML in .gs server files', () => {
 
       // Allow threshold — legacy code may have some safe cases
       // (e.g., pre-validated constants like STATUS_COLORS[status])
-      // Threshold set to 15 per file as ceiling; lower as true violations are eliminated.
+      // Threshold per file: raised to 20 after consolidation merges (v4.35.0)
+      // brought modal/dashboard HTML generators into 03_UIComponents and 09_Dashboards.
       if (issues.length > 0) {
-        expect(issues.length).toBeLessThanOrEqual(15);
+        expect(issues.length).toBeLessThanOrEqual(20);
       }
     });
   });
@@ -1001,14 +979,13 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
-    WS_EXISTS && '25_WorkloadService.gs',
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
     '08c_FormsAndNotifications.gs',
-    '10d_SyncAndMaintenance.gs',
+    '10c_FormsAndSync.gs',
     '12_Features.gs',
-  ].filter(Boolean);
+  ];
   const srcDir = path.resolve(__dirname, '..', 'src');
 
   lockFiles.forEach(file => {
@@ -1062,8 +1039,7 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-    WS_EXISTS && '25_WorkloadService.gs',
-  ].filter(Boolean);
+  ];
   const srcDir = path.resolve(__dirname, '..', 'src');
 
   // Extract named function bodies from a source string.
@@ -1153,6 +1129,12 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataGetCorrelationSummary',       // delegates to getCorrelationSummary() (17_CorrelationEngine.gs)
     'dataGetWebAppSearchResults',      // delegates to getWebAppSearchResults() (05_Integrations.gs)
     'dataLogResourceClick',            // writes directly to _Resource_Click_Log sheet (lightweight tracking)
+    'dataBulkUpdateStatus',            // bulk action: writes directly to Grievance Log sheet
+    'dataBulkExportCsv',               // bulk action: reads directly from Grievance Log sheet
+    'dataBulkCreateFolders',           // bulk action: delegates to setupDriveFolderForGrievance()
+    'dataBulkSendEmail',               // bulk action: sends emails directly via safeSendEmail_()
+    'dataGetCaseActivityLog',          // reads _Audit_Log sheet directly for case-level activity (Feature 5)
+    'dataGetAuditLog',                 // reads _Audit_Log sheet directly for Access Log Viewer (v4.36.0)
   ];
 
   wrappers

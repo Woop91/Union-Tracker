@@ -388,9 +388,9 @@
   
   var TAB_COLORS = {
   cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-  tasks: '#f59e0b', home: '#ff3366',
+  tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
   more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-  resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+  poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
   polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
   events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
   testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -491,6 +491,11 @@
   if (embedRoot) {
    if (!AppState.isDark) embedRoot.classList.add('light');
    else embedRoot.classList.remove('light');
+  }
+  var pomsRoot = document.querySelector('.poms-root');
+  if (pomsRoot) {
+   if (AppState.isDark) pomsRoot.classList.add('poms-dark');
+   else pomsRoot.classList.remove('poms-dark');
   }
   }
 
@@ -1991,6 +1996,8 @@
   { id: 'tasks', icon: '\u2705', label: 'Tasks' },
   { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
   { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
+  { id: 'accesslog', icon: '\uD83D\uDD0D', label: 'Access Log' },
+  { id: 'engagement', icon: '\uD83C\uDFAF', label: 'Engagement' },
   { group: 'Reference' },
   { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
   { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
@@ -1998,6 +2005,7 @@
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
   { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
+  { id: 'mentorship', icon: '\uD83E\uDD1D', label: 'Mentorship' },
   { group: 'Comms' },
   { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
   { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
@@ -2030,6 +2038,7 @@
   { divider: true },
   { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
   { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
+  { id: 'reportcard', icon: '\uD83D\uDCCB', label: 'Report Card' },
   { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
   { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ];
@@ -2368,6 +2377,47 @@
  }
 
  
+ function renderPOMSReference(appContainer, role) {
+  var mySwitch = _navSwitchId;
+  var myGen = _renderGeneration; 
+  renderPageLayout(appContainer, role, 'poms', function(container) {
+  showLoading(container);
+  
+  container.style.height = 'calc(100vh - 56px)';
+  container.style.padding = '0';
+  container.style.overflow = 'hidden';
+  google.script.run
+   .withSuccessHandler(function(html) {
+   if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; 
+   container.innerHTML = '';
+   var wrap = el('div');
+   wrap.style.height = '100%';
+   wrap.innerHTML = html;
+   container.appendChild(wrap);
+   
+   var pomsRoot = wrap.querySelector('.poms-root');
+   if (pomsRoot) {
+    if (AppState.isDark) pomsRoot.classList.add('poms-dark');
+    else pomsRoot.classList.remove('poms-dark');
+   }
+   
+   wrap.querySelectorAll('script').forEach(function(old) {
+    try {
+    var s = document.createElement('script');
+    s.textContent = old.textContent;
+    old.parentNode.replaceChild(s, old);
+    } catch (scriptErr) {
+    console.error('POMS script re-execution failed:', scriptErr);
+    }
+   });
+   })
+   .withFailureHandler(function(err) {
+   container.innerHTML = '';
+   container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load POMS Reference.'));
+   })
+   .getPOMSReferenceHtml();
+  });
+ }
 
  
  
@@ -2535,6 +2585,14 @@
   _navProgressDone();
   return;
   }
+  if (tabId === 'poms') {
+  _hideAllVisiblePanes();
+  _splitRenderTarget = 'primary';
+  renderPOMSReference(app, role);
+  _activePane = _layoutCache.content;
+  _navProgressDone();
+  return;
+  }
 
   
   if (switchId !== _navSwitchId) { _navProgressDone(); return; }
@@ -2667,6 +2725,7 @@
    case 'cases': return renderMyCases;
    case 'profile': return renderUpdateProfile;
    case 'resources': return renderMemberResources;
+   case 'workload': return renderWorkloadTracker;
    case 'weeklyq': 
    case 'polls': return renderPollsPage;
    case 'survey': return renderSurveyResultsPage;
@@ -2681,6 +2740,7 @@
    case 'mytasks': return renderMemberTasks;
    case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
    case 'timeline': return renderMemberTimelinePage;
+   case 'reportcard': return renderReportCard;
    default: return renderMemberHome;
   }
   } else {
@@ -2704,6 +2764,10 @@
    case 'feedback': return function(a) { renderFeedbackPage(a, 'steward'); };
    case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
    case 'timeline': return renderStewardTimelinePage;
+   case 'mentorship': return renderMentorshipPage;
+   case 'workload': return renderWorkloadTracker;
+   case 'accesslog': return renderAccessLogPage;
+   case 'engagement': return renderEngagementDashboard;
    case 'failsafe': return renderFailsafePage;
    case 'search': return renderSearchPage;
    case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
@@ -2956,6 +3020,202 @@
   window.removeEventListener('offline', _showOfflineBanner);
   window.removeEventListener('online', _hideOfflineBanner);
  }
+
+ 
+ 
+ 
+ (function() {
+  var _shortcutFocusIdx = -1;
+
+  
+  function _clearKbFocus() {
+  var focused = document.querySelectorAll('.card-clickable.kb-focus');
+  for (var i = 0; i < focused.length; i++) {
+   focused[i].classList.remove('kb-focus');
+  }
+  }
+
+  
+  function _getVisibleCards() {
+  var content = _layoutCache.content;
+  if (!content) return [];
+  var cards = content.querySelectorAll('.card-clickable');
+  var visible = [];
+  for (var i = 0; i < cards.length; i++) {
+   
+   if (cards[i].offsetParent !== null) visible.push(cards[i]);
+  }
+  return visible;
+  }
+
+  
+  function _focusCard(cards, idx) {
+  _clearKbFocus();
+  if (idx < 0 || idx >= cards.length) return;
+  _shortcutFocusIdx = idx;
+  var card = cards[idx];
+  card.classList.add('kb-focus');
+  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  
+  function _showShortcutHelp() {
+  var existing = document.getElementById('_shortcut-help');
+  if (existing) { existing.remove(); return; }
+
+  var shortcuts = [
+   ['n', 'Go to Cases / New Grievance'],
+   ['/', 'Focus search input'],
+   ['j', 'Next item in list'],
+   ['k', 'Previous item in list'],
+   ['Enter', 'Open focused card'],
+   ['Esc', 'Close modal / overlay'],
+   ['?', 'Show this help']
+  ];
+
+  var rows = [];
+  for (var i = 0; i < shortcuts.length; i++) {
+   rows.push(el('div', { className: 'shortcut-row' }, [
+   el('kbd', {}, shortcuts[i][0]),
+   el('span', { style: { fontSize: '14px' } }, shortcuts[i][1])
+   ]));
+  }
+
+  var card = el('div', { className: 'shortcut-card' }, [
+   el('div', { style: { fontSize: '18px', fontWeight: '700', marginBottom: '16px' } }, 'Keyboard Shortcuts'),
+  ].concat(rows).concat([
+   el('div', { style: { marginTop: '16px', textAlign: 'right' } }, [
+   el('button', {
+    style: {
+    background: 'var(--accent, #7C3AED)',
+    color: '#fff',
+    border: 'none',
+    padding: '8px 20px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer'
+    },
+    onclick: function() {
+    var overlay = document.getElementById('_shortcut-help');
+    if (overlay) overlay.remove();
+    }
+   }, 'Close')
+   ])
+  ]));
+
+  var overlay = el('div', {
+   id: '_shortcut-help',
+   role: 'dialog',
+   'aria-modal': 'true',
+   'aria-label': 'Keyboard shortcuts',
+   onclick: function(e) {
+   if (e.target === overlay) overlay.remove();
+   }
+  }, card);
+
+  document.body.appendChild(overlay);
+  
+  var closeBtn = card.querySelector('button');
+  if (closeBtn) closeBtn.focus();
+  }
+
+  document.addEventListener('keydown', function(e) {
+  
+  var tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
+   
+   if (e.key === 'Escape') e.target.blur();
+   return;
+  }
+  
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+  switch (e.key) {
+   case 'n':
+   
+   if (AppState.activeRole) {
+    _handleTabNav(AppState.activeRole, 'cases');
+   }
+   break;
+
+   case '/':
+   e.preventDefault(); 
+   
+   var content = _layoutCache.content;
+   if (content) {
+    var searchEl = content.querySelector('.search-input') || content.querySelector('#globalSearch');
+    if (searchEl) {
+    searchEl.focus();
+    searchEl.select();
+    }
+   }
+   break;
+
+   case 'j':
+   
+   (function() {
+    var cards = _getVisibleCards();
+    if (cards.length === 0) return;
+    var nextIdx = _shortcutFocusIdx + 1;
+    if (nextIdx >= cards.length) nextIdx = cards.length - 1;
+    _focusCard(cards, nextIdx);
+   })();
+   break;
+
+   case 'k':
+   
+   (function() {
+    var cards = _getVisibleCards();
+    if (cards.length === 0) return;
+    var prevIdx = _shortcutFocusIdx - 1;
+    if (prevIdx < 0) prevIdx = 0;
+    _focusCard(cards, prevIdx);
+   })();
+   break;
+
+   case 'Enter':
+   
+   (function() {
+    var focused = document.querySelector('.card-clickable.kb-focus');
+    if (focused) {
+    focused.click();
+    }
+   })();
+   break;
+
+   case 'Escape':
+   
+   var shortcutHelp = document.getElementById('_shortcut-help');
+   if (shortcutHelp) {
+    shortcutHelp.remove();
+    break;
+   }
+   
+   if (_shortcutFocusIdx >= 0) {
+    _clearKbFocus();
+    _shortcutFocusIdx = -1;
+    break;
+   }
+   break;
+
+   case '?':
+   _showShortcutHelp();
+   break;
+
+   default:
+   return; // Don't call preventDefault for unhandled keys
+  }
+  });
+
+  
+  var _origHandleTabNav = _handleTabNav;
+  _handleTabNav = function() {
+  _shortcutFocusIdx = -1;
+  _clearKbFocus();
+  return _origHandleTabNav.apply(this, arguments);
+  };
+ })();
 
  
  
@@ -3277,6 +3537,58 @@
    
    IdleLogout.init();
   }
+
+  
+  
+  
+  (function() {
+   function _updateOnlineStatus() {
+   var banner = document.getElementById('_offline-banner');
+   if (!navigator.onLine) {
+    if (!banner) {
+    banner = el('div', {
+     id: '_offline-banner',
+     style: { position: 'fixed', top: '0', left: '0', right: '0', padding: '8px 16px', background: '#f97316', color: '#fff', textAlign: 'center', fontSize: '13px', fontWeight: '600', zIndex: '9999' }
+    }, 'You are offline. Showing cached data. Changes will sync when reconnected.');
+    document.body.prepend(banner);
+    }
+    
+    document.querySelectorAll('.btn-primary, .btn-secondary').forEach(function(btn) {
+    if (!btn.dataset.offlineDisabled) {
+     btn.dataset.offlineDisabled = 'true';
+     btn.dataset.origDisabled = btn.disabled ? 'true' : '';
+     btn.disabled = true;
+    }
+    });
+   } else {
+    if (banner) banner.remove();
+    
+    document.querySelectorAll('[data-offline-disabled]').forEach(function(btn) {
+    btn.disabled = btn.dataset.origDisabled === 'true';
+    delete btn.dataset.offlineDisabled;
+    delete btn.dataset.origDisabled;
+    });
+   }
+   }
+
+   window.addEventListener('online', function() {
+   _updateOnlineStatus();
+   
+   if (typeof AppState !== 'undefined' && AppState.activeRole) {
+    var initFn = AppState.activeRole === 'steward' ? 'dataGetStewardDashboardInit' : 'dataGetMemberHomeInit';
+    try { google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {})[initFn](SESSION_TOKEN); } catch(_) {  }
+   }
+   });
+   window.addEventListener('offline', _updateOnlineStatus);
+
+   
+   if (typeof AppState !== 'undefined') {
+   var origBatchData = AppState.batchData;
+   if (origBatchData) {
+    try { localStorage.setItem('dds_offline_cache', JSON.stringify(origBatchData)); } catch(_) {  }
+   }
+   }
+  })();
   } catch (bootErr) {
   console.error('Bootstrap error:', bootErr);
   var app = document.getElementById('app');

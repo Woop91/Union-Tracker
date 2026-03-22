@@ -11,6 +11,7 @@
  *         stewards, member_view for members)
  *     (4) Config + user data injection into HTML template
  *   Deep-link support: ?page=workload opens specific SPA tab after auth.
+ *   Token-authenticated pages: ?page=esign (e-sig), ?page=rsvp (meeting RSVP).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
  *   "Execute as: Me" deployment means the script runs with the owner's
@@ -47,10 +48,20 @@ function doGet(e) {
   if (e.parameter && e.parameter.page === 'esign') {
     try {
       return HtmlService.createHtmlOutputFromFile('esign')
-        .setTitle('Grievance E-Signature');
+        .setTitle('Grievance E-Signature — ' + (function() { try { return getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Local'; } catch(_) { return 'Your Local'; } })());
     } catch (esignErr) {
       Logger.log('doGet esign error: ' + esignErr.message);
       return _serveFatalError('E-Signature page unavailable.');
+    }
+  }
+
+  // v4.36.0 — RSVP page (token-authenticated, no login required)
+  if (e.parameter && e.parameter.page === 'rsvp') {
+    try {
+      return _serveRSVPPage(e);
+    } catch (rsvpErr) {
+      Logger.log('doGet rsvp error: ' + rsvpErr.message);
+      return _serveFatalError('RSVP page unavailable.');
     }
   }
 
@@ -357,6 +368,74 @@ function _serveFatalError(detail) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Dashboard — Error')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+}
+
+/**
+ * Serves the RSVP confirmation page — token-authenticated, no login required.
+ * Processes the RSVP response and shows a confirmation/error page.
+ * @param {Object} e - Event object with token and response params
+ * @returns {HtmlOutput}
+ * @private
+ */
+function _serveRSVPPage(e) {
+  var token = e.parameter.token || '';
+  var response = e.parameter.response || '';
+
+  if (!token || (response !== 'accept' && response !== 'decline')) {
+    return _serveFatalError('Invalid RSVP link.');
+  }
+
+  var result = RSVPService.processRSVP(token, response);
+
+  var orgName = '';
+  try {
+    var cfg = ConfigReader.getConfig();
+    orgName = cfg.orgName || '';
+  } catch (_) { /* ignore */ }
+
+  var statusText = result.success
+    ? (response === 'accept' ? 'Accepted' : 'Declined')
+    : 'Error';
+  var statusColor = response === 'accept' ? '#22c55e' : '#ef4444';
+  var icon = result.success ? (response === 'accept' ? '\u2705' : '\u274C') : '\u26A0\uFE0F';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>Meeting RSVP' + (orgName ? ' — ' + escapeHtml(orgName) : '') + '</title>'
+    + '<style>'
+    + 'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
+    + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#141414;color:#e0e0e0}'
+    + 'body.light{background:#f2f2f5;color:#1a1a2e}'
+    + '.card{max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center}'
+    + 'body.light .card{background:#ffffff;box-shadow:0 2px 12px rgba(0,0,0,0.08)}'
+    + '.icon{font-size:48px;margin-bottom:16px}'
+    + 'h1{font-size:20px;margin:0 0 8px}'
+    + '.meeting-name{font-size:16px;font-weight:600;margin:0 0 12px;color:' + statusColor + '}'
+    + 'p{color:#888;font-size:14px;line-height:1.6;margin:0 0 12px}'
+    + 'body.light p{color:#5c5c7a}'
+    + '.status{display:inline-block;padding:6px 16px;border-radius:20px;font-weight:600;font-size:13px;'
+    + 'background:' + statusColor + '22;color:' + statusColor + '}'
+    + '</style></head><body><div class="card">'
+    + '<div class="icon">' + icon + '</div>';
+
+  if (result.success) {
+    html += '<h1>RSVP ' + statusText + '</h1>'
+      + '<div class="meeting-name">' + escapeHtml(result.meetingName || '') + '</div>'
+      + '<p>' + (result.memberName ? escapeHtml(result.memberName) + ', your' : 'Your')
+      + ' response has been recorded.</p>'
+      + '<div class="status">' + escapeHtml(statusText) + '</div>';
+  } else {
+    html += '<h1>RSVP Link Expired</h1>'
+      + '<p>' + escapeHtml(result.error || 'This link is no longer valid.') + '</p>'
+      + '<p>Please contact your steward for a new invitation.</p>';
+  }
+
+  html += '</div><script>try{if(localStorage.getItem("dds_isDark")==="false")document.body.classList.add("light")}catch(e){}</script>'
+    + '</body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Meeting RSVP' + (orgName ? ' — ' + escapeHtml(orgName) : ''))
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 

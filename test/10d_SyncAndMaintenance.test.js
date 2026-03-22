@@ -14,7 +14,7 @@ loadSources([
   '00_Security.gs',
   '00_DataAccess.gs',
   '01_Core.gs',
-  '10d_SyncAndMaintenance.gs'
+  '10c_FormsAndSync.gs'
 ]);
 
 // ============================================================================

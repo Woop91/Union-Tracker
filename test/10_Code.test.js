@@ -22,8 +22,7 @@ loadSources([
   '08d_AuditAndFormulas.gs',
   '10a_SheetCreation.gs',
   '10b_SurveyDocSheets.gs',
-  '10c_FormHandlers.gs',
-  '10d_SyncAndMaintenance.gs'
+  '10c_FormsAndSync.gs'
 ]);
 
 // ============================================================================

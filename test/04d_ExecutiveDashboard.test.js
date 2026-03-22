@@ -9,7 +9,7 @@ const { loadSources } = require('./load-source');
 loadSources([
   '00_Security.gs', '00_DataAccess.gs', '01_Core.gs',
   '02_DataManagers.gs', '03_UIComponents.gs',
-  '04d_ExecutiveDashboard.gs'
+  '09_Dashboards.gs'
 ]);
 
 describe('04d function existence', () => {

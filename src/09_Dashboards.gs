@@ -3105,3 +3105,2214 @@ function rejectFlaggedSubmission(rowNum) {
   // Update dashboard
   syncSatisfactionValues();
 }
+
+// ============================================================================
+// SHEET THEME & FORMATTING (merged from 09a_SheetFormatting.gs)
+// ============================================================================
+
+// ============================================================================
+// TAB COLOR ASSIGNMENTS — which sheet gets which tab-bar color
+// ============================================================================
+
+/**
+ * Map of sheet names to tab-bar color groups.
+ * Blue  = data entry, Green = engagement/survey,
+ * Gold  = documentation/guide, Red = admin/technical.
+ * @private
+ */
+var TAB_COLOR_MAP_ = {};
+// Populated lazily by applyTabBarColors_() because SHEETS may not yet be
+// initialised when this file first loads in the GAS V8 runtime.
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Safely gets a sheet by name, returns null if not found.
+ * @param {Spreadsheet} ss
+ * @param {string} name
+ * @returns {Sheet|null}
+ * @private
+ */
+function getSheetSafe_(ss, name) {
+  if (!name) return null;
+  return ss.getSheetByName(name) || null;
+}
+
+/**
+ * Applies the Union brand header style to row 1 of a sheet.
+ * Navy background, white bold text, 14pt, centered, 40px tall.
+ * @param {Sheet} sheet
+ * @param {number} numCols - Number of columns to span
+ * @private
+ */
+function applyBrandHeader_(sheet, numCols) {
+  if (numCols < 1) return;
+  var range = sheet.getRange(1, 1, 1, numCols);
+  range
+    .setBackground(SHEET_COLORS.THEME_NAVY)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setFontWeight('bold')
+    .setFontSize(13)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 40);
+}
+
+/**
+ * Applies a subtitle/instruction row (italic gray, 10pt).
+ * @param {Sheet} sheet
+ * @param {number} row
+ * @param {number} numCols
+ * @param {string} text - Subtitle text to set (if falsy, only styles existing text)
+ * @private
+ */
+function applySubtitleRow_(sheet, row, numCols, text) {
+  if (numCols < 1) return;
+  var range = sheet.getRange(row, 1, 1, numCols);
+  if (text) {
+    sheet.getRange(row, 1, 1, 1).setValue(text);
+  }
+  range
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setFontStyle('italic')
+    .setFontSize(10)
+    .setBackground(SHEET_COLORS.BG_WHITE);
+}
+
+/**
+ * Applies alternating row banding (Light Sky / white) to a data range.
+ * Uses a single setBackgrounds() call for performance.
+ * @param {Sheet} sheet
+ * @param {number} startRow - First data row
+ * @param {number} numCols
+ * @param {number} [endRow] - Last row (defaults to sheet lastRow or startRow+50)
+ * @private
+ */
+function applyRowBanding_(sheet, startRow, numCols, endRow) {
+  var lastRow = endRow || Math.max(sheet.getLastRow(), startRow + 50);
+  var rowCount = lastRow - startRow + 1;
+  if (rowCount < 1 || numCols < 1) return;
+
+  var bgColors = [];
+  for (var r = 0; r < rowCount; r++) {
+    var color = (r % 2 === 0) ? SHEET_COLORS.BG_WHITE : SHEET_COLORS.THEME_LIGHT_SKY;
+    bgColors.push(new Array(numCols).fill(color));
+  }
+  sheet.getRange(startRow, 1, rowCount, numCols).setBackgrounds(bgColors);
+}
+
+/**
+ * Applies a section divider row (full-width colored bar with centered text).
+ * @param {Sheet} sheet
+ * @param {number} row
+ * @param {number} numCols
+ * @param {string} bgColor
+ * @private
+ */
+function applySectionDivider_(sheet, row, numCols, bgColor) {
+  if (numCols < 1) return;
+  sheet.getRange(row, 1, 1, numCols)
+    .setBackground(bgColor)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 30);
+}
+
+/**
+ * Sets an empty-state placeholder message in italic gray.
+ * Only writes if the sheet has no data below the header rows.
+ * @param {Sheet} sheet
+ * @param {number} dataStartRow - First expected data row
+ * @param {number} numCols
+ * @param {string} message
+ * @private
+ */
+function applyEmptyState_(sheet, dataStartRow, numCols, message) {
+  if (sheet.getLastRow() < dataStartRow) {
+    sheet.getRange(dataStartRow, 1, 1, numCols).merge()
+      .setValue(message)
+      .setFontColor(SHEET_COLORS.TEXT_LIGHT_GRAY)
+      .setFontStyle('italic')
+      .setFontSize(11)
+      .setHorizontalAlignment('center')
+      .setBackground(SHEET_COLORS.BG_WHITE);
+  }
+}
+
+/**
+ * Applies a secondary header row style (Steel Blue bg, white bold text).
+ * Useful for column header rows below a banner.
+ * @param {Sheet} sheet
+ * @param {number} row
+ * @param {number} numCols
+ * @private
+ */
+function applyColumnHeaderRow_(sheet, row, numCols) {
+  if (numCols < 1) return;
+  sheet.getRange(row, 1, 1, numCols)
+    .setBackground(SHEET_COLORS.THEME_STEEL_BLUE)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 32);
+}
+
+/**
+ * Clears existing conditional formatting rules for a sheet.
+ * Called before adding new theme rules to avoid duplicates.
+ * @param {Sheet} sheet
+ * @private
+ */
+function clearConditionalFormats_(sheet) {
+  sheet.setConditionalFormatRules([]);
+}
+
+/**
+ * Standard column width presets.
+ * @param {Sheet} sheet
+ * @param {Object<number,number>} widthMap - {colNumber: widthPx}
+ * @private
+ */
+function applyColumnWidths_(sheet, widthMap) {
+  var keys = Object.keys(widthMap);
+  for (var i = 0; i < keys.length; i++) {
+    var col = parseInt(keys[i], 10);
+    if (col > 0 && col <= sheet.getMaxColumns()) {
+      sheet.setColumnWidth(col, widthMap[keys[i]]);
+    }
+  }
+}
+
+// ============================================================================
+// INDIVIDUAL TAB FORMATTERS
+// ============================================================================
+
+// ─── Tab 1: Getting Started ─────────────────────────────────────────────────
+
+function formatGettingStartedTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.GETTING_STARTED);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 7);
+
+  // Row 1 branded header
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+
+  // Quick Navigation panel in columns H-J
+  var navCol = 8; // column H
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols < navCol + 2) {
+    sheet.insertColumnsAfter(maxCols, (navCol + 2) - maxCols);
+  }
+  numCols = Math.max(numCols, navCol + 2);
+  applyColumnWidths_(sheet, { 8: 160, 9: 160, 10: 160 });
+
+  // Panel title
+  sheet.getRange(2, navCol, 1, 3).merge()
+    .setValue('QUICK NAVIGATION')
+    .setBackground(SHEET_COLORS.THEME_NAVY)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setHorizontalAlignment('center');
+
+  // Category groups with tab names
+  var navGroups = [
+    { label: 'CORE DATA', color: '#6A1B9A', tabs: [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG, SHEETS.CASE_CHECKLIST] },
+    { label: 'REFERENCE', color: SHEET_COLORS.THEME_GOLD, tabs: [SHEETS.FAQ, SHEETS.RESOURCES, SHEETS.FEATURES_REFERENCE] },
+    { label: 'ENGAGEMENT', color: SHEET_COLORS.TAB_GREEN, tabs: [SHEETS.MEETING_ATTENDANCE, SHEETS.FEEDBACK, SHEETS.SATISFACTION] },
+    { label: 'ADMIN', color: SHEET_COLORS.TAB_RED_ORANGE, tabs: [SHEETS.FUNCTION_CHECKLIST, SHEETS.CONFIG] }
+  ];
+
+  var navRow = 3;
+  for (var g = 0; g < navGroups.length; g++) {
+    var group = navGroups[g];
+    // Category header spans cols H-J
+    sheet.getRange(navRow, navCol, 1, 3).merge()
+      .setValue(group.label)
+      .setBackground(group.color)
+      .setFontColor(SHEET_COLORS.TEXT_WHITE)
+      .setFontWeight('bold')
+      .setFontSize(10)
+      .setHorizontalAlignment('center');
+    navRow++;
+
+    // Tab names as navigable links across columns
+    for (var t = 0; t < group.tabs.length; t++) {
+      var tabName = group.tabs[t];
+      var targetSheet = getSheetSafe_(ss, tabName);
+      if (targetSheet) {
+        var gid = targetSheet.getSheetId();
+        sheet.getRange(navRow, navCol + (t % 3))
+          .setFormula('=HYPERLINK("#gid=' + gid + '","' + tabName.replace(/"/g, '""') + '")')
+          .setFontColor(SHEET_COLORS.LINK_PRIMARY)
+          .setFontSize(11);
+      } else {
+        sheet.getRange(navRow, navCol + (t % 3))
+          .setValue(tabName)
+          .setFontColor(SHEET_COLORS.TEXT_GRAY)
+          .setFontSize(11);
+      }
+      if (t % 3 === 2 || t === group.tabs.length - 1) navRow++;
+    }
+  }
+
+  // Light border around the nav panel
+  var panelRange = sheet.getRange(2, navCol, navRow - 2, 3);
+  panelRange.setBorder(true, true, true, true, false, false,
+    SHEET_COLORS.THEME_NAVY, SpreadsheetApp.BorderStyle.SOLID);
+
+  // Color-code step sections by scanning column A for "Step" keywords
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var stepColors = {
+    '1': SHEET_COLORS.THEME_GOLD,
+    '2': SHEET_COLORS.THEME_STEEL_BLUE,
+    '3': SHEET_COLORS.THEME_AMBER,
+    '4': SHEET_COLORS.THEME_GREEN
+  };
+
+  for (var r = 0; r < data.length; r++) {
+    var val = String(data[r][0]).trim();
+    // Match "Step 1", "Step 2", etc.
+    var match = val.match(/^Step\s+(\d)/i);
+    if (match && stepColors[match[1]]) {
+      // Limit to columns A-G so we don't overwrite the nav panel in H-J
+      applySectionDivider_(sheet, r + 2, Math.min(numCols, 7), stepColors[match[1]]);
+    }
+  }
+
+  Logger.log('Formatted: Getting Started');
+}
+
+// ─── Tab 2: FAQ ─────────────────────────────────────────────────────────────
+
+function formatFAQTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.FAQ);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 5);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+
+  // Apply alternating Q/A backgrounds: scan for question vs answer rows
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var sectionColors = [
+    SHEET_COLORS.THEME_NAVY,
+    SHEET_COLORS.THEME_STEEL_BLUE,
+    SHEET_COLORS.THEME_GREEN,
+    SHEET_COLORS.THEME_AMBER,
+    SHEET_COLORS.THEME_RED
+  ];
+  var sectionIdx = 0;
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var r = 0; r < data.length; r++) {
+    var val = String(data[r][0]).trim().toUpperCase();
+    var row = r + 2;
+
+    // Detect section headers (all-caps text like "GETTING STARTED", "MEMBER DIRECTORY")
+    var rawVal = String(data[r][0]).trim();
+    if (rawVal.length > 3 && rawVal === rawVal.toUpperCase() &&
+        !val.match(/^\d/) && !val.match(/^Q[:.]/) && val.indexOf('?') === -1 &&
+        rawVal.length < 50) {
+      var color = sectionColors[sectionIdx % sectionColors.length];
+      applySectionDivider_(sheet, row, numCols, color);
+      sectionIdx++;
+    }
+  }
+
+  Logger.log('Formatted: FAQ');
+}
+
+// ─── Tab 3: Survey Questions ────────────────────────────────────────────────
+
+function formatSurveyQuestionsTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.SURVEY_QUESTIONS);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 10);
+
+  // Row 1 = column headers → brand header style
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+
+  // Column widths: Question Text wide, IDs narrow
+  applyColumnWidths_(sheet, { 1: 80, 2: 100, 3: 100, 4: 140, 5: 300, 6: 100, 7: 80, 8: 80, 9: 200, 10: 100 });
+
+  // Text wrap on Question Text column (5) and Options column (9)
+  var lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow > 1) {
+    sheet.getRange(2, 5, lastRow - 1, 1).setWrap(true);
+    if (numCols >= 9) sheet.getRange(2, 9, lastRow - 1, 1).setWrap(true);
+  }
+
+  // Conditional formatting: Type column (6) color-coding
+  clearConditionalFormats_(sheet);
+  var typeRange = sheet.getRange(2, 6, Math.max(lastRow - 1, 50), 1);
+  var activeRange = sheet.getRange(2, 8, Math.max(lastRow - 1, 50), 1);
+  var rules = [];
+
+  var typeColors = [
+    { text: 'dropdown', bg: '#DBEAFE' },     // blue
+    { text: 'slider-10', bg: '#F3E8FF' },    // purple
+    { text: 'radio', bg: '#FFEDD5' },         // orange
+    { text: 'paragraph', bg: '#CCFBF1' }     // teal
+  ];
+  for (var t = 0; t < typeColors.length; t++) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(typeColors[t].text)
+      .setBackground(typeColors[t].bg)
+      .setRanges([typeRange])
+      .build());
+  }
+
+  // Active column: Y = green, N = gray
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenTextEqualTo('Y')
+    .setBackground(SHEET_COLORS.BG_LIGHT_GREEN)
+    .setRanges([activeRange])
+    .build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenTextEqualTo('N')
+    .setBackground(SHEET_COLORS.BG_VERY_LIGHT_GRAY)
+    .setFontColor(SHEET_COLORS.TEXT_GRAY)
+    .setRanges([activeRange])
+    .build());
+
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 2, numCols);
+
+  Logger.log('Formatted: Survey Questions');
+}
+
+// ─── Tab 4: Notifications ───────────────────────────────────────────────────
+
+function formatNotificationsTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.NOTIFICATIONS);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 8);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyRowBanding_(sheet, 2, numCols);
+  applyEmptyState_(sheet, 2, numCols,
+    'No notifications yet. Use 📢 Notifications menu to create in-app messages.');
+
+  Logger.log('Formatted: Notifications');
+}
+
+// ─── Tab 5: Resources ───────────────────────────────────────────────────────
+
+function formatResourcesTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.RESOURCES);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 6);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+
+  // Column widths: Content column wide, text wrap
+  applyColumnWidths_(sheet, { 1: 80, 2: 160, 3: 120, 4: 200, 5: 300, 6: 100 });
+  var lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow > 1 && numCols >= 5) {
+    sheet.getRange(2, 4, lastRow - 1, 1).setWrap(true);  // Summary
+    sheet.getRange(2, 5, lastRow - 1, 1).setWrap(true);  // Content
+  }
+
+  // Category color-coding via conditional formatting
+  clearConditionalFormats_(sheet);
+  var catRange = sheet.getRange(2, 3, Math.max(lastRow - 1, 50), 1);
+  var catColors = [
+    { text: 'Grievance Process', bg: '#FEE2E2' },
+    { text: 'Know Your Rights', bg: SHEET_COLORS.BG_LIGHT_GREEN },
+    { text: 'Forms & Templates', bg: '#DBEAFE' },
+    { text: 'Contact Info', bg: '#CCFBF1' },
+    { text: 'Guide', bg: SHEET_COLORS.BG_LIGHT_YELLOW },
+    { text: 'FAQ', bg: '#F3E8FF' }
+  ];
+  var rules = [];
+  for (var c = 0; c < catColors.length; c++) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(catColors[c].text)
+      .setBackground(catColors[c].bg)
+      .setRanges([catRange])
+      .build());
+  }
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 2, numCols);
+
+  Logger.log('Formatted: Resources');
+}
+
+// ─── Tab 6: Resource Config ─────────────────────────────────────────────────
+
+function formatResourceConfigTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.RESOURCE_CONFIG);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 4);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyRowBanding_(sheet, 2, numCols);
+
+  Logger.log('Formatted: Resource Config');
+}
+
+// ─── Tab 7: Feedback & Development ──────────────────────────────────────────
+
+function formatFeedbackTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.FEEDBACK);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 8);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyColumnWidths_(sheet, { 1: 140, 2: 140, 3: 110, 4: 90, 5: 200, 6: 300, 7: 100, 8: 120 });
+
+  // Conditional formatting: Priority + Status
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 1, 50);
+  var priorityRange = sheet.getRange(2, 4, dataRows, 1);
+  var statusRange = sheet.getRange(2, 7, dataRows, 1);
+  var rules = [];
+
+  // Priority: Critical=deep red, High=orange, Medium=amber, Low=gray
+  var priorities = [
+    { text: 'Critical', bg: SHEET_COLORS.THEME_RED, font: SHEET_COLORS.TEXT_WHITE },
+    { text: 'High', bg: '#FED7AA', font: '#9A3412' },
+    { text: 'Medium', bg: SHEET_COLORS.BG_LIGHT_YELLOW, font: '#92400E' },
+    { text: 'Low', bg: SHEET_COLORS.BG_VERY_LIGHT_GRAY, font: SHEET_COLORS.TEXT_GRAY }
+  ];
+  for (var p = 0; p < priorities.length; p++) {
+    var builder = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(priorities[p].text)
+      .setBackground(priorities[p].bg)
+      .setRanges([priorityRange]);
+    if (priorities[p].font) builder = builder.setFontColor(priorities[p].font);
+    rules.push(builder.build());
+  }
+
+  // Status: New=blue, Planned=purple, In Progress=amber, Resolved=green, Wont Fix=gray
+  var statuses = [
+    { text: 'New', bg: '#DBEAFE' },
+    { text: 'Planned', bg: '#F3E8FF' },
+    { text: 'In Progress', bg: '#FEF3C7' },
+    { text: 'Resolved', bg: SHEET_COLORS.BG_LIGHT_GREEN },
+    { text: 'Wont Fix', bg: SHEET_COLORS.BG_VERY_LIGHT_GRAY }
+  ];
+  for (var s = 0; s < statuses.length; s++) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(statuses[s].text)
+      .setBackground(statuses[s].bg)
+      .setRanges([statusRange])
+      .build());
+  }
+
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 2, numCols);
+
+  Logger.log('Formatted: Feedback & Development');
+}
+
+// ─── Tab 8: Function Checklist ──────────────────────────────────────────────
+
+function formatFunctionChecklistTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.FUNCTION_CHECKLIST);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 6);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyColumnWidths_(sheet, { 1: 50, 2: 120, 3: 200, 4: 160, 5: 300, 6: 200 });
+
+  // Conditional formatting: checked rows (col A = TRUE) get green tint
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 1, 100);
+  var fullRange = sheet.getRange(2, 1, dataRows, numCols);
+
+  var rules = [];
+  // Whole-row green tint when checkbox is checked
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$A2=TRUE')
+    .setBackground(SHEET_COLORS.BG_PALE_GREEN)
+    .setRanges([fullRange])
+    .build());
+  // Whole-row highlight when Notes (col F) is non-empty
+  if (numCols >= 6) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND($A2<>TRUE, LEN($F2)>0)')
+      .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)
+      .setRanges([fullRange])
+      .build());
+  }
+
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 2, numCols);
+
+  Logger.log('Formatted: Function Checklist');
+}
+
+// ─── Tab 9: Settings Overview ───────────────────────────────────────────────
+
+function formatSettingsOverviewTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.SETTINGS_OVERVIEW);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 5);
+
+  // Steel blue header for admin tabs
+  sheet.getRange(1, 1, 1, numCols)
+    .setBackground(SHEET_COLORS.THEME_STEEL_BLUE)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setFontWeight('bold')
+    .setFontSize(13)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 40);
+  sheet.setFrozenRows(1);
+
+  // Conditional formatting: empty Current Value cells = amber warning
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 1, 20);
+  if (numCols >= 2) {
+    var valueRange = sheet.getRange(2, 2, dataRows, 1);
+    var rules = [
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenCellEmpty()
+        .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)
+        .setRanges([valueRange])
+        .build()
+    ];
+    sheet.setConditionalFormatRules(rules);
+  }
+
+  applyRowBanding_(sheet, 2, numCols);
+  Logger.log('Formatted: Settings Overview');
+}
+
+// ─── Tab 10: Events ─────────────────────────────────────────────────────────
+
+function formatEventsTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.PORTAL_EVENTS);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 10);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyColumnWidths_(sheet, { 1: 60, 2: 200, 3: 100, 4: 140, 5: 140, 6: 160, 7: 300, 8: 200, 9: 140, 10: 120 });
+
+  // Conditional formatting: event Type color-coding
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 1, 50);
+  var typeRange = sheet.getRange(2, 3, dataRows, 1);
+  var typeColors = [
+    { text: 'Meeting', bg: '#DBEAFE' },
+    { text: 'Negotiation', bg: '#FEE2E2' },
+    { text: 'Training', bg: SHEET_COLORS.BG_LIGHT_GREEN },
+    { text: 'Social', bg: '#F3E8FF' },
+    { text: 'Community', bg: SHEET_COLORS.BG_LIGHT_YELLOW }
+  ];
+  var rules = [];
+  for (var i = 0; i < typeColors.length; i++) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(typeColors[i].text)
+      .setBackground(typeColors[i].bg)
+      .setRanges([typeRange])
+      .build());
+  }
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 2, numCols);
+  applyEmptyState_(sheet, 2, numCols,
+    'No events yet. Use 📅 Events menu → Add New Event to create your first event.');
+
+  Logger.log('Formatted: Events');
+}
+
+// ─── Tab 11: MeetingMinutes ─────────────────────────────────────────────────
+
+function formatMeetingMinutesTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.PORTAL_MINUTES);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 8);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyColumnWidths_(sheet, { 1: 60, 2: 120, 3: 200, 4: 300, 5: 300, 6: 140, 7: 120, 8: 200 });
+
+  // Text wrap on Bullets (4) and FullMinutes (5)
+  var lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow > 1) {
+    sheet.getRange(2, 4, lastRow - 1, 1).setWrap(true);
+    sheet.getRange(2, 5, lastRow - 1, 1).setWrap(true);
+  }
+
+  applyRowBanding_(sheet, 2, numCols);
+  applyEmptyState_(sheet, 2, numCols,
+    'No meeting minutes yet. Use 📝 Meeting Minutes menu to add new minutes.');
+
+  Logger.log('Formatted: MeetingMinutes');
+}
+
+// ─── Tab 12: Workload Reporting ─────────────────────────────────────────────
+
+function formatWorkloadReportingTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.WORKLOAD_REPORTING);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 13);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+
+  // Conditional formatting: Priority Cases column (3) — 0=green, 1-3=yellow, 4+=red
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 1, 50);
+  var priorityRange = sheet.getRange(2, 3, dataRows, 1);
+  var rules = [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenNumberEqualTo(0)
+      .setBackground(SHEET_COLORS.BG_LIGHT_GREEN)
+      .setRanges([priorityRange])
+      .build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenNumberBetween(1, 3)
+      .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)
+      .setRanges([priorityRange])
+      .build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenNumberGreaterThanOrEqualTo(4)
+      .setBackground(SHEET_COLORS.BG_LIGHT_RED)
+      .setRanges([priorityRange])
+      .build()
+  ];
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 2, numCols);
+  applyEmptyState_(sheet, 2, numCols,
+    'No workload data yet. Members submit weekly reports via the Workload tab in the web portal.');
+
+  Logger.log('Formatted: Workload Reporting');
+}
+
+// ─── Tab 13: Non-Member Contacts ────────────────────────────────────────────
+
+function formatNonMemberContactsTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.NON_MEMBER_CONTACTS);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 9);
+
+  // Distinct amber-tinted header to differentiate from Member Directory
+  sheet.getRange(1, 1, 1, numCols)
+    .setBackground(SHEET_COLORS.THEME_AMBER)
+    .setFontColor(SHEET_COLORS.TEXT_WHITE)
+    .setFontWeight('bold')
+    .setFontSize(13)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 40);
+  sheet.setFrozenRows(1);
+
+  applyColumnWidths_(sheet, { 1: 120, 2: 120, 3: 160, 4: 140, 5: 80, 6: 100, 7: 120, 8: 200, 9: 140 });
+  applyRowBanding_(sheet, 2, numCols);
+
+  Logger.log('Formatted: Non-Member Contacts');
+}
+
+// ─── Tab 14: Case Checklist ─────────────────────────────────────────────────
+
+function formatCaseChecklistTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.CASE_CHECKLIST);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 9);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyColumnWidths_(sheet, { 1: 80, 2: 80, 3: 120, 4: 250, 5: 120, 6: 80, 7: 80, 8: 120, 9: 120 });
+
+  // Conditional formatting
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 1, 100);
+  var fullRange = sheet.getRange(2, 1, dataRows, numCols);
+  var rules = [];
+
+  // Completed (col G=TRUE) → green tint + strikethrough
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$G2=TRUE')
+    .setBackground(SHEET_COLORS.BG_PALE_GREEN)
+    .setStrikethrough(true)
+    .setRanges([fullRange])
+    .build());
+
+  // Required + NOT completed → red tint warning
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=AND($F2="Y", $G2<>TRUE)')
+    .setBackground(SHEET_COLORS.BG_LIGHT_RED)
+    .setRanges([fullRange])
+    .build());
+
+  // Action Type color-coding (col C)
+  var actionRange = sheet.getRange(2, 3, dataRows, 1);
+  var actionColors = [
+    { text: 'Filing', bg: SHEET_COLORS.THEME_NAVY, font: SHEET_COLORS.TEXT_WHITE },
+    { text: 'Documentation', bg: '#DBEAFE', font: '#1E40AF' },
+    { text: 'Hearing Prep', bg: '#FFEDD5', font: '#9A3412' },
+    { text: 'Follow-Up', bg: SHEET_COLORS.BG_LIGHT_GREEN, font: SHEET_COLORS.TEXT_DARK_GREEN },
+    { text: 'Admin', bg: SHEET_COLORS.BG_VERY_LIGHT_GRAY, font: SHEET_COLORS.TEXT_GRAY }
+  ];
+  for (var a = 0; a < actionColors.length; a++) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(actionColors[a].text)
+      .setBackground(actionColors[a].bg)
+      .setFontColor(actionColors[a].font)
+      .setRanges([actionRange])
+      .build());
+  }
+
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 2, numCols);
+  applyEmptyState_(sheet, 2, numCols,
+    'No checklist items yet. Items are auto-generated when a new case is created.');
+
+  Logger.log('Formatted: Case Checklist');
+}
+
+// ─── Tab 15: Member Satisfaction ────────────────────────────────────────────
+
+function formatMemberSatisfactionTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.SATISFACTION);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 20);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+
+  // Freeze first 4 columns (Timestamp + demographics) for horizontal scroll
+  sheet.setFrozenColumns(4);
+
+  // Uniform column widths: Timestamp wide, Q columns 90px
+  var widths = { 1: 150 };
+  for (var col = 2; col <= numCols; col++) {
+    widths[col] = (col <= 5) ? 120 : 90;
+  }
+  applyColumnWidths_(sheet, widths);
+
+  // Set uniform row height for readability
+  var lastRow = sheet.getLastRow();
+  for (var row = 1; row <= lastRow; row++) {
+    sheet.setRowHeight(row, 30);
+  }
+
+  // Text wrap on header row so long question text is readable
+  sheet.getRange(1, 1, 1, numCols).setWrap(true);
+
+  // Color scale on numeric response columns (typically cols 6-20: slider 1-10)
+  // Red→Yellow→Green gradient
+  clearConditionalFormats_(sheet);
+  if (lastRow > 1 && numCols >= 6) {
+    var dataRows = lastRow - 1;
+    var rules = [];
+    var sliderStart = Math.min(6, numCols);
+    var sliderEnd = Math.min(20, numCols);
+    var sliderRange = sheet.getRange(2, sliderStart, dataRows, sliderEnd - sliderStart + 1);
+
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .setGradientMinpointWithValue('#FCA5A5', SpreadsheetApp.InterpolationType.NUMBER, '1')
+      .setGradientMidpointWithValue('#FDE68A', SpreadsheetApp.InterpolationType.NUMBER, '5')
+      .setGradientMaxpointWithValue('#6EE7B7', SpreadsheetApp.InterpolationType.NUMBER, '10')
+      .setRanges([sliderRange])
+      .build());
+
+    sheet.setConditionalFormatRules(rules);
+  }
+
+  applyRowBanding_(sheet, 2, numCols);
+  Logger.log('Formatted: Member Satisfaction');
+}
+
+// ─── Tab 16: Features Reference ─────────────────────────────────────────────
+
+function formatFeaturesReferenceTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.FEATURES_REFERENCE);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 5);
+
+  // This sheet already has good formatting from createFeaturesReferenceSheet.
+  // Just re-theme the main header row to match Union brand.
+  var row1Val = String(sheet.getRange(1, 1).getValue());
+  if (row1Val.indexOf('FEATURES REFERENCE') !== -1) {
+    sheet.getRange(1, 1, 1, numCols)
+      .setBackground(SHEET_COLORS.THEME_NAVY)
+      .setFontColor(SHEET_COLORS.TEXT_WHITE);
+  }
+
+  // Re-theme the column header row (usually row 5)
+  var lastRow = sheet.getLastRow();
+  for (var r = 2; r <= Math.min(lastRow, 10); r++) {
+    var val = String(sheet.getRange(r, 1).getValue()).trim();
+    if (val === 'Category') {
+      applyColumnHeaderRow_(sheet, r, numCols);
+      sheet.setFrozenRows(r);
+      break;
+    }
+  }
+
+  Logger.log('Formatted: Features Reference');
+}
+
+// ─── Tab 17: Volunteer Hours ────────────────────────────────────────────────
+
+function formatVolunteerHoursTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.VOLUNTEER_HOURS);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 9);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyColumnWidths_(sheet, { 1: 80, 2: 80, 3: 140, 4: 120, 5: 120, 6: 70, 7: 250, 8: 120, 9: 200 });
+
+  // Type hint row (row 2) styling if present
+  if (sheet.getLastRow() >= 2) {
+    var row2Val = String(sheet.getRange(2, 1).getValue()).trim().toLowerCase();
+    if (row2Val === 'auto-id' || row2Val.indexOf('auto') !== -1) {
+      applySubtitleRow_(sheet, 2, numCols);
+    }
+  }
+
+  // Conditional formatting: Unverified rows (Verified By empty)
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 2, 50);
+  var fullRange = sheet.getRange(3, 1, dataRows, numCols);
+  var rules = [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND(LEN($A3)>0, LEN($H3)=0)')
+      .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)
+      .setRanges([fullRange])
+      .build()
+  ];
+  sheet.setConditionalFormatRules(rules);
+  applyRowBanding_(sheet, 3, numCols);
+  applyEmptyState_(sheet, 3, numCols,
+    'No volunteer hours logged yet. Use 🤝 Volunteer menu → Log Hours to add entries.');
+
+  Logger.log('Formatted: Volunteer Hours');
+}
+
+// ─── Tab 18: Meeting Attendance ─────────────────────────────────────────────
+
+function formatMeetingAttendanceTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.MEETING_ATTENDANCE);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 8);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyColumnWidths_(sheet, { 1: 80, 2: 120, 3: 120, 4: 200, 5: 80, 6: 140, 7: 80, 8: 200 });
+
+  // Type hint row (row 2) if present
+  if (sheet.getLastRow() >= 2) {
+    var row2Val = String(sheet.getRange(2, 1).getValue()).trim().toLowerCase();
+    if (row2Val === 'auto-id' || row2Val.indexOf('auto') !== -1) {
+      applySubtitleRow_(sheet, 2, numCols);
+    }
+  }
+
+  // Conditional formatting: Attended checkbox
+  clearConditionalFormats_(sheet);
+  var dataRows = Math.max(sheet.getLastRow() - 2, 50);
+  var fullRange = sheet.getRange(3, 1, dataRows, numCols);
+  var rules = [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$G3=TRUE')
+      .setBackground(SHEET_COLORS.BG_PALE_GREEN)
+      .setRanges([fullRange])
+      .build()
+  ];
+
+  // Meeting Type color-coding (col C)
+  var typeRange = sheet.getRange(3, 3, dataRows, 1);
+  var mtgColors = [
+    { text: 'Regular', bg: '#DBEAFE' },
+    { text: 'Special', bg: '#FFEDD5' },
+    { text: 'Committee', bg: '#CCFBF1' },
+    { text: 'Emergency', bg: '#FEE2E2' }
+  ];
+  for (var m = 0; m < mtgColors.length; m++) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(mtgColors[m].text)
+      .setBackground(mtgColors[m].bg)
+      .setRanges([typeRange])
+      .build());
+  }
+  sheet.setConditionalFormatRules(rules);
+
+  applyRowBanding_(sheet, 3, numCols);
+  applyEmptyState_(sheet, 3, numCols,
+    'No attendance records yet. Use 📅 Meetings menu → Take Attendance to log participation.');
+
+  Logger.log('Formatted: Meeting Attendance');
+}
+
+// ─── Tab 19: Meeting Check-In Log ───────────────────────────────────────────
+
+function formatMeetingCheckInLogTab_(ss) {
+  var sheet = getSheetSafe_(ss, SHEETS.MEETING_CHECKIN_LOG);
+  if (!sheet) return;
+  var numCols = Math.max(sheet.getLastColumn(), 8);
+
+  applyBrandHeader_(sheet, numCols);
+  sheet.setFrozenRows(1);
+  applyRowBanding_(sheet, 2, numCols);
+  applyEmptyState_(sheet, 2, numCols,
+    'No check-ins yet. Check-ins are auto-populated when members sign in via the web portal.');
+
+  Logger.log('Formatted: Meeting Check-In Log');
+}
+
+// ============================================================================
+// TAB BAR COLORS
+// ============================================================================
+
+/**
+ * Applies tab-bar color grouping to all visible sheets.
+ * Blue = data entry, Green = engagement, Gold = documentation, Red = admin.
+ * @param {Spreadsheet} ss
+ * @private
+ */
+function applyTabBarColors_(ss) {
+  var blue   = SHEET_COLORS.TAB_BLUE;
+  var green  = SHEET_COLORS.TAB_GREEN;
+  var gold   = SHEET_COLORS.TAB_GOLD;
+  var red    = SHEET_COLORS.TAB_RED_ORANGE;
+
+  // Blue — Data entry tabs
+  var blueSheets = [
+    SHEETS.PORTAL_EVENTS, SHEETS.PORTAL_MINUTES, SHEETS.MEETING_ATTENDANCE,
+    SHEETS.MEETING_CHECKIN_LOG, SHEETS.VOLUNTEER_HOURS, SHEETS.WORKLOAD_REPORTING,
+    SHEETS.NON_MEMBER_CONTACTS, SHEETS.CASE_CHECKLIST
+  ];
+
+  // Green — Engagement / survey tabs
+  var greenSheets = [
+    SHEETS.SURVEY_QUESTIONS, SHEETS.SATISFACTION, SHEETS.NOTIFICATIONS,
+    SHEETS.FEEDBACK
+  ];
+
+  // Gold — Documentation / guide tabs
+  var goldSheets = [
+    SHEETS.GETTING_STARTED, SHEETS.FAQ, SHEETS.RESOURCES,
+    SHEETS.RESOURCE_CONFIG, SHEETS.FEATURES_REFERENCE, SHEETS.CONFIG_GUIDE
+  ];
+
+  // Red-Orange — Admin / technical tabs
+  var redSheets = [
+    SHEETS.FUNCTION_CHECKLIST, SHEETS.SETTINGS_OVERVIEW, SHEETS.CONFIG
+  ];
+
+  var groups = [
+    { names: blueSheets, color: blue },
+    { names: greenSheets, color: green },
+    { names: goldSheets, color: gold },
+    { names: redSheets, color: red }
+  ];
+
+  for (var g = 0; g < groups.length; g++) {
+    for (var n = 0; n < groups[g].names.length; n++) {
+      var sheet = getSheetSafe_(ss, groups[g].names[n]);
+      if (sheet) {
+        sheet.setTabColor(groups[g].color);
+      }
+    }
+  }
+
+  // Core data sheets get a distinct purple
+  var coreSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
+  for (var c = 0; c < coreSheets.length; c++) {
+    var coreSheet = getSheetSafe_(ss, coreSheets[c]);
+    if (coreSheet) coreSheet.setTabColor('#6A1B9A');
+  }
+
+  Logger.log('Tab bar colors applied');
+}
+
+// ============================================================================
+// MASTER FUNCTION — Apply Union Theme to All Tabs
+// ============================================================================
+
+/**
+ * Applies the Union brand theme to all visible tabs.
+ * Callable from Admin menu: 🎨 Apply Union Theme.
+ * Idempotent — safe to run multiple times.
+ */
+function applyUnionThemeToAllTabs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('Applying Union brand theme to all tabs...', '🎨 Theme', 10);
+
+  try {
+    // Phase 1: Format each tab
+    formatGettingStartedTab_(ss);
+    formatFAQTab_(ss);
+    formatSurveyQuestionsTab_(ss);
+    formatNotificationsTab_(ss);
+    formatResourcesTab_(ss);
+    formatResourceConfigTab_(ss);
+    formatFeedbackTab_(ss);
+    formatFunctionChecklistTab_(ss);
+    formatSettingsOverviewTab_(ss);
+    formatEventsTab_(ss);
+    formatMeetingMinutesTab_(ss);
+    formatWorkloadReportingTab_(ss);
+    formatNonMemberContactsTab_(ss);
+    formatCaseChecklistTab_(ss);
+    formatMemberSatisfactionTab_(ss);
+    formatFeaturesReferenceTab_(ss);
+    formatVolunteerHoursTab_(ss);
+    formatMeetingAttendanceTab_(ss);
+    formatMeetingCheckInLogTab_(ss);
+
+    // Phase 2: Tab bar colors
+    applyTabBarColors_(ss);
+
+    ss.toast('Union brand theme applied to all tabs!', '✅ Theme Complete', 5);
+    Logger.log('applyUnionThemeToAllTabs: completed successfully');
+
+  } catch (error) {
+    Logger.log('applyUnionThemeToAllTabs error: ' + error.message);
+    ss.toast('Theme error: ' + error.message, '❌ Error', 5);
+  }
+}
+
+/**
+ * Format a single tab by name (for debugging or selective formatting).
+ * @param {string} sheetName - The tab name to format
+ */
+function formatSingleTab(sheetName) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var formatters = {};
+  formatters[SHEETS.GETTING_STARTED] = formatGettingStartedTab_;
+  formatters[SHEETS.FAQ] = formatFAQTab_;
+  formatters[SHEETS.SURVEY_QUESTIONS] = formatSurveyQuestionsTab_;
+  formatters[SHEETS.NOTIFICATIONS] = formatNotificationsTab_;
+  formatters[SHEETS.RESOURCES] = formatResourcesTab_;
+  formatters[SHEETS.RESOURCE_CONFIG] = formatResourceConfigTab_;
+  formatters[SHEETS.FEEDBACK] = formatFeedbackTab_;
+  formatters[SHEETS.FUNCTION_CHECKLIST] = formatFunctionChecklistTab_;
+  formatters[SHEETS.SETTINGS_OVERVIEW] = formatSettingsOverviewTab_;
+  formatters[SHEETS.PORTAL_EVENTS] = formatEventsTab_;
+  formatters[SHEETS.PORTAL_MINUTES] = formatMeetingMinutesTab_;
+  formatters[SHEETS.WORKLOAD_REPORTING] = formatWorkloadReportingTab_;
+  formatters[SHEETS.NON_MEMBER_CONTACTS] = formatNonMemberContactsTab_;
+  formatters[SHEETS.CASE_CHECKLIST] = formatCaseChecklistTab_;
+  formatters[SHEETS.SATISFACTION] = formatMemberSatisfactionTab_;
+  formatters[SHEETS.FEATURES_REFERENCE] = formatFeaturesReferenceTab_;
+  formatters[SHEETS.VOLUNTEER_HOURS] = formatVolunteerHoursTab_;
+  formatters[SHEETS.MEETING_ATTENDANCE] = formatMeetingAttendanceTab_;
+  formatters[SHEETS.MEETING_CHECKIN_LOG] = formatMeetingCheckInLogTab_;
+
+  var fn = formatters[sheetName];
+  if (fn) {
+    fn(ss);
+    ss.toast('Formatted: ' + sheetName, '✅', 3);
+  } else {
+    ss.toast('No formatter found for: ' + sheetName, '⚠️', 3);
+  }
+}
+
+// ============================================================================
+// DASHBOARD ENHANCEMENTS (merged from 16_DashboardEnhancements.gs)
+// ============================================================================
+
+// ============================================================================
+// 1. CUSTOM DATE RANGES - Server-side helpers
+// ============================================================================
+// ============================================================================
+// 2. EXPORT INDIVIDUAL CHARTS AS IMAGES - Server-side download handler
+// ============================================================================
+
+/**
+ * Saves an exported chart image (base64 PNG) to the user's Drive
+ * @param {string} chartName - Name identifier for the chart
+ * @param {string} base64Data - Base64-encoded PNG data (without data: prefix)
+ * @returns {string} Drive file URL
+ */
+function saveChartImageToDrive(chartName, base64Data) {
+  if (!chartName || typeof chartName !== 'string') throw new Error('Invalid chart name');
+  if (!base64Data || typeof base64Data !== 'string') throw new Error('Invalid image data');
+  chartName = chartName.replace(/[^a-zA-Z0-9_\- ]/g, '_').substring(0, 100);
+  if (base64Data.length > 10 * 1024 * 1024) throw new Error('Image data too large');
+
+  var blob = Utilities.newBlob(
+    Utilities.base64Decode(base64Data),
+    'image/png',
+    chartName + '_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd') + '.png'
+  );
+
+  var folder = getOrCreateExportFolder_();
+  var file = folder.createFile(blob);
+  return file.getUrl();
+}
+
+/**
+ * Gets or creates the Dashboard Exports folder in Drive
+ * @returns {Folder} Google Drive folder
+ * @private
+ */
+function getOrCreateExportFolder_() {
+  var folderName = 'Dashboard Exports';
+  var folders = DriveApp.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return DriveApp.createFolder(folderName);
+}
+// ============================================================================
+// 3. SCHEDULED EMAIL REPORTS
+// ============================================================================
+
+/**
+ * Schedules a recurring dashboard email report
+ * @param {Object} config - Report configuration
+ * @param {string} config.email - Recipient email address
+ * @param {string} config.frequency - 'daily', 'weekly', or 'monthly'
+ * @param {string[]} config.sections - Sections to include ('summary','charts','trends','satisfaction')
+ * @param {boolean} config.includePII - Whether to include PII data
+ * @returns {Object} Schedule confirmation with trigger ID
+ */
+function scheduleEmailReport(config) {
+  if (!config || !config.email) {
+    return { success: false, error: 'Email address is required' };
+  }
+
+  // Validate email format
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.email)) {
+    return { success: false, error: 'Invalid email address format' };
+  }
+
+  // Authorization check — PII reports may only be sent to stewards or admins
+  var recipientRole = typeof getUserRole_ === 'function' ? getUserRole_(config.email) : null;
+  if (recipientRole !== 'admin' && recipientRole !== 'steward') {
+    var callerEmail = '';
+    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    // Allow sending to self even if not steward/admin (non-PII only)
+    if (config.includePII && callerEmail.toLowerCase() !== config.email.toLowerCase()) {
+      return { success: false, error: 'Reports containing PII can only be sent to stewards or admins.' };
+    }
+  }
+
+  // Store report config in script properties
+  var props = PropertiesService.getScriptProperties();
+  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
+
+  var schedule = {
+    id: 'rpt_' + Date.now(),
+    email: config.email,
+    frequency: config.frequency || 'weekly',
+    sections: config.sections || ['summary', 'charts'],
+    includePII: config.includePII || false,
+    createdBy: Session.getActiveUser().getEmail(),
+    createdAt: new Date().toISOString(),
+    active: true
+  };
+
+  schedules.push(schedule);
+  props.setProperty('report_schedules', JSON.stringify(schedules));
+
+  // Install trigger if not already installed
+  installReportTrigger_();
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('report:scheduled', schedule);
+  }
+
+  return { success: true, schedule: schedule };
+}
+
+/**
+ * Sends all scheduled email reports (called by trigger)
+ */
+function sendScheduledReports() {
+  var props = PropertiesService.getScriptProperties();
+  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
+
+  var now = new Date();
+  var dayOfWeek = now.getDay(); // 0=Sun
+  var dayOfMonth = now.getDate();
+
+  for (var i = 0; i < schedules.length; i++) {
+    var sched = schedules[i];
+    if (!sched.active) continue;
+
+    var shouldSend = false;
+    if (sched.frequency === 'daily') {
+      shouldSend = true;
+    } else if (sched.frequency === 'weekly' && dayOfWeek === 1) {
+      shouldSend = true;
+    } else if (sched.frequency === 'monthly' && dayOfMonth === 1) {
+      shouldSend = true;
+    }
+
+    if (shouldSend) {
+      try {
+        sendDashboardReportEmail_(sched);
+      } catch (e) {
+        Logger.log('Failed to send report to ' + sched.email + ': ' + e.message);
+      }
+    }
+  }
+}
+
+/**
+ * Sends a single dashboard report email
+ * @param {Object} schedule - The schedule config
+ * @private
+ */
+function sendDashboardReportEmail_(schedule) {
+  var data = JSON.parse(getUnifiedDashboardData(schedule.includePII));
+  var sections = schedule.sections;
+
+  var html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#1e293b;color:#f8fafc;padding:24px;border-radius:12px">';
+  html += '<h1 style="color:#3b82f6;font-size:20px;margin-bottom:16px">Dashboard Report</h1>';
+  html += '<p style="color:#94a3b8;font-size:12px">Generated ' + new Date().toLocaleDateString() + '</p>';
+
+  if (sections.indexOf('summary') >= 0) {
+    html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
+    html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Summary Metrics</h2>';
+    html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
+    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.totalMembers)) + '</td></tr>';
+    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.openCases)) + '</td></tr>';
+    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.winRate)) + '%</td></tr>';
+    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.moraleScore)) + '/10</td></tr>';
+    html += '</table></div>';
+  }
+
+  if (sections.indexOf('trends') >= 0 && data.monthlyFilings) {
+    html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
+    html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Monthly Filings Trend</h2>';
+    html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
+    for (var m = 0; m < data.monthlyFilings.length; m++) {
+      html += '<tr><td>' + escapeHtml(String(data.monthlyFilings[m].month)) + '</td><td style="text-align:right">' + escapeHtml(String(data.monthlyFilings[m].count)) + ' filed</td></tr>';
+    }
+    html += '</table></div>';
+  }
+
+  if (sections.indexOf('satisfaction') >= 0) {
+    html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
+    html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Satisfaction</h2>';
+    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + escapeHtml(String(data.moraleScore)) + '/10</strong></p>';
+    html += '</div>';
+  }
+
+  html += '<p style="color:#64748b;font-size:11px;margin-top:24px;text-align:center">This is an automated report. Manage your subscriptions in the dashboard settings.</p>';
+  html += '</div>';
+
+  MailApp.sendEmail({
+    to: schedule.email,
+    subject: 'Dashboard Report - ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMM d, yyyy'),
+    htmlBody: html
+  });
+
+}
+
+/**
+ * Installs the daily trigger for report dispatch
+ * @private
+ */
+function installReportTrigger_() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'sendScheduledReports') {
+      return; // Already installed
+    }
+  }
+  ScriptApp.newTrigger('sendScheduledReports')
+    .timeBased()
+    .everyDays(1)
+    .atHour(7)
+    .create();
+}
+
+/**
+ * Gets all scheduled reports for the current user
+ * @returns {string} JSON array of schedules
+ */
+function getScheduledReports() {
+  var props = PropertiesService.getScriptProperties();
+  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
+  var userEmail = Session.getActiveUser().getEmail();
+
+  var userSchedules = schedules.filter(function(s) {
+    return s.createdBy === userEmail;
+  });
+
+  return JSON.stringify(userSchedules);
+}
+
+/**
+ * Removes a scheduled report
+ * @param {string} scheduleId - The schedule ID to remove
+ * @returns {Object} Removal confirmation
+ */
+function removeScheduledReport(scheduleId) {
+  var props = PropertiesService.getScriptProperties();
+  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
+  var userEmail = Session.getActiveUser().getEmail();
+
+  schedules = schedules.filter(function(s) {
+    return !(s.id === scheduleId && s.createdBy === userEmail);
+  });
+
+  props.setProperty('report_schedules', JSON.stringify(schedules));
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('report:removed', { scheduleId: scheduleId });
+  }
+
+  return { success: true };
+}
+// ============================================================================
+// 4. NOTIFICATIONS (v4.22.0 — rerouted to sheet-based system in 05_Integrations.gs)
+// ============================================================================
+// getUserNotifications() and markNotificationRead() removed — used ScriptProperties
+// storage which is orphaned by the Notifications sheet system (v4.13.0+).
+// broadcastStewardNotification() removed — no active callers; steward compose
+// form handles broadcast directly via sendWebAppNotification().
+//
+// pushNotification() is kept because saveSharedView() (below) calls it.
+// It now writes to the Notifications sheet instead of ScriptProperties.
+
+/**
+ * Server-side push for a single-user notification.
+ * Called internally by saveSharedView() and EventBus trigger handlers.
+ * Writes to the 📢 Notifications sheet (same system as sendWebAppNotification).
+ * @param {string} userEmail - Target user email
+ * @param {Object} notification - { title, body, type }
+ * @returns {Object} { success, id }
+ */
+function pushNotification(userEmail, notification) {
+  try {
+    if (!userEmail || !notification || !notification.title) {
+      return { success: false, error: 'userEmail and notification.title are required.' };
+    }
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) {
+      if (typeof createNotificationsSheet === 'function') {
+        sheet = createNotificationsSheet(ss);
+      } else {
+        return { success: false, error: 'Notifications sheet not found.' };
+      }
+    }
+
+    var allData = sheet.getDataRange().getValues();
+    var maxNum = 0;
+    var C = NOTIFICATIONS_COLS;
+    for (var i = 1; i < allData.length; i++) {
+      var existId = String(allData[i][C.NOTIFICATION_ID - 1] || '');
+      var match = existId.match(/NOTIF-(\d+)/);
+      if (match) { var num = parseInt(match[1], 10); if (num > maxNum) maxNum = num; }
+    }
+    var nextId = 'NOTIF-' + String(maxNum + 1).padStart(3, '0');
+
+    var tz = Session.getScriptTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    sheet.appendRow([
+      nextId,
+      userEmail,                                      // RECIPIENT
+      'System',                                       // TYPE
+      String(notification.title || ''),               // TITLE
+      String(notification.body || ''),                // MESSAGE
+      'Normal',                                       // PRIORITY
+      Session.getActiveUser().getEmail() || 'system', // SENT_BY
+      'System',                                       // SENT_BY_NAME
+      today,                                          // CREATED_DATE
+      '',                                             // EXPIRES_DATE
+      '',                                             // DISMISSED_BY
+      'Active',                                       // STATUS
+      'Dismissible'                                   // DISMISS_MODE
+    ]);
+
+    if (typeof EventBus !== 'undefined' && EventBus.emit) {
+      EventBus.emit('notification:pushed', { userId: userEmail, id: nextId });
+    }
+
+    return { success: true, id: nextId };
+  } catch (e) {
+    Logger.log('pushNotification error: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+// ============================================================================
+// 5. MULTI-USER COLLABORATION ON CHART SELECTIONS
+// ============================================================================
+
+/**
+ * Saves a shared dashboard view configuration
+ * @param {Object} view - View configuration
+ * @param {string} view.name - View name
+ * @param {string[]} view.selectedCharts - Array of chart IDs to display
+ * @param {Object} view.filters - Active filters
+ * @param {string[]} view.sharedWith - Email addresses to share with
+ * @returns {Object} Saved view with ID
+ */
+function saveSharedView(view) {
+  return withScriptLock_(function() {
+  var props = PropertiesService.getScriptProperties();
+  var views = JSON.parse(props.getProperty('shared_views') || '[]');
+  var userEmail = Session.getActiveUser().getEmail();
+
+  var sharedView = {
+    id: 'view_' + Date.now(),
+    name: escapeForFormula(view.name || 'Untitled View'),
+    selectedCharts: view.selectedCharts || [],
+    filters: view.filters || {},
+    dateRange: view.dateRange || null,
+    createdBy: userEmail,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    sharedWith: view.sharedWith || [],
+    comments: []
+  };
+
+  views.push(sharedView);
+  props.setProperty('shared_views', JSON.stringify(views));
+
+  // Notify shared users
+  for (var i = 0; i < sharedView.sharedWith.length; i++) {
+    pushNotification(sharedView.sharedWith[i], {
+      title: 'Dashboard View Shared',
+      body: userEmail + ' shared "' + sharedView.name + '" with you',
+      type: 'info'
+    });
+  }
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('collaboration:viewCreated', { viewId: sharedView.id, name: sharedView.name });
+  }
+
+  return { success: true, view: sharedView };
+  });
+}
+
+/**
+ * Gets all shared views accessible to the current user
+ * @returns {string} JSON array of shared views
+ */
+function getSharedViews() {
+  var props = PropertiesService.getScriptProperties();
+  var views = JSON.parse(props.getProperty('shared_views') || '[]');
+  var userEmail = Session.getActiveUser().getEmail();
+
+  var accessible = views.filter(function(v) {
+    return v.createdBy === userEmail ||
+           (v.sharedWith && v.sharedWith.indexOf(userEmail) >= 0);
+  });
+
+  return JSON.stringify(accessible);
+}
+
+
+/**
+ * Deletes a shared view (only owner can delete)
+ * @param {string} viewId - View ID to delete
+ * @returns {Object} Deletion result
+ */
+function deleteSharedView(viewId) {
+  var props = PropertiesService.getScriptProperties();
+  var views = JSON.parse(props.getProperty('shared_views') || '[]');
+  var userEmail = Session.getActiveUser().getEmail();
+
+  var filtered = views.filter(function(v) {
+    return !(v.id === viewId && v.createdBy === userEmail);
+  });
+
+  if (filtered.length === views.length) {
+    return { success: false, error: 'View not found or not authorized' };
+  }
+
+  props.setProperty('shared_views', JSON.stringify(filtered));
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('collaboration:viewDeleted', { viewId: viewId });
+  }
+
+  return { success: true };
+}
+// ============================================================================
+// 6. SAVED CHART CONFIGURATIONS (PRESETS)
+// ============================================================================
+
+/**
+ * Saves a chart configuration preset
+ * @param {Object} preset - Preset configuration
+ * @param {string} preset.name - Preset display name
+ * @param {string[]} preset.visibleCharts - Chart IDs to show
+ * @param {Object} preset.chartOptions - Per-chart overrides (colors, types)
+ * @param {Object} preset.layout - Layout configuration (grid columns, ordering)
+ * @param {Object} preset.filters - Pre-applied filters
+ * @returns {Object} Saved preset with ID
+ */
+function saveChartPreset(preset) {
+  return withScriptLock_(function() {
+  var props = PropertiesService.getUserProperties();
+  var presets = JSON.parse(props.getProperty('chart_presets') || '[]');
+
+  var chartPreset = {
+    id: 'preset_' + Date.now(),
+    name: preset.name || 'Custom Preset',
+    visibleCharts: preset.visibleCharts || [],
+    chartOptions: preset.chartOptions || {},
+    layout: preset.layout || { columns: 2 },
+    filters: preset.filters || {},
+    dateRange: preset.dateRange || null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  presets.push(chartPreset);
+  props.setProperty('chart_presets', JSON.stringify(presets));
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('preset:saved', chartPreset);
+  }
+
+  return { success: true, preset: chartPreset };
+  });
+}
+
+/**
+ * Gets all saved chart presets for the current user
+ * @returns {string} JSON array of presets
+ */
+function getChartPresets() {
+  var props = PropertiesService.getUserProperties();
+  return props.getProperty('chart_presets') || '[]';
+}
+
+/**
+ * Deletes a chart preset
+ * @param {string} presetId - Preset ID to delete
+ * @returns {Object} Deletion result
+ */
+function deleteChartPreset(presetId) {
+  var props = PropertiesService.getUserProperties();
+  var presets = JSON.parse(props.getProperty('chart_presets') || '[]');
+
+  presets = presets.filter(function(p) { return p.id !== presetId; });
+  props.setProperty('chart_presets', JSON.stringify(presets));
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('preset:deleted', { presetId: presetId });
+  }
+
+  return { success: true };
+}
+
+// ============================================================================
+// 7. ADVANCED FILTERING OPTIONS
+// ============================================================================
+
+/**
+ * Applies advanced filters to dashboard data and returns filtered results
+ * @param {boolean} isPII - Whether to include PII data
+ * @param {Object} filters - Filter configuration
+ * @param {string[]} [filters.statuses] - Filter by grievance statuses
+ * @param {string[]} [filters.locations] - Filter by locations
+ * @param {string[]} [filters.stewards] - Filter by steward names
+ * @param {string[]} [filters.categories] - Filter by grievance categories
+ * @param {string[]} [filters.units] - Filter by units
+ * @param {string} [filters.dateFrom] - Start date (ISO)
+ * @param {string} [filters.dateTo] - End date (ISO)
+ * @param {string} [filters.searchText] - Text search across all fields
+ * @param {number[]} [filters.steps] - Filter by grievance steps (1,2,3,4)
+ * @param {number} [filters.minMorale] - Minimum morale score
+ * @param {number} [filters.maxMorale] - Maximum morale score
+ * @returns {string} JSON filtered dashboard data
+ */
+function getFilteredDashboardData(isPII, filters) {
+  var fullData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+
+  if (!filters || Object.keys(filters).length === 0) {
+    return JSON.stringify(fullData);
+  }
+
+  // Apply date range filter first (reuse existing function)
+  if (filters.dateFrom || filters.dateTo) {
+    fullData = JSON.parse(getUnifiedDashboardDataWithDateRange(
+      isPII, 0, filters.dateFrom || '2000-01-01', filters.dateTo || new Date().toISOString()
+    ));
+  }
+
+  // Filter status distribution to only selected statuses
+  if (filters.statuses && filters.statuses.length > 0) {
+    var filteredStatus = {};
+    for (var sKey in fullData.statusDistribution) {
+      if (filters.statuses.indexOf(sKey) >= 0) {
+        filteredStatus[sKey] = fullData.statusDistribution[sKey];
+      }
+    }
+    fullData.statusDistribution = filteredStatus;
+  }
+
+  // Filter location breakdown
+  if (filters.locations && filters.locations.length > 0) {
+    var filteredLocations = {};
+    for (var locKey in fullData.locationBreakdown) {
+      if (filters.locations.indexOf(locKey) >= 0) {
+        filteredLocations[locKey] = fullData.locationBreakdown[locKey];
+      }
+    }
+    fullData.locationBreakdown = filteredLocations;
+  }
+
+  // Filter unit breakdown
+  if (filters.units && filters.units.length > 0) {
+    var filteredUnits = {};
+    for (var uKey in fullData.unitBreakdown) {
+      if (filters.units.indexOf(uKey) >= 0) {
+        filteredUnits[uKey] = fullData.unitBreakdown[uKey];
+      }
+    }
+    fullData.unitBreakdown = filteredUnits;
+  }
+
+  // Filter grievances by category
+  if (filters.categories && filters.categories.length > 0 && fullData.grievancesByCategory) {
+    var filteredCats = {};
+    for (var catKey in fullData.grievancesByCategory) {
+      if (filters.categories.indexOf(catKey) >= 0) {
+        filteredCats[catKey] = fullData.grievancesByCategory[catKey];
+      }
+    }
+    fullData.grievancesByCategory = filteredCats;
+  }
+
+  // Filter drill-down data by steward
+  if (filters.stewards && filters.stewards.length > 0 && fullData.chartDrillDown) {
+    for (var ddKey in fullData.chartDrillDown.statusByCase) {
+      fullData.chartDrillDown.statusByCase[ddKey] = fullData.chartDrillDown.statusByCase[ddKey].filter(function(c) {
+        return !c.steward || filters.stewards.indexOf(c.steward) >= 0;
+      });
+    }
+  }
+
+  // Filter by step progression
+  if (filters.steps && filters.steps.length > 0) {
+    var filteredSteps = { step1: 0, step2: 0, step3: 0, arb: 0 };
+    if (filters.steps.indexOf(1) >= 0) filteredSteps.step1 = fullData.stepProgression.step1;
+    if (filters.steps.indexOf(2) >= 0) filteredSteps.step2 = fullData.stepProgression.step2;
+    if (filters.steps.indexOf(3) >= 0) filteredSteps.step3 = fullData.stepProgression.step3;
+    if (filters.steps.indexOf(4) >= 0) filteredSteps.arb = fullData.stepProgression.arb;
+    fullData.stepProgression = filteredSteps;
+  }
+
+  // Text search filter on drill-down case data
+  if (filters.searchText) {
+    var searchLower = filters.searchText.toLowerCase();
+    if (fullData.chartDrillDown) {
+      for (var drillKey in fullData.chartDrillDown) {
+        var drillGroup = fullData.chartDrillDown[drillKey];
+        for (var gKey in drillGroup) {
+          drillGroup[gKey] = drillGroup[gKey].filter(function(item) {
+            var searchable = JSON.stringify(item).toLowerCase();
+            return searchable.indexOf(searchLower) >= 0;
+          });
+        }
+      }
+    }
+  }
+
+  fullData.filtersApplied = filters;
+  return JSON.stringify(fullData);
+}
+// ============================================================================
+// 8. DRILL-DOWN CAPABILITIES (Multi-level hierarchical)
+// ============================================================================
+
+// ============================================================================
+// EXECUTIVE DASHBOARD (merged from 04d_ExecutiveDashboard.gs)
+// ============================================================================
+
+// ============================================================================
+// 1. NAVIGATION HELPERS
+// ============================================================================
+
+// navigateToSheet() - REMOVED DUPLICATE - see line 565 for main definition
+
+// ============================================================================
+// 2. EXECUTIVE COMMAND MODAL (SPA Architecture - Bridge Pattern)
+// ============================================================================
+
+/**
+ * High-Performance KPI Aggregator for the Modal (Bridge Pattern)
+ * Returns JSON data for client-side rendering
+ * @returns {string} JSON string with dashboard statistics
+ */
+function getDashboardStats() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var logSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  var stats = {
+    totalGrievances: 0,
+    activeGrievances: 0,
+    activeSteps: { step1: 0, step2: 0, arbitration: 0 },
+    outcomes: { wins: 0, losses: 0, settled: 0, withdrawn: 0 },
+    winRate: 0,
+    overdueCount: 0,
+    totalMembers: 0,
+    stewardCount: 0,
+    moraleScore: 5, // Default; overridden by getSatisfactionSummary() below
+    unitBreakdown: {},
+    stewardWorkload: []
+  };
+
+  // Process Grievance Log
+  if (logSheet && logSheet.getLastRow() > 1) {
+    var logData = logSheet.getDataRange().getValues();
+    logData.shift(); // Remove headers
+
+    // Filter to only rows with a valid grievance ID (starts with "G")
+    logData = logData.filter(function(row) {
+      var gid = (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '').toString();
+      return isGrievanceId_(gid);
+    });
+    stats.totalGrievances = logData.length;
+
+    logData.forEach(function(row) {
+      var status = (row[GRIEVANCE_COLS.STATUS - 1] || '').toString().toLowerCase();
+      var currentStep = (row[GRIEVANCE_COLS.CURRENT_STEP - 1] || '').toString().toLowerCase();
+      var unit = row[GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
+      var steward = row[GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
+
+      // Count active vs closed
+      if (status === 'open' || status === 'pending info' || status === 'appealed') {
+        stats.activeGrievances++;
+      }
+
+      // M7: Count by step — use word-boundary matching to prevent 'step 10' matching 'step 1'
+      if (/\bstep\s*1\b/.test(currentStep) || currentStep === '1' || currentStep === 'step i') stats.activeSteps.step1++;
+      if (/\bstep\s*2\b/.test(currentStep) || currentStep === '2' || currentStep === 'step ii') stats.activeSteps.step2++;
+      if (/\barbitration\b/.test(currentStep) || /\bstep\s*3\b/.test(currentStep) || currentStep === 'step iii') stats.activeSteps.arbitration++;
+
+      // Count outcomes using the Resolution column (not Status)
+      var resolution = (row[GRIEVANCE_COLS.RESOLUTION - 1] || '').toString().toLowerCase();
+      if (resolution === 'won' || resolution === 'sustained') stats.outcomes.wins++;
+      if (resolution === 'denied' || resolution === 'lost') stats.outcomes.losses++;
+      if (resolution === 'settled') stats.outcomes.settled++;
+      if (resolution === 'withdrawn') stats.outcomes.withdrawn++;
+
+      // Unit breakdown
+      if (!stats.unitBreakdown[unit]) stats.unitBreakdown[unit] = 0;
+      stats.unitBreakdown[unit]++;
+
+      // Steward workload (only active cases)
+      if (status === 'open' || status === 'pending info') {
+        var existingSteward = stats.stewardWorkload.find(function(s) { return s.name === steward; });
+        if (existingSteward) {
+          existingSteward.count++;
+        } else {
+          stats.stewardWorkload.push({ name: steward, count: 1 });
+        }
+      }
+
+      // Check for overdue — use deadline matching the current step
+      if (status === 'open' || status === 'pending info') {
+        var dueDate = null;
+        if (/\bstep\s*2\b/.test(currentStep) || currentStep === '2' || currentStep === 'step ii') {
+          dueDate = row[GRIEVANCE_COLS.STEP2_DUE - 1];
+        } else if (/\barbitration\b/.test(currentStep) || /\bstep\s*3\b/.test(currentStep) || currentStep === 'step iii') {
+          dueDate = row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1];
+        } else {
+          dueDate = row[GRIEVANCE_COLS.STEP1_DUE - 1];
+        }
+        if (dueDate && new Date(dueDate) < new Date()) {
+          stats.overdueCount++;
+        }
+      }
+    });
+
+    // Calculate win rate — only resolved outcomes in denominator
+    var totalResolved = stats.outcomes.wins + stats.outcomes.losses + stats.outcomes.settled + stats.outcomes.withdrawn;
+    if (totalResolved > 0) {
+      stats.winRate = Math.round((stats.outcomes.wins / totalResolved) * 100);
+    }
+
+    // Sort steward workload
+    stats.stewardWorkload.sort(function(a, b) { return b.count - a.count; });
+  }
+
+  // Process Member Directory
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var memberData = memberSheet.getDataRange().getValues();
+    for (var m = 1; m < memberData.length; m++) {
+      if (memberData[m][MEMBER_COLS.MEMBER_ID - 1]) {
+        stats.totalMembers++;
+        if (isTruthyValue(memberData[m][MEMBER_COLS.IS_STEWARD - 1])) stats.stewardCount++;
+      }
+    }
+  }
+
+  // Get morale score from satisfaction data (v4.23.0: dynamic via getSatisfactionSummary)
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  if (satSheet && satSheet.getLastRow() > 1) {
+    try {
+      var summary = getSatisfactionSummary();
+      if (summary && summary.sections && summary.sections['OVERALL_SAT']) {
+        var overallAvg = summary.sections['OVERALL_SAT'].avg;
+        if (overallAvg !== null && !isNaN(overallAvg)) {
+          stats.moraleScore = Math.round(overallAvg * 10) / 10;
+        }
+      }
+    } catch(e) {
+      Logger.log('Error reading satisfaction summary for morale score: ' + e.message);
+    }
+  }
+
+  return JSON.stringify(stats);
+}
+/**
+ * Gets executive metrics from dashboard calculations
+ * @returns {Object} Metrics object with activeGrievances, winRate, overdueSteps
+ * @private
+ */
+function getExecutiveMetrics_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var calcSheet = ss.getSheetByName(SHEETS.DASHBOARD_CALC);
+
+  var metrics = {
+    activeGrievances: 0,
+    activeTrend: "Stable",
+    winRate: 0,
+    winRateTrend: "Stable",
+    overdueSteps: 0,
+    overdueTrend: "Stable"
+  };
+
+  if (calcSheet) {
+    try {
+      // Pull values from calculation sheet
+      var data = calcSheet.getDataRange().getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] === 'Active Grievances') metrics.activeGrievances = data[i][1] || 0;
+        if (data[i][0] === 'Win Rate') metrics.winRate = Math.round((data[i][1] || 0) * 100);
+        if (data[i][0] === 'Overdue') metrics.overdueSteps = data[i][1] || 0;
+      }
+    } catch (e) {
+      Logger.log('Error getting executive metrics: ' + e.message);
+    }
+  }
+
+  // Try to get from grievance sheet if calc sheet not available
+  if (metrics.activeGrievances === 0) {
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+      var grievanceData = grievanceSheet.getDataRange().getValues();
+      var openCount = 0;
+      var wonCount = 0;
+      var closedCount = 0;
+      var overdueCount = 0;
+
+      for (var g = 1; g < grievanceData.length; g++) {
+        var status = grievanceData[g][GRIEVANCE_COLS.STATUS - 1];
+        if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) openCount++;
+        if (status === GRIEVANCE_STATUS.WON) wonCount++;
+        if (GRIEVANCE_CLOSED_STATUSES.indexOf(status) !== -1) closedCount++;
+
+        var daysToDeadline = grievanceData[g][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+        if (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0)) {
+          overdueCount++;
+        }
+      }
+
+      metrics.activeGrievances = openCount;
+      metrics.winRate = closedCount > 0 ? Math.round((wonCount / closedCount) * 100) : 0;
+      metrics.overdueSteps = overdueCount;
+    }
+  }
+
+  return metrics;
+}
+
+// ============================================================================
+// 3. UNIFIED STEWARD DASHBOARD (v4.3.2)
+// ============================================================================
+// Consolidates all analytics, charts, and reports into a single tabbed interface.
+// This replaces the individual chart modals for a unified experience.
+// ============================================================================
+
+/**
+ * Shows the unified Steward Dashboard (web app URL)
+ * Opens the unified dashboard in steward mode (with PII)
+ * v4.4.0: Now opens as web app instead of modal for better experience
+ */
+function showStewardDashboard() {
+  var url = ScriptApp.getService().getUrl() + '?mode=steward';
+  var html = HtmlService.createHtmlOutput(
+    '<html><head>' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0;padding:16px}' +
+    '.icon{font-size:clamp(36px,10vw,48px);margin-bottom:16px}h1{margin:0 0 8px;font-size:clamp(18px,5vw,24px);text-align:center}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5;font-size:clamp(13px,3.5vw,15px);padding:0 8px}' +
+    'a.open-link{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;min-height:44px;line-height:20px;text-align:center}a.open-link:hover{background:#2563eb}' +
+    '.copy-btn{background:#475569;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:clamp(11px,3vw,13px);min-height:44px}' +
+    '.url{background:#1e293b;padding:12px;border-radius:8px;font-family:monospace;font-size:clamp(10px,2.5vw,12px);word-break:break-all;max-width:90%;margin-bottom:16px;border:1px solid #334155;width:100%}' +
+    '.warning{background:rgba(239,68,68,0.2);color:#fca5a5;padding:8px 16px;border-radius:8px;font-size:clamp(10px,2.5vw,12px);margin-bottom:16px}' +
+    '.btn-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}' +
+    '@media(max-width:480px){.btn-row{flex-direction:column;width:100%}a.open-link,.copy-btn{width:100%;text-align:center}}' +
+    '</style></head><body><div class="icon">🛡️</div><h1>Steward Command Center</h1>' +
+    '<div class="warning">INTERNAL USE ONLY - Contains PII</div>' +
+    '<p>Open the Steward Dashboard web app. This version includes full member details and sensitive information.</p>' +
+    '<div class="url" id="url">' + escapeHtml(url) + '</div>' +
+    '<div class="btn-row"><a class="open-link" href="' + escapeHtml(url) + '" target="_blank">Open Dashboard</a>' +
+    '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
+    '</body></html>'
+  ).setWidth(500).setHeight(400);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Steward Command Center');
+}
+// ============================================================================
+// 4. STRATEGIC PRO MOVES & ALERTS
+// ============================================================================
+
+/**
+ * Checks dashboard metrics and sends email alerts if thresholds exceeded
+ */
+function checkDashboardAlerts() {
+  var metrics = getExecutiveMetrics_();
+  var winRate = metrics.winRate;
+
+  var alerts = [];
+  if (winRate < 50) alerts.push("CRITICAL WIN RATE: " + winRate + "%");
+  if (metrics.overdueSteps > 10) alerts.push("HIGH OVERDUE COUNT: " + metrics.overdueSteps + " cases");
+
+  if (alerts.length > 0) {
+    try {
+      MailApp.sendEmail(
+        Session.getEffectiveUser().getEmail(),
+        "DASHBOARD ALERT",
+        "The following alerts require attention:\n\n" + alerts.join("\n")
+      );
+      SpreadsheetApp.getActiveSpreadsheet().toast("Alert email sent", "Notification");
+    } catch (e) {
+      Logger.log('Error sending alert email: ' + e.message);
+    }
+  }
+}
+
+// ============================================================================
+// 5. AUTOMATION & COMMUNICATION
+// ============================================================================
+
+/**
+ * Creates automation triggers for nightly refresh
+ */
+function createAutomationTriggers() {
+  // Check for existing triggers to avoid duplicates
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'refreshAllVisuals') {
+      SpreadsheetApp.getUi().alert('Automation trigger already exists. No action needed.');
+      return;
+    }
+  }
+
+  // Midnight Refresh Trigger
+  ScriptApp.newTrigger('refreshAllVisuals')
+    .timeBased()
+    .everyDays(1)
+    .atHour(1)
+    .create();
+
+  SpreadsheetApp.getUi().alert('Success: Dashboard will now auto-refresh every night at 1:00 AM.');
+}
+
+/**
+ * Sets up the midnight auto-refresh trigger
+ * Runs midnightAutoRefresh daily at midnight (12:00 AM)
+ */
+function setupMidnightTrigger() {
+  // Check for existing triggers to avoid duplicates
+  var triggers = ScriptApp.getProjectTriggers();
+  var hasExisting = false;
+
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'midnightAutoRefresh') {
+      hasExisting = true;
+      break;
+    }
+  }
+
+  if (hasExisting) {
+    SpreadsheetApp.getUi().alert('Midnight auto-refresh trigger already exists. No action needed.');
+    return;
+  }
+
+  // Create midnight trigger (12:00 AM)
+  ScriptApp.newTrigger('midnightAutoRefresh')
+    .timeBased()
+    .everyDays(1)
+    .atHour(0)
+    .nearMinute(0)
+    .create();
+
+  SpreadsheetApp.getUi().alert('Success: Midnight Auto-Refresh is now active.\n\nThe system will automatically refresh all dashboards and check alerts at 12:00 AM daily.');
+}
+
+/**
+ * Removes the midnight auto-refresh trigger
+ */
+function removeMidnightTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var removed = false;
+
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'midnightAutoRefresh') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      removed = true;
+    }
+  }
+
+  if (removed) {
+    SpreadsheetApp.getUi().alert('Midnight auto-refresh trigger has been removed.');
+  } else {
+    SpreadsheetApp.getUi().alert('No midnight trigger found to remove.');
+  }
+}
+
+/**
+ * Midnight Auto-Refresh function
+ * Called automatically by time-based trigger at midnight
+ * Refreshes dashboards, hidden sheets, and checks for critical alerts
+ */
+function midnightAutoRefresh() {
+  try {
+    var startTime = new Date();
+
+    Logger.log('Midnight Auto-Refresh started at ' + startTime.toISOString());
+
+    // 1. Check for critical dashboard alerts
+    checkDashboardAlerts();
+    Logger.log('Dashboard alerts checked');
+
+    // 2. Check for overdue grievances and send reminders
+    checkOverdueGrievances_();
+
+    var endTime = new Date();
+    var duration = (endTime - startTime) / 1000;
+
+    Logger.log('Midnight Auto-Refresh completed in ' + duration + ' seconds');
+
+    // Note: Executive Command and Member Analytics are now modal-based
+    // and don't require midnight refresh - data is fetched on-demand
+
+  } catch (e) {
+    Logger.log('Midnight Auto-Refresh error: ' + e.message);
+    // Optionally send error notification
+    try {
+      var adminEmail = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
+      if (adminEmail) {
+        MailApp.sendEmail(adminEmail,
+          COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Auto-Refresh Error',
+          'The midnight auto-refresh encountered an error:\n\n' + e.message + '\n\nPlease check the script logs for details.');
+      }
+    } catch (emailErr) {
+      Logger.log('Could not send error notification: ' + emailErr.message);
+    }
+  }
+}
+
+/**
+ * Checks for overdue grievances and sends reminder notifications
+ * @private
+ */
+function checkOverdueGrievances_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (!grievanceSheet || grievanceSheet.getLastRow() < 2) return;
+
+    var data = grievanceSheet.getDataRange().getValues();
+    var overdueList = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var status = data[i][GRIEVANCE_COLS.STATUS - 1];
+      var daysToDeadline = data[i][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+
+      // Check for active cases that are overdue
+      if ((status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) &&
+          (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0))) {
+        overdueList.push({
+          id: data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+          name: maskName(data[i][GRIEVANCE_COLS.FIRST_NAME - 1], data[i][GRIEVANCE_COLS.LAST_NAME - 1]),
+          steward: data[i][GRIEVANCE_COLS.STEWARD - 1],
+          days: daysToDeadline
+        });
+      }
+    }
+
+    if (overdueList.length > 0) {
+      var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
+      if (chiefStewardEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chiefStewardEmail)) {
+        var body = 'DAILY OVERDUE GRIEVANCE REPORT\n\n' +
+                   'The following ' + overdueList.length + ' grievance(s) have passed their deadline:\n\n';
+
+        overdueList.forEach(function(g) {
+          body += '- ' + g.id + ': ' + g.name + ' (Steward: ' + (g.steward || 'Unassigned') + ')\n';
+        });
+
+        body += '\nPlease take immediate action to address these cases.' + COMMAND_CONFIG.EMAIL.FOOTER;
+
+        MailApp.sendEmail(chiefStewardEmail,
+          COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Daily Overdue Report - ' + overdueList.length + ' Case(s)',
+          body);
+
+        Logger.log('Sent overdue report with ' + overdueList.length + ' cases');
+      }
+    }
+  } catch (e) {
+    Logger.log('Error checking overdue grievances: ' + e.message);
+  }
+}
+
+/**
+ * Emails the Executive Dashboard as a PDF snapshot
+ */
+function emailExecutivePDF() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    var date = new Date();
+    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+    // Export only the active sheet as PDF (not the entire spreadsheet)
+    var activeSheet = ss.getActiveSheet();
+    var sheetGid = activeSheet.getSheetId();
+    var url = ss.getUrl().replace(/\/edit.*$/, '') +
+      '/export?exportFormat=pdf&format=pdf' +
+      '&gid=' + sheetGid +
+      '&size=letter&portrait=true&fitw=1' +
+      '&gridlines=false&printtitle=false&sheetnames=false';
+    var token = ScriptApp.getOAuthToken();
+    var response = UrlFetchApp.fetch(url, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    var blob = response.getBlob().setName("Health_Report_" + dateStr + ".pdf");
+
+    MailApp.sendEmail({
+      to: Session.getEffectiveUser().getEmail(),
+      subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Weekly Executive Summary - " + dateStr,
+      body: "Attached is the latest strategic briefing." + COMMAND_CONFIG.EMAIL.FOOTER,
+      attachments: [blob]
+    });
+
+    SpreadsheetApp.getUi().alert('PDF report sent to your email.');
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error generating PDF: ' + e.message);
+  }
+}
