@@ -369,3 +369,97 @@ Admins change retention by editing the Config tab — no code change required.
 ### CORE RULE REMINDER
 Everything dynamic — config values always read at runtime from Config tab.
 Never hardcode thresholds, deadlines, or durations.
+
+---
+
+## SESSION: 2026-03-22 — Grievance tab review + full DataService audit
+
+### Changes Made
+
+**v4.36.0 — Grievance tab fixes + DataService wrapper audit**
+
+**Files modified:**
+- `src/21_WebDashDataService.gs` — added `dataInitiateGrievance` wrapper
+- `src/steward_view.html` — fixed step dropdown, added `managers2` select + sync logic
+- `src/05_Integrations.gs` — added `managers2` to `pdfData` in `initiateGrievance()`
+
+---
+
+### Fix 1 — CRITICAL: dataInitiateGrievance was missing (submit always failed)
+
+`renderNewGrievanceForm()` called `.dataInitiateGrievance(SESSION_TOKEN, data, idemKey)` but
+no such function existed in `21_WebDashDataService.gs`. Every grievance submission silently
+failed via `withFailureHandler`. Added the wrapper with steward auth guard + script lock.
+
+```js
+function dataInitiateGrievance(sessionToken, data, idemKey) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' };
+  return withScriptLock_(function() { return initiateGrievance(s, data, idemKey); });
+}
+```
+
+---
+
+### Fix 2 — Step dropdown mismatch
+
+Dashboard had 6 options (Informal → Arbitration, values 1–6).
+PDF form (`grievance_form.html`) only has Step 1 and Step 2.
+Steps 3–6 would silently render as Step 1 on the generated PDF.
+
+**Fix:** Hardcoded dashboard dropdown to exactly `[['1','Step I'],['2','Step II']]`.
+String dispatch pattern (`_throttledServerCall`, `DataCache.cachedCall`) bypasses the
+`.dataXxx()` grep — future audits must search for both `'.dataXxx('` AND `'"dataXxx"'`.
+
+---
+
+### Fix 3 — Second manager slot never populated
+
+PDF has `managers` and `managers2` fields. Dashboard only had one manager select.
+Added `fld.managers2` with sync logic (primary choice excluded from secondary dropdown).
+Wired through: `_collectFormData()` → `formOverrides.managers2` → `pdfData.managers2`
+in `initiateGrievance()`.
+
+---
+
+### DataService Wrapper Audit — Full Results
+
+**Audit method:**
+```bash
+# Calls from frontend (both method and string dispatch)
+grep -oh '\.data[A-Z][a-zA-Z]*(' src/*.html | sed 's/[.()]//g' | sort -u
+grep -oh '"data[A-Z][a-zA-Z]*"' src/*.html src/*.gs | sed 's/"//g' | sort -u
+# Defined in DataService
+grep -oh '^function data[A-Z][a-zA-Z]*' src/21_WebDashDataService.gs | sed 's/^function //' | sort -u
+```
+
+**Result after fixes:** 0 missing wrappers.
+
+**NOTE:** The audit initially identified 4 survey wrappers and 34 stubs as "missing" from
+`21_WebDashDataService.gs`. These were already implemented in their own service files
+(`08e_SurveyEngine.gs`, `13_MemberSelfService.gs`, `17_CorrelationEngine.gs`,
+`29_TrendAlertService.gs`, `30_EngagementService.gs`, `30_TestRunner.gs`,
+`33_NewFeatureServices.gs`). Adding duplicates to `21_WebDashDataService.gs` caused G13
+(duplicate function name) test failures. The duplicates were removed — only
+`dataInitiateGrievance` was genuinely missing and was kept.
+
+**19 apparent orphans — reclassified:**
+- 12 are ACTIVE via string dispatch (`_throttledServerCall`, `DataCache.cachedCall`) or in test runner files — DO NOT REMOVE
+- 7 are TRUE orphans (wrapper exists, UI not yet built):
+  `dataExportUndoHistory`, `dataGetDeadlineCalendarData`, `dataGetFilterDropdownValues`,
+  `dataGetSheetHealth`, `dataGetUndoHistory`, `dataUndoToIndex`, `dataWebCheckInMember`
+  → Keep these. They are planned UI features.
+
+---
+
+### AUDIT RULES FOR FUTURE AGENTS
+
+1. When auditing DataService coverage, search for BOTH calling conventions:
+   - Method calls: `.dataXxx(` in `.html` files
+   - String dispatch: `'dataXxx'` or `"dataXxx"` in `.html` and `.gs` files
+2. Never delete a DataService wrapper unless confirmed unused in ALL files including
+   `30_TestRunner.gs`, `31_WebAppTests.gs`, `esign.html`
+3. Missing wrappers cause silent failures (not JS errors) — always stub rather than leave absent
+4. `dataInitiateGrievance` uses steward auth + script lock — this is the correct pattern
+   for all write operations that modify the Grievance Log

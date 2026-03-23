@@ -4746,6 +4746,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
       region:     formOverrides.region || regionVal,
       workloc:    formOverrides.workloc || memberData.workLocation,
       managers:   formOverrides.managers || memberData.manager || memberData.supervisor,
+      managers2:  formOverrides.managers2 || '',
       articles:   formOverrides.articles || data.articles,
       step:       formOverrides.step || String(data.step || '1'),
       statement:  formOverrides.statement || data.description,
@@ -4773,6 +4774,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     var documentHash = generateDocumentHash_(grievanceObj);
 
     var pdfBlob = generateDraftGrievancePDF_(pdfData, grievanceId, documentHash);
+    var pdfSaved = false;
 
     if (pdfBlob && driveResult && driveResult.folderId) {
       try {
@@ -4780,6 +4782,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
         pdfBlob.setName(draftFileName);
         var caseFolder = DriveApp.getFolderById(driveResult.folderId);
         caseFolder.createFile(pdfBlob);
+        pdfSaved = true;
       } catch (pdfErr) {
         Logger.log('initiateGrievance: PDF save failed: ' + pdfErr.message);
       }
@@ -4819,6 +4822,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
       success: true,
       grievanceId: grievanceId,
       driveFolderUrl: driveFolderUrl,
+      pdfSaved: pdfSaved,
       memberName: memberData.firstName + ' ' + memberData.lastName,
       message: 'Grievance ' + grievanceId + ' created for ' + memberData.firstName + ' ' + memberData.lastName + '.'
     };

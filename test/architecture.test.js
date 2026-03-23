@@ -1135,6 +1135,7 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataBulkSendEmail',               // bulk action: sends emails directly via safeSendEmail_()
     'dataGetCaseActivityLog',          // reads _Audit_Log sheet directly for case-level activity (Feature 5)
     'dataGetAuditLog',                 // reads _Audit_Log sheet directly for Access Log Viewer (v4.36.0)
+    'dataInitiateGrievance',           // delegates to initiateGrievance() via withScriptLock_ (05_Integrations.gs)
   ];
 
   wrappers

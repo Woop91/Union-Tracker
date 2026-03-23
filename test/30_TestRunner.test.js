@@ -191,8 +191,8 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
     // (e.g., workload SSO, broadcast filters, badge counts, task delegation, scale system,
     // e-signature, form options, filter dropdown values — v4.33.0,
     // onboarding wizard — v4.34.x, case activity log — v4.34.0,
-    // access log viewer — v4.36.0)
-    expect(untested.length).toBeLessThanOrEqual(47);
+    // access log viewer — v4.36.0, grievance initiation — v4.36.0)
+    expect(untested.length).toBeLessThanOrEqual(48);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {

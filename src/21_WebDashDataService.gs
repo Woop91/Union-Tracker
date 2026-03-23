@@ -5092,10 +5092,29 @@ function dataSubmitGrievanceSignature(sigToken, sigBase64) {
  * @returns {Object} Form options or error object
  */
 function dataGetGrievanceFormOptions(sessionToken) {
-  var email = _resolveCallerEmail(sessionToken);
-  if (!email) return { success: false, message: 'Not authenticated.' };
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' };
   return getGrievanceFormOptions();
+}
+
+/**
+ * Authenticated wrapper for initiateGrievance().
+ * Called by renderNewGrievanceForm() in steward_view.html when a steward submits
+ * the New Grievance intake form. Requires steward-level session.
+ * @param {string} sessionToken - Active steward session token
+ * @param {Object} data - Grievance payload from _collectFormData():
+ *   { memberEmail, step, incidentDate, issueCategory, articles, description, remedy, formOverrides }
+ * @param {string} idemKey - Idempotency key (format: GRV_<timestamp>_<random>)
+ * @returns {Object} { success, grievanceId, driveFolderUrl, memberName, message } on success
+ *                  { success: false, message } on failure
+ *                  { duplicate: true, message } if idemKey already processed
+ */
+function dataInitiateGrievance(sessionToken, data, idemKey) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' };
+  return withScriptLock_(function() { return initiateGrievance(s, data, idemKey); });
 }
 
 /** @param {string} sessionToken @param {number} [limit] @returns {Object[]} Meeting minutes. Requires auth. */

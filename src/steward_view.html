@@ -8216,6 +8216,7 @@ function renderNewGrievanceForm(appContainer) {
         infoGrid.appendChild(cell);
       });
       selectedMemberDisplay.appendChild(infoGrid);
+      _buildEmailRecipients();
     }
 
     searchCard.appendChild(_grAc.wrapper);
@@ -8244,13 +8245,12 @@ function renderNewGrievanceForm(appContainer) {
     function _buildFormFields() {
       formFieldsContainer.innerHTML = '';
 
-      // Step
+      // Step — only Step 1 and Step 2 are valid on the grievance form
       var stepGroup = el('div', { className: 'form-group' });
       stepGroup.appendChild(el('label', { className: 'form-label' }, 'Current Step'));
       fld.step = el('select', { className: 'form-input' });
-      var steps = (formOptions.steps && formOptions.steps.length) ? formOptions.steps : ['Informal', 'Step I', 'Step II', 'Step III', 'Mediation', 'Arbitration'];
-      steps.forEach(function(s, idx) {
-        fld.step.appendChild(el('option', { value: idx + 1 }, s));
+      [['1', 'Step I'], ['2', 'Step II']].forEach(function(pair) {
+        fld.step.appendChild(el('option', { value: pair[0] }, pair[1]));
       });
       stepGroup.appendChild(fld.step);
       formFieldsContainer.appendChild(stepGroup);
@@ -8297,14 +8297,33 @@ function renderNewGrievanceForm(appContainer) {
       }
       formFieldsContainer.appendChild(artGroup);
 
-      // Management Rep(s)
+      // Management Rep(s) — primary + optional 2nd to match both PDF slots
       var mgrGroup = el('div', { className: 'form-group' });
       mgrGroup.appendChild(el('label', { className: 'form-label' }, 'Management Representative(s)'));
-      fld.managers = el('select', { className: 'form-input' });
-      fld.managers.appendChild(el('option', { value: '' }, '— Select —'));
       var mgrs = (formOptions.managers && formOptions.managers.length) ? formOptions.managers : [];
+
+      fld.managers = el('select', { className: 'form-input', style: { marginBottom: '6px' } });
+      fld.managers.appendChild(el('option', { value: '' }, '— Primary —'));
       mgrs.forEach(function(m) { fld.managers.appendChild(el('option', { value: m }, m)); });
       mgrGroup.appendChild(fld.managers);
+
+      fld.managers2 = el('select', { className: 'form-input' });
+      fld.managers2.appendChild(el('option', { value: '' }, '— 2nd (optional) —'));
+      mgrs.forEach(function(m) { fld.managers2.appendChild(el('option', { value: m }, m)); });
+      mgrGroup.appendChild(fld.managers2);
+
+      // Sync: exclude primary selection from 2nd dropdown
+      function _syncMgr2() {
+        var cur1 = fld.managers.value, cur2 = fld.managers2.value;
+        fld.managers2.innerHTML = '';
+        fld.managers2.appendChild(el('option', { value: '' }, '— 2nd (optional) —'));
+        mgrs.forEach(function(m) {
+          if (m !== cur1) fld.managers2.appendChild(el('option', { value: m }, m));
+        });
+        if (cur2 && cur2 !== cur1) fld.managers2.value = cur2;
+      }
+      fld.managers.addEventListener('change', _syncMgr2);
+
       formFieldsContainer.appendChild(mgrGroup);
 
       // Statement of Violation
@@ -8491,7 +8510,7 @@ function renderNewGrievanceForm(appContainer) {
         ['Incident Date', data.incidentDate || '\u2014'],
         ['Issue Category', data.issueCategory || '\u2014'],
         ['Articles', data.articles || '\u2014'],
-        ['Manager(s)', data.formOverrides.managers || '\u2014'],
+        ['Manager(s)', [data.formOverrides.managers, data.formOverrides.managers2].filter(Boolean).join(', ') || '\u2014'],
         ['Statement', data.description || '\u2014'],
         ['Remedy', data.remedy || '\u2014']
       ];
@@ -8526,6 +8545,7 @@ function renderNewGrievanceForm(appContainer) {
           region:     fld.region ? fld.region.value : '',
           startdate:  fld.startdate ? fld.startdate.value : '',
           managers:   fld.managers ? fld.managers.value : '',
+          managers2:  fld.managers2 ? fld.managers2.value : '',
           statement2: fld.statement2 ? fld.statement2.value.trim() : '',
           remedy2:    fld.remedy2 ? fld.remedy2.value.trim() : ''
         }
@@ -8536,6 +8556,16 @@ function renderNewGrievanceForm(appContainer) {
     function _submitGrievance() {
       if (!selectedMember) {
         statusMsg.textContent = 'Please select a member first.';
+        statusMsg.style.color = 'var(--danger)';
+        return;
+      }
+      if (!fld.incidentDate || !fld.incidentDate.value) {
+        statusMsg.textContent = 'Incident date is required.';
+        statusMsg.style.color = 'var(--danger)';
+        return;
+      }
+      if (!fld.issueCategory || !fld.issueCategory.value) {
+        statusMsg.textContent = 'Issue category is required.';
         statusMsg.style.color = 'var(--danger)';
         return;
       }
@@ -8571,6 +8601,9 @@ function renderNewGrievanceForm(appContainer) {
               var folderLink = el('a', { href: r.driveFolderUrl, target: '_blank', style: { fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCC2 Open Case Folder in Drive');
               previewArea.appendChild(folderLink);
             }
+            if (r.pdfSaved === false) {
+              previewArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--warning)', marginTop: '6px', fontWeight: '500' } }, '\u26A0\uFE0F Draft PDF could not be saved to the case folder. Please generate it manually from the grievance detail view.'));
+            }
             previewArea.appendChild(el('div', { className: 'text-xs-muted-mt-8' }, 'The member has been notified that their signature is needed. Once signed, you will be notified and can email the document.'));
 
             // Handle email sending if recipients were selected
@@ -8604,12 +8637,7 @@ function renderNewGrievanceForm(appContainer) {
         .dataInitiateGrievance(SESSION_TOKEN, data, idemKey);
     }
 
-    // Re-build email recipients when member changes
-    var _origSelectMember = _selectMember;
-    _selectMember = function(m) {
-      _origSelectMember(m);
-      _buildEmailRecipients();
-    };
+    // Email recipients are now rebuilt inside _selectMember directly
 
     container.appendChild(content);
   });
