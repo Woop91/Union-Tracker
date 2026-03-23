@@ -424,24 +424,44 @@ var Auth = (function () {
     return Utilities.base64EncodeWebSafe(bytes).replace(/[=]+$/, '');
   }
 
+  function _hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    var c = (1 - Math.abs(2 * l - 1)) * s;
+    var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    var m = l - c / 2;
+    var r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else { r = c; b = x; }
+    var toHex = function(v) { var hex = Math.round((v + m) * 255).toString(16); return hex.length === 1 ? '0' + hex : hex; };
+    return '#' + toHex(r) + toHex(g) + toHex(b);
+  }
+
   function _buildEmailHtml(config, signInUrl, email) {
-    // Dynamic accent color from config
+    // Convert accent hue to hex — hsl() is not supported by many email clients
+    // (Outlook, older Gmail, Yahoo) which silently strip it, making the button invisible
     var hue = config.accentHue || 250;
-    var accent = 'hsl(' + hue + ', 70%, 55%)';
+    var accent = _hslToHex(hue, 70, 55);
     var safeInitials = escapeHtml(String(config.logoInitials || ''));
     var safeOrgName = escapeHtml(String(config.orgName || ''));
     var safeExpiry = escapeHtml(String(config.magicLinkExpiryDays || 7));
 
+    // "Bulletproof button" pattern: <table> with bgcolor works in all email clients
+    // including Outlook, which ignores CSS background on <a> tags
     return '<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin:0; padding:40px 20px; background:#f5f5f5;">'
       + '<div style="max-width:480px; margin:0 auto; background:#fff; border-radius:16px; padding:40px 32px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
       + '<div style="text-align:center; margin-bottom:24px;">'
-      + '<div style="display:inline-block; width:48px; height:48px; border-radius:12px; background:' + accent + '; color:#fff; font-size:20px; font-weight:700; line-height:48px;">' + safeInitials + '</div>'
+      + '<div style="display:inline-block; width:48px; height:48px; border-radius:12px; background:' + accent + '; color:#fff; font-size:20px; font-weight:700; line-height:48px; text-align:center;">' + safeInitials + '</div>'
       + '</div>'
       + '<h1 style="text-align:center; font-size:20px; color:#1a1a2e; margin:0 0 8px;">Sign in to ' + safeOrgName + '</h1>'
       + '<p style="text-align:center; color:#666; font-size:14px; margin:0 0 28px;">Click the button below to access your dashboard.</p>'
-      + '<div style="text-align:center; margin-bottom:28px;">'
-      + '<a href="' + signInUrl + '" style="display:inline-block; background:' + accent + '; color:#fff; text-decoration:none; padding:14px 36px; border-radius:10px; font-size:16px; font-weight:600;">Sign In</a>'
-      + '</div>'
+      + '<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 28px;">'
+      + '<tr><td align="center" bgcolor="' + accent + '" style="border-radius:10px;">'
+      + '<a href="' + signInUrl + '" target="_blank" style="display:inline-block; background:' + accent + '; color:#ffffff; text-decoration:none; padding:14px 36px; border-radius:10px; font-size:16px; font-weight:600; font-family:-apple-system,BlinkMacSystemFont,sans-serif;">Sign In</a>'
+      + '</td></tr></table>'
       + '<p style="color:#999; font-size:12px; text-align:center; line-height:1.6;">'
       + 'This link expires in ' + safeExpiry + ' days.<br>'
       + 'If you didn\'t request this, you can safely ignore this email.'
