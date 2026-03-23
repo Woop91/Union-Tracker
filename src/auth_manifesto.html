@@ -1,0 +1,155 @@
+<script>
+/**
+ * AUTH MANIFESTO — Background phrases + quote cycler for login screen
+ * Member Hub feature — v1.0.0 — 2026-03-22
+ *
+ * HOW TO INTEGRATE:
+ *  1. Add <?!= include('member_hub_styles') ?> in index.html <head>
+ *  2. Add <?!= include('auth_manifesto') ?> just before closing </body>
+ *  3. At the TOP of showAuthChoose(), call: injectAuthManifesto(container);
+ *
+ * GAS-SAFE: No DOM APIs unavailable in HtmlService. No external fetches.
+ * SOLIDBASE SAFE: union-agnostic — uses generic phrases only.
+ */
+
+// ─── PHRASE LAYER ───────────────────────────────────────────────────
+// Injected once, lives behind the login card via z-index layering.
+// Phrases cycle independently via CSS animation (no JS timer needed).
+
+function injectAuthManifesto(authContainer) {
+  // Only inject once
+  if (document.getElementById('auth-manifesto-layer')) return;
+
+  var phrases = [
+    "Your work doesn't clock out at 5.",
+    "The union is waiting for you.",
+    "Your rights don't end when you leave.",
+    "You are the change.",
+    "Solidarity is not a slogan. It's a practice."
+  ];
+
+  // Corner accents
+  ['tl','tr','bl','br'].forEach(function(pos) {
+    var c = document.createElement('div');
+    c.className = 'auth-corner ' + pos;
+    document.body.appendChild(c);
+  });
+
+  // Phrase layer
+  var layer = document.createElement('div');
+  layer.id = 'auth-manifesto-layer';
+  layer.className = 'auth-manifesto-layer';
+  layer.setAttribute('aria-hidden', 'true');
+  phrases.forEach(function(p, i) {
+    var div = document.createElement('div');
+    div.className = 'auth-manifesto-phrase amp-' + (i + 1);
+    div.textContent = p;
+    layer.appendChild(div);
+  });
+  document.body.insertBefore(layer, document.body.firstChild);
+
+  // Quote cycler — starts immediately, clears on dashboard entry
+  startAuthQuoteCycler();
+}
+
+// ─── QUOTE POOL ─────────────────────────────────────────────────────
+// Keep pool large. 3 picked per session for inline hub quotes.
+// All cycling on login screen — stops when user enters dashboard.
+// IMPORTANT: Never reduce below 8 quotes — cycler needs variety.
+
+var AUTH_QUOTES = [
+  { text: "The most courageous act is still to think for yourself. Aloud.", attr: "Coco Chanel" },
+  { text: "The labor of a human being is not a commodity or article of commerce.", attr: "Clayton Antitrust Act, 1914" },
+  { text: "All that serves labor serves the nation. All that harms labor is treason.", attr: "Abraham Lincoln" },
+  { text: "The only effective answer to organized greed is organized labor.", attr: "Thomas Donahue" },
+  { text: "No work is insignificant. All labor that uplifts humanity has dignity.", attr: "Martin Luther King Jr." },
+  { text: "An injury to one is an injury to all.", attr: "Industrial Workers of the World" },
+  { text: "Don't mourn. Organize.", attr: "Joe Hill, 1915" },
+  { text: "What the working people need is their full share of the wealth they create.", attr: "Samuel Gompers" },
+  { text: "Strong unions mean strong communities.", attr: "Labor movement tradition" },
+  { text: "You can't eat the orange and throw the peel away — a worker is not a piece of fruit.", attr: "Arthur Miller" },
+  { text: "The fight for a better tomorrow begins with the choices you make today.", attr: "Labor movement tradition" },
+  { text: "We don't need to be saved. We need to be heard.", attr: "Union organizing tradition" },
+  { text: "Power concedes nothing without a demand. It never did and it never will.", attr: "Frederick Douglass, 1857" },
+  { text: "The cause of labor is the cause of humanity.", attr: "Samuel Gompers" },
+  { text: "Workers built this country. Workers will rebuild it.", attr: "Labor movement tradition" },
+];
+
+var _authQuoteTimer = null;
+
+function _shuffleArray(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function startAuthQuoteCycler() {
+  var wrap = document.getElementById('auth-quote-wrap');
+  if (!wrap) {
+    // Create the wrap below the card after a short delay
+    // (card may not be in DOM yet at call time)
+    setTimeout(function() {
+      var card = document.querySelector('.auth-glass-card') || document.querySelector('.auth-container');
+      if (!card) return;
+      var w = document.createElement('div');
+      w.id = 'auth-quote-wrap';
+      w.className = 'auth-quote-wrap';
+      card.parentNode.insertBefore(w, card.nextSibling);
+      _buildQuoteCycler(w);
+    }, 200);
+    return;
+  }
+  _buildQuoteCycler(wrap);
+}
+
+function _buildQuoteCycler(wrap) {
+  var pool = _shuffleArray(AUTH_QUOTES);
+  wrap.innerHTML = '';
+  pool.forEach(function(q, i) {
+    var div = document.createElement('div');
+    div.className = 'auth-quote-item' + (i === 0 ? ' aq-visible' : '');
+    div.innerHTML =
+      '<div class="aq-text">\u201C' + q.text + '\u201D</div>' +
+      '<div class="aq-attr">\u2014 ' + q.attr + '</div>';
+    wrap.appendChild(div);
+  });
+
+  var idx = 0;
+  var nodes = wrap.querySelectorAll('.auth-quote-item');
+  _authQuoteTimer = setInterval(function() {
+    nodes[idx].classList.remove('aq-visible');
+    idx = (idx + 1) % nodes.length;
+    nodes[idx].classList.add('aq-visible');
+  }, 8000);
+}
+
+function stopAuthQuoteCycler() {
+  if (_authQuoteTimer) { clearInterval(_authQuoteTimer); _authQuoteTimer = null; }
+}
+
+// ─── HUB INLINE QUOTES ──────────────────────────────────────────────
+// Picks 3 non-repeating quotes for use in the Member Hub tab sections.
+// Call renderHubInlineQuotes() after the hub tab content renders.
+
+function _pickHubQuotes(n) {
+  var pool = _shuffleArray(AUTH_QUOTES);
+  return pool.slice(0, n);
+}
+
+function renderHubInlineQuotes() {
+  var ids = ['hub-quote-1', 'hub-quote-2', 'hub-quote-3'];
+  var three = _pickHubQuotes(3);
+  ids.forEach(function(id, i) {
+    var el = document.getElementById(id);
+    if (el && three[i]) {
+      el.className = 'hub-inline-quote';
+      el.innerHTML =
+        '<div class="hiq-text">\u201C' + three[i].text + '\u201D</div>' +
+        '<div class="hiq-attr">\u2014 ' + three[i].attr + '</div>';
+    }
+  });
+}
+</script>

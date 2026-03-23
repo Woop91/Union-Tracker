@@ -249,6 +249,8 @@ Records what each AI agent changed, when, and in which files.
 | 2026-02-25 | Claude (claude.ai) | Merged staging→Main: v4.13.0 SPA overhaul + notification bell/EventBus + individual-file build. Synced all 3 branches. | All `src/`, `dist/`, `build.js`, `CLAUDE.md` |
 | 2026-02-28 | Claude Code (Opus 4.6) | v4.18.1-security: Full security assessment + 7 remediations — auth default ON, magic link rate limiting, token cleanup trigger, timing attack fix, PIN token migration to PropertiesService, innerHTML→textContent, escapeForFormula | `00_Security.gs`, `19_WebDashAuth.gs`, `13_MemberSelfService.gs`, `14_MeetingCheckIn.gs`, `21_WebDashDataService.gs`, `CODE_REVIEW.md`, `CHANGELOG.md`, `FEATURES.md` |
 | 2026-03-19 | Claude (claude.ai) | v4.32.0: Workforce Mobility & Retention survey section added — Sections 13 + 13A, q80–q86 (q85 removed/folded), Looker columns, getSatisfactionSummary auto-includes via dynamic section key | `dist/10b_SurveyDocSheets.gs`, `src/10b_SurveyDocSheets.gs`, `dist/12_Features.gs`, `src/12_Features.gs`, `dist/01_Core.gs`, `src/01_Core.gs`, `AI_REFERENCE.md` |
+| 2026-03-22 | Claude (claude.ai) | DESIGN ITERATION (not yet released): Member Hub feature — 3 new HTML files created. `member_hub_styles.html` (auth manifesto + hub CSS), `auth_manifesto.html` (phrase bg + quote cycler JS), `member_hub_view.html` (renderMemberHub tab function). See integration instructions at top of each file. Union-agnostic. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html` |
+| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All files pushed to SolidBase Main. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
 
 ---
 
@@ -257,7 +259,30 @@ Records what each AI agent changed, when, and in which files.
 1. Bulk actions (flag/email/export)
 2. Deadline calendar view
 3. Grievance history for members
-4. Welcome/landing page
+4. ~~Welcome/landing page~~ → **IN PROGRESS: Member Hub** (design iteration, not yet released)
+
+## 🔨 IN PROGRESS — Member Hub (design phase, not released)
+
+**Feature:** Login screen manifesto + Member Hub tab for member view.
+
+**Files created (not yet integrated):**
+- `src/member_hub_styles.html` — CSS for auth manifesto background animation + hub tab layout
+- `src/auth_manifesto.html` — JS: `injectAuthManifesto()`, `startAuthQuoteCycler()`, `renderHubInlineQuotes()`
+- `src/member_hub_view.html` — JS: `renderMemberHub()` tab render function
+
+**Integration steps (DO NOT EXECUTE until approved for release):**
+1. Add `<?!= include('member_hub_styles') ?>` to `index.html` `<head>` block
+2. Add `<?!= include('auth_manifesto') ?>` before `</body>` in `index.html`
+3. Add `<?!= include('member_hub_view') ?>` before `</body>` in `index.html`
+4. In `auth_view.html` `showAuthChoose()`: call `injectAuthManifesto(container)` at top; wrap inner `wrapper` div with class `auth-glass-card`; append `<div id="auth-quote-wrap" class="auth-quote-wrap">` after card
+5. In `index.html` member tab nav array (Community group): add `{ id: 'memberhub', icon: '✊', label: 'Member Hub' }`
+6. In `index.html` member tab routing switch: add `case 'memberhub': return renderMemberHub;`
+
+**Design decisions:**
+- Login card: rgba(8,13,24,0.22) background, blur(3px) — intentionally transparent so bg phrases bleed through
+- Quotes: pool of 15, 3 picked per session for inline hub sections; full pool cycles on login screen every 8s
+- Action links wire to existing tabs: meetings, events, polls, unionstats, stewarddirectory
+- Member name personalization: uses `CURRENT_USER.name` split to first name only
 5. Events page with Join Virtual button
 
 See `PHASE2_PLAN.md` for details.

@@ -86,6 +86,10 @@ const HTML_FILES = [
   'grievance_form.html',
   'esign.html',
   'AdminSettings.html',
+  // Member Hub (design phase — not yet integrated into index.html)
+  'auth_manifesto.html',
+  'member_hub_styles.html',
+  'member_hub_view.html',
 ];
 
 /**
