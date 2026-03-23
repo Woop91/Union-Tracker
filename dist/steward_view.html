@@ -2879,7 +2879,7 @@ function renderStewardResources(appContainer) {
    var expandContent = el('div', { className: 'res-card-content' });
    if (r.content) expandContent.appendChild(el('div', null, r.content));
    
-   if (r.url && /^https?:\/\
+   if (r.url && /^https?:\/\//i.test(r.url)) {
    var resLink = el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource');
    resLink.addEventListener('click', function(ev) {
     ev.stopPropagation();
@@ -6236,7 +6236,7 @@ function _renderMinutesList(container) {
   var expanded = false;
   var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes || '');
   card.appendChild(fullDiv);
-  if (m.driveDocUrl && /^https?:\/\
+  if (m.driveDocUrl && /^https?:\/\//i.test(m.driveDocUrl)) {
    card.appendChild(el('a', { href: m.driveDocUrl, target: '_blank', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', marginTop: '6px', textDecoration: 'none' } }, '\uD83D\uDCC4 Open Google Doc'));
   }
   if (m.fullMinutes) {

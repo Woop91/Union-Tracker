@@ -1840,7 +1840,7 @@ function renderMemberResources(appContainer) {
   var expandContent = el('div', { className: 'res-card-content' });
   if (r.content) expandContent.appendChild(el('div', null, r.content));
   
-  if (r.url && /^https?:\/\
+  if (r.url && /^https?:\/\//i.test(r.url)) {
    var resLink = el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource');
    resLink.addEventListener('click', function(ev) {
    ev.stopPropagation(); // don't toggle card expand

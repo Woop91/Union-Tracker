@@ -176,8 +176,8 @@ function minifyHtml(content) {
 
   // Minify <script> blocks: remove // comments (careful with URLs), collapse whitespace
   content = content.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/gi, function(_, open, js, close) {
-    // Remove single-line comments (but not URLs like https://)
-    js = js.replace(/([^:])\/\/(?![\/*])(?![^\n]*['"`]).*$/gm, '$1');
+    // Remove single-line comments (but not URLs like https:// and regex \/\/)
+    js = js.replace(/([^:\\])\/\/(?![\/*])(?![^\n]*['"`]).*$/gm, '$1');
     // Remove multi-line comments
     js = js.replace(/\/\*[\s\S]*?\*\//g, '');
     // Collapse multiple blank lines into one
