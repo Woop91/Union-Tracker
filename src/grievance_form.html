@@ -12,13 +12,12 @@ body{
   font-family:Arial,Helvetica,sans-serif;
   font-size:10.5pt;
   color:#000;
-  padding:clamp(4px, 2vw, 1rem) clamp(4px, 2vw, 1rem) 3rem;
+  padding:1rem 1rem 3rem;
 }
 
 /* ── TOOLBAR ── */
 .toolbar{
-  max-width:min(8.5in, 100%);
-  margin:0 auto .5rem;
+  max-width:8.5in;margin:0 auto .5rem;
   display:flex;flex-wrap:wrap;gap:6px;align-items:center;
   background:#1a2e47;padding:6px 10px;border-radius:3px;
 }
@@ -41,7 +40,7 @@ body{
 
 /* ── PDF HELP BAR ── */
 .pdf-help{
-  max-width:min(8.5in, 100%);margin:0 auto 6px;
+  max-width:8.5in;margin:0 auto 6px;
   display:flex;align-items:flex-start;gap:8px;
   background:#1a3a5c;color:#dce8f8;
   font-family:Arial,sans-serif;font-size:11.5px;line-height:1.45;
@@ -59,10 +58,10 @@ body{
 /* ── PAGE — fluid width, caps at letter size ── */
 .page{
   background:#fff;
-  width:min(8.5in, 100%);   /* fluid: shrinks with viewport */
+  width:8.5in;
   min-height:11in;
   margin:0 auto;
-  padding:clamp(10px, 3%, .45in) clamp(10px, 4%, .45in) clamp(10px, 3%, .45in);
+  padding:.35in .45in .45in;
   box-shadow:0 3px 18px rgba(0,0,0,.3);
 }
 
@@ -152,88 +151,87 @@ textarea.fi{
 #agency[readonly]{opacity:.75;cursor:default;}
 #workloc[readonly]{opacity:.85;cursor:default;font-style:italic;}
 
-/* ── TOUCH TARGETS — only override font-size & height for touch devices ──
-   This is the ONLY breakpoint, and only addresses iOS auto-zoom prevention
-   (inputs < 16px trigger zoom on iOS Safari)                               */
+/* ── MOBILE ── edge-to-edge page, stacked labels, touch-safe targets ── */
 @media (max-width:640px){
 
-  /* ── Page chrome ── */
+  /* Page chrome */
   body{padding:0 0 2rem;}
-  .toolbar{border-radius:0;flex-wrap:wrap;gap:4px;padding:6px 8px;}
-  .tbtn{padding:10px 8px;font-size:13px;flex:1 1 auto;}
+  .toolbar{border-radius:0;flex-wrap:wrap;padding:8px;gap:6px;}
+  .toolbar span{width:100%;margin-right:0;order:-1;}
+  .tbtn{padding:9px 16px;font-size:13px;flex:1 1 auto;text-align:center;}
   .pdf-help{border-radius:0;font-size:11px;}
-  .page{padding:12px 12px 28px;box-shadow:none;border-radius:0;}
 
-  /* ── Hide logo, title, waivers ── */
-  .hdr img{display:none!important;}
-  .hdr-mid > div:first-child{display:none!important;}
-  .hdr{gap:4px!important;margin-bottom:8pt!important;}
-  .hdr-mid{min-height:unset!important;}
-  .hdr-step{
-    width:100%!important;text-align:left!important;
-    margin-right:0!important;
-    display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  /* Page sheet: edge-to-edge */
+  .page{
+    width:100%;
+    min-height:unset;
+    padding:14px 12px 28px;
+    box-shadow:none;
+    border-radius:0;
   }
-  .hdr-step > div{margin-bottom:0!important;}
-  #waiver-sections{display:none!important;}
 
-  /* ── iROW: LABEL on left, FIELD flush right ──
-     Grid: label auto-width | field fills remaining space  */
+  /* ── Header reflow ── */
+  .hdr{flex-wrap:wrap;gap:6px;}
+  .hdr-mid{
+    height:auto!important;
+    flex:1 1 60%!important;
+    min-width:0;
+  }
+  .hdr-mid>div:first-child{
+    font-size:19pt!important;
+    white-space:normal!important;
+    line-height:1.1;
+  }
+  .hdr-step{
+    width:100%!important;
+    text-align:left!important;
+    margin-right:0!important;
+    display:flex;
+    gap:18px;
+    align-items:center;
+    padding-top:4px;
+  }
+  .hdr-step>div{margin-bottom:0!important;}
+
+  /* ── irow: stack label → field ── */
   .irow{
-    display:grid!important;
-    grid-template-columns:auto 1fr!important;
-    align-items:center!important;
-    column-gap:10px!important;
-    row-gap:10px!important;
-    margin-bottom:14px!important;
+    flex-direction:column;
+    align-items:stretch!important;
+    flex-wrap:wrap;
+    gap:4px;
+    margin-bottom:10px;
   }
   .irow .lbl{
-    grid-column:1!important;
-    text-align:right!important;
-    white-space:nowrap!important;
-    font-size:9.5pt!important;
+    white-space:normal;
     margin-left:0!important;
   }
   .irow .fi{
-    grid-column:2!important;
     width:100%!important;
-    max-width:100%!important;
     flex:none!important;
-    height:44px!important;
-    font-size:16px!important;
-    padding:4px 10px!important;
-    box-sizing:border-box!important;
+    box-sizing:border-box;
   }
-  select.fi{height:44px!important;font-size:16px!important;}
-  textarea.fi{
-    grid-column:1 / -1!important;
-    height:90px!important;
-    min-height:90px!important;
-    font-size:16px!important;
-    resize:vertical!important;
-  }
-  #step.fi{width:70px!important;}
 
-  /* ── Article line ── */
-  #articles{
-    width:100%!important;max-width:100%!important;
-    height:44px!important;font-size:16px!important;
-    display:block!important;margin-top:6px!important;
-  }
+  /* ── Fields: iOS-safe 16px (no auto-zoom) + 44px touch target ── */
+  .fi{height:44px;font-size:16px;padding:4px 8px;}
+  select.fi{height:44px;font-size:16px;}
+  textarea.fi{height:80px;font-size:16px;resize:vertical;}
+
+  /* ── Labels: allow wrapping ── */
+  .lbl{white-space:normal;}
+
+  /* ── Article violation line ── */
+  .page div[style*="white-space:nowrap"]{white-space:normal!important;}
+  .page div[style*="flex-wrap:wrap"]{flex-wrap:wrap!important;}
+
+  /* ── Sig grid: 2 cols on mobile ── */
+  .sig-row{grid-template-columns:2fr 90px;}
+  .arrows-row{grid-template-columns:2fr 90px;}
+  .sig-box{height:50px;}
+  .sig-date{width:100%!important;height:44px!important;font-size:13px!important;padding:4px 3px!important;}
 
   /* ── Section heads ── */
-  .shead,.whead{font-size:11pt;margin-top:14pt!important;}
+  .shead,.whead{font-size:11pt;}
 
-  /* ── Sig grid: 2 cols ── */
-  .sig-row,.arrows-row{
-    grid-template-columns:1fr minmax(90px,110px)!important;
-    gap:0 6px!important;
-  }
-  .sig-date{
-    width:100%!important;height:44px!important;
-    font-size:13px!important;padding:4px 3px!important;
-  }
-  .sig-box{height:44px!important;}
 }
 
 /* iOS zoom prevention — only on actual touch hardware */
