@@ -18,6 +18,7 @@
   <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
 
   <?!= include('styles') ?>
+  <?!= include('member_hub_styles') ?>
 
   
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" as="script" crossorigin="anonymous">
@@ -2026,6 +2027,7 @@
   { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ]);
   return [
+  { id: 'memberhub', icon: '\u270A', label: 'Member Hub' },
   { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
   { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
   { group: 'Manage' },
@@ -2735,6 +2737,7 @@
   }
   if (role === 'member') {
   switch(tabId) {
+   case 'memberhub': return renderMemberHub;
    case 'home': return renderMemberHome;
    case 'cases': return renderMyCases;
    case 'profile': return renderUpdateProfile;
@@ -3623,6 +3626,9 @@
  </script>
 
   <?!= include('shared_components') ?>
+
+  <?!= include('auth_manifesto') ?>
+  <?!= include('member_hub_view') ?>
 
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>
