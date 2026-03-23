@@ -439,31 +439,3 @@ if (getConfigValue_(CONFIG_COLS.ENABLE_GRIEVANCES) === 'no') {
 
 ### Version Tag for When Implemented
 Suggest codename: **"Grievance Module Toggle"**, version bump: minor (e.g. `4.33.2` or next available).
-
-## [2026-03-23] Grievance Form — Desktop-First + Mobile Content-Preserving Redesign
-
-### Files Changed
-- `src/grievance_form.html` (both DDS-Dashboard and SolidBase)
-
-### What Changed
-**Desktop (8.5in fixed):**
-- Removed all `clamp()` and `min(8.5in, 100%)` fluid sizing
-- body padding → `1rem 1rem 3rem`
-- .toolbar, .pdf-help max-width → `8.5in`
-- .page width → `8.5in`, padding → `.35in .45in .45in`
-
-**Mobile `@media (max-width:640px)` — FULLY REPLACED:**
-- Previously: hid logo (`.hdr img`), title (`.hdr-mid > div:first-child`), and waivers (`#waiver-sections`) on mobile
-- Now: all content visible on mobile, scales/reflows naturally
-- Layout: flex-column stacking (label above field) instead of grid
-- Touch targets: 44px height, 16px font retained
-- Header: GRIEVANCE REPORT title scales to 19pt on mobile
-- Sig grid: 2-col retained
-
-### Source
-Uploaded file: `DDS_Grievance_Form_1.html` — used as reference for the full-size desktop and content-preserving mobile approach
-
-### Commits
-- DDS-Dashboard Main: cdb923e
-- SolidBase Main: 283ca98
-
