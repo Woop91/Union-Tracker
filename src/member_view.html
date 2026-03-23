@@ -92,7 +92,7 @@ function _memberHeader(container, title, subtitle) {
     if (IS_DUAL_ROLE) {
       headerRight.appendChild(el('button', {
         style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
-        onClick: function() { AppState.activeRole = 'steward'; initStewardView(document.getElementById('app')); }
+        onClick: function() { _invalidateTabCache(); _activePane = null; _layoutCache = {}; _tabPanesRole = null; AppState.activeRole = 'steward'; AppState.activeTab = 'cases'; initStewardView(document.getElementById('app')); }
       }, '\uD83D\uDD27 ' + CONFIG.stewardLabel));
     }
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
@@ -1311,7 +1311,8 @@ function _renderMemberWelcome(container) {
     { icon: '\uD83D\uDCDE', label: 'Contact Steward', tab: 'contact' },
     { icon: '\u2753', label: 'Ask a Question', tab: 'qa' },
     { icon: '\uD83D\uDCDA', label: 'Resources', tab: 'resources' },
-    { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' }
+    { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' },
+    { icon: '\uD83D\uDCCA', label: 'Workload', tab: 'workload' }
   ].forEach(function (qa) {
     var actionCard = el('div', {
       className: 'card card-clickable',
@@ -1822,7 +1823,7 @@ function renderMemberResources(appContainer) {
       { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
       { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
     ];
-    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     quickLinks.forEach(function(r) {
       if (!r.url) return;
@@ -2210,8 +2211,10 @@ function renderMemberMore(appContainer) {
     var menuItems = [
       { group: 'Manage' },
       { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', badge: AppState.memberTaskCount || 0, action: function() { _handleTabNav('member', 'mytasks'); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { _handleTabNav('member', 'workload'); } },
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
       { group: 'Reference' },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('member', 'poms'); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
       { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
       { group: 'Community' },
@@ -3595,8 +3598,8 @@ function renderWorkloadTracker(appContainer) {
 
 var WT_SUB_CATS = {
   priority:   ['QDD','CAL','TERI','Aged Case','Congressional','Dire Need','Homeless',
-               'Presumptive Disability','COBRA','Aged','SOAR Involvement',
-               'MC/WW','100% P&T','Public Inquiry','High Priority','Medium Priority'],
+               'Presumptive Disability','COBRA','DDS Aged','SOAR Involvement',
+               'MC/WW','100% P&T','Public Inquiry','DDS Important (High)','DDS Important (Medium)'],
   pending:    ['New Cases','Immediate Action','No Activity 15+ Days',
                'No Activity 30+ Days','Internal QA Returns','Federal QA Returns','Approval Returns'],
   unread:     ['All Unread Documents','MER','CE Reports','Trailer Mail'],

@@ -71,11 +71,6 @@ describe('Permission escalation: non-steward calling steward-only functions', ()
     }).toThrow(/steward|access denied/i);
   });
 
-  test('fsTriggerBulkExport wrapper throws for non-steward', () => {
-    expect(() => {
-      fsTriggerBulkExport('invalid-token');
-    }).toThrow(/steward|access denied/i);
-  });
 });
 
 

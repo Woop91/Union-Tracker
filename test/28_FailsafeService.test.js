@@ -2,7 +2,7 @@
  * Tests for 28_FailsafeService.gs
  *
  * Covers the FailsafeService IIFE: initFailsafeSheet, getDigestConfig,
- * updateDigestConfig, processScheduledDigests, triggerBulkExport,
+ * updateDigestConfig, processScheduledDigests,
  * backupCriticalSheets, setupFailsafeTriggers, removeFailsafeTriggers,
  * and global wrappers.
  */
@@ -341,46 +341,6 @@ describe('FailsafeService.processScheduledDigests', () => {
 });
 
 // ============================================================================
-// FailsafeService.triggerBulkExport
-// ============================================================================
-
-describe('FailsafeService.triggerBulkExport', () => {
-  test('rejects missing stewardEmail', () => {
-    var result = FailsafeService.triggerBulkExport(null);
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('Not authorized');
-  });
-
-  test('returns error when no member data', () => {
-    installSS([]);
-    var result = FailsafeService.triggerBulkExport('admin@test.com');
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('No member data');
-  });
-
-  test('returns sent count', () => {
-    var memberSheet = buildMemberSheet([
-      ['Alice', 'alice@test.com', 'HR'],
-      ['Bob', 'bob@test.com', 'Ops']
-    ]);
-    installSS([memberSheet]);
-
-    // Mock DataService so _composeMemberDigest generates content
-    global.DataService = {
-      getMemberGrievances: jest.fn(() => [
-        { status: 'Open', issueType: 'Discipline', dateFiled: '2026-01-15' }
-      ]),
-      getMemberTasks: jest.fn(() => [])
-    };
-
-    var result = FailsafeService.triggerBulkExport('admin@test.com');
-    expect(result.success).toBe(true);
-    expect(typeof result.sent).toBe('number');
-    expect(result.sent).toBeGreaterThanOrEqual(0);
-  });
-});
-
-// ============================================================================
 // FailsafeService.backupCriticalSheets
 // ============================================================================
 
@@ -399,7 +359,7 @@ describe('FailsafeService.backupCriticalSheets', () => {
     installSS([memberSheet]);
 
     FailsafeService.backupCriticalSheets();
-    expect(DriveApp.createFolder).toHaveBeenCalledWith('SolidBase_Backups');
+    expect(DriveApp.createFolder).toHaveBeenCalledWith('DDS_Dashboard_Backups');
   });
 
   test('backs up sheets to CSV files', () => {
@@ -466,7 +426,7 @@ describe('FailsafeService.backupCriticalSheets', () => {
 
     var result = FailsafeService.backupCriticalSheets();
     expect(result).toHaveProperty('backedUp');
-    expect(result).toHaveProperty('folderName', 'SolidBase_Backups');
+    expect(result).toHaveProperty('folderName', 'DDS_Dashboard_Backups');
     expect(result.success).toBe(true);
   });
 });

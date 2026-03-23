@@ -159,14 +159,33 @@ var MentorshipService = (function () {
   }
 
   function createPairing(mentorEmail, menteeEmail, caseTypes) {
+    if (!mentorEmail || !menteeEmail) return { success: false, message: 'Mentor and mentee emails are required.' };
+    var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(mentorEmail) || !emailPattern.test(menteeEmail)) {
+      return { success: false, message: 'Invalid email format.' };
+    }
+    if (mentorEmail.toLowerCase().trim() === menteeEmail.toLowerCase().trim()) {
+      return { success: false, message: 'Mentor and mentee cannot be the same person.' };
+    }
+
+    // Check for duplicate active pairing
+    var existing = getPairings();
+    for (var i = 0; i < existing.length; i++) {
+      if (existing[i].mentorEmail.toLowerCase() === mentorEmail.toLowerCase().trim() &&
+          existing[i].menteeEmail.toLowerCase() === menteeEmail.toLowerCase().trim()) {
+        return { success: false, message: 'This pairing already exists.' };
+      }
+    }
+
     var sheet = initSheet();
     var id = Utilities.getUuid();
     var now = new Date();
-    var safeCaseTypes = typeof escapeForFormula === 'function' ? escapeForFormula(caseTypes || '') : (caseTypes || '');
-    sheet.appendRow([id, mentorEmail, menteeEmail, safeCaseTypes, 'active', now, '']);
+    var esc = typeof escapeForFormula === 'function' ? escapeForFormula : function (v) { return v; };
+    sheet.appendRow([id, esc(mentorEmail.trim()), esc(menteeEmail.trim()), esc(caseTypes || ''), 'active', now, '']);
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('MENTORSHIP_CREATED', { mentor: mentorEmail, mentee: menteeEmail });
     }
+    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
     return { success: true, id: id };
   }
 
@@ -180,6 +199,7 @@ var MentorshipService = (function () {
       if (String(data[i][0]) === String(pairingId)) {
         var safeNotes = typeof escapeForFormula === 'function' ? escapeForFormula(notes) : notes;
         sheet.getRange(i + 1, 7).setValue(safeNotes);
+        if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
         return { success: true };
       }
     }
@@ -195,6 +215,10 @@ var MentorshipService = (function () {
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(pairingId)) {
         sheet.getRange(i + 1, 5).setValue('closed');
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('MENTORSHIP_CLOSED', { pairingId: pairingId, mentor: String(data[i][1]), mentee: String(data[i][2]) });
+        }
+        if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
         return { success: true };
       }
     }
@@ -246,12 +270,26 @@ var MentorshipService = (function () {
     var experienced = stewards.filter(function (s) { return !s.isNew; });
     var newStewards = stewards.filter(function (s) { return s.isNew && !pairedEmails[s.email]; });
 
+    // Track mentor load (existing active pairings + new suggestions)
+    var mentorLoad = {};
+    experienced.forEach(function (s) { mentorLoad[s.email] = 0; });
+    existing.forEach(function (p) {
+      var me = p.mentorEmail.toLowerCase();
+      if (mentorLoad.hasOwnProperty(me)) mentorLoad[me]++;
+    });
+
     newStewards.forEach(function (mentee) {
       if (experienced.length > 0) {
-        // Round-robin assignment
-        var mentor = experienced[suggestions.length % experienced.length];
+        // Pick mentor with lowest current load
+        var bestMentor = experienced[0];
+        var bestLoad = mentorLoad[bestMentor.email] || 0;
+        for (var m = 1; m < experienced.length; m++) {
+          var load = mentorLoad[experienced[m].email] || 0;
+          if (load < bestLoad) { bestMentor = experienced[m]; bestLoad = load; }
+        }
+        mentorLoad[bestMentor.email] = bestLoad + 1;
         suggestions.push({
-          mentorEmail: mentor.email,
+          mentorEmail: bestMentor.email,
           menteeEmail: mentee.email,
           reason: 'New steward (joined ' + (mentee.joined ? mentee.joined.toLocaleDateString() : 'recently') + ')'
         });
@@ -1419,7 +1457,7 @@ var SMSService = (function () {
     if (!isConfigured()) {
       return { success: false, error: 'Twilio not configured.' };
     }
-    return _sendViaTwilio(toPhone, 'Test message from SolidBase. If you received this, SMS is working!');
+    return _sendViaTwilio(toPhone, 'Test message from DDS Dashboard. If you received this, SMS is working!');
   }
 
   /**

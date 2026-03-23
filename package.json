@@ -1,6 +1,6 @@
 {
   "name": "union-steward-dashboard",
-  "version": "4.34.2",
+  "version": "4.34.3",
   "description": "Modular Union Steward Dashboard for Google Sheets",
   "main": "build.js",
   "scripts": {
@@ -46,7 +46,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Woop91/SolidBase"
+    "url": "https://github.com/Woop91/DDS-Dashboard"
   },
   "lint-staged": {
     "src/**/*.gs": [

@@ -323,7 +323,6 @@ describe('Auth denial: Failsafe Service wrappers', () => {
   const fsFunctions = [
     { name: 'fsGetDigestConfig', args: [INVALID_TOKEN] },
     { name: 'fsUpdateDigestConfig', args: [INVALID_TOKEN, {}] },
-    { name: 'fsTriggerBulkExport', args: [INVALID_TOKEN] },
     { name: 'fsBackupCriticalSheets', args: [INVALID_TOKEN] },
     { name: 'fsSetupTriggers', args: [INVALID_TOKEN] },
     { name: 'fsRemoveTriggers', args: [INVALID_TOKEN] },

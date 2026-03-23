@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.34.3] - 2026-03-23
+
+### Fixed
+- **Mentorship: input validation** — `createPairing` now validates email format, prevents self-pairing, and rejects duplicate active pairings.
+- **Mentorship: formula injection** — `escapeForFormula()` applied to mentor/mentee emails before sheet write.
+- **Mentorship: audit trail** — `closePairing` now logs `MENTORSHIP_CLOSED` audit event with pairing details.
+- **Mentorship: nav badges** — All write operations (`createPairing`, `updatePairingNotes`, `closePairing`) now call `_refreshNavBadges()`.
+- **Mentorship: mentor load balancing** — `suggestPairings` now picks the mentor with the fewest existing active pairings instead of naive round-robin.
+
+### Added
+- **Mentorship: manual pairing form** — Stewards can now create pairings with any two emails, not just from suggestions.
+- **Mentorship: save feedback** — "Save Notes" button shows "Saved!" confirmation with auto-reset.
+- **Mentorship: suggestion refresh** — Accepting a suggested pairing now refreshes the Active Pairings list.
+
+## [4.34.2] - 2026-03-22
+
+### Changed
+- **BROADCAST_SCOPE_ALL** default changed from `no` to `yes` — stewards can now message all members by default.
+- **ENABLE_CORRELATION** now seeded as `yes` with yes/no dropdown validation — correlation engine active by default on new installs.
+
+### Note
+All other security features (ACCESS_CONTROL, DASHBOARD_MEMBER_AUTH, ERROR_LOGGING, NOTIFY_ON_CRITICAL, auto-archival) were already enabled by default.
+
 ## [4.34.1] - 2026-03-21
 
 ### Fixed

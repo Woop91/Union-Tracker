@@ -294,7 +294,7 @@
         var base = n.isMulti ? CYBER_NEONS.red : n;
         return {
           bg: '#06060c', surface: '#0a0a12', surfaceAlt: '#12121e', raised: '#15152a',
-          text: base.solid, 'text-secondary': 'rgba(' + base.rgb + ',0.4)', muted: 'rgba(' + base.rgb + ',0.25)',
+          text: base.solid, 'text-secondary': 'rgba(' + base.rgb + ',0.6)', muted: 'rgba(' + base.rgb + ',0.45)',
           card: '#0a0a12', 'bg-tertiary': '#0f0f18',
           success: '#00e5ff', warning: '#ffaa00', danger: '#ffaa00', info: '#00ccff',
           border: 'rgba(' + base.rgb + ',0.12)', radius: '0px',
@@ -2088,8 +2088,10 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { group: 'Reference' },
+        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
         { group: 'Community' },
@@ -3674,8 +3676,8 @@
           app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,sans-serif;background:#141414;color:#e0e0e0">'
             + '<div style="max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center">'
             + '<h1 style="font-size:20px;margin:0 0 12px">Something went wrong</h1>'
-            + '<p style="color:#888;font-size:14px;line-height:1.6;margin:0 0 20px">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
-            + '<p id="boot-err-detail" style="color:#555;font-size:11px;line-height:1.4;margin:0 0 20px;font-family:monospace;word-break:break-all"></p>'
+            + '<p style="color:#999;font-size:14px;line-height:1.6;margin:0 0 20px">The dashboard could not load. Try clearing your browser cache or opening in an incognito window.</p>'
+            + '<p id="boot-err-detail" style="color:#999;font-size:11px;line-height:1.4;margin:0 0 20px;font-family:monospace;word-break:break-all"></p>'
             + '<a href="javascript:localStorage.removeItem(\'dashboardSessionToken\');location.reload()" style="display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px">Clear &amp; Reload</a>'
             + '</div></div>';
           var errEl = document.getElementById('boot-err-detail');

@@ -1660,7 +1660,7 @@ function test_authsweep_tlEndpointsGated() {
 /** Tests authsweep: fs endpoints gated. */
 function test_authsweep_fsEndpointsGated() {
   // Failsafe endpoints: all must exist, write ops must be steward-gated
-  var gated = ['fsGetDigestConfig', 'fsUpdateDigestConfig', 'fsTriggerBulkExport',
+  var gated = ['fsGetDigestConfig', 'fsUpdateDigestConfig',
     'fsBackupCriticalSheets', 'fsSetupTriggers', 'fsRemoveTriggers',
     'fsInitSheets', 'fsEnsureAllSheets', 'fsDiagnostic'];
   for (var i = 0; i < gated.length; i++) {

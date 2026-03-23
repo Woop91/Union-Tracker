@@ -83,7 +83,7 @@ function _stewardHeader(container, title, subtitle) {
  
  headerRight.appendChild(el('button', {
   style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '8px 14px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', minHeight: '36px' },
-  onClick: function() { AppState.activeRole = 'member'; initMemberView(document.getElementById('app')); }
+  onClick: function() { _invalidateTabCache(); _activePane = null; _layoutCache = {}; _tabPanesRole = null; AppState.activeRole = 'member'; AppState.activeTab = 'home'; initMemberView(document.getElementById('app')); }
  }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
  headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
   AppState.isDark = !AppState.isDark;
@@ -2794,7 +2794,7 @@ function renderStewardResources(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
   { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
   ];
-  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
   quickLinks.forEach(function(r) {
   if (!r.url) return;
@@ -3800,8 +3800,10 @@ function renderStewardMore(appContainer) {
  var menuItems = [
   { group: 'Manage' },
   { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
+  { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
   { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
   { group: 'Reference' },
+  { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('steward', 'poms'); } },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
   { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
   { group: 'Community' },
@@ -6768,26 +6770,6 @@ function renderFailsafePage(appContainer) {
  var content = el('div', { className: 'content' });
 
  
- var exportCard = el('div', { className: 'card p-16-mb-12' });
- exportCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Bulk Member Export'));
- exportCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Send every member their personal data summary via email. Includes grievances, workload, and assigned tasks.'));
- var exportStatus = el('div', { className: 'status-msg' });
- exportCard.appendChild(exportStatus);
- exportCard.appendChild(el('button', {
-  className: 'btn btn-primary',
-  onClick: function() {
-  exportStatus.textContent = 'Sending emails... this may take a minute.'; exportStatus.style.color = 'var(--muted)';
-  serverCall().withSuccessHandler(function(r) {
-   if (r && r.success) { exportStatus.textContent = r.sent + ' member summaries emailed!'; exportStatus.style.color = 'var(--success)'; }
-   else { exportStatus.textContent = r ? r.message : 'Error.'; exportStatus.style.color = 'var(--danger)'; }
-  }).withFailureHandler(function() {
-   exportStatus.textContent = 'Failed to send exports.'; exportStatus.style.color = 'var(--danger)';
-  }).fsTriggerBulkExport(SESSION_TOKEN);
-  }
- }, 'Send Data to All Members'));
- content.appendChild(exportCard);
-
- 
  var backupCard = el('div', { className: 'card p-16-mb-12' });
  backupCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Manual CSV Backup'));
  backupCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Create CSV backups of critical sheets (Member Directory, Grievances, Tasks, etc.) in your Google Drive.'));
@@ -6956,7 +6938,7 @@ function renderTestRunnerPage(appContainer) {
  var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--card)', border: '2px solid var(--accent)', boxShadow: '0 2px 12px rgba(0,0,0,0.4)' } });
 
  
- var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'webapp', 'configrd', 'portal', 'weeklyq', 'workload', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
+ var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'loginlink', 'contacts', 'emailtypes', 'webapp', 'configrd', 'portal', 'weeklyq', 'workload', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
  var runAllBtn = el('button', {
   className: 'btn btn-primary',
   style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
@@ -7026,6 +7008,9 @@ function renderTestRunnerPage(appContainer) {
   { value: 'configlive', label: 'Config Completeness' },
   { value: 'survey', label: 'Survey Engine' },
   { value: 'emailsend', label: 'Email & Auth Scopes' },
+  { value: 'loginlink', label: 'Login Links' },
+  { value: 'contacts', label: 'Contacts' },
+  { value: 'emailtypes', label: 'Email Types' },
   { value: 'webapp', label: 'Web App Routing' },
   { value: 'configrd', label: 'ConfigReader' },
   { value: 'portal', label: 'Portal Sheets' },
@@ -8407,6 +8392,42 @@ function renderMentorshipPage(appContainer) {
  var content = el('div', { className: 'content' });
 
  
+ var formSection = el('div', { style: { marginBottom: '24px' } });
+ formSection.appendChild(el('h3', { style: { fontSize: '16px', marginBottom: '12px' } }, 'Create Pairing'));
+ var form = el('div', { className: 'card', style: { padding: '16px', display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' } });
+ var mentorInput = el('input', { className: 'form-input', type: 'email', placeholder: 'Mentor email', style: { flex: '1', minWidth: '160px' } });
+ var menteeInput = el('input', { className: 'form-input', type: 'email', placeholder: 'Mentee email', style: { flex: '1', minWidth: '160px' } });
+ var caseInput = el('input', { className: 'form-input', placeholder: 'Case types (optional)', style: { flex: '1', minWidth: '140px' } });
+ var formMsg = el('span', { style: { fontSize: '13px', minWidth: '80px' } });
+ var createBtn = el('button', {
+  className: 'btn btn-primary', style: { fontSize: '13px' },
+  onClick: function() {
+  if (!mentorInput.value || !menteeInput.value) { formMsg.textContent = 'Both emails required.'; formMsg.style.color = 'var(--danger, #ef4444)'; return; }
+  createBtn.disabled = true;
+  createBtn.textContent = 'Creating...';
+  formMsg.textContent = '';
+  serverCall().withSuccessHandler(function(r) {
+   createBtn.disabled = false;
+   createBtn.textContent = 'Create';
+   if (r && r.success) {
+   formMsg.textContent = 'Created!'; formMsg.style.color = 'var(--success, #22c55e)';
+   mentorInput.value = ''; menteeInput.value = ''; caseInput.value = '';
+   _loadMentorshipPairings(activeList);
+   setTimeout(function() { formMsg.textContent = ''; }, 2000);
+   } else {
+   formMsg.textContent = (r && r.message) || 'Failed.'; formMsg.style.color = 'var(--danger, #ef4444)';
+   }
+  }).withFailureHandler(function() {
+   createBtn.disabled = false; createBtn.textContent = 'Create';
+   formMsg.textContent = 'Server error.'; formMsg.style.color = 'var(--danger, #ef4444)';
+  }).dataCreateMentorshipPairing(SESSION_TOKEN, mentorInput.value.trim(), menteeInput.value.trim(), caseInput.value.trim());
+  }
+ }, 'Create');
+ form.appendChild(mentorInput); form.appendChild(menteeInput); form.appendChild(caseInput); form.appendChild(createBtn); form.appendChild(formMsg);
+ formSection.appendChild(form);
+ content.appendChild(formSection);
+
+ 
  var activeSection = el('div', { style: { marginBottom: '24px' } });
  activeSection.appendChild(el('h3', { style: { fontSize: '16px', marginBottom: '12px' } }, 'Active Pairings'));
  var activeList = el('div', { id: 'mentorship-active' });
@@ -8479,11 +8500,24 @@ function _buildMentorshipCard(p) {
  actions.appendChild(el('button', {
  className: 'btn btn-secondary',
  style: { fontSize: '12px' },
- onClick: function() {
+ onClick: function(ev) {
+  var btn = ev.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
   serverCall().withSuccessHandler(function(r) {
-  if (r && r.success) notesArea.style.borderColor = 'var(--success, #22c55e)';
+  if (r && r.success) {
+   notesArea.style.borderColor = 'var(--success, #22c55e)';
+   btn.textContent = 'Saved!';
+  } else {
+   notesArea.style.borderColor = 'var(--danger, #ef4444)';
+   btn.textContent = 'Save Notes';
+  }
+  btn.disabled = false;
+  setTimeout(function() { btn.textContent = 'Save Notes'; notesArea.style.borderColor = ''; }, 2000);
   }).withFailureHandler(function() {
   notesArea.style.borderColor = 'var(--danger, #ef4444)';
+  btn.textContent = 'Save Notes';
+  btn.disabled = false;
   }).dataUpdateMentorshipNotes(SESSION_TOKEN, p.id, notesArea.value);
  }
  }, 'Save Notes'));
@@ -8528,6 +8562,8 @@ function _loadMentorshipSuggestions(suggestList) {
     btn.textContent = 'Created!';
     btn.disabled = true;
     }
+    var activeList = document.getElementById('mentorship-active');
+    if (activeList) _loadMentorshipPairings(activeList);
    }
    }).dataCreateMentorshipPairing(SESSION_TOKEN, s.mentorEmail, s.menteeEmail, '');
   }

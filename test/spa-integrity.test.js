@@ -845,6 +845,35 @@ describe('G19: More menu items have route handlers', () => {
 
 
 // ============================================================================
+// G20: POMS DESCRIPTION ACCURACY
+// ============================================================================
+// Bug (2026-03-14): Both views described POMS as "Postal Operations Manual"
+// instead of "Program Operations Manual System". This guard prevents the wrong
+// acronym expansion from reappearing.
+
+describe('G20: POMS description accuracy', () => {
+  const stewardCode = read('steward_view.html');
+  const memberCode = read('member_view.html');
+
+  test('steward view does not say "Postal Operations Manual"', () => {
+    expect(stewardCode).not.toContain('Postal Operations Manual');
+  });
+
+  test('member view does not say "Postal Operations Manual"', () => {
+    expect(memberCode).not.toContain('Postal Operations Manual');
+  });
+
+  test('steward view has correct POMS description', () => {
+    expect(stewardCode).toContain('Program Operations Manual System');
+  });
+
+  test('member view has correct POMS description', () => {
+    expect(memberCode).toContain('Program Operations Manual System');
+  });
+});
+
+
+// ============================================================================
 // G21: MEMBER DUES-GATED TABS HAVE _isDuesPaying() GUARD
 // ============================================================================
 // Bug history: v4.25.10 — Resources tab banner claimed dues restriction but
@@ -1156,6 +1185,77 @@ describe('G25: Switch to Member/Steward resets navigation state', () => {
     const handler = getSwitchHandler();
     expect(handler).toContain('initStewardView');
     expect(handler).toContain('initMemberView');
+  });
+});
+
+// G25b: Mobile header switch buttons must also reset navigation state
+describe('G25b: Mobile header switch buttons reset navigation state', () => {
+  const stewardView = read('steward_view.html');
+  const memberView = read('member_view.html');
+
+  test('Steward header Switch-to-Member resets _invalidateTabCache()', () => {
+    // Find the onClick that switches to member in steward header
+    const switchBlock = stewardView.substring(
+      stewardView.indexOf("activeRole = 'member'") - 200,
+      stewardView.indexOf("activeRole = 'member'") + 100
+    );
+    expect(switchBlock).toContain('_invalidateTabCache()');
+  });
+
+  test('Steward header Switch-to-Member resets _activePane', () => {
+    const switchBlock = stewardView.substring(
+      stewardView.indexOf("activeRole = 'member'") - 200,
+      stewardView.indexOf("activeRole = 'member'") + 100
+    );
+    expect(switchBlock).toContain('_activePane = null');
+  });
+
+  test('Steward header Switch-to-Member resets _layoutCache', () => {
+    const switchBlock = stewardView.substring(
+      stewardView.indexOf("activeRole = 'member'") - 200,
+      stewardView.indexOf("activeRole = 'member'") + 100
+    );
+    expect(switchBlock).toContain('_layoutCache = {}');
+  });
+
+  test('Steward header Switch-to-Member resets _tabPanesRole', () => {
+    const switchBlock = stewardView.substring(
+      stewardView.indexOf("activeRole = 'member'") - 200,
+      stewardView.indexOf("activeRole = 'member'") + 100
+    );
+    expect(switchBlock).toContain('_tabPanesRole = null');
+  });
+
+  test('Member header Switch-to-Steward resets _invalidateTabCache()', () => {
+    const switchBlock = memberView.substring(
+      memberView.indexOf("activeRole = 'steward'") - 200,
+      memberView.indexOf("activeRole = 'steward'") + 100
+    );
+    expect(switchBlock).toContain('_invalidateTabCache()');
+  });
+
+  test('Member header Switch-to-Steward resets _activePane', () => {
+    const switchBlock = memberView.substring(
+      memberView.indexOf("activeRole = 'steward'") - 200,
+      memberView.indexOf("activeRole = 'steward'") + 100
+    );
+    expect(switchBlock).toContain('_activePane = null');
+  });
+
+  test('Member header Switch-to-Steward resets _layoutCache', () => {
+    const switchBlock = memberView.substring(
+      memberView.indexOf("activeRole = 'steward'") - 200,
+      memberView.indexOf("activeRole = 'steward'") + 100
+    );
+    expect(switchBlock).toContain('_layoutCache = {}');
+  });
+
+  test('Member header Switch-to-Steward resets _tabPanesRole', () => {
+    const switchBlock = memberView.substring(
+      memberView.indexOf("activeRole = 'steward'") - 200,
+      memberView.indexOf("activeRole = 'steward'") + 100
+    );
+    expect(switchBlock).toContain('_tabPanesRole = null');
   });
 });
 

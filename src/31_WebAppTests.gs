@@ -710,7 +710,7 @@ function test_failsafe_publicAPIComplete() {
 function test_failsafe_globalWrappersExist() {
   var wrappers = [
     'fsGetDigestConfig', 'fsUpdateDigestConfig',
-    'fsProcessScheduledDigests', 'fsTriggerBulkExport',
+    'fsProcessScheduledDigests',
     'fsBackupCriticalSheets', 'fsSetupTriggers', 'fsRemoveTriggers',
     'fsInitSheets'
   ];
@@ -741,9 +741,9 @@ function test_failsafe_digestConfigReturnsShape() {
 /** Tests failsafe: wrappers reject null token. */
 function test_failsafe_wrappersRejectNullToken() {
   try {
-    var result = fsTriggerBulkExport(null);
+    var result = fsBackupCriticalSheets(null);
     if (result && typeof result === 'object') {
-      TestRunner.assertEquals(false, result.success, 'fsTriggerBulkExport(null) rejects');
+      TestRunner.assertEquals(false, result.success, 'fsBackupCriticalSheets(null) rejects');
     }
   } catch (_e) { /* throwing is acceptable */ }
 }

@@ -7,7 +7,7 @@
  *   Data resilience system with scheduled email digests and Google Drive CSV
  *   backups. Members can opt into periodic email digests of their grievance/
  *   workload/task data. Automatic weekly Drive backups export key sheets as
- *   CSV files to a SolidBase_Backups folder. Maintains maximum 52 backup
+ *   CSV files to a DDS_Dashboard_Backups folder. Maintains maximum 52 backup
  *   files (~1 year of weekly backups per sheet).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -35,7 +35,7 @@
 
 var FailsafeService = (function () {
 
-  var BACKUP_FOLDER_NAME = 'SolidBase_Backups';
+  var BACKUP_FOLDER_NAME = 'DDS_Dashboard_Backups';
   var MAX_BACKUP_FILES = 52; // ~1 year of weekly backups per sheet
 
   // ═══════════════════════════════════════
@@ -332,58 +332,6 @@ var FailsafeService = (function () {
   }
 
   // ═══════════════════════════════════════
-  // Bulk Export
-  // ═══════════════════════════════════════
-
-  /**
-   * Sends a personal data summary email to every member in the directory.
-   * @param {string} stewardEmail - Requesting steward's email (authorization check).
-   * @returns {{success: boolean, sent?: number, message?: string}}
-   */
-  function triggerBulkExport(stewardEmail) {
-    if (!stewardEmail) return { success: false, message: 'Not authorized.' };
-
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
-    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-    if (!memberSheet || memberSheet.getLastRow() <= 1) return { success: false, message: 'No member data.' };
-
-    var members = memberSheet.getDataRange().getValues();
-    var headers = members[0];
-    var emailCol = -1;
-    for (var h = 0; h < headers.length; h++) {
-      if (String(headers[h]).toLowerCase().indexOf('email') !== -1) { emailCol = h; break; }
-    }
-    if (emailCol === -1) return { success: false, message: 'Email column not found.' };
-
-    var sent = 0;
-    for (var i = 1; i < members.length; i++) {
-      var email = String(members[i][emailCol]).toLowerCase().trim();
-      if (!email || email.indexOf('@') === -1) continue;
-
-      var remaining = MailApp.getRemainingDailyQuota();
-      if (remaining < 5) break;
-
-      try {
-        var config = { includeGrievances: true, includeWorkload: true, includeTasks: true };
-        var body = _composeMemberDigest(email, config);
-        if (body) {
-          MailApp.sendEmail({
-            to: email,
-            subject: 'Your Personal Union Data Summary',
-            htmlBody: body,
-            noReply: true
-          });
-          sent++;
-        }
-      } catch (e) { Logger.log('Bulk export error for ' + email + ': ' + e.message); }
-    }
-
-    logAuditEvent('FAILSAFE_BULK_EXPORT', sent + ' member summaries emailed by ' + stewardEmail);
-    return { success: true, sent: sent };
-  }
-
-  // ═══════════════════════════════════════
   // Drive Backup
   // ═══════════════════════════════════════
 
@@ -632,7 +580,6 @@ var FailsafeService = (function () {
     getDigestConfig: getDigestConfig,
     updateDigestConfig: updateDigestConfig,
     processScheduledDigests: processScheduledDigests,
-    triggerBulkExport: triggerBulkExport,
     backupCriticalSheets: backupCriticalSheets,
     setupFailsafeTriggers: setupFailsafeTriggers,
     removeFailsafeTriggers: removeFailsafeTriggers,
@@ -645,7 +592,7 @@ var FailsafeService = (function () {
 // ═══════════════════════════════════════
 // Auth model:
 //   fsGetDigestConfig / fsUpdateDigestConfig — server-resolved identity only; client email param ignored
-//   fsTriggerBulkExport / fsSetupTriggers / fsRemoveTriggers / fsBackupCriticalSheets / fsInitSheets — steward-only
+//   fsSetupTriggers / fsRemoveTriggers / fsBackupCriticalSheets / fsInitSheets — steward-only
 //
 // sessionToken: client passes SESSION_TOKEN (from PAGE_DATA.sessionToken) for magic link / session auth.
 // Server validates the token via Auth.resolveEmailFromToken() — the raw email is never trusted.
@@ -682,17 +629,6 @@ function fsUpdateDigestConfig(sessionToken, config) {
 function fsProcessScheduledDigests() {
   // Scheduled trigger — no interactive auth; runs as script owner
   return FailsafeService.processScheduledDigests();
-}
-
-/**
- * Global wrapper: sends bulk data export emails to all members (steward-only).
- * @param {string} sessionToken - Session token for steward auth.
- * @returns {{success: boolean, sent?: number, message?: string}}
- */
-function fsTriggerBulkExport(sessionToken) {
-  var e = _requireStewardAuth(sessionToken);
-  if (!e) return { success: false, message: 'Not authorized.' };
-  return FailsafeService.triggerBulkExport(e);
 }
 
 /**
