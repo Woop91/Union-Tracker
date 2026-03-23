@@ -2046,10 +2046,18 @@
 
     // Dev-only tabs filtered out in production mode
     var _DEV_ONLY_TABS = { testrunner: 1 };
+    // Grievance-related tabs hidden when CONFIG.showGrievances is false
+    var _GRIEVANCE_TABS = { cases: 1, newgrievance: 1 };
 
     function _filterDevTabs(tabs) {
-      if (IS_DEV_MODE) return tabs;
-      return tabs.filter(function(t) { return !t.id || !_DEV_ONLY_TABS[t.id]; });
+      var filtered = tabs;
+      if (!IS_DEV_MODE) {
+        filtered = filtered.filter(function(t) { return !t.id || !_DEV_ONLY_TABS[t.id]; });
+      }
+      if (CONFIG.showGrievances === false) {
+        filtered = filtered.filter(function(t) { return !t.id || !_GRIEVANCE_TABS[t.id]; });
+      }
+      return filtered;
     }
 
     function _getSidebarTabs(role) {
@@ -2795,6 +2803,10 @@
 
     /** Returns the render function for a given role + tabId */
     function _getTabRenderFn(role, tabId) {
+      // Guard: redirect grievance tabs to default when grievances disabled
+      if (CONFIG.showGrievances === false && _GRIEVANCE_TABS[tabId]) {
+        tabId = role === 'member' ? 'home' : 'home';
+      }
       if (role === 'member') {
         switch(tabId) {
           case 'home': return renderMemberHome;

@@ -330,6 +330,7 @@ function _sanitizeConfig(config) {
     // v4.20.18: insights cache TTL exposed so client can show staleness info
     insightsCacheTTLMin: config.insightsCacheTTLMin || 5,
     issueCategories: (typeof DEFAULT_CONFIG !== 'undefined' && Array.isArray(DEFAULT_CONFIG.ISSUE_CATEGORY)) ? DEFAULT_CONFIG.ISSUE_CATEGORY : [],
+    showGrievances: _isGrievancesEnabled(),
   };
 }
 

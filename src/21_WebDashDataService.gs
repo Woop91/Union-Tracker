@@ -4745,13 +4745,13 @@ function _requireStewardAuth(sessionToken) {
 //   - Public reads: no auth required (aggregate/non-PII data only)
 
 /** @param {string} sessionToken @returns {Object[]} Steward cases. Requires steward auth. */
-function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardCases(s); }
+function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; if (!_isGrievancesEnabled()) return { success: true, cases: [] }; return DataService.getStewardCases(s); }
 /** @param {string} sessionToken @returns {Object} Steward KPIs. Requires steward auth. */
-function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardKPIs(s); }
+function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; if (!_isGrievancesEnabled()) return { totalCases: 0, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 }; return DataService.getStewardKPIs(s); }
 /** @param {string} sessionToken @returns {Object[]} Member's own active grievances. Requires auth. */
-function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberGrievances(e); }
+function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: true, grievances: [] }; return DataService.getMemberGrievances(e); }
 /** @param {string} sessionToken @returns {Object} Member's closed grievance history. Requires auth. */
-function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberGrievanceHistory(e); }
+function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: true, history: [] }; return DataService.getMemberGrievanceHistory(e); }
 /** @param {string} sessionToken @param {string} stewardEmail @returns {Object|null} Steward contact info. Requires auth. */
 function dataGetStewardContact(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) { Logger.log('dataGetStewardContact: auth failed'); return null; } return DataService.getStewardContact(stewardEmail || e); }
 
@@ -4803,9 +4803,9 @@ function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _r
 /** @param {string} sessionToken @param {string} stewardEmail @returns {Object} Self-assigns a steward. Requires auth. */
 function dataMemberAssignSteward(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return withScriptLock_(function() { return DataService.assignStewardToMember(e, stewardEmail); }); }
 /** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Starts a grievance draft. Requires auth. */
-function dataStartGrievanceDraft(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.startGrievanceDraft(e, data, idemKey); }) : { success: false, message: 'Not authenticated.' }; }
+function dataStartGrievanceDraft(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return withScriptLock_(function() { return DataService.startGrievanceDraft(e, data, idemKey); }); }
 /** @param {string} sessionToken @returns {Object} Creates Drive folder for member's grievance. Requires auth. */
-function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
+function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return DataService.createGrievanceDriveFolder(e); }
 // v4.31.1 — Resource click tracking moved to line ~5423 (3-param version with resourceTitle)
 /** @param {string} sessionToken @returns {Object} Survey completion status for caller. Requires auth. */
 function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberSurveyStatus(e); }
@@ -4971,9 +4971,9 @@ function dataGetStewardDirectory(sessionToken) {
   }
 }
 /** @param {string} sessionToken @returns {Object} Org-wide grievance statistics. Requires steward auth. */
-function dataGetGrievanceStats(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
+function dataGetGrievanceStats(sessionToken) { if (!_isGrievancesEnabled()) return { available: false }; var s = _requireStewardAuth(sessionToken); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
 /** @param {string} sessionToken @returns {Object[]} Grievance hotspot locations. Requires steward auth. */
-function dataGetGrievanceHotSpots(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getGrievanceHotSpots(); }
+function dataGetGrievanceHotSpots(sessionToken) { if (!_isGrievancesEnabled()) return []; var s = _requireStewardAuth(sessionToken); if (!s) return []; return DataService.getGrievanceHotSpots(); }
 /** @param {string} sessionToken @returns {Object|null} Membership statistics. Requires auth. */
 function dataGetMembershipStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMembershipStats() : null; }
 
@@ -4981,17 +4981,17 @@ function dataGetMembershipStats(sessionToken) { var e = _resolveCallerEmail(sess
 // Uses _resolveCallerEmail (any authenticated member) instead of _requireStewardAuth.
 // Data is already anonymized (aggregate counts only); hotspots require 3+ per location.
 /** @param {string} sessionToken @returns {Object} Anonymized grievance stats (member-safe). Requires auth. */
-function dataGetMemberGrievanceStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { available: false }; return DataService.getGrievanceStats(); }
+function dataGetMemberGrievanceStats(sessionToken) { if (!_isGrievancesEnabled()) return { available: false }; var e = _resolveCallerEmail(sessionToken); if (!e) return { available: false }; return DataService.getGrievanceStats(); }
 /** @param {string} sessionToken @returns {Object[]} Anonymized grievance hotspots (member-safe). Requires auth. */
-function dataGetMemberGrievanceHotSpots(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return DataService.getGrievanceHotSpots(); }
+function dataGetMemberGrievanceHotSpots(sessionToken) { if (!_isGrievancesEnabled()) return []; var e = _resolveCallerEmail(sessionToken); if (!e) return []; return DataService.getGrievanceHotSpots(); }
 
 // v4.32.0 — Grievance Feedback wrappers
 /** @param {string} sessionToken @returns {Object|null} Pending grievance feedback prompt for caller. Requires auth. */
-function dataGetPendingGrievanceFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getPendingGrievanceFeedback(e) : null; }
+function dataGetPendingGrievanceFeedback(sessionToken) { if (!_isGrievancesEnabled()) return null; var e = _resolveCallerEmail(sessionToken); return e ? DataService.getPendingGrievanceFeedback(e) : null; }
 /** @param {string} sessionToken @param {string} grievanceId @param {Object} ratings @param {string} comment @returns {Object} Submits grievance feedback. Requires auth. */
-function dataSubmitGrievanceFeedback(sessionToken, grievanceId, ratings, comment) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.submitGrievanceFeedback(e, grievanceId, ratings, comment); }) : { success: false, message: 'Not authenticated.' }; }
+function dataSubmitGrievanceFeedback(sessionToken, grievanceId, ratings, comment) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return withScriptLock_(function() { return DataService.submitGrievanceFeedback(e, grievanceId, ratings, comment); }); }
 /** @param {string} sessionToken @returns {Object|null} Aggregate grievance feedback stats. Requires auth. */
-function dataGetGrievanceFeedbackStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getGrievanceFeedbackStats() : null; }
+function dataGetGrievanceFeedbackStats(sessionToken) { if (!_isGrievancesEnabled()) return null; var e = _resolveCallerEmail(sessionToken); return e ? DataService.getGrievanceFeedbackStats() : null; }
 /** @param {string} sessionToken @returns {Object|null} Feedback summary for calling steward. Requires steward auth. */
 function dataGetStewardFeedbackSummary(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardFeedbackSummary(s) : null; }
 /** @param {string} sessionToken @param {number} [limit] @returns {Object[]} Upcoming events. Requires auth. */
@@ -5094,6 +5094,7 @@ function dataSubmitGrievanceSignature(sigToken, sigBase64) {
 function dataGetGrievanceFormOptions(sessionToken) {
   var email = _resolveCallerEmail(sessionToken);
   if (!email) return { success: false, message: 'Not authenticated.' };
+  if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' };
   return getGrievanceFormOptions();
 }
 

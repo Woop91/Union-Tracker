@@ -248,6 +248,17 @@ function createConfigSheet(ss) {
     sheet.getRange(3, CONFIG_COLS.ENABLE_CORRELATION).setDataValidation(correlationRule);
   }
 
+  // Grievance toggle (v4.34.4) — 'yes' (default) shows all grievance features; 'no' hides them.
+  seedConfigDefault_(sheet, CONFIG_COLS.SHOW_GRIEVANCES, ['yes'], isExistingSheet);
+  if (CONFIG_COLS.SHOW_GRIEVANCES) {
+    var grievanceToggleRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['yes', 'no'], true)
+      .setAllowInvalid(false)
+      .setHelpText('yes = show grievance tracking features. no = hide all grievance UI and endpoints.')
+      .build();
+    sheet.getRange(3, CONFIG_COLS.SHOW_GRIEVANCES).setDataValidation(grievanceToggleRule);
+  }
+
   // Retention thresholds (v4.33.1) — days before auto-archival via dailyTrigger()
   // Grievance Archive Days: closed grievances older than this are moved to _Archive_Grievances.
   // Audit Log Archive Days: audit entries older than this are exported to Drive CSV and pruned.

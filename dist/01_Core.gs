@@ -1293,6 +1293,8 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'TEST_NOTIFY_EMAIL',        header: 'Test Runner Notify Email' },
   // Correlation Engine (v4.30.0) — set to 'yes' to enable the correlation/insights engine
   { key: 'ENABLE_CORRELATION',       header: 'Enable Correlation Engine' },
+  // Grievance Toggle (v4.34.4) — set to 'no' to hide all grievance UI/endpoints
+  { key: 'SHOW_GRIEVANCES',          header: 'Show Grievances' },
   // Retention thresholds (v4.33.1) — days before auto-archival; defaults applied if blank
   // GRIEVANCE_ARCHIVE_DAYS: closed grievances older than this are moved to _Archive_Grievances
   { key: 'GRIEVANCE_ARCHIVE_DAYS',   header: 'Grievance Archive Days' },
@@ -1301,6 +1303,19 @@ var CONFIG_HEADER_MAP_ = [
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
+
+/**
+ * Returns true if grievance features are enabled (Config: SHOW_GRIEVANCES ≠ 'no').
+ * Defaults to true (enabled) if the config value is missing or blank.
+ * @returns {boolean}
+ */
+function _isGrievancesEnabled() {
+  try {
+    var val = getConfigValue_(CONFIG_COLS.SHOW_GRIEVANCES);
+    if (!val || String(val).trim() === '') return true;
+    return String(val).toLowerCase().trim() !== 'no';
+  } catch (_e) { return true; }
+}
 
 // ============================================================================
 // SURVEY PERIODS COLUMNS — Hidden sheet: _Survey_Periods (v4.21.0)
