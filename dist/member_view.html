@@ -6402,13 +6402,13 @@ function renderQAForum(appContainer, role) {
           onClick: function() {
             serverCall().withSuccessHandler(function(r) {
               if (r && r.success) _renderQuestionDetail(cont, questionId);
-            }).withFailureHandler(function(e) { console.error(e.message); }).qaUpvoteQuestion(SESSION_TOKEN, questionId);
+            }).withFailureHandler(function() { /* upvote failed — count display stale until refresh */ }).qaUpvoteQuestion(SESSION_TOKEN, questionId);
           }
         }, '\u25B2 ' + q.upvoteCount));
         if (isSteward && q.status !== 'flagged') {
           actions.appendChild(el('button', {
             style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-            onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, questionId, 'flag'); }
+            onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).withFailureHandler(function() { /* flag failed — silent, non-critical */ }).qaModerateQuestion(SESSION_TOKEN, questionId, 'flag'); }
           }, 'Flag'));
         }
         // Mark Resolved: available to question owner (member) or any steward
@@ -6421,7 +6421,7 @@ function renderQAForum(appContainer, role) {
                   _renderQuestionDetail(cont, questionId);
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                 }
-              }).withFailureHandler(function(e) { console.error(e.message); }).qaResolveQuestion(SESSION_TOKEN, questionId);
+              }).withFailureHandler(function() { /* resolve failed — user can retry */ }).qaResolveQuestion(SESSION_TOKEN, questionId);
             }
           }, '\u2713 Mark Resolved'));
         }
@@ -6469,7 +6469,7 @@ function renderQAForum(appContainer, role) {
                   _renderQuestionDetail(cont, questionId);
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
                 } else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
-              }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitAnswer(SESSION_TOKEN, CURRENT_USER.name || '', questionId, text, true);
+              }).withFailureHandler(function() { ansStatus.textContent = 'Network error — please try again.'; ansStatus.style.color = 'var(--danger)'; }).qaSubmitAnswer(SESSION_TOKEN, CURRENT_USER.name || '', questionId, text, true);
             }
           }, 'Post Answer'));
         }
@@ -6526,11 +6526,11 @@ function renderQAForum(appContainer, role) {
             var acts = el('div', { className: 'flex-gap-6' });
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'approve'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont); /* re-render to confirm state */ }).qaModerateQuestion(SESSION_TOKEN, q.id, 'approve'); }
             }, 'Approve'));
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'delete'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'delete'); }
             }, 'Delete'));
             card.appendChild(acts);
             cont.appendChild(card);
@@ -6546,11 +6546,11 @@ function renderQAForum(appContainer, role) {
             var acts = el('div', { className: 'flex-gap-6' });
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'approve'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'approve'); }
             }, 'Approve'));
             acts.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'delete'); }
+              onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'delete'); }
             }, 'Delete'));
             card.appendChild(acts);
             cont.appendChild(card);

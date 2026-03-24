@@ -4167,6 +4167,9 @@ function _renderRecentContacts(container) {
       if (entry.notes) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, entry.notes));
       container.appendChild(card);
     });
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load contact log.'));
   }).dataGetStewardContactLog(SESSION_TOKEN);
 }
 
