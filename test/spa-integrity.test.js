@@ -165,7 +165,6 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
       renderStewardContact: ['contact', 'stewarddirectory'],
       renderUpdateProfile: ['profile'],
       renderMemberResources: ['resources'],
-      renderWorkloadTracker: ['workload'],
       renderPollsPage: ['polls'],
       renderSurveyResultsPage: ['survey'],
       renderUnionStatsPage: ['unionstats'],
@@ -1022,12 +1021,12 @@ describe('G23: Tab navigation race condition guard', () => {
 
   test('_handleTabNav increments _navSwitchId on each call', () => {
     // Must see ++_navSwitchId or _navSwitchId++ or _navSwitchId += 1
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
     expect(fnBody).toMatch(/\+\+_navSwitchId|_navSwitchId\s*\+\+|_navSwitchId\s*\+=\s*1/);
   });
 
   test('stale-switch guard checks switchId before cached/fresh render', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
     // Must compare the local switchId against the global _navSwitchId
     expect(fnBody).toMatch(/switchId\s*!==\s*_navSwitchId/);
   });
@@ -1094,7 +1093,7 @@ describe('G24: Tab stacking prevention', () => {
   });
 
   test('cache-hit path hides all visible panes (not just _activePane)', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
     // The cache-hit block must query all panes in the root
     const cacheBlock = fnBody.match(/if\s*\(cached\)\s*\{[\s\S]*?_touchPane/);
     expect(cacheBlock).not.toBeNull();
@@ -1102,7 +1101,7 @@ describe('G24: Tab stacking prevention', () => {
   });
 
   test('fresh-render path hides all visible panes before _renderTabFresh', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
     // Between "FRESH RENDER" comment and _renderTabFresh call, must hide all panes
     const freshBlock = fnBody.match(/FRESH RENDER[\s\S]*?_renderTabFresh/);
     expect(freshBlock).not.toBeNull();
@@ -1110,16 +1109,21 @@ describe('G24: Tab stacking prevention', () => {
   });
 
   test('orgchart early-return uses _hideAllVisiblePanes', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
     const orgBlock = fnBody.match(/tabId === 'orgchart'[\s\S]*?renderOrgChart[\s\S]*?return;/);
     expect(orgBlock).not.toBeNull();
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  test.skip('poms early-return uses _hideAllVisiblePanes (not in SolidBase)', () => {});
+  test.skip('poms early-return uses _hideAllVisiblePanes (not in SolidBase)', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+    const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
+    expect(pomsBlock).not.toBeNull();
+    expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
+  });
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
     const memberMore = fnBody.match(/_member_more[\s\S]*?renderMemberMore[\s\S]*?return;/);
     expect(memberMore).not.toBeNull();
     expect(memberMore[0]).toContain('_hideAllVisiblePanes()');

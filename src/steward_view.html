@@ -5038,7 +5038,7 @@ function _renderWorkloadInsights(container, wl, showDetail) {
   var totalSubmissions = d.totalSubmissions || 0;
   var memberCount = d.members || 0;
   grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
-    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+    /* workload tab not available in SolidBase */
   }));
 
   // Extract averages from the data — averages keys are CATEGORY_LABELS values
@@ -5057,7 +5057,7 @@ function _renderWorkloadInsights(container, wl, showDetail) {
       items.sort(function(a, b) { return b.count - a.count; });
       _renderInsightDetailList(panel, items, 'var(--info)');
       var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
-        if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+        /* workload tab not available in SolidBase */
       }}, 'View Workload Tracker \u2192');
       panel.appendChild(navBtn);
     });

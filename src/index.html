@@ -1487,6 +1487,13 @@
     var _layoutCache = {};
 
     function renderPageLayout(container, role, activeTab, contentFn) {
+      // OFFENSIVE PATTERN: Warn if called outside _handleTabNav or role init
+      if (IS_DEV_MODE && !_insideHandleTabNav && !_insideRoleInit) {
+        console.warn('[RenderGuard] renderPageLayout("' + activeTab + '") called outside _handleTabNav. ' +
+          'This bypasses pane caching, nav highlights, and stale-switch guards. ' +
+          'Route through _handleTabNav instead.');
+      }
+
       getLayoutMode(); // keep LayoutState current for other callers (e.g. isSidebarLayout in headers)
 
       // Fire-and-forget usage analytics (v4.31.3)
@@ -2591,7 +2598,64 @@
       return { stale: function() { return id !== _navSwitchId || gen !== _renderGeneration; } };
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // OFFENSIVE PATTERN: Direct render call detection
+    // Set true while inside _handleTabNav. renderPageLayout checks this
+    // in dev mode and warns if a render function was called directly.
+    // ══════════════════════════════════════════════════════════════════════
+    var _insideHandleTabNav = false;
+    var _insideRoleInit = false; // also legit: initStewardView / initMemberView
+
+    // ══════════════════════════════════════════════════════════════════════
+    // OFFENSIVE PATTERN: Dev-mode tab integrity validator
+    // Runs once at init. Catches: missing render functions, unfiltered
+    // dev-only items in More menus, dues-gated tabs without render gates.
+    // ══════════════════════════════════════════════════════════════════════
+    function _validateTabIntegrity() {
+      if (!IS_DEV_MODE) return;
+      var warns = [];
+
+      // 1. Every sidebar tab ID must have a render function
+      ['steward', 'member'].forEach(function(role) {
+        var tabs = _getSidebarTabs(role);
+        tabs.forEach(function(t) {
+          if (!t.id) return;
+          var fn = _getTabRenderFn(role, t.id);
+          // Lazy-loaded tabs (poms, orgchart) are handled in _handleTabNav before dispatch
+          if (!fn && t.id !== 'poms' && t.id !== 'orgchart') {
+            warns.push('[TabIntegrity] ' + role + ' sidebar tab "' + t.id + '" has no render function');
+          }
+        });
+      });
+
+      // 2. Dev-only tab IDs should not exist in _getTabRenderFn without a guard
+      for (var devTab in _DEV_ONLY_TABS) {
+        var fn = _getTabRenderFn('steward', devTab);
+        if (fn && fn === renderTestRunnerPage) {
+          // This means the guard was removed — fn should be conditional
+          warns.push('[TabIntegrity] Dev-only tab "' + devTab + '" returns render fn without IS_DEV_MODE guard in _getTabRenderFn');
+        }
+      }
+
+      // 3. Every dues-gated tab should have a render function that checks _isDuesPaying
+      // (We can't introspect the function body, but we can check the tab is registered)
+      for (var duesTab in _DUES_GATED_TABS) {
+        if (!_getTabRenderFn('member', duesTab) && duesTab !== 'poms' && duesTab !== 'orgchart') {
+          warns.push('[TabIntegrity] Dues-gated tab "' + duesTab + '" has no member render function');
+        }
+      }
+
+      if (warns.length > 0) {
+        console.warn('=== Tab Integrity Warnings (' + warns.length + ') ===');
+        warns.forEach(function(w) { console.warn(w); });
+      }
+    }
+
     function _handleTabNav(role, tabId) {
+      _insideHandleTabNav = true;
+      try { return _handleTabNavInner(role, tabId); } finally { _insideHandleTabNav = false; }
+    }
+    function _handleTabNavInner(role, tabId) {
       var app = document.getElementById('app');
       var switchId = ++_navSwitchId; // claim this switch; any older in-flight switch is now stale
       _renderGeneration++; // H7: bump render generation so stale async callbacks are discarded
@@ -2829,7 +2893,6 @@
           case 'cases': return renderMyCases;
           case 'profile': return renderUpdateProfile;
           case 'resources': return renderMemberResources;
-          case 'workload': return renderWorkloadTracker;
           case 'weeklyq': // legacy deep-link
           case 'polls': return renderPollsPage;
           case 'survey': return renderSurveyResultsPage;
@@ -2871,7 +2934,6 @@
           case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
           case 'timeline': return renderStewardTimelinePage;
           case 'mentorship': return renderMentorshipPage;
-          case 'workload': return renderWorkloadTracker;
           case 'accesslog': return renderAccessLogPage;
           case 'engagement': return renderEngagementDashboard;
           case 'failsafe': return renderFailsafePage;

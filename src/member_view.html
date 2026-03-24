@@ -2211,7 +2211,6 @@ function renderMemberMore(appContainer) {
     var menuItems = [
       { group: 'Manage' },
       { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', badge: AppState.memberTaskCount || 0, action: function() { _handleTabNav('member', 'mytasks'); } },
-      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { _handleTabNav('member', 'workload'); } },
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
       { group: 'Reference' },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
