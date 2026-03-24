@@ -2960,7 +2960,7 @@ function _renderSurveyWizard(container, questions, sectionMeta, sliderLabels, pe
       stepContainer.innerHTML = '';
       navRow.style.display = '';
       _showSurveyError(stepContainer, navRow, err.message || 'Network error. Your progress is saved.', responses, appContainer);
-    }).dataSubmitSurveyResponse(null, responses);
+    }).dataSubmitSurveyResponse(SESSION_TOKEN, responses);
   }
 
   renderStep();
@@ -2994,7 +2994,7 @@ function _showSurveyError(stepContainer, navRow, message, responses, appContaine
       }
     }).withFailureHandler(function(err2) {
       _showSurveyError(stepContainer, navRow, err2.message || 'Still failing. Your responses are saved locally.', responses, appContainer);
-    }).dataSubmitSurveyResponse(null, responses);
+    }).dataSubmitSurveyResponse(SESSION_TOKEN, responses);
   } }, 'Retry'));
   errCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { renderSurveyFormPage(document.getElementById('app')); } }, 'Back to Survey'));
   stepContainer.appendChild(errCard);
