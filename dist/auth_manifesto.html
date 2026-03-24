@@ -34,24 +34,28 @@ function injectAuthManifesto(authContainer) {
 
  
  startAuthQuoteCycler();
+
+ 
+ measureAndHidePhrases();
+ window.addEventListener('resize', measureAndHidePhrases);
 }
 
 var AUTH_QUOTES = [
- { text: "The most courageous act is still to think for yourself. Aloud.", attr: "Coco Chanel" },
- { text: "The labor of a human being is not a commodity or article of commerce.", attr: "Clayton Antitrust Act, 1914" },
- { text: "All that serves labor serves the nation. All that harms labor is treason.", attr: "Abraham Lincoln" },
- { text: "The only effective answer to organized greed is organized labor.", attr: "Thomas Donahue" },
- { text: "No work is insignificant. All labor that uplifts humanity has dignity.", attr: "Martin Luther King Jr." },
- { text: "An injury to one is an injury to all.", attr: "Industrial Workers of the World" },
+ { text: "An injury to one is an injury to all.", attr: "IWW motto" },
  { text: "Don't mourn. Organize.", attr: "Joe Hill, 1915" },
- { text: "What the working people need is their full share of the wealth they create.", attr: "Samuel Gompers" },
- { text: "Strong unions mean strong communities.", attr: "Labor movement tradition" },
- { text: "You can't eat the orange and throw the peel away — a worker is not a piece of fruit.", attr: "Arthur Miller" },
- { text: "The fight for a better tomorrow begins with the choices you make today.", attr: "Labor movement tradition" },
- { text: "We don't need to be saved. We need to be heard.", attr: "Union organizing tradition" },
- { text: "Power concedes nothing without a demand. It never did and it never will.", attr: "Frederick Douglass, 1857" },
+ { text: "Strong unions mean strong communities.", attr: "Labor tradition" },
+ { text: "Wages are not given. They are won.", attr: "Labor tradition" },
+ { text: "We don't need to be saved. We need to be heard.", attr: "Labor tradition" },
+ { text: "No work is insignificant. All labor that uplifts humanity has dignity.", attr: "Martin Luther King Jr." },
+ { text: "Power concedes nothing without a demand.", attr: "Frederick Douglass, 1857" },
  { text: "The cause of labor is the cause of humanity.", attr: "Samuel Gompers" },
- { text: "Workers built this country. Workers will rebuild it.", attr: "Labor movement tradition" },
+ { text: "Workers built this country. Workers will rebuild it.", attr: "Labor tradition" },
+ { text: "The only answer to organized greed is organized labor.", attr: "Thomas Donahue" },
+ { text: "What workers need is their full share of the wealth they create.", attr: "Samuel Gompers" },
+ { text: "The contract is the floor, not the ceiling.", attr: "Labor tradition" },
+ { text: "You are the union.", attr: "Labor tradition" },
+ { text: "Collective action is individual protection.", attr: "Labor tradition" },
+ { text: "The union is only as strong as its members.", attr: "Labor tradition" },
 ];
 
 var _authQuoteTimer = null;
@@ -107,6 +111,20 @@ function _buildQuoteCycler(wrap) {
 
 function stopAuthQuoteCycler() {
  if (_authQuoteTimer) { clearInterval(_authQuoteTimer); _authQuoteTimer = null; }
+}
+
+function measureAndHidePhrases() {
+ var vw = window.innerWidth;
+ document.querySelectorAll('.auth-manifesto-phrase').forEach(function(p) {
+ var fits = p.scrollWidth <= vw + 2; 
+ if (!fits) {
+  p.style.animation = 'none';
+  p.style.opacity   = '0';
+ } else {
+  p.style.animation = '';
+  p.style.opacity   = '';
+ }
+ });
 }
 
 function _pickHubQuotes(n) {

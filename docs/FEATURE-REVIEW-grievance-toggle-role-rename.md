@@ -197,4 +197,4 @@ Three rows. No deploy required to change behavior — edit Config tab, reload ap
 2. Sheet tab names: rename dynamically later, or UI labels only permanently?
 3. "Primary/Secondary" label naming accurate, or different terminology needed?
 4. Should toggle state changes be logged in audit log?
-5. SolidBase-only change, or sync equivalent config keys to DDS-Dashboard too?
+5. SolidBase-only change, or sync equivalent config keys to SolidBase too?

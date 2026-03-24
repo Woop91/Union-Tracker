@@ -6301,11 +6301,16 @@ function dataMarkWelcomeDismissed(sessionToken) {
   // CR-AUTH-3: Use server-side identity instead of client-supplied email
   var email = _resolveCallerEmail(sessionToken);
   if (!email) return { success: false };
-  var emailHash = _welcomeEmailHash(email);
-  var propKey = 'WELCOME_DISMISSED_' + emailHash;
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty(propKey, new Date().toISOString());
-  return { success: true };
+  try {
+    var emailHash = _welcomeEmailHash(email);
+    var propKey = 'WELCOME_DISMISSED_' + emailHash;
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(propKey, new Date().toISOString());
+    return { success: true };
+  } catch (err) {
+    Logger.log('dataMarkWelcomeDismissed error: ' + err.message);
+    return { success: false };
+  }
 }
 
 /**
@@ -6318,12 +6323,17 @@ function dataApplyColorTheme(sessionToken, themeKey) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
   if (!THEME_PRESETS || !THEME_PRESETS[themeKey]) return { success: false, message: 'Unknown theme.' };
-  var preset = THEME_PRESETS[themeKey];
-  saveVisualSetting('theme', themeKey);
-  if (preset.accentHue !== undefined) {
-    saveVisualSetting('accentHue', preset.accentHue);
+  try {
+    var preset = THEME_PRESETS[themeKey];
+    saveVisualSetting('theme', themeKey);
+    if (preset.accentHue !== undefined) {
+      saveVisualSetting('accentHue', preset.accentHue);
+    }
+    return { success: true, themeKey: themeKey, accentHue: preset.accentHue || 250 };
+  } catch (err) {
+    Logger.log('dataApplyColorTheme error: ' + err.message);
+    return { success: false, message: 'Failed to apply theme.' };
   }
-  return { success: true, themeKey: themeKey, accentHue: preset.accentHue || 250 };
 }
 
 /**
@@ -6591,13 +6601,22 @@ function dataGetAuditLog(sessionToken, options) {
   var eventTypeFilter = options.eventTypeFilter ? String(options.eventTypeFilter).trim() : '';
   var searchTerm = options.searchTerm ? String(options.searchTerm).toLowerCase().trim() : '';
 
+  // Column indices (0-based) for dual-schema audit log:
+  // Edit audit rows use AUDIT_LOG_COLS; event audit rows use EVENT_AUDIT_COLS.
+  var _tsIdx     = AUDIT_LOG_COLS.TIMESTAMP - 1;
+  var _userIdx   = AUDIT_LOG_COLS.USER_EMAIL - 1;
+  var _actionIdx = AUDIT_LOG_COLS.ACTION_TYPE - 1;
+  var _newValIdx = AUDIT_LOG_COLS.NEW_VALUE - 1;
+  var _evtTypeIdx = EVENT_AUDIT_COLS.EVENT_TYPE - 1;
+  var _evtDetailIdx = EVENT_AUDIT_COLS.DETAILS - 1;
+
   // Process rows in reverse (newest first)
   for (var i = data.length - 1; i >= 0; i--) {
     var row = data[i];
-    var ts = row[0]; // Timestamp
-    var eventType = String(row[9] || row[1] || '').trim(); // ACTION_TYPE or EVENT_TYPE
-    var user = String(row[1] || '').trim(); // USER_EMAIL
-    var details = String(row[7] || row[3] || '').trim(); // NEW_VALUE or DETAILS
+    var ts = row[_tsIdx]; // Timestamp
+    var eventType = String(row[_actionIdx] || row[_evtTypeIdx] || '').trim(); // ACTION_TYPE or EVENT_TYPE
+    var user = String(row[_userIdx] || '').trim(); // USER_EMAIL (edit) or EVENT_TYPE (event, fallback)
+    var details = String(row[_newValIdx] || row[_evtDetailIdx] || '').trim(); // NEW_VALUE or DETAILS
 
     if (eventType) eventTypeSet[eventType] = true;
 
@@ -6625,11 +6644,11 @@ function dataGetAuditLog(sessionToken, options) {
       timestamp: ts instanceof Date ? ts.toISOString() : String(ts),
       eventType: eventType,
       user: displayUser,
-      sheet: String(row[2] || '').trim(),
-      fieldName: String(row[5] || '').trim(),
-      oldValue: String(row[6] || '').substring(0, 200),
+      sheet: String(row[AUDIT_LOG_COLS.SHEET - 1] || '').trim(),
+      fieldName: String(row[AUDIT_LOG_COLS.FIELD_NAME - 1] || '').trim(),
+      oldValue: String(row[AUDIT_LOG_COLS.OLD_VALUE - 1] || '').substring(0, 200),
       newValue: displayDetails.substring(0, 500),
-      recordId: String(row[8] || '').trim(),
+      recordId: String(row[AUDIT_LOG_COLS.RECORD_ID - 1] || '').trim(),
       actionType: eventType
     });
   }

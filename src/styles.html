@@ -342,6 +342,17 @@ button:focus-visible, [role="button"]:focus-visible {
   font-size: 0.5625rem;
   font-family: var(--fontBody);
 }
+/* Pulsate animation for More button — draws attention on mobile */
+@keyframes navMorePulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+.nav-more-pulse {
+  animation: navMorePulse 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-more-pulse { animation: none; opacity: 0.7; }
+}
 
 /* ═══════════════════════════════════════
    FULL-PAGE THEMES (v4.26.0)

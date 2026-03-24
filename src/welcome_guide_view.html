@@ -1,0 +1,288 @@
+<script>
+/**
+ * WELCOME GUIDE TAB — renderWelcomeGuide()
+ * v4.35.0 — 2026-03-24
+ * Interactive getting-started guide for the web app.
+ * Works for both steward and member roles with role-specific content.
+ *
+ * HOW TO INTEGRATE:
+ *  1. Add <?!= include('welcome_guide_view') ?> before </body> in index.html
+ *  2. In index.html tab routing switches add:
+ *       case 'guide': return renderWelcomeGuide;    (member)
+ *       case 'guide': return function(a) { renderWelcomeGuide(a, 'steward'); };  (steward)
+ *  3. In index.html sidebar tab arrays add:
+ *       { id: 'guide', icon: '\uD83D\uDCD6', label: 'Welcome Guide' }
+ */
+
+function renderWelcomeGuide(appContainer, role) {
+  var pageRole = role || AppState.activeRole || 'member';
+  renderPageLayout(appContainer, pageRole, 'guide', function(container) {
+    if (pageRole === 'steward') _stewardHeader(container, 'Welcome Guide', 'Learn how to use your dashboard');
+    else _memberHeader(container, 'Welcome Guide', 'Learn how to use your dashboard');
+
+    var wrap = el('div', { style: { maxWidth: '860px', margin: '0 auto', padding: '0 0 72px' } });
+
+    // ── HERO ──────────────────────────────────────────────────────────
+    var hero = el('div', {
+      className: 'card card-glass',
+      style: { padding: '28px 22px', marginBottom: '16px', background: 'linear-gradient(135deg, var(--accentBg), rgba(255,255,255,0.03))', border: '1px solid var(--accentBorder)' }
+    });
+
+    var firstName = (CURRENT_USER && CURRENT_USER.name)
+      ? CURRENT_USER.name.split(' ')[0]
+      : (pageRole === 'steward' ? CONFIG.stewardLabel : CONFIG.memberLabel);
+
+    hero.appendChild(el('div', {
+      style: { fontSize: '22px', fontWeight: '700', fontFamily: 'var(--fontDisplay)', color: 'var(--text)', marginBottom: '8px' }
+    }, 'Welcome, ' + escapeHtml(firstName) + '!'));
+
+    hero.appendChild(el('div', {
+      style: { color: 'var(--muted)', fontSize: '14px', lineHeight: '1.6' }
+    }, pageRole === 'steward'
+      ? 'This guide walks you through the key features of your ' + CONFIG.stewardLabel + ' Dashboard. Use the sections below to learn how each tool works and how to get the most out of the system.'
+      : 'This guide walks you through the key features of your ' + CONFIG.memberLabel + ' Dashboard. Use the sections below to learn what you can do and where to find things.'));
+
+    wrap.appendChild(hero);
+
+    // ── MOBILE BACK BUTTON WARNING ────────────────────────────────────
+    // Only show on mobile (bottom nav visible = screen <640px)
+    var backWarn = el('div', {
+      className: 'card',
+      style: {
+        padding: '14px 16px', marginBottom: '16px',
+        background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)',
+        borderRadius: '12px', display: 'none'
+      }
+    });
+    var backWarnInner = el('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px' } });
+    backWarnInner.appendChild(el('span', { style: { fontSize: '22px', flexShrink: '0' } }, '\u26A0\uFE0F'));
+    var backWarnText = el('div');
+    backWarnText.appendChild(el('div', {
+      style: { fontSize: '14px', fontWeight: '700', color: 'var(--text)', marginBottom: '4px' }
+    }, 'Don\'t use the browser back button'));
+    backWarnText.appendChild(el('div', {
+      style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.5' }
+    }, 'This is a single-page app. Using your browser\'s back button or swipe-back gesture will take you away from the dashboard entirely. Use the navigation bar at the bottom of the screen to move between sections.'));
+    backWarnInner.appendChild(backWarnText);
+    backWarn.appendChild(backWarnInner);
+    wrap.appendChild(backWarn);
+    // Show only on mobile
+    if (window.innerWidth < 640) { backWarn.style.display = 'block'; }
+    try {
+      window.addEventListener('resize', function _guideResize() {
+        if (!backWarn.parentNode) { window.removeEventListener('resize', _guideResize); return; }
+        backWarn.style.display = window.innerWidth < 640 ? 'block' : 'none';
+      });
+    } catch (_e) { /* non-critical */ }
+
+    // ── NAVIGATION BASICS ─────────────────────────────────────────────
+    _guideSection(wrap, 'Getting Around', 'How to navigate the dashboard', [
+      { icon: '\uD83D\uDCF1', title: 'Bottom Navigation', desc: 'On mobile, tap the icons at the bottom of the screen to switch between tabs. Tap "More" to see all available sections.' },
+      { icon: '\uD83D\uDDA5', title: 'Sidebar Navigation', desc: 'On larger screens, use the sidebar on the left to navigate. Tabs are organized into groups like Manage, Reference, and Community.' },
+      { icon: '\uD83D\uDD0D', title: 'Search', desc: 'Use the search icon in the header to quickly find cases, members, or content across the dashboard.' },
+      { icon: '\uD83C\uDF19', title: 'Dark Mode', desc: 'Toggle between light and dark themes using the moon/sun icon in the header or the Appearance section in More.' }
+    ]);
+
+    // ── ROLE-SPECIFIC FEATURE SECTIONS ────────────────────────────────
+    if (pageRole === 'steward') {
+      _guideStewardSections(wrap);
+    } else {
+      _guideMemberSections(wrap);
+    }
+
+    // ── TIPS & SHORTCUTS ──────────────────────────────────────────────
+    _guideSection(wrap, 'Tips & Shortcuts', 'Get more out of the dashboard', [
+      { icon: '\u26A1', title: 'Pull to Refresh', desc: 'Pull down on any tab to refresh the data without reloading the entire page.' },
+      { icon: '\uD83D\uDD14', title: 'Notifications', desc: 'Check your notification bell regularly. You\'ll get updates on case changes, new tasks, and community activity.' },
+      { icon: '\uD83D\uDCCC', title: 'Deep Links', desc: 'You can bookmark or share direct links to specific tabs. The URL updates as you navigate.' },
+      { icon: '\uD83D\uDCA1', title: 'Feedback', desc: 'Found a bug or have an idea? Use the Feedback tab to let your admin know. Every submission is reviewed.' }
+    ]);
+
+    // ── QUICK LAUNCH ──────────────────────────────────────────────────
+    var launchCard = el('div', {
+      className: 'card card-glass',
+      style: { padding: '20px', marginTop: '16px' }
+    });
+    launchCard.appendChild(el('div', {
+      style: { fontSize: '16px', fontWeight: '700', fontFamily: 'var(--fontDisplay)', marginBottom: '12px', color: 'var(--text)' }
+    }, 'Ready to go?'));
+
+    var launchGrid = el('div', {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }
+    });
+
+    var quickLaunch = pageRole === 'steward'
+      ? [
+          { icon: '\uD83D\uDCCB', label: 'View Cases', tab: 'cases' },
+          { icon: '\uD83D\uDC65', label: 'Members', tab: 'members' },
+          { icon: '\uD83D\uDCCA', label: 'Insights', tab: 'insights' },
+          { icon: '\u2705', label: 'Tasks', tab: 'tasks' }
+        ]
+      : [
+          { icon: '\uD83C\uDFE0', label: 'Home', tab: 'home' },
+          { icon: '\uD83D\uDCCB', label: 'My Cases', tab: 'cases' },
+          { icon: '\uD83D\uDC64', label: 'Profile', tab: 'profile' },
+          { icon: '\uD83D\uDCDA', label: 'Resources', tab: 'resources' }
+        ];
+
+    quickLaunch.forEach(function(ql) {
+      var btn = el('div', {
+        className: 'card card-clickable',
+        style: { padding: '12px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' },
+        onClick: function() { _handleTabNav(pageRole, ql.tab); }
+      });
+      btn.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '4px' } }, ql.icon));
+      btn.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '500' } }, ql.label));
+      launchGrid.appendChild(btn);
+    });
+    launchCard.appendChild(launchGrid);
+    wrap.appendChild(launchCard);
+
+    container.appendChild(wrap);
+  });
+}
+
+// ── SHARED HELPERS ────────────────────────────────────────────────────
+
+/**
+ * Renders an expandable guide section with feature cards.
+ */
+function _guideSection(parent, title, subtitle, items) {
+  var section = el('div', { style: { marginTop: '16px' } });
+
+  var headerBtn = el('button', {
+    style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      width: '100%', background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: '12px', padding: '14px 16px', cursor: 'pointer',
+      fontFamily: 'var(--fontDisplay)', textAlign: 'left'
+    }
+  });
+
+  var headerLeft = el('div');
+  headerLeft.appendChild(el('div', {
+    style: { fontSize: '16px', fontWeight: '700', color: 'var(--text)' }
+  }, title));
+  if (subtitle) {
+    headerLeft.appendChild(el('div', {
+      style: { fontSize: '13px', color: 'var(--muted)', marginTop: '2px' }
+    }, subtitle));
+  }
+  headerBtn.appendChild(headerLeft);
+
+  var chevron = el('span', {
+    style: { fontSize: '18px', color: 'var(--muted)', transition: 'transform 0.2s ease' }
+  }, '\u25BC');
+  headerBtn.appendChild(chevron);
+
+  section.appendChild(headerBtn);
+
+  var body = el('div', {
+    style: { overflow: 'hidden', maxHeight: '0', transition: 'max-height 0.3s ease', padding: '0 2px' }
+  });
+
+  var grid = el('div', {
+    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px', paddingTop: '10px' }
+  });
+
+  items.forEach(function(item) {
+    var card = el('div', {
+      className: 'card card-glass',
+      style: { padding: '14px 16px' }
+    });
+    var cardHeader = el('div', {
+      style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }
+    });
+    cardHeader.appendChild(el('span', { style: { fontSize: '22px' } }, item.icon));
+    cardHeader.appendChild(el('span', {
+      style: { fontSize: '14px', fontWeight: '600', color: 'var(--text)' }
+    }, item.title));
+    card.appendChild(cardHeader);
+    card.appendChild(el('div', {
+      style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.5' }
+    }, item.desc));
+    grid.appendChild(card);
+  });
+
+  body.appendChild(grid);
+  section.appendChild(body);
+
+  var expanded = false;
+  headerBtn.onclick = function() {
+    expanded = !expanded;
+    if (expanded) {
+      body.style.maxHeight = (grid.scrollHeight + 20) + 'px';
+      chevron.style.transform = 'rotate(180deg)';
+    } else {
+      body.style.maxHeight = '0';
+      chevron.style.transform = 'rotate(0deg)';
+    }
+  };
+
+  parent.appendChild(section);
+}
+
+// ── STEWARD FEATURE SECTIONS ──────────────────────────────────────────
+
+function _guideStewardSections(wrap) {
+  _guideSection(wrap, 'Case Management', 'Track and manage grievances', [
+    { icon: '\uD83D\uDCCB', title: 'Cases Tab', desc: 'Your home base. View all active grievances, filter by status, and click any case to see its full details and timeline.' },
+    { icon: '\uD83D\uDCDD', title: 'New Grievance', desc: 'File a new grievance with the guided form. Fill in member info, violation details, and contract references. The system tracks deadlines automatically.' },
+    { icon: '\u23F0', title: 'Deadlines', desc: 'Cases show color-coded deadline indicators. Red means overdue, yellow means due soon. The dashboard KPI cards summarize these at a glance.' },
+    { icon: '\uD83D\uDCC5', title: 'Timeline', desc: 'Every case has a timeline showing all actions taken. Add notes, upload documents, and track step progression.' }
+  ]);
+
+  _guideSection(wrap, 'Members & Communication', 'Stay connected with your unit', [
+    { icon: '\uD83D\uDC65', title: 'Member Directory', desc: 'View and manage all members in your unit. See contact info, dues status, and role assignments.' },
+    { icon: '\uD83D\uDCDE', title: 'Contact Log', desc: 'Record every member interaction. This builds a history that strengthens grievance documentation and tracks engagement.' },
+    { icon: '\uD83D\uDCE2', title: 'Broadcast', desc: 'Send messages to your entire unit or targeted groups. Great for meeting reminders, contract updates, and action alerts.' },
+    { icon: '\uD83E\uDD1D', title: 'Mentorship', desc: 'Connect experienced stewards with newer ones. Track mentorship pairs and progress.' }
+  ]);
+
+  _guideSection(wrap, 'Tools & Insights', 'Analyze and plan', [
+    { icon: '\uD83D\uDCCA', title: 'Insights', desc: 'Visual analytics on case trends, resolution rates, and grievance types. Use this data to identify patterns and strengthen your approach.' },
+    { icon: '\u2705', title: 'Tasks', desc: 'Your personal task board. Track action items, set priorities, and mark items complete as you work through them.' },
+    { icon: '\uD83D\uDCCA', title: 'Survey Tracking', desc: 'Monitor survey distribution and response rates. See which members have responded and send reminders.' },
+    { icon: '\uD83C\uDFAF', title: 'Engagement', desc: 'Track member participation and engagement metrics across your unit.' }
+  ]);
+
+  _guideSection(wrap, 'Community & Reference', 'Shared resources for everyone', [
+    { icon: '\uD83D\uDCAC', title: 'Q&A Forum', desc: 'Ask questions and share knowledge with other stewards. Search existing answers before posting to avoid duplicates.' },
+    { icon: '\uD83D\uDDF3', title: 'Polls', desc: 'Create and manage polls to gauge member sentiment on workplace issues, contract priorities, or meeting topics.' },
+    { icon: '\uD83D\uDCDD', title: 'Minutes', desc: 'View and manage meeting minutes. Keep a record of decisions made and action items assigned.' },
+    { icon: '\uD83D\uDCDA', title: 'Resources', desc: 'Access shared documents, contract references, and training materials uploaded by your admin.' }
+  ]);
+}
+
+// ── MEMBER FEATURE SECTIONS ───────────────────────────────────────────
+
+function _guideMemberSections(wrap) {
+  _guideSection(wrap, 'Your Dashboard', 'What you see when you log in', [
+    { icon: '\u270A', title: 'Member Hub', desc: 'Your union orientation page. Learn why your union matters, daily habits that protect your rights, and how to get involved.' },
+    { icon: '\uD83C\uDFE0', title: 'Home', desc: 'Your personalized home tab. See your active cases, upcoming tasks, and recent activity at a glance.' },
+    { icon: '\uD83D\uDCCB', title: 'My Cases', desc: 'View all grievances filed on your behalf. Check case status, deadlines, and the full timeline of actions taken.' },
+    { icon: '\u2705', title: 'My Tasks', desc: 'Action items assigned to you. Check off tasks as you complete them to keep your ' + CONFIG.stewardLabel + ' informed.' }
+  ]);
+
+  _guideSection(wrap, 'Staying Informed', 'Keep up with what matters', [
+    { icon: '\uD83D\uDCCA', title: 'Workload Tracker', desc: 'Monitor your workload and caseload metrics. Document when assignments exceed reasonable limits.' },
+    { icon: '\uD83D\uDCCA', title: 'Union Stats', desc: 'See aggregated statistics about your union\'s activity, case outcomes, and collective impact.' },
+    { icon: '\uD83D\uDCC5', title: 'Events', desc: 'Browse upcoming union events, meetings, and important dates. Never miss a contract deadline or membership meeting.' },
+    { icon: '\uD83D\uDD14', title: 'Notifications', desc: 'Stay updated on case changes, new tasks, and messages from your ' + CONFIG.stewardLabel + '.' }
+  ]);
+
+  _guideSection(wrap, 'Community & Reference', 'Connect and learn', [
+    { icon: '\uD83D\uDCAC', title: 'Q&A Forum', desc: 'Ask questions about your rights, workplace issues, or contract language. Your stewards and fellow members can help.' },
+    { icon: '\uD83D\uDDF3', title: 'Polls', desc: 'Participate in polls on workplace issues and union priorities. Your voice shapes collective action.' },
+    { icon: '\uD83D\uDCDA', title: 'Resources', desc: 'Access contract documents, training materials, and helpful references shared by your union.' },
+    { icon: '\uD83D\uDCD6', title: 'Resources', desc: 'Access policy references, training materials, and helpful documents. Searchable and organized by topic.' }
+  ]);
+
+  _guideSection(wrap, 'Your Profile & Contact', 'Manage your information', [
+    { icon: '\uD83D\uDC64', title: 'Profile', desc: 'Update your contact information, notification preferences, and account PIN. Keep your info current so your ' + CONFIG.stewardLabel + ' can reach you.' },
+    { icon: '\uD83D\uDC65', title: CONFIG.stewardLabel + ' Directory', desc: 'Find your assigned ' + CONFIG.stewardLabel + ' and their contact information. Reach out when you need representation or have questions.' },
+    { icon: '\uD83D\uDCCB', title: 'Report Card', desc: 'View your engagement summary and participation metrics.' },
+    { icon: '\uD83D\uDCA1', title: 'Feedback', desc: 'Submit bug reports or feature suggestions. Help make the dashboard better for everyone.' }
+  ]);
+}
+</script>

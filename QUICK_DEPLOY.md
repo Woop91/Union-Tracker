@@ -1,8 +1,8 @@
-# Quick Deploy - Union Steward Dashboard
+# Quick Deploy - SolidBase
 
 **Version:** 4.30.0 | **Architecture:** 52-File Production
 
-Deploy the Union Steward Dashboard to a Google Sheet using the source files in `src/`.
+Deploy the SolidBase to a Google Sheet using the source files in `src/`.
 
 ---
 
@@ -17,6 +17,7 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 - Steward Dashboard, Member Dashboard, and Executive Dashboard
 - Meeting management with auto-generated Google Docs
 - Mobile-optimized quick actions and web app portal
+- Standalone workload tracker portal with PIN authentication
 - Comfort View accessibility features
 
 ---
@@ -34,7 +35,7 @@ cd SolidBase/src
 
 1. Go to [sheets.google.com](https://sheets.google.com)
 2. Click **"+ Blank"** to create a new spreadsheet
-3. Name it **"Union Steward Dashboard"**
+3. Name it **"SolidBase"**
 
 ### Step 3: Open Apps Script Editor
 
@@ -90,6 +91,7 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 | `22_WebDashApp` | `src/22_WebDashApp.gs` |
 | `23_PortalSheets` | `src/23_PortalSheets.gs` |
 | `24_WeeklyQuestions` | `src/24_WeeklyQuestions.gs` |
+| `25_WorkloadService` | `src/25_WorkloadService.gs` |
 | `26_QAForum` | `src/26_QAForum.gs` |
 | `27_TimelineService` | `src/27_TimelineService.gs` |
 | `28_FailsafeService` | `src/28_FailsafeService.gs` |

@@ -151,17 +151,20 @@ function doGetWebDashboard(e) {
       return _serveError(config, 'not_found', user.email);
     }
 
-    // Handle "remember me" — create session token if requested
-    // Also echo back an existing validated session token so the client always has
-    // SESSION_TOKEN populated for non-SSO auth (magic link + remember me, or returning
-    // session users). This is safe: the token was already validated by resolveUser().
+    // Handle session persistence for non-SSO auth methods.
+    // Magic link tokens are one-use (CR-03), so without a session token the user
+    // would be kicked back to login on every page load/refresh.
+    // - remember=1: long-lived session (cookieDurationMs, default 30 days)
+    // - magic link without remember: short-lived session (24 hours) so the user
+    //   isn't locked out after a single page load (v4.34.4 — Android login fix)
     var sessionToken = null;
-    if (e.parameter.remember === '1' && user.method === 'magic') {
-      var tokenResult = Auth.createSessionToken(user.email);
+    if (user.method === 'magic') {
+      var shortLived = (e.parameter.remember !== '1');
+      var tokenResult = Auth.createSessionToken(user.email, shortLived);
       // C3: Handle session storage failure — createSessionToken may return error object
       if (tokenResult && typeof tokenResult === 'object' && tokenResult.error) {
         Logger.log('Session token storage failed: ' + tokenResult.message);
-        // Proceed without remember-me; user will need to re-authenticate next visit
+        // Proceed without session; user will need to re-authenticate next visit
       } else {
         sessionToken = tokenResult;
       }
@@ -203,6 +206,7 @@ function _serveAuth(config, e, authError) {
     error: e.parameter.authError || authError || null,
     webAppUrl: _getWebAppUrlSafe(),
     tokenChecked: !!(e.parameter.sessionToken),
+    isDevMode: !isProductionMode(),
   });
 
   return template.evaluate()
@@ -491,27 +495,11 @@ function getOrgChartHtml() {
 }
 
 /**
- * Client-callable: Returns the POMS Reference HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the POMS Reference tab.
- * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
+ * Stub: POMS Reference not available in SolidBase.
+ * @returns {string} Placeholder message
  */
 function getPOMSReferenceHtml() {
-  try {
-    var email = Session.getActiveUser().getEmail();
-    if (!email) return '<div class="empty-state">Authentication required.</div>';
-    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
-    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
-    var cacheKey = 'HTML_poms_ref_' + ver;
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get(cacheKey);
-    if (cached) return cached;
-    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
-    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
-    return html;
-  } catch (e) {
-    Logger.log('getPOMSReferenceHtml error: ' + e.message);
-    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
-  }
+  return '<div class="empty-state">POMS Reference is not available in this deployment.</div>';
 }
 
 /**

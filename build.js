@@ -53,7 +53,7 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules (load after all DDS modules)
+  // Web-dashboard SPA modules (load after all core modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -90,6 +90,7 @@ const HTML_FILES = [
   'auth_manifesto.html',
   'member_hub_styles.html',
   'member_hub_view.html',
+  'welcome_guide_view.html',
 ];
 
 /**

@@ -587,7 +587,7 @@ describe('A9: UI tab routes have matching render functions', () => {
 
   // Each routed function must be defined SOMEWHERE in the HTML files
   // (any of the SPA HTML files, including auth_view.html and error_view.html)
-  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html'].map(f =>
+  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html', 'member_hub_view.html', 'welcome_guide_view.html'].map(f =>
     fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
   ).join('\n');
 
@@ -761,7 +761,7 @@ describe('A11b: Client-callable HTML endpoints have auth checks', () => {
   );
 
   // HTML-serving endpoints that must have auth
-  const htmlEndpoints = ['getOrgChartHtml', 'getPOMSReferenceHtml'];
+  const htmlEndpoints = ['getOrgChartHtml'];
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() checks Session.getActiveUser before serving content`, () => {

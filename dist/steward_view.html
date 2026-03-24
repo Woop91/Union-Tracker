@@ -2101,12 +2101,57 @@ function _showMemberDetail(container, itemEl, member) {
  }
  }, '\uD83D\uDCCB View Contact History');
 
+ 
+ var genPinBtn = null;
+ if (IS_DEV_MODE) {
+ genPinBtn = el('button', {
+  style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#f59e0b', fontWeight: '600', cursor: 'pointer' },
+  onClick: function() {
+  genPinBtn.disabled = true;
+  genPinBtn.textContent = 'Generating...';
+  serverCall()
+   .withSuccessHandler(function(result) {
+   genPinBtn.disabled = false;
+   genPinBtn.textContent = '\uD83D\uDD11 Generate Login PIN';
+   if (result && result.success) {
+    
+    var existingPinDisplay = actionArea.querySelector('.dev-pin-display');
+    if (existingPinDisplay) existingPinDisplay.remove();
+    var pinDisplay = el('div', { className: 'dev-pin-display', style: { borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '8px' } });
+    pinDisplay.appendChild(el('div', { style: { fontSize: '11px', color: '#f59e0b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '\uD83D\uDD11 Login PIN for ' + escapeHtml(result.memberName || member.name)));
+    var pinBox = el('div', { style: { display: 'inline-block', fontSize: '28px', fontWeight: '700', letterSpacing: '8px', color: 'var(--text)', background: 'var(--raised)', border: '2px dashed rgba(251, 191, 36, 0.4)', borderRadius: '10px', padding: '12px 24px', fontFamily: 'monospace', userSelect: 'all' } }, result.pin);
+    pinDisplay.appendChild(pinBox);
+    pinDisplay.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.5' } }, 'Give this PIN to the member. They can enter it on the login page to access the dashboard. Valid for 14 days.'));
+    
+    var copyBtn = el('button', {
+    style: { fontSize: '11px', padding: '4px 12px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600', cursor: 'pointer', marginTop: '8px' },
+    onClick: function() {
+     try { navigator.clipboard.writeText(result.pin); copyBtn.textContent = '\u2705 Copied!'; setTimeout(function() { copyBtn.textContent = 'Copy PIN'; }, 2000); } catch (_e) {  pinBox.focus(); }
+    }
+    }, 'Copy PIN');
+    pinDisplay.appendChild(copyBtn);
+    actionArea.appendChild(pinDisplay);
+   } else {
+    actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, (result && result.message) || 'Failed to generate PIN.'));
+   }
+   })
+   .withFailureHandler(function() {
+   genPinBtn.disabled = false;
+   genPinBtn.textContent = '\uD83D\uDD11 Generate Login PIN';
+   actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to generate PIN.'));
+   })
+   .authGenerateDevPin(member.email, SESSION_TOKEN);
+  }
+ }, '\uD83D\uDD11 Generate Login PIN');
+ }
+
  btnRow.appendChild(profileBtn);
  btnRow.appendChild(logContactBtn);
  btnRow.appendChild(viewHistoryBtn);
  btnRow.appendChild(notifBtn);
  btnRow.appendChild(caseFolderBtn);
  btnRow.appendChild(startGrievanceBtn);
+ if (genPinBtn) btnRow.appendChild(genPinBtn);
  panel.appendChild(btnRow);
  panel.appendChild(actionArea);
 
@@ -2794,7 +2839,7 @@ function renderStewardResources(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
   { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
   ];
-  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Your Union Local Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
   quickLinks.forEach(function(r) {
   if (!r.url) return;
@@ -3800,10 +3845,8 @@ function renderStewardMore(appContainer) {
  var menuItems = [
   { group: 'Manage' },
   { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
-  { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
   { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
   { group: 'Reference' },
-  { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('steward', 'poms'); } },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
   { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
   { group: 'Community' },
@@ -3982,6 +4025,9 @@ function _renderRecentContacts(container) {
   if (entry.notes) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, entry.notes));
   container.appendChild(card);
  });
+ }).withFailureHandler(function() {
+ container.innerHTML = '';
+ container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load contact log.'));
  }).dataGetStewardContactLog(SESSION_TOKEN);
 }
 

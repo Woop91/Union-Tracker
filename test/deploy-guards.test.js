@@ -558,6 +558,14 @@ describe('G9: Nav tabs and handlers are in sync', () => {
     });
   });
 
+  // Member-only tabs (removed from steward nav)
+  const memberOnlyTabs = []; // POMS removed from SolidBase
+  memberOnlyTabs.forEach(tabId => {
+    test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
+      const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
+      expect(count).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
 
 
@@ -612,9 +620,68 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 
 
 // ============================================================================
+// G11: poms_reference.html is self-contained and parseable
+// ============================================================================
+// Reason: poms_reference.html is loaded via HtmlService.createHtmlOutputFromFile
+// and injected into the SPA. If its <script> block has syntax errors, the entire
+// POMS tab fails silently.
+
+describe.skip('G11: poms_reference.html integrity (not in SolidBase)', () => {
+
+  test('poms_reference.html exists', () => {
+    expect(fs.existsSync(pomsPath)).toBe(true);
+  });
+
+  test('POMS_DATA is available (lazy-loaded from server or inline)', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    // POMS_DATA may be inline (const POMS_DATA = [...]) or lazy-loaded (var POMS_DATA = [])
+    const match = code.match(/POMS_DATA\s*=\s*\[/);
+    expect(match).not.toBeNull();
+    // If lazy-loaded, data lives in 21_WebDashDataService.gs
+    const clientEntries = (code.match(/\{id:/g) || []).length;
+    if (clientEntries < 78) {
+      const svcPath = path.join(SRC_DIR, '21_WebDashDataService.gs');
+      const svcCode = fs.readFileSync(svcPath, 'utf8');
+      const serverEntries = (svcCode.match(/\{id:"/g) || []).length;
+      expect(serverEntries).toBeGreaterThanOrEqual(78);
+    }
+  });
+
+  test('contains FLOWS object with flowcharts', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const match = code.match(/FLOWS\s*=\s*\{/);
+    expect(match).not.toBeNull();
+    // Count flowcharts (title: entries)
+    const charts = (code.match(/title:"/g) || []).length;
+    expect(charts).toBeGreaterThanOrEqual(17);
+  });
+
+  test('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
+      expect(code).toContain(`P.tab==='${tab}'`);
+    });
+  });
+
+  test('<script> block parses without syntax errors', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
+    expect(scriptMatch).not.toBeNull();
+    expect(() => {
+    }).not.toThrow();
+  });
+
+  test('no DDS Apps Script ID present', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    expect(code).not.toContain('18hHHX');
+  });
+});
+
+
+// ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
+// Reason: SolidBase Apps Script ID (18hHHX...) must never appear in source
 // files that get synced to the public Union-Tracker repo.
 
 describe('G12: No sensitive ID leaks', () => {
@@ -687,6 +754,34 @@ describe('G13: Module load order is safe', () => {
   });
 });
 
+
+describe.skip('G14: WorkloadService crash-safe patterns (not in SolidBase)', () => {
+
+  test('_refreshReportingData does NOT clearContents before writing', () => {
+    // Extract the _refreshReportingData function body
+    const funcStart = wsCode.indexOf('function _refreshReportingData()');
+    expect(funcStart).toBeGreaterThan(-1);
+    const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
+    const funcBody = wsCode.substring(funcStart, funcEnd);
+
+    // The old antipattern: report.clearContents() before setValues
+    // New pattern: setValues first, then clearContent only for stale rows
+    expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
+  });
+
+  test('rate limit uses atomic check-and-record pattern', () => {
+    // _checkAndRecordRateLimit should exist (replaces separate check + record)
+    expect(wsCode).toContain('function _checkAndRecordRateLimit');
+    // Old separate _recordRateLimitAttempt should NOT exist
+    expect(wsCode).not.toContain('function _recordRateLimitAttempt');
+    // No separate _recordSubmission call
+    expect(wsCode).not.toContain('function _recordSubmission');
+  });
+
+  test('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
+    expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
+  });
+});
 
 // ============================================================================
 // G15: IDLE LOGOUT MODULE

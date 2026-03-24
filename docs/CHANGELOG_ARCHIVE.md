@@ -59,7 +59,7 @@ For recent changes, see CHANGELOG.md.
 - Broadcast subject line, scope config, dues gate on 6 member tabs
 - Survey banner, lock icons, config scope seed for dues gate
 - Dynamic resource categories; wire Resources + Resource Config sheets into CREATE_DASHBOARD
-- Org Chart default + `sync-org-chart.js` script (v4.22.6)
+- MADDS Org Chart default + `sync-org-chart.js` script (v4.22.6)
 - Q&A Forum: steward-only answers, resolve, notifications
 - Q&A Forum: unanswered badge, show-resolved toggle, anonymous notify
 - Q&A Forum: unanswered count on notification bell
@@ -68,7 +68,7 @@ For recent changes, see CHANGELOG.md.
 ### Changed
 - Survey form URL deprecation cleanup (v4.22.7)
 - Notification cleanup pass (v4.22.2)
-- Sync-org-chart v2: push org chart to all branches
+- Sync-org-chart v2: push MADDS to all branches
 - Remove dues gate from resources
 
 ### Fixed

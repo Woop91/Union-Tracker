@@ -19,6 +19,7 @@
   <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
 
   <?!= include('styles') ?>
+  <?!= include('member_hub_styles') ?>
 
   <!-- Chart.js — deferred until actually needed (lazy-loaded by ChartHelper) -->
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" as="script" crossorigin="anonymous">
@@ -2089,17 +2090,17 @@
         { group: 'Temp' },
         { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
         { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
+        { id: 'guide', icon: '\uD83D\uDCD6', label: 'Welcome Guide' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ]);
       return [
+        { id: 'memberhub', icon: '\u270A', label: 'Member Hub' },
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
-        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { group: 'Reference' },
-        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
         { group: 'Community' },
@@ -2116,6 +2117,7 @@
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'reportcard', icon: '\uD83D\uDCCB', label: 'Report Card' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
+        { id: 'guide', icon: '\uD83D\uDCD6', label: 'Welcome Guide' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
     }
@@ -2265,9 +2267,9 @@
         { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
         { id: 'more_steward', icon: '\u2630', label: 'More' },
       ] : [
+        { id: 'memberhub', icon: '\u270A', label: 'Hub' },
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
-        { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
-        { id: 'stewarddirectory', icon: '\uD83D\uDCAC', label: 'Contact' },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Alerts' },
         { id: 'more', icon: '\u2630', label: 'More' },
       ];
 
@@ -2378,6 +2380,11 @@
               }
             }, mtCount > 9 ? '9+' : String(mtCount)));
           }
+        }
+
+        // Pulsate animation for More button to draw first-time attention
+        if ((tab.id === 'more' || tab.id === 'more_steward') && tab.id !== activeTab) {
+          item.classList.add('nav-more-pulse');
         }
 
         item.appendChild(iconWrap);
@@ -2669,15 +2676,6 @@
         _navProgressDone();
         return;
       }
-      if (tabId === 'poms') {
-        _hideAllVisiblePanes();
-        _splitRenderTarget = 'primary';
-        renderPOMSReference(app, role);
-        _activePane = _layoutCache.content;
-        _navProgressDone();
-        return;
-      }
-
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 
@@ -2809,6 +2807,7 @@
       }
       if (role === 'member') {
         switch(tabId) {
+          case 'memberhub': return renderMemberHub;
           case 'home': return renderMemberHome;
           case 'cases': return renderMyCases;
           case 'profile': return renderUpdateProfile;
@@ -2829,6 +2828,7 @@
           case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
           case 'timeline': return renderMemberTimelinePage;
           case 'reportcard': return renderReportCard;
+          case 'guide': return renderWelcomeGuide;
           default: return renderMemberHome;
         }
       } else {
@@ -2859,6 +2859,7 @@
           case 'failsafe': return renderFailsafePage;
           case 'search': return renderSearchPage;
           case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
+          case 'guide': return function(a) { renderWelcomeGuide(a, 'steward'); };
           default: return renderStewardDashboard;
         }
       }
@@ -3700,6 +3701,9 @@
   </script>
 
   <?!= include('shared_components') ?>
+  <?!= include('auth_manifesto') ?>
+  <?!= include('member_hub_view') ?>
+  <?!= include('welcome_guide_view') ?>
 
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>

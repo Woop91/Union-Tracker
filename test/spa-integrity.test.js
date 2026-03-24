@@ -851,7 +851,7 @@ describe('G19: More menu items have route handlers', () => {
 // instead of "Program Operations Manual System". This guard prevents the wrong
 // acronym expansion from reappearing.
 
-describe('G20: POMS description accuracy', () => {
+describe.skip('G20: POMS description accuracy (not in SolidBase)', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
 
@@ -1116,12 +1116,7 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  test('poms early-return uses _hideAllVisiblePanes', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
-    expect(pomsBlock).not.toBeNull();
-    expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
-  });
+  test.skip('poms early-return uses _hideAllVisiblePanes (not in SolidBase)', () => {});
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');

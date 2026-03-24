@@ -232,12 +232,15 @@ var Auth = (function () {
   }
 
   /**
-   * Creates a session token for "remember me" functionality.
-   * Called after successful auth if remember=1.
+   * Creates a session token for session persistence.
+   * Called after successful magic link auth. If shortLived is true, token
+   * expires in 24 hours (for users who didn't check "remember me") instead
+   * of the full cookieDuration (default 30 days).
    * @param {string} email
+   * @param {boolean} [shortLived] - If true, 24-hour expiry instead of full duration
    * @returns {string} Session token
    */
-  function createSessionToken(email) {
+  function createSessionToken(email, shortLived) {
     // Auto-evict expired tokens if approaching quota
     try {
       var props = PropertiesService.getScriptProperties();
@@ -272,7 +275,9 @@ var Auth = (function () {
       config = { cookieDurationMs: 30 * 24 * 60 * 60 * 1000 }; // 30 days default
     }
     var token = _generateToken();
-    var expiry = Date.now() + (config.cookieDurationMs || 30 * 24 * 60 * 60 * 1000);
+    var SHORT_SESSION_MS = 24 * 60 * 60 * 1000; // 24 hours
+    var duration = shortLived ? SHORT_SESSION_MS : (config.cookieDurationMs || 30 * 24 * 60 * 60 * 1000);
+    var expiry = Date.now() + duration;
 
     try {
       props = PropertiesService.getScriptProperties();
@@ -471,6 +476,101 @@ var Auth = (function () {
       + '</div></body></html>';
   }
 
+  // ═══════════════════════════════════════
+  // DEV-ONLY PIN LOGIN
+  // Steward generates a 6-digit PIN for a member. Member enters just the
+  // PIN on the login screen — no email needed. PIN is reusable for 14 days.
+  // Guarded by isProductionMode() — never available in prod.
+  // ═══════════════════════════════════════
+
+  var DEV_PIN_PREFIX = 'DEV_PIN_';
+  var DEV_PIN_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+
+  /**
+   * Generates a 6-digit login PIN for a member. Called by a steward.
+   * DEV MODE ONLY — refused in production.
+   * @param {string} memberEmail - The member to generate a PIN for
+   * @param {string} sessionToken - Steward's session token for auth
+   * @returns {Object} { success, pin?, memberName?, message }
+   */
+  function generateDevPin(memberEmail, sessionToken) {
+    if (isProductionMode()) {
+      return { success: false, message: 'PIN login is not available in production.' };
+    }
+    memberEmail = String(memberEmail).trim().toLowerCase();
+    if (!memberEmail || memberEmail.indexOf('@') < 0) {
+      return { success: false, message: 'Invalid email address.' };
+    }
+
+    // Validate member exists in directory
+    var userRecord = DataService.findUserByEmail(memberEmail);
+    if (!userRecord) {
+      return { success: false, message: 'Member not found in directory.' };
+    }
+
+    // Remove any existing PIN for this member (search all DEV_PIN_ keys)
+    var props = PropertiesService.getScriptProperties();
+    var allProps = props.getProperties();
+    var keys = Object.keys(allProps);
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].indexOf(DEV_PIN_PREFIX) === 0) {
+        try {
+          var existing = JSON.parse(allProps[keys[i]]);
+          if (existing.email === memberEmail) {
+            props.deleteProperty(keys[i]);
+          }
+        } catch (_e) { /* skip corrupt */ }
+      }
+    }
+
+    // Generate unique 6-digit PIN — ensure no collision
+    var pin;
+    var attempts = 0;
+    do {
+      pin = String(100000 + Math.floor(Math.random() * 900000));
+      attempts++;
+    } while (props.getProperty(DEV_PIN_PREFIX + pin) && attempts < 10);
+
+    // Store PIN → email mapping (keyed by PIN for fast lookup at login)
+    props.setProperty(DEV_PIN_PREFIX + pin, JSON.stringify({
+      email: memberEmail,
+      expiry: Date.now() + DEV_PIN_EXPIRY_MS,
+      created: Date.now(),
+    }));
+
+    var memberName = userRecord.name || userRecord.firstName || memberEmail;
+    return { success: true, pin: pin, memberName: memberName, message: 'PIN generated for ' + memberName };
+  }
+
+  /**
+   * Validates a dev login PIN. Returns the email if valid, null if not.
+   * Member enters only the PIN — no email needed.
+   * PIN is reusable until it expires (14 days).
+   * DEV MODE ONLY.
+   * @param {string} pin - 6-digit PIN
+   * @returns {string|null} verified member email or null
+   */
+  function verifyDevPin(pin) {
+    if (isProductionMode()) return null;
+    pin = String(pin).trim();
+    if (!pin || pin.length !== 6) return null;
+
+    var props = PropertiesService.getScriptProperties();
+    var raw = props.getProperty(DEV_PIN_PREFIX + pin);
+    if (!raw) return null;
+
+    try {
+      var data = JSON.parse(raw);
+      if (data.expiry < Date.now()) {
+        props.deleteProperty(DEV_PIN_PREFIX + pin);
+        return null;
+      }
+      return data.email;
+    } catch (_e) {
+      return null;
+    }
+  }
+
   // Public API
   return {
     resolveUser: resolveUser,
@@ -478,6 +578,8 @@ var Auth = (function () {
     createSessionToken: createSessionToken,
     invalidateSession: invalidateSession,
     cleanupExpiredTokens: cleanupExpiredTokens,
+    generateDevPin: generateDevPin,
+    verifyDevPin: verifyDevPin,
     /**
      * Resolve a verified email from a session token.
      * Used by auth helpers when Session.getActiveUser() is empty
@@ -530,6 +632,40 @@ function authLogout(sessionToken) {
  */
 function authCleanupExpiredTokens() {
   return Auth.cleanupExpiredTokens();
+}
+
+/**
+ * Client-callable: Steward generates a login PIN for a member.
+ * DEV MODE ONLY. Returns { success, pin, memberName, message }.
+ */
+function authGenerateDevPin(memberEmail, sessionToken) {
+  if (isProductionMode()) {
+    return { success: false, message: 'PIN login is not available in production.' };
+  }
+  // Require steward auth
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, message: 'Steward authorization required.' };
+  return Auth.generateDevPin(memberEmail, sessionToken);
+}
+
+/**
+ * Client-callable: Member verifies a login PIN (no email needed).
+ * DEV MODE ONLY — returns session token on success.
+ */
+function authVerifyDevPin(pin) {
+  if (isProductionMode()) {
+    return { success: false, message: 'PIN login is not available in production.' };
+  }
+  var verifiedEmail = Auth.verifyDevPin(pin);
+  if (!verifiedEmail) {
+    return { success: false, message: 'Invalid or expired PIN. Please ask your steward for a new one.' };
+  }
+  // Create a session token so the member stays logged in
+  var sessionToken = Auth.createSessionToken(verifiedEmail);
+  if (sessionToken && typeof sessionToken === 'object' && sessionToken.error) {
+    return { success: false, message: 'PIN verified but session creation failed. Please try again.' };
+  }
+  return { success: true, sessionToken: sessionToken, email: verifiedEmail };
 }
 
 /**

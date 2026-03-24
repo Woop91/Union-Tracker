@@ -317,7 +317,7 @@ Multiple functions make individual `getRange().setValue()` calls per row instead
 ### Hardcoded Values Violating Project Rules (10+ findings)
 - 60+ hardcoded satisfaction survey column indices
 - Hardcoded sheet names: `'Config'`, `'_Survey_Tracking'`, `'PortalMemberDirectory'`, etc.
-- Hardcoded org names (removed in SolidBase)
+- Hardcoded org names: "Your Union Local", "Your Organization"
 - Magic numbers: steward workload thresholds (5, 8), row limits (50, 100, 998)
 - Grievance type values hardcoded in formula sheet
 - Column letter `E` hardcoded in calc formula sheet

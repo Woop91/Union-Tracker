@@ -51,7 +51,18 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 ### Environment Variables
 
-No environment variables are required for building, testing, or deploying.
+Some helper scripts require a `.env` file in the repo root:
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `GITHUB_509D_TOKEN` | `scripts/sync-org-chart.js` | GitHub PAT for syncing the org chart between repos |
+
+Create a `.env` file (already in `.gitignore`) with:
+```
+GITHUB_509D_TOKEN=ghp_your_token_here
+```
+
+This is only needed if you run `npm run sync:org-chart`. It is **not** required for building, testing, or deploying.
 
 ## Project Structure
 
@@ -94,6 +105,7 @@ No environment variables are required for building, testing, or deploying.
 │   ├── 22_WebDashApp.gs            # SPA entry point and routing
 │   ├── 23_PortalSheets.gs          # Hidden sheet management for SPA
 │   ├── 24_WeeklyQuestions.gs       # Weekly check-in questions
+│   ├── 25_WorkloadService.gs       # SPA-integrated workload
 │   ├── 26_QAForum.gs               # Q&A Forum for steward-member Q&A
 │   ├── 27_TimelineService.gs       # Timeline/activity feed service
 │   ├── 28_FailsafeService.gs       # Critical operation failsafe wrapper
@@ -101,7 +113,7 @@ No environment variables are required for building, testing, or deploying.
 │   ├── 30_TestRunner.gs             # GAS-native test runner (210 tests)
 │   ├── 31_WebAppTests.gs           # GAS-native web app tests
 │   ├── DevMenu.gs                  # Dev menu (excluded from prod build)
-│   └── (8 .html files)             # SPA templates
+│   └── (8 .html files)             # SPA templates + poms_reference
 ├── test/                   # Jest unit tests
 │   ├── gas-mock.js         # GAS environment mocks
 │   ├── load-source.js      # Source file loader
@@ -137,7 +149,7 @@ No environment variables are required for building, testing, or deploying.
 | 15_ | Event bus (pub/sub system) |
 | 16_ | Dashboard enhancements (date ranges, chart export) |
 | 17_ | Correlation engine (statistical analysis) |
-| 19-24_ | SPA web dashboard modules (auth, config, data, app, sheets, questions) |
+| 19-25_ | SPA web dashboard modules (auth, config, data, app, sheets, questions, workload) |
 | 26_ | Q&A Forum |
 | 27_ | Timeline service |
 | 28_ | FailsafeService (critical operation wrapper) |

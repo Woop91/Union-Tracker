@@ -1,6 +1,6 @@
 # Dashboard Developer Guide
 
-This guide provides an overview of the codebase architecture, development workflow, and best practices for contributing to the Union Steward Dashboard.
+This guide provides an overview of the codebase architecture, development workflow, and best practices for contributing to the SolidBase.
 
 ## Table of Contents
 
@@ -169,6 +169,7 @@ The codebase follows a layered architecture with 42 modules organized by numbere
 | `22_WebDashApp.gs` | SPA entry point and routing | `doGetWebDashboard`, `PAGE_DATA` |
 | `23_PortalSheets.gs` | Hidden sheet management for SPA | `getPortalSheetData`, `updatePortalSheet` |
 | `24_WeeklyQuestions.gs` | Weekly check-in questions | `getWeeklyQuestions`, `submitWeeklyResponse` |
+| `25_WorkloadService.gs` | SPA-integrated workload (IIFE: WorkloadService) | `getWorkloadFormData`, `submitWorkloadData` |
 
 ### Extended Services
 
@@ -409,6 +410,7 @@ const BUILD_ORDER = [
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',

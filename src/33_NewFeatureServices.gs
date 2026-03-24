@@ -1457,7 +1457,7 @@ var SMSService = (function () {
     if (!isConfigured()) {
       return { success: false, error: 'Twilio not configured.' };
     }
-    return _sendViaTwilio(toPhone, 'Test message from DDS Dashboard. If you received this, SMS is working!');
+    return _sendViaTwilio(toPhone, 'Test message from SolidBase. If you received this, SMS is working!');
   }
 
   /**

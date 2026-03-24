@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.36.0] - 2026-03-24
+
+### Added
+- **Modal Hub** — Centralized launcher for all 35+ dialogs, accessible from the Union Hub menu. Modals organized by category (Members, Cases & Grievances, Search & Analytics, Calendar & Meetings, Surveys & Polls, Tools & Productivity, Web App & Portal, Admin & System). Real-time search/filter across all modals. Master enable/disable toggle persisted to Config sheet.
+- **MODAL_REGISTRY** — New constant in `04a_UIMenus.gs` cataloging every modal with label, icon, description, and server function name. `launchModalFromHub()` validates function names against the registry before execution.
+- **ENABLE_MODAL_HUB** — New Config column and Admin Settings toggle (Branding & UX tab) to globally enable/disable all modals launched from the Modal Hub.
+
+### Fixed
+- **Data service: error handling** — `dataApplyColorTheme()` and `dataMarkWelcomeDismissed()` now wrapped in try/catch.
+- **Data service: audit log column indices** — Replaced hardcoded array indices with `AUDIT_LOG_COLS` and `EVENT_AUDIT_COLS` constants.
+- **POMS Reference: XSS prevention** — Added `pesc()` escape function for all server-loaded data in `poms_reference.html`.
+- **Grievance Form: missing failure handler** — Added `.withFailureHandler()` to `getGrievanceFormOptions()`.
+- **Grievance Form: email injection** — `doEmail()` now validates email format and URI-encodes the recipient.
+
+## [4.35.1] - 2026-03-24
+
+### Added
+- **Dev PIN login** — Stewards can generate a 6-digit login PIN for any member from the Members tab detail panel (dev builds only). Members enter just the PIN on the login screen — no email needed. PINs are valid for 14 days and reusable. Completely disabled in production.
+- **Welcome Guide: back-button warning** — Mobile users see a prominent warning not to use the browser back button, directing them to the bottom navigation bar instead.
+- **More button pulsate** — The "More" button in the mobile bottom nav now pulsates to draw attention. Respects `prefers-reduced-motion`.
+
+### Changed
+- **Member bottom nav reorganized** — Replaced "My Cases" and "Contact" with "Hub" (Member Hub) and "Alerts" (Notifications). Cases and steward contact remain accessible via the Member Hub and More menu.
+
+## [4.35.0] - 2026-03-24
+
+### Added
+- **Welcome Guide tab** — New dedicated "Welcome Guide" tab in the web app SPA for both steward and member roles. Interactive getting-started page with expandable sections covering navigation basics, role-specific feature overviews, tips & shortcuts, and quick-launch buttons.
+
+## [4.34.5] - 2026-03-24
+
+### Fixed
+- **Auth: Android Google login** — SSO failure message now explains mobile cookie restrictions and directs users to the email link option.
+- **Auth: magic link single-use lockout** — Magic link auth now always creates a session token (24h short-lived if "Remember this device" is off, full duration if on), preventing users from being kicked to login on every page load after consuming the one-use token.
+- **Auth: remember-me default** — "Remember this device" toggle now defaults to ON for email link flow, since magic link tokens are one-use and users need session persistence.
+
+## [4.34.4] - 2026-03-24
+
+### Fixed
+- **Survey visibility mismatch** — Steward view showed active survey but member view showed "No Survey Open". Root cause: `getSurveyQuestions()` cached the period status for 5 minutes, and `openNewSurveyPeriod()`/`archiveSurveyPeriod_()` did not invalidate the cache. Fix: period is now always fetched fresh via `getSurveyPeriod()` on every call (both cache-hit and cache-miss paths). Questions/sections remain cached. `openNewSurveyPeriod()` and `archiveSurveyPeriod_()` now also explicitly clear the cache key on period state change.
+
 ## [4.34.3] - 2026-03-23
 
 ### Fixed

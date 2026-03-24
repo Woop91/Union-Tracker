@@ -1733,7 +1733,7 @@ function renderMemberResources(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
   { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
  ];
- if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+ if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Your Union Local Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
  quickLinks.forEach(function(r) {
   if (!r.url) return;
@@ -2112,7 +2112,6 @@ function renderMemberMore(appContainer) {
   { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { _handleTabNav('member', 'workload'); } },
   { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
   { group: 'Reference' },
-  { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('member', 'poms'); } },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
   { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
   { group: 'Community' },
@@ -2840,7 +2839,7 @@ function _renderSurveyWizard(container, questions, sectionMeta, sliderLabels, pe
   stepContainer.innerHTML = '';
   navRow.style.display = '';
   _showSurveyError(stepContainer, navRow, err.message || 'Network error. Your progress is saved.', responses, appContainer);
- }).dataSubmitSurveyResponse(null, responses);
+ }).dataSubmitSurveyResponse(SESSION_TOKEN, responses);
  }
 
  renderStep();
@@ -2874,7 +2873,7 @@ function _showSurveyError(stepContainer, navRow, message, responses, appContaine
   }
  }).withFailureHandler(function(err2) {
   _showSurveyError(stepContainer, navRow, err2.message || 'Still failing. Your responses are saved locally.', responses, appContainer);
- }).dataSubmitSurveyResponse(null, responses);
+ }).dataSubmitSurveyResponse(SESSION_TOKEN, responses);
  } }, 'Retry'));
  errCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { renderSurveyFormPage(document.getElementById('app')); } }, 'Back to Survey'));
  stepContainer.appendChild(errCard);
@@ -5686,12 +5685,16 @@ function _renderPollVoteUI(qCard, q) {
  if (q.hasResponded) {
  _renderPollResults(qCard, q);
  } else {
+ 
+ var voteErr = el('div', { style: { color: 'var(--danger)', fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
+ qCard.appendChild(voteErr);
  q.options.forEach(function(opt) {
   var btn = el('button', {
   className: 'btn',
   style: { display: 'block', width: '100%', marginBottom: '6px', textAlign: 'left', padding: '10px 14px', fontSize: '13px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text)' },
   onClick: function() {
-   btn.disabled = true; btn.textContent = 'Voting…';
+   btn.disabled = true; btn.textContent = 'Voting…'; voteErr.textContent = '';
+   
    serverCall().withSuccessHandler(function(result) {
    if (result && result.success) {
     q.hasResponded = true;
@@ -5701,11 +5704,12 @@ function _renderPollVoteUI(qCard, q) {
     _renderPollVoteUI(qCard, q);
    } else {
     btn.disabled = false; btn.textContent = opt;
-    qCard.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, (result && result.message) || 'Error submitting.'));
+    voteErr.textContent = (result && result.message) || 'Error submitting.';
    }
    }).withFailureHandler(function() {
    btn.disabled = false; btn.textContent = opt;
-   }).wqSubmitResponse(null, q.id, opt);
+   voteErr.textContent = 'Network error — please try again.';
+   }).wqSubmitResponse(SESSION_TOKEN, q.id, opt);
   }
   }, opt);
   qCard.appendChild(btn);
@@ -5751,12 +5755,13 @@ function renderPollsPage(appContainer) {
 function _renderThisWeekPolls(target) {
  showLoading(target);
  
- serverCall().withSuccessHandler(function(freq) {
+ 
+ serverCall().withSuccessHandler(function(data) {
+ target.innerHTML = '';
+ var freq = (data && data.frequency) || 'weekly';
  var freqLabels = { weekly: 'each Monday', biweekly: 'every other Monday', monthly: 'on the 1st of each month' };
  var nextLabel = freqLabels[freq] || 'each Monday';
- serverCall().withSuccessHandler(function(data) {
-  target.innerHTML = '';
-  if (!data || !data.questions || data.questions.length === 0) {
+ if (!data || !data.questions || data.questions.length === 0) {
   var empty = el('div', { className: 'empty-state-lg' });
   empty.appendChild(el('div', { className: 'emoji-lg' }, '🗳️'));
   var periodWord = freq === 'monthly' ? 'this month' : freq === 'biweekly' ? 'this fortnight' : 'this week';
@@ -5764,35 +5769,18 @@ function _renderThisWeekPolls(target) {
   empty.appendChild(el('div', { className: 'text-sm-muted' }, 'New polls are posted ' + nextLabel + '.'));
   target.appendChild(empty);
   return;
-  }
-  target.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 All votes are fully anonymous — your identity is never stored'));
-  data.questions.forEach(function(q) {
+ }
+ target.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 All votes are fully anonymous — your identity is never stored'));
+ data.questions.forEach(function(q) {
   var qCard = el('div', { className: 'wq-card mb-14' });
   qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
   _renderPollVoteUI(qCard, q);
   target.appendChild(qCard);
-  });
+ });
  }).withFailureHandler(function() {
-  target.innerHTML = '';
-  target.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load polls.'));
- }).wqGetActiveQuestions(SESSION_TOKEN);
- }).withFailureHandler(function() {
- 
- serverCall().withSuccessHandler(function(data) {
-  target.innerHTML = '';
-  if (!data || !data.questions || data.questions.length === 0) {
-  target.appendChild(el('div', { className: 'empty-state-13' }, 'No polls this period.'));
-  return;
-  }
-  target.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 All votes are fully anonymous'));
-  data.questions.forEach(function(q) {
-  var qCard = el('div', { className: 'wq-card mb-14' });
-  qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
-  _renderPollVoteUI(qCard, q);
-  target.appendChild(qCard);
-  });
- }).wqGetActiveQuestions(SESSION_TOKEN);
- }).wqGetPollFrequency();
+ target.innerHTML = '';
+ target.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load polls.'));
+ }).wqGetPollData(SESSION_TOKEN);
 }
 
 function _renderPastPolls(target) {
@@ -6202,13 +6190,13 @@ function renderQAForum(appContainer, role) {
    onClick: function() {
    serverCall().withSuccessHandler(function(r) {
     if (r && r.success) _renderQuestionDetail(cont, questionId);
-   }).withFailureHandler(function(e) { console.error(e.message); }).qaUpvoteQuestion(SESSION_TOKEN, questionId);
+   }).withFailureHandler(function() {  }).qaUpvoteQuestion(SESSION_TOKEN, questionId);
    }
   }, '\u25B2 ' + q.upvoteCount));
   if (isSteward && q.status !== 'flagged') {
    actions.appendChild(el('button', {
    style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-   onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, questionId, 'flag'); }
+   onClick: function() { serverCall().withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).withFailureHandler(function() {  }).qaModerateQuestion(SESSION_TOKEN, questionId, 'flag'); }
    }, 'Flag'));
   }
   
@@ -6221,7 +6209,7 @@ function renderQAForum(appContainer, role) {
      _renderQuestionDetail(cont, questionId);
      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
     }
-    }).withFailureHandler(function(e) { console.error(e.message); }).qaResolveQuestion(SESSION_TOKEN, questionId);
+    }).withFailureHandler(function() {  }).qaResolveQuestion(SESSION_TOKEN, questionId);
    }
    }, '\u2713 Mark Resolved'));
   }
@@ -6269,7 +6257,7 @@ function renderQAForum(appContainer, role) {
      _renderQuestionDetail(cont, questionId);
      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
     } else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
-    }).withFailureHandler(function(e) { console.error(e.message); }).qaSubmitAnswer(SESSION_TOKEN, CURRENT_USER.name || '', questionId, text, true);
+    }).withFailureHandler(function() { ansStatus.textContent = 'Network error — please try again.'; ansStatus.style.color = 'var(--danger)'; }).qaSubmitAnswer(SESSION_TOKEN, CURRENT_USER.name || '', questionId, text, true);
    }
    }, 'Post Answer'));
   }
@@ -6326,11 +6314,11 @@ function renderQAForum(appContainer, role) {
    var acts = el('div', { className: 'flex-gap-6' });
    acts.appendChild(el('button', {
     style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'approve'); }
+    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont);  }).qaModerateQuestion(SESSION_TOKEN, q.id, 'approve'); }
    }, 'Approve'));
    acts.appendChild(el('button', {
     style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'delete'); }
+    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(SESSION_TOKEN, q.id, 'delete'); }
    }, 'Delete'));
    card.appendChild(acts);
    cont.appendChild(card);
@@ -6346,11 +6334,11 @@ function renderQAForum(appContainer, role) {
    var acts = el('div', { className: 'flex-gap-6' });
    acts.appendChild(el('button', {
     style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
-    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'approve'); }
+    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'approve'); }
    }, 'Approve'));
    acts.appendChild(el('button', {
     style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
-    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function(e) { console.error(e.message); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'delete'); }
+    onClick: function() { serverCall().withSuccessHandler(function() { _renderModQueue(cont); }).withFailureHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(SESSION_TOKEN, a.id, 'delete'); }
    }, 'Delete'));
    card.appendChild(acts);
    cont.appendChild(card);

@@ -35,7 +35,7 @@ This document provides a comprehensive, searchable reference of all features in 
 22. [Meeting Check-In & Document Automation](#22-meeting-check-in--document-automation)
 23. [Member Drive Folders](#23-member-drive-folders)
 24. [Constant Contact Integration](#24-constant-contact-integration)
-25. [Workload Tracker](#25-workload-tracker) *(not included in SolidBase)*
+25. [Workload Tracker](#25-workload-tracker)
 26. [Resources Hub](#26-resources-hub)
 27. [Notifications System](#27-notifications-system)
 28. [SPA Web Dashboard](#28-spa-web-dashboard)
@@ -688,7 +688,45 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ## 25. Workload Tracker
 
-> **Note:** The Workload Tracker (`25_WorkloadService.gs`) is not included in SolidBase. It is an org-specific feature available in the DDS-Dashboard source.
+> **File:** `25_WorkloadService.gs` (SPA module) | **Version:** 4.10.0 / 4.13.0
+
+### SPA Workload Module (v4.13.0)
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **SPA Workload Form** | SSO-authenticated workload submission embedded in member_view | `WorkloadService.getFormData()` | SPA, SSO, form |
+| **SPA Workload Submit** | Submit workload via SPA without separate PIN auth | `WorkloadService.submitData()` | submit, SPA, SSO |
+
+### Workload Categories
+
+| Category | Description |
+|----------|-------------|
+| Priority Cases | High-priority cases requiring immediate attention |
+| Pending Cases | Cases awaiting action or response |
+| Unread Documents | Documents not yet reviewed |
+| To-Do Items | Outstanding tasks |
+| Sent Referrals | Referrals sent to other departments |
+| CE Activities | Continuing education activities |
+| Assistance Requests | Requests for assistance received |
+| Aged Cases | Cases open beyond expected timeframes |
+
+### Privacy Controls
+
+| Level | Description |
+|-------|-------------|
+| Unit Anonymous | Identity hidden within unit; data included in collective stats |
+| Agency Anonymous | Identity hidden agency-wide; data included in collective stats |
+| Private | Data excluded from all collective reporting |
+
+### Workload Sheets
+
+| Sheet | Purpose |
+|-------|---------|
+| `_Workload_Vault` | Encrypted raw submission data |
+| `_Workload_Reporting` | Anonymized collective statistics |
+| `_Workload_Reminders` | Email reminder configuration |
+| `_Workload_UserMeta` | Member preferences and metadata |
+| `_Workload_Archive` | Archived data (24-month rolling) |
 
 ---
 
@@ -775,7 +813,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ### Member SPA Sidebar Tabs (v4.25.4)
 
-Home, My Cases, My Tasks, Union Stats, Resources, Org. Chart, Q&A Forum, Polls, Feedback, Minutes, Notifications, Events, My Meetings, Timeline, Steward Directory, Profile, Survey Results.
+Home, My Cases, My Tasks, Workload Tracker, Union Stats, POMS Ref., Resources, Org. Chart, Q&A Forum, Polls, Feedback, Minutes, Notifications, Events, My Meetings, Timeline, Steward Directory, Profile, Survey Results.
 
 > **No Directory tab.** Members do not have a general Directory. Steward contacts are accessed via the "Steward Directory" utility link (renders `renderStewardContact()`).
 
@@ -937,7 +975,7 @@ Organization chart visualization for the MADDS org chart.
 | **4.12.2** | SPA web dashboard -- SSO + magic link auth, steward/member views, deep-link routing |
 | **4.12.0** | Notifications system -- sheet, API, dual-role page, steward compose |
 | **4.11.0** | Resources hub, meeting check-in route, design refresh (DM Sans + Fraunces) |
-| **4.10.0** | Workload Tracker (not included in SolidBase -- org-specific feature) |
+| **4.10.0** | Workload Tracker -- 8 categories, privacy controls, reciprocity, email reminders |
 | **4.9.0** | Constant Contact v3 API integration -- read-only email engagement metrics sync (OPEN_RATE, RECENT_CONTACT_DATE) |
 | **4.8.2** | State field added to member contact update (self-service portal, contact form, profile) |
 | **4.6.0** | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override |

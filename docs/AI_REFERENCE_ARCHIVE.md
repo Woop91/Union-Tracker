@@ -27,7 +27,7 @@ for reference. For current project context, see AI_REFERENCE.md.
 - **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values.
 - **Single branch: Main only.** Never create dev/staging/feature branches.
 - **Version bump is mandatory** on every code change: `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
-- **DDS Script ID must NEVER appear in SolidBase** (public repo).
+- **DDS Script ID must NEVER appear in Union-Tracker** (public repo).
 - **Read before act.** Never assume repo state, file contents, or function behavior.
 
 ## 2026-02-28 — Workflow Correction (v4.18.2)
@@ -1034,7 +1034,7 @@ To add a new column to the Member Directory that auto-migrates to existing sheet
 ### Changes made (session: 2026-03-06)
 
 **Issues fixed:**
-1. Dues gate removed from `renderMemberResources()` -- labor rights content (Weingarten, Just Cause, etc.) must be accessible to all bargaining unit members regardless of dues status.
+1. ✅ Dues gate removed from `renderMemberResources()` — labor rights content (Weingarten, Just Cause, etc.) must be accessible to all bargaining unit members regardless of dues status. Union-Tracker parity restored.
 2. ✅ Category mismatch resolved — steward form dropdown was using a completely different and incompatible list vs. the 📚 Resources sheet data validation.
 3. ✅ Category list is now fully dynamic — driven from new `📚 Resource Config` sheet, never hardcoded in client code.
 4. ✅ Steward manage list now sorted by Sort Order — previously showed items in insertion (sheet row) order.
@@ -1066,14 +1066,14 @@ Contract Article → Know Your Rights → Grievance Process → Forms & Template
 
 ---
 
-## v4.22.6 — Org Chart Default (2026-03-06)
+## v4.22.6 — MADDS Org Chart Default (2026-03-06)
 
-**Change summary:** Replaced `src/org_chart.html` with the organizational chart. This is now the default Org Chart view for SolidBase.
+**Change summary:** Replaced `src/org_chart.html` with the MADDS (Main Internal Breakout) chart sourced from the `Woop91/509d` repository (`org-chart/MADDS.html`, last updated 2026-03-01). This is now the default Org Chart view for both SolidBase and Union-Tracker.
 
-**Source:** Organizational chart including: role hierarchy, chapter structure, Role Descriptions, Financial Overview, Staff Directory & Compensation, Career Paths sections.
+**Source:** `509d/org-chart/MADDS.html` — Full Your Union Local organizational chart including: President → Officers → Chief of Staff → Directors → Coordinators → Public Sector Chapters (Your Organization expanded by default) → Other Chapters. Also contains Role Descriptions, Financial Overview, Staff Directory & Compensation, Career Paths, and Chapter Advisors & Internal Organizers sections.
 
 **Embedding approach (critical — do not revert):**
-The org chart is a standalone HTML page. To embed it in the GAS SPA, the following conversions were made:
+The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the following conversions were made:
 - `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>` tags stripped; content wrapped in `<div class="madds-embed">`
 - CSS `:root {}` → `.madds-embed {}` (scopes CSS variables, prevents collision with app vars)
 - `html, body {}` → `.madds-embed {}`; `body {}` → `.madds-embed {}`
@@ -1087,35 +1087,37 @@ The org chart is a standalone HTML page. To embed it in the GAS SPA, the followi
 **No server-side changes required.** The existing `getOrgChartHtml()` in `22_WebDashApp.gs` continues to serve `org_chart` via `HtmlService.createHtmlOutputFromFile('org_chart').getContent()`. The `renderOrgChart()` function in `index.html` is unchanged.
 
 **Files changed:**
-- `src/org_chart.html` — Replaced with org chart fragment (3,266 lines)
+- `src/org_chart.html` — Replaced with MADDS chart fragment (3,266 lines)
 - `src/01_Core.gs` — Added v4.22.6 changelog entry; updated VERSION to "4.22.6"
 
 **⚠️ RULES:**
 - Do NOT rename `org_chart.html` — the GAS server function is hardcoded to `'org_chart'` filename.
-- If updating the org chart source, re-run the scoping conversions above -- do NOT paste the raw standalone HTML directly.
+- If updating MADDS.html from the 509d repo, re-run the scoping conversions above — do NOT paste the raw standalone HTML directly.
 - Keep `.madds-embed` as the wrapper class and `#madds-mode-toggle` as the toggle ID.
+- The 509d repo is the source of truth for the chart content; the converted fragment lives in SolidBase and Union-Tracker `src/`.
 
 ---
 
 ## [2026-03-07] Org Chart Sync Script Added
 
 ### Change
-Added `scripts/sync-org-chart.js` — a Node.js script that fetches the org chart
-source and transforms it into the SPA-compatible `src/org_chart.html`.
+Added `scripts/sync-org-chart.js` — a Node.js script that fetches `MADDS.html`
+from the private `Woop91/509d` repo (GitHub Contents API) and transforms it into
+the SPA-compatible `src/org_chart.html` used by SolidBase.
 
 ### Wire-up
 - `package.json` → `"sync-org-chart": "node scripts/sync-org-chart.js"` (manual, not pre-deploy)
 - Requires `.env` at repo root with `GITHUB_509D_TOKEN=ghp_...` (gitignored)
 
 ### Problem Solved
-`org_chart.html` was a manually synced copy of the org chart source with no automation.
-Any update required a manual copy + transform + redeploy.
+`org_chart.html` was a manually synced copy of `509d/MADDS.html` with no automation.
+Any update to the 509d chart required a manual copy + transform + redeploy.
 
 ### Transformations Applied (in order)
 1. Strip leading block comment
 2. Strip `<!DOCTYPE>` / `<html>` opening tags
 3. Strip preamble inside `<head>` (`<meta>`, `<title>`, Google Fonts `<link>`)
-   NOTE: In the org chart source, `<head>` wraps the entire `<style>` block (closes AFTER `</style>`).
+   ⚠️ NOTE: In MADDS.html, `<head>` wraps the entire `<style>` block (closes AFTER `</style>`).
    Must NOT use `<head>...</head>` greedy match — would delete all CSS.
    Strip individual tags instead, then strip `</head>` separately.
 4. CSS scope: `:root {` → `.madds-embed {`
@@ -1178,10 +1180,11 @@ Sender email = 'system', Sender name = 'Q&A Forum'.
 
 ### [2026-03-07] sync-org-chart.js v2 — Multi-repo, All Branches
 
-Updated to commit org_chart.html to all branches:
-- `SolidBase` (Main): `src/org_chart.html`, `dist/org_chart.html`
+Updated to commit org_chart.html to all branches of both repos:
+- `SolidBase` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
+- `Union-Tracker` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
 
-Org chart is now the sole chart view. Skip logic prevents empty commits when file is unchanged.
+MADDS is now the sole org chart. Skip logic prevents empty commits when file is unchanged.
 Uses git clone to temp dir (GitHub Contents API returns 403 on write for these repos).
 
 ---
@@ -2064,8 +2067,9 @@ Failsafe page button
 3. `src/steward_view.html` — `menuItems[]` reordered with `{ group }` and `{ divider }` entries; renderer updated
 4. `src/member_view.html` — `menuItems[]` reordered with `{ group }` and `{ divider }` entries; renderer updated; `renderWorkloadTracker()` made role-aware
 
-### Note
-- WorkloadService removed from SolidBase (org-specific feature).
+### ⚠️ Union-Tracker Note
+- WorkloadTracker typeof guards still needed in UT for 3 files (pre-existing issue, not introduced here).
+- These changes must be synced DDS Main → UT staging per standard flow.
 
 ## Tab Regroup v2 — Intent-Based Groups (2026-03-09)
 
@@ -2335,7 +2339,7 @@ Every bug from the 2026-03-08/09 session would have been caught by automated tes
 ### Design Rationale
 - **Failure-only**: Daily success emails are noise. If you want proof tests ran, check the SPA panel.
 - **Config tab over hardcoded**: Follows "everything dynamic" rule. Admins can change the email without code changes.
-- **Quota guard**: The organization uses MailApp for other notifications too -- don't compete for the 100/day limit.
+- **Quota guard**: Your Organization uses MailApp for other notifications too — don't compete for the 100/day limit.
 - **HTML + plain-text**: HTML renders in Gmail/Outlook; plain-text is the fallback for text-only clients.
 
 ## v4.25.3 — Deadline Config Completeness (2026-03-09)
@@ -2928,8 +2932,8 @@ Total: 54 test suites, 2,744 tests passing (previously 41 suites, 2,446 tests).
 
 ## 🔍 CONTRACT AUDIT + FIXES — 2026-03-11 (v4.25.9, Batch 3)
 
-### Verified Contract: Union CBA, Article 23
-Source: Grievance Policy for Bargaining Units (reference document).
+### Verified Contract: Your Union Local Unit 8 CBA (2024–2026), Article 23
+Source: MA DOC Grievance Policy 270.03 for Bargaining Units 8 & 10 (July 2025).
 
 **Actual Unit 8 Grievance Deadlines (calendar days unless noted):**
 

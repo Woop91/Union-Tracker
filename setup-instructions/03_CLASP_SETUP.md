@@ -149,11 +149,11 @@ You have two options: create a brand new Google Sheet + Apps Script project, or 
 Run:
 
 ```bash
-npx clasp create --type sheets --title "Union Steward Dashboard"
+npx clasp create --type sheets --title "SolidBase"
 ```
 
 This will:
-- Create a new Google Sheet named "Union Steward Dashboard"
+- Create a new Google Sheet named "SolidBase"
 - Create an attached Apps Script project
 - Generate a `.clasp.json` file in your repo with the project's script ID
 
@@ -364,7 +364,7 @@ npm install
 npx clasp login
 
 # 4. Create a new Sheet + Apps Script project
-npx clasp create --type sheets --title "Union Steward Dashboard"
+npx clasp create --type sheets --title "SolidBase"
 
 # 5. Build the source files
 npm run build

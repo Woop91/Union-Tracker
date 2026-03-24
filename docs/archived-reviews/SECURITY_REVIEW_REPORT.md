@@ -2,7 +2,7 @@
 
 > **Note:** This security review was conducted at v4.5.0.
 
-**Repository:** Union Steward Dashboard (v4.5.0)
+**Repository:** SolidBase (v4.5.0)
 **Review Date:** February 2026
 **Reviewer:** Claude Code Security Review
 **Branch:** claude/security-review-qpHab
