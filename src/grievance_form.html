@@ -321,7 +321,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
         </select>
       </div>
       <div style="text-align:left;">
-        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong>509</strong>
+        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong><span id="bu-num">—</span></strong>
       </div>
     </div>
   </div>
@@ -330,8 +330,8 @@ body.dark .tbtn.go:hover{background:#a00000;}
     <label for="jobtitle" class="lbl">JOB TITLE:</label>
     <select id="jobtitle" class="fi" style="width:2.1in;">
       <option value=""></option>
-      <option>Disability Examiner</option>
-      <option>Alternate Supervisor</option>
+      <option>Employee</option>
+      <option>Supervisor</option>
       <option>Unit Supervisor</option>
       <option>QA Specialist</option>
     </select>
@@ -345,8 +345,8 @@ body.dark .tbtn.go:hover{background:#a00000;}
     <span class="lbl" style="margin-left:6px;">REGION:</span>
     <select id="region" class="fi" style="width:1.3in;" onchange="autoFillLocation()">
       <option value=""></option>
-      <option value="Everett">Everett</option>
-      <option value="Worcester">Worcester</option>
+      <option value="Main Office">Main Office</option>
+      <option value="Regional Office">Regional Office</option>
     </select>
     <span class="lbl" style="margin-left:6px;">WORK LOCATION:</span>
     <input id="workloc" class="fi" type="text" style="flex:1;" readonly placeholder="Auto-filled from Region">
@@ -426,7 +426,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <!-- WAIVER 1 -->
   <div class="whead">Alliance Waiver of Right to Appeal Disciplinary Action to Civil Service Commission</div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Alliance, AFSCME/SEIU, AFL-CIO Units 8 &amp; 10, effective January 1, 2014 to December 31, 2016.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the parties, per applicable contract provisions.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my demotion, suspension or discharge effective on<input id="w1date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -458,7 +458,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
     Acknowledgement of Alliance Waiver of Right to Arbitrate Claims of Discriminatory<br>
     Termination Filed in Multiple Forums
   </div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Alliance, AFSCME/SEIU, AFL-CIO Units 8 &amp; 10, effective January 1, 2014 to December 31, 2016.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the parties, per applicable contract provisions.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my discharge effective on <input id="w2date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -504,7 +504,7 @@ function buildBody(){
   const sep="\u2500".repeat(66);
   const w1=v("w1date"),w2=v("w2date");
   return[
-    "GRIEVANCE REPORT \u2014 LOCAL 509 / SEIU",
+    "GRIEVANCE REPORT \u2014 YOUR UNION LOCAL",
     "=".repeat(66),
     "GRIEVANT(S)      : "+dash(v("grievant")),
     "JOB TITLE        : "+dash(v("jobtitle")),
@@ -515,7 +515,7 @@ function buildBody(){
     "MANAGER(S)       : "+dash([v("managers"),v("managers2")].filter(Boolean).join(", ")),
     "ARTICLE(S)       : "+dash(v("articles")),
     "STEP #           : "+dash(v("step")),
-    "BARGAINING UNIT  : 509",
+    "BARGAINING UNIT  : "+dash(document.getElementById("bu-num").textContent),
     "",sep,
     "STATEMENT OF VIOLATION:",
     ([v("statement"),v("statement2")].filter(Boolean).join("\n"))||"(not provided)",
@@ -580,12 +580,12 @@ function toggleDark(){
 }
 
 // Defaults — overridden by server data on DOMContentLoaded
-var MANAGERS = ['Timothy Dunphy','Aja James','Majdeline Hage','Kelly Forss','Lisa Maddox-Mason','Maryalice McGough','Matthew Dichard'];
+var MANAGERS = ['Manager 1','Manager 2','Manager 3'];
 
 // Address lookup (union-specific — values from Config sheet, addresses here)
 var LOCATION_ADDRESSES = {
-  'Everett':   '135 Santilli Hwy, Everett, MA 02149',
-  'Worcester': '324R Clark St, Worcester, MA 01606'
+  'Main Office':     '123 Main St, Your City, ST 00000',
+  'Regional Office': '456 Regional Ave, Your City, ST 00000'
 };
 
 function _rebuildManagerSelects(){
