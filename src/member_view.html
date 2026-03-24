@@ -5873,12 +5873,16 @@ function _renderPollVoteUI(qCard, q) {
   if (q.hasResponded) {
     _renderPollResults(qCard, q);
   } else {
+    // v4.31.2 fix: single reusable error node prevents stacking on repeated attempts
+    var voteErr = el('div', { style: { color: 'var(--danger)', fontSize: '12px', minHeight: '16px', marginBottom: '4px' } });
+    qCard.appendChild(voteErr);
     q.options.forEach(function(opt) {
       var btn = el('button', {
         className: 'btn',
         style: { display: 'block', width: '100%', marginBottom: '6px', textAlign: 'left', padding: '10px 14px', fontSize: '13px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text)' },
         onClick: function() {
-          btn.disabled = true; btn.textContent = 'Voting…';
+          btn.disabled = true; btn.textContent = 'Voting…'; voteErr.textContent = '';
+          // v4.31.2 fix: was wqSubmitResponse(null, ...) — null caused auth failure on every vote
           serverCall().withSuccessHandler(function(result) {
             if (result && result.success) {
               q.hasResponded = true;
@@ -5888,11 +5892,12 @@ function _renderPollVoteUI(qCard, q) {
               _renderPollVoteUI(qCard, q);
             } else {
               btn.disabled = false; btn.textContent = opt;
-              qCard.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '12px' } }, (result && result.message) || 'Error submitting.'));
+              voteErr.textContent = (result && result.message) || 'Error submitting.';
             }
           }).withFailureHandler(function() {
             btn.disabled = false; btn.textContent = opt;
-          }).wqSubmitResponse(null, q.id, opt);
+            voteErr.textContent = 'Network error — please try again.';
+          }).wqSubmitResponse(SESSION_TOKEN, q.id, opt);
         }
       }, opt);
       qCard.appendChild(btn);
@@ -5938,49 +5943,33 @@ function renderPollsPage(appContainer) {
 
 function _renderThisWeekPolls(target) {
   showLoading(target);
-  // Load frequency first so empty-state copy is accurate, then load polls
-  serverCall().withSuccessHandler(function(freq) {
+  // v4.31.2: replaced wqGetPollFrequency + wqGetActiveQuestions waterfall with
+  // single wqGetPollData batch call (added v4.31.1) — halves round-trips on load
+  serverCall().withSuccessHandler(function(data) {
+    target.innerHTML = '';
+    var freq = (data && data.frequency) || 'weekly';
     var freqLabels = { weekly: 'each Monday', biweekly: 'every other Monday', monthly: 'on the 1st of each month' };
     var nextLabel = freqLabels[freq] || 'each Monday';
-    serverCall().withSuccessHandler(function(data) {
-      target.innerHTML = '';
-      if (!data || !data.questions || data.questions.length === 0) {
-        var empty = el('div', { className: 'empty-state-lg' });
-        empty.appendChild(el('div', { className: 'emoji-lg' }, '🗳️'));
-        var periodWord = freq === 'monthly' ? 'this month' : freq === 'biweekly' ? 'this fortnight' : 'this week';
-        empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No polls ' + periodWord));
-        empty.appendChild(el('div', { className: 'text-sm-muted' }, 'New polls are posted ' + nextLabel + '.'));
-        target.appendChild(empty);
-        return;
-      }
-      target.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 All votes are fully anonymous — your identity is never stored'));
-      data.questions.forEach(function(q) {
-        var qCard = el('div', { className: 'wq-card mb-14' });
-        qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
-        _renderPollVoteUI(qCard, q);
-        target.appendChild(qCard);
-      });
-    }).withFailureHandler(function() {
-      target.innerHTML = '';
-      target.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load polls.'));
-    }).wqGetActiveQuestions(SESSION_TOKEN);
+    if (!data || !data.questions || data.questions.length === 0) {
+      var empty = el('div', { className: 'empty-state-lg' });
+      empty.appendChild(el('div', { className: 'emoji-lg' }, '🗳️'));
+      var periodWord = freq === 'monthly' ? 'this month' : freq === 'biweekly' ? 'this fortnight' : 'this week';
+      empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No polls ' + periodWord));
+      empty.appendChild(el('div', { className: 'text-sm-muted' }, 'New polls are posted ' + nextLabel + '.'));
+      target.appendChild(empty);
+      return;
+    }
+    target.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 All votes are fully anonymous — your identity is never stored'));
+    data.questions.forEach(function(q) {
+      var qCard = el('div', { className: 'wq-card mb-14' });
+      qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+      _renderPollVoteUI(qCard, q);
+      target.appendChild(qCard);
+    });
   }).withFailureHandler(function() {
-    // Frequency load failed — fall back to loading polls anyway
-    serverCall().withSuccessHandler(function(data) {
-      target.innerHTML = '';
-      if (!data || !data.questions || data.questions.length === 0) {
-        target.appendChild(el('div', { className: 'empty-state-13' }, 'No polls this period.'));
-        return;
-      }
-      target.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 All votes are fully anonymous'));
-      data.questions.forEach(function(q) {
-        var qCard = el('div', { className: 'wq-card mb-14' });
-        qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
-        _renderPollVoteUI(qCard, q);
-        target.appendChild(qCard);
-      });
-    }).wqGetActiveQuestions(SESSION_TOKEN);
-  }).wqGetPollFrequency();
+    target.innerHTML = '';
+    target.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load polls.'));
+  }).wqGetPollData(SESSION_TOKEN);
 }
 
 function _renderPastPolls(target) {

@@ -1,224 +1,252 @@
 <script>
+/**
+ * MEMBER HUB TAB — renderMemberHub()
+ * v1.1.0 — 2026-03-22
+ * Union-agnostic. Identical copy goes to SolidBase.
+ *
+ * HOW TO INTEGRATE:
+ *  1. Add <?!= include('member_hub_view') ?> before </body> in index.html
+ *  2. Add <?!= include('member_hub_styles') ?> in index.html <head>
+ *  3. Add <?!= include('auth_manifesto') ?> before </body> in index.html
+ *  4. In index.html member tab routing switch add:
+ *       case 'memberhub': return renderMemberHub;
+ *  5. In index.html member tab nav array (Community group) add:
+ *       { id: 'memberhub', icon: '\u270A', label: 'Member Hub' },
+ *  6. In auth_view.html showAuthChoose():
+ *       - Call injectAuthManifesto(container) at top of function
+ *       - Set wrapper.className = 'auth-glass-card'
+ *       - Append: var qw = el('div', { id: 'auth-quote-wrap', className: 'auth-quote-wrap' });
+ *                 container.appendChild(qw);
+ *
+ * CONTENT ORDER (intentional escalation):
+ *   Hero → Quote 1 → Life Impact → Quote 2 →
+ *   Daily Habits → Quote 3 → Work to Rule → Action Links
+ *
+ * SOLIDBASE: All action link tab keys exist in both repos.
+ *            No DDS-specific logic anywhere in this file.
+ */
 
 function renderMemberHub(appContainer) {
- renderPageLayout(appContainer, 'member', 'memberhub', function(container) {
+  renderPageLayout(appContainer, 'member', 'memberhub', function(container) {
 
- var wrap = el('div', { style: { maxWidth: '860px', margin: '0 auto', padding: '22px 14px 72px' } });
+    var wrap = el('div', { style: { maxWidth: '860px', margin: '0 auto', padding: '22px 14px 72px' } });
 
- 
- var hero = el('div', { className: 'hub-hero fade-in' });
+    // ── HERO ──────────────────────────────────────────────────────────
+    var hero = el('div', { className: 'hub-hero fade-in' });
 
- var liveTag = el('div', { className: 'hub-live-tag' });
- liveTag.appendChild(el('div', { className: 'hub-blink' }));
- liveTag.appendChild(document.createTextNode('\u00A0Your union works 24 / 7'));
- hero.appendChild(liveTag);
+    var liveTag = el('div', { className: 'hub-live-tag' });
+    liveTag.appendChild(el('div', { className: 'hub-blink' }));
+    liveTag.appendChild(document.createTextNode('\u00A0Your union works 24 / 7'));
+    hero.appendChild(liveTag);
 
- var headline = el('div', { className: 'hub-headline' });
- headline.innerHTML = 'Your work doesn\u2019t<br><span class="hub-hl-accent">clock out at 5.</span>';
- hero.appendChild(headline);
+    var headline = el('div', { className: 'hub-headline' });
+    headline.innerHTML = 'Your work doesn\u2019t<br><span class="hub-hl-accent">clock out at 5.</span>';
+    hero.appendChild(headline);
 
- var firstName = (CURRENT_USER && CURRENT_USER.name)
-  ? CURRENT_USER.name.split(' ')[0]
-  : 'Member';
+    var firstName = (CURRENT_USER && CURRENT_USER.name)
+      ? CURRENT_USER.name.split(' ')[0]
+      : 'Member';
 
- var lead = el('p', { className: 'hub-lead' });
- lead.innerHTML =
-  'Welcome, <strong>' + escapeHtml(firstName) + '</strong>. ' +
-  'The decisions made at your workplace don\u2019t stay there. They follow you home. ' +
-  'They shape your <strong>health</strong>, your <strong>family</strong>, your <strong>future</strong>. ' +
-  'That\u2019s why this isn\u2019t just a job \u2014 and that\u2019s why <strong>you</strong> are the union.';
- hero.appendChild(lead);
- wrap.appendChild(hero);
+    var lead = el('p', { className: 'hub-lead' });
+    lead.innerHTML =
+      'Welcome, <strong>' + escapeHtml(firstName) + '</strong>. ' +
+      'The decisions made at your workplace don\u2019t stay there. They follow you home. ' +
+      'They shape your <strong>health</strong>, your <strong>family</strong>, your <strong>future</strong>. ' +
+      'That\u2019s why this isn\u2019t just a job \u2014 and that\u2019s why <strong>you</strong> are the union.';
+    hero.appendChild(lead);
+    wrap.appendChild(hero);
 
- 
- wrap.appendChild(el('div', { id: 'hub-quote-1' }));
+    // ── QUOTE 1 ───────────────────────────────────────────────────────
+    wrap.appendChild(el('div', { id: 'hub-quote-1' }));
 
- 
- wrap.appendChild(_hubSectionHd('How work touches your life'));
+    // ── LIFE IMPACT ───────────────────────────────────────────────────
+    wrap.appendChild(_hubSectionHd('How work touches your life'));
 
- var lifeCards = [
-  { cls:'hlc-fin',  ico:'\uD83D\uDCB0', name:'Financial Security',  tag:'Wages &amp; benefits',
-  body:'Every contract negotiation determines whether you can pay rent, save for emergencies, or take your family on a vacation. Your union is the only reason you have leverage.',
-  pts:['Negotiated wage increases &amp; step pay','Healthcare, dental &amp; vision','Overtime protections','Longevity pay &amp; differentials'] },
-  { cls:'hlc-hlth', ico:'\uD83D\uDEE1\uFE0F', name:'Health &amp; Safety', tag:'Physical &amp; mental',
-  body:'Workplace stress and burnout don\u2019t clock out. They affect your sleep, your health, your relationships. Your union fights to keep you whole.',
-  pts:['Safe working conditions','Mental health &amp; EAP protections','Sick leave &amp; FMLA enforcement','Hostile work environment grievances'] },
-  { cls:'hlc-fam',  ico:'\uD83C\uDFE0', name:'Family &amp; Home',   tag:'Beyond the building',
-  body:'When you\u2019re overworked and underpaid, it shows up at dinner. Your schedule, your energy, your ability to be present \u2014 the union fights for your time back.',
-  pts:['Work-life balance protections','Parental &amp; family leave','Reasonable scheduling','Workload &amp; caseload limits'] },
-  { cls:'hlc-ret',  ico:'\uD83C\uDF05', name:'Retirement',          tag:'Long-term security',
-  body:'The retirement you get is a direct result of fights your union has won \u2014 and the ones you engage in today. Today\u2019s contract is tomorrow\u2019s security.',
-  pts:['Pension protections','Retirement healthcare coverage','Years-of-service credit','Deferred compensation plans'] },
- ];
+    var lifeCards = [
+      { cls:'hlc-fin',  ico:'\uD83D\uDCB0', name:'Financial Security',  tag:'Wages &amp; benefits',
+        body:'Every contract negotiation determines whether you can pay rent, save for emergencies, or take your family on a vacation. Your union is the only reason you have leverage.',
+        pts:['Negotiated wage increases &amp; step pay','Healthcare, dental &amp; vision','Overtime protections','Longevity pay &amp; differentials'] },
+      { cls:'hlc-hlth', ico:'\uD83D\uDEE1\uFE0F', name:'Health &amp; Safety', tag:'Physical &amp; mental',
+        body:'Workplace stress and burnout don\u2019t clock out. They affect your sleep, your health, your relationships. Your union fights to keep you whole.',
+        pts:['Safe working conditions','Mental health &amp; EAP protections','Sick leave &amp; FMLA enforcement','Hostile work environment grievances'] },
+      { cls:'hlc-fam',  ico:'\uD83C\uDFE0', name:'Family &amp; Home',   tag:'Beyond the building',
+        body:'When you\u2019re overworked and underpaid, it shows up at dinner. Your schedule, your energy, your ability to be present \u2014 the union fights for your time back.',
+        pts:['Work-life balance protections','Parental &amp; family leave','Reasonable scheduling','Workload &amp; caseload limits'] },
+      { cls:'hlc-ret',  ico:'\uD83C\uDF05', name:'Retirement',          tag:'Long-term security',
+        body:'The retirement you get is a direct result of fights your union has won \u2014 and the ones you engage in today. Today\u2019s contract is tomorrow\u2019s security.',
+        pts:['Pension protections','Retirement healthcare coverage','Years-of-service credit','Deferred compensation plans'] },
+    ];
 
- var lifeGrid = el('div', { className: 'hub-life-grid' });
- lifeCards.forEach(function(c) {
-  var card = el('div', { className: 'hub-life-card ' + c.cls, onClick: function() { _hlcToggle(card); } });
-  var hd = el('div', { className: 'hlc-hd' });
-  var ico = el('div', { className: 'hlc-ico' }); ico.innerHTML = c.ico; hd.appendChild(ico);
-  var hdT = el('div');
-  hdT.appendChild(el('div', { className: 'hlc-name' }, c.name));
-  var tagEl = el('div', { className: 'hlc-tag' }); tagEl.innerHTML = c.tag; hdT.appendChild(tagEl);
-  hd.appendChild(hdT); card.appendChild(hd);
-  var body = el('div', { className: 'hlc-body' });
-  body.appendChild(el('p', { style:{marginBottom:'6px'} }, c.body));
-  var pts = el('ul', { className: 'hlc-pts' });
-  c.pts.forEach(function(p) { var li = el('li'); li.innerHTML = p; pts.appendChild(li); });
-  body.appendChild(pts); card.appendChild(body);
-  card.appendChild(el('div', { className: 'hlc-hint' }, 'Tap to expand'));
-  lifeGrid.appendChild(card);
- });
- wrap.appendChild(lifeGrid);
+    var lifeGrid = el('div', { className: 'hub-life-grid' });
+    lifeCards.forEach(function(c) {
+      var card = el('div', { className: 'hub-life-card ' + c.cls, onClick: function() { _hlcToggle(card); } });
+      var hd = el('div', { className: 'hlc-hd' });
+      var ico = el('div', { className: 'hlc-ico' }); ico.innerHTML = c.ico; hd.appendChild(ico);
+      var hdT = el('div');
+      hdT.appendChild(el('div', { className: 'hlc-name' }, c.name));
+      var tagEl = el('div', { className: 'hlc-tag' }); tagEl.innerHTML = c.tag; hdT.appendChild(tagEl);
+      hd.appendChild(hdT); card.appendChild(hd);
+      var body = el('div', { className: 'hlc-body' });
+      body.appendChild(el('p', { style:{marginBottom:'6px'} }, c.body));
+      var pts = el('ul', { className: 'hlc-pts' });
+      c.pts.forEach(function(p) { var li = el('li'); li.innerHTML = p; pts.appendChild(li); });
+      body.appendChild(pts); card.appendChild(body);
+      card.appendChild(el('div', { className: 'hlc-hint' }, 'Tap to expand'));
+      lifeGrid.appendChild(card);
+    });
+    wrap.appendChild(lifeGrid);
 
- 
- wrap.appendChild(el('div', { id: 'hub-quote-2' }));
+    // ── QUOTE 2 ───────────────────────────────────────────────────────
+    wrap.appendChild(el('div', { id: 'hub-quote-2' }));
 
- 
- wrap.appendChild(_hubSectionHd('Protect yourself daily'));
+    // ── DAILY HABITS ──────────────────────────────────────────────────
+    wrap.appendChild(_hubSectionHd('Protect yourself daily'));
 
- var habits = [
-  { cls:'hhc-clock',  ico:'\u23F1\uFE0F', name:'Clock out on time',         rule:'Every. Single. Day.',
-  body:'Staying late unpaid signals your time is free. It normalizes overwork and creates unofficial expectations. Your schedule is part of your contract \u2014 honor it.' },
-  { cls:'hhc-meal',   ico:'\uD83C\uDF7D\uFE0F', name:'Take your meal break', rule:'Every minute of it',
-  body:'Meal periods are a legal right, not a favor. Skipping them erodes protections for everyone. Eat away from your desk. Log it if your contract requires.' },
-  { cls:'hhc-break',  ico:'\u2615', name:'Take every break',              rule:'Don\u2019t give it back',
-  body:'Rest breaks were bargained for. Not taking them gives back a hard-won right. Take them even when it feels inconvenient. Every time.' },
-  { cls:'hhc-ot',     ico:'\uD83D\uDEAB', name:'Decline OT when you can',  rule:'Know your right to say no', warn:'Check your contract first' },
-  { cls:'hhc-fund',   ico:'\uD83C\uDFE6', name:'Build an emergency fund',  rule:'Start: one week\u2019s pay',
-  body:'Financial pressure is management\u2019s greatest leverage. When you can\u2019t afford to miss a check, you\u2019re less likely to file grievances or support collective action.' },
-  { cls:'hhc-vac',    ico:'\uD83C\uDF34', name:'Hold vacation time',       rule:'Don\u2019t burn it all early',
-  body:'Accrued leave is a financial asset and a strategic buffer. Hold some back for the unexpected. Burning it all early leaves you vulnerable the rest of the year.' },
-  { cls:'hhc-sick',   ico:'\uD83E\uDD12', name:'Bank some sick time',      rule:'Use it. Keep a reserve.',
-  body:'Illness is unpredictable. Draining your sick bank early turns a serious illness into a financial crisis. Use it when sick \u2014 but maintain a buffer.' },
-  { cls:'hhc-offclk', ico:'\uD83D\uDD34', name:'Never work off the clock', rule:'Not ever. Not once.', warn:'Document it \u2014 it\u2019s grievable' },
- ];
+    var habits = [
+      { cls:'hhc-clock',  ico:'\u23F1\uFE0F', name:'Clock out on time',         rule:'Every. Single. Day.',
+        body:'Staying late unpaid signals your time is free. It normalizes overwork and creates unofficial expectations. Your schedule is part of your contract \u2014 honor it.' },
+      { cls:'hhc-meal',   ico:'\uD83C\uDF7D\uFE0F', name:'Take your meal break', rule:'Every minute of it',
+        body:'Meal periods are a legal right, not a favor. Skipping them erodes protections for everyone. Eat away from your desk. Log it if your contract requires.' },
+      { cls:'hhc-break',  ico:'\u2615', name:'Take every break',              rule:'Don\u2019t give it back',
+        body:'Rest breaks were bargained for. Not taking them gives back a hard-won right. Take them even when it feels inconvenient. Every time.' },
+      { cls:'hhc-ot',     ico:'\uD83D\uDEAB', name:'Decline OT when you can',  rule:'Know your right to say no', warn:'Check your contract first' },
+      { cls:'hhc-fund',   ico:'\uD83C\uDFE6', name:'Build an emergency fund',  rule:'Start: one week\u2019s pay',
+        body:'Financial pressure is management\u2019s greatest leverage. When you can\u2019t afford to miss a check, you\u2019re less likely to file grievances or support collective action.' },
+      { cls:'hhc-vac',    ico:'\uD83C\uDF34', name:'Hold vacation time',       rule:'Don\u2019t burn it all early',
+        body:'Accrued leave is a financial asset and a strategic buffer. Hold some back for the unexpected. Burning it all early leaves you vulnerable the rest of the year.' },
+      { cls:'hhc-sick',   ico:'\uD83E\uDD12', name:'Bank some sick time',      rule:'Use it. Keep a reserve.',
+        body:'Illness is unpredictable. Draining your sick bank early turns a serious illness into a financial crisis. Use it when sick \u2014 but maintain a buffer.' },
+      { cls:'hhc-offclk', ico:'\uD83D\uDD34', name:'Never work off the clock', rule:'Not ever. Not once.', warn:'Document it \u2014 it\u2019s grievable' },
+    ];
 
- 
- habits[3].body = 'Chronic OT means management avoids hiring. Every hour you absorb delays a job posting. Know your contract limits.';
- habits[7].body = 'Emails before you clock in. Paperwork after. Texts on your day off. These are wage theft \u2014 from you. Document every instance. If work is happening, the clock is running.';
+    // Bodies for ot and offclk (set here to keep data clean above)
+    habits[3].body = 'Chronic OT means management avoids hiring. Every hour you absorb delays a job posting. Know your contract limits.';
+    habits[7].body = 'Emails before you clock in. Paperwork after. Texts on your day off. These are wage theft \u2014 from you. Document every instance. If work is happening, the clock is running.';
 
- var habitsGrid = el('div', { className: 'hub-habits-grid' });
- habits.forEach(function(h) {
-  var card = el('div', { className: 'hub-habit-card ' + h.cls, onClick: function() { _hhcToggle(card); } });
-  var hd = el('div', { className: 'hhc-hd' });
-  var ico = el('div', { className: 'hhc-ico' }); ico.innerHTML = h.ico; hd.appendChild(ico);
-  var hdR = el('div');
-  hdR.appendChild(el('div', { className: 'hhc-name' }, h.name));
-  hdR.appendChild(el('div', { className: 'hhc-rule' }, h.rule));
-  hd.appendChild(hdR); card.appendChild(hd);
-  var body = el('div', { className: 'hhc-body' });
-  body.appendChild(el('p', {}, h.body));
-  if (h.warn) {
-  var w = el('div', { className: 'hhc-warn' });
-  w.textContent = '\u26A0\uFE0F ' + h.warn;
-  body.appendChild(w);
-  }
-  card.appendChild(body);
-  habitsGrid.appendChild(card);
- });
- wrap.appendChild(habitsGrid);
+    var habitsGrid = el('div', { className: 'hub-habits-grid' });
+    habits.forEach(function(h) {
+      var card = el('div', { className: 'hub-habit-card ' + h.cls, onClick: function() { _hhcToggle(card); } });
+      var hd = el('div', { className: 'hhc-hd' });
+      var ico = el('div', { className: 'hhc-ico' }); ico.innerHTML = h.ico; hd.appendChild(ico);
+      var hdR = el('div');
+      hdR.appendChild(el('div', { className: 'hhc-name' }, h.name));
+      hdR.appendChild(el('div', { className: 'hhc-rule' }, h.rule));
+      hd.appendChild(hdR); card.appendChild(hd);
+      var body = el('div', { className: 'hhc-body' });
+      body.appendChild(el('p', {}, h.body));
+      if (h.warn) {
+        var w = el('div', { className: 'hhc-warn' });
+        w.textContent = '\u26A0\uFE0F ' + h.warn;
+        body.appendChild(w);
+      }
+      card.appendChild(body);
+      habitsGrid.appendChild(card);
+    });
+    wrap.appendChild(habitsGrid);
 
- 
- wrap.appendChild(el('div', { id: 'hub-quote-3' }));
+    // ── QUOTE 3 ───────────────────────────────────────────────────────
+    wrap.appendChild(el('div', { id: 'hub-quote-3' }));
 
- 
- wrap.appendChild(_hubSectionHd('Take it further \u2014 collectively'));
+    // ── WORK TO RULE (escalation after habits) ────────────────────────
+    wrap.appendChild(_hubSectionHd('Take it further \u2014 collectively'));
 
- var wtrStrip = el('div', { className: 'hub-wtr-strip', onClick: function() { wtrStrip.classList.toggle('hub-wtr-open'); } });
+    var wtrStrip = el('div', { className: 'hub-wtr-strip', onClick: function() { wtrStrip.classList.toggle('hub-wtr-open'); } });
 
- var wtrHd = el('div', { className: 'hub-wtr-hd' });
- var wtrLeft = el('div', { className: 'hub-wtr-left' });
- var wtrIco = el('div', { className: 'hub-wtr-ico' }); wtrIco.textContent = '\u2696\uFE0F'; wtrLeft.appendChild(wtrIco);
- var wtrTitles = el('div');
- wtrTitles.appendChild(el('div', { className: 'hub-wtr-title' }, 'Work to Rule'));
- wtrTitles.appendChild(el('div', { className: 'hub-wtr-subtitle' }, 'The most powerful tool you already have'));
- wtrLeft.appendChild(wtrTitles); wtrHd.appendChild(wtrLeft);
- var wtrBadge = el('div', { className: 'hub-wtr-badge' }); wtrBadge.textContent = 'Tap to learn'; wtrHd.appendChild(wtrBadge);
- wtrStrip.appendChild(wtrHd);
+    var wtrHd = el('div', { className: 'hub-wtr-hd' });
+    var wtrLeft = el('div', { className: 'hub-wtr-left' });
+    var wtrIco = el('div', { className: 'hub-wtr-ico' }); wtrIco.textContent = '\u2696\uFE0F'; wtrLeft.appendChild(wtrIco);
+    var wtrTitles = el('div');
+    wtrTitles.appendChild(el('div', { className: 'hub-wtr-title' }, 'Work to Rule'));
+    wtrTitles.appendChild(el('div', { className: 'hub-wtr-subtitle' }, 'The most powerful tool you already have'));
+    wtrLeft.appendChild(wtrTitles); wtrHd.appendChild(wtrLeft);
+    var wtrBadge = el('div', { className: 'hub-wtr-badge' }); wtrBadge.textContent = 'Tap to learn'; wtrHd.appendChild(wtrBadge);
+    wtrStrip.appendChild(wtrHd);
 
- var wtrBody = el('div', { className: 'hub-wtr-body' });
+    var wtrBody = el('div', { className: 'hub-wtr-body' });
 
- var intro = el('p', { className: 'hub-wtr-intro' });
- intro.textContent = 'Those daily habits above? When every member does them together \u2014 on purpose, in solidarity \u2014 that becomes Work to Rule. Doing your job exactly as written. Nothing more, nothing less. No informal favors. No unpaid workarounds.';
- wtrBody.appendChild(intro);
+    var intro = el('p', { className: 'hub-wtr-intro' });
+    intro.textContent = 'Those daily habits above? When every member does them together \u2014 on purpose, in solidarity \u2014 that becomes Work to Rule. Doing your job exactly as written. Nothing more, nothing less. No informal favors. No unpaid workarounds.';
+    wtrBody.appendChild(intro);
 
- var subNote = el('p', { className: 'hub-wtr-sub-note' });
- subNote.textContent = 'It requires no strike, no vote, and no formal action. It is completely legal. When workers do it collectively, it is extraordinarily effective \u2014 because most workplaces run on the informal extra labor workers donate for free every single day.';
- wtrBody.appendChild(subNote);
+    var subNote = el('p', { className: 'hub-wtr-sub-note' });
+    subNote.textContent = 'It requires no strike, no vote, and no formal action. It is completely legal. When workers do it collectively, it is extraordinarily effective \u2014 because most workplaces run on the informal extra labor workers donate for free every single day.';
+    wtrBody.appendChild(subNote);
 
- var principles = [
-  { n:'1', title:'Do exactly what your job description says', body:'Not one task beyond it. If it isn\u2019t written, it isn\u2019t your responsibility until it\u2019s negotiated.' },
-  { n:'2', title:'Follow every procedure to the letter', body:'Every safety check. Every form. Every approval chain. Done correctly, every time. This is your right \u2014 and your leverage.' },
-  { n:'3', title:'Clock out at your exact scheduled time', body:'Not five minutes late. Not \u201Cjust to finish this.\u201D When your time is up, it\u2019s up. Every time, without exception.' },
-  { n:'4', title:'Take every break and meal period in full', body:'Stop mid-task if necessary. The work will be there when you return. Your rest is non-negotiable.' },
-  { n:'5', title:'Make no informal agreements with management', body:'Verbal promises and side arrangements aren\u2019t in your contract. Decline politely and redirect to your steward.' },
- ];
+    var principles = [
+      { n:'1', title:'Do exactly what your job description says', body:'Not one task beyond it. If it isn\u2019t written, it isn\u2019t your responsibility until it\u2019s negotiated.' },
+      { n:'2', title:'Follow every procedure to the letter', body:'Every safety check. Every form. Every approval chain. Done correctly, every time. This is your right \u2014 and your leverage.' },
+      { n:'3', title:'Clock out at your exact scheduled time', body:'Not five minutes late. Not \u201Cjust to finish this.\u201D When your time is up, it\u2019s up. Every time, without exception.' },
+      { n:'4', title:'Take every break and meal period in full', body:'Stop mid-task if necessary. The work will be there when you return. Your rest is non-negotiable.' },
+      { n:'5', title:'Make no informal agreements with management', body:'Verbal promises and side arrangements aren\u2019t in your contract. Decline politely and redirect to your steward.' },
+    ];
 
- var ul = el('ul', { className: 'hub-wtr-principles' });
- principles.forEach(function(p) {
-  var li = el('li');
-  var num = el('div', { className: 'hub-wtr-num' }, p.n); li.appendChild(num);
-  var txt = el('div');
-  var strong = el('strong'); strong.textContent = p.title; txt.appendChild(strong);
-  txt.appendChild(document.createTextNode(' ' + p.body));
-  li.appendChild(txt); ul.appendChild(li);
- });
- wtrBody.appendChild(ul);
+    var ul = el('ul', { className: 'hub-wtr-principles' });
+    principles.forEach(function(p) {
+      var li = el('li');
+      var num = el('div', { className: 'hub-wtr-num' }, p.n); li.appendChild(num);
+      var txt = el('div');
+      var strong = el('strong'); strong.textContent = p.title; txt.appendChild(strong);
+      txt.appendChild(document.createTextNode(' ' + p.body));
+      li.appendChild(txt); ul.appendChild(li);
+    });
+    wtrBody.appendChild(ul);
 
- var note = el('div', { className: 'hub-wtr-note' });
- note.innerHTML = '\uD83D\uDCA1 <strong>Why it works:</strong> Management depends on workers going above and beyond \u2014 unpaid. When that stops collectively, operations slow. No one crosses a picket line. No one loses pay. The contract becomes the floor, not the ceiling.';
- wtrBody.appendChild(note);
- wtrStrip.appendChild(wtrBody);
- wrap.appendChild(wtrStrip);
+    var note = el('div', { className: 'hub-wtr-note' });
+    note.innerHTML = '\uD83D\uDCA1 <strong>Why it works:</strong> Management depends on workers going above and beyond \u2014 unpaid. When that stops collectively, operations slow. No one crosses a picket line. No one loses pay. The contract becomes the floor, not the ceiling.';
+    wtrBody.appendChild(note);
+    wtrStrip.appendChild(wtrBody);
+    wrap.appendChild(wtrStrip);
 
- 
- wrap.appendChild(_hubSectionHd('Take action now'));
+    // ── ACTION LINKS ──────────────────────────────────────────────────
+    wrap.appendChild(_hubSectionHd('Take action now'));
 
- var actionLinks = [
-  { cls:'hal-meetings', ico:'\uD83D\uDCC5', name:'Calendar',        desc:'Meetings &amp; key dates',       tab:'meetings'        },
-  { cls:'hal-events',   ico:'\uD83D\uDCE3', name:'Events',          desc:'Rallies, trainings &amp; actions',tab:'events'          },
-  { cls:'hal-polls',    ico:'\uD83D\uDDF3\uFE0F', name:'Polling',   desc:'Have your say on union matters', tab:'polls'           },
-  { cls:'hal-stats',    ico:'\uD83D\uDCC8', name:'Insights',        desc:'Grievance trends &amp; stats',    tab:'unionstats'      },
-  { cls:'hal-steward',  ico:'\uD83E\uDD1D', name:'Contact Steward', desc:'Reach your steward directly',    tab:'stewarddirectory'},
- ];
+    var actionLinks = [
+      { cls:'hal-meetings', ico:'\uD83D\uDCC5', name:'Calendar',        desc:'Meetings &amp; key dates',       tab:'meetings'        },
+      { cls:'hal-events',   ico:'\uD83D\uDCE3', name:'Events',          desc:'Rallies, trainings &amp; actions',tab:'events'          },
+      { cls:'hal-polls',    ico:'\uD83D\uDDF3\uFE0F', name:'Polling',   desc:'Have your say on union matters', tab:'polls'           },
+      { cls:'hal-stats',    ico:'\uD83D\uDCC8', name:'Insights',        desc:'Grievance trends &amp; stats',    tab:'unionstats'      },
+      { cls:'hal-steward',  ico:'\uD83E\uDD1D', name:'Contact Steward', desc:'Reach your steward directly',    tab:'stewarddirectory'},
+    ];
 
- var actionGrid = el('div', { className: 'hub-action-grid' });
- actionLinks.forEach(function(a) {
-  var link = el('div', {
-  className: 'hub-action-link ' + a.cls,
-  role: 'button', tabIndex: 0,
-  onClick: function() { _handleTabNav('member', a.tab); }
+    var actionGrid = el('div', { className: 'hub-action-grid' });
+    actionLinks.forEach(function(a) {
+      var link = el('div', {
+        className: 'hub-action-link ' + a.cls,
+        role: 'button', tabIndex: 0,
+        onClick: function() { _handleTabNav('member', a.tab); }
+      });
+      var icoBox = el('div', { className: 'hal-ico' }); icoBox.innerHTML = a.ico; link.appendChild(icoBox);
+      link.appendChild(el('div', { className: 'hal-name' }, a.name));
+      var desc = el('div', { className: 'hal-desc' }); desc.innerHTML = a.desc; link.appendChild(desc);
+      actionGrid.appendChild(link);
+    });
+    wrap.appendChild(actionGrid);
+    container.appendChild(wrap);
+
+    // Render inline quotes after DOM settle
+    if (typeof renderHubInlineQuotes === 'function') {
+      setTimeout(renderHubInlineQuotes, 0);
+    }
   });
-  var icoBox = el('div', { className: 'hal-ico' }); icoBox.innerHTML = a.ico; link.appendChild(icoBox);
-  link.appendChild(el('div', { className: 'hal-name' }, a.name));
-  var desc = el('div', { className: 'hal-desc' }); desc.innerHTML = a.desc; link.appendChild(desc);
-  actionGrid.appendChild(link);
- });
- wrap.appendChild(actionGrid);
- container.appendChild(wrap);
-
- 
- if (typeof renderHubInlineQuotes === 'function') {
-  setTimeout(renderHubInlineQuotes, 0);
- }
- });
 }
 
+// ── CARD TOGGLE HELPERS ───────────────────────────────────────────────
 function _hlcToggle(card) {
- var was = card.classList.contains('hlc-open');
- document.querySelectorAll('.hub-life-card').forEach(function(c) { c.classList.remove('hlc-open'); });
- if (!was) card.classList.add('hlc-open');
+  var was = card.classList.contains('hlc-open');
+  document.querySelectorAll('.hub-life-card').forEach(function(c) { c.classList.remove('hlc-open'); });
+  if (!was) card.classList.add('hlc-open');
 }
 function _hhcToggle(card) {
- var was = card.classList.contains('hhc-open');
- document.querySelectorAll('.hub-habit-card').forEach(function(c) { c.classList.remove('hhc-open'); });
- if (!was) card.classList.add('hhc-open');
+  var was = card.classList.contains('hhc-open');
+  document.querySelectorAll('.hub-habit-card').forEach(function(c) { c.classList.remove('hhc-open'); });
+  if (!was) card.classList.add('hhc-open');
 }
 
+// ── SECTION HEADER BUILDER ────────────────────────────────────────────
 function _hubSectionHd(label) {
- var hd = el('div', { className: 'hub-section-hd', style: { margin: '28px 0 14px' } });
- hd.appendChild(el('span', { className: 'hub-section-hd-text' }, label));
- hd.appendChild(el('div', { className: 'hub-section-hd-line' }));
- return hd;
+  var hd = el('div', { className: 'hub-section-hd', style: { margin: '28px 0 14px' } });
+  hd.appendChild(el('span', { className: 'hub-section-hd-text' }, label));
+  hd.appendChild(el('div', { className: 'hub-section-hd-line' }));
+  return hd;
 }
 </script>

@@ -4,7 +4,286 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grievance Form</title>
-<style> *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#a0a8b4;font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;color:#000;padding:clamp(4px,2vw,1rem) clamp(4px,2vw,1rem) 3rem}.toolbar{max-width:min(8.5in,100%);margin:0 auto .5rem;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#1a2e47;padding:6px 10px;border-radius:3px}.toolbar span{color:rgba(255,255,255,.5);font-size:11px;margin-right:auto;font-family:Arial,sans-serif;flex:1 1 auto}.tbtn{font-size:11px;padding:4px 12px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:2px;cursor:pointer;font-family:Arial,sans-serif;flex:1 1 auto;text-align:center}.tbtn:hover{background:rgba(255,255,255,.1)}.tbtn.go{background:#c0392b;border-color:#c0392b}.tbtn.go:hover{background:#a93226}#toast{position:fixed;bottom:1rem;right:1rem;background:#1a2e47;color:#fff;font-family:Arial,sans-serif;font-size:11px;padding:7px 14px;border-radius:3px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99}#toast.on{opacity:1}.pdf-help{max-width:min(8.5in,100%);margin:0 auto 6px;display:flex;align-items:flex-start;gap:8px;background:#1a3a5c;color:#dce8f8;font-family:Arial,sans-serif;font-size:11.5px;line-height:1.45;padding:7px 10px 7px 9px;border-radius:3px}.pdf-help-icon{font-size:14px;flex-shrink:0;margin-top:1px}.pdf-help span:last-of-type{flex:1}.pdf-help strong{color:#fff}.pdf-help-close{flex-shrink:0;background:none;border:none;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;padding:0 2px;line-height:1;margin-top:1px}.pdf-help-close:hover{color:#fff}.page{background:#fff;width:min(8.5in,100%);min-height:11in;margin:0 auto;padding:clamp(10px,3%,.45in) clamp(10px,4%,.45in) clamp(10px,3%,.45in);box-shadow:0 3px 18px rgba(0,0,0,.3)}.fi{background:#cdd8f0;border:1px solid #7a90cc;font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;padding:1px 4px;outline:none;display:inline-block;vertical-align:middle;height:20px;min-width:0}.fi:focus{background:#b8caf5;border-color:#2244aa}select.fi{cursor:pointer;height:22px;padding:1px 2px}textarea.fi{resize:none;overflow:hidden;display:block;width:100%;vertical-align:top;line-height:1.55;padding:3px 4px;height:38px}.irow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-bottom:5pt}.irow .lbl{flex:0 0 auto}.irow .fi{flex:1 1 140px;min-width:0}.lbl{font-size:10pt;font-weight:bold;white-space:nowrap}.shead{font-size:10.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:.02em;margin-bottom:4pt}.whead{font-size:10.5pt;font-weight:bold;text-transform:uppercase;text-align:center;letter-spacing:.02em;line-height:1.4;margin-bottom:5pt}.thick{border:none;border-top:2.5px solid #000;margin:10pt 0 8pt}.sign-here-wrap{display:flex;flex-direction:column;align-items:center;width:fit-content}.sign-here{display:inline-block;background:#c0392b;color:#fff;font-size:7pt;font-weight:bold;letter-spacing:.05em;padding:2px 8px;border-radius:2px;white-space:nowrap;line-height:1.5}.sign-arrow{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:7px solid #c0392b}.sig-row{display:grid;grid-template-columns:2fr minmax(70px,90px) 2fr minmax(70px,90px);gap:0 8px}.sig-col{display:flex;flex-direction:column}.sig-box{background:#cdd8f0;border:1px solid #7a90cc;height:28px;display:block;width:100%}.sig-lbl{font-size:8.5pt;margin-top:2px}.arrows-row{display:grid;grid-template-columns:2fr minmax(70px,90px) 2fr minmax(70px,90px);gap:0 8px;margin-top:10pt;margin-bottom:3px}.sig-date{box-sizing:border-box}.fi.date-err{border-color:#c0392b!important;background:#fde8e8!important}.date-msg{font-size:9pt;color:#c0392b;margin-top:2px;display:none}.date-msg.on{display:block}#agency[readonly]{opacity:.75;cursor:default}#workloc[readonly]{opacity:.85;cursor:default;font-style:italic}@media (max-width:640px){body{padding:0 0 2rem}.toolbar{border-radius:0;flex-wrap:wrap;gap:4px;padding:6px 8px}.tbtn{padding:10px 8px;font-size:13px;flex:1 1 auto}.pdf-help{border-radius:0;font-size:11px}.page{padding:12px 12px 28px;box-shadow:none;border-radius:0}.hdr img{display:none!important}.hdr-mid > div:first-child{display:none!important}.hdr{gap:4px!important;margin-bottom:8pt!important}.hdr-mid{min-height:unset!important}.hdr-step{width:100%!important;text-align:left!important;margin-right:0!important;display:flex;gap:12px;flex-wrap:wrap;align-items:center}.hdr-step > div{margin-bottom:0!important}#waiver-sections{display:none!important}.irow{display:grid!important;grid-template-columns:auto 1fr!important;align-items:center!important;column-gap:10px!important;row-gap:10px!important;margin-bottom:14px!important}.irow .lbl{grid-column:1!important;text-align:right!important;white-space:nowrap!important;font-size:9.5pt!important;margin-left:0!important}.irow .fi{grid-column:2!important;width:100%!important;max-width:100%!important;flex:none!important;height:44px!important;font-size:16px!important;padding:4px 10px!important;box-sizing:border-box!important}select.fi{height:44px!important;font-size:16px!important}textarea.fi{grid-column:1 / -1!important;height:90px!important;min-height:90px!important;font-size:16px!important;resize:vertical!important}#step.fi{width:70px!important}#articles{width:100%!important;max-width:100%!important;height:44px!important;font-size:16px!important;display:block!important;margin-top:6px!important}.shead,.whead{font-size:11pt;margin-top:14pt!important}.sig-row,.arrows-row{grid-template-columns:1fr minmax(90px,110px)!important;gap:0 6px!important}.sig-date{width:100%!important;height:44px!important;font-size:13px!important;padding:4px 3px!important}.sig-box{height:44px!important}}@media (hover:none) and (pointer:coarse){.fi{font-size:16px!important}select.fi{font-size:16px!important}textarea.fi{font-size:16px!important}}@media print{body{background:none;padding:0}.toolbar,#toast,.sign-here-wrap,.pdf-help{display:none!important}.page{box-shadow:none;margin:0;width:100%;min-height:auto}.fi,.sig-box,.sig-date{background:#dce6ff!important;border:1px solid #7a90cc!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:letter;margin:0}}body.dark{background:#000}body.dark .toolbar{background:#000;border-bottom:1px solid #222}body.dark .pdf-help{background:#0a1a2a;color:#b8cce0}body.dark .pdf-help strong{color:#e8f0f8}body.dark .page{background:#0d0d0d;color:#e8e8e8;box-shadow:0 0 0 1px #1a1a1a}body.dark .fi{background:#000;border-color:#3a3a3a;color:#f0f0f0}body.dark .fi:focus{background:#0a0a0a;border-color:#777;outline:none}body.dark select.fi{background:#000;color:#f0f0f0}body.dark textarea.fi{background:#000;color:#f0f0f0}body.dark .fi.date-err{border-color:#e74c3c!important;background:#2a0a0a!important}body.dark .date-msg{color:#e88}body.dark .lbl{color:#d0d0d0}body.dark strong{color:#e8e8e8}body.dark .shead{color:#e8e8e8}body.dark .whead{color:#a0a0a0}body.dark .thick{border-top-color:#333}body.dark .sig-box{background:#000;border-color:#3a3a3a}body.dark .sig-lbl{color:#888}body.dark .page div,body.dark .page span:not(.lbl):not(.sign-here){color:#e8e8e8}body.dark .toolbar span{color:rgba(255,255,255,.4)}body.dark .tbtn{border-color:rgba(255,255,255,.2);color:#e8e8e8}body.dark .tbtn:hover{background:rgba(255,255,255,.07)}body.dark .tbtn.go{background:#8b0000;border-color:#8b0000}body.dark .tbtn.go:hover{background:#a00000}@media print{body.dark .page{background:#fff!important;color:#000!important}body.dark .fi{background:#cdd8f0!important;border-color:#7a90cc!important;color:#000!important}}</style>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  background:#a0a8b4;
+  font-family:Arial,Helvetica,sans-serif;
+  font-size:10.5pt;
+  color:#000;
+  padding:clamp(4px, 2vw, 1rem) clamp(4px, 2vw, 1rem) 3rem;
+}
+
+/* ── TOOLBAR ── */
+.toolbar{
+  max-width:min(8.5in, 100%);
+  margin:0 auto .5rem;
+  display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  background:#1a2e47;padding:6px 10px;border-radius:3px;
+}
+.toolbar span{color:rgba(255,255,255,.5);font-size:11px;margin-right:auto;font-family:Arial,sans-serif;flex:1 1 auto;}
+.tbtn{
+  font-size:11px;padding:4px 12px;
+  border:1px solid rgba(255,255,255,.35);
+  background:transparent;color:#fff;border-radius:2px;cursor:pointer;
+  font-family:Arial,sans-serif;
+  /* touch-friendly — grows when toolbar is narrow */
+  flex:1 1 auto;text-align:center;
+}
+.tbtn:hover{background:rgba(255,255,255,.1);}
+.tbtn.go{background:#c0392b;border-color:#c0392b;}
+.tbtn.go:hover{background:#a93226;}
+#toast{position:fixed;bottom:1rem;right:1rem;background:#1a2e47;color:#fff;
+  font-family:Arial,sans-serif;font-size:11px;padding:7px 14px;border-radius:3px;
+  opacity:0;transition:opacity .2s;pointer-events:none;z-index:99;}
+#toast.on{opacity:1;}
+
+/* ── PDF HELP BAR ── */
+.pdf-help{
+  max-width:min(8.5in, 100%);margin:0 auto 6px;
+  display:flex;align-items:flex-start;gap:8px;
+  background:#1a3a5c;color:#dce8f8;
+  font-family:Arial,sans-serif;font-size:11.5px;line-height:1.45;
+  padding:7px 10px 7px 9px;border-radius:3px;
+}
+.pdf-help-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.pdf-help span:last-of-type{flex:1;}
+.pdf-help strong{color:#fff;}
+.pdf-help-close{
+  flex-shrink:0;background:none;border:none;color:rgba(255,255,255,.5);
+  font-size:13px;cursor:pointer;padding:0 2px;line-height:1;margin-top:1px;
+}
+.pdf-help-close:hover{color:#fff;}
+
+/* ── PAGE — fluid width, caps at letter size ── */
+.page{
+  background:#fff;
+  width:min(8.5in, 100%);   /* fluid: shrinks with viewport */
+  min-height:11in;
+  margin:0 auto;
+  padding:clamp(10px, 3%, .45in) clamp(10px, 4%, .45in) clamp(10px, 3%, .45in);
+  box-shadow:0 3px 18px rgba(0,0,0,.3);
+}
+
+/* ── FIELDS ── */
+.fi{
+  background:#cdd8f0;
+  border:1px solid #7a90cc;
+  font-family:Arial,Helvetica,sans-serif;
+  font-size:10pt;
+  color:#000;
+  padding:1px 4px;
+  outline:none;
+  display:inline-block;
+  vertical-align:middle;
+  height:20px;
+  min-width:0;
+}
+.fi:focus{background:#b8caf5;border-color:#2244aa;}
+select.fi{cursor:pointer;height:22px;padding:1px 2px;}
+textarea.fi{
+  resize:none;overflow:hidden;
+  display:block;width:100%;
+  vertical-align:top;line-height:1.55;
+  padding:3px 4px;
+  height:38px;
+}
+
+/* ── irow — FLUID: wraps naturally at any width ── */
+.irow{
+  display:flex;
+  flex-wrap:wrap;          /* KEY: wraps at any viewport, no breakpoint needed */
+  align-items:center;
+  gap:4px 8px;
+  margin-bottom:5pt;
+}
+.irow .lbl{flex:0 0 auto;}  /* labels don't stretch */
+.irow .fi{
+  flex:1 1 140px;           /* grows freely; wraps when < 140px available */
+  min-width:0;
+}
+
+/* ── LABELS ── */
+.lbl{font-size:10pt;font-weight:bold;white-space:nowrap;}
+
+/* ── SECTION HEADS ── */
+.shead{font-size:10.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:.02em;margin-bottom:4pt;}
+.whead{font-size:10.5pt;font-weight:bold;text-transform:uppercase;
+  text-align:center;letter-spacing:.02em;line-height:1.4;margin-bottom:5pt;}
+
+/* ── DIVIDER ── */
+.thick{border:none;border-top:2.5px solid #000;margin:10pt 0 8pt;}
+
+/* ── SIGN HERE ── */
+.sign-here-wrap{display:flex;flex-direction:column;align-items:center;width:fit-content;}
+.sign-here{display:inline-block;background:#c0392b;color:#fff;font-size:7pt;font-weight:bold;
+  letter-spacing:.05em;padding:2px 8px;border-radius:2px;white-space:nowrap;line-height:1.5;}
+.sign-arrow{width:0;height:0;border-left:6px solid transparent;
+  border-right:6px solid transparent;border-top:7px solid #c0392b;}
+
+/* ── SIG ROW — fluid: 4 cols on wide, 2 on narrow ── */
+.sig-row{
+  display:grid;
+  /* minmax lets date column shrink; 2fr gives sig box the space */
+  grid-template-columns:2fr minmax(70px,90px) 2fr minmax(70px,90px);
+  gap:0 8px;
+}
+.sig-col{display:flex;flex-direction:column;}
+.sig-box{background:#cdd8f0;border:1px solid #7a90cc;height:28px;display:block;width:100%;}
+.sig-lbl{font-size:8.5pt;margin-top:2px;}
+
+.arrows-row{
+  display:grid;
+  grid-template-columns:2fr minmax(70px,90px) 2fr minmax(70px,90px);
+  gap:0 8px;
+  margin-top:10pt;margin-bottom:3px;
+}
+
+/* ── Signature date inputs ── */
+.sig-date{box-sizing:border-box;}
+
+/* ── Date validation ── */
+.fi.date-err{border-color:#c0392b!important;background:#fde8e8!important;}
+.date-msg{font-size:9pt;color:#c0392b;margin-top:2px;display:none;}
+.date-msg.on{display:block;}
+
+/* ── Agency / workloc readonly ── */
+#agency[readonly]{opacity:.75;cursor:default;}
+#workloc[readonly]{opacity:.85;cursor:default;font-style:italic;}
+
+/* ── TOUCH TARGETS — only override font-size & height for touch devices ──
+   This is the ONLY breakpoint, and only addresses iOS auto-zoom prevention
+   (inputs < 16px trigger zoom on iOS Safari)                               */
+@media (max-width:640px){
+
+  /* ── Page chrome ── */
+  body{padding:0 0 2rem;}
+  .toolbar{border-radius:0;flex-wrap:wrap;gap:4px;padding:6px 8px;}
+  .tbtn{padding:10px 8px;font-size:13px;flex:1 1 auto;}
+  .pdf-help{border-radius:0;font-size:11px;}
+  .page{padding:12px 12px 28px;box-shadow:none;border-radius:0;}
+
+  /* ── Hide logo, title, waivers ── */
+  .hdr img{display:none!important;}
+  .hdr-mid > div:first-child{display:none!important;}
+  .hdr{gap:4px!important;margin-bottom:8pt!important;}
+  .hdr-mid{min-height:unset!important;}
+  .hdr-step{
+    width:100%!important;text-align:left!important;
+    margin-right:0!important;
+    display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  }
+  .hdr-step > div{margin-bottom:0!important;}
+  #waiver-sections{display:none!important;}
+
+  /* ── iROW: LABEL on left, FIELD flush right ──
+     Grid: label auto-width | field fills remaining space  */
+  .irow{
+    display:grid!important;
+    grid-template-columns:auto 1fr!important;
+    align-items:center!important;
+    column-gap:10px!important;
+    row-gap:10px!important;
+    margin-bottom:14px!important;
+  }
+  .irow .lbl{
+    grid-column:1!important;
+    text-align:right!important;
+    white-space:nowrap!important;
+    font-size:9.5pt!important;
+    margin-left:0!important;
+  }
+  .irow .fi{
+    grid-column:2!important;
+    width:100%!important;
+    max-width:100%!important;
+    flex:none!important;
+    height:44px!important;
+    font-size:16px!important;
+    padding:4px 10px!important;
+    box-sizing:border-box!important;
+  }
+  select.fi{height:44px!important;font-size:16px!important;}
+  textarea.fi{
+    grid-column:1 / -1!important;
+    height:90px!important;
+    min-height:90px!important;
+    font-size:16px!important;
+    resize:vertical!important;
+  }
+  #step.fi{width:70px!important;}
+
+  /* ── Article line ── */
+  #articles{
+    width:100%!important;max-width:100%!important;
+    height:44px!important;font-size:16px!important;
+    display:block!important;margin-top:6px!important;
+  }
+
+  /* ── Section heads ── */
+  .shead,.whead{font-size:11pt;margin-top:14pt!important;}
+
+  /* ── Sig grid: 2 cols ── */
+  .sig-row,.arrows-row{
+    grid-template-columns:1fr minmax(90px,110px)!important;
+    gap:0 6px!important;
+  }
+  .sig-date{
+    width:100%!important;height:44px!important;
+    font-size:13px!important;padding:4px 3px!important;
+  }
+  .sig-box{height:44px!important;}
+}
+
+/* iOS zoom prevention — only on actual touch hardware */
+@media (hover:none) and (pointer:coarse){
+  .fi{font-size:16px!important;}
+  select.fi{font-size:16px!important;}
+  textarea.fi{font-size:16px!important;}
+}
+
+/* ── PRINT ── */
+@media print{
+  body{background:none;padding:0;}
+  .toolbar,#toast,.sign-here-wrap,.pdf-help{display:none!important;}
+  .page{box-shadow:none;margin:0;width:100%;min-height:auto;}
+  .fi,.sig-box,.sig-date{background:#dce6ff!important;border:1px solid #7a90cc!important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  @page{size:letter;margin:0;}
+}
+
+/* ── DARK MODE — OLED ── */
+body.dark{background:#000;}
+body.dark .toolbar{background:#000;border-bottom:1px solid #222;}
+body.dark .pdf-help{background:#0a1a2a;color:#b8cce0;}
+body.dark .pdf-help strong{color:#e8f0f8;}
+body.dark .page{background:#0d0d0d;color:#e8e8e8;box-shadow:0 0 0 1px #1a1a1a;}
+body.dark .fi{background:#000;border-color:#3a3a3a;color:#f0f0f0;}
+body.dark .fi:focus{background:#0a0a0a;border-color:#777;outline:none;}
+body.dark select.fi{background:#000;color:#f0f0f0;}
+body.dark textarea.fi{background:#000;color:#f0f0f0;}
+body.dark .fi.date-err{border-color:#e74c3c!important;background:#2a0a0a!important;}
+body.dark .date-msg{color:#e88;}
+body.dark .lbl{color:#d0d0d0;}
+body.dark strong{color:#e8e8e8;}
+body.dark .shead{color:#e8e8e8;}
+body.dark .whead{color:#a0a0a0;}
+body.dark .thick{border-top-color:#333;}
+body.dark .sig-box{background:#000;border-color:#3a3a3a;}
+body.dark .sig-lbl{color:#888;}
+body.dark .page div,
+body.dark .page span:not(.lbl):not(.sign-here){color:#e8e8e8;}
+body.dark .toolbar span{color:rgba(255,255,255,.4);}
+body.dark .tbtn{border-color:rgba(255,255,255,.2);color:#e8e8e8;}
+body.dark .tbtn:hover{background:rgba(255,255,255,.07);}
+body.dark .tbtn.go{background:#8b0000;border-color:#8b0000;}
+body.dark .tbtn.go:hover{background:#a00000;}
+@media print{
+  body.dark .page{background:#fff!important;color:#000!important;}
+  body.dark .fi{background:#cdd8f0!important;border-color:#7a90cc!important;color:#000!important;}
+}
+</style>
 </head>
 <body>
 
@@ -16,14 +295,14 @@
   <button class="tbtn" id="dmBtn" onclick="toggleDark()">🌙 Dark</button>
 </div>
 
-
+<!-- ── PDF HELP BAR ── -->
 <div class="pdf-help" id="pdfHelp">
   <span class="pdf-help-icon">💾</span>
   <span>To save as PDF: click <strong>Print&thinsp;/&thinsp;Save PDF</strong> → in the print dialog set <strong>Destination → Save as PDF</strong> (Chrome/Edge) &nbsp;|&nbsp; <strong>PDF → Save as PDF</strong> (Safari) &nbsp;|&nbsp; <strong>Microsoft Print to PDF</strong> (Windows)</span>
   <button class="pdf-help-close" onclick="document.getElementById('pdfHelp').style.display='none'" title="Dismiss">&#10005;</button>
 </div>
 
-  
+  <!-- HEADER: logo + title + step -->
   <div class="hdr" style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;margin-bottom:8pt;">
     <div style="width:90px;height:90px;flex-shrink:0;background:#1a2e47;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:1.2;font-family:Arial,sans-serif;">YOUR<br>LOCAL</div>
     <div class="hdr-mid" style="flex:1;padding-top:0;min-height:60px;display:flex;flex-direction:column;justify-content:space-between;">
@@ -105,7 +384,7 @@
 
   <hr class="thick">
 
-  
+  <!-- STATEMENT -->
   <div class="shead">Statement by Grievant or Union</div>
   <div style="font-size:9.5pt;line-height:1.5;margin-bottom:6pt;">
     Use additional sheets of paper if necessary. The statement should include:
@@ -119,13 +398,13 @@
 
   <hr class="thick">
 
-  
+  <!-- REMEDY -->
   <div class="shead">Relief or Remedy Sought</div>
   <textarea id="remedy1" class="fi" rows="2" oninput="grow(this)"></textarea>
   <textarea id="remedy2" class="fi" rows="1" oninput="grow(this)" style="width:100%;margin-top:4pt;"></textarea>
   <div style="font-size:9.5pt;font-style:italic;margin-top:4pt;padding-left:2px;">&hellip;and make grievant(s) whole.</div>
 
-  
+  <!-- Sig block 1 -->
   <div class="arrows-row">
     <div style="display:flex;align-items:flex-end;">
       <div class="sign-here-wrap"><span class="sign-here">SIGN HERE</span><div class="sign-arrow"></div></div>
@@ -145,7 +424,7 @@
 
   <div id="waiver-sections"><hr class="thick">
 
-  
+  <!-- WAIVER 1 -->
   <div class="whead">Alliance Waiver of Right to Appeal Disciplinary Action to Civil Service Commission</div>
   <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the parties, per applicable contract provisions.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
@@ -174,7 +453,7 @@
 
   <hr class="thick">
 
-  
+  <!-- WAIVER 2 -->
   <div class="whead">
     Acknowledgement of Alliance Waiver of Right to Arbitrate Claims of Discriminatory<br>
     Termination Filed in Multiple Forums
@@ -207,166 +486,169 @@
     <div class="sig-col" style="display:flex;flex-direction:column;"><input id="sig3sdate" class="fi sig-date" type="date" style="width:100%;height:28px;font-size:8pt;padding:1px 3px;" onchange="validateDate(this)" aria-label="Steward Date"><span class="date-msg" style="font-size:7.5pt;"></span><span class="sig-lbl">Steward Date</span></div>
   </div>
 
-</div>
+</div><!-- /.page -->
 <div id="toast"></div>
 
 <script>
 function grow(el){el.style.height="auto";el.style.height=el.scrollHeight+"px";}
 
 function v(id){
- const e=document.getElementById(id);
- if(!e)return"";
- if(e.tagName==="SELECT")return(e.value||"").trim();
- return(e.value||"").trim();
+  const e=document.getElementById(id);
+  if(!e)return"";
+  if(e.tagName==="SELECT")return(e.value||"").trim();
+  return(e.value||"").trim();
 }
 function dash(s){return s||"\u2014";}
 
 function buildBody(){
- const sep="\u2500".repeat(66);
- const w1=v("w1date"),w2=v("w2date");
- return[
- "GRIEVANCE REPORT",
- "=".repeat(66),
- "GRIEVANT(S)      : "+dash(v("grievant")),
- "JOB TITLE        : "+dash(v("jobtitle")),
- "AGENCY           : "+dash(v("agency")),
- "AGENCY START DATE: "+dash(v("startdate")),
- "REGION           : "+dash(v("region")),
- "WORK LOCATION    : "+dash(v("workloc")),
- "MANAGER(S)       : "+dash([v("managers"),v("managers2")].filter(Boolean).join(", ")),
- "ARTICLE(S)       : "+dash(v("articles")),
- "STEP #           : "+dash(v("step")),
- "BARGAINING UNIT  : "+dash(v("bunit")),
- "",sep,
- "STATEMENT OF VIOLATION:",
- ([v("statement"),v("statement2")].filter(Boolean).join("\n"))||"(not provided)",
- "",sep,
- "RELIEF OR REMEDY SOUGHT:",
- ([v("remedy1"),v("remedy2")].filter(Boolean).join("\n"))||"(not provided)",
- "...and make grievant(s) whole.",
- "",sep,
- "Grievant: ________________________  Date: ________  Steward/Rep: ________________________  Date: ________",
- "",sep,
- "ALLIANCE WAIVER \u2014 CIVIL SERVICE COMMISSION:",
- w1?"Waiver invoked. Effective date: "+w1:"(not invoked)",
- "Grievant: ________________________  Date: ________  Steward/Rep: ________________________  Date: ________",
- "",sep,
- "ACKNOWLEDGEMENT \u2014 DISCRIMINATORY TERMINATION / MULTIPLE FORUMS:",
- w2?"Waiver invoked. Effective date: "+w2:"(not invoked)",
- "Grievant: ________________________  Date: ________  Steward/Rep: ________________________  Date: ________",
- "",sep,
- "NOTE: Physical (wet ink) signatures required on the printed copy of this form.",
- ].join("\n");
+  const sep="\u2500".repeat(66);
+  const w1=v("w1date"),w2=v("w2date");
+  return[
+    "GRIEVANCE REPORT",
+    "=".repeat(66),
+    "GRIEVANT(S)      : "+dash(v("grievant")),
+    "JOB TITLE        : "+dash(v("jobtitle")),
+    "AGENCY           : "+dash(v("agency")),
+    "AGENCY START DATE: "+dash(v("startdate")),
+    "REGION           : "+dash(v("region")),
+    "WORK LOCATION    : "+dash(v("workloc")),
+    "MANAGER(S)       : "+dash([v("managers"),v("managers2")].filter(Boolean).join(", ")),
+    "ARTICLE(S)       : "+dash(v("articles")),
+    "STEP #           : "+dash(v("step")),
+    "BARGAINING UNIT  : "+dash(v("bunit")),
+    "",sep,
+    "STATEMENT OF VIOLATION:",
+    ([v("statement"),v("statement2")].filter(Boolean).join("\n"))||"(not provided)",
+    "",sep,
+    "RELIEF OR REMEDY SOUGHT:",
+    ([v("remedy1"),v("remedy2")].filter(Boolean).join("\n"))||"(not provided)",
+    "...and make grievant(s) whole.",
+    "",sep,
+    "Grievant: ________________________  Date: ________  Steward/Rep: ________________________  Date: ________",
+    "",sep,
+    "ALLIANCE WAIVER \u2014 CIVIL SERVICE COMMISSION:",
+    w1?"Waiver invoked. Effective date: "+w1:"(not invoked)",
+    "Grievant: ________________________  Date: ________  Steward/Rep: ________________________  Date: ________",
+    "",sep,
+    "ACKNOWLEDGEMENT \u2014 DISCRIMINATORY TERMINATION / MULTIPLE FORUMS:",
+    w2?"Waiver invoked. Effective date: "+w2:"(not invoked)",
+    "Grievant: ________________________  Date: ________  Steward/Rep: ________________________  Date: ________",
+    "",sep,
+    "NOTE: Physical (wet ink) signatures required on the printed copy of this form.",
+  ].join("\n");
 }
 
 function doEmail(){
- const to=prompt("Recipient email address:");
- if(!to)return;
- const sub=encodeURIComponent("Grievance Report \u2014 "+(v("grievant")||"Grievant"));
- window.location.href="mailto:"+to+"?subject="+sub+"&body="+encodeURIComponent(buildBody());
- showToast("Opening email client\u2026");
+  const to=prompt("Recipient email address:");
+  if(!to)return;
+  const sub=encodeURIComponent("Grievance Report \u2014 "+(v("grievant")||"Grievant"));
+  window.location.href="mailto:"+to+"?subject="+sub+"&body="+encodeURIComponent(buildBody());
+  showToast("Opening email client\u2026");
 }
 
 function doClear(){
- if(!confirm("Clear all entered data?"))return;
- document.querySelectorAll("input.fi,textarea.fi").forEach(el=>{
- el.value="";
- if(el.tagName==="TEXTAREA")el.style.height="auto";
- });
- document.querySelectorAll("select.fi").forEach(el=>el.selectedIndex=0);
- document.getElementById("step").value="1";
- document.getElementById("agency").value="";
- syncManagers();
- document.getElementById("managers2").value="";
- ["sig1gdate","sig1sdate","sig2gdate","sig2sdate","sig3gdate","sig3sdate"]
- .forEach(id=>{ const el=document.getElementById(id); if(el){ el.value=""; el.classList.remove("date-err"); const m=el.nextElementSibling; if(m) m.classList.remove("on"); } });
+  if(!confirm("Clear all entered data?"))return;
+  document.querySelectorAll("input.fi,textarea.fi").forEach(el=>{
+    el.value="";
+    if(el.tagName==="TEXTAREA")el.style.height="auto";
+  });
+  document.querySelectorAll("select.fi").forEach(el=>el.selectedIndex=0);
+  document.getElementById("step").value="1";
+  document.getElementById("agency").value="";
+  syncManagers();
+  document.getElementById("managers2").value="";
+  ["sig1gdate","sig1sdate","sig2gdate","sig2sdate","sig3gdate","sig3sdate"]
+    .forEach(id=>{ const el=document.getElementById(id); if(el){ el.value=""; el.classList.remove("date-err"); const m=el.nextElementSibling; if(m) m.classList.remove("on"); } });
 }
 
 function showToast(msg){
- const t=document.getElementById("toast");
- t.textContent=msg;t.classList.add("on");
- setTimeout(()=>t.classList.remove("on"),3000);
+  const t=document.getElementById("toast");
+  t.textContent=msg;t.classList.add("on");
+  setTimeout(()=>t.classList.remove("on"),3000);
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
- document.querySelectorAll("textarea.fi").forEach(grow);
+  document.querySelectorAll("textarea.fi").forEach(grow);
 });
 
 function toggleDark(){
- const d=document.body.classList.toggle('dark');
- document.getElementById('dmBtn').textContent=d?'☀ Light':'🌙 Dark';
+  const d=document.body.classList.toggle('dark');
+  document.getElementById('dmBtn').textContent=d?'☀ Light':'🌙 Dark';
 }
 
+// Defaults — overridden by server data on DOMContentLoaded
 var MANAGERS = ['Timothy Dunphy','Aja James','Majdeline Hage','Kelly Forss','Lisa Maddox-Mason','Maryalice McGough','Matthew Dichard'];
 
+// Address lookup (union-specific — values from Config sheet, addresses here)
 var LOCATION_ADDRESSES = {
- 'Everett':   '135 Santilli Hwy, Everett, MA 02149',
- 'Worcester': '324R Clark St, Worcester, MA 01606'
+  'Everett':   '135 Santilli Hwy, Everett, MA 02149',
+  'Worcester': '324R Clark St, Worcester, MA 01606'
 };
 
 function _rebuildManagerSelects(){
- var sel1 = document.getElementById('managers');
- var sel2 = document.getElementById('managers2');
- var cur1 = sel1.value, cur2 = sel2.value;
- sel1.innerHTML = '<option value="">— Primary —</option>';
- sel2.innerHTML = '<option value="">— 2nd (optional) —</option>';
- MANAGERS.forEach(function(name){
- sel1.appendChild(Object.assign(document.createElement('option'),{value:name,textContent:name,selected:name===cur1}));
- if(name !== cur1) sel2.appendChild(Object.assign(document.createElement('option'),{value:name,textContent:name,selected:name===cur2}));
- });
+  var sel1 = document.getElementById('managers');
+  var sel2 = document.getElementById('managers2');
+  var cur1 = sel1.value, cur2 = sel2.value;
+  sel1.innerHTML = '<option value="">— Primary —</option>';
+  sel2.innerHTML = '<option value="">— 2nd (optional) —</option>';
+  MANAGERS.forEach(function(name){
+    sel1.appendChild(Object.assign(document.createElement('option'),{value:name,textContent:name,selected:name===cur1}));
+    if(name !== cur1) sel2.appendChild(Object.assign(document.createElement('option'),{value:name,textContent:name,selected:name===cur2}));
+  });
 }
 
 function _rebuildRegionSelect(locations){
- var sel = document.getElementById('region');
- var cur = sel.value;
- sel.innerHTML = '<option value=""></option>';
- locations.forEach(function(loc){
- sel.appendChild(Object.assign(document.createElement('option'),{value:loc,textContent:loc,selected:loc===cur}));
- });
+  var sel = document.getElementById('region');
+  var cur = sel.value;
+  sel.innerHTML = '<option value=""></option>';
+  locations.forEach(function(loc){
+    sel.appendChild(Object.assign(document.createElement('option'),{value:loc,textContent:loc,selected:loc===cur}));
+  });
 }
 
 function syncManagers(){
- var m1 = document.getElementById('managers').value;
- var m2 = document.getElementById('managers2').value;
- var sel2 = document.getElementById('managers2');
- sel2.innerHTML = '<option value="">— 2nd (optional) —</option>';
- MANAGERS.forEach(function(name){
- if(name !== m1){
-  var o = document.createElement('option');
-  o.value = o.textContent = name;
-  if(name === m2) o.selected = true;
-  sel2.appendChild(o);
- }
- });
- if(m1 && m2 && m1 === m2) sel2.value = '';
+  var m1 = document.getElementById('managers').value;
+  var m2 = document.getElementById('managers2').value;
+  var sel2 = document.getElementById('managers2');
+  sel2.innerHTML = '<option value="">— 2nd (optional) —</option>';
+  MANAGERS.forEach(function(name){
+    if(name !== m1){
+      var o = document.createElement('option');
+      o.value = o.textContent = name;
+      if(name === m2) o.selected = true;
+      sel2.appendChild(o);
+    }
+  });
+  if(m1 && m2 && m1 === m2) sel2.value = '';
 }
 
 function autoFillLocation(){
- var region = document.getElementById('region').value;
- var wl = document.getElementById('workloc');
- wl.value = LOCATION_ADDRESSES[region] || '';
+  var region = document.getElementById('region').value;
+  var wl = document.getElementById('workloc');
+  wl.value = LOCATION_ADDRESSES[region] || '';
 }
 
+// Fetch live data from Config sheet (falls back to hardcoded defaults for PDF rendering)
 if(typeof google !== 'undefined' && google.script && google.script.run){
- google.script.run.withSuccessHandler(function(opts){
- if(!opts) return;
- if(opts.managers && opts.managers.length) { MANAGERS = opts.managers; _rebuildManagerSelects(); }
- if(opts.officeLocations && opts.officeLocations.length) _rebuildRegionSelect(opts.officeLocations);
- }).getGrievanceFormOptions();
+  google.script.run.withSuccessHandler(function(opts){
+    if(!opts) return;
+    if(opts.managers && opts.managers.length) { MANAGERS = opts.managers; _rebuildManagerSelects(); }
+    if(opts.officeLocations && opts.officeLocations.length) _rebuildRegionSelect(opts.officeLocations);
+  }).getGrievanceFormOptions();
 }
 
 function validateDate(el){
- const msg = el.nextElementSibling;
- if(!el.value){ el.classList.remove('date-err'); if(msg) msg.classList.remove('on'); return; }
- const d = new Date(el.value + 'T00:00:00');
- const now = new Date(); now.setHours(0,0,0,0);
- const cutoff = new Date(now); cutoff.setFullYear(now.getFullYear()-50);
- const future = new Date(now); future.setFullYear(now.getFullYear()+1);
- let err = '';
- if(d < cutoff) err = 'Date seems too far in the past.';
- else if(d > future) err = 'Date cannot be more than 1 year in the future.';
- el.classList.toggle('date-err', !!err);
- if(msg){ msg.textContent = err; msg.classList.toggle('on', !!err); }
+  const msg = el.nextElementSibling;
+  if(!el.value){ el.classList.remove('date-err'); if(msg) msg.classList.remove('on'); return; }
+  const d = new Date(el.value + 'T00:00:00');
+  const now = new Date(); now.setHours(0,0,0,0);
+  const cutoff = new Date(now); cutoff.setFullYear(now.getFullYear()-50);
+  const future = new Date(now); future.setFullYear(now.getFullYear()+1);
+  let err = '';
+  if(d < cutoff) err = 'Date seems too far in the past.';
+  else if(d > future) err = 'Date cannot be more than 1 year in the future.';
+  el.classList.toggle('date-err', !!err);
+  if(msg){ msg.textContent = err; msg.classList.toggle('on', !!err); }
 }
 </script>
 </div>
