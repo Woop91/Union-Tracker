@@ -1,6 +1,7 @@
 <script>
 
 function initMemberView(container) {
+ _insideRoleInit = true;
  var t = ThemeEngine.getTheme('member', AppState.isDark);
  ThemeEngine.applyTheme(t);
  AppState.activeRole = 'member';
@@ -19,11 +20,13 @@ function initMemberView(container) {
  if (batch.events && Array.isArray(batch.events)) DataCache.set('events', batch.events);
  AppState.loading = false;
  renderMemberHome(container);
+ _insideRoleInit = false;
  _checkDeepLink('member');
  return;
  }
 
  
+ _insideRoleInit = false; 
  
  serverCall().withSuccessHandler(function(counts) {
  AppState.notificationCount = (counts && counts.notificationCount) || 0;
@@ -35,13 +38,17 @@ function initMemberView(container) {
  .withSuccessHandler(function(grievances) {
   AppState.grievances = grievances || [];
   AppState.loading = false;
+  _insideRoleInit = true;
   renderMemberHome(container);
+  _insideRoleInit = false;
   _checkDeepLink('member');
  })
  .withFailureHandler(function() {
   AppState.grievances = [];
   AppState.loading = false;
+  _insideRoleInit = true;
   renderMemberHome(container);
+  _insideRoleInit = false;
   _checkDeepLink('member');
  })
  .dataGetMemberGrievances(SESSION_TOKEN);
@@ -114,9 +121,13 @@ function _renderDuesGate(appContainer, featureName, backFn) {
 
 function _renderOnboardingWizard(container) {
  
+ if (AppState._onboardingDismissed) return;
  try {
- if (localStorage.getItem('dds_onboarding_dismissed') === 'true') return;
+ if (localStorage.getItem('dds_onboarding_dismissed') === 'true') { AppState._onboardingDismissed = true; return; }
  } catch (_e) {  }
+ 
+ // treat onboarding as dismissed too (both track "first visit" state).
+ if (AppState._welcomeDismissed) { AppState._onboardingDismissed = true; return; }
 
  var STEPS = [
  { key: 'welcome', title: 'Welcome!', desc: 'Let\'s get your account set up in a few quick steps.' },
@@ -167,6 +178,7 @@ function _renderOnboardingWizard(container) {
  container.appendChild(overlay);
 
  function _dismissOnboarding() {
+ AppState._onboardingDismissed = true;
  try { localStorage.setItem('dds_onboarding_dismissed', 'true'); } catch (_e) {  }
  overlay.style.opacity = '0';
  overlay.style.transition = 'opacity 0.3s ease';
@@ -2127,7 +2139,7 @@ function renderMemberMore(appContainer) {
   { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { _handleTabNav('member', 'stewarddirectory'); } },
   { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { _handleTabNav('member', 'profile'); } },
   { icon: '\uD83D\uDCCB', label: 'Report Card', desc: 'Your personal engagement score', action: function() { _handleTabNav('member', 'reportcard'); } },
-  { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { renderSurveyFormPage(document.getElementById('app')); } },
+  { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { _handleTabNav('member', 'takesurvey'); } },
   { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { _handleTabNav('member', 'survey'); } },
  ];
 
@@ -2149,8 +2161,8 @@ function renderMemberMore(appContainer) {
   var isLocked = m.locked && !isDuesPaying;
   var item = el('div', {
   className: 'more-menu-item',
-  style: isLocked ? { opacity: '0.6' } : {},
-  onClick: function() { try { m.action(); } catch(e) { console.error('More menu error (' + m.label + '):', e); item.style.borderColor = 'var(--danger)'; item.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to open. Please try again.')); } }
+  style: isLocked ? { opacity: '0.6', cursor: 'not-allowed' } : {},
+  onClick: function() { if (isLocked) return; try { m.action(); } catch(e) { console.error('More menu error (' + m.label + '):', e); item.style.borderColor = 'var(--danger)'; item.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to open. Please try again.')); } }
   });
 
   

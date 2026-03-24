@@ -1,8 +1,9 @@
 <script>
 /**
  * Steward View — "Mono Signal"
- * v4.12.0 — Cases, Members tab, Broadcast, Survey tracking, Weekly Q manager,
- * Resources tab, responsive sidebar layout.
+ * v4.36.0 — Cases, Members tab, Broadcast, Survey tracking, Polls manager,
+ * Resources tab, responsive sidebar layout, Insights, Engagement, Mentorship,
+ * Contact Log, Access Log, Timeline, Failsafe, deadline calendar, trend alerts.
  */
 
 // ═══════════════════════════════════════
@@ -10,6 +11,7 @@
 // ═══════════════════════════════════════
 
 function initStewardView(container) {
+  _insideRoleInit = true;
   var t = ThemeEngine.getTheme('steward', AppState.isDark);
   ThemeEngine.applyTheme(t);
   AppState.activeRole = 'steward';
@@ -27,12 +29,15 @@ function initStewardView(container) {
     AppState.qaUnansweredCount = batch.qaUnansweredCount || 0;
     AppState.loading = false;
     renderStewardDashboard(container);
+    _insideRoleInit = false;
     _checkDeepLink('steward');
     _prefetchInsights();
+    if (IS_DEV_MODE && typeof _validateTabIntegrity === 'function') _validateTabIntegrity();
     return;
   }
 
   // OPT-1: Single batch endpoint replaces 3+ sequential server calls
+  _insideRoleInit = false; // async path — render happens inside _handleTabNav via _checkDeepLink
   serverCall()
     .withSuccessHandler(function(result) {
       AppState.cases = result.cases || [];
@@ -43,15 +48,20 @@ function initStewardView(container) {
       AppState.qaUnansweredCount = (result.badges && result.badges.qaUnansweredCount) || 0;
       AppState.memberCount = result.memberCount || 0;
       AppState.loading = false;
+      _insideRoleInit = true;
       renderStewardDashboard(container);
+      _insideRoleInit = false;
       _checkDeepLink('steward');
       _prefetchInsights();
+      if (IS_DEV_MODE && typeof _validateTabIntegrity === 'function') _validateTabIntegrity();
     })
     .withFailureHandler(function() {
       AppState.cases = [];
       AppState.kpis = { totalCases: 0, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
       AppState.loading = false;
+      _insideRoleInit = true;
       renderStewardDashboard(container);
+      _insideRoleInit = false;
     })
     .dataGetStewardDashboardInit(SESSION_TOKEN);
 }
@@ -4038,10 +4048,11 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { _handleTabNav('steward', 'surveytrack'); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { _handleTabNav('steward', 'stewarddirectory'); } },
       { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { _handleTabNav('steward', 'failsafe'); } },
-      { icon: '\uD83E\uDDEA', label: 'Test Runner', desc: 'Run integration tests', action: function() { _handleTabNav('steward', 'testrunner'); } },
+      { icon: '\uD83E\uDDEA', label: 'Test Runner', desc: 'Run integration tests', devOnly: true, action: function() { _handleTabNav('steward', 'testrunner'); } },
     ];
 
     menuItems.forEach(function(m) {
+      if (m.devOnly && !IS_DEV_MODE) return; // mirror _filterDevTabs for More menu
       if (m.group) {
         content.appendChild(el('div', {
           style: {
