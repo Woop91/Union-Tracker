@@ -1,0 +1,72 @@
+name: Post-Deploy Smoke Test
+
+# Manually triggered after a clasp push to verify the deployment is alive.
+# Requires WEBAPP_URL secret to be set in repo settings.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deploy target description (for logging only)'
+        required: false
+        default: 'prod'
+
+jobs:
+  smoke:
+    name: Smoke Test Deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Hit health endpoint
+        id: health
+        run: |
+          if [ -z "${{ secrets.WEBAPP_URL }}" ]; then
+            echo "::warning::WEBAPP_URL secret not configured. Set it in repo Settings > Secrets."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          HEALTH_URL="${{ secrets.WEBAPP_URL }}?healthz=1"
+          echo "Checking: $HEALTH_URL"
+          echo "Target: ${{ inputs.target }}"
+
+          # Follow redirects (-L), capture HTTP code, 30s timeout
+          HTTP_CODE=$(curl -sL -o /tmp/health_response.json -w "%{http_code}" \
+            --max-time 30 "$HEALTH_URL" 2>/dev/null || echo "000")
+
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Health check failed with HTTP $HTTP_CODE"
+            cat /tmp/health_response.json 2>/dev/null || echo "(no response body)"
+            exit 1
+          fi
+
+          # Parse JSON response
+          echo "Response:"
+          cat /tmp/health_response.json
+
+          # Check the "ok" field
+          OK=$(python3 -c "import json; data=json.load(open('/tmp/health_response.json')); print(data.get('ok', False))" 2>/dev/null || echo "parse_error")
+
+          if [ "$OK" != "True" ]; then
+            echo "::error::Health check returned ok=false"
+            exit 1
+          fi
+
+          VERSION=$(python3 -c "import json; data=json.load(open('/tmp/health_response.json')); print(data.get('version', 'unknown'))" 2>/dev/null || echo "unknown")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Report result
+        if: always()
+        run: |
+          echo "## Post-Deploy Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target**: ${{ inputs.target }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.health.outputs.skipped }}" = "true" ]; then
+            echo "- **Status**: Skipped (WEBAPP_URL secret not configured)" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.health.outcome }}" = "success" ]; then
+            echo "- **Status**: Healthy" >> $GITHUB_STEP_SUMMARY
+            echo "- **Version**: ${{ steps.health.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi

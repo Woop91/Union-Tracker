@@ -699,6 +699,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetWorkloadSummaryStats',
     'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
     'dataGetGrievanceForSigning', 'dataSubmitGrievanceSignature', // sigToken auth, not session
+    'dataLogClientError', // telemetry — must work during auth failures (no session to validate)
   ];
 
   // Functions that are init/admin only (not called from client google.script.run)
@@ -1136,6 +1137,7 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataGetCaseActivityLog',          // reads _Audit_Log sheet directly for case-level activity (Feature 5)
     'dataGetAuditLog',                 // reads _Audit_Log sheet directly for Access Log Viewer (v4.36.0)
     'dataInitiateGrievance',           // delegates to initiateGrievance() via withScriptLock_ (05_Integrations.gs)
+    'dataLogClientError',              // writes directly to _ClientErrors sheet (telemetry, no DataService needed)
   ];
 
   wrappers

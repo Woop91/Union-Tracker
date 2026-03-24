@@ -29,7 +29,19 @@ fi
 
 if [ "$PROTECTED_PUSH" = true ]; then
   echo ""
-  echo "[2/2] Pushing to $PROTECTED_BRANCH — running full test suite..."
+  echo "[2/3] Pushing to $PROTECTED_BRANCH — running deploy guards..."
+  echo ""
+  npm run test:guards
+
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "Push to $PROTECTED_BRANCH blocked: deploy guards failed."
+    echo "Fix guard failures before pushing to $PROTECTED_BRANCH."
+    exit 1
+  fi
+
+  echo ""
+  echo "[3/3] Running full unit test suite..."
   echo ""
   npm run test:unit
 

@@ -91,6 +91,42 @@
     }
 
     // ═══════════════════════════════════════
+    // CLIENT ERROR TELEMETRY — Captures uncaught errors and unhandled promise
+    // rejections, beacons them to the server for post-incident debugging.
+    // Rate-limited: max 5 reports per session to avoid feedback loops.
+    // ═══════════════════════════════════════
+    var _clientErrorCount = 0;
+    var _CLIENT_ERROR_LIMIT = 5;
+    function _reportClientError(data) {
+      if (_clientErrorCount >= _CLIENT_ERROR_LIMIT) return;
+      _clientErrorCount++;
+      try {
+        google.script.run.dataLogClientError(data);
+      } catch (_) { /* telemetry must never throw */ }
+    }
+    window.onerror = function(msg, url, line, col, error) {
+      _reportClientError({
+        type: 'uncaught',
+        message: String(msg || '').substring(0, 500),
+        line: line || 0,
+        col: col || 0,
+        stack: (error && error.stack) ? error.stack.substring(0, 1000) : '',
+        pane: (typeof AppState !== 'undefined' && AppState.activeTab) ? AppState.activeTab : 'bootstrap',
+        ua: navigator.userAgent
+      });
+    };
+    window.addEventListener('unhandledrejection', function(ev) {
+      var reason = ev.reason || {};
+      _reportClientError({
+        type: 'promise',
+        message: String(reason.message || reason).substring(0, 500),
+        stack: (reason.stack || '').substring(0, 1000),
+        pane: (typeof AppState !== 'undefined' && AppState.activeTab) ? AppState.activeTab : 'bootstrap',
+        ua: navigator.userAgent
+      });
+    });
+
+    // ═══════════════════════════════════════
     // N3: PRELOAD — Fire batch data call IMMEDIATELY, before module definitions parse.
     // This overlaps the server round-trip with JS parsing time.
     // ═══════════════════════════════════════

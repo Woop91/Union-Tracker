@@ -6068,6 +6068,58 @@ function dataLogTabVisit(sessionToken, tab, role) {
 }
 
 /**
+ * v4.37.0 — Client-side error telemetry endpoint.
+ * Receives uncaught JS errors and unhandled promise rejections from the browser
+ * and persists them to a hidden _ClientErrors sheet for post-incident debugging.
+ *
+ * Fire-and-forget from client. Rate-limited: max 500 rows, FIFO eviction.
+ * PII-safe: only logs error type, message, pane, and user agent — no session tokens.
+ *
+ * @param {Object} errorData - { type, message, line, col, stack, pane, ua }
+ */
+function dataLogClientError(errorData) {
+  try {
+    if (!errorData || !errorData.message) return;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
+    var sheetName = '_ClientErrors';
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(['Timestamp', 'Type', 'Message', 'Pane', 'Line', 'Col', 'User Agent', 'Stack']);
+      sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(sheet);
+    }
+    // Truncate long fields to prevent quota issues
+    var safeMsg = String(errorData.message || '').substring(0, 500);
+    var safeStack = String(errorData.stack || '').substring(0, 1000);
+    var safeUA = String(errorData.ua || '').substring(0, 200);
+    // Formula-protect user-influenced fields
+    if (typeof escapeForFormula === 'function') {
+      safeMsg = escapeForFormula(safeMsg);
+      safeStack = escapeForFormula(safeStack);
+    }
+    sheet.appendRow([
+      new Date().toISOString(),
+      String(errorData.type || 'unknown').substring(0, 50),
+      safeMsg,
+      String(errorData.pane || 'unknown').substring(0, 50),
+      errorData.line || '',
+      errorData.col || '',
+      safeUA,
+      safeStack
+    ]);
+    // FIFO: keep max 500 rows
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 500) {
+      sheet.deleteRows(2, lastRow - 500);
+    }
+  } catch (e) {
+    Logger.log('dataLogClientError failed: ' + e.message);
+  }
+}
+
+/**
  * v4.31.3 — Aggregated webapp usage stats for Union Stats > Usage sub-tab.
  */
 function dataGetUsageStats(sessionToken) {

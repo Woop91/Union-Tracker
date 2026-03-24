@@ -44,6 +44,24 @@
 function doGet(e) {
   e = e || { parameter: {} };
 
+  // v4.37.0 — Lightweight health check endpoint for post-deploy smoke tests.
+  // Returns JSON with version, timestamp, and basic system status.
+  // No auth required — returns only non-sensitive operational data.
+  if (e.parameter && e.parameter.healthz === '1') {
+    var health = { ok: true, version: COMMAND_CONFIG.VERSION, timestamp: new Date().toISOString() };
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      health.spreadsheet = !!ss;
+      if (ss) health.sheets = ss.getSheets().length;
+    } catch (hErr) {
+      health.ok = false;
+      health.spreadsheet = false;
+      health.error = hErr.message;
+    }
+    return ContentService.createTextOutput(JSON.stringify(health))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // v4.33.0 — E-Signature page (token-authenticated, no login required)
   if (e.parameter && e.parameter.page === 'esign') {
     try {

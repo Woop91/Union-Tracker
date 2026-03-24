@@ -297,3 +297,105 @@ jobs:
           if [ -z "$ADDED" ] && [ -z "$REMOVED" ]; then
             echo "✅ appsscript.json changed but **oauthScopes list was not modified**." >> $GITHUB_STEP_SUMMARY
           fi
+
+  # ────────────────────────────────────────────────────────────────────────
+  # CI GATE: Single required check for branch protection.
+  # All upstream jobs must pass for this to succeed. Branch protection only
+  # needs to require "CI Gate" instead of listing every job individually.
+  # Uses if: always() so it runs even when upstream jobs are skipped.
+  # ────────────────────────────────────────────────────────────────────────
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, code-quality, deploy-guards, dist-parity]
+    if: always()
+
+    steps:
+      - name: Check all required jobs passed
+        run: |
+          echo "lint-and-build: ${{ needs.lint-and-build.result }}"
+          echo "code-quality:   ${{ needs.code-quality.result }}"
+          echo "deploy-guards:  ${{ needs.deploy-guards.result }}"
+          echo "dist-parity:    ${{ needs.dist-parity.result }}"
+
+          if [ "${{ needs.lint-and-build.result }}" != "success" ] || \
+             [ "${{ needs.code-quality.result }}" != "success" ] || \
+             [ "${{ needs.deploy-guards.result }}" != "success" ] || \
+             [ "${{ needs.dist-parity.result }}" != "success" ]; then
+            echo "::error::One or more required jobs failed or were cancelled."
+            exit 1
+          fi
+
+          echo "All required CI jobs passed."
+
+  # ────────────────────────────────────────────────────────────────────────
+  # AUTO-TRIAGE: Create a GitHub Issue when any required job fails.
+  # Deduplicates by checking for an open issue with the same branch label.
+  # ────────────────────────────────────────────────────────────────────────
+  auto-triage:
+    name: Auto-Triage CI Failures
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, deploy-guards, dist-parity]
+    if: failure()
+
+    steps:
+      - name: Create or update triage issue
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const sha = context.sha.slice(0, 8);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const label = 'ci-failure';
+            const branchLabel = `branch:${branch}`;
+
+            // Check for existing open issue on this branch
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: [label, branchLabel].join(','),
+              per_page: 1
+            });
+
+            const body = [
+              `## CI Failure`,
+              ``,
+              `- **Branch**: \`${branch}\``,
+              `- **Commit**: \`${sha}\``,
+              `- **Run**: [View workflow run](${runUrl})`,
+              `- **Time**: ${new Date().toISOString()}`,
+              ``,
+              `> Auto-created by CI. Closes automatically when the branch passes.`
+            ].join('\n');
+
+            if (existing.length > 0) {
+              // Update existing issue with new failure info
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing[0].number,
+                body: `CI still failing at \`${sha}\`: [run](${runUrl})`
+              });
+              core.info(`Updated existing issue #${existing[0].number}`);
+            } else {
+              // Ensure labels exist
+              for (const name of [label, branchLabel]) {
+                try {
+                  await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name });
+                } catch {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    name, color: name === label ? 'e11d48' : '6366f1'
+                  });
+                }
+              }
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `CI failure on ${branch} (${sha})`,
+                body,
+                labels: [label, branchLabel]
+              });
+              core.info(`Created issue #${issue.number}`);
+            }

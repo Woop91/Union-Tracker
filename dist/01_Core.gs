@@ -64,6 +64,114 @@ var ERROR_CONFIG = {
 };
 
 // ============================================================================
+// INVARIANT ASSERTIONS
+// ============================================================================
+
+/**
+ * Asserts a condition that should always be true. If the assertion fails,
+ * logs a CRITICAL error with full context. In dev mode, throws to surface
+ * the bug immediately; in prod, logs and continues to avoid crashing the
+ * user's session.
+ *
+ * Use at boundaries where "impossible" states would cause confusing downstream
+ * errors — e.g., after auth resolution, after sheet lookups, after data parsing.
+ *
+ * @param {boolean} condition - The condition to assert
+ * @param {string} context - Description of what was expected (e.g., "lookupMember returned non-null for authenticated email")
+ * @returns {boolean} The condition value (for inline use)
+ */
+function invariant(condition, context) {
+  if (!condition) {
+    var msg = 'INVARIANT VIOLATION: ' + (context || 'unspecified');
+    var err = new Error(msg);
+    handleError(err, 'invariant', ERROR_LEVEL.CRITICAL);
+    // In dev mode, throw so the developer sees it immediately
+    var isDev = false;
+    try { isDev = typeof IS_DEV_MODE !== 'undefined' && IS_DEV_MODE; } catch (_) {}
+    try { isDev = isDev || (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION && COMMAND_CONFIG.VERSION.indexOf('-dev') !== -1); } catch (_) {}
+    if (isDev) throw err;
+  }
+  return !!condition;
+}
+
+// ============================================================================
+// GRACEFUL DEGRADATION REGISTRY
+// ============================================================================
+
+/**
+ * Runtime feature health tracking. When a feature throws repeatedly, it gets
+ * auto-disabled for a cooldown period to prevent cascading failures.
+ * State is kept in CacheService so it persists across short-lived GAS executions.
+ * @const {Object}
+ */
+var FeatureHealth = (function() {
+  var CACHE_PREFIX = 'DEGRADED_';
+  var COOLDOWN_SECS = 300; // 5-minute auto-restore
+
+  function _cache() {
+    try { return CacheService.getScriptCache(); } catch (_) { return null; }
+  }
+
+  return {
+    /**
+     * Check if a feature is currently degraded (disabled due to prior failures).
+     * @param {string} featureName - Feature identifier
+     * @returns {boolean} True if the feature is degraded
+     */
+    isDegraded: function(featureName) {
+      var c = _cache();
+      return c ? !!c.get(CACHE_PREFIX + featureName) : false;
+    },
+
+    /**
+     * Mark a feature as degraded. It will auto-restore after COOLDOWN_SECS.
+     * @param {string} featureName - Feature identifier
+     * @param {string} [reason] - Why it was degraded
+     */
+    degrade: function(featureName, reason) {
+      var c = _cache();
+      if (c) c.put(CACHE_PREFIX + featureName, reason || '1', COOLDOWN_SECS);
+      Logger.log('FeatureHealth: degraded "' + featureName + '" for ' + COOLDOWN_SECS + 's' + (reason ? ' — ' + reason : ''));
+    },
+
+    /**
+     * Manually restore a degraded feature.
+     * @param {string} featureName - Feature identifier
+     */
+    restore: function(featureName) {
+      var c = _cache();
+      if (c) c.remove(CACHE_PREFIX + featureName);
+    }
+  };
+})();
+
+/**
+ * Wraps a function with automatic degradation. If the feature is degraded,
+ * returns a safe fallback immediately. If the wrapped function throws, the
+ * feature is degraded for the cooldown period.
+ *
+ * @param {string} featureName - Feature identifier (e.g., "calendar", "drive", "email")
+ * @param {Function} fn - The function to guard
+ * @param {*} [fallback] - Value to return when degraded (default: { success: false, degraded: true })
+ * @returns {Function} Guarded function
+ */
+function withFeatureGuard(featureName, fn, fallback) {
+  var defaultFallback = { success: false, degraded: true, message: featureName + ' is temporarily unavailable.' };
+  return function() {
+    if (FeatureHealth.isDegraded(featureName)) {
+      return fallback !== undefined ? fallback : defaultFallback;
+    }
+    try {
+      return fn.apply(this, arguments);
+    } catch (e) {
+      FeatureHealth.degrade(featureName, e.message);
+      handleError(e, featureName + ' (auto-degraded)', ERROR_LEVEL.ERROR);
+      return fallback !== undefined ? fallback : defaultFallback;
+    }
+  };
+}
+
+// ============================================================================
 // CORE ERROR HANDLING
 // ============================================================================
 /**
@@ -260,7 +368,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.36.0",
+  VERSION: "4.37.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
