@@ -1983,6 +1983,8 @@
  var _DEV_ONLY_TABS = { testrunner: 1 };
  
  var _GRIEVANCE_TABS = { cases: 1, newgrievance: 1 };
+ 
+ var _DUES_GATED_TABS = { resources: 1, orgchart: 1, polls: 1, takesurvey: 1, unionstats: 1 };
 
  function _filterDevTabs(tabs) {
   var filtered = tabs;
@@ -2054,6 +2056,15 @@
   { id: 'guide', icon: '\uD83D\uDCD6', label: 'Welcome Guide' },
   { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ];
+ }
+
+ 
+ function _findTabDef(role, tabId) {
+  var tabs = _getSidebarTabs(role);
+  for (var i = 0; i < tabs.length; i++) {
+  if (tabs[i].id === tabId) return tabs[i];
+  }
+  return null;
  }
 
  
@@ -2463,7 +2474,7 @@
  }
 
  
- var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
+ var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1, takesurvey: 1 };
 
  
  function _invalidateTabCache(tabId) {
@@ -2587,14 +2598,20 @@
   }
 
   
-  if (tabId === 'orgchart') {
-  if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
-   if (typeof _renderDuesGate === 'function') {
-   _renderDuesGate(app, 'Org Chart', function() { _handleTabNav(role, 'home'); });
-   }
-   _navProgressDone();
-   return;
+  
+  
+  
+  if (role === 'member' && _DUES_GATED_TABS[tabId] && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
+  if (typeof _renderDuesGate === 'function') {
+   var gateLabel = (_findTabDef(role, tabId) || {}).label || tabId;
+   _renderDuesGate(app, gateLabel, function() { _handleTabNav(role, 'home'); });
   }
+  _navProgressDone();
+  return;
+  }
+
+  
+  if (tabId === 'orgchart') {
   _hideAllVisiblePanes();
   _splitRenderTarget = 'primary';
   renderOrgChart(app, role);
@@ -2729,7 +2746,7 @@
  function _getTabRenderFn(role, tabId) {
   
   if (CONFIG.showGrievances === false && _GRIEVANCE_TABS[tabId]) {
-  tabId = role === 'member' ? 'home' : 'home';
+  tabId = role === 'member' ? 'home' : 'members';
   }
   if (role === 'member') {
   switch(tabId) {
@@ -2754,6 +2771,7 @@
    case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
    case 'timeline': return renderMemberTimelinePage;
    case 'reportcard': return renderReportCard;
+   case 'takesurvey': return renderSurveyFormPage;
    case 'guide': return renderWelcomeGuide;
    default: return renderMemberHome;
   }
