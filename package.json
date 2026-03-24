@@ -1,6 +1,6 @@
 {
   "name": "solidbase-dashboard",
-  "version": "4.37.0",
+  "version": "4.37.1",
   "description": "SolidBase — Modular Union Dashboard for Google Sheets",
   "main": "build.js",
   "scripts": {

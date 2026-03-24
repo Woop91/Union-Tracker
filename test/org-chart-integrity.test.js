@@ -135,9 +135,12 @@ describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   });
 
   test('renderOrgChart explicitly resets _initDesktopRan before script re-execution', () => {
-    // The reset must happen BEFORE the script forEach loop
-    const resetIdx = indexCode.indexOf('_initDesktopRan = false');
-    const forEachIdx = indexCode.indexOf("querySelectorAll('script')");
+    // The reset must happen BEFORE the script forEach loop within renderOrgChart
+    // (search from renderOrgChart position to avoid matching _loadMemberViewThen's querySelectorAll)
+    const fnStart = indexCode.indexOf('function renderOrgChart');
+    expect(fnStart).toBeGreaterThan(-1);
+    const resetIdx = indexCode.indexOf('_initDesktopRan = false', fnStart);
+    const forEachIdx = indexCode.indexOf("querySelectorAll('script')", fnStart);
     expect(resetIdx).toBeGreaterThan(-1);
     expect(forEachIdx).toBeGreaterThan(-1);
     expect(resetIdx).toBeLessThan(forEachIdx);

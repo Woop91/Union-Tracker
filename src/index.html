@@ -1915,7 +1915,7 @@
             var app = document.getElementById('app');
             try {
               if (switchRole === 'steward') initStewardView(app);
-              else initMemberView(app);
+              else _loadMemberViewThen(app, function() { initMemberView(app); });
             } catch (switchErr) {
               console.error('Switch role error:', switchErr);
               app.innerHTML = '';
@@ -2464,6 +2464,54 @@
           }
         });
       }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LAZY-LOAD MEMBER VIEW
+    // For steward/both users, member_view.html is NOT in the initial
+    // template (would exceed GAS ~820KB HtmlOutput limit). It's fetched
+    // on-demand when the user switches to member view.
+    // Member-only users get it in the template; _memberViewLoaded starts
+    // true for them so _loadMemberViewThen is a synchronous pass-through.
+    // ══════════════════════════════════════════════════════════════════════
+    var _memberViewLoaded = typeof initMemberView === 'function';
+
+    function _loadMemberViewThen(container, callback) {
+      if (_memberViewLoaded) { callback(); return; }
+      showLoading(container, 'kpi');
+      google.script.run
+        .withSuccessHandler(function(html) {
+          if (html) {
+            var temp = document.createElement('div');
+            temp.innerHTML = html;
+            var scripts = temp.querySelectorAll('script');
+            for (var i = 0; i < scripts.length; i++) {
+              try {
+                var s = document.createElement('script');
+                s.textContent = scripts[i].textContent;
+                document.head.appendChild(s);
+              } catch (scriptErr) {
+                console.error('Member view script load failed:', scriptErr);
+              }
+            }
+          }
+          _memberViewLoaded = true;
+          callback();
+        })
+        .withFailureHandler(function(err) {
+          console.error('Failed to load member view:', err);
+          container.innerHTML = '';
+          var errCard = el('div', { style: { textAlign: 'center', padding: '40px' } });
+          errCard.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'));
+          errCard.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '8px', color: 'var(--text)' } }, 'Failed to load member view'));
+          errCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '16px' } }, String(err.message || err)));
+          errCard.appendChild(el('button', {
+            style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' },
+            onClick: function() { _loadMemberViewThen(container, callback); }
+          }, 'Retry'));
+          container.appendChild(errCard);
+        })
+        .getMemberViewHtml();
     }
 
     function renderOrgChart(appContainer, role) {
@@ -3825,7 +3873,7 @@
     <?!= include('auth_view') ?>
   <? } else if (view === 'steward' || view === 'both') { ?>
     <?!= include('steward_view') ?>
-    <?!= include('member_view') ?>
+    <!-- member_view.html lazy-loaded via getMemberViewHtml() to stay under GAS ~820KB limit -->
   <? } else if (view === 'member') { ?>
     <?!= include('member_view') ?>
   <? } else { ?>

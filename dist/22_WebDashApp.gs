@@ -488,6 +488,25 @@ function include(filename) {
 }
 
 /**
+ * Client-callable: Returns the member view HTML for lazy-loading.
+ * For dual-role users (steward + member), member_view.html is NOT included
+ * in the initial template to stay under the GAS ~820KB HtmlOutput limit.
+ * Loaded on-demand when the user switches to member view.
+ * @returns {string} Raw HTML content (<script> block defining member view functions)
+ */
+function getMemberViewHtml() {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (!email) return '';
+    // No CacheService — member_view.html exceeds the 100KB per-key limit.
+    return HtmlService.createHtmlOutputFromFile('member_view').getContent();
+  } catch (e) {
+    Logger.log('getMemberViewHtml error: ' + e.message);
+    return '';
+  }
+}
+
+/**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
  * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
