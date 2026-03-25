@@ -165,6 +165,7 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
       renderStewardContact: ['contact', 'stewarddirectory'],
       renderUpdateProfile: ['profile'],
       renderMemberResources: ['resources'],
+      // renderWorkloadTracker: ['workload'], // SolidBase: excluded
       renderPollsPage: ['polls'],
       renderSurveyResultsPage: ['survey'],
       renderUnionStatsPage: ['unionstats'],
@@ -306,7 +307,7 @@ describe('G11: _ensureAllSheetsInternal covers all feature sheets', () => {
       'initFailsafeSheet':         ['FAILSAFE_CONFIG'],
       'initWeeklyQuestionSheets':  ['WEEKLY_QUESTIONS', 'WEEKLY_RESPONSES', 'QUESTION_POOL'],
       'initPortalSheets':          [], // portal sheets not in SHEETS constant
-      'initWorkloadTrackerSheets': ['WORKLOAD_VAULT', 'WORKLOAD_REPORTING', 'WORKLOAD_REMINDERS', 'WORKLOAD_USERMETA'],
+      // 'initWorkloadTrackerSheets': [...], // SolidBase: excluded
       'setupHiddenSheets':         [], // hidden calc sheets
       'createResourcesSheet':      ['RESOURCES'],
       'createResourceConfigSheet': ['RESOURCE_CONFIG'],
@@ -850,7 +851,7 @@ describe('G19: More menu items have route handlers', () => {
 // instead of "Program Operations Manual System". This guard prevents the wrong
 // acronym expansion from reappearing.
 
-describe.skip('G20: POMS description accuracy (not in SolidBase)', () => {
+describe.skip('G20: POMS description accuracy (SolidBase: excluded)', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
 
@@ -927,7 +928,7 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
 // G22: Workload Tracker frontend invariants
 // ============================================================================
 
-describe('G22 — Workload Tracker frontend invariants', () => {
+describe.skip('G22 — Workload Tracker frontend invariants (SolidBase: excluded)', () => {
   const memberView = read('member_view.html');
 
   test('WT_CAT_KEY_LABELS map is defined from WT_CATEGORIES', () => {
@@ -1021,12 +1022,12 @@ describe('G23: Tab navigation race condition guard', () => {
 
   test('_handleTabNav increments _navSwitchId on each call', () => {
     // Must see ++_navSwitchId or _navSwitchId++ or _navSwitchId += 1
-    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
     expect(fnBody).toMatch(/\+\+_navSwitchId|_navSwitchId\s*\+\+|_navSwitchId\s*\+=\s*1/);
   });
 
   test('stale-switch guard checks switchId before cached/fresh render', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
     // Must compare the local switchId against the global _navSwitchId
     expect(fnBody).toMatch(/switchId\s*!==\s*_navSwitchId/);
   });
@@ -1037,7 +1038,7 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  test('renderPOMSReference async callback checks _navSwitchId', () => {
+  test.skip('renderPOMSReference async callback checks _navSwitchId (SolidBase: POMS excluded)', () => {
     const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
     expect(fnBody).toMatch(/_navSwitchId/);
   });
@@ -1093,7 +1094,7 @@ describe('G24: Tab stacking prevention', () => {
   });
 
   test('cache-hit path hides all visible panes (not just _activePane)', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
     // The cache-hit block must query all panes in the root
     const cacheBlock = fnBody.match(/if\s*\(cached\)\s*\{[\s\S]*?_touchPane/);
     expect(cacheBlock).not.toBeNull();
@@ -1101,7 +1102,7 @@ describe('G24: Tab stacking prevention', () => {
   });
 
   test('fresh-render path hides all visible panes before _renderTabFresh', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
     // Between "FRESH RENDER" comment and _renderTabFresh call, must hide all panes
     const freshBlock = fnBody.match(/FRESH RENDER[\s\S]*?_renderTabFresh/);
     expect(freshBlock).not.toBeNull();
@@ -1109,21 +1110,21 @@ describe('G24: Tab stacking prevention', () => {
   });
 
   test('orgchart early-return uses _hideAllVisiblePanes', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const orgBlock = fnBody.match(/tabId === 'orgchart'[\s\S]*?renderOrgChart[\s\S]*?return;/);
     expect(orgBlock).not.toBeNull();
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  test.skip('poms early-return uses _hideAllVisiblePanes (not in SolidBase)', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+  test.skip('poms early-return uses _hideAllVisiblePanes (SolidBase: POMS excluded)', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
     expect(pomsBlock).not.toBeNull();
     expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNavInner');
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const memberMore = fnBody.match(/_member_more[\s\S]*?renderMemberMore[\s\S]*?return;/);
     expect(memberMore).not.toBeNull();
     expect(memberMore[0]).toContain('_hideAllVisiblePanes()');

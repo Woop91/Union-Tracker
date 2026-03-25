@@ -582,7 +582,6 @@ var WeeklyQuestions = (function () {
     getPollFrequency:         getPollFrequency,
     setPollFrequency:         setPollFrequency,
     Q_COLS:                   Q_COLS,  // v4.24.4 — exposed so autoSelectCommunityPoll avoids duplicating indices
-    getPeriodKey:             _periodKey, // v4.31.2 — exposed for seedWeeklyQuestions to use correct period
   };
 
 })();

@@ -1931,15 +1931,10 @@ function seedWeeklyQuestions() {
   // _Weekly_Responses:  ID | Question ID | Email Hash | Response | Timestamp
   // _Question_Pool:     ID | Text | Options (JSON) | Submitted By Hash | Status | Created
 
-  // v4.31.2 fix: ensure poll sheets exist before writing — seed silently bailed if sheets missing
-  if (typeof WeeklyQuestions !== 'undefined') {
-    try { WeeklyQuestions.initWeeklyQuestionSheets(); } catch (e) { Logger.log('Poll sheet init: ' + e.message); }
-  }
-
   // --- Question Pool (member-submitted candidates for random draw) ---
   var poolSheet = ss.getSheetByName(SHEETS.QUESTION_POOL);
   if (!poolSheet) {
-    Logger.log('_Question_Pool sheet not found after init. Skipping weekly questions seed.');
+    Logger.log('_Question_Pool sheet not found. Skipping weekly questions seed.');
     return;
   }
 
@@ -1996,18 +1991,11 @@ function seedWeeklyQuestions() {
   var wqSheet = ss.getSheetByName(SHEETS.WEEKLY_QUESTIONS);
   if (wqSheet) {
     var now = new Date();
-    // v4.31.2 fix: use WeeklyQuestions.getPeriodKey() so weekStr respects POLL_FREQUENCY setting
-    // (biweekly/monthly frequencies use different period anchors than simple Monday-of-week)
-    var weekStr;
-    if (typeof WeeklyQuestions !== 'undefined' && typeof WeeklyQuestions.getPeriodKey === 'function') {
-      weekStr = WeeklyQuestions.getPeriodKey();
-    } else {
-      var weekStart = new Date(now);
-      weekStart.setHours(0, 0, 0, 0);
-      var day = weekStart.getDay();
-      weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1));
-      weekStr = weekStart.toISOString().split('T')[0];
-    }
+    var weekStart = new Date(now);
+    weekStart.setHours(0, 0, 0, 0);
+    var day = weekStart.getDay();
+    weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1)); // Monday of this week
+    var weekStr = weekStart.toISOString().split('T')[0];
 
     var stewardOpts = ['Higher wages', 'Reduced caseloads', 'Better benefits', 'More schedule flexibility'];
     var communityOpts = ['Always available', 'Usually available', 'Sometimes available', 'Rarely available'];
@@ -2127,7 +2115,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds DDS/Your Union Local-specific content including
+ * by createResourcesSheet(). Adds union-specific content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -2190,8 +2178,8 @@ function seedResourcesData() {
       'New to the bargaining unit? Here is what you need to know about your rights and benefits.',
       'As a new bargaining unit member you should:\\n\\n1. Know your steward — check the dashboard for contact info\\n2. Read your contract — ask your steward for a copy\\n3. Understand your probation period and what it means\\n4. Set up your PIN for the union dashboard\\n5. Attend new member orientation\\n6. Know your Weingarten rights from day one\\n7. Understand the grievance process\\n8. Complete your workload tracker weekly\\n9. Attend union meetings when possible\\n10. Report any contract violations to your steward\\n\\nYour union is here for you from day one.',
       '', '✅', nextId - 1, 'Yes', 'Members', today, 'System'],
-    ['RES-' + String(nextId++).padStart(3, '0'), 'DDS Collective Bargaining Agreement Summary', 'Contract Article',
-      'Key provisions of the current collective bargaining agreement between Your Union Local and DDS.',
+    ['RES-' + String(nextId++).padStart(3, '0'), 'Collective Bargaining Agreement Summary', 'Contract Article',
+      'Key provisions of the current collective bargaining agreement.',
       'The CBA covers:\\n- Wages and step increases\\n- Health insurance and benefits\\n- Work schedules and overtime\\n- Grievance and arbitration procedures\\n- Seniority rights\\n- Transfers and promotions\\n- Discipline and discharge (just cause)\\n- Leave policies (sick, personal, vacation)\\n- Workplace safety\\n- Union rights and representation\\n\\nThe full contract is available from your steward or union office. Key articles are referenced in grievance filings — your steward will identify the specific articles that apply to your situation.',
       '', '📜', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Caseload Standards & Workload Rights', 'Policy',

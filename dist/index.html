@@ -93,42 +93,6 @@
  
  
  
- 
- var _clientErrorCount = 0;
- var _CLIENT_ERROR_LIMIT = 5;
- function _reportClientError(data) {
-  if (_clientErrorCount >= _CLIENT_ERROR_LIMIT) return;
-  _clientErrorCount++;
-  try {
-  google.script.run.dataLogClientError(data);
-  } catch (_) {  }
- }
- window.onerror = function(msg, url, line, col, error) {
-  _reportClientError({
-  type: 'uncaught',
-  message: String(msg || '').substring(0, 500),
-  line: line || 0,
-  col: col || 0,
-  stack: (error && error.stack) ? error.stack.substring(0, 1000) : '',
-  pane: (typeof AppState !== 'undefined' && AppState.activeTab) ? AppState.activeTab : 'bootstrap',
-  ua: navigator.userAgent
-  });
- };
- window.addEventListener('unhandledrejection', function(ev) {
-  var reason = ev.reason || {};
-  _reportClientError({
-  type: 'promise',
-  message: String(reason.message || reason).substring(0, 500),
-  stack: (reason.stack || '').substring(0, 1000),
-  pane: (typeof AppState !== 'undefined' && AppState.activeTab) ? AppState.activeTab : 'bootstrap',
-  ua: navigator.userAgent
-  });
- });
-
- 
- 
- 
- 
  var _preloadedBatch = null;
  var _preloadReady = false;
  var _preloadCallbacks = [];
@@ -1021,6 +985,7 @@
   loading: true,
   initialTab: INITIAL_TAB, 
   notificationCount: 0,
+  defaultView: PAGE_DATA.defaultView || 'steward', 
  };
 
  
@@ -1178,26 +1143,48 @@
   case 'member':
    
    
+   var _bootRole = CURRENT_VIEW;
+   if (IS_DUAL_ROLE && AppState.defaultView === 'member' && CURRENT_VIEW === 'steward') {
+   _bootRole = 'member';
+   AppState.activeRole = 'member';
+   AppState.activeTab = 'home';
+   }
+   
+   function _bootRender(appEl) {
+   if (_bootRole === 'steward') {
+    initStewardView(appEl);
+   } else if (_bootRole === 'member' && IS_DUAL_ROLE && CURRENT_VIEW === 'steward') {
+    
+    _loadMemberViewThen(appEl, function() { initMemberView(appEl); });
+   } else {
+    initMemberView(appEl);
+   }
+   }
+   
+   
    if (CURRENT_USER && CURRENT_USER.email) {
-   if (_swrApplied && _preloadedBatch) {
+   if (_swrApplied && _preloadedBatch && _bootRole === CURRENT_VIEW) {
     
     AppState.batchData = _preloadedBatch;
-    if (CURRENT_VIEW === 'steward') initStewardView(app);
-    else initMemberView(app);
+    _bootRender(app);
     
     _onPreloadReady(function(freshBatch) {
     if (freshBatch) AppState.batchData = freshBatch;
     });
    } else {
+    
+    if (_bootRole !== CURRENT_VIEW) {
+    // Member default: don't wait for steward batch — member view fetches its own data
+    _bootRender(app);
+    } else {
     _onPreloadReady(function(batch) {
-    AppState.batchData = batch;
-    if (CURRENT_VIEW === 'steward') initStewardView(app);
-    else initMemberView(app);
+     AppState.batchData = batch;
+     _bootRender(app);
     });
+    }
    }
    } else {
-   if (CURRENT_VIEW === 'steward') initStewardView(app);
-   else initMemberView(app);
+   _bootRender(app);
    }
    break;
   case 'error':
@@ -1457,13 +1444,6 @@
  var _layoutCache = {};
 
  function renderPageLayout(container, role, activeTab, contentFn) {
-  
-  if (IS_DEV_MODE && !_insideHandleTabNav && !_insideRoleInit) {
-  console.warn('[RenderGuard] renderPageLayout("' + activeTab + '") called outside _handleTabNav. ' +
-   'This bypasses pane caching, nav highlights, and stale-switch guards. ' +
-   'Route through _handleTabNav instead.');
-  }
-
   getLayoutMode(); 
 
   
@@ -1849,7 +1829,7 @@
    var app = document.getElementById('app');
    try {
     if (switchRole === 'steward') initStewardView(app);
-    else _loadMemberViewThen(app, function() { initMemberView(app); });
+    else initMemberView(app);
    } catch (switchErr) {
     console.error('Switch role error:', switchErr);
     app.innerHTML = '';
@@ -1863,6 +1843,27 @@
   }, [
    el('span', { className: 'sidebar-item-icon' }, role === 'steward' ? '\uD83D\uDC64' : '\uD83D\uDD27'),
    el('span', null, 'Switch to ' + switchLabel)
+  ]));
+  
+  var isDefault = AppState.defaultView === role;
+  var defaultLabelEl = el('span', null,
+   isDefault ? '\u2713 Default view' : 'Set as default login view'
+  );
+  sidebar.appendChild(el('div', {
+   className: 'sidebar-item',
+   style: { fontSize: '12px', opacity: isDefault ? '0.5' : '0.75', paddingLeft: '20px' },
+   onClick: isDefault ? function() {} : function() {
+   AppState.defaultView = role;
+   defaultLabelEl.textContent = '\u2713 Default view';
+   this.style.opacity = '0.5';
+   serverCall()
+    .withSuccessHandler(function() {})
+    .withFailureHandler(function(err) { console.error('Failed to save default view:', err); })
+    .dataSetDefaultView(SESSION_TOKEN, role);
+   }
+  }, [
+   el('span', { className: 'sidebar-item-icon', style: { fontSize: '12px' } }, '\uD83D\uDCCC'),
+   defaultLabelEl
   ]));
   }
   sidebar.appendChild(el('div', {
@@ -2026,8 +2027,6 @@
  var _DEV_ONLY_TABS = { testrunner: 1 };
  
  var _GRIEVANCE_TABS = { cases: 1, newgrievance: 1 };
- 
- var _DUES_GATED_TABS = { resources: 1, orgchart: 1, polls: 1, takesurvey: 1, unionstats: 1 };
 
  function _filterDevTabs(tabs) {
   var filtered = tabs;
@@ -2069,7 +2068,6 @@
   { group: 'Temp' },
   { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
   { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
-  { id: 'guide', icon: '\uD83D\uDCD6', label: 'Welcome Guide' },
   { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ]);
   return [
@@ -2096,18 +2094,8 @@
   { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
   { id: 'reportcard', icon: '\uD83D\uDCCB', label: 'Report Card' },
   { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
-  { id: 'guide', icon: '\uD83D\uDCD6', label: 'Welcome Guide' },
   { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ];
- }
-
- 
- function _findTabDef(role, tabId) {
-  var tabs = _getSidebarTabs(role);
-  for (var i = 0; i < tabs.length; i++) {
-  if (tabs[i].id === tabId) return tabs[i];
-  }
-  return null;
  }
 
  
@@ -2255,9 +2243,9 @@
   { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
   { id: 'more_steward', icon: '\u2630', label: 'More' },
   ] : [
-  { id: 'memberhub', icon: '\u270A', label: 'Hub' },
   { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
-  { id: 'notifications', icon: '\uD83D\uDD14', label: 'Alerts' },
+  { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
+  { id: 'stewarddirectory', icon: '\uD83D\uDCAC', label: 'Contact' },
   { id: 'more', icon: '\u2630', label: 'More' },
   ];
 
@@ -2370,11 +2358,6 @@
    }
   }
 
-  
-  if ((tab.id === 'more' || tab.id === 'more_steward') && tab.id !== activeTab) {
-   item.classList.add('nav-more-pulse');
-  }
-
   item.appendChild(iconWrap);
   var label = el('span', { className: 'nav-label' }, tab.label);
   if (tab.id === activeTab && navTheme === 'default') label.style.color = 'var(--accent)';
@@ -2409,9 +2392,12 @@
  
  
  var _memberViewLoaded = typeof initMemberView === 'function';
+ var _memberViewLoading = false; 
 
  function _loadMemberViewThen(container, callback) {
   if (_memberViewLoaded) { callback(); return; }
+  if (_memberViewLoading) return; 
+  _memberViewLoading = true;
   showLoading(container, 'kpi');
   google.script.run
   .withSuccessHandler(function(html) {
@@ -2429,10 +2415,28 @@
     }
    }
    }
+   
+   if (typeof initMemberView !== 'function') {
+   console.error('Member view scripts loaded but initMemberView not defined. html length:', (html || '').length);
+   _memberViewLoading = false;
+   container.innerHTML = '';
+   var errCard = el('div', { style: { textAlign: 'center', padding: '40px' } });
+   errCard.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'));
+   errCard.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '8px', color: 'var(--text)' } }, 'Member view failed to load'));
+   errCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '16px' } }, 'The server returned empty content. Please reload the page.'));
+   errCard.appendChild(el('button', {
+    style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' },
+    onClick: function() { location.reload(); }
+   }, 'Reload'));
+   container.appendChild(errCard);
+   return;
+   }
    _memberViewLoaded = true;
+   _memberViewLoading = false;
    callback();
   })
   .withFailureHandler(function(err) {
+   _memberViewLoading = false;
    console.error('Failed to load member view:', err);
    container.innerHTML = '';
    var errCard = el('div', { style: { textAlign: 'center', padding: '40px' } });
@@ -2565,7 +2569,7 @@
  }
 
  
- var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1, takesurvey: 1 };
+ var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
 
  
  function _invalidateTabCache(tabId) {
@@ -2608,64 +2612,7 @@
   return { stale: function() { return id !== _navSwitchId || gen !== _renderGeneration; } };
  }
 
- 
- 
- 
- 
- 
- var _insideHandleTabNav = false;
- var _insideRoleInit = false; 
-
- 
- 
- 
- 
- 
- function _validateTabIntegrity() {
-  if (!IS_DEV_MODE) return;
-  var warns = [];
-
-  
-  ['steward', 'member'].forEach(function(role) {
-  var tabs = _getSidebarTabs(role);
-  tabs.forEach(function(t) {
-   if (!t.id) return;
-   var fn = _getTabRenderFn(role, t.id);
-   
-   if (!fn && t.id !== 'poms' && t.id !== 'orgchart') {
-   warns.push('[TabIntegrity] ' + role + ' sidebar tab "' + t.id + '" has no render function');
-   }
-  });
-  });
-
-  
-  for (var devTab in _DEV_ONLY_TABS) {
-  var fn = _getTabRenderFn('steward', devTab);
-  if (fn && fn === renderTestRunnerPage) {
-   
-   warns.push('[TabIntegrity] Dev-only tab "' + devTab + '" returns render fn without IS_DEV_MODE guard in _getTabRenderFn');
-  }
-  }
-
-  
-  // (We can't introspect the function body, but we can check the tab is registered)
-  for (var duesTab in _DUES_GATED_TABS) {
-  if (!_getTabRenderFn('member', duesTab) && duesTab !== 'poms' && duesTab !== 'orgchart') {
-   warns.push('[TabIntegrity] Dues-gated tab "' + duesTab + '" has no member render function');
-  }
-  }
-
-  if (warns.length > 0) {
-  console.warn('=== Tab Integrity Warnings (' + warns.length + ') ===');
-  warns.forEach(function(w) { console.warn(w); });
-  }
- }
-
  function _handleTabNav(role, tabId) {
-  _insideHandleTabNav = true;
-  try { return _handleTabNavInner(role, tabId); } finally { _insideHandleTabNav = false; }
- }
- function _handleTabNavInner(role, tabId) {
   var app = document.getElementById('app');
   var switchId = ++_navSwitchId; 
   _renderGeneration++; 
@@ -2746,20 +2693,14 @@
   }
 
   
-  
-  
-  
-  if (role === 'member' && _DUES_GATED_TABS[tabId] && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
-  if (typeof _renderDuesGate === 'function') {
-   var gateLabel = (_findTabDef(role, tabId) || {}).label || tabId;
-   _renderDuesGate(app, gateLabel, function() { _handleTabNav(role, 'home'); });
-  }
-  _navProgressDone();
-  return;
-  }
-
-  
   if (tabId === 'orgchart') {
+  if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
+   if (typeof _renderDuesGate === 'function') {
+   _renderDuesGate(app, 'Org Chart', function() { _handleTabNav(role, 'home'); });
+   }
+   _navProgressDone();
+   return;
+  }
   _hideAllVisiblePanes();
   _splitRenderTarget = 'primary';
   renderOrgChart(app, role);
@@ -2767,6 +2708,8 @@
   _navProgressDone();
   return;
   }
+  
+
   
   if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 
@@ -2894,7 +2837,7 @@
  function _getTabRenderFn(role, tabId) {
   
   if (CONFIG.showGrievances === false && _GRIEVANCE_TABS[tabId]) {
-  tabId = role === 'member' ? 'home' : 'members';
+  tabId = role === 'member' ? 'home' : 'home';
   }
   if (role === 'member') {
   switch(tabId) {
@@ -2903,6 +2846,7 @@
    case 'cases': return renderMyCases;
    case 'profile': return renderUpdateProfile;
    case 'resources': return renderMemberResources;
+   case 'workload': return renderWorkloadTracker;
    case 'weeklyq': 
    case 'polls': return renderPollsPage;
    case 'survey': return renderSurveyResultsPage;
@@ -2918,8 +2862,6 @@
    case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
    case 'timeline': return renderMemberTimelinePage;
    case 'reportcard': return renderReportCard;
-   case 'takesurvey': return renderSurveyFormPage;
-   case 'guide': return renderWelcomeGuide;
    default: return renderMemberHome;
   }
   } else {
@@ -2949,7 +2891,6 @@
    case 'failsafe': return renderFailsafePage;
    case 'search': return renderSearchPage;
    case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
-   case 'guide': return function(a) { renderWelcomeGuide(a, 'steward'); };
    default: return renderStewardDashboard;
   }
   }
@@ -3790,13 +3731,12 @@
   <?!= include('shared_components') ?>
   <?!= include('auth_manifesto') ?>
   <?!= include('member_hub_view') ?>
-  <?!= include('welcome_guide_view') ?>
 
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>
   <? } else if (view === 'steward' || view === 'both') { ?>
     <?!= include('steward_view') ?>
-    
+    <?!= include('member_view') ?>
   <? } else if (view === 'member') { ?>
     <?!= include('member_view') ?>
   <? } else { ?>

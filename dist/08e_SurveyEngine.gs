@@ -292,9 +292,6 @@ function openNewSurveyPeriod(callerEmail) {
       // Reset _Survey_Tracking statuses to 'Not Completed' for new period
       startNewSurveyRound();
 
-      // Invalidate survey questions cache so members see updated period status immediately
-      try { CacheService.getScriptCache().remove('surveyQuestions_v1'); } catch (_c) { Logger.log('_c: ' + (_c.message || _c)); }
-
       // Push survey-open notification to all active members
       pushSurveyOpenNotification_(periodName);
 
@@ -431,9 +428,6 @@ function archiveSurveyPeriod_(periodId) {
     rowData[C.STATUS      - 1] = 'Closed';
     rowData[C.ARCHIVE_URL - 1] = pastFolderUrl;
     periodsSheet.getRange(periodRow, 1, 1, 8).setValues([rowData]);
-
-    // Invalidate survey questions cache so members see updated period status
-    try { CacheService.getScriptCache().remove('surveyQuestions_v1'); } catch (_c) { Logger.log('_c: ' + (_c.message || _c)); }
 
     Logger.log('archiveSurveyPeriod_: Archived ' + periodId + ' → ' + (pastFolderUrl || '(no Drive URL)'));
 

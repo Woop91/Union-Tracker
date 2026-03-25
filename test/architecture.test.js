@@ -587,7 +587,7 @@ describe('A9: UI tab routes have matching render functions', () => {
 
   // Each routed function must be defined SOMEWHERE in the HTML files
   // (any of the SPA HTML files, including auth_view.html and error_view.html)
-  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html', 'member_hub_view.html', 'welcome_guide_view.html'].map(f =>
+  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html', 'member_hub_view.html'].map(f =>
     fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
   ).join('\n');
 
@@ -699,7 +699,6 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetWorkloadSummaryStats',
     'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
     'dataGetGrievanceForSigning', 'dataSubmitGrievanceSignature', // sigToken auth, not session
-    'dataLogClientError', // telemetry — must work during auth failures (no session to validate)
   ];
 
   // Functions that are init/admin only (not called from client google.script.run)
@@ -756,17 +755,18 @@ describe('A11: Server-exposed functions have auth checks', () => {
 // All client-callable functions in 22_WebDashApp.gs that return HTML content
 // must verify Session.getActiveUser().getEmail() before serving.
 
-describe('A11b: Client-callable HTML endpoints have auth checks', () => {
+describe('A11b: Client-callable HTML endpoints have error handling', () => {
   const webAppSrc = fs.readFileSync(
     path.resolve(__dirname, '..', 'src', '22_WebDashApp.gs'), 'utf8'
   );
 
-  // HTML-serving endpoints that must have auth
-  const htmlEndpoints = ['getOrgChartHtml'];
+  // HTML-serving endpoints — serve static content, auth enforced by doGet().
+  // No per-function auth check: Session.getActiveUser().getEmail() returns empty
+  // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
+  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml', 'getPOMSReferenceHtml'];
 
   htmlEndpoints.forEach(fn => {
-    test(`${fn}() checks Session.getActiveUser before serving content`, () => {
-      // Extract the function body
+    test(`${fn}() has try/catch error handling`, () => {
       const fnRegex = new RegExp(
         'function\\s+' + fn + '\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)^\\}',
         'm'
@@ -774,16 +774,13 @@ describe('A11b: Client-callable HTML endpoints have auth checks', () => {
       const match = webAppSrc.match(fnRegex);
       expect(match).not.toBeNull();
       const body = match[1];
-      const hasSessionCheck = body.includes('Session.getActiveUser()') ||
-                              body.includes('_resolveCallerEmail') ||
-                              body.includes('_requireStewardAuth') ||
-                              body.includes('checkWebAppAuthorization');
-      expect(hasSessionCheck).toBe(true);
+      expect(body).toMatch(/try\s*\{/);
+      expect(body).toMatch(/catch\s*\(/);
     });
   });
 
   htmlEndpoints.forEach(fn => {
-    test(`${fn}() returns safe fallback when auth fails`, () => {
+    test(`${fn}() returns safe fallback on error`, () => {
       const fnRegex = new RegExp(
         'function\\s+' + fn + '\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)^\\}',
         'm'
@@ -791,8 +788,8 @@ describe('A11b: Client-callable HTML endpoints have auth checks', () => {
       const match = webAppSrc.match(fnRegex);
       expect(match).not.toBeNull();
       const body = match[1];
-      // Must have an auth-failure return that doesn't serve the HTML file
-      expect(body).toMatch(/if\s*\(!email\)\s*return/);
+      // catch block must return a safe value (empty string or HTML message)
+      expect(body).toMatch(/catch\s*\(\w+\)\s*\{[\s\S]*return\s/);
     });
   });
 });
@@ -1138,6 +1135,7 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataGetAuditLog',                 // reads _Audit_Log sheet directly for Access Log Viewer (v4.36.0)
     'dataInitiateGrievance',           // delegates to initiateGrievance() via withScriptLock_ (05_Integrations.gs)
     'dataLogClientError',              // writes directly to _ClientErrors sheet (telemetry, no DataService needed)
+    'dataSetDefaultView',              // writes to ScriptProperties (per-user view preference, no DataService needed)
   ];
 
   wrappers

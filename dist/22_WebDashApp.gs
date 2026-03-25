@@ -44,24 +44,6 @@
 function doGet(e) {
   e = e || { parameter: {} };
 
-  // v4.37.0 — Lightweight health check endpoint for post-deploy smoke tests.
-  // Returns JSON with version, timestamp, and basic system status.
-  // No auth required — returns only non-sensitive operational data.
-  if (e.parameter && e.parameter.healthz === '1') {
-    var health = { ok: true, version: COMMAND_CONFIG.VERSION, timestamp: new Date().toISOString() };
-    try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      health.spreadsheet = !!ss;
-      if (ss) health.sheets = ss.getSheets().length;
-    } catch (hErr) {
-      health.ok = false;
-      health.spreadsheet = false;
-      health.error = hErr.message;
-    }
-    return ContentService.createTextOutput(JSON.stringify(health))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
   // v4.33.0 — E-Signature page (token-authenticated, no login required)
   if (e.parameter && e.parameter.page === 'esign') {
     try {
@@ -169,20 +151,17 @@ function doGetWebDashboard(e) {
       return _serveError(config, 'not_found', user.email);
     }
 
-    // Handle session persistence for non-SSO auth methods.
-    // Magic link tokens are one-use (CR-03), so without a session token the user
-    // would be kicked back to login on every page load/refresh.
-    // - remember=1: long-lived session (cookieDurationMs, default 30 days)
-    // - magic link without remember: short-lived session (24 hours) so the user
-    //   isn't locked out after a single page load (v4.34.4 — Android login fix)
+    // Handle "remember me" — create session token if requested
+    // Also echo back an existing validated session token so the client always has
+    // SESSION_TOKEN populated for non-SSO auth (magic link + remember me, or returning
+    // session users). This is safe: the token was already validated by resolveUser().
     var sessionToken = null;
-    if (user.method === 'magic') {
-      var shortLived = (e.parameter.remember !== '1');
-      var tokenResult = Auth.createSessionToken(user.email, shortLived);
+    if (e.parameter.remember === '1' && user.method === 'magic') {
+      var tokenResult = Auth.createSessionToken(user.email);
       // C3: Handle session storage failure — createSessionToken may return error object
       if (tokenResult && typeof tokenResult === 'object' && tokenResult.error) {
         Logger.log('Session token storage failed: ' + tokenResult.message);
-        // Proceed without session; user will need to re-authenticate next visit
+        // Proceed without remember-me; user will need to re-authenticate next visit
       } else {
         sessionToken = tokenResult;
       }
@@ -224,7 +203,6 @@ function _serveAuth(config, e, authError) {
     error: e.parameter.authError || authError || null,
     webAppUrl: _getWebAppUrlSafe(),
     tokenChecked: !!(e.parameter.sessionToken),
-    isDevMode: !isProductionMode(),
   });
 
   return template.evaluate()
@@ -264,11 +242,23 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var colorThemeData = {};
   try { colorThemeData = getUserColorTheme(); } catch (_e) { colorThemeData = { themeKey: 'default', accentHue: 250 }; }
 
+  // Read default view preference for dual-role users (ScriptProperties, email-keyed).
+  // Uses ScriptProperties (not UserProperties) because UserProperties returns the
+  // script owner's props in Execute-as-Me webapps — shared, not per-user.
+  var defaultView = 'steward';
+  if (role === 'both') {
+    try {
+      var pref = PropertiesService.getScriptProperties().getProperty('defaultView_' + userRecord.email.toLowerCase());
+      if (pref === 'member') defaultView = 'member';
+    } catch (_) {}
+  }
+
   template.pageData = JSON.stringify({
     view: role === 'steward' || role === 'both' ? 'steward' : 'member',
     config: _sanitizeConfig(config),
     user: safeUser,
     isDualRole: role === 'steward' || role === 'both',
+    defaultView: defaultView,
     sessionToken: sessionToken || null,
     initialTab: initialTab || null,
     webAppUrl: _getWebAppUrlSafe(),
@@ -496,8 +486,10 @@ function include(filename) {
  */
 function getMemberViewHtml() {
   try {
-    var email = Session.getActiveUser().getEmail();
-    if (!email) return '';
+    // No auth check needed — user already authenticated via doGet().
+    // Session.getActiveUser().getEmail() returns empty for magic-link/session-token
+    // users (Execute-as-Me), which was causing this to return '' and silently
+    // breaking the member view switch for dual-role users.
     // No CacheService — member_view.html exceeds the 100KB per-key limit.
     return HtmlService.createHtmlOutputFromFile('member_view').getContent();
   } catch (e) {
@@ -513,8 +505,8 @@ function getMemberViewHtml() {
  */
 function getOrgChartHtml() {
   try {
-    var email = Session.getActiveUser().getEmail();
-    if (!email) return '<div class="empty-state">Authentication required.</div>';
+    // No auth check — user already authenticated via doGet().
+    // Session.getActiveUser().getEmail() returns empty for magic-link users.
     // PERF: Cache static HTML in CacheService — avoids re-reading the file on every tab click.
     // Version-keyed so deploys automatically bust the cache.
     var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
@@ -532,11 +524,27 @@ function getOrgChartHtml() {
 }
 
 /**
- * Stub: POMS Reference not available in SolidBase.
- * @returns {string} Placeholder message
+ * Client-callable: Returns the POMS Reference HTML for lazy-loading.
+ * Loaded on-demand when the user navigates to the POMS Reference tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
  */
 function getPOMSReferenceHtml() {
-  return '<div class="empty-state">POMS Reference is not available in this deployment.</div>';
+  try {
+    // No auth check — user already authenticated via doGet().
+    // Session.getActiveUser().getEmail() returns empty for magic-link users.
+    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_poms_ref_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    Logger.log('getPOMSReferenceHtml error: ' + e.message);
+    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
+  }
 }
 
 /**

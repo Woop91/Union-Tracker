@@ -68,7 +68,7 @@ function showAuthChoose(container) {
  if (ssoError === 'sso_failed') {
  var ssoMsg = el('div', {
   style: { fontSize: '12px', color: 'var(--danger)', marginTop: '8px', textAlign: 'center', lineHeight: '1.5' }
- }, 'Google sign-in could not detect your account. This is common on Android and mobile browsers due to cookie restrictions. Use the email link option below \u2014 it works reliably on all devices.');
+ }, 'Google sign-in requires you to be logged into a Google account in this browser. Try the email link option instead.');
  card.appendChild(ssoMsg);
  }
 
@@ -85,26 +85,6 @@ function showAuthChoose(container) {
  onClick: function() { showAuthEmail(container); }
  }, '\u2709\uFE0F  Email me a sign-in link');
  card.appendChild(emailBtn);
-
- 
- if (IS_DEV_MODE) {
- var pinDivider = el('div', { className: 'auth-divider', style: { marginTop: '12px' } });
- pinDivider.appendChild(el('div', { className: 'auth-divider-line' }));
- pinDivider.appendChild(el('span', { className: 'auth-divider-text' }, 'or'));
- pinDivider.appendChild(el('div', { className: 'auth-divider-line' }));
- card.appendChild(pinDivider);
-
- var pinBtn = el('button', {
-  className: 'btn btn-secondary',
-  style: { background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#f59e0b' },
-  onClick: function() { showAuthDevPin(container); }
- }, '\uD83D\uDD11  Sign in with a PIN (Dev)');
- card.appendChild(pinBtn);
-
- card.appendChild(el('div', {
-  style: { fontSize: '10px', color: '#f59e0b', textAlign: 'center', marginTop: '6px' }
- }, 'Dev build only \u2014 not available in production'));
- }
 
  
  var footer = el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' } });
@@ -149,17 +129,16 @@ function showAuthEmail(container) {
  wrapper.appendChild(emailInput);
 
  
- 
- var rememberMe = { value: true };
- var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' }, role: 'switch', 'aria-checked': 'true', tabIndex: 0 });
+ var rememberMe = { value: false };
+ var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' }, role: 'switch', 'aria-checked': 'false', tabIndex: 0 });
 
  var track = el('div', {
  className: 'auth-toggle-track',
- style: { background: 'var(--accent)' }
+ style: { background: 'var(--border, #333)' }
  });
  var thumb = el('div', {
  className: 'auth-toggle-thumb',
- style: { left: '18px' }
+ style: { left: '2px' }
  });
  track.appendChild(thumb);
  toggleContainer.appendChild(track);
@@ -308,98 +287,6 @@ function showAuthSent(container, email, rememberMe) {
  wrapper.appendChild(actions);
 
  container.appendChild(wrapper);
-}
-
-function showAuthDevPin(container) {
- container.innerHTML = '';
- var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
-
- var back = el('button', {
- style: { color: 'var(--accent)', fontSize: '13px', marginBottom: '20px', textAlign: 'left', fontFamily: 'var(--fontBody)', alignSelf: 'flex-start' },
- 'aria-label': 'Go back',
- onClick: function() { showAuthChoose(container); }
- }, '\u2190 Back');
- wrapper.appendChild(back);
-
- wrapper.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD11'));
- wrapper.appendChild(el('div', { className: 'auth-title' }, 'Sign in with PIN'));
- wrapper.appendChild(el('div', {
- style: { fontSize: '13px', color: 'var(--muted)', marginTop: '4px', marginBottom: '20px', lineHeight: '1.5' }
- }, 'Enter the 6-digit PIN your steward gave you.'));
-
- 
- wrapper.appendChild(el('div', {
- style: { display: 'inline-block', background: 'rgba(251, 191, 36, 0.15)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#f59e0b', fontSize: '10px', fontWeight: '600', padding: '3px 10px', borderRadius: '6px', marginBottom: '20px' }
- }, 'DEV BUILD ONLY'));
-
- 
- var pinInput = el('input', {
- className: 'auth-input',
- type: 'text',
- inputMode: 'numeric',
- maxLength: 6,
- placeholder: '\u2022\u2022\u2022\u2022\u2022\u2022',
- autocomplete: 'one-time-code',
- style: { textAlign: 'center', fontSize: '28px', letterSpacing: '10px', fontWeight: '700', maxWidth: '220px' },
- });
- wrapper.appendChild(pinInput);
-
- var errorMsg = el('div', { style: { fontSize: '12px', color: 'var(--danger)', textAlign: 'center', marginTop: '8px', minHeight: '18px' } });
- wrapper.appendChild(errorMsg);
-
- var signInBtn = el('button', {
- className: 'btn btn-primary',
- style: { marginTop: '12px', opacity: '0.5', background: '#f59e0b', borderColor: '#f59e0b', maxWidth: '220px', width: '100%' },
- onClick: function() { _verifyDevPin(container, pinInput.value.trim(), errorMsg, signInBtn); }
- }, 'Sign in');
- wrapper.appendChild(signInBtn);
-
- pinInput.addEventListener('input', function() {
- errorMsg.textContent = '';
- signInBtn.style.opacity = pinInput.value.trim().length === 6 ? '1' : '0.5';
- });
- pinInput.addEventListener('keydown', function(e) {
- if (e.key === 'Enter') signInBtn.click();
- });
-
- 
- wrapper.appendChild(el('div', {
- style: { fontSize: '11px', color: 'var(--muted)', marginTop: '20px', lineHeight: '1.5', maxWidth: '260px' }
- }, 'Don\'t have a PIN? Ask your steward to generate one for you from the Members tab.'));
-
- container.appendChild(wrapper);
- pinInput.focus();
-}
-
-function _verifyDevPin(container, pin, errorEl, btn) {
- if (!pin || pin.length !== 6) { errorEl.textContent = 'Enter the 6-digit PIN from your steward.'; return; }
- btn.disabled = true;
- btn.textContent = 'Verifying...';
-
- google.script.run
- .withSuccessHandler(function(result) {
-  if (result && result.success) {
-  
-  if (result.sessionToken) {
-   try { localStorage.setItem('dashboardSessionToken', result.sessionToken); } catch (_e) {  }
-  }
-  if (WEB_APP_URL && result.sessionToken) {
-   window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
-  } else {
-   window.top.location.reload();
-  }
-  } else {
-  btn.disabled = false;
-  btn.textContent = 'Sign in';
-  errorEl.textContent = (result && result.message) || 'Invalid PIN.';
-  }
- })
- .withFailureHandler(function(err) {
-  btn.disabled = false;
-  btn.textContent = 'Sign in';
-  errorEl.textContent = (err && err.message) || 'Server error. Please try again.';
- })
- .authVerifyDevPin(pin);
 }
 
 function showAuthError(container, message, email) {

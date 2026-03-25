@@ -1,7 +1,7 @@
 {
   "name": "solidbase-dashboard",
-  "version": "4.37.1",
-  "description": "SolidBase — Modular Union Dashboard for Google Sheets",
+  "version": "4.38.0",
+  "description": "SolidBase — Modular Union Steward Dashboard",
   "main": "build.js",
   "scripts": {
     "build": "node build.js",
@@ -45,7 +45,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Woop91/SolidBase"
+    "url": "https://github.com/Woop91/SolidBase.git"
   },
   "lint-staged": {
     "src/**/*.gs": [

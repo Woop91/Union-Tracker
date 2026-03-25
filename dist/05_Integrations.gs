@@ -4505,7 +4505,7 @@ function submitGrievanceSignature(sigToken, sigBase64) {
       grievant:   memberName,
       jobtitle:   '', // from member dir if available
       startdate:  hireDateStr,
-      agency:     'Your Organization',
+      agency:     '',
       region:     regionVal,
       workloc:    workLoc,
       articles:   grievanceObj.articles,

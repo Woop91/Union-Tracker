@@ -1,9 +1,8 @@
 <script>
 /**
  * Steward View — "Mono Signal"
- * v4.36.0 — Cases, Members tab, Broadcast, Survey tracking, Polls manager,
- * Resources tab, responsive sidebar layout, Insights, Engagement, Mentorship,
- * Contact Log, Access Log, Timeline, Failsafe, deadline calendar, trend alerts.
+ * v4.12.0 — Cases, Members tab, Broadcast, Survey tracking, Weekly Q manager,
+ * Resources tab, responsive sidebar layout.
  */
 
 // ═══════════════════════════════════════
@@ -11,7 +10,6 @@
 // ═══════════════════════════════════════
 
 function initStewardView(container) {
-  _insideRoleInit = true;
   var t = ThemeEngine.getTheme('steward', AppState.isDark);
   ThemeEngine.applyTheme(t);
   AppState.activeRole = 'steward';
@@ -29,15 +27,12 @@ function initStewardView(container) {
     AppState.qaUnansweredCount = batch.qaUnansweredCount || 0;
     AppState.loading = false;
     renderStewardDashboard(container);
-    _insideRoleInit = false;
     _checkDeepLink('steward');
     _prefetchInsights();
-    if (IS_DEV_MODE && typeof _validateTabIntegrity === 'function') _validateTabIntegrity();
     return;
   }
 
   // OPT-1: Single batch endpoint replaces 3+ sequential server calls
-  _insideRoleInit = false; // async path — render happens inside _handleTabNav via _checkDeepLink
   serverCall()
     .withSuccessHandler(function(result) {
       AppState.cases = result.cases || [];
@@ -48,20 +43,15 @@ function initStewardView(container) {
       AppState.qaUnansweredCount = (result.badges && result.badges.qaUnansweredCount) || 0;
       AppState.memberCount = result.memberCount || 0;
       AppState.loading = false;
-      _insideRoleInit = true;
       renderStewardDashboard(container);
-      _insideRoleInit = false;
       _checkDeepLink('steward');
       _prefetchInsights();
-      if (IS_DEV_MODE && typeof _validateTabIntegrity === 'function') _validateTabIntegrity();
     })
     .withFailureHandler(function() {
       AppState.cases = [];
       AppState.kpis = { totalCases: 0, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
       AppState.loading = false;
-      _insideRoleInit = true;
       renderStewardDashboard(container);
-      _insideRoleInit = false;
     })
     .dataGetStewardDashboardInit(SESSION_TOKEN);
 }
@@ -108,7 +98,7 @@ function _stewardHeader(container, title, subtitle) {
     // All stewards can switch to member view (every steward is also a member)
     headerRight.appendChild(el('button', {
       style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '8px 14px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', minHeight: '36px' },
-      onClick: function() { _invalidateTabCache(); _activePane = null; _layoutCache = {}; _tabPanesRole = null; AppState.activeRole = 'member'; AppState.activeTab = 'home'; var _app = document.getElementById('app'); _loadMemberViewThen(_app, function() { initMemberView(_app); }); }
+      onClick: function() { _invalidateTabCache(); _activePane = null; _layoutCache = {}; _tabPanesRole = null; AppState.activeRole = 'member'; AppState.activeTab = 'home'; var _app = document.getElementById('app'); try { _loadMemberViewThen(_app, function() { initMemberView(_app); }); } catch(e) { console.error('Switch to member error:', e); _app.innerHTML = ''; _app.appendChild(el('div', { style: { textAlign: 'center', padding: '40px' } }, [el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'), el('div', { style: { fontWeight: '600', marginBottom: '8px' } }, 'Failed to switch view'), el('button', { style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' }, onClick: function() { location.reload(); } }, 'Reload')])); } }
     }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
       AppState.isDark = !AppState.isDark;
@@ -2225,57 +2215,12 @@ function _showMemberDetail(container, itemEl, member) {
     }
   }, '\uD83D\uDCCB View Contact History');
 
-  // ── Generate Login PIN (dev only) ──────────────────────────────────────
-  var genPinBtn = null;
-  if (IS_DEV_MODE) {
-    genPinBtn = el('button', {
-      style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#f59e0b', fontWeight: '600', cursor: 'pointer' },
-      onClick: function() {
-        genPinBtn.disabled = true;
-        genPinBtn.textContent = 'Generating...';
-        serverCall()
-          .withSuccessHandler(function(result) {
-            genPinBtn.disabled = false;
-            genPinBtn.textContent = '\uD83D\uDD11 Generate Login PIN';
-            if (result && result.success) {
-              // Show the PIN in a styled display area
-              var existingPinDisplay = actionArea.querySelector('.dev-pin-display');
-              if (existingPinDisplay) existingPinDisplay.remove();
-              var pinDisplay = el('div', { className: 'dev-pin-display', style: { borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '8px' } });
-              pinDisplay.appendChild(el('div', { style: { fontSize: '11px', color: '#f59e0b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '\uD83D\uDD11 Login PIN for ' + escapeHtml(result.memberName || member.name)));
-              var pinBox = el('div', { style: { display: 'inline-block', fontSize: '28px', fontWeight: '700', letterSpacing: '8px', color: 'var(--text)', background: 'var(--raised)', border: '2px dashed rgba(251, 191, 36, 0.4)', borderRadius: '10px', padding: '12px 24px', fontFamily: 'monospace', userSelect: 'all' } }, result.pin);
-              pinDisplay.appendChild(pinBox);
-              pinDisplay.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.5' } }, 'Give this PIN to the member. They can enter it on the login page to access the dashboard. Valid for 14 days.'));
-              // Copy button
-              var copyBtn = el('button', {
-                style: { fontSize: '11px', padding: '4px 12px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600', cursor: 'pointer', marginTop: '8px' },
-                onClick: function() {
-                  try { navigator.clipboard.writeText(result.pin); copyBtn.textContent = '\u2705 Copied!'; setTimeout(function() { copyBtn.textContent = 'Copy PIN'; }, 2000); } catch (_e) { /* fallback: select text */ pinBox.focus(); }
-                }
-              }, 'Copy PIN');
-              pinDisplay.appendChild(copyBtn);
-              actionArea.appendChild(pinDisplay);
-            } else {
-              actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, (result && result.message) || 'Failed to generate PIN.'));
-            }
-          })
-          .withFailureHandler(function() {
-            genPinBtn.disabled = false;
-            genPinBtn.textContent = '\uD83D\uDD11 Generate Login PIN';
-            actionArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to generate PIN.'));
-          })
-          .authGenerateDevPin(member.email, SESSION_TOKEN);
-      }
-    }, '\uD83D\uDD11 Generate Login PIN');
-  }
-
   btnRow.appendChild(profileBtn);
   btnRow.appendChild(logContactBtn);
   btnRow.appendChild(viewHistoryBtn);
   btnRow.appendChild(notifBtn);
   btnRow.appendChild(caseFolderBtn);
   btnRow.appendChild(startGrievanceBtn);
-  if (genPinBtn) btnRow.appendChild(genPinBtn);
   panel.appendChild(btnRow);
   panel.appendChild(actionArea);
 
@@ -2990,7 +2935,7 @@ function renderStewardResources(appContainer) {
         { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
         { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
       ];
-      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Your Union Local Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
       quickLinks.forEach(function(r) {
         if (!r.url) return;
@@ -4048,11 +3993,10 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { _handleTabNav('steward', 'surveytrack'); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { _handleTabNav('steward', 'stewarddirectory'); } },
       { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { _handleTabNav('steward', 'failsafe'); } },
-      { icon: '\uD83E\uDDEA', label: 'Test Runner', desc: 'Run integration tests', devOnly: true, action: function() { _handleTabNav('steward', 'testrunner'); } },
+      { icon: '\uD83E\uDDEA', label: 'Test Runner', desc: 'Run integration tests', action: function() { _handleTabNav('steward', 'testrunner'); } },
     ];
 
     menuItems.forEach(function(m) {
-      if (m.devOnly && !IS_DEV_MODE) return; // mirror _filterDevTabs for More menu
       if (m.group) {
         content.appendChild(el('div', {
           style: {
@@ -4221,9 +4165,6 @@ function _renderRecentContacts(container) {
       if (entry.notes) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, entry.notes));
       container.appendChild(card);
     });
-  }).withFailureHandler(function() {
-    container.innerHTML = '';
-    container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load contact log.'));
   }).dataGetStewardContactLog(SESSION_TOKEN);
 }
 
@@ -5049,7 +4990,7 @@ function _renderWorkloadInsights(container, wl, showDetail) {
   var totalSubmissions = d.totalSubmissions || 0;
   var memberCount = d.members || 0;
   grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
-    /* workload tab not available in SolidBase */
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
   }));
 
   // Extract averages from the data — averages keys are CATEGORY_LABELS values
@@ -5068,7 +5009,7 @@ function _renderWorkloadInsights(container, wl, showDetail) {
       items.sort(function(a, b) { return b.count - a.count; });
       _renderInsightDetailList(panel, items, 'var(--info)');
       var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
-        /* workload tab not available in SolidBase */
+        if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
       }}, 'View Workload Tracker \u2192');
       panel.appendChild(navBtn);
     });

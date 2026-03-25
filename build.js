@@ -90,7 +90,6 @@ const HTML_FILES = [
   'auth_manifesto.html',
   'member_hub_styles.html',
   'member_hub_view.html',
-  'welcome_guide_view.html',
 ];
 
 /**
@@ -319,7 +318,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 42 .gs + 9 .html + 1 appsscript.json = 52 files
+  // Current prod capacity: 36 .gs + 14 .html + 1 appsscript.json = 51 files
   const GAS_FILE_WARN = 50;
   const GAS_FILE_LIMIT = 60;
   const prodFileCount = fileList.filter(f => !PROD_EXCLUDE.includes(f)).length;

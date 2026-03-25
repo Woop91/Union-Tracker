@@ -157,7 +157,6 @@ var ADMIN_SETTINGS_SCHEMA_ = [
       { key: 'BROADCAST_SCOPE_ALL',    label: 'Broadcast: All Members',    type: 'toggle', desc: 'Allow stewards to message ALL members (not just assigned)' },
       { key: 'ENABLE_CORRELATION',     label: 'Enable Correlation Engine', type: 'toggle', desc: 'Enable correlation analysis on the Insights page' },
       { key: 'SHOW_GRIEVANCES',        label: 'Show Grievances',           type: 'toggle', desc: 'Show grievance tracking (cases, new grievance, stats). Reload required.' },
-      { key: 'ENABLE_MODAL_HUB',       label: 'Enable Modal Hub',          type: 'toggle', desc: 'Master toggle for all modals launched from the Modal Hub' },
       { key: 'CUSTOM_LINK_1_NAME',     label: 'Custom Link 1 Name',        type: 'text',   desc: 'Display name for first custom sidebar link' },
       { key: 'CUSTOM_LINK_1_URL',      label: 'Custom Link 1 URL',         type: 'url',    desc: 'URL for first custom sidebar link' },
       { key: 'CUSTOM_LINK_2_NAME',     label: 'Custom Link 2 Name',        type: 'text',   desc: 'Display name for second custom sidebar link' },

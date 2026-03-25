@@ -390,7 +390,8 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 describe('G6: dist/ files are in sync with src/', () => {
 
   test('dist/ does not contain dev-only files (must be built with --prod)', () => {
-    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
+    // Test runner included in prod — tab gated by IS_DEV_MODE, endpoints by steward auth
+    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs'];
     const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
     expect(found).toEqual([]);
   });
@@ -559,7 +560,8 @@ describe('G9: Nav tabs and handlers are in sync', () => {
   });
 
   // Member-only tabs (removed from steward nav)
-  const memberOnlyTabs = []; // POMS removed from SolidBase
+  // SolidBase: poms removed from nav entirely
+  const memberOnlyTabs = [];
   memberOnlyTabs.forEach(tabId => {
     test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
       const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
@@ -606,9 +608,9 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   });
 
   // Must find at least the known lazy-loaders
-  test('detects lazy-loaded server functions (getOrgChartHtml, getPOMSReferenceHtml)', () => {
+  test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
-    expect(serverFunctions.has('getPOMSReferenceHtml')).toBe(true);
+    // SolidBase: getPOMSReferenceHtml excluded (POMS not deployed)
   });
 
   [...serverFunctions].forEach(fn => {
@@ -626,7 +628,8 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 // and injected into the SPA. If its <script> block has syntax errors, the entire
 // POMS tab fails silently.
 
-describe.skip('G11: poms_reference.html integrity (not in SolidBase)', () => {
+describe.skip('G11: poms_reference.html integrity (SolidBase: excluded)', () => {
+  const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
 
   test('poms_reference.html exists', () => {
     expect(fs.existsSync(pomsPath)).toBe(true);
@@ -668,6 +671,7 @@ describe.skip('G11: poms_reference.html integrity (not in SolidBase)', () => {
     const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
     expect(scriptMatch).not.toBeNull();
     expect(() => {
+      new vm.Script(scriptMatch[1], { filename: 'poms_reference.html' });
     }).not.toThrow();
   });
 
@@ -681,7 +685,7 @@ describe.skip('G11: poms_reference.html integrity (not in SolidBase)', () => {
 // ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: SolidBase Apps Script ID (18hHHX...) must never appear in source
+// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
 // files that get synced to the public Union-Tracker repo.
 
 describe('G12: No sensitive ID leaks', () => {
@@ -755,7 +759,8 @@ describe('G13: Module load order is safe', () => {
 });
 
 
-describe.skip('G14: WorkloadService crash-safe patterns (not in SolidBase)', () => {
+describe.skip('G14: WorkloadService crash-safe patterns (SolidBase: excluded)', () => {
+  const wsCode = '';
 
   test('_refreshReportingData does NOT clearContents before writing', () => {
     // Extract the _refreshReportingData function body

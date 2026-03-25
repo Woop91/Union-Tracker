@@ -127,7 +127,7 @@ describe('OC3: renderOrgChart script re-execution is reliable', () => {
 // ============================================================================
 // Bug: _initDesktopRan was set to true on first visit and never reset. When
 // the user navigated away and back, initDesktop() wouldn't run, leaving
-// Your Organization sub-sections in an incorrect state.
+// MassAbility sub-sections in an incorrect state.
 
 describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   test('org_chart.html declares _initDesktopRan on window (resets on re-execution)', () => {
@@ -135,12 +135,10 @@ describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   });
 
   test('renderOrgChart explicitly resets _initDesktopRan before script re-execution', () => {
-    // The reset must happen BEFORE the script forEach loop within renderOrgChart
-    // (search from renderOrgChart position to avoid matching _loadMemberViewThen's querySelectorAll)
-    const fnStart = indexCode.indexOf('function renderOrgChart');
-    expect(fnStart).toBeGreaterThan(-1);
-    const resetIdx = indexCode.indexOf('_initDesktopRan = false', fnStart);
-    const forEachIdx = indexCode.indexOf("querySelectorAll('script')", fnStart);
+    // The reset must happen BEFORE the script forEach loop in renderOrgChart.
+    // Use renderOrgChart-specific pattern to avoid matching _loadMemberViewThen's querySelectorAll.
+    const resetIdx = indexCode.indexOf('_initDesktopRan = false');
+    const forEachIdx = indexCode.indexOf("wrap.querySelectorAll('script').forEach");
     expect(resetIdx).toBeGreaterThan(-1);
     expect(forEachIdx).toBeGreaterThan(-1);
     expect(resetIdx).toBeLessThan(forEachIdx);

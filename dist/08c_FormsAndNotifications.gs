@@ -297,7 +297,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * SEIU Local Dashboard including:
+ * Union Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -311,7 +311,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author SEIU Local
+ * @author Dashboard Team
  * @version 4.33.0
  */
 
@@ -1310,12 +1310,7 @@ function getSurveyQuestions() {
   var CACHE_KEY = 'surveyQuestions_v1';
   try {
     var cached = CacheService.getScriptCache().get(CACHE_KEY);
-    if (cached) {
-      var cachedResult = JSON.parse(cached);
-      // Always fetch period fresh — never serve stale period status from cache
-      cachedResult.period = getSurveyPeriod();
-      return cachedResult;
-    }
+    if (cached) return JSON.parse(cached);
   } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
 
   try {
@@ -1438,15 +1433,12 @@ function getSurveyQuestions() {
     var result = {
       questions:   questions,
       sections:    sections,
-      sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' }
+      sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' },
+      period:      getSurveyPeriod()
     };
 
-    // Cache questions/sections for 5 minutes (period is fetched fresh below — never cached)
+    // Cache 5 minutes
     try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(result), 300); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
-
-    // Always fetch period fresh — period status changes when stewards open/close
-    // periods and must never be served from stale cache
-    result.period = getSurveyPeriod();
 
     return result;
 

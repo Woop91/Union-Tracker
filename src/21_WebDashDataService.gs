@@ -6068,58 +6068,6 @@ function dataLogTabVisit(sessionToken, tab, role) {
 }
 
 /**
- * v4.37.0 — Client-side error telemetry endpoint.
- * Receives uncaught JS errors and unhandled promise rejections from the browser
- * and persists them to a hidden _ClientErrors sheet for post-incident debugging.
- *
- * Fire-and-forget from client. Rate-limited: max 500 rows, FIFO eviction.
- * PII-safe: only logs error type, message, pane, and user agent — no session tokens.
- *
- * @param {Object} errorData - { type, message, line, col, stack, pane, ua }
- */
-function dataLogClientError(errorData) {
-  try {
-    if (!errorData || !errorData.message) return;
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) return;
-    var sheetName = '_ClientErrors';
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
-      sheet.appendRow(['Timestamp', 'Type', 'Message', 'Pane', 'Line', 'Col', 'User Agent', 'Stack']);
-      sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
-      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(sheet);
-    }
-    // Truncate long fields to prevent quota issues
-    var safeMsg = String(errorData.message || '').substring(0, 500);
-    var safeStack = String(errorData.stack || '').substring(0, 1000);
-    var safeUA = String(errorData.ua || '').substring(0, 200);
-    // Formula-protect user-influenced fields
-    if (typeof escapeForFormula === 'function') {
-      safeMsg = escapeForFormula(safeMsg);
-      safeStack = escapeForFormula(safeStack);
-    }
-    sheet.appendRow([
-      new Date().toISOString(),
-      String(errorData.type || 'unknown').substring(0, 50),
-      safeMsg,
-      String(errorData.pane || 'unknown').substring(0, 50),
-      errorData.line || '',
-      errorData.col || '',
-      safeUA,
-      safeStack
-    ]);
-    // FIFO: keep max 500 rows
-    var lastRow = sheet.getLastRow();
-    if (lastRow > 500) {
-      sheet.deleteRows(2, lastRow - 500);
-    }
-  } catch (e) {
-    Logger.log('dataLogClientError failed: ' + e.message);
-  }
-}
-
-/**
  * v4.31.3 — Aggregated webapp usage stats for Union Stats > Usage sub-tab.
  */
 function dataGetUsageStats(sessionToken) {
@@ -6353,16 +6301,11 @@ function dataMarkWelcomeDismissed(sessionToken) {
   // CR-AUTH-3: Use server-side identity instead of client-supplied email
   var email = _resolveCallerEmail(sessionToken);
   if (!email) return { success: false };
-  try {
-    var emailHash = _welcomeEmailHash(email);
-    var propKey = 'WELCOME_DISMISSED_' + emailHash;
-    var props = PropertiesService.getScriptProperties();
-    props.setProperty(propKey, new Date().toISOString());
-    return { success: true };
-  } catch (err) {
-    Logger.log('dataMarkWelcomeDismissed error: ' + err.message);
-    return { success: false };
-  }
+  var emailHash = _welcomeEmailHash(email);
+  var propKey = 'WELCOME_DISMISSED_' + emailHash;
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(propKey, new Date().toISOString());
+  return { success: true };
 }
 
 /**
@@ -6375,16 +6318,35 @@ function dataApplyColorTheme(sessionToken, themeKey) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
   if (!THEME_PRESETS || !THEME_PRESETS[themeKey]) return { success: false, message: 'Unknown theme.' };
+  var preset = THEME_PRESETS[themeKey];
+  saveVisualSetting('theme', themeKey);
+  if (preset.accentHue !== undefined) {
+    saveVisualSetting('accentHue', preset.accentHue);
+  }
+  return { success: true, themeKey: themeKey, accentHue: preset.accentHue || 250 };
+}
+
+/**
+ * Client-callable: Saves the user's default view preference for dual-role users.
+ * Stored in ScriptProperties (email-keyed) because UserProperties returns the
+ * script owner's props in Execute-as-Me webapps.
+ * @param {string} sessionToken - Session token for auth
+ * @param {string} viewPref - 'steward' or 'member'
+ * @returns {{ success: boolean, defaultView?: string, message?: string }}
+ */
+function dataSetDefaultView(sessionToken, viewPref) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, message: 'Not authenticated.' };
+  if (viewPref !== 'steward' && viewPref !== 'member') {
+    return { success: false, message: 'Invalid view preference.' };
+  }
   try {
-    var preset = THEME_PRESETS[themeKey];
-    saveVisualSetting('theme', themeKey);
-    if (preset.accentHue !== undefined) {
-      saveVisualSetting('accentHue', preset.accentHue);
-    }
-    return { success: true, themeKey: themeKey, accentHue: preset.accentHue || 250 };
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('defaultView_' + email.toLowerCase(), viewPref);
+    return { success: true, defaultView: viewPref };
   } catch (err) {
-    Logger.log('dataApplyColorTheme error: ' + err.message);
-    return { success: false, message: 'Failed to apply theme.' };
+    Logger.log('dataSetDefaultView error: ' + err.message);
+    return { success: false, message: 'Failed to save preference.' };
   }
 }
 
@@ -6653,22 +6615,13 @@ function dataGetAuditLog(sessionToken, options) {
   var eventTypeFilter = options.eventTypeFilter ? String(options.eventTypeFilter).trim() : '';
   var searchTerm = options.searchTerm ? String(options.searchTerm).toLowerCase().trim() : '';
 
-  // Column indices (0-based) for dual-schema audit log:
-  // Edit audit rows use AUDIT_LOG_COLS; event audit rows use EVENT_AUDIT_COLS.
-  var _tsIdx     = AUDIT_LOG_COLS.TIMESTAMP - 1;
-  var _userIdx   = AUDIT_LOG_COLS.USER_EMAIL - 1;
-  var _actionIdx = AUDIT_LOG_COLS.ACTION_TYPE - 1;
-  var _newValIdx = AUDIT_LOG_COLS.NEW_VALUE - 1;
-  var _evtTypeIdx = EVENT_AUDIT_COLS.EVENT_TYPE - 1;
-  var _evtDetailIdx = EVENT_AUDIT_COLS.DETAILS - 1;
-
   // Process rows in reverse (newest first)
   for (var i = data.length - 1; i >= 0; i--) {
     var row = data[i];
-    var ts = row[_tsIdx]; // Timestamp
-    var eventType = String(row[_actionIdx] || row[_evtTypeIdx] || '').trim(); // ACTION_TYPE or EVENT_TYPE
-    var user = String(row[_userIdx] || '').trim(); // USER_EMAIL (edit) or EVENT_TYPE (event, fallback)
-    var details = String(row[_newValIdx] || row[_evtDetailIdx] || '').trim(); // NEW_VALUE or DETAILS
+    var ts = row[0]; // Timestamp
+    var eventType = String(row[9] || row[1] || '').trim(); // ACTION_TYPE or EVENT_TYPE
+    var user = String(row[1] || '').trim(); // USER_EMAIL
+    var details = String(row[7] || row[3] || '').trim(); // NEW_VALUE or DETAILS
 
     if (eventType) eventTypeSet[eventType] = true;
 
@@ -6696,11 +6649,11 @@ function dataGetAuditLog(sessionToken, options) {
       timestamp: ts instanceof Date ? ts.toISOString() : String(ts),
       eventType: eventType,
       user: displayUser,
-      sheet: String(row[AUDIT_LOG_COLS.SHEET - 1] || '').trim(),
-      fieldName: String(row[AUDIT_LOG_COLS.FIELD_NAME - 1] || '').trim(),
-      oldValue: String(row[AUDIT_LOG_COLS.OLD_VALUE - 1] || '').substring(0, 200),
+      sheet: String(row[2] || '').trim(),
+      fieldName: String(row[5] || '').trim(),
+      oldValue: String(row[6] || '').substring(0, 200),
       newValue: displayDetails.substring(0, 500),
-      recordId: String(row[AUDIT_LOG_COLS.RECORD_ID - 1] || '').trim(),
+      recordId: String(row[8] || '').trim(),
       actionType: eventType
     });
   }
