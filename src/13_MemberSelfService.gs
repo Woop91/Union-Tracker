@@ -1490,3 +1490,194 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
 // ============================================================================
 // WEB APP INTEGRATION
 // ============================================================================
+
+// ============================================================================
+// DEV-ONLY: PIN LOGIN + STEWARD PIN MANAGEMENT
+// These functions are intentionally only wired to UI when IS_DEV_MODE is true.
+// They must never appear in production auth flows.
+// ============================================================================
+
+/**
+ * DEV ONLY — Authenticate a user by scanning all member PIN hashes.
+ * No email required. Scans entire Member Directory, tries hashPIN() against
+ * each row that has a stored hash. Returns a session token on first match.
+ *
+ * Rate limited globally (10 attempts / 15 min) since memberId is unknown
+ * before the scan completes — per-member lockout is applied post-match.
+ *
+ * @param {string} pin - The plaintext PIN entered by the user
+ * @returns {Object} { success, sessionToken, email, memberName } or { success: false, message }
+ */
+function devAuthLoginByPIN(pin) {
+  // ── Input validation ──────────────────────────────────────────────────────
+  pin = String(pin || '').trim();
+  if (!pin || !/^\d{4,6}$/.test(pin)) {
+    return { success: false, message: 'PIN must be 4–6 digits.' };
+  }
+
+  // ── Global rate limit — prevent blind brute-force before any row is matched ─
+  var cache = CacheService.getScriptCache();
+  var globalRateKey = 'DEV_PIN_SCAN_RATE';
+  var globalAttempts = parseInt(cache.get(globalRateKey) || '0', 10);
+  if (globalAttempts >= 10) {
+    return { success: false, message: 'Too many attempts. Try again in 15 minutes.' };
+  }
+  cache.put(globalRateKey, String(globalAttempts + 1), 900); // 15 min window
+
+  // ── Sheet scan ────────────────────────────────────────────────────────────
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) return { success: false, message: 'Member directory not found.' };
+
+  var data = sheet.getDataRange().getValues();
+  var pinCol  = PIN_CONFIG.PIN_COLUMN - 1;         // 0-indexed
+  var idCol   = MEMBER_COLS.MEMBER_ID  - 1;
+  var emailCol= MEMBER_COLS.EMAIL      - 1;
+  var fNameCol= MEMBER_COLS.FIRST_NAME - 1;
+  var lNameCol= MEMBER_COLS.LAST_NAME  - 1;
+
+  for (var i = 1; i < data.length; i++) {
+    var storedHash = String(data[i][pinCol] || '').trim();
+    if (!storedHash) continue; // skip members with no PIN set
+
+    var memberId = String(data[i][idCol] || '').trim().toUpperCase();
+    if (!memberId) continue;
+
+    // ── Per-member lockout check ──────────────────────────────────────────
+    if (typeof checkPINLockout === 'function') {
+      var lockout = checkPINLockout(memberId);
+      if (lockout.isLocked) continue; // skip locked accounts silently
+    }
+
+    var computed = hashPIN(pin, memberId);
+    if (computed !== storedHash) continue;
+
+    // ── Match found ───────────────────────────────────────────────────────
+    var email     = String(data[i][emailCol] || '').trim().toLowerCase();
+    var firstName = String(data[i][fNameCol] || '').trim();
+    var lastName  = String(data[i][lNameCol] || '').trim();
+    var memberName = (firstName + ' ' + lastName).trim() || memberId;
+
+    if (!email) {
+      // No email on record — can't create session (session system keys off email)
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('DEV_PIN_LOGIN_NO_EMAIL', { memberId: memberId });
+      }
+      return { success: false, message: 'Account has no email on file. Contact your steward.' };
+    }
+
+    // Clear rate counters on success
+    cache.remove(globalRateKey);
+    if (typeof clearPINAttempts === 'function') clearPINAttempts(memberId);
+
+    // Create session token
+    var token = Auth.createSessionToken(email);
+    if (token && typeof token === 'object' && token.error) {
+      return { success: false, message: 'Session creation failed. Try again.' };
+    }
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('DEV_PIN_LOGIN', { memberId: memberId, email: email });
+    }
+
+    return { success: true, sessionToken: token, email: email, memberName: memberName };
+  }
+
+  // ── No match ──────────────────────────────────────────────────────────────
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('DEV_PIN_LOGIN_FAIL', { reason: 'no_match' });
+  }
+  var remaining = Math.max(0, 10 - (globalAttempts + 1));
+  return {
+    success: false,
+    message: remaining > 0
+      ? 'Incorrect PIN. ' + remaining + ' attempt' + (remaining === 1 ? '' : 's') + ' remaining.'
+      : 'Too many attempts. Try again in 15 minutes.'
+  };
+}
+
+/**
+ * DEV ONLY — Steward generates or resets a member's PIN from the web app.
+ * Requires steward or admin role. Returns plaintext PIN once — never stored.
+ * The PIN is shown to the steward in the UI to pass to the member in person.
+ *
+ * @param {string} sessionToken - Steward's session token
+ * @param {string} memberEmail  - Email of the member to generate PIN for
+ * @returns {Object} { success, pin, memberName, isReset, message }
+ */
+function devStewardManageMemberPIN(sessionToken, memberEmail) {
+  // ── Auth: steward/admin only ───────────────────────────────────────────────
+  var stewardEmail = _requireStewardAuth(sessionToken);
+  if (!stewardEmail) {
+    return { success: false, message: 'Steward authorization required.' };
+  }
+
+  if (!memberEmail) {
+    return { success: false, message: 'Member email is required.' };
+  }
+  memberEmail = String(memberEmail).trim().toLowerCase();
+
+  // ── Locate member by email ────────────────────────────────────────────────
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) return { success: false, message: 'Member directory not found.' };
+
+  var data    = sheet.getDataRange().getValues();
+  var emailCol= MEMBER_COLS.EMAIL      - 1;
+  var idCol   = MEMBER_COLS.MEMBER_ID  - 1;
+  var fNameCol= MEMBER_COLS.FIRST_NAME - 1;
+  var lNameCol= MEMBER_COLS.LAST_NAME  - 1;
+  var pinCol  = PIN_CONFIG.PIN_COLUMN  - 1;
+
+  var memberRow = -1;
+  var memberId  = '';
+  var memberName= '';
+  var hadPIN    = false;
+
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = String(data[i][emailCol] || '').trim().toLowerCase();
+    if (rowEmail !== memberEmail) continue;
+
+    memberRow  = i + 1; // 1-indexed sheet row
+    memberId   = String(data[i][idCol]   || '').trim().toUpperCase();
+    memberName = (String(data[i][fNameCol] || '') + ' ' + String(data[i][lNameCol] || '')).trim();
+    hadPIN     = String(data[i][pinCol] || '').trim().length > 0;
+    break;
+  }
+
+  if (memberRow === -1) {
+    return { success: false, message: 'Member not found: ' + memberEmail };
+  }
+  if (!memberId) {
+    return { success: false, message: 'Member has no Member ID — cannot generate PIN.' };
+  }
+
+  // ── Generate, hash, store ─────────────────────────────────────────────────
+  var newPin    = generateMemberPIN();         // 6-digit numeric string
+  var hashedPin = hashPIN(newPin, memberId);   // salted SHA-256
+  sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
+
+  var action = hadPIN ? 'PIN_RESET_BY_STEWARD' : 'PIN_GENERATED_BY_STEWARD';
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent(action, {
+      memberId:     memberId,
+      memberEmail:  memberEmail,
+      generatedBy:  stewardEmail
+    });
+  }
+
+  return {
+    success:    true,
+    pin:        newPin,       // plaintext — shown once in UI, never persisted
+    memberId:   memberId,
+    memberName: memberName || memberEmail,
+    isReset:    hadPIN,
+    message:    hadPIN
+      ? 'PIN reset for ' + (memberName || memberEmail) + '. Share this PIN with the member in person.'
+      : 'PIN generated for ' + (memberName || memberEmail) + '. Share this PIN with the member in person.'
+  };
+}

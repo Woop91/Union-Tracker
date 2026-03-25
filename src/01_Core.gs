@@ -260,7 +260,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.38.0",
+  VERSION: "4.39.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -462,6 +462,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.39.0', date: '2026-03-24', codename: 'DEV PIN Login', changes: 'DEV ONLY (IS_DEV_MODE gate): (1) devAuthLoginByPIN(pin) — PIN-only login scan, no email, global rate limit 10/15min, audit logged. (2) showAuthPIN() on login screen — only when IS_DEV_MODE=true, redirects with sessionToken. (3) devStewardManageMemberPIN(sessionToken, email) — steward generates/resets PIN from webapp, returns plaintext once. (4) Manage PIN button in steward member detail panel — one-time display with copy button. All dev-only functions are IS_DEV_MODE gated.' },
   { version: '4.38.0', date: '2026-03-24', codename: 'Reliability', changes: 'Default view preference for dual-role users (sidebar selector, dataSetDefaultView endpoint, ScriptProperties storage). Loading fence on _loadMemberViewThen prevents double-tap concurrent fetches. Try/catch on mobile header role-switch buttons. Magic-link auth fix: removed Session.getActiveUser() checks from getMemberViewHtml/getOrgChartHtml/getPOMSReferenceHtml (returns empty for Execute-as-Me). Test runner included in prod builds (tab gated by IS_DEV_MODE). initMemberView verification after script injection with error UI.' },
   { version: '4.37.1', date: '2026-03-24', codename: 'Lazy Member View', changes: 'Lazy-load member_view.html for dual-role users to stay under GAS ~820KB HtmlOutput limit. Conditional template inclusion: steward/both get steward_view only, member-only get member_view inline. getMemberViewHtml() server endpoint for on-demand fetch.' },
   { version: '4.36.0', date: '2026-03-24', codename: 'Centralized Modal Hub', changes: 'New Modal Hub: centralized launcher for all 35+ dialogs organized by category. Searchable with real-time filtering. Master enable/disable toggle (ENABLE_MODAL_HUB). MODAL_REGISTRY in 04a_UIMenus.gs catalogs all modals. Tab review XSS/error handling fixes: DataService try/catch, AUDIT_LOG_COLS constants, poms_reference pesc() XSS prevention, grievance_form failureHandler + email injection guard.' },

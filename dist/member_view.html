@@ -444,7 +444,7 @@ function renderMemberHome(appContainer) {
   }, 'Some features require membership dues'));
   duesBannerText.appendChild(el('div', {
   style: { fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }
-  }, 'Events, Resources, Polls, Survey, Org Chart, and Union Stats are only available to dues-paying members. Contact your steward if you believe this is an error.'));
+  }, 'Events, Resources, Polls, Survey, Org Charts, and Union Stats are only available to dues-paying members. Contact your steward if you believe this is an error.'));
   duesBanner.appendChild(duesBannerText);
   container.appendChild(duesBanner);
  }
@@ -2920,6 +2920,29 @@ function renderSurveyResultsPage(appContainer) {
   { id: 'compare', label: '\uD83D\uDCCA Compare' },
   { id: 'meeting', label: '\uD83D\uDCCB Meeting' },
   ];
+
+  // ── Take Survey CTA — show when survey is open and member hasn't completed ──
+  if (_isDuesPaying()) {
+  DataCache.cachedCall('surveyStatus_' + CURRENT_USER.email, 'dataGetSurveyStatus', [SESSION_TOKEN], function(status) {
+   if (status && !status.hasCompleted) {
+   var banner = el('div', { className: 'card card-glass fade-in', style: {
+    padding: '14px 16px', marginBottom: '12px', display: 'flex',
+    alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+    border: '1px solid var(--accent)', borderRadius: 'var(--radius, 10px)'
+   }});
+   var bannerText = el('div');
+   bannerText.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px', color: 'var(--text)' } }, '\uD83D\uDCDD A survey is currently open'));
+   bannerText.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '2px' } }, 'Your anonymous feedback helps shape priorities'));
+   banner.appendChild(bannerText);
+   banner.appendChild(el('button', {
+    className: 'btn btn-primary',
+    style: { fontSize: '13px', whiteSpace: 'nowrap', flexShrink: '0' },
+    onClick: function() { renderSurveyFormPage(document.getElementById('app')); }
+   }, 'Take Survey'));
+   content.insertBefore(banner, content.firstChild);
+   }
+  });
+  }
 
   content.appendChild(el('div', { className: 'privacy-badge mb-8' }, '\uD83D\uDD12 Aggregate only \u2014 no individual responses visible'));
   content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '10px' } }, (data.periodName || '') + ' \u2014 ' + data.responseCount + ' responses'));

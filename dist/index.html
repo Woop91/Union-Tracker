@@ -47,6 +47,19 @@
  var WEB_APP_URL = PAGE_DATA.webAppUrl || '';
 
  
+ function escapeHtml(t) {
+  if (t == null) return '';
+  return String(t)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#x27;')
+  .replace(/`/g, '&#x60;');
+ }
+ function safeText(t) { return escapeHtml(t); }
+
+ 
  if (SESSION_TOKEN) {
   safeLSSet('dashboardSessionToken', SESSION_TOKEN);
   try { localStorage.removeItem('dashboardSessionRedirectCount'); } catch (_lsErr) {}
@@ -1530,7 +1543,21 @@
   layout.appendChild(sidebar);
 
   var content = el('div', { className: 'page-layout-content', id: 'main-content', role: 'main' });
+  try {
   contentFn(content);
+  } catch (contentErr) {
+  console.error('Content render error:', contentErr);
+  content.innerHTML = '';
+  var _cErrWrap = el('div', { style: { textAlign: 'center', padding: '40px' } });
+  _cErrWrap.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'));
+  _cErrWrap.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '8px', color: 'var(--text)' } }, 'Failed to render this view'));
+  _cErrWrap.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '16px', fontFamily: 'monospace', wordBreak: 'break-all' } }, String(contentErr.message || contentErr)));
+  _cErrWrap.appendChild(el('button', {
+   style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' },
+   onClick: function() { location.reload(); }
+  }, 'Reload'));
+  content.appendChild(_cErrWrap);
+  }
 
   
   var _useSplit = SplitView.isEnabled();
@@ -1824,12 +1851,13 @@
    _activePane = null;
    _layoutCache = {};
    _tabPanesRole = null;
+   AppState.batchData = null; 
    AppState.activeRole = switchRole;
    AppState.activeTab = switchRole === 'steward' ? 'cases' : 'home';
    var app = document.getElementById('app');
    try {
     if (switchRole === 'steward') initStewardView(app);
-    else initMemberView(app);
+    else _loadMemberViewThen(app, function() { initMemberView(app); });
    } catch (switchErr) {
     console.error('Switch role error:', switchErr);
     app.innerHTML = '';
@@ -2048,7 +2076,6 @@
   { group: 'Manage' },
   { id: 'tasks', icon: '\u2705', label: 'Tasks' },
   { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
-  { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
   { id: 'accesslog', icon: '\uD83D\uDD0D', label: 'Access Log' },
   { id: 'engagement', icon: '\uD83C\uDFAF', label: 'Engagement' },
   { group: 'Reference' },
@@ -2057,6 +2084,7 @@
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+  { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
   { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
   { id: 'mentorship', icon: '\uD83E\uDD1D', label: 'Mentorship' },
   { group: 'Comms' },
@@ -2083,6 +2111,7 @@
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+  { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
   { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
   { group: 'Comms' },
   { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
@@ -2093,7 +2122,6 @@
   { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
   { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
   { id: 'reportcard', icon: '\uD83D\uDCCB', label: 'Report Card' },
-  { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
   { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ];
  }
@@ -2433,7 +2461,21 @@
    }
    _memberViewLoaded = true;
    _memberViewLoading = false;
+   try {
    callback();
+   } catch (cbErr) {
+   console.error('Member view render error:', cbErr);
+   container.innerHTML = '';
+   var cbErrCard = el('div', { style: { textAlign: 'center', padding: '40px' } });
+   cbErrCard.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'));
+   cbErrCard.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '8px', color: 'var(--text)' } }, 'Member view failed to render'));
+   cbErrCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '16px', fontFamily: 'monospace', wordBreak: 'break-all' } }, String(cbErr.message || cbErr)));
+   cbErrCard.appendChild(el('button', {
+    style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' },
+    onClick: function() { location.reload(); }
+   }, 'Reload'));
+   container.appendChild(cbErrCard);
+   }
   })
   .withFailureHandler(function(err) {
    _memberViewLoading = false;
@@ -2496,49 +2538,6 @@
    container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load org chart.'));
    })
    .getOrgChartHtml();
-  });
- }
-
- 
- function renderPOMSReference(appContainer, role) {
-  var mySwitch = _navSwitchId;
-  var myGen = _renderGeneration; 
-  renderPageLayout(appContainer, role, 'poms', function(container) {
-  showLoading(container);
-  
-  container.style.height = 'calc(100vh - 56px)';
-  container.style.padding = '0';
-  container.style.overflow = 'hidden';
-  google.script.run
-   .withSuccessHandler(function(html) {
-   if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; 
-   container.innerHTML = '';
-   var wrap = el('div');
-   wrap.style.height = '100%';
-   wrap.innerHTML = html;
-   container.appendChild(wrap);
-   
-   var pomsRoot = wrap.querySelector('.poms-root');
-   if (pomsRoot) {
-    if (AppState.isDark) pomsRoot.classList.add('poms-dark');
-    else pomsRoot.classList.remove('poms-dark');
-   }
-   
-   wrap.querySelectorAll('script').forEach(function(old) {
-    try {
-    var s = document.createElement('script');
-    s.textContent = old.textContent;
-    old.parentNode.replaceChild(s, old);
-    } catch (scriptErr) {
-    console.error('POMS script re-execution failed:', scriptErr);
-    }
-   });
-   })
-   .withFailureHandler(function(err) {
-   container.innerHTML = '';
-   container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load POMS Reference.'));
-   })
-   .getPOMSReferenceHtml();
   });
  }
 
@@ -2846,7 +2845,6 @@
    case 'cases': return renderMyCases;
    case 'profile': return renderUpdateProfile;
    case 'resources': return renderMemberResources;
-   case 'workload': return renderWorkloadTracker;
    case 'weeklyq': 
    case 'polls': return renderPollsPage;
    case 'survey': return renderSurveyResultsPage;
