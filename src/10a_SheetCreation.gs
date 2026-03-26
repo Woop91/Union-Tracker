@@ -191,7 +191,8 @@ function createConfigSheet(ss) {
 
   // Mobile Dashboard & branding defaults
   seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['UN'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['SB'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['SB'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);

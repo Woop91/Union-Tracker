@@ -1550,8 +1550,7 @@ function devAuthLoginByPIN(pin) {
       if (lockout.isLocked) continue; // skip locked accounts silently
     }
 
-    var computed = hashPIN(pin, memberId);
-    if (computed !== storedHash) continue;
+    if (!verifyPIN(pin, memberId, storedHash)) continue;
 
     // ── Match found ───────────────────────────────────────────────────────
     var email     = String(data[i][emailCol] || '').trim().toLowerCase();
@@ -1572,7 +1571,7 @@ function devAuthLoginByPIN(pin) {
     if (typeof clearPINAttempts === 'function') clearPINAttempts(memberId);
 
     // Create session token
-    var token = Auth.createSessionToken(email);
+    var token = Auth.createSessionToken(email, 'pin');
     if (token && typeof token === 'object' && token.error) {
       return { success: false, message: 'Session creation failed. Try again.' };
     }

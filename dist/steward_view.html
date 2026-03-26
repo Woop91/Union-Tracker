@@ -1,6 +1,12 @@
 <script>
 
 function initStewardView(container) {
+ 
+ if (typeof _cleanupAuthEffects === 'function') _cleanupAuthEffects();
+ if (typeof stopAuthQuoteCycler === 'function') stopAuthQuoteCycler();
+ var _manifestoLayer = document.getElementById('auth-manifesto-layer');
+ if (_manifestoLayer) _manifestoLayer.remove();
+
  var t = ThemeEngine.getTheme('steward', AppState.isDark);
  ThemeEngine.applyTheme(t);
  AppState.activeRole = 'steward';
@@ -2870,7 +2876,7 @@ function renderStewardResources(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
   { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
   ];
-  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Organization Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
   quickLinks.forEach(function(r) {
   if (!r.url) return;
@@ -3876,11 +3882,13 @@ function renderStewardMore(appContainer) {
  var menuItems = [
   { group: 'Manage' },
   { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
+  
   { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
   { group: 'Reference' },
+  
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
-  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the union organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
-  { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'Agency structure & budget', action: function() { _handleTabNav('steward', 'maddsorgchart'); } },
+  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
+  
   { group: 'Community' },
   { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('steward', 'qaforum'); } },
   { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { _handleTabNav('steward', 'polls'); } },
@@ -4731,86 +4739,6 @@ function _renderMembershipInsights(container, ms, showDetail) {
 
 function _renderWorkloadPredictions(container) {
  
- var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
- card.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Workload Predictions'));
-
- var predictionContent = el('div');
- card.appendChild(predictionContent);
-
- serverCall().withSuccessHandler(function(pred) {
- if (!pred) return;
-
- var trendIcon = pred.trend === 'increasing' ? '\uD83D\uDCC8' : pred.trend === 'decreasing' ? '\uD83D\uDCC9' : '\u27A1\uFE0F';
- var trendColor = pred.trend === 'increasing' ? '#ef4444' : pred.trend === 'decreasing' ? '#22c55e' : 'var(--muted)';
-
- var row = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' } });
-
- var currentBox = el('div', { style: { textAlign: 'center' } });
- currentBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700' } }, String(pred.current)));
- currentBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Current'));
- row.appendChild(currentBox);
-
- row.appendChild(el('span', { style: { fontSize: '20px', color: trendColor } }, trendIcon));
-
- var predictedBox = el('div', { style: { textAlign: 'center' } });
- predictedBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700', color: trendColor } }, String(pred.predicted)));
- predictedBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Predicted'));
- row.appendChild(predictedBox);
-
- predictionContent.appendChild(row);
-
- 
- if (pred.history && pred.history.length > 0) {
-  var maxVal = Math.max.apply(null, pred.history) || 1;
-  var spark = el('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '2px', height: '40px', marginTop: '12px' } });
-  pred.history.forEach(function(v) {
-  var pct = Math.round((v / maxVal) * 100);
-  spark.appendChild(el('div', {
-   style: { flex: '1', height: pct + '%', background: 'var(--accent)', borderRadius: '2px 2px 0 0', minHeight: '2px' },
-   title: String(v) + ' items'
-  }));
-  });
-  predictionContent.appendChild(spark);
-  predictionContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Recent workload history'));
- }
- }).withFailureHandler(function() {
- predictionContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load predictions.'));
- }).dataGetWorkloadPrediction(SESSION_TOKEN, '');
-
- container.appendChild(card);
-
- 
- var rebalCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
- rebalCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Rebalancing Suggestions'));
-
- var suggestContent = el('div');
- rebalCard.appendChild(suggestContent);
-
- serverCall().withSuccessHandler(function(suggestions) {
- if (!suggestions || suggestions.length === 0) {
-  suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Workload is balanced across stewards.'));
-  return;
- }
- suggestions.forEach(function(s) {
-  var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
-
-  var leftCol = el('div');
-  leftCol.appendChild(el('div', { style: { fontWeight: '500', fontSize: '14px' } }, escapeHtml(s.stewardEmail)));
-  leftCol.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, escapeHtml(s.suggestion)));
-  row.appendChild(leftCol);
-
-  var rightCol = el('div', { style: { textAlign: 'right', fontSize: '13px' } });
-  rightCol.appendChild(el('div', { style: { fontWeight: '600' } }, s.currentLoad + ' cases'));
-  rightCol.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'avg: ' + s.averageLoad));
-  row.appendChild(rightCol);
-
-  suggestContent.appendChild(row);
- });
- }).withFailureHandler(function() {
- suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load suggestions.'));
- }).dataGetRebalancingSuggestions(SESSION_TOKEN);
-
- container.appendChild(rebalCard);
 }
 
 function _renderWorkloadInsights(container, wl, showDetail) {
@@ -4828,9 +4756,7 @@ function _renderWorkloadInsights(container, wl, showDetail) {
 
  var totalSubmissions = d.totalSubmissions || 0;
  var memberCount = d.members || 0;
- grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
- if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'insights');
- }));
+ grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting'));
 
  
  var avgs = d.averages || {};
@@ -4847,10 +4773,6 @@ function _renderWorkloadInsights(container, wl, showDetail) {
   }
   items.sort(function(a, b) { return b.count - a.count; });
   _renderInsightDetailList(panel, items, 'var(--info)');
-  var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
-  if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'insights');
-  }}, 'View Workload Tracker \u2192');
-  panel.appendChild(navBtn);
  });
  }));
 

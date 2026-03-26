@@ -180,8 +180,9 @@ function doGetWebDashboard(e) {
       } else {
         sessionToken = tokenResult;
       }
-    } else if (user.method === 'session' && e.parameter.sessionToken) {
+    } else if ((user.method === 'session' || user.method === 'pin') && e.parameter.sessionToken) {
       // Echo back the already-validated session token so the client can use it
+      // PIN sessions use the same echo-back — token was created during devAuthLoginByPIN()
       sessionToken = e.parameter.sessionToken;
     }
 
@@ -548,16 +549,18 @@ function getOrgChartHtml() {
 }
 
 /**
- * Client-callable: Agency Org Chart stub — not available in SolidBase.
- * @returns {string} Placeholder message
+ * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
+ * SolidBase stub — agency_org_chart.html is not included in this deployment.
+ * @returns {string} Placeholder HTML directing admins to configure their own chart
  */
 function getAgencyOrgChartHtml() {
-  return '<div class="empty-state">Agency org chart is not configured. Set up your agency chart in Admin Settings.</div>';
+  return '<div class="empty-state">Configure your agency organizational chart in the Admin Settings.</div>';
 }
 
 /**
- * Client-callable: POMS Reference stub — not available in SolidBase.
- * @returns {string} Placeholder message
+ * Client-callable: Returns the POMS Reference HTML for lazy-loading.
+ * SolidBase stub — poms_reference.html is not included in this deployment.
+ * @returns {string} Stub message indicating POMS is unavailable
  */
 function getPOMSReferenceHtml() {
   return '<div class="empty-state">POMS Reference is not available in this deployment.</div>';

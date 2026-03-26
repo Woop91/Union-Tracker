@@ -294,17 +294,17 @@ button:focus-visible, [role="button"]:focus-visible {
 #nav-progress {
   position: fixed;
   top: 0; left: 0;
-  height: 2px;
+  height: 3px;
   width: 0%;
-  background: var(--accent);
+  background: linear-gradient(90deg, #ff003c, #ff2d2d, #ff003c);
   z-index: 300;
   opacity: 0;
   /* two transitions: width (fast expand) and opacity (fade out at end) */
   transition: width 0.35s cubic-bezier(0.1, 0.6, 0.4, 1), opacity 0.3s ease;
   pointer-events: none;
   border-radius: 0 1px 1px 0;
-  /* Glow: brightens bar against both dark and light surfaces */
-  box-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
+  /* Neon glow: vivid red against both dark and light surfaces */
+  box-shadow: 0 0 6px #ff003c, 0 0 14px rgba(255,0,60,0.5), 0 0 28px rgba(255,0,60,0.25);
 }
 #nav-progress.np-active {
   opacity: 1;
@@ -1799,23 +1799,13 @@ button:focus-visible, [role="button"]:focus-visible {
 /* ═══════════════════════════════════════
    AUTH SCREEN
    ═══════════════════════════════════════ */
+/* Base auth styles — visual overrides in member_hub_styles.html */
 .auth-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-height: 100vh;
   padding: 24px;
-}
-.auth-logo {
-  width: 56px; height: 56px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
-  font-size: 1.375rem;
-  font-weight: 700;
-  color: #fff;
 }
 .auth-title {
   font-family: var(--fontDisplay);
@@ -1854,7 +1844,7 @@ button:focus-visible, [role="button"]:focus-visible {
   font-size: 0.9375rem;
   color: var(--text);
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .auth-input:focus { border-color: var(--accent); }
 .auth-input::placeholder { color: var(--muted); }
@@ -2827,6 +2817,94 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 
 /* ═══════════════════════════════════════
+   SWIPE PANEL (mobile nav drawer from right)
+   Revealed by edge-swipe from right side.
+   Hidden on tablet+ where sidebar is visible.
+   ═══════════════════════════════════════ */
+.swipe-panel-scrim {
+  position: fixed; inset: 0; z-index: 490;
+  background: rgba(0,0,0,0);
+  transition: background 0.3s ease;
+  pointer-events: none;
+}
+.swipe-panel-scrim.open {
+  background: rgba(0,0,0,0.4);
+  pointer-events: auto;
+}
+.swipe-panel {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: min(300px, 80vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+  z-index: 500;
+  transform: translateX(100%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0 24px;
+  will-change: transform;
+}
+.swipe-panel.open { transform: translateX(0); }
+.swipe-panel.dragging { transition: none; }
+
+.swipe-panel-header {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.swipe-panel-title {
+  font-family: var(--fontDisplay);
+  font-size: 0.9375rem; font-weight: 700; color: var(--text);
+}
+.swipe-panel-close {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.swipe-panel-close:hover { background: var(--accentBg, rgba(99,102,241,0.1)); color: var(--text); }
+
+.swipe-panel-items { padding: 8px 12px; }
+.swipe-panel-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 10px;
+  font-family: var(--fontBody); font-size: 0.8125rem;
+  color: var(--text); cursor: pointer;
+  transition: background 0.15s;
+}
+.swipe-panel-item:hover { background: var(--accentBg, rgba(99,102,241,0.06)); }
+.swipe-panel-item.active {
+  background: var(--accentBg, rgba(99,102,241,0.1));
+  color: var(--accent); font-weight: 600;
+}
+.swipe-panel-item-icon { font-size: 1.125rem; width: 24px; text-align: center; flex-shrink: 0; }
+.swipe-panel-group {
+  padding: 16px 14px 4px;
+  font-family: var(--fontBody); font-size: 0.625rem;
+  font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--muted);
+}
+.swipe-panel-divider { height: 1px; background: var(--border); margin: 6px 14px; }
+
+/* Swipe edge hint — subtle visual cue on right edge */
+.swipe-edge-hint {
+  position: fixed; top: 50%; right: 0;
+  transform: translateY(-50%);
+  width: 4px; height: 40px;
+  border-radius: 4px 0 0 4px;
+  background: var(--accent);
+  opacity: 0.25;
+  z-index: 150;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.swipe-edge-hint.hidden { opacity: 0; }
+
+/* ═══════════════════════════════════════
    RESPONSIVE — Tablet (640-1024px)
    ═══════════════════════════════════════ */
 @media (min-width: 640px) {
@@ -2834,6 +2912,8 @@ button:focus-visible, [role="button"]:focus-visible {
   .page-layout-content { padding-bottom: 0; }
   .bottom-nav { display: none; }
   .sidebar-nav { display: block; }
+  /* Swipe panel hidden on tablet+ — sidebar handles navigation */
+  .swipe-panel, .swipe-panel-scrim, .swipe-edge-hint { display: none !important; }
   .kpi-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .fab { bottom: 24px; right: 24px; }
   .info-grid-responsive { grid-template-columns: repeat(2, 1fr); }
@@ -3454,7 +3534,7 @@ button:focus-visible, [role="button"]:focus-visible {
    PRINT STYLESHEET
    ═══════════════════════════════════════ */
 @media print {
-  .sidebar-nav, .bottom-nav, .nav-progress, .glow-bar,
+  .sidebar-nav, .bottom-nav, .nav-progress, .glow-bar, .swipe-panel, .swipe-panel-scrim, .swipe-edge-hint,
   .crt-overlay, .crt-scan-beam, .crt-pixel-grid,
   .fab-button, .idle-logout-overlay, .bulk-toolbar { display: none !important; }
   .page-layout-content { margin: 0 !important; max-width: 100% !important; }

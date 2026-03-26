@@ -412,9 +412,9 @@
   
   var TAB_COLORS = {
   cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-  tasks: '#f59e0b', home: '#ff3366',
+  tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
   more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-  resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
+  poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
   polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
   events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
   testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -515,6 +515,11 @@
   if (embedRoot) {
    if (!AppState.isDark) embedRoot.classList.add('light');
    else embedRoot.classList.remove('light');
+  }
+  var agencyRoot = document.querySelector('.agency-oc');
+  if (agencyRoot) {
+   if (AppState.isDark) agencyRoot.classList.add('dark');
+   else agencyRoot.classList.remove('dark');
   }
   }
 
@@ -2166,7 +2171,6 @@
   { group: 'Reference' },
   { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
   { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
-  { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2202,7 +2206,6 @@
   { group: 'Reference' },
   { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
   { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
-  { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2639,16 +2642,16 @@
  
  function renderAgencyOrgChart(appContainer, role) {
   renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
-  container.innerHTML = '';
-  var placeholder = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px 20px' } });
-  placeholder.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '\uD83C\uDFE2'));
-  placeholder.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '600', marginBottom: '8px' } }, 'Agency Org Chart'));
-  placeholder.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '14px' } }, 'Configure your agency organizational chart in the Admin Settings.'));
-  container.appendChild(placeholder);
+  container.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--textMuted)">Configure your agency organizational chart in the Admin Settings.</div>';
   });
  }
 
  
+ function renderPOMSReference(appContainer, role) {
+  renderPageLayout(appContainer, role, 'poms', function(container) {
+  container.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--textMuted)">POMS Reference is not available in this deployment.</div>';
+  });
+ }
 
  
  
@@ -2761,6 +2764,11 @@
 
   _navProgressStart();
 
+  
+  
+  
+  if (!_isSplitSecondary) window.scrollTo(0, 0);
+
   // Handle "More" menus for both roles (mobile bottom-nav)
   if (tabId === 'more' || tabId === '_member_more') { _hideAllVisiblePanes(); _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
   if (tabId === 'more_steward' || tabId === '_steward_more') { _hideAllVisiblePanes(); _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
@@ -2834,7 +2842,14 @@
   _navProgressDone();
   return;
   }
-  
+  if (tabId === 'poms') {
+  _hideAllVisiblePanes();
+  _splitRenderTarget = 'primary';
+  renderPOMSReference(app, role);
+  _activePane = _layoutCache.content;
+  _navProgressDone();
+  return;
+  }
 
   
   if (switchId !== _navSwitchId) { _navProgressDone(); return; }
@@ -2972,6 +2987,7 @@
    case 'cases': return renderMyCases;
    case 'profile': return renderUpdateProfile;
    case 'resources': return renderMemberResources;
+   case 'workload': return renderWorkloadTracker;
    case 'weeklyq': 
    case 'polls': return renderPollsPage;
    case 'survey': return renderSurveyResultsPage;
@@ -3012,6 +3028,7 @@
    case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
    case 'timeline': return renderStewardTimelinePage;
    case 'mentorship': return renderMentorshipPage;
+   case 'workload': return renderWorkloadTracker;
    case 'accesslog': return renderAccessLogPage;
    case 'engagement': return renderEngagementDashboard;
    case 'failsafe': return renderFailsafePage;
@@ -3264,6 +3281,14 @@
   document.removeEventListener('touchstart', _touchHandlers.start);
   document.removeEventListener('touchmove', _touchHandlers.move);
   document.removeEventListener('touchend', _touchHandlers.end);
+  document.removeEventListener('touchstart', _swipePanel.touchStart);
+  document.removeEventListener('touchmove', _swipePanel.touchMove);
+  document.removeEventListener('touchend', _swipePanel.touchEnd);
+  if (typeof _backSwipe !== 'undefined') {
+  document.removeEventListener('touchstart', _backSwipe.start);
+  document.removeEventListener('touchmove', _backSwipe.move);
+  document.removeEventListener('touchend', _backSwipe.end);
+  }
   window.removeEventListener('offline', _showOfflineBanner);
   window.removeEventListener('online', _hideOfflineBanner);
  }
@@ -3272,33 +3297,303 @@
  
  
  
- // show the "More" menu instead of leaving the app.
  
- (function() {
-  if (CURRENT_VIEW === 'auth' || CURRENT_VIEW === 'error') return;
+ var _swipePanel = (function() {
+  var _panel = null, _scrim = null, _hint = null;
+  var _isOpen = false;
+  var _startX = 0, _startY = 0, _currentX = 0;
+  var _tracking = false, _dragging = false;
+  var _edgeZone = 30; 
+  var _threshold = 60; 
+  var _panelWidth = 0;
+  var _cooldown = false;
 
-  try {
-  
-  history.pushState({ dds: 'buffer' }, '');
+  function _ensureDOM() {
+  if (_panel) return;
 
-  window.addEventListener('popstate', function() {
-   
-   try { history.pushState({ dds: 'buffer' }, ''); } catch (_e) {}
+  _scrim = document.createElement('div');
+  _scrim.className = 'swipe-panel-scrim';
+  _scrim.addEventListener('click', close);
+  document.body.appendChild(_scrim);
 
-   
-   if (typeof UsageTracker !== 'undefined') UsageTracker.trackPerf('back_swipe', { tab: AppState.activeTab || '' });
+  _panel = document.createElement('div');
+  _panel.className = 'swipe-panel';
+  document.body.appendChild(_panel);
 
-   // Show the "More" menu — the full navigation hub
-   var role = AppState.activeRole;
-   if (!role) return;
-   var moreTab = (role === 'steward') ? '_steward_more' : '_member_more';
-   _handleTabNav(role, moreTab);
-  });
-  } catch (_histErr) {
-  
-  console.warn('Back-swipe interception unavailable:', _histErr.message);
+  _hint = document.createElement('div');
+  _hint.className = 'swipe-edge-hint';
+  _hint.addEventListener('click', open);
+  document.body.appendChild(_hint);
   }
+
+  function _renderContent() {
+  if (!_panel) return;
+  _panel.innerHTML = '';
+
+  var role = AppState.activeRole;
+  if (!role) return;
+
+  
+  var header = el('div', { className: 'swipe-panel-header' });
+  var titleText = CONFIG.orgAbbrev || CONFIG.orgName || 'Navigation';
+  header.appendChild(el('div', { className: 'swipe-panel-title' }, titleText));
+  header.appendChild(el('div', {
+   className: 'swipe-panel-close',
+   role: 'button', tabIndex: 0,
+   'aria-label': 'Close navigation',
+   onClick: close
+  }, '\u00D7'));
+  _panel.appendChild(header);
+
+  
+  var items = el('div', { className: 'swipe-panel-items' });
+  var tabs = _getSidebarTabs(role);
+  tabs.forEach(function(tab) {
+   if (tab.divider) {
+   items.appendChild(el('div', { className: 'swipe-panel-divider' }));
+   return;
+   }
+   if (tab.group) {
+   items.appendChild(el('div', { className: 'swipe-panel-group' }, tab.group));
+   return;
+   }
+   var isActive = tab.id === AppState.activeTab ||
+   (role === 'steward' && tab.id === 'cases' && AppState.activeTab === 'home');
+   var item = el('div', {
+   className: 'swipe-panel-item' + (isActive ? ' active' : ''),
+   role: 'button', tabIndex: 0,
+   onClick: function() {
+    close();
+    setTimeout(function() { _handleTabNav(role, tab.id); }, 80);
+   }
+   });
+   item.appendChild(el('span', { className: 'swipe-panel-item-icon' }, tab.icon));
+   item.appendChild(el('span', {}, tab.label));
+   if (tab.badge) {
+   item.appendChild(el('span', {
+    style: { marginLeft: 'auto', background: 'var(--accent)', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '10px', fontWeight: '700' }
+   }, String(tab.badge)));
+   }
+   items.appendChild(item);
+  });
+  _panel.appendChild(items);
+  }
+
+  function open() {
+  if (_isOpen || LayoutState.mode !== 'mobile') return;
+  _ensureDOM();
+  _renderContent();
+  _isOpen = true;
+  _panelWidth = _panel.offsetWidth;
+  requestAnimationFrame(function() {
+   _panel.classList.add('open');
+   _scrim.classList.add('open');
+   if (_hint) _hint.classList.add('hidden');
+  });
+  }
+
+  function close() {
+  if (!_isOpen || !_panel) return;
+  _isOpen = false;
+  _panel.classList.remove('open', 'dragging');
+  _scrim.classList.remove('open');
+  if (_hint) _hint.classList.remove('hidden');
+  _cooldown = true;
+  setTimeout(function() { _cooldown = false; }, 300);
+  }
+
+  
+  function touchStart(e) {
+  if (LayoutState.mode !== 'mobile' || _cooldown) return;
+  var touch = e.touches[0];
+  _startX = touch.clientX;
+  _startY = touch.clientY;
+  _currentX = _startX;
+  _tracking = false;
+  _dragging = false;
+
+  if (_isOpen) {
+   
+   _tracking = true;
+   _ensureDOM();
+   _panelWidth = _panel.offsetWidth;
+  } else {
+   
+   var vw = window.innerWidth;
+   if (_startX >= vw - _edgeZone) {
+   _tracking = true;
+   _ensureDOM();
+   _panelWidth = _panel.offsetWidth;
+   }
+  }
+  }
+
+  function touchMove(e) {
+  if (!_tracking) return;
+  var touch = e.touches[0];
+  _currentX = touch.clientX;
+  var deltaX = _currentX - _startX;
+  var deltaY = touch.clientY - _startY;
+
+  
+  if (!_dragging && Math.abs(deltaY) > Math.abs(deltaX) + 10) {
+   _tracking = false;
+   return;
+  }
+
+  if (_isOpen) {
+   
+   if (deltaX > 10) {
+   _dragging = true;
+   var shift = Math.min(deltaX, _panelWidth);
+   _panel.classList.add('dragging');
+   _panel.style.transform = 'translateX(' + shift + 'px)';
+   var scrimOpacity = Math.max(0, 0.4 * (1 - shift / _panelWidth));
+   _scrim.style.background = 'rgba(0,0,0,' + scrimOpacity.toFixed(3) + ')';
+   if (e.cancelable) e.preventDefault();
+   }
+  } else {
+   
+   if (deltaX < -10) {
+   _dragging = true;
+   var pull = Math.min(Math.abs(deltaX), _panelWidth);
+   _panel.classList.add('dragging');
+   _panel.style.transform = 'translateX(' + (_panelWidth - pull) + 'px)';
+   _scrim.style.background = 'rgba(0,0,0,' + (0.4 * (pull / _panelWidth)).toFixed(3) + ')';
+   _scrim.style.pointerEvents = 'auto';
+   if (e.cancelable) e.preventDefault();
+   }
+  }
+  }
+
+  function touchEnd() {
+  if (!_tracking || !_dragging) {
+   _tracking = false;
+   _dragging = false;
+   return;
+  }
+
+  var deltaX = _currentX - _startX;
+  _tracking = false;
+  _dragging = false;
+
+  
+  _panel.classList.remove('dragging');
+  _panel.style.transform = '';
+  _scrim.style.background = '';
+  _scrim.style.pointerEvents = '';
+
+  if (_isOpen) {
+   
+   if (deltaX > _threshold) {
+   close();
+   } else {
+   
+   _panel.classList.add('open');
+   _scrim.classList.add('open');
+   }
+  } else {
+   
+   if (Math.abs(deltaX) > _threshold) {
+   _isOpen = true;
+   _renderContent();
+   _panel.classList.add('open');
+   _scrim.classList.add('open');
+   if (_hint) _hint.classList.add('hidden');
+   } else {
+   
+   _panel.classList.remove('open');
+   _scrim.classList.remove('open');
+   }
+  }
+  }
+
+  return {
+  open: open, close: close,
+  isOpen: function() { return _isOpen; },
+  touchStart: touchStart, touchMove: touchMove, touchEnd: touchEnd,
+  inject: function() {
+   if (LayoutState.mode !== 'mobile') return;
+   _ensureDOM();
+  }
+  };
  })();
+
+ 
+ if (CURRENT_VIEW !== 'auth' && CURRENT_VIEW !== 'error') {
+  document.addEventListener('touchstart', _swipePanel.touchStart, { passive: true });
+  document.addEventListener('touchmove', _swipePanel.touchMove, { passive: false });
+  document.addEventListener('touchend', _swipePanel.touchEnd, { passive: true });
+  
+  setTimeout(function() { _swipePanel.inject(); }, 500);
+ }
+
+ 
+ // LEFT-EDGE SWIPE → "MORE" MENU (v4.40.0, reworked v4.41.0)
+ // Detects right-swipe from the left screen edge and opens the "More"
+ 
+ // (pushState/popstate) approach didn't fire inside the GAS iframe.
+ 
+ var _backSwipe = (function() {
+  var _startX = 0, _startY = 0, _currentX = 0;
+  var _tracking = false;
+  var _edgeZone = 30;  
+  var _threshold = 60; 
+  var _cooldown = false;
+
+  function start(e) {
+  if (LayoutState.mode !== 'mobile' || _cooldown) return;
+  if (_swipePanel.isOpen()) return; 
+  var touch = e.touches[0];
+  _startX = touch.clientX;
+  _startY = touch.clientY;
+  _currentX = _startX;
+  _tracking = _startX <= _edgeZone;
+  }
+
+  function move(e) {
+  if (!_tracking) return;
+  var touch = e.touches[0];
+  _currentX = touch.clientX;
+  var deltaX = _currentX - _startX;
+  var deltaY = touch.clientY - _startY;
+
+  
+  if (Math.abs(deltaY) > Math.abs(deltaX) + 10) {
+   _tracking = false;
+   return;
+  }
+
+  
+  if (deltaX > 10 && e.cancelable) e.preventDefault();
+  }
+
+  function end() {
+  if (!_tracking) { _tracking = false; return; }
+  _tracking = false;
+
+  var deltaX = _currentX - _startX;
+  if (deltaX < _threshold) return;
+
+  if (typeof UsageTracker !== 'undefined') UsageTracker.trackPerf('back_swipe', { tab: AppState.activeTab || '' });
+
+  var role = AppState.activeRole;
+  if (!role) return;
+  var moreTab = (role === 'steward') ? '_steward_more' : '_member_more';
+  _handleTabNav(role, moreTab);
+
+  _cooldown = true;
+  setTimeout(function() { _cooldown = false; }, 600);
+  }
+
+  return { start: start, move: move, end: end };
+ })();
+
+ if (CURRENT_VIEW !== 'auth' && CURRENT_VIEW !== 'error') {
+  document.addEventListener('touchstart', _backSwipe.start, { passive: true });
+  document.addEventListener('touchmove', _backSwipe.move, { passive: false });
+  document.addEventListener('touchend', _backSwipe.end, { passive: true });
+ }
 
  
  

@@ -1,43 +1,101 @@
 <script>
 
-function injectAuthManifesto(authContainer) {
+// overlap or bunch up. One "hero" phrase fades in more prominently.
+
+var _PHRASE_ZONES = [
  
+ { xMin: 0.05, xMax: 0.90, yMin: 0.05, yMax: 0.28 },
+ 
+ { xMin: 0.05, xMax: 0.42, yMin: 0.35, yMax: 0.65 },
+ 
+ { xMin: 0.50, xMax: 0.92, yMin: 0.60, yMax: 0.88 }
+];
+
+function injectAuthManifesto(authContainer) {
  if (document.getElementById('auth-manifesto-layer')) return;
 
- var phrases = [
+ var allPhrases = [
  "Your work doesn't clock out at 5.",
  "The union is waiting for you.",
  "Your rights don't end when you leave.",
  "You are the change.",
- "Solidarity is not a slogan. It's a practice."
+ "Solidarity is not\na slogan. It's a practice."
  ];
 
  
- ['tl','tr','bl','br'].forEach(function(pos) {
- var c = document.createElement('div');
- c.className = 'auth-corner ' + pos;
- document.body.appendChild(c);
- });
+ var shuffled = allPhrases.slice();
+ for (var s = shuffled.length - 1; s > 0; s--) {
+ var r = Math.floor(Math.random() * (s + 1));
+ var tmp = shuffled[s]; shuffled[s] = shuffled[r]; shuffled[r] = tmp;
+ }
+ var picked = shuffled.slice(0, 3);
+ var fontSizes = ['2.25rem', '1.5rem', '1.875rem']; 
 
- 
  var layer = document.createElement('div');
  layer.id = 'auth-manifesto-layer';
  layer.className = 'auth-manifesto-layer';
  layer.setAttribute('aria-hidden', 'true');
- phrases.forEach(function(p, i) {
+ picked.forEach(function(p, i) {
  var div = document.createElement('div');
- div.className = 'auth-manifesto-phrase amp-' + (i + 1);
+ div.className = 'auth-manifesto-phrase';
+ div.id = 'auth-phrase-' + i;
+ div.style.fontSize = fontSizes[i] || '1.5rem';
  div.textContent = p;
  layer.appendChild(div);
  });
  document.body.insertBefore(layer, document.body.firstChild);
 
- 
+ // Stagger starts with random offsets so they don't sync up
+ picked.forEach(function(_, i) {
+ var delay = 1000 + Math.floor(Math.random() * 4000) + (i * 3500);
+ setTimeout(function() { _animatePhrase(i); }, delay);
+ });
+
  startAuthQuoteCycler();
+}
+
+function _animatePhrase(index) {
+ var el = document.getElementById('auth-phrase-' + index);
+ if (!el) return;
+
+ var zone = _PHRASE_ZONES[index];
+ var vw = window.innerWidth;
+ var vh = window.innerHeight;
+
+ // Random position within this phrase's dedicated zone
+ var x = (zone.xMin + Math.random() * (zone.xMax - zone.xMin)) * vw;
+ var y = (zone.yMin + Math.random() * (zone.yMax - zone.yMin)) * vh;
+
+ // Clamp so text doesn't overflow
+ x = Math.max(10, Math.min(x, vw - 290));
+ y = Math.max(10, Math.min(y, vh - 80));
+
+ var rotation = (Math.random() * 16) - 8;
+ var scale = 0.85 + (Math.random() * 0.3);
+
+ el.style.left = x + 'px';
+ el.style.top = y + 'px';
+ el.style.transform = 'rotate(' + rotation + 'deg) scale(' + scale + ')';
 
  
- measureAndHidePhrases();
- window.addEventListener('resize', measureAndHidePhrases);
+ setTimeout(function() {
+ var isDark = document.documentElement.dataset.themeMode === 'dark';
+ 
+ if (index === 0) {
+  el.style.opacity = isDark ? '0.55' : '0.50';
+ } else {
+  el.style.opacity = isDark ? '0.35' : '0.30';
+ }
+
+ 
+ var hold = 12000 + Math.floor(Math.random() * 6000);
+ setTimeout(function() {
+  el.style.opacity = '0';
+  
+  var wait = 4000 + Math.floor(Math.random() * 4000);
+  setTimeout(function() { _animatePhrase(index); }, wait);
+ }, hold);
+ }, 200);
 }
 
 var AUTH_QUOTES = [
@@ -72,8 +130,6 @@ function _shuffleArray(arr) {
 function startAuthQuoteCycler() {
  var wrap = document.getElementById('auth-quote-wrap');
  if (!wrap) {
- 
- 
  setTimeout(function() {
   var card = document.querySelector('.auth-glass-card') || document.querySelector('.auth-container');
   if (!card) return;
@@ -111,20 +167,6 @@ function _buildQuoteCycler(wrap) {
 
 function stopAuthQuoteCycler() {
  if (_authQuoteTimer) { clearInterval(_authQuoteTimer); _authQuoteTimer = null; }
-}
-
-function measureAndHidePhrases() {
- var vw = window.innerWidth;
- document.querySelectorAll('.auth-manifesto-phrase').forEach(function(p) {
- var fits = p.scrollWidth <= vw + 2; 
- if (!fits) {
-  p.style.animation = 'none';
-  p.style.opacity   = '0';
- } else {
-  p.style.animation = '';
-  p.style.opacity   = '';
- }
- });
 }
 
 function _pickHubQuotes(n) {

@@ -297,7 +297,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * SEIU Local Dashboard including:
+ * SolidBase Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -311,7 +311,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author SEIU Local
+ * @author Development Team
  * @version 4.33.0
  */
 
