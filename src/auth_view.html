@@ -32,6 +32,9 @@ function _injectAuthEffects() {
     '<rect filter="url(#authNoise)" width="100%" height="100%"/></svg>';
   document.body.appendChild(noise);
 
+  // Nav cats — show idle cats on the login screen (they'll chase the bar on first tab nav)
+  if (typeof _ensureNavCats === 'function') _ensureNavCats();
+
   // Dark mode toggle (top-right)
   var toggle = document.createElement('button');
   toggle.className = 'auth-mode-toggle';

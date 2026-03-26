@@ -70,26 +70,31 @@ function createConfigSheet(ss) {
     migrateRemoveYesNoColumn_(sheet);
   }
 
-  // Row 1: Section Headers (grouped categories)
+  // Row 1: Section Headers (grouped categories) — must match CONFIG_HEADER_MAP_ length (79 cols)
   var sectionHeaders = [
-    '── EMPLOYMENT INFO ──', '', '', '',                // A-D (4 cols)
-    '── SUPERVISION ──', '',                            // E-F (2 cols)
-    '── STEWARD INFO ──', '',                           // G-H (2 cols)
-    '── GRIEVANCE SETTINGS ──', '', '', '',             // J-M (4 cols)
-    '── LINKS & COORDINATORS ──', '', '', '',           // N-Q (4 cols)
-    '── NOTIFICATIONS ──', '', '',                      // R-T (3 cols)
-    '── ORGANIZATION ──', '', '', '',                   // U-X (4 cols)
-    '── INTEGRATION ──', '',                            // Y-Z (2 cols)
-    '── DEADLINES ──', '', '', '', '', '', '',              // AA-AG (7 cols)
-    '── MULTI-SELECT OPTIONS ──',                        // AE (1 col)
-    '── CONTRACT & LEGAL ──', '', '', '',               // AF-AI (4 cols)
-    '── ORG IDENTITY ──', '', '',                       // AJ-AL (3 cols)
-    '── EXTENDED CONTACT ──', '', '', '', '',           // AM-AQ (5 cols)
-    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
-    '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
-    '── CUSTOM LINKS ──', '', '', '',                     // BE-BH (4 cols)
-    '── SURVEY LOG ──', '',                               // BI-BJ (2 cols)
-    '── BROADCAST ──'                                     // BK (1 col)
+    '── EMPLOYMENT INFO ──', '', '', '',                          // cols 1-4 (4)
+    '── SUPERVISION ──', '',                                      // cols 5-6 (2)
+    '── STEWARD INFO ──', '',                                     // cols 7-8 (2)
+    '── GRIEVANCE SETTINGS ──', '', '', '',                       // cols 9-12 (4)
+    '── LINKS & COORDINATORS ──', '', '', '',                     // cols 13-16 (4)
+    '── NOTIFICATIONS ──', '', '',                                // cols 17-19 (3)
+    '── ORGANIZATION ──', '', '', '',                             // cols 20-23 (4)
+    '── INTEGRATION ──', '',                                      // cols 24-25 (2)
+    '── DEADLINES ──', '', '', '', '', '', '',                    // cols 26-32 (7)
+    '── MULTI-SELECT OPTIONS ──',                                 // col 33 (1)
+    '── CONTRACT & LEGAL ──', '', '', '',                         // cols 34-37 (4)
+    '── ORG IDENTITY ──', '', '',                                 // cols 38-40 (3)
+    '── EXTENDED CONTACT ──', '', '', '', '',                     // cols 41-45 (5)
+    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '',     // cols 46-52 (7)
+    '── MOBILE DASHBOARD ──', '', '', '', '', '',                 // cols 53-58 (6)
+    '── CUSTOM LINKS ──', '', '', '',                             // cols 59-62 (4)
+    '── SURVEY LOG ──', '',                                       // cols 63-64 (2)
+    '── DRIVE FOLDERS ──', '', '', '', '',                        // cols 65-69 (5)
+    '── SURVEY ENGINE ──', '',                                    // cols 70-71 (2)
+    '── ADVANCED SETTINGS ──', '', '',                            // cols 72-74 (3)
+    '── FEATURE TOGGLES ──', '',                                  // cols 75-76 (2)
+    '── RETENTION ──', '',                                        // cols 77-78 (2)
+    '── ORG BRANDING ──'                                          // col 79 (1)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -549,45 +554,59 @@ function applyConfigSheetStyling(sheet) {
  * @private
  */
 function applySectionColors_(sheet, lastCol) {
-  // Section color definitions (16 sections, columns A-BI)
+  // Section color definitions (23 sections, columns A-CA = 79 cols)
   var SECTION_COLORS = {
-    EMPLOYMENT: { bg: '#3b82f6', text: SHEET_COLORS.TEXT_WHITE },      // Blue - A-E
-    SUPERVISION: { bg: '#8b5cf6', text: SHEET_COLORS.TEXT_WHITE },     // Violet - F-G
-    STEWARD: { bg: '#06b6d4', text: SHEET_COLORS.TEXT_WHITE },         // Cyan - H-I
-    GRIEVANCE: { bg: '#ef4444', text: SHEET_COLORS.TEXT_WHITE },       // Red - J-M
-    LINKS: { bg: '#f97316', text: SHEET_COLORS.TEXT_WHITE },           // Orange - N-Q
-    NOTIFICATIONS: { bg: '#eab308', text: SHEET_COLORS.HEADER_SLATE },   // Yellow - R-T
-    ORGANIZATION: { bg: '#22c55e', text: SHEET_COLORS.TEXT_WHITE },    // Green - U-X
-    INTEGRATION: { bg: '#14b8a6', text: SHEET_COLORS.TEXT_WHITE },     // Teal - Y-Z
-    DEADLINES: { bg: '#ec4899', text: SHEET_COLORS.TEXT_WHITE },       // Pink - AA-AD
-    MULTISELECT: { bg: '#a855f7', text: SHEET_COLORS.TEXT_WHITE },     // Purple - AE
-    CONTRACT: { bg: '#6366f1', text: SHEET_COLORS.TEXT_WHITE },        // Indigo - AF-AI
-    IDENTITY: { bg: '#0ea5e9', text: SHEET_COLORS.TEXT_WHITE },        // Sky - AJ-AL
-    EXTENDED: { bg: '#84cc16', text: SHEET_COLORS.HEADER_SLATE },        // Lime - AM-AQ
-    COMMAND: { bg: '#f43f5e', text: SHEET_COLORS.TEXT_WHITE },         // Rose - AR-AX
-    MOBILE: { bg: '#10b981', text: SHEET_COLORS.TEXT_WHITE },          // Emerald - AY-BE
-    CUSTOM_LINKS: { bg: '#f59e0b', text: SHEET_COLORS.HEADER_SLATE }    // Amber - BF-BI
+    EMPLOYMENT:      { bg: '#3b82f6', text: SHEET_COLORS.TEXT_WHITE },     // Blue
+    SUPERVISION:     { bg: '#8b5cf6', text: SHEET_COLORS.TEXT_WHITE },     // Violet
+    STEWARD:         { bg: '#06b6d4', text: SHEET_COLORS.TEXT_WHITE },     // Cyan
+    GRIEVANCE:       { bg: '#ef4444', text: SHEET_COLORS.TEXT_WHITE },     // Red
+    LINKS:           { bg: '#f97316', text: SHEET_COLORS.TEXT_WHITE },     // Orange
+    NOTIFICATIONS:   { bg: '#eab308', text: SHEET_COLORS.HEADER_SLATE },  // Yellow
+    ORGANIZATION:    { bg: '#22c55e', text: SHEET_COLORS.TEXT_WHITE },     // Green
+    INTEGRATION:     { bg: '#14b8a6', text: SHEET_COLORS.TEXT_WHITE },     // Teal
+    DEADLINES:       { bg: '#ec4899', text: SHEET_COLORS.TEXT_WHITE },     // Pink
+    MULTISELECT:     { bg: '#a855f7', text: SHEET_COLORS.TEXT_WHITE },     // Purple
+    CONTRACT:        { bg: '#6366f1', text: SHEET_COLORS.TEXT_WHITE },     // Indigo
+    IDENTITY:        { bg: '#0ea5e9', text: SHEET_COLORS.TEXT_WHITE },     // Sky
+    EXTENDED:        { bg: '#84cc16', text: SHEET_COLORS.HEADER_SLATE },   // Lime
+    COMMAND:         { bg: '#f43f5e', text: SHEET_COLORS.TEXT_WHITE },     // Rose
+    MOBILE:          { bg: '#10b981', text: SHEET_COLORS.TEXT_WHITE },     // Emerald
+    CUSTOM_LINKS:    { bg: '#f59e0b', text: SHEET_COLORS.HEADER_SLATE },  // Amber
+    SURVEY_LOG:      { bg: '#64748b', text: SHEET_COLORS.TEXT_WHITE },     // Slate
+    DRIVE_FOLDERS:   { bg: '#0d9488', text: SHEET_COLORS.TEXT_WHITE },     // Teal-dark
+    SURVEY_ENGINE:   { bg: '#7c3aed', text: SHEET_COLORS.TEXT_WHITE },     // Violet-dark
+    ADVANCED:        { bg: '#475569', text: SHEET_COLORS.TEXT_WHITE },     // Slate-dark
+    FEATURE_TOGGLES: { bg: '#ea580c', text: SHEET_COLORS.TEXT_WHITE },     // Orange-dark
+    RETENTION:       { bg: '#dc2626', text: SHEET_COLORS.TEXT_WHITE },     // Red-dark
+    ORG_BRANDING:    { bg: '#4f46e5', text: SHEET_COLORS.TEXT_WHITE }      // Indigo-dark
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
-  // Total: 61 columns (A-BI)
+  // Total: 79 columns (A-CA) — must match CONFIG_HEADER_MAP_ order
   var sections = [
-    { start: 1, end: 5, color: SECTION_COLORS.EMPLOYMENT },      // A-E
-    { start: 6, end: 7, color: SECTION_COLORS.SUPERVISION },     // F-G
-    { start: 8, end: 9, color: SECTION_COLORS.STEWARD },         // H-I
-    { start: 10, end: 13, color: SECTION_COLORS.GRIEVANCE },     // J-M
-    { start: 14, end: 17, color: SECTION_COLORS.LINKS },         // N-Q
-    { start: 18, end: 20, color: SECTION_COLORS.NOTIFICATIONS }, // R-T
-    { start: 21, end: 24, color: SECTION_COLORS.ORGANIZATION },  // U-X
-    { start: 25, end: 26, color: SECTION_COLORS.INTEGRATION },   // Y-Z
-    { start: 27, end: 30, color: SECTION_COLORS.DEADLINES },     // AA-AD
-    { start: 31, end: 31, color: SECTION_COLORS.MULTISELECT },   // AE
-    { start: 32, end: 35, color: SECTION_COLORS.CONTRACT },      // AF-AI
-    { start: 36, end: 38, color: SECTION_COLORS.IDENTITY },      // AJ-AL
-    { start: 39, end: 43, color: SECTION_COLORS.EXTENDED },      // AM-AQ
-    { start: 44, end: 50, color: SECTION_COLORS.COMMAND },       // AR-AX (Strategic Command Center)
-    { start: 51, end: 57, color: SECTION_COLORS.MOBILE },        // AY-BE (Mobile Dashboard)
-    { start: 58, end: 61, color: SECTION_COLORS.CUSTOM_LINKS }   // BF-BI (Custom Links)
+    { start: 1,  end: 4,  color: SECTION_COLORS.EMPLOYMENT },       // cols 1-4
+    { start: 5,  end: 6,  color: SECTION_COLORS.SUPERVISION },      // cols 5-6
+    { start: 7,  end: 8,  color: SECTION_COLORS.STEWARD },          // cols 7-8
+    { start: 9,  end: 12, color: SECTION_COLORS.GRIEVANCE },        // cols 9-12
+    { start: 13, end: 16, color: SECTION_COLORS.LINKS },            // cols 13-16
+    { start: 17, end: 19, color: SECTION_COLORS.NOTIFICATIONS },    // cols 17-19
+    { start: 20, end: 23, color: SECTION_COLORS.ORGANIZATION },     // cols 20-23
+    { start: 24, end: 25, color: SECTION_COLORS.INTEGRATION },      // cols 24-25
+    { start: 26, end: 32, color: SECTION_COLORS.DEADLINES },        // cols 26-32
+    { start: 33, end: 33, color: SECTION_COLORS.MULTISELECT },      // col 33
+    { start: 34, end: 37, color: SECTION_COLORS.CONTRACT },         // cols 34-37
+    { start: 38, end: 40, color: SECTION_COLORS.IDENTITY },         // cols 38-40
+    { start: 41, end: 45, color: SECTION_COLORS.EXTENDED },         // cols 41-45
+    { start: 46, end: 52, color: SECTION_COLORS.COMMAND },          // cols 46-52
+    { start: 53, end: 58, color: SECTION_COLORS.MOBILE },           // cols 53-58
+    { start: 59, end: 62, color: SECTION_COLORS.CUSTOM_LINKS },     // cols 59-62
+    { start: 63, end: 64, color: SECTION_COLORS.SURVEY_LOG },       // cols 63-64
+    { start: 65, end: 69, color: SECTION_COLORS.DRIVE_FOLDERS },    // cols 65-69
+    { start: 70, end: 71, color: SECTION_COLORS.SURVEY_ENGINE },    // cols 70-71
+    { start: 72, end: 74, color: SECTION_COLORS.ADVANCED },         // cols 72-74
+    { start: 75, end: 76, color: SECTION_COLORS.FEATURE_TOGGLES },  // cols 75-76
+    { start: 77, end: 78, color: SECTION_COLORS.RETENTION },        // cols 77-78
+    { start: 79, end: 79, color: SECTION_COLORS.ORG_BRANDING }      // col 79
   ];
 
   sections.forEach(function(section) {
