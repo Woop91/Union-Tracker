@@ -397,7 +397,7 @@ describe('G6: dist/ files are in sync with src/', () => {
   });
 
   test('every src .gs file has identical copy in dist', () => {
-    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs']; // excluded by --prod build
+    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
 
