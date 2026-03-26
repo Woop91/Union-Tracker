@@ -1377,6 +1377,11 @@
  var _navProgressPending = false;
  var _navProgressSafetyTimer = null;
  var _navCatsReturnTimer = null;
+ var _barAnimFrame = null;
+ var _barOscillating = false;
+ var _barCurrentPct = 0;    
+ var _scatterCatEls = [];
+ var _scatterCatTimers = [];
 
  
  function _ensureNavCats() {
@@ -1425,34 +1430,49 @@
  function _navCatsChase() {
   var cats = _ensureNavCats();
   var wraps = cats.querySelectorAll('.cat-wrap');
-  // If cats are walking back, capture the furthest cat's position and chase from there
+  
   if (cats.classList.contains('returning') && wraps.length) {
-  var maxX = 0;
   for (var wi = 0; wi < wraps.length; wi++) {
    var wMat = new DOMMatrix(getComputedStyle(wraps[wi]).transform);
-   if (wMat.m41 > maxX) maxX = wMat.m41;
    wraps[wi].style.transition = 'none';
-   wraps[wi].style.transform = '';
+   wraps[wi].style.transform = 'translate(' + Math.round(wMat.m41) + 'px,' + Math.round(wMat.m42) + 'px)';
   }
-  cats.style.transition = 'none';
-  cats.style.transform = 'translateX(' + Math.round(maxX) + 'px)';
   cats.offsetWidth; 
   if (_navCatsReturnTimer) { clearTimeout(_navCatsReturnTimer); _navCatsReturnTimer = null; }
   }
   cats.classList.remove('pouncing', 'returning');
   cats.classList.add('chasing');
-  cats.style.transition = '';
+  cats.style.transform = '';
   
-  var targetX = Math.round(window.innerWidth * 0.82);
-  cats.style.transform = 'translateX(' + targetX + 'px)';
+  var catsRect = cats.getBoundingClientRect();
+  var riseY = -(catsRect.top - 4); 
+  var targetX = Math.round(window.innerWidth * 0.88);
+  
+  var speeds = [4.8, 2.8, 3.6]; 
+  for (var ci = 0; ci < wraps.length; ci++) {
+  wraps[ci].style.transitionProperty = 'transform';
+  wraps[ci].style.transitionDuration = (speeds[ci] || 3.5) + 's';
+  wraps[ci].style.transitionTimingFunction = 'cubic-bezier(0.1,0.6,0.4,1)';
+  wraps[ci].style.transform = 'translate(' + targetX + 'px,' + Math.round(riseY) + 'px)';
+  }
  }
 
  function _navCatsPounce() {
   var cats = document.getElementById('nav-cats');
   if (!cats) return;
-  
-  cats.style.transform = 'translateX(' + (window.innerWidth - 30) + 'px)';
+  var wraps = cats.querySelectorAll('.cat-wrap');
+  var endX = window.innerWidth - 30;
+  var catsRect = cats.getBoundingClientRect();
+  var riseY = -(catsRect.top - 4); 
   cats.classList.add('pouncing');
+  
+  for (var pi = 0; pi < wraps.length; pi++) {
+  var dur = 0.25 + Math.random() * 0.35;
+  wraps[pi].style.transitionProperty = 'transform';
+  wraps[pi].style.transitionDuration = dur.toFixed(2) + 's';
+  wraps[pi].style.transitionTimingFunction = 'ease';
+  wraps[pi].style.transform = 'translate(' + endX + 'px,' + Math.round(riseY) + 'px)';
+  }
   
   setTimeout(function() {
   cats.classList.remove('chasing', 'pouncing');
@@ -1463,17 +1483,22 @@
  
  function _navCatsReturn(cats) {
   var wraps = cats.querySelectorAll('.cat-wrap');
-  if (!wraps.length) { cats.style.transform = ''; return; }
+  if (!wraps.length) return;
   
-  var mat = new DOMMatrix(getComputedStyle(cats).transform);
-  var currentX = mat.m41 || 0;
-  if (currentX < 10) { cats.style.transform = ''; return; }
-  // Snap container back to origin — wrappers hold each cat's position
-  cats.style.transition = 'none';
-  cats.style.transform = '';
-  for (var i = 0; i < wraps.length; i++) {
-  wraps[i].style.transition = 'none';
-  wraps[i].style.transform = 'translateX(' + Math.round(currentX) + 'px)';
+  var hasPos = false;
+  for (var c = 0; c < wraps.length; c++) {
+  var m = new DOMMatrix(getComputedStyle(wraps[c]).transform);
+  if (Math.abs(m.m41) > 10 || Math.abs(m.m42) > 10) { hasPos = true; break; }
+  }
+  if (!hasPos) {
+  for (var r = 0; r < wraps.length; r++) { wraps[r].style.transition = ''; wraps[r].style.transform = ''; }
+  return;
+  }
+  
+  for (var f = 0; f < wraps.length; f++) {
+  var fm = new DOMMatrix(getComputedStyle(wraps[f]).transform);
+  wraps[f].style.transition = 'none';
+  wraps[f].style.transform = 'translate(' + Math.round(fm.m41) + 'px,' + Math.round(fm.m42) + 'px)';
   }
   cats.classList.add('returning');
   cats.offsetWidth; 
@@ -1483,7 +1508,7 @@
   wraps[j].style.transitionProperty = 'transform';
   wraps[j].style.transitionDuration = dur.toFixed(1) + 's';
   wraps[j].style.transitionTimingFunction = 'ease-in-out';
-  wraps[j].style.transform = 'translateX(0)';
+  wraps[j].style.transform = 'translate(0,0)';
   }
   
   if (_navCatsReturnTimer) clearTimeout(_navCatsReturnTimer);
@@ -1497,36 +1522,199 @@
   }, 16000);
  }
 
+ 
+ var _SC_POSITIONS = [
+  { left: '78%', top: '10%' },
+  { left: '4%',  top: '68%' },
+  { left: '62%', top: '80%' },
+  { left: '10%', top: '40%' }
+ ];
+ var _SC_SPEEDS = [3.2, 5.2, 2.6, 4.5]; // seconds — each cat's chase speed
+
+ function _ensureScatterCats() {
+  if (_scatterCatEls.length) return _scatterCatEls;
+  var svg = '<svg class="nav-cat cat-play1" viewBox="0 0 14 18" width="13" height="16">' +
+  '<polygon points="3,6 2,2 5,5" fill="currentColor"/>' +
+  '<polygon points="9,5 12,2 11,6" fill="currentColor"/>' +
+  '<circle cx="7" cy="6.5" r="3.5" fill="currentColor"/>' +
+  '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="currentColor"/>' +
+  '<path d="M11,12 Q14,8 13,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+  '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
+  '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/></svg>';
+  for (var i = 0; i < _SC_POSITIONS.length; i++) {
+  var el = document.createElement('div');
+  el.className = 'scatter-cat';
+  el.setAttribute('aria-hidden', 'true');
+  el.style.left = _SC_POSITIONS[i].left;
+  el.style.top = _SC_POSITIONS[i].top;
+  el.innerHTML = svg;
+  document.body.appendChild(el);
+  _scatterCatEls.push(el);
+  }
+  return _scatterCatEls;
+ }
+
+ function _scatterCatsChase() {
+  var cats = _ensureScatterCats();
+  
+  for (var t = 0; t < _scatterCatTimers.length; t++) clearTimeout(_scatterCatTimers[t]);
+  _scatterCatTimers.length = 0;
+
+  for (var i = 0; i < cats.length; i++) {
+  
+  if (cats[i].classList.contains('sc-settling')) {
+   var m = new DOMMatrix(getComputedStyle(cats[i]).transform);
+   cats[i].style.transition = 'none';
+   cats[i].style.transform = m.m41 || m.m42 ? ('translate(' + Math.round(m.m41) + 'px,' + Math.round(m.m42) + 'px)') : '';
+   cats[i].offsetWidth; 
+  }
+  cats[i].classList.remove('sc-settling');
+  cats[i].classList.add('sc-active', 'sc-chasing');
+  
+  var rect = cats[i].getBoundingClientRect();
+  var targetX = window.innerWidth - 30 - rect.left;
+  var targetY = -(rect.top - 6); 
+  cats[i].style.transition = 'transform ' + _SC_SPEEDS[i] + 's cubic-bezier(0.1,0.6,0.4,1), opacity 0.4s ease';
+  cats[i].style.transform = 'translate(' + Math.round(targetX) + 'px,' + Math.round(targetY) + 'px)';
+  }
+ }
+
+ function _scatterCatsSettle() {
+  for (var i = 0; i < _scatterCatEls.length; i++) {
+  var el = _scatterCatEls[i];
+  el.classList.remove('sc-chasing');
+  el.classList.add('sc-settling');
+  
+  var dur = 8 + Math.random() * 7;
+  el.style.transition = 'transform ' + dur.toFixed(1) + 's ease-in-out, opacity 2s ease';
+  el.style.transform = '';
+  }
+  var cleanTimer = setTimeout(function() {
+  for (var j = 0; j < _scatterCatEls.length; j++) {
+   _scatterCatEls[j].classList.remove('sc-active', 'sc-settling');
+   _scatterCatEls[j].style.transition = '';
+   _scatterCatEls[j].style.transform = '';
+  }
+  }, 16000);
+  _scatterCatTimers.push(cleanTimer);
+ }
+
  function _navProgressStart() {
   var bar = document.getElementById('nav-progress');
   if (!bar) return;
   _navProgressPending = true;
+  _barOscillating = false;
   
   if (_navProgressSafetyTimer) { clearTimeout(_navProgressSafetyTimer); _navProgressSafetyTimer = null; }
-  _navProgressSafetyTimer = setTimeout(function() { if (_navProgressPending) _navProgressDone(); }, 10000);
+  _navProgressSafetyTimer = setTimeout(function() { if (_navProgressPending) _navProgressDone(); }, 15000);
   
   if (_navProgressTimer) { clearTimeout(_navProgressTimer); _navProgressTimer = null; }
+  if (_barAnimFrame) { cancelAnimationFrame(_barAnimFrame); _barAnimFrame = null; }
   bar.style.transition = 'none';
   bar.style.width = '0%';
   bar.style.opacity = '1';
   bar.classList.add('np-active');
-  
   bar.offsetWidth; 
-  bar.style.transition = '';
   
-  bar.style.width = '85%';
+  _barCurrentPct = 0;
+  var startTime = performance.now();
+  var duration = 4000;
+  function animateBar(now) {
+  if (!_navProgressPending && !_barOscillating) return;
+  var elapsed = now - startTime;
+  var t = Math.min(elapsed / duration, 1);
+  var eased = 1 - Math.pow(1 - t, 3); 
+  _barCurrentPct = eased * 100;
+  bar.style.width = _barCurrentPct.toFixed(1) + '%';
+  if (t < 1) {
+   _barAnimFrame = requestAnimationFrame(animateBar);
+  } else {
+   _barAnimFrame = null;
+   
+   if (_navProgressPending) _startBarOscillation(bar);
+  }
+  }
+  _barAnimFrame = requestAnimationFrame(animateBar);
   
   _navCatsChase();
+  _scatterCatsChase();
  }
+
+ 
+ function _startBarOscillation(bar) {
+  _barOscillating = true;
+  
+  var easeStart = performance.now();
+  var easeDur = 1200;
+  var fromPct = 100;
+  var toPct = 90;
+  function easeBack(now) {
+  if (!_navProgressPending) return;
+  var t = Math.min((now - easeStart) / easeDur, 1);
+  var eased = t * t * (3 - 2 * t); 
+  _barCurrentPct = fromPct - (fromPct - toPct) * eased;
+  bar.style.width = _barCurrentPct.toFixed(1) + '%';
+  _updateCatsToBarPos();
+  if (t < 1) {
+   _barAnimFrame = requestAnimationFrame(easeBack);
+  } else {
+   
+   _startBarOscPhase2(bar, performance.now());
+  }
+  }
+  _barAnimFrame = requestAnimationFrame(easeBack);
+ }
+
+ function _startBarOscPhase2(bar, oscStart) {
+  function oscillate(now) {
+  if (!_navProgressPending) return;
+  var t = (now - oscStart) / 1000; 
+  
+  var progress = Math.min(t / 20, 1);
+  var base = 90 + progress * 9;
+  var amplitude = 3 * (1 - progress); 
+  var wave = Math.sin(t * 1.2) * amplitude;
+  _barCurrentPct = Math.min(base + wave, 99.5);
+  bar.style.width = _barCurrentPct.toFixed(1) + '%';
+  _updateCatsToBarPos();
+  _barAnimFrame = requestAnimationFrame(oscillate);
+  }
+  _barAnimFrame = requestAnimationFrame(oscillate);
+ }
+
+ 
+ function _updateCatsToBarPos() {
+  var cats = document.getElementById('nav-cats');
+  if (!cats || !cats.classList.contains('chasing')) return;
+  var wraps = cats.querySelectorAll('.cat-wrap');
+  if (!wraps.length) return;
+  
+  var barX = (_barCurrentPct / 100) * window.innerWidth;
+  
+  var catsRect = cats.getBoundingClientRect();
+  var riseY = -(catsRect.top - 4);
+  var offsets = [-40, -15, -28]; 
+  for (var i = 0; i < wraps.length; i++) {
+  var targetX = Math.max(0, barX + (offsets[i] || -20));
+  wraps[i].style.transition = 'none';
+  wraps[i].style.transform = 'translate(' + Math.round(targetX) + 'px,' + Math.round(riseY) + 'px)';
+  }
+ }
+
  function _navProgressDone() {
   _navProgressPending = false;
+  _barOscillating = false;
+  _barCurrentPct = 100;
   if (_navProgressSafetyTimer) { clearTimeout(_navProgressSafetyTimer); _navProgressSafetyTimer = null; }
+  if (_barAnimFrame) { cancelAnimationFrame(_barAnimFrame); _barAnimFrame = null; }
   var bar = document.getElementById('nav-progress');
   if (!bar) return;
   
+  bar.style.transition = 'width 0.3s ease, opacity 0.3s ease';
   bar.style.width = '100%';
   
   _navCatsPounce();
+  _scatterCatsSettle();
   _navProgressTimer = setTimeout(function() {
   bar.style.opacity = '0';
   _navProgressTimer = setTimeout(function() {
@@ -1547,7 +1735,12 @@
   if (_navProgressTimer) { clearTimeout(_navProgressTimer); _navProgressTimer = null; }
   if (_navProgressSafetyTimer) { clearTimeout(_navProgressSafetyTimer); _navProgressSafetyTimer = null; }
   if (_navCatsReturnTimer) { clearTimeout(_navCatsReturnTimer); _navCatsReturnTimer = null; }
+  if (_barAnimFrame) { cancelAnimationFrame(_barAnimFrame); _barAnimFrame = null; }
   _navProgressPending = false;
+  _barOscillating = false;
+  
+  for (var si = 0; si < _scatterCatTimers.length; si++) clearTimeout(_scatterCatTimers[si]);
+  _scatterCatTimers.length = 0;
   
   if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null; }
   
@@ -1558,6 +1751,17 @@
 
  function handleLogout() {
   _cleanupAppTimers();
+
+  
+  var overlay = document.getElementById('logout-overlay');
+  if (!overlay) {
+  overlay = document.createElement('div');
+  overlay.id = 'logout-overlay';
+  overlay.innerHTML = '<div class="logout-ring"></div><div class="logout-text">Signing out\u2026</div>';
+  document.body.appendChild(overlay);
+  }
+  requestAnimationFrame(function() { overlay.classList.add('active'); });
+
   var token = localStorage.getItem('dashboardSessionToken');
   localStorage.removeItem('dashboardSessionToken');
 
@@ -1578,7 +1782,8 @@
    .withFailureHandler(function() { _redirectToLogout(); })
    .authLogout(token);
   } else {
-  _redirectToLogout();
+  
+  setTimeout(_redirectToLogout, 500);
   }
  }
 

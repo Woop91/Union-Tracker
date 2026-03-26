@@ -299,8 +299,8 @@ button:focus-visible, [role="button"]:focus-visible {
   background: linear-gradient(90deg, #ff003c, #ff2d2d, #ff003c);
   z-index: 300;
   opacity: 0;
-  /* two transitions: width (fast expand) and opacity (fade out at end) */
-  transition: width 0.35s cubic-bezier(0.1, 0.6, 0.4, 1), opacity 0.3s ease;
+  /* opacity transition only — width animated by JS for smooth 4s fill */
+  transition: opacity 0.3s ease;
   pointer-events: none;
   border-radius: 0 1px 1px 0;
   /* Neon glow: vivid red against both dark and light surfaces */
@@ -316,12 +316,12 @@ button:focus-visible, [role="button"]:focus-visible {
 
 /* ── Nav cats — three tiny cats that chase the progress bar ── */
 #nav-cats {
-  position: fixed; top: 4px; left: 8px; z-index: 299;
+  position: fixed; bottom: 30px; left: 8px; z-index: 299;
   display: flex; align-items: flex-end; gap: 3px;
   pointer-events: none;
   color: var(--text, #1a1a1a);
   opacity: 0.3;
-  transition: transform 0.4s cubic-bezier(0.1,0.6,0.4,1), opacity 0.3s ease;
+  transition: opacity 0.3s ease;
 }
 #nav-cats.chasing { opacity: 0.6; }
 .cat-lazy  { animation: cat-idle-lazy 4s ease-in-out infinite; }
@@ -379,6 +379,48 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 @media(max-width:768px) { #nav-cats { display:none; } }
 @media(prefers-reduced-motion:reduce) { #nav-cats { display:none; } }
+
+/* ── Scatter cats — 4 extra cats at screen edges that chase the bar ── */
+.scatter-cat {
+  position: fixed; z-index: 298;
+  pointer-events: none;
+  color: var(--text, #1a1a1a);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.scatter-cat.sc-active { opacity: 0.35; }
+.scatter-cat.sc-active .nav-cat { animation: cat-idle-play 2.5s ease-in-out infinite; }
+.scatter-cat.sc-chasing { opacity: 0.5; }
+.scatter-cat.sc-chasing .nav-cat { animation: cat-run 0.22s ease-in-out infinite alternate; }
+.scatter-cat.sc-settling { opacity: 0.25; }
+.scatter-cat.sc-settling .nav-cat { animation: cat-idle-lazy 3s ease-in-out infinite; }
+@media(max-width:768px) { .scatter-cat { display:none; } }
+@media(prefers-reduced-motion:reduce) { .scatter-cat { display:none; } }
+
+/* ── Logout overlay animation ── */
+#logout-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+  transition: background 0.5s ease;
+}
+#logout-overlay.active { background: rgba(0,0,0,0.65); pointer-events: all; }
+.logout-ring {
+  width: 44px; height: 44px;
+  border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: #ff003c;
+  border-radius: 50%;
+  animation: logoutSpin 0.7s linear infinite;
+}
+@keyframes logoutSpin { to { transform: rotate(360deg); } }
+.logout-text {
+  color: #fff; font-size: 15px; font-weight: 500;
+  letter-spacing: 0.06em; margin-top: 14px; opacity: 0;
+  animation: logoutFadeIn 0.6s ease 0.2s forwards;
+}
+@keyframes logoutFadeIn { to { opacity: 1; } }
 
 /* ═══════════════════════════════════════
    BOTTOM NAV

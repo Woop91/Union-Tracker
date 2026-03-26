@@ -17,10 +17,11 @@ function _injectAuthEffects() {
   // Body gradient (so manifesto layer behind auth-container is visible)
   document.body.classList.add('auth-active');
 
-  // Perimeter light (rotating conic-gradient border)
+  // Perimeter light (rotating conic-gradient border) — random hue per session
   var pl = document.createElement('div');
   pl.className = 'auth-perimeter-light';
   pl.setAttribute('aria-hidden', 'true');
+  pl.style.filter = 'hue-rotate(' + Math.floor(Math.random() * 360) + 'deg)';
   document.body.appendChild(pl);
 
   // Noise texture overlay (inline SVG)
@@ -93,7 +94,7 @@ function showAuthChoose(container) {
   var card = el('div', { className: 'auth-glass-card' });
 
   // ── Brand title ──
-  card.appendChild(el('div', { className: 'auth-brand' }, CONFIG.logoInitials || CONFIG.orgAbbrev || 'SB'));
+  card.appendChild(el('div', { className: 'auth-brand' }, CONFIG.logoInitials || CONFIG.orgAbbrev || 'DDS'));
 
   // ── Header ──
   var header = el('div', { style: { textAlign: 'center', marginBottom: '28px' } });
