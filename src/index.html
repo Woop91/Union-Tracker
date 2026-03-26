@@ -1432,6 +1432,69 @@
      * CSS handles the animation via #nav-progress in styles.html.
      */
     var _navProgressTimer = null;
+
+    // ── Nav cats: three tiny cats that chase the red laser-bar ──
+    function _ensureNavCats() {
+      var c = document.getElementById('nav-cats');
+      if (c) return c;
+      c = document.createElement('div');
+      c.id = 'nav-cats';
+      c.setAttribute('aria-hidden', 'true');
+      // Lazy cat (laying down, bored) + two sitting/playing cats — SVG silhouettes
+      c.innerHTML =
+        '<svg class="nav-cat cat-lazy" viewBox="0 0 24 12" width="20" height="10">' +
+          '<ellipse cx="11" cy="8.5" rx="7" ry="3" fill="currentColor"/>' +
+          '<circle cx="17" cy="6" r="2.8" fill="currentColor"/>' +
+          '<polygon points="15,4 14.5,1 16.5,3" fill="currentColor"/>' +
+          '<polygon points="18,3 20,1 19.5,4" fill="currentColor"/>' +
+          '<path d="M4,7.5 Q1,3.5 2.5,1.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+          '<line x1="15.5" y1="5.5" x2="16.2" y2="5.5" stroke="#4ade80" stroke-width="0.7" opacity="0.7"/>' +
+          '<line x1="17.5" y1="5.5" x2="18.2" y2="5.5" stroke="#4ade80" stroke-width="0.7" opacity="0.7"/>' +
+        '</svg>' +
+        '<svg class="nav-cat cat-play1" viewBox="0 0 14 18" width="11" height="14">' +
+          '<polygon points="3,6 2,2 5,5" fill="currentColor"/>' +
+          '<polygon points="9,5 12,2 11,6" fill="currentColor"/>' +
+          '<circle cx="7" cy="6.5" r="3.5" fill="currentColor"/>' +
+          '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="currentColor"/>' +
+          '<path d="M11,12 Q14,8 13,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+          '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
+          '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
+        '</svg>' +
+        '<svg class="nav-cat cat-play2" viewBox="0 0 14 18" width="11" height="14">' +
+          '<polygon points="3,6 1.5,2 5,5" fill="currentColor"/>' +
+          '<polygon points="9,5 12.5,2 11,6" fill="currentColor"/>' +
+          '<circle cx="7" cy="6.5" r="3.5" fill="currentColor"/>' +
+          '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="currentColor"/>' +
+          '<path d="M11,12 Q15,9 12,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+          '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
+          '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
+        '</svg>';
+      document.body.appendChild(c);
+      return c;
+    }
+
+    function _navCatsChase() {
+      var cats = _ensureNavCats();
+      cats.classList.remove('pouncing');
+      cats.classList.add('chasing');
+      // Chase to ~82% of viewport (where bar pauses at 85%)
+      var targetX = Math.round(window.innerWidth * 0.82);
+      cats.style.transform = 'translateX(' + targetX + 'px)';
+    }
+
+    function _navCatsPounce() {
+      var cats = document.getElementById('nav-cats');
+      if (!cats) return;
+      // Snap to end of bar (100%)
+      cats.style.transform = 'translateX(' + (window.innerWidth - 30) + 'px)';
+      cats.classList.add('pouncing');
+      // Trot back home after pounce
+      setTimeout(function() {
+        cats.classList.remove('chasing', 'pouncing');
+        cats.style.transform = '';
+      }, 900);
+    }
+
     function _navProgressStart() {
       var bar = document.getElementById('nav-progress');
       if (!bar) return;
@@ -1446,12 +1509,16 @@
       bar.style.transition = '';
       // Animate to 85% — holds there until _navProgressDone() is called
       bar.style.width = '85%';
+      // Cats chase the laser!
+      _navCatsChase();
     }
     function _navProgressDone() {
       var bar = document.getElementById('nav-progress');
       if (!bar) return;
       // Snap to 100% then fade out
       bar.style.width = '100%';
+      // Cats pounce at the end!
+      _navCatsPounce();
       _navProgressTimer = setTimeout(function() {
         bar.style.opacity = '0';
         _navProgressTimer = setTimeout(function() {

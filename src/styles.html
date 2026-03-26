@@ -314,6 +314,53 @@ button:focus-visible, [role="button"]:focus-visible {
   #nav-progress { transition: opacity 0.15s ease; }
 }
 
+/* ── Nav cats — three tiny cats that chase the progress bar ── */
+#nav-cats {
+  position: fixed; top: 4px; left: 8px; z-index: 299;
+  display: flex; align-items: flex-end; gap: 3px;
+  pointer-events: none;
+  color: var(--text, #1a1a1a);
+  opacity: 0.3;
+  transition: transform 0.4s cubic-bezier(0.1,0.6,0.4,1), opacity 0.3s ease;
+}
+#nav-cats.chasing { opacity: 0.6; }
+.cat-lazy  { animation: cat-idle-lazy 4s ease-in-out infinite; }
+.cat-play1 { animation: cat-idle-play 2.2s ease-in-out infinite; }
+.cat-play2 { animation: cat-idle-play 2.8s ease-in-out infinite 0.4s; }
+@keyframes cat-idle-lazy {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-0.5px); }
+}
+@keyframes cat-idle-play {
+  0%,100% { transform: translateY(0)    rotate(0deg); }
+  30%     { transform: translateY(-2px)  rotate(-4deg); }
+  70%     { transform: translateY(-1px)  rotate(4deg); }
+}
+#nav-cats.chasing .cat-play1,
+#nav-cats.chasing .cat-play2 {
+  animation: cat-run 0.18s ease-in-out infinite alternate;
+}
+#nav-cats.chasing .cat-lazy {
+  animation: cat-wake 0.3s ease forwards;
+}
+@keyframes cat-run {
+  from { transform: translateY(0)    rotate(-6deg); }
+  to   { transform: translateY(-3px) rotate(6deg); }
+}
+@keyframes cat-wake {
+  to { transform: translateY(-2px) scaleY(1.2); }
+}
+#nav-cats.pouncing .nav-cat {
+  animation: cat-pounce 0.4s ease forwards !important;
+}
+@keyframes cat-pounce {
+  0%  { transform: translateY(0); }
+  45% { transform: translateY(-10px) scale(1.2); }
+  100%{ transform: translateY(0)     scale(1); }
+}
+@media(max-width:768px) { #nav-cats { display:none; } }
+@media(prefers-reduced-motion:reduce) { #nav-cats { display:none; } }
+
 /* ═══════════════════════════════════════
    BOTTOM NAV
    ═══════════════════════════════════════ */
