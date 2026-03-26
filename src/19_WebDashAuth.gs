@@ -40,7 +40,7 @@ var Auth = (function () {
    * Attempts to resolve the current user from available auth signals.
    * Priority: (1) session token in URL, (2) SSO, (3) magic link token in URL
    * @param {Object} e - doGet event object
-   * @returns {Object|null} { email: string, method: 'sso'|'magic'|'session' } or null
+   * @returns {Object|null} { email: string, method: 'sso'|'magic'|'session'|'pin' } or null
    */
   function resolveUser(e) {
     var params = e ? e.parameter || {} : {};
@@ -50,9 +50,10 @@ var Auth = (function () {
 
     // 1. Check for session token (returning user with "remember me")
     if (params.sessionToken) {
-      var sessionEmail = _validateSessionToken(params.sessionToken);
-      if (sessionEmail) {
-        return { email: sessionEmail, method: 'session' };
+      var sessionData = _getSessionData(params.sessionToken);
+      if (sessionData && sessionData.email) {
+        // Preserve original auth method (e.g. 'pin') if stored in session
+        return { email: sessionData.email, method: sessionData.authMethod || 'session' };
       }
     }
 
@@ -121,7 +122,7 @@ var Auth = (function () {
     } catch (cfgErr) {
       Logger.log('Auth.sendMagicLink: ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
       config = {
-        orgName: 'Dashboard',
+        orgName: 'SolidBase',
         logoInitials: '',
         accentHue: 250,
         magicLinkExpiryMs: 7 * 24 * 60 * 60 * 1000,
@@ -235,9 +236,10 @@ var Auth = (function () {
    * Creates a session token for "remember me" functionality.
    * Called after successful auth if remember=1.
    * @param {string} email
+   * @param {string} [authMethod] - Original auth method ('sso', 'magic', 'pin'). Stored in session for access-level decisions.
    * @returns {string} Session token
    */
-  function createSessionToken(email) {
+  function createSessionToken(email, authMethod) {
     // Auto-evict expired tokens if approaching quota
     try {
       var props = PropertiesService.getScriptProperties();
@@ -276,11 +278,13 @@ var Auth = (function () {
 
     try {
       props = PropertiesService.getScriptProperties();
-      props.setProperty(SESSION_PREFIX + token, JSON.stringify({
+      var sessionObj = {
         email: email.toLowerCase(),
         expiry: expiry,
         created: Date.now(),
-      }));
+      };
+      if (authMethod) sessionObj.authMethod = authMethod;
+      props.setProperty(SESSION_PREFIX + token, JSON.stringify(sessionObj));
     } catch (propErr) {
       Logger.log('Auth.createSessionToken: PropertiesService write failed (' + propErr.message + ')');
       // C3: Return error instead of a token that doesn't exist server-side
@@ -395,24 +399,32 @@ var Auth = (function () {
     }
   }
 
-  function _validateSessionToken(token) {
+  /**
+   * Reads full session data for a token. Returns null if expired or missing.
+   * @param {string} token
+   * @returns {Object|null} { email, expiry, created, authMethod } or null
+   * @private
+   */
+  function _getSessionData(token) {
     var props = PropertiesService.getScriptProperties();
     var raw = props.getProperty(SESSION_PREFIX + token);
-
     if (!raw) return null;
-
     try {
       var data = JSON.parse(raw);
-
       if (data.expiry < Date.now()) {
         props.deleteProperty(SESSION_PREFIX + token);
         return null;
       }
-
-      return data.email;
+      return data;
     } catch (_e) {
       return null;
     }
+  }
+
+  /** @returns {string|null} Email or null — backward-compatible wrapper */
+  function _validateSessionToken(token) {
+    var data = _getSessionData(token);
+    return data ? data.email : null;
   }
 
   function _generateToken() {
@@ -487,6 +499,17 @@ var Auth = (function () {
      */
     resolveEmailFromToken: _validateSessionToken,
     validateSessionToken: _validateSessionToken,
+    /**
+     * Check if a session token was created via PIN login.
+     * PIN sessions have restricted access — no personal data.
+     * @param {string} token
+     * @returns {boolean}
+     */
+    isPINSession: function(token) {
+      if (!token) return false;
+      var data = _getSessionData(token);
+      return !!(data && data.authMethod === 'pin');
+    },
   };
 
 })();

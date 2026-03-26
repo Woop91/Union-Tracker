@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Optimized Grievance Form</title>
+<title>Grievance Form — SolidBase</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -288,7 +288,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 <body>
 
 <div class="toolbar">
-  <span>Optimized Grievance Form &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
+  <span>Grievance Form &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
   <button class="tbtn go" onclick="doEmail()">&#9993; Email</button>
   <button class="tbtn" onclick="window.print()">&#9113; Print&thinsp;/&thinsp;Save PDF</button>
   <button class="tbtn" onclick="doClear()">&#10005; Clear</button>
@@ -426,7 +426,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <!-- WAIVER 1 -->
   <div class="whead">Alliance Waiver of Right to Appeal Disciplinary Action to Civil Service Commission</div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement — refer to your local CBA for applicable dates and units.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Alliance, AFSCME/SEIU, AFL-CIO Units 8 &amp; 10, effective January 1, 2014 to December 31, 2016.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my demotion, suspension or discharge effective on<input id="w1date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -458,7 +458,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
     Acknowledgement of Alliance Waiver of Right to Arbitrate Claims of Discriminatory<br>
     Termination Filed in Multiple Forums
   </div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement — refer to your local CBA for applicable dates and units.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Alliance, AFSCME/SEIU, AFL-CIO Units 8 &amp; 10, effective January 1, 2014 to December 31, 2016.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my discharge effective on <input id="w2date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -504,7 +504,7 @@ function buildBody(){
   const sep="\u2500".repeat(66);
   const w1=v("w1date"),w2=v("w2date");
   return[
-    "GRIEVANCE REPORT",
+    "GRIEVANCE REPORT \u2014 LOCAL 509 / SEIU",
     "=".repeat(66),
     "GRIEVANT(S)      : "+dash(v("grievant")),
     "JOB TITLE        : "+dash(v("jobtitle")),

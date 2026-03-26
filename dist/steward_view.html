@@ -2111,7 +2111,7 @@ function _showMemberDetail(container, itemEl, member) {
  
  // Allows steward to generate or reset a member's login PIN from the webapp.
  
- if (typeof IS_DEV_MODE !== 'undefined' && IS_DEV_MODE) {
+ {
  var managePinBtn = el('button', {
   style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--muted)', fontWeight: '600', cursor: 'pointer' },
   onClick: function() {
@@ -2170,7 +2170,7 @@ function _showMemberDetail(container, itemEl, member) {
     pinStatus.textContent = 'Server error. Try again.';
     pinStatus.style.color = 'var(--danger)';
     })
-    .devStewardManageMemberPIN(SESSION_TOKEN, member.email);
+    .stewardManageMemberPIN(SESSION_TOKEN, member.email);
    }
   }, '\uD83D\uDD11 Generate PIN');
 
@@ -3879,10 +3879,12 @@ function renderStewardMore(appContainer) {
   { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
   { group: 'Reference' },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
-  { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
+  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the union organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
+  { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'Agency structure & budget', action: function() { _handleTabNav('steward', 'maddsorgchart'); } },
   { group: 'Community' },
   { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('steward', 'qaforum'); } },
   { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { _handleTabNav('steward', 'polls'); } },
+  { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { _handleTabNav('steward', 'surveytrack'); } },
   { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { _handleTabNav('steward', 'feedback'); } },
   { group: 'Comms' },
   { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { _handleTabNav('steward', 'broadcast'); } },
@@ -3891,7 +3893,6 @@ function renderStewardMore(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { _handleTabNav('steward', 'events'); } },
   { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { _handleTabNav('steward', 'timeline'); } },
   { divider: true },
-  { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { _handleTabNav('steward', 'surveytrack'); } },
   { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { _handleTabNav('steward', 'stewarddirectory'); } },
   { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { _handleTabNav('steward', 'failsafe'); } },
   { icon: '\uD83E\uDDEA', label: 'Test Runner', desc: 'Run integration tests', action: function() { _handleTabNav('steward', 'testrunner'); } },
@@ -4827,7 +4828,9 @@ function _renderWorkloadInsights(container, wl, showDetail) {
 
  var totalSubmissions = d.totalSubmissions || 0;
  var memberCount = d.members || 0;
- grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting'));
+ grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
+ if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'insights');
+ }));
 
  
  var avgs = d.averages || {};
@@ -4844,7 +4847,10 @@ function _renderWorkloadInsights(container, wl, showDetail) {
   }
   items.sort(function(a, b) { return b.count - a.count; });
   _renderInsightDetailList(panel, items, 'var(--info)');
-  
+  var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
+  if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'insights');
+  }}, 'View Workload Tracker \u2192');
+  panel.appendChild(navBtn);
  });
  }));
 
@@ -8671,5 +8677,204 @@ function _loadMentorshipSuggestions(suggestList) {
  suggestList.innerHTML = '';
  suggestList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load suggestions.'));
  }).dataGetMentorshipSuggestions(SESSION_TOKEN);
+}
+
+function renderAnalyticsPage(container) {
+ if (!IS_ADMIN) { container.innerHTML = '<div class="card" style="padding:24px;color:var(--danger)">Admin access required.</div>'; return; }
+
+ var content = _layoutCache.content || container;
+ content.innerHTML = '';
+
+ var header = el('div', { style: { marginBottom: '24px' } });
+ header.appendChild(el('div', { style: { fontSize: '1.25rem', fontWeight: '700', color: 'var(--text)' } }, 'Usage Analytics'));
+ header.appendChild(el('div', { style: { fontSize: '0.8125rem', color: 'var(--muted)', marginTop: '4px' } }, 'Real-time webapp usage data. Only visible to admins.'));
+ content.appendChild(header);
+
+ 
+ var rangeWrap = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' } });
+ var _activeDays = 7;
+ [7, 14, 30].forEach(function(d) {
+ var btn = el('button', {
+  className: 'btn ' + (d === 7 ? 'btn-primary' : 'btn-secondary'),
+  style: { padding: '6px 14px', fontSize: '12px' },
+  onClick: function() {
+  _activeDays = d;
+  rangeWrap.querySelectorAll('.btn').forEach(function(b) { b.className = 'btn btn-secondary'; b.style.padding = '6px 14px'; b.style.fontSize = '12px'; });
+  btn.className = 'btn btn-primary'; btn.style.padding = '6px 14px'; btn.style.fontSize = '12px';
+  _loadAnalytics(content, d, statsGrid, perfGrid, tabsList, dailyChart, errList, userPerfList);
+  }
+ }, d + ' days');
+ rangeWrap.appendChild(btn);
+ });
+ content.appendChild(rangeWrap);
+
+ 
+ var statsGrid = el('div', { className: 'kpi-grid', style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' } });
+ content.appendChild(statsGrid);
+
+ 
+ var perfHeader = el('div', { style: { fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text)', marginBottom: '10px', marginTop: '8px' } }, 'Performance');
+ content.appendChild(perfHeader);
+ var perfGrid = el('div', { className: 'kpi-grid', style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' } });
+ content.appendChild(perfGrid);
+
+ 
+ var dailyHeader = el('div', { style: { fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, 'Daily Sessions');
+ content.appendChild(dailyHeader);
+ var dailyChart = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', minHeight: '120px' } });
+ content.appendChild(dailyChart);
+
+ 
+ var userPerfHeader = el('div', { style: { fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, 'Slowest Users (avg load time)');
+ content.appendChild(userPerfHeader);
+ var userPerfList = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px' } });
+ content.appendChild(userPerfList);
+
+ 
+ var tabsHeader = el('div', { style: { fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, 'Top Tabs');
+ content.appendChild(tabsHeader);
+ var tabsList = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px' } });
+ content.appendChild(tabsList);
+
+ 
+ var errHeader = el('div', { style: { fontSize: '0.9375rem', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, 'Recent Errors');
+ content.appendChild(errHeader);
+ var errList = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px' } });
+ content.appendChild(errList);
+
+ 
+ _loadAnalytics(content, 7, statsGrid, perfGrid, tabsList, dailyChart, errList, userPerfList);
+}
+
+function _loadAnalytics(container, days, statsGrid, perfGrid, tabsList, dailyChart, errList, userPerfList) {
+ statsGrid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px">Loading analytics...</div>';
+ perfGrid.innerHTML = '';
+ tabsList.innerHTML = '';
+ dailyChart.innerHTML = '';
+ errList.innerHTML = '';
+ userPerfList.innerHTML = '';
+
+ google.script.run
+ .withSuccessHandler(function(result) {
+  if (!result || !result.success) {
+  statsGrid.innerHTML = '<div style="color:var(--danger);padding:12px">' + escapeHtml(result && result.message || 'Failed to load.') + '</div>';
+  return;
+  }
+
+  
+  statsGrid.innerHTML = '';
+  var kpis = [
+  { label: 'Unique Users', value: result.uniqueUsers || 0 },
+  { label: 'Total Sessions', value: result.totalSessions || 0 },
+  { label: 'Events Tracked', value: result.filteredEvents || 0 },
+  { label: 'Back Swipes', value: result.backSwipes || 0 },
+  ];
+  
+  if (result.authMethods) {
+  kpis.push({ label: 'SSO Logins', value: result.authMethods.sso || 0 });
+  kpis.push({ label: 'Magic Link', value: result.authMethods.magic || 0 });
+  kpis.push({ label: 'PIN Logins', value: result.authMethods.pin || 0 });
+  }
+  
+  if (result.deviceTypes) {
+  kpis.push({ label: 'Mobile', value: result.deviceTypes.mobile || 0 });
+  kpis.push({ label: 'Desktop', value: result.deviceTypes.desktop || 0 });
+  kpis.push({ label: 'Tablet', value: result.deviceTypes.tablet || 0 });
+  }
+  kpis.forEach(function(k) {
+  var card = el('div', { className: 'kpi-card card', style: { padding: '14px', textAlign: 'center' } });
+  card.appendChild(el('div', { style: { fontSize: '1.5rem', fontWeight: '700', color: 'var(--accent)' } }, String(k.value)));
+  card.appendChild(el('div', { className: 'kpi-label', style: { fontSize: '0.625rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' } }, k.label));
+  statsGrid.appendChild(card);
+  });
+
+  
+  perfGrid.innerHTML = '';
+  var perf = result.performance || {};
+  var perfKpis = [
+  { label: 'Avg Load Time', value: perf.avgLoadMs != null ? perf.avgLoadMs + 'ms' : 'N/A', warn: perf.avgLoadMs > 3000 },
+  { label: 'P95 Load Time', value: perf.p95LoadMs != null ? perf.p95LoadMs + 'ms' : 'N/A', warn: perf.p95LoadMs > 5000 },
+  { label: 'Avg Batch Fetch', value: perf.avgBatchMs != null ? perf.avgBatchMs + 'ms' : 'N/A' },
+  { label: 'SWR Hit Rate', value: perf.swrHitRate != null ? perf.swrHitRate + '%' : 'N/A' },
+  { label: 'Perf Samples', value: perf.sampleCount || 0 },
+  ];
+  perfKpis.forEach(function(k) {
+  var card = el('div', { className: 'kpi-card card', style: { padding: '14px', textAlign: 'center' } });
+  card.appendChild(el('div', { style: { fontSize: '1.5rem', fontWeight: '700', color: k.warn ? 'var(--danger)' : 'var(--accent)' } }, String(k.value)));
+  card.appendChild(el('div', { className: 'kpi-label', style: { fontSize: '0.625rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' } }, k.label));
+  perfGrid.appendChild(card);
+  });
+
+  
+  dailyChart.innerHTML = '';
+  var daily = result.dailySessions || [];
+  if (daily.length === 0) {
+  dailyChart.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'No daily data yet.'));
+  } else {
+  var maxSessions = Math.max.apply(null, daily.map(function(d) { return d.sessions; })) || 1;
+  daily.forEach(function(d) {
+   var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+   row.appendChild(el('div', { style: { width: '70px', fontSize: '11px', color: 'var(--muted)', flexShrink: '0' } }, d.date.slice(5)));
+   var barWrap = el('div', { style: { flex: '1', height: '18px', background: 'var(--surfaceAlt, rgba(255,255,255,0.06))', borderRadius: '4px', overflow: 'hidden' } });
+   var bar = el('div', { style: { height: '100%', width: Math.max(2, (d.sessions / maxSessions) * 100) + '%', background: 'var(--accent)', borderRadius: '4px', transition: 'width 0.3s' } });
+   barWrap.appendChild(bar);
+   row.appendChild(barWrap);
+   row.appendChild(el('div', { style: { width: '30px', fontSize: '11px', color: 'var(--text)', textAlign: 'right', fontWeight: '600' } }, String(d.sessions)));
+   dailyChart.appendChild(row);
+  });
+  }
+
+  
+  userPerfList.innerHTML = '';
+  var up = result.userPerf || [];
+  if (up.length === 0) {
+  userPerfList.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'No performance data yet.'));
+  } else {
+  up.forEach(function(u, i) {
+   var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0', borderBottom: i < up.length - 1 ? '1px solid var(--border)' : 'none' } });
+   var isSlow = u.avgMs > 3000;
+   row.appendChild(el('div', { style: { flex: '1', fontSize: '12px', color: 'var(--text)' } }, escapeHtml(u.email)));
+   row.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: isSlow ? 'var(--danger)' : 'var(--accent)' } }, u.avgMs + 'ms'));
+   row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)' } }, u.samples + ' samples'));
+   userPerfList.appendChild(row);
+  });
+  }
+
+  
+  tabsList.innerHTML = '';
+  var tabs = result.topTabs || [];
+  if (tabs.length === 0) {
+  tabsList.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'No tab data yet.'));
+  } else {
+  var maxTabCount = tabs[0].count || 1;
+  tabs.slice(0, 12).forEach(function(t) {
+   var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+   row.appendChild(el('div', { style: { width: '90px', fontSize: '12px', color: 'var(--text)', fontWeight: '500' } }, escapeHtml(t.tab)));
+   var barWrap = el('div', { style: { flex: '1', height: '14px', background: 'var(--surfaceAlt, rgba(255,255,255,0.06))', borderRadius: '3px', overflow: 'hidden' } });
+   barWrap.appendChild(el('div', { style: { height: '100%', width: Math.max(2, (t.count / maxTabCount) * 100) + '%', background: 'var(--accent)', borderRadius: '3px' } }));
+   row.appendChild(barWrap);
+   row.appendChild(el('div', { style: { width: '40px', fontSize: '11px', color: 'var(--muted)', textAlign: 'right' } }, String(t.count)));
+   tabsList.appendChild(row);
+  });
+  }
+
+  
+  errList.innerHTML = '';
+  var errs = result.recentErrors || [];
+  if (errs.length === 0) {
+  errList.appendChild(el('div', { style: { color: 'var(--success)', fontSize: '13px' } }, 'No errors in this period.'));
+  } else {
+  errs.forEach(function(e) {
+   var row = el('div', { style: { padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '12px' } });
+   row.appendChild(el('div', { style: { color: 'var(--danger)', fontWeight: '600' } }, escapeHtml(e.msg)));
+   row.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '10px', marginTop: '2px' } }, escapeHtml(e.user) + ' \u2014 ' + (e.ts ? e.ts.slice(0, 16).replace('T', ' ') : '')));
+   errList.appendChild(row);
+  });
+  }
+ })
+ .withFailureHandler(function(err) {
+  statsGrid.innerHTML = '<div style="color:var(--danger);padding:12px">Failed to load analytics: ' + escapeHtml(String(err)) + '</div>';
+ })
+ .dataGetUsageAnalytics(SESSION_TOKEN, days);
 }
 </script>

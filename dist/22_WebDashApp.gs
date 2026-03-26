@@ -94,7 +94,7 @@ function doGetWebDashboard(e) {
     config = ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
-    config = { orgName: 'Dashboard', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -112,6 +112,11 @@ function doGetWebDashboard(e) {
       // can display a helpful message.
       if (e.parameter.sso === '1') {
         return _serveAuth(config, e, 'sso_failed');
+      }
+      // v4.40.0: Magic link expired or already used — show helpful message
+      // instead of silently dumping users back to login with no explanation
+      if (e.parameter.token) {
+        return _serveAuth(config, e, 'token_expired');
       }
       // Not authenticated — show login screen
       return _serveAuth(config, e);
@@ -155,8 +160,18 @@ function doGetWebDashboard(e) {
     // Also echo back an existing validated session token so the client always has
     // SESSION_TOKEN populated for non-SSO auth (magic link + remember me, or returning
     // session users). This is safe: the token was already validated by resolveUser().
+    // v4.40.0: SSO users are auto-remembered — Google auth implies browser trust,
+    // and losing the session on accidental tab close was a top user pain point.
     var sessionToken = null;
-    if (e.parameter.remember === '1' && user.method === 'magic') {
+    if (user.method === 'sso') {
+      // Auto-remember SSO users — no toggle needed; Google auth is already trusted
+      var ssoToken = Auth.createSessionToken(user.email, 'sso');
+      if (ssoToken && typeof ssoToken === 'object' && ssoToken.error) {
+        Logger.log('SSO auto-session storage failed: ' + ssoToken.message);
+      } else {
+        sessionToken = ssoToken;
+      }
+    } else if (e.parameter.remember === '1' && user.method === 'magic') {
       var tokenResult = Auth.createSessionToken(user.email);
       // C3: Handle session storage failure — createSessionToken may return error object
       if (tokenResult && typeof tokenResult === 'object' && tokenResult.error) {
@@ -179,7 +194,7 @@ function doGetWebDashboard(e) {
       Logger.log('doGet slow: ' + elapsed + 'ms before serving dashboard');
     }
 
-    return _serveDashboard(config, userRecord, role, sessionToken, initialTab);
+    return _serveDashboard(config, userRecord, role, sessionToken, initialTab, user.method);
 
   } catch (err) {
     Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
@@ -203,6 +218,7 @@ function _serveAuth(config, e, authError) {
     error: e.parameter.authError || authError || null,
     webAppUrl: _getWebAppUrlSafe(),
     tokenChecked: !!(e.parameter.sessionToken),
+    isDevMode: !isProductionMode(),
   });
 
   return template.evaluate()
@@ -213,8 +229,9 @@ function _serveAuth(config, e, authError) {
 
 /**
  * Serves the dashboard (steward or member view).
+ * @param {string} [authMethod] - Auth method ('sso', 'magic', 'session', 'pin')
  */
-function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
+function _serveDashboard(config, userRecord, role, sessionToken, initialTab, authMethod) {
   var template = HtmlService.createTemplateFromFile('index');
   template.view = role; // 'steward', 'member', or 'both'
 
@@ -265,6 +282,13 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     colorTheme: colorThemeData.themeKey || 'default',
     colorThemes: (typeof getColorThemeList === 'function') ? getColorThemeList() : [],
     isDevMode: !isProductionMode(),
+    authMethod: authMethod || 'sso',
+    isAdmin: (function() {
+      try {
+        if (typeof _adminIsAuthorized_ === 'function') return _adminIsAuthorized_(userRecord.email);
+        return userRecord.email.toLowerCase() === Session.getEffectiveUser().getEmail().toLowerCase();
+      } catch (_) { return false; }
+    })(),
   });
 
   return template.evaluate()
@@ -524,27 +548,19 @@ function getOrgChartHtml() {
 }
 
 /**
- * Client-callable: Returns the POMS Reference HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the POMS Reference tab.
- * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
+ * Client-callable: Agency Org Chart stub — not available in SolidBase.
+ * @returns {string} Placeholder message
+ */
+function getAgencyOrgChartHtml() {
+  return '<div class="empty-state">Agency org chart is not configured. Set up your agency chart in Admin Settings.</div>';
+}
+
+/**
+ * Client-callable: POMS Reference stub — not available in SolidBase.
+ * @returns {string} Placeholder message
  */
 function getPOMSReferenceHtml() {
-  try {
-    // No auth check — user already authenticated via doGet().
-    // Session.getActiveUser().getEmail() returns empty for magic-link users.
-    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
-    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
-    var cacheKey = 'HTML_poms_ref_' + ver;
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get(cacheKey);
-    if (cached) return cached;
-    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
-    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
-    return html;
-  } catch (e) {
-    Logger.log('getPOMSReferenceHtml error: ' + e.message);
-    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
-  }
+  return '<div class="empty-state">POMS Reference is not available in this deployment.</div>';
 }
 
 /**

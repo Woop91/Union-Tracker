@@ -1492,13 +1492,12 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
 // ============================================================================
 
 // ============================================================================
-// DEV-ONLY: PIN LOGIN + STEWARD PIN MANAGEMENT
-// These functions are intentionally only wired to UI when IS_DEV_MODE is true.
-// They must never appear in production auth flows.
+// PIN LOGIN + STEWARD PIN MANAGEMENT
+// Available in all environments. PIN authentication for members.
 // ============================================================================
 
 /**
- * DEV ONLY — Authenticate a user by scanning all member PIN hashes.
+ * Authenticate a user by scanning all member PIN hashes.
  * No email required. Scans entire Member Directory, tries hashPIN() against
  * each row that has a stored hash. Returns a session token on first match.
  *

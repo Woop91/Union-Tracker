@@ -4743,17 +4743,36 @@ function _requireStewardAuth(sessionToken) {
 //   - Steward ops: _requireStewardAuth(sessionToken) verifies steward role, uses server email
 //   - Member self-service: _resolveCallerEmail(sessionToken) provides server-verified identity
 //   - Public reads: no auth required (aggregate/non-PII data only)
+//   - PIN sessions: restricted from personal data (profile, grievances, Drive, steward contact)
+
+/**
+ * Check if the session token was created via PIN login.
+ * PIN sessions are restricted from viewing or editing personal data.
+ * @param {string} sessionToken
+ * @returns {boolean}
+ * @private
+ */
+function _isPINSession(sessionToken) {
+  if (!sessionToken) return false;
+  if (typeof Auth !== 'undefined' && typeof Auth.isPINSession === 'function') {
+    return Auth.isPINSession(sessionToken);
+  }
+  return false;
+}
+
+/** Standard response for PIN-restricted endpoints */
+var _PIN_RESTRICTED_RESPONSE = { success: false, pinRestricted: true, message: 'Personal information is not available with PIN login. Sign in with Google or email link for full access.' };
 
 /** @param {string} sessionToken @returns {Object[]} Steward cases. Requires steward auth. */
 function dataGetStewardCases(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; if (!_isGrievancesEnabled()) return { success: true, cases: [] }; return DataService.getStewardCases(s); }
 /** @param {string} sessionToken @returns {Object} Steward KPIs. Requires steward auth. */
 function dataGetStewardKPIs(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; if (!_isGrievancesEnabled()) return { totalCases: 0, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 }; return DataService.getStewardKPIs(s); }
-/** @param {string} sessionToken @returns {Object[]} Member's own active grievances. Requires auth. */
-function dataGetMemberGrievances(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: true, grievances: [] }; return DataService.getMemberGrievances(e); }
-/** @param {string} sessionToken @returns {Object} Member's closed grievance history. Requires auth. */
-function dataGetMemberGrievanceHistory(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: true, history: [] }; return DataService.getMemberGrievanceHistory(e); }
-/** @param {string} sessionToken @param {string} stewardEmail @returns {Object|null} Steward contact info. Requires auth. */
-function dataGetStewardContact(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) { Logger.log('dataGetStewardContact: auth failed'); return null; } return DataService.getStewardContact(stewardEmail || e); }
+/** @param {string} sessionToken @returns {Object[]} Member's own active grievances. Requires auth. PIN-restricted. */
+function dataGetMemberGrievances(sessionToken) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: true, grievances: [] }; return DataService.getMemberGrievances(e); }
+/** @param {string} sessionToken @returns {Object} Member's closed grievance history. Requires auth. PIN-restricted. */
+function dataGetMemberGrievanceHistory(sessionToken) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: true, history: [] }; return DataService.getMemberGrievanceHistory(e); }
+/** @param {string} sessionToken @param {string} stewardEmail @returns {Object|null} Steward contact info. Requires auth. PIN-restricted. */
+function dataGetStewardContact(sessionToken, stewardEmail) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) { Logger.log('dataGetStewardContact: auth failed'); return null; } return DataService.getStewardContact(stewardEmail || e); }
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 // Steward: view any member's full profile; Member: view own profile only
@@ -4768,6 +4787,12 @@ function dataGetStewardContact(sessionToken, stewardEmail) { var e = _resolveCal
 function dataGetFullProfile(sessionToken, email) {
   var caller = _resolveCallerEmail(sessionToken);
   if (!caller) return { success: false, message: 'Not authenticated.' };
+  // PIN sessions: return minimal non-PII profile only
+  if (_isPINSession(sessionToken)) {
+    var limitedProfile = DataService.getFullMemberProfile(caller);
+    if (!limitedProfile) return { success: false, message: 'Member not found.' };
+    return { success: true, pinRestricted: true, name: limitedProfile.name, firstName: limitedProfile.firstName, lastName: limitedProfile.lastName, unit: limitedProfile.unit, role: limitedProfile.role };
+  }
   var isSteward = checkWebAppAuthorization('steward', sessionToken).isAuthorized;
   // Members may only fetch their own profile; stewards can fetch any member's
   var targetEmail = (isSteward && email) ? email : caller;
@@ -4785,6 +4810,7 @@ function dataGetFullProfile(sessionToken, email) {
  * @returns {Object} { success: boolean, message: string }
  */
 function dataUpdateProfile(sessionToken, updates) {
+  if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE;
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
   var isSteward = checkWebAppAuthorization('steward', sessionToken).isAuthorized;
@@ -4793,8 +4819,8 @@ function dataUpdateProfile(sessionToken, updates) {
   if (updates && updates._targetEmail) delete updates._targetEmail; // strip internal routing field
   return withScriptLock_(function() { return DataService.updateMemberProfile(targetEmail, updates); });
 }
-/** @param {string} sessionToken @returns {Object|null} Assigned steward info for caller. Requires auth. */
-function dataGetAssignedSteward(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getAssignedStewardInfo(e); }
+/** @param {string} sessionToken @returns {Object|null} Assigned steward info for caller. Requires auth. PIN-restricted. */
+function dataGetAssignedSteward(sessionToken) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getAssignedStewardInfo(e); }
 /** @param {string} sessionToken @returns {Object[]} Available stewards for self-assign. Requires auth. */
 function dataGetAvailableStewards(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getAvailableStewards(e); }
 /** @param {string} sessionToken @param {string} memberEmail @param {string} stewardEmail @returns {Object} Assigns steward to member. Requires steward auth. */
@@ -4802,10 +4828,10 @@ function dataAssignSteward(sessionToken, memberEmail, stewardEmail) { var s = _r
 // v4.28.2 — Member-safe self-assign: members can assign a steward to THEMSELVES only.
 /** @param {string} sessionToken @param {string} stewardEmail @returns {Object} Self-assigns a steward. Requires auth. */
 function dataMemberAssignSteward(sessionToken, stewardEmail) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return withScriptLock_(function() { return DataService.assignStewardToMember(e, stewardEmail); }); }
-/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Starts a grievance draft. Requires auth. */
-function dataStartGrievanceDraft(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return withScriptLock_(function() { return DataService.startGrievanceDraft(e, data, idemKey); }); }
-/** @param {string} sessionToken @returns {Object} Creates Drive folder for member's grievance. Requires auth. */
-function dataCreateGrievanceDrive(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return DataService.createGrievanceDriveFolder(e); }
+/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Starts a grievance draft. Requires auth. PIN-restricted. */
+function dataStartGrievanceDraft(sessionToken, data, idemKey) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return withScriptLock_(function() { return DataService.startGrievanceDraft(e, data, idemKey); }); }
+/** @param {string} sessionToken @returns {Object} Creates Drive folder for member's grievance. Requires auth. PIN-restricted. */
+function dataCreateGrievanceDrive(sessionToken) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return DataService.createGrievanceDriveFolder(e); }
 // v4.31.1 — Resource click tracking moved to line ~5423 (3-param version with resourceTitle)
 /** @param {string} sessionToken @returns {Object} Survey completion status for caller. Requires auth. */
 function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return DataService.getMemberSurveyStatus(e); }
@@ -7094,4 +7120,272 @@ function dataGetPomsReference(sessionToken) {
     ex:"ONLY non-mosaic Down syndrome (10.01) has a specific adult listing — confirmed by karyotype or molecular testing. All other congenital disorders are evaluated under the affected body system (heart defects → 4.06, spina bifida → 11.00, cleft palate → 2.00). Part B (children) has additional congenital listings including low birth weight.",
     rm:["Only Down syndrome has specific adult listing","All other congenital → affected body system","Must be non-mosaic (confirmed by testing)","Children: Part B has additional listings"],rl:["DI 34001","DI 34002"]},
 ];
+}
+
+// ═══════════════════════════════════════
+// USAGE TRACKING (v4.40.0 — production-enabled)
+// ═══════════════════════════════════════
+
+/**
+ * Logs usage events from the client-side UsageTracker.
+ * v4.40.0: Enabled for all users (was dev-only). Tracks session time, tabs,
+ * performance metrics, errors, and navigation patterns.
+ * Writes to a hidden _Usage_Log sheet. Auto-trims to 10,000 rows max.
+ *
+ * @param {string} sessionToken - Caller's session token
+ * @param {Object} payload - { sessionId, sessionStart, elapsed, userAgent, events: [...] }
+ * @returns {Object} { success: boolean }
+ */
+function dataLogUsageEvents(sessionToken, payload) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, message: 'Not authenticated.' };
+
+  if (!payload || !payload.events || !Array.isArray(payload.events)) {
+    return { success: false, message: 'No events.' };
+  }
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+
+    var sheetName = (typeof HIDDEN_SHEETS !== 'undefined' && HIDDEN_SHEETS.USAGE_LOG) || '_Usage_Log';
+    var sheet = ss.getSheetByName(sheetName);
+
+    // Auto-create the sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(['Timestamp', 'Email', 'Session ID', 'Event Type', 'Event Data', 'Session Elapsed (ms)', 'User Agent']);
+      sheet.setFrozenRows(1);
+      try { sheet.hideSheet(); } catch (_h) {}
+    }
+
+    // Batch-write events
+    var rows = [];
+    var sid = String(payload.sessionId || '').slice(0, 20);
+    var ua = String(payload.userAgent || '').slice(0, 150);
+    var elapsed = payload.elapsed || 0;
+
+    for (var i = 0; i < payload.events.length && i < 100; i++) {
+      var ev = payload.events[i];
+      var ts = ev.t ? new Date(ev.t) : new Date();
+      rows.push([
+        ts,
+        email,
+        sid,
+        String(ev.type || '').slice(0, 30),
+        JSON.stringify(ev.data || {}).slice(0, 500),
+        elapsed,
+        ua
+      ]);
+    }
+
+    if (rows.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 7).setValues(rows);
+    }
+
+    // Auto-trim: keep only the latest 10,000 rows to prevent sheet bloat
+    var rowCount = sheet.getLastRow();
+    if (rowCount > 12000) {
+      var deleteCount = rowCount - 10000;
+      sheet.deleteRows(2, deleteCount); // keep header row
+    }
+
+    return { success: true, logged: rows.length };
+  } catch (err) {
+    Logger.log('dataLogUsageEvents error: ' + err.message);
+    return { success: false, message: 'Logging failed.' };
+  }
+}
+
+/**
+ * Returns aggregated usage analytics for admin dashboard.
+ * ADMIN ONLY — gated by _adminIsAuthorized_. Returns summary stats
+ * from the _Usage_Log sheet for the requested time range.
+ *
+ * @param {string} sessionToken - Caller's session token
+ * @param {number} [days] - Number of days to analyze (default 7)
+ * @returns {Object} Aggregated analytics data
+ */
+function dataGetUsageAnalytics(sessionToken, days) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, message: 'Not authenticated.' };
+
+  // Admin-only gate
+  try {
+    var isAdmin = false;
+    if (typeof _adminIsAuthorized_ === 'function') {
+      isAdmin = _adminIsAuthorized_(email);
+    } else {
+      isAdmin = (email.toLowerCase() === Session.getEffectiveUser().getEmail().toLowerCase());
+    }
+    if (!isAdmin) return { success: false, message: 'Admin access required.' };
+  } catch (_authErr) {
+    return { success: false, message: 'Authorization check failed.' };
+  }
+
+  days = Math.min(Math.max(parseInt(days, 10) || 7, 1), 90);
+  var cutoff = new Date(Date.now() - days * 86400000);
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+    var sheetName = (typeof HIDDEN_SHEETS !== 'undefined' && HIDDEN_SHEETS.USAGE_LOG) || '_Usage_Log';
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 2) {
+      return { success: true, days: days, totalEvents: 0, message: 'No usage data yet.' };
+    }
+
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+
+    // Aggregate metrics
+    var uniqueUsers = {};
+    var sessions = {};
+    var tabCounts = {};
+    var authMethods = { sso: 0, magic: 0, pin: 0, session: 0, unknown: 0 };
+    var perfLoads = [];     // page load times in ms
+    var perfBatches = [];   // batch fetch times in ms
+    var swrHits = 0;
+    var swrMisses = 0;
+    var backSwipes = 0;
+    var errors = [];
+    var deviceTypes = { mobile: 0, tablet: 0, desktop: 0 };
+    var dailySessions = {};
+    var userLoadTimes = {};
+    var totalEvents = 0;
+    var filteredEvents = 0;
+
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var ts = row[0];
+      totalEvents++;
+
+      // Filter by date range
+      if (ts instanceof Date && ts < cutoff) continue;
+      filteredEvents++;
+
+      var userEmail = String(row[1] || '');
+      var sid = String(row[2] || '');
+      var eventType = String(row[3] || '');
+      var eventData = {};
+      try { eventData = JSON.parse(row[4] || '{}'); } catch (_) {}
+      var ua = String(row[6] || '');
+
+      // Track unique users
+      if (userEmail) uniqueUsers[userEmail] = (uniqueUsers[userEmail] || 0) + 1;
+
+      // Track sessions
+      if (sid) sessions[sid] = true;
+
+      // Daily sessions (for chart)
+      if (ts instanceof Date) {
+        var dayKey = ts.toISOString().slice(0, 10);
+        if (!dailySessions[dayKey]) dailySessions[dayKey] = {};
+        if (sid) dailySessions[dayKey][sid] = true;
+      }
+
+      // Parse events by type
+      switch (eventType) {
+        case 'tab':
+          if (eventData.tab) tabCounts[eventData.tab] = (tabCounts[eventData.tab] || 0) + 1;
+          break;
+        case 'session_start':
+          if (eventData.auth) {
+            var method = eventData.auth;
+            if (authMethods.hasOwnProperty(method)) authMethods[method]++;
+            else authMethods.unknown++;
+          }
+          // Device detection from UA
+          if (/Mobile|Android|iPhone/i.test(ua)) deviceTypes.mobile++;
+          else if (/iPad|Tablet/i.test(ua)) deviceTypes.tablet++;
+          else deviceTypes.desktop++;
+          break;
+        case 'perf_load':
+          if (eventData.ms) {
+            perfLoads.push(eventData.ms);
+            if (userEmail) {
+              if (!userLoadTimes[userEmail]) userLoadTimes[userEmail] = [];
+              userLoadTimes[userEmail].push(eventData.ms);
+            }
+          }
+          break;
+        case 'perf_batch':
+          if (eventData.ms) perfBatches.push(eventData.ms);
+          break;
+        case 'perf_swr':
+          if (eventData.hit) swrHits++;
+          else swrMisses++;
+          break;
+        case 'back_swipe':
+          backSwipes++;
+          break;
+        case 'error':
+          errors.push({
+            user: userEmail,
+            msg: String(eventData.msg || '').slice(0, 100),
+            ts: ts instanceof Date ? ts.toISOString() : ''
+          });
+          break;
+      }
+    }
+
+    // Compute averages
+    var avgLoadMs = perfLoads.length > 0
+      ? Math.round(perfLoads.reduce(function(a, b) { return a + b; }, 0) / perfLoads.length)
+      : null;
+    var avgBatchMs = perfBatches.length > 0
+      ? Math.round(perfBatches.reduce(function(a, b) { return a + b; }, 0) / perfBatches.length)
+      : null;
+    var p95LoadMs = perfLoads.length > 0
+      ? (function() { var s = perfLoads.slice().sort(function(a, b) { return a - b; }); return s[Math.floor(s.length * 0.95)]; })()
+      : null;
+
+    // Per-user load time averages (sorted slowest first)
+    var userPerfList = [];
+    for (var ue in userLoadTimes) {
+      var times = userLoadTimes[ue];
+      var avg = Math.round(times.reduce(function(a, b) { return a + b; }, 0) / times.length);
+      userPerfList.push({ email: ue, avgMs: avg, samples: times.length });
+    }
+    userPerfList.sort(function(a, b) { return b.avgMs - a.avgMs; });
+
+    // Daily session counts (for trend chart)
+    var dailyData = [];
+    for (var dk in dailySessions) {
+      dailyData.push({ date: dk, sessions: Object.keys(dailySessions[dk]).length });
+    }
+    dailyData.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+
+    // Top tabs (sorted by count)
+    var topTabs = [];
+    for (var tk in tabCounts) {
+      topTabs.push({ tab: tk, count: tabCounts[tk] });
+    }
+    topTabs.sort(function(a, b) { return b.count - a.count; });
+
+    return {
+      success: true,
+      days: days,
+      totalEvents: totalEvents,
+      filteredEvents: filteredEvents,
+      uniqueUsers: Object.keys(uniqueUsers).length,
+      totalSessions: Object.keys(sessions).length,
+      authMethods: authMethods,
+      performance: {
+        avgLoadMs: avgLoadMs,
+        avgBatchMs: avgBatchMs,
+        p95LoadMs: p95LoadMs,
+        swrHitRate: (swrHits + swrMisses) > 0 ? Math.round(100 * swrHits / (swrHits + swrMisses)) : null,
+        sampleCount: perfLoads.length
+      },
+      backSwipes: backSwipes,
+      deviceTypes: deviceTypes,
+      topTabs: topTabs.slice(0, 20),
+      dailySessions: dailyData,
+      userPerf: userPerfList.slice(0, 20),
+      recentErrors: errors.slice(-20).reverse(),
+    };
+  } catch (err) {
+    Logger.log('dataGetUsageAnalytics error: ' + err.message);
+    return { success: false, message: 'Analytics query failed.' };
+  }
 }

@@ -2362,7 +2362,7 @@ function seedWorkloadData() {
     var timestamp = new Date(now.getTime() - daysAgo * 86400000);
     var email = emails[Math.floor(Math.random() * emails.length)];
 
-    // Realistic caseload numbers for DDS social workers
+    // Realistic caseload numbers for social workers
     var priorityCases = Math.floor(Math.random() * 8) + 1;
     var pendingCases = Math.floor(Math.random() * 15) + 5;
     var unreadDocs = Math.floor(Math.random() * 20);

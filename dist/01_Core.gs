@@ -340,7 +340,7 @@ var DRIVE_CONFIG = {
 /**
  * Returns the root Drive folder name for this deployment.
  * Derived from the ORG_NAME value in the Config sheet (row 3).
- * Example: "My Union" → "My Union Dashboard"
+ * Example: "Your Local" → "Your Local Dashboard"
  * Falls back to DRIVE_CONFIG.ROOT_FOLDER_FALLBACK if Config is not yet set up.
  * Memoized per script execution (same pattern as getSystemName_).
  * @returns {string} Root folder name
@@ -367,7 +367,7 @@ function getDriveRootFolderName_() {
  * Get organization name from Config sheet, falling back to default.
  * Single source of truth for the org name used across the system.
  * @private
- * @returns {string} Organization name (from Config sheet)
+ * @returns {string} Organization name (e.g., "SEIU Local")
  */
 // M-43: _cachedOrgName / _cachedSystemName / _cachedLocalNumber are intentionally
 // never invalidated. In Google Apps Script, each script execution is short-lived
@@ -462,6 +462,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.40.0', date: '2026-03-25', codename: 'PIN Login GA', changes: 'PIN login enabled in all environments (dev + production). Removed IS_DEV_MODE gates from auth_view.html PIN button, steward_view.html Manage PIN button, and 13_MemberSelfService.gs comments. Added isDevMode to auth page PAGE_DATA. Login page restyled: black background, glass card with backdrop blur, brighter quotes with text glow. Default org name fallback changed to SolidBase.' },
   { version: '4.39.0', date: '2026-03-24', codename: 'DEV PIN Login', changes: 'DEV ONLY (IS_DEV_MODE gate): (1) devAuthLoginByPIN(pin) — PIN-only login scan, no email, global rate limit 10/15min, audit logged. (2) showAuthPIN() on login screen — only when IS_DEV_MODE=true, redirects with sessionToken. (3) devStewardManageMemberPIN(sessionToken, email) — steward generates/resets PIN from webapp, returns plaintext once. (4) Manage PIN button in steward member detail panel — one-time display with copy button. All dev-only functions are IS_DEV_MODE gated.' },
   { version: '4.38.0', date: '2026-03-24', codename: 'Reliability', changes: 'Default view preference for dual-role users (sidebar selector, dataSetDefaultView endpoint, ScriptProperties storage). Loading fence on _loadMemberViewThen prevents double-tap concurrent fetches. Try/catch on mobile header role-switch buttons. Magic-link auth fix: removed Session.getActiveUser() checks from getMemberViewHtml/getOrgChartHtml/getPOMSReferenceHtml (returns empty for Execute-as-Me). Test runner included in prod builds (tab gated by IS_DEV_MODE). initMemberView verification after script injection with error UI.' },
   { version: '4.37.1', date: '2026-03-24', codename: 'Lazy Member View', changes: 'Lazy-load member_view.html for dual-role users to stay under GAS ~820KB HtmlOutput limit. Conditional template inclusion: steward/both get steward_view only, member-only get member_view inline. getMemberViewHtml() server endpoint for on-demand fetch.' },
@@ -473,7 +474,7 @@ var VERSION_HISTORY = [
   { version: '4.34.2', date: '2026-03-22', codename: 'Enable Defaults', changes: 'Enable all safety/security/maintenance features by default. BROADCAST_SCOPE_ALL default changed from no to yes. ENABLE_CORRELATION now seeded as yes with yes/no dropdown validation. All security features (ACCESS_CONTROL, DASHBOARD_MEMBER_AUTH, ERROR_LOGGING, NOTIFY_ON_CRITICAL) were already enabled by default.' },
   { version: '4.34.1', date: '2026-03-21', codename: 'Theme Unification', changes: 'Theme sync: org_chart.html and poms_reference.html now follow AppState dark/light toggle (class toggle on .madds-embed and .poms-root). Live toggle via UnifiedTheme.apply() also updates embedded components. esign.html: 7 hardcoded colors replaced with CSS vars (--accentHover, --accentMuted, --badge-*, --canvas-bg) with dark media query overrides. OS theme detection: first-visit default now respects prefers-color-scheme instead of always-dark. Modal overlay uses theme-aware --overlay-bg (light=0.35, dark=0.55). Offline banner uses var(--danger) instead of hardcoded #ef4444. Dead code removed: unused last7Keys variable, orphaned resourceDownloads local computation. Build fix: minifyHtml() now normalizes \\r\\n→\\n before regex processing, fixing dist-parity CI failure on Windows builds.' },
   { version: '4.31.1', date: '2026-03-20', codename: 'Public Dashboard Removal', changes: 'Remove orphaned 04e_PublicDashboard.gs (~3K lines). File was never routed via doGet and confirmed no public dashboard will exist. Deleted: src/04e_PublicDashboard.gs, dist/04e_PublicDashboard.gs, test/04e_PublicDashboard.test.js. Removed from build.js file list and architecture/auth-denial/UIService test file lists. XSS threshold in architecture.test.js lowered from 130 to 10 (04e contributed ~122 false positives). Updated all documentation references across AI_REFERENCE.md, CODE_REVIEW.md, DEVELOPER_GUIDE.md, FEATURES.md, README.md, CONTRIBUTING.md, QUICK_DEPLOY.md, presentation.html. Changelog entries in VERSION_HISTORY preserved as historical record.' },
-  { version: '4.32.0', date: '2026-03-19', codename: 'Workforce Mobility Survey', changes: 'New survey Section 13 (WORKFORCE_RETENTION) and Section 13A (WORKFORCE_LEAVING) added to quarterly member survey. Section 13 (always shown, 4 questions): q80 likelihood to stay (radio: Very Likely–Very Unlikely), q81 exploring outside the agency (radio-branch — Yes triggers 13A), q84 union addressing retention factors (slider-10), q86 optional open text. Section 13A (conditional on q81=Yes, 2 questions): q82 types of opportunities outside the agency (checkbox, max 2: MA state transfer | leaving state service | private | non-profit/education | not sure), q83 reasons for leaving (checkbox, max 3: Pay & Benefits | Workload | Management | Limited Advancement or Transfer Opportunities | Work-Life Balance | RTO Policy | Burnout | Culture | Other — transfer awareness from former q85 folded into this option). Standalone q85 removed. Looker: Workforce Retention Avg, Likelihood to Stay, Exploring Outside Agency columns added to both _Looker_Satisfaction and _Looker_Anon_Satisfaction headers and refresh functions. getSatisfactionSummary() workforce section added. Section colors: WORKFORCE_RETENTION #e8f4f8, WORKFORCE_LEAVING #fdecea. Always active (not toggled). Visible to all dashboard roles.' },
+  { version: '4.32.0', date: '2026-03-19', codename: 'Workforce Mobility Survey', changes: 'New survey Section 13 (WORKFORCE_RETENTION) and Section 13A (WORKFORCE_LEAVING) added to quarterly member survey. Section 13 (always shown, 4 questions): q80 likelihood to stay (radio: Very Likely–Very Unlikely), q81 exploring outside DDS (radio-branch — Yes triggers 13A), q84 union addressing retention factors (slider-10), q86 optional open text. Section 13A (conditional on q81=Yes, 2 questions): q82 types of opportunities outside DDS (checkbox, max 2: MA state transfer | leaving state service | private | non-profit/education | not sure), q83 reasons for leaving (checkbox, max 3: Pay & Benefits | Workload | Management | Limited Advancement or Transfer Opportunities | Work-Life Balance | RTO Policy | Burnout | Culture | Other — transfer awareness from former q85 folded into this option). Standalone q85 removed. Looker: Workforce Retention Avg, Likelihood to Stay, Exploring Outside DDS columns added to both _Looker_Satisfaction and _Looker_Anon_Satisfaction headers and refresh functions. getSatisfactionSummary() workforce section added. Section colors: WORKFORCE_RETENTION #e8f4f8, WORKFORCE_LEAVING #fdecea. Always active (not toggled). Visible to all dashboard roles.' },
   { version: '4.31.0', date: '2026-03-17', codename: 'Security Hardening', changes: 'Security: magic token immediate-delete (TOCTOU fix), session token error handling, bootstrap admin audit logging, resource IDs removed from client config. Reliability: email index cache invalidation, Drive sharing fatal errors, preload race guard, layout render generation counter, timer/observer cleanup. Features: 15min auto-logout with 2min warning modal, Chart.js SRI integrity hash. Perf: glow animation transform/opacity, keyboard handler dedup. Removed ~1385 lines deprecated Interactive Dashboard code.' },
   { version: '4.30.2', date: '2026-03-17', codename: 'Contact Log Name Matching', changes: 'Contact Log stores member name (col 9). Autocomplete triggers at 1 char. By Member tab gets autocomplete. Recent contacts display member name.' },
   { version: '4.28.7', date: '2026-03-15', codename: 'Gmail Scope Test + Auth Sweep', changes: 'Fix gmailAppAccessible test (gmail.send has no side-effect-free probe). Fix testRunnerEndpointsGated false failure (SSO bypasses null-token rejection). 4 new authsweep tests for wq/qa/tl/fs endpoints. Full auth sweep: 100+ endpoints verified, 10 scopes confirmed, no auth gaps.' },
@@ -701,7 +702,8 @@ var HIDDEN_SHEETS = {
   SURVEY_TRACKING: '_Survey_Tracking',
   SURVEY_VAULT: '_Survey_Vault',
   SURVEY_PERIODS: '_Survey_Periods',
-  ARCHIVE_GRIEVANCES: '_Archive_Grievances'
+  ARCHIVE_GRIEVANCES: '_Archive_Grievances',
+  USAGE_LOG: '_Usage_Log'              // v4.40.0: production usage tracking (session time, tabs, perf, errors)
 };
 
 // ============================================================================
@@ -2256,8 +2258,8 @@ var GRIEVANCE_OUTCOMES = {
  * Default deadline rules for grievance step calculations (fallback values).
  * Actual values are loaded from Config sheet at runtime via getDeadlineRules().
  *
- * SOURCE: Based on standard CBA grievance procedures.
- * Customize via Config sheet for your specific contract terms.
+ * SOURCE: Based on collective bargaining agreement grievance
+ * Policy 270.03 for Bargaining Units 8 & 10 (July 2025 edition).
  *
  * CONTRACT SUMMARY FOR UNIT 8 (only 2 steps + arbitration):
  *   Filing:        21 calendar days from incident

@@ -165,7 +165,7 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
       renderStewardContact: ['contact', 'stewarddirectory'],
       renderUpdateProfile: ['profile'],
       renderMemberResources: ['resources'],
-      // renderWorkloadTracker: ['workload'], // SolidBase: excluded
+      // renderWorkloadTracker: ['workload'], — SolidBase: workload excluded
       renderPollsPage: ['polls'],
       renderSurveyResultsPage: ['survey'],
       renderUnionStatsPage: ['unionstats'],
@@ -307,7 +307,7 @@ describe('G11: _ensureAllSheetsInternal covers all feature sheets', () => {
       'initFailsafeSheet':         ['FAILSAFE_CONFIG'],
       'initWeeklyQuestionSheets':  ['WEEKLY_QUESTIONS', 'WEEKLY_RESPONSES', 'QUESTION_POOL'],
       'initPortalSheets':          [], // portal sheets not in SHEETS constant
-      // 'initWorkloadTrackerSheets': [...], // SolidBase: excluded
+      // 'initWorkloadTrackerSheets' — SolidBase: WorkloadService excluded
       'setupHiddenSheets':         [], // hidden calc sheets
       'createResourcesSheet':      ['RESOURCES'],
       'createResourceConfigSheet': ['RESOURCE_CONFIG'],
@@ -844,32 +844,9 @@ describe('G19: More menu items have route handlers', () => {
 });
 
 
-// ============================================================================
-// G20: POMS DESCRIPTION ACCURACY
-// ============================================================================
-// Bug (2026-03-14): Both views described POMS as "Postal Operations Manual"
-// instead of "Program Operations Manual System". This guard prevents the wrong
-// acronym expansion from reappearing.
-
-describe.skip('G20: POMS description accuracy (SolidBase: excluded)', () => {
-  const stewardCode = read('steward_view.html');
-  const memberCode = read('member_view.html');
-
-  test('steward view does not say "Postal Operations Manual"', () => {
-    expect(stewardCode).not.toContain('Postal Operations Manual');
-  });
-
-  test('member view does not say "Postal Operations Manual"', () => {
-    expect(memberCode).not.toContain('Postal Operations Manual');
-  });
-
-  test('steward view has correct POMS description', () => {
-    expect(stewardCode).toContain('Program Operations Manual System');
-  });
-
-  test('member view has correct POMS description', () => {
-    expect(memberCode).toContain('Program Operations Manual System');
-  });
+// G20: POMS DESCRIPTION ACCURACY — SKIPPED in SolidBase (POMS excluded)
+describe.skip('G20: POMS description accuracy (SolidBase: POMS excluded)', () => {
+  test.skip('POMS not included in SolidBase', () => {});
 });
 
 
@@ -924,79 +901,9 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
   });
 });
 
-// ============================================================================
-// G22: Workload Tracker frontend invariants
-// ============================================================================
-
+// G22: Workload Tracker frontend — SKIPPED in SolidBase (workload excluded)
 describe.skip('G22 — Workload Tracker frontend invariants (SolidBase: excluded)', () => {
-  const memberView = read('member_view.html');
-
-  test('WT_CAT_KEY_LABELS map is defined from WT_CATEGORIES', () => {
-    expect(memberView).toContain('var WT_CAT_KEY_LABELS = {}');
-    expect(memberView).toContain('WT_CATEGORIES.forEach');
-    expect(memberView).toContain('WT_CAT_KEY_LABELS[c.key] = c.label');
-  });
-
-  test('history sub-categories use WT_CAT_KEY_LABELS not raw keys', () => {
-    // Must NOT use ck + ' > ' (raw key concatenation)
-    expect(memberView).not.toMatch(/ck \+ ' > ' \+ sk/);
-    // Must use label lookup
-    expect(memberView).toContain('WT_CAT_KEY_LABELS[ck]');
-  });
-
-  test('stats sub-category headings use WT_CAT_KEY_LABELS', () => {
-    expect(memberView).toContain('WT_CAT_KEY_LABELS[sck]');
-  });
-
-  test('bar chart uses dynamic max instead of hardcoded 100', () => {
-    // Must NOT have (val / 100) * 100 pattern
-    expect(memberView).not.toMatch(/val\s*\/\s*100\)\s*\*\s*100/);
-    // Must have barMax calculation
-    expect(memberView).toContain('barMax');
-    expect(memberView).toMatch(/val\s*\/\s*barMax/);
-  });
-
-  test('auto-save draft functions are defined', () => {
-    expect(memberView).toContain('function _saveDraft()');
-    expect(memberView).toContain('function _loadDraft()');
-    expect(memberView).toContain('function _clearDraft()');
-  });
-
-  test('draft is cleared on successful submission', () => {
-    expect(memberView).toContain('_clearDraft()');
-  });
-
-  test('draft is restored on page load', () => {
-    expect(memberView).toContain('_loadDraft()');
-    expect(memberView).toContain('_wtRestoreForm(inputs, draft)');
-  });
-
-  test('last-submitted indicator is rendered', () => {
-    expect(memberView).toContain('wt-last-submitted');
-    expect(memberView).toContain('wt_lastSub_');
-  });
-
-  test('WT_CATEGORIES has exactly 8 entries with required fields', () => {
-    const catMatch = memberView.match(/var WT_CATEGORIES = \[([\s\S]*?)\];/);
-    expect(catMatch).not.toBeNull();
-    const idMatches = catMatch[1].match(/id:\s*'t\d'/g);
-    expect(idMatches).not.toBeNull();
-    expect(idMatches.length).toBe(8);
-    const keyMatches = catMatch[1].match(/key:\s*'[a-z]+'/g);
-    expect(keyMatches).not.toBeNull();
-    expect(keyMatches.length).toBe(8);
-  });
-
-  test('WT_CAT_KEYS has exactly 8 entries matching WT_CATEGORIES keys', () => {
-    const keysMatch = memberView.match(/var WT_CAT_KEYS = \[([^\]]+)\]/);
-    expect(keysMatch).not.toBeNull();
-    const keys = keysMatch[1].match(/'([a-z]+)'/g).map(k => k.replace(/'/g, ''));
-    expect(keys.length).toBe(8);
-    // Each key must appear in WT_CATEGORIES
-    keys.forEach(k => {
-      expect(memberView).toContain("key: '" + k + "'");
-    });
-  });
+  test.skip('Workload Tracker not included in SolidBase', () => {});
 });
 
 
@@ -1038,10 +945,7 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  test.skip('renderPOMSReference async callback checks _navSwitchId (SolidBase: POMS excluded)', () => {
-    const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
-    expect(fnBody).toMatch(/_navSwitchId/);
-  });
+  // renderPOMSReference test — SKIPPED in SolidBase (POMS excluded)
 });
 
 // Helper: extract a function body by name (brace-counting)
@@ -1116,12 +1020,7 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  test.skip('poms early-return uses _hideAllVisiblePanes (SolidBase: POMS excluded)', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
-    expect(pomsBlock).not.toBeNull();
-    expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
-  });
+  // poms early-return test — SKIPPED in SolidBase (POMS routing removed)
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');

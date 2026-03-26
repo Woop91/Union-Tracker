@@ -41,6 +41,9 @@
     var CURRENT_USER = PAGE_DATA.user || null;
     var IS_DUAL_ROLE = PAGE_DATA.isDualRole || false;
     var IS_DEV_MODE = PAGE_DATA.isDevMode || false;
+    var AUTH_METHOD = PAGE_DATA.authMethod || 'sso';
+    var IS_PIN_SESSION = AUTH_METHOD === 'pin';
+    var IS_ADMIN = PAGE_DATA.isAdmin || false;
     var SESSION_TOKEN = PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
     var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
@@ -112,12 +115,15 @@
     var _preloadCallbacks = [];
     var _preloadViewId = CURRENT_VIEW; // stamp the view at preload request time
 
+    var _batchRequestStart = Date.now();
     if ((CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member') && CURRENT_USER && CURRENT_USER.email) {
       google.script.run
         .withSuccessHandler(function(batch) {
           // H4: Discard stale preload data if the view changed while the request was in flight
           if (CURRENT_VIEW !== _preloadViewId) return;
           _preloadedBatch = batch || {};
+          // v4.40.0: Track batch fetch duration for performance analytics
+          if (typeof UsageTracker !== 'undefined') UsageTracker.trackPerf('perf_batch', { ms: Date.now() - _batchRequestStart });
           _preloadReady = true;
           // Skip re-render if SWR already showed identical data
           if (_swrApplied) {
@@ -202,12 +208,16 @@
         var raw = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
         if (!raw) return;
         var parsed = JSON.parse(raw);
-        // Only use SWR data if less than 5 minutes old
-        if (Date.now() - parsed.ts > 300000) return;
+        // v4.40.0: SWR TTL increased from 5 min to 30 min — returning users get
+        // instant render from cached data while fresh batch loads in background.
+        // Fresh data always overwrites SWR render when it arrives (line 147).
+        if (Date.now() - parsed.ts > 1800000) return;
         if (parsed.data) {
           _preloadedBatch = parsed.data;
           // Don't set _preloadReady — let the fresh server call complete and overwrite
           _swrApplied = true;
+          // v4.40.0: Track SWR hit for analytics
+          if (typeof UsageTracker !== 'undefined') UsageTracker.trackPerf('perf_swr', { hit: true, age: Date.now() - parsed.ts });
         }
       } catch (_) {}
     })();
@@ -406,9 +416,9 @@
       // ── Per-tab accent colors (used by blob/shatter/liquid themes) ──
       var TAB_COLORS = {
         cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
+        tasks: '#f59e0b', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+        resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
         polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
         events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
         testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -504,16 +514,11 @@
         // 3. Manage CRT overlay elements for cyberpunk
         _manageCrtOverlay(isCyber);
 
-        // 4. Sync embedded component themes (org chart, POMS)
+        // 4. Sync embedded component themes (org chart)
         var embedRoot = document.querySelector('.madds-embed');
         if (embedRoot) {
           if (!AppState.isDark) embedRoot.classList.add('light');
           else embedRoot.classList.remove('light');
-        }
-        var pomsRoot = document.querySelector('.poms-root');
-        if (pomsRoot) {
-          if (AppState.isDark) pomsRoot.classList.add('poms-dark');
-          else pomsRoot.classList.remove('poms-dark');
         }
       }
 
@@ -1495,6 +1500,85 @@
     }
 
     // ═══════════════════════════════════════
+    // USAGE TRACKER (v4.40.0 — always-on)
+    // ═══════════════════════════════════════
+    // Tracks session time, tabs, performance, errors, and navigation.
+    // Data written to _Usage_Log sheet; viewable via admin-only Analytics tab.
+    var UsageTracker = (function() {
+      // Skip on auth/error pages — no useful data to collect
+      if (CURRENT_VIEW === 'auth' || CURRENT_VIEW === 'error') {
+        return { trackTab: function(){}, trackError: function(){}, trackPerf: function(){}, flush: function(){} };
+      }
+
+      var _sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      var _sessionStart = Date.now();
+      var _events = [];
+      var _MAX_BUFFER = 50;
+
+      function _push(type, data) {
+        _events.push({ t: Date.now(), type: type, data: data || null });
+        if (_events.length >= _MAX_BUFFER) flush();
+      }
+
+      function trackTab(tabId) {
+        _push('tab', { tab: tabId, role: (typeof AppState !== 'undefined' && AppState.activeRole) || '' });
+      }
+
+      function trackError(msg, source, line) {
+        _push('error', { msg: String(msg || '').slice(0, 200), src: String(source || '').slice(0, 100), line: line || 0 });
+      }
+
+      function trackPerf(metric, data) {
+        _push(metric, data);
+      }
+
+      function flush() {
+        if (_events.length === 0) return;
+        var batch = _events.splice(0);
+        var payload = {
+          sessionId: _sessionId,
+          sessionStart: _sessionStart,
+          elapsed: Date.now() - _sessionStart,
+          userAgent: (navigator.userAgent || '').slice(0, 150),
+          events: batch
+        };
+        try {
+          google.script.run
+            .withSuccessHandler(function() {})
+            .withFailureHandler(function() {})
+            .dataLogUsageEvents(SESSION_TOKEN, payload);
+        } catch (_e) {}
+      }
+
+      // Flush every 90 seconds (longer than dev mode — less server load in prod)
+      setInterval(flush, 90000);
+
+      // Flush on page unload
+      window.addEventListener('beforeunload', function() {
+        _push('session_end', { elapsed: Date.now() - _sessionStart });
+        flush();
+      });
+
+      // Track JS errors
+      var _origOnError = window.onerror;
+      window.onerror = function(msg, source, line, col, err) {
+        trackError(msg, source, line);
+        if (typeof _origOnError === 'function') return _origOnError(msg, source, line, col, err);
+      };
+
+      // Record session start with device + auth info
+      _push('session_start', {
+        view: CURRENT_VIEW,
+        user: (CURRENT_USER && CURRENT_USER.email) || '',
+        auth: AUTH_METHOD,
+        screen: window.innerWidth + 'x' + window.innerHeight,
+        dpr: window.devicePixelRatio || 1
+      });
+
+      return { trackTab: trackTab, trackError: trackError, trackPerf: trackPerf, flush: flush };
+    })();
+
+    // ═══════════════════════════════════════
     // LAYOUT DETECTION
     // ═══════════════════════════════════════
     var LayoutState = { mode: 'mobile', width: 0 };
@@ -2134,7 +2218,8 @@
     }
 
     function _getSidebarTabs(role) {
-      if (role === 'steward') return _filterDevTabs([
+      if (role === 'steward') {
+      var stewardTabs = [
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
         { id: 'newgrievance', icon: '\uD83D\uDCDD', label: 'New Grievance' },
         { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
@@ -2146,7 +2231,8 @@
         { id: 'engagement', icon: '\uD83C\uDFAF', label: 'Engagement' },
         { group: 'Reference' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
+        { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2163,7 +2249,15 @@
         { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
         { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
-      ]);
+      ];
+      // v4.40.0: Admin-only analytics tab
+      if (IS_ADMIN) {
+        stewardTabs.push({ divider: true });
+        stewardTabs.push({ group: 'Admin' });
+        stewardTabs.push({ id: 'analytics', icon: '\uD83D\uDCC8', label: 'Usage Analytics' });
+      }
+      return _filterDevTabs(stewardTabs);
+      }
       return [
         { id: 'memberhub', icon: '\u270A', label: 'Member Hub' },
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
@@ -2173,7 +2267,8 @@
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { group: 'Reference' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
+        { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2607,6 +2702,23 @@
       });
     }
 
+    /**
+     * Agency Org Chart — generic placeholder for SolidBase.
+     * Organization-specific agency chart is not included in SolidBase.
+     */
+    function renderAgencyOrgChart(appContainer, role) {
+      renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
+        container.innerHTML = '';
+        var placeholder = el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px 20px' } });
+        placeholder.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '\uD83C\uDFE2'));
+        placeholder.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '600', marginBottom: '8px' } }, 'Agency Org Chart'));
+        placeholder.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '14px' } }, 'Configure your agency organizational chart in the Admin Settings.'));
+        container.appendChild(placeholder);
+      });
+    }
+
+    // POMS Reference removed — SolidBase does not include POMS reference content
+
     // ═══════════════════════════════════════
     // TAB PANE CACHE — keeps rendered tab panes alive in the DOM (display:none).
     // On revisit, just show the pane — zero DOM rebuild, zero server calls.
@@ -2687,6 +2799,9 @@
       var switchId = ++_navSwitchId; // claim this switch; any older in-flight switch is now stale
       _renderGeneration++; // H7: bump render generation so stale async callbacks are discarded
 
+      // DEV: track tab navigation for usage analytics
+      if (typeof UsageTracker !== 'undefined') UsageTracker.trackTab(tabId);
+
       // ── SPLIT VIEW ROUTING ──
       // When split-view is active, determine which panel receives this navigation
       var _isSplitSecondary = false;
@@ -2766,7 +2881,7 @@
       if (tabId === 'orgchart') {
         if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
           if (typeof _renderDuesGate === 'function') {
-            _renderDuesGate(app, 'Org Chart', function() { _handleTabNav(role, 'home'); });
+            _renderDuesGate(app, 'Union Org Chart', function() { _handleTabNav(role, 'home'); });
           }
           _navProgressDone();
           return;
@@ -2778,7 +2893,22 @@
         _navProgressDone();
         return;
       }
-      // POMS Reference removed for SolidBase
+      if (tabId === 'maddsorgchart') {
+        if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
+          if (typeof _renderDuesGate === 'function') {
+            _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
+          }
+          _navProgressDone();
+          return;
+        }
+        _hideAllVisiblePanes();
+        _splitRenderTarget = 'primary';
+        renderAgencyOrgChart(app, role);
+        _activePane = _layoutCache.content;
+        _navProgressDone();
+        return;
+      }
+      // POMS routing removed — SolidBase does not include POMS reference
 
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
@@ -2931,6 +3061,7 @@
           case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
           case 'timeline': return renderMemberTimelinePage;
           case 'reportcard': return renderReportCard;
+          case 'pinsetup': return renderPINSetup;
           default: return renderMemberHome;
         }
       } else {
@@ -2960,6 +3091,7 @@
           case 'failsafe': return renderFailsafePage;
           case 'search': return renderSearchPage;
           case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
+          case 'analytics': return IS_ADMIN ? renderAnalyticsPage : renderStewardDashboard;
           default: return renderStewardDashboard;
         }
       }
@@ -3212,6 +3344,38 @@
       window.removeEventListener('offline', _showOfflineBanner);
       window.removeEventListener('online', _hideOfflineBanner);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BACK-SWIPE INTERCEPTION (v4.40.0)
+    // On mobile, users accidentally exit the web app via browser back gesture.
+    // Solution: push history entries on tab navigation, intercept popstate to
+    // show the "More" menu instead of leaving the app.
+    // ═══════════════════════════════════════════════════════════════════════
+    (function() {
+      if (CURRENT_VIEW === 'auth' || CURRENT_VIEW === 'error') return;
+
+      try {
+        // Push an initial buffer entry so the first back gesture stays in-app
+        history.pushState({ dds: 'buffer' }, '');
+
+        window.addEventListener('popstate', function() {
+          // Re-push buffer to keep intercepting future back gestures
+          try { history.pushState({ dds: 'buffer' }, ''); } catch (_e) {}
+
+          // Track back-swipe for analytics
+          if (typeof UsageTracker !== 'undefined') UsageTracker.trackPerf('back_swipe', { tab: AppState.activeTab || '' });
+
+          // Show the "More" menu — the full navigation hub
+          var role = AppState.activeRole;
+          if (!role) return;
+          var moreTab = (role === 'steward') ? '_steward_more' : '_member_more';
+          _handleTabNav(role, moreTab);
+        });
+      } catch (_histErr) {
+        // GAS sandbox may restrict history API — fail silently
+        console.warn('Back-swipe interception unavailable:', _histErr.message);
+      }
+    })();
 
     // ═══════════════════════════════════════════════════════════════════════
     // KEYBOARD SHORTCUTS
@@ -3716,6 +3880,11 @@
         getLayoutMode();
         _prevMode = LayoutState.mode;
         initApp();
+
+        // v4.40.0: Track page load time (time from script start to first meaningful render)
+        if (typeof UsageTracker !== 'undefined') {
+          UsageTracker.trackPerf('perf_load', { ms: Date.now() - _batchRequestStart });
+        }
 
         // Fire-and-forget: ensure all required sheets exist.
         // Runs AFTER initApp dispatches — never blocks initial render.

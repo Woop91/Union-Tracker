@@ -397,7 +397,7 @@ describe('G6: dist/ files are in sync with src/', () => {
   });
 
   test('every src .gs file has identical copy in dist', () => {
-    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build
+    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs']; // excluded by --prod build
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
 
@@ -560,7 +560,7 @@ describe('G9: Nav tabs and handlers are in sync', () => {
   });
 
   // Member-only tabs (removed from steward nav)
-  // SolidBase: poms removed from nav entirely
+  // SolidBase: POMS excluded — no member-only tabs to check
   const memberOnlyTabs = [];
   memberOnlyTabs.forEach(tabId => {
     test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
@@ -610,7 +610,7 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   // Must find at least the known lazy-loaders
   test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
-    // SolidBase: getPOMSReferenceHtml excluded (POMS not deployed)
+    // SolidBase: getPOMSReferenceHtml excluded (POMS not in SolidBase)
   });
 
   [...serverFunctions].forEach(fn => {
@@ -622,63 +622,10 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 
 
 // ============================================================================
-// G11: poms_reference.html is self-contained and parseable
+// G11: poms_reference.html — SKIPPED in SolidBase (POMS not included)
 // ============================================================================
-// Reason: poms_reference.html is loaded via HtmlService.createHtmlOutputFromFile
-// and injected into the SPA. If its <script> block has syntax errors, the entire
-// POMS tab fails silently.
-
-describe.skip('G11: poms_reference.html integrity (SolidBase: excluded)', () => {
-  const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
-
-  test('poms_reference.html exists', () => {
-    expect(fs.existsSync(pomsPath)).toBe(true);
-  });
-
-  test('POMS_DATA is available (lazy-loaded from server or inline)', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    // POMS_DATA may be inline (const POMS_DATA = [...]) or lazy-loaded (var POMS_DATA = [])
-    const match = code.match(/POMS_DATA\s*=\s*\[/);
-    expect(match).not.toBeNull();
-    // If lazy-loaded, data lives in 21_WebDashDataService.gs
-    const clientEntries = (code.match(/\{id:/g) || []).length;
-    if (clientEntries < 78) {
-      const svcPath = path.join(SRC_DIR, '21_WebDashDataService.gs');
-      const svcCode = fs.readFileSync(svcPath, 'utf8');
-      const serverEntries = (svcCode.match(/\{id:"/g) || []).length;
-      expect(serverEntries).toBeGreaterThanOrEqual(78);
-    }
-  });
-
-  test('contains FLOWS object with flowcharts', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    const match = code.match(/FLOWS\s*=\s*\{/);
-    expect(match).not.toBeNull();
-    // Count flowcharts (title: entries)
-    const charts = (code.match(/title:"/g) || []).length;
-    expect(charts).toBeGreaterThanOrEqual(17);
-  });
-
-  test('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
-      expect(code).toContain(`P.tab==='${tab}'`);
-    });
-  });
-
-  test('<script> block parses without syntax errors', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
-    expect(scriptMatch).not.toBeNull();
-    expect(() => {
-      new vm.Script(scriptMatch[1], { filename: 'poms_reference.html' });
-    }).not.toThrow();
-  });
-
-  test('no DDS Apps Script ID present', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    expect(code).not.toContain('18hHHX');
-  });
+describe.skip('G11: poms_reference.html integrity (SolidBase: POMS excluded)', () => {
+  test.skip('poms_reference.html exists', () => {});
 });
 
 
@@ -759,33 +706,9 @@ describe('G13: Module load order is safe', () => {
 });
 
 
+// G14: WorkloadService — SKIPPED in SolidBase (WorkloadService excluded)
 describe.skip('G14: WorkloadService crash-safe patterns (SolidBase: excluded)', () => {
-  const wsCode = '';
-
-  test('_refreshReportingData does NOT clearContents before writing', () => {
-    // Extract the _refreshReportingData function body
-    const funcStart = wsCode.indexOf('function _refreshReportingData()');
-    expect(funcStart).toBeGreaterThan(-1);
-    const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
-    const funcBody = wsCode.substring(funcStart, funcEnd);
-
-    // The old antipattern: report.clearContents() before setValues
-    // New pattern: setValues first, then clearContent only for stale rows
-    expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
-  });
-
-  test('rate limit uses atomic check-and-record pattern', () => {
-    // _checkAndRecordRateLimit should exist (replaces separate check + record)
-    expect(wsCode).toContain('function _checkAndRecordRateLimit');
-    // Old separate _recordRateLimitAttempt should NOT exist
-    expect(wsCode).not.toContain('function _recordRateLimitAttempt');
-    // No separate _recordSubmission call
-    expect(wsCode).not.toContain('function _recordSubmission');
-  });
-
-  test('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
-    expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
-  });
+  test.skip('WorkloadService not included in SolidBase', () => {});
 });
 
 // ============================================================================

@@ -6,6 +6,35 @@
  */
 
 // ═══════════════════════════════════════
+// PIN RESTRICTION NOTICE
+// ═══════════════════════════════════════
+
+/**
+ * Renders a PIN-restricted notice and returns true if the session is PIN-based.
+ * Call at the top of any render function that shows personal data.
+ * @param {HTMLElement} appContainer
+ * @param {string} sectionLabel - e.g. 'Profile', 'Cases', 'Steward Contact'
+ * @returns {boolean} true if restricted (caller should return early)
+ */
+function _renderPINRestricted(appContainer, sectionLabel) {
+  if (typeof IS_PIN_SESSION === 'undefined' || !IS_PIN_SESSION) return false;
+  renderPageLayout(appContainer, 'member', AppState.activeTab || 'home', function(container) {
+    _memberHeader(container, sectionLabel, 'Restricted');
+    var content = el('div', { className: 'content', style: { textAlign: 'center', padding: '40px 20px' } });
+    content.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '\uD83D\uDD12'));
+    content.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '12px' } }, 'Personal Information Restricted'));
+    content.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6', maxWidth: '360px', margin: '0 auto 24px' } },
+      'PIN login provides limited access. To view ' + sectionLabel.toLowerCase() + ', sign in with Google or use an email sign-in link.'));
+    var loginBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '8px' },
+      onClick: function() { handleLogout(); }
+    }, 'Sign In with Full Access');
+    content.appendChild(loginBtn);
+    container.appendChild(content);
+  });
+  return true;
+}
+
+// ═══════════════════════════════════════
 // INIT & DATA LOADING
 // ═══════════════════════════════════════
 
@@ -14,6 +43,15 @@ function initMemberView(container) {
   ThemeEngine.applyTheme(t);
   AppState.activeRole = 'member';
   showLoading(container, 'kpi');
+
+  // PIN sessions: skip personal data fetches (server blocks them anyway)
+  if (typeof IS_PIN_SESSION !== 'undefined' && IS_PIN_SESSION) {
+    AppState.grievances = [];
+    AppState.loading = false;
+    renderMemberHome(container);
+    _checkDeepLink('member');
+    return;
+  }
 
   // Use batch data if available from initApp pre-fetch
   var batch = AppState.batchData;
@@ -451,14 +489,16 @@ function renderMemberHome(appContainer) {
     // Welcome card — localStorage-based, shows until user dismisses
     _renderMemberWelcome(container);
 
-    // Onboarding wizard — shown if member has not completed setup
-    serverCall().withSuccessHandler(function(status) {
-      if (status && !status.isComplete) {
-        _renderOnboardingWizard(container);
-      }
-    }).withFailureHandler(function() {
-      // Silently skip onboarding if status check fails
-    }).dataGetOnboardingStatus(SESSION_TOKEN);
+    // Onboarding wizard — shown if member has not completed setup (not for PIN sessions)
+    if (!IS_PIN_SESSION) {
+      serverCall().withSuccessHandler(function(status) {
+        if (status && !status.isComplete) {
+          _renderOnboardingWizard(container);
+        }
+      }).withFailureHandler(function() {
+        // Silently skip onboarding if status check fails
+      }).dataGetOnboardingStatus(SESSION_TOKEN);
+    }
 
     // Dues-restricted banner — shown persistently to non-dues-paying members
     // Synchronous: CURRENT_USER.duesPaying is available at render time (no server call needed)
@@ -509,6 +549,20 @@ function renderMemberHome(appContainer) {
       }
     });
 
+    // ── PIN session: show limited-access notice instead of personal data ────
+    if (IS_PIN_SESSION) {
+      var pinNotice = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '20px', textAlign: 'center' } });
+      pinNotice.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\uD83D\uDD12'));
+      pinNotice.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Limited Access Mode'));
+      pinNotice.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6' } },
+        'You\u2019re signed in with a PIN. Personal information (cases, profile, steward contact) is only available when signed in with Google or email link.'));
+      pinNotice.appendChild(el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' },
+        onClick: function() { handleLogout(); }
+      }, 'Sign In with Full Access'));
+      container.appendChild(pinNotice);
+    }
+
+    if (!IS_PIN_SESSION) {
     // Active grievance card — only show if member has an active case
     var activeG = AppState.grievances.find(function(g) { return g.status !== 'resolved'; });
     if (activeG) {
@@ -581,6 +635,7 @@ function renderMemberHome(appContainer) {
         }, 'Find a ' + CONFIG.stewardLabel));
       }
     });
+    } // end !IS_PIN_SESSION
 
     // Actionable stats strip — Unread Notifications, Survey Status, Upcoming Events
     var statsStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
@@ -868,6 +923,7 @@ function renderGrievanceCard(parentContainer, g) {
 }
 
 function renderGrievanceDetail(appContainer, g) {
+  if (_renderPINRestricted(appContainer, 'Case Details')) return;
   renderPageLayout(appContainer, 'member', 'cases', function(container) {
     // Back button
     container.appendChild(el('div', { style: { padding: '12px 20px' } },
@@ -998,6 +1054,7 @@ function renderGrievanceDetail(appContainer, g) {
 // ═══════════════════════════════════════
 
 function renderMyCases(appContainer) {
+  if (_renderPINRestricted(appContainer, 'Cases')) return;
   renderPageLayout(appContainer, 'member', 'cases', function(container) {
     _memberHeader(container, 'My Cases', AppState.grievances.length + ' total');
 
@@ -1311,7 +1368,8 @@ function _renderMemberWelcome(container) {
     { icon: '\uD83D\uDCDE', label: 'Contact Steward', tab: 'contact' },
     { icon: '\u2753', label: 'Ask a Question', tab: 'qa' },
     { icon: '\uD83D\uDCDA', label: 'Resources', tab: 'resources' },
-    { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' }
+    { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' },
+    { icon: '\uD83D\uDCCA', label: 'Workload', tab: 'workload' }
   ].forEach(function (qa) {
     var actionCard = el('div', {
       className: 'card card-clickable',
@@ -1448,6 +1506,7 @@ function _dismissMemberWelcome(cardEl) {
 // ═══════════════════════════════════════
 
 function renderStewardContact(appContainer) {
+  if (_renderPINRestricted(appContainer, 'Steward Contact')) return;
   renderPageLayout(appContainer, 'member', 'contact', function(container) {
     _memberHeader(container, 'Contact');
     var content = el('div', { className: 'content' });
@@ -2000,6 +2059,7 @@ function renderMemberResources(appContainer) {
 // ═══════════════════════════════════════
 
 function renderUpdateProfile(appContainer) {
+  if (_renderPINRestricted(appContainer, 'Profile')) return;
   renderPageLayout(appContainer, 'member', 'profile', function(container) {
     _memberHeader(container, 'Update Profile');
     var content = el('div', { className: 'content' });
@@ -2094,6 +2154,158 @@ function renderUpdateProfile(appContainer) {
       // Digest settings section (v4.17.0)
       _renderDigestSettings(content);
     }).dataGetFullProfile(SESSION_TOKEN);
+  });
+}
+
+// ═══════════════════════════════════════
+// PIN SETUP — self-service PIN creation
+// ═══════════════════════════════════════
+
+function renderPINSetup(appContainer) {
+  if (_renderPINRestricted(appContainer, 'PIN Setup')) return;
+  renderPageLayout(appContainer, 'member', 'pinsetup', function(container) {
+    // ── Blue-themed "SolidBase" header ────────────────────────────────
+    var header = el('div', {
+      style: {
+        background: 'linear-gradient(135deg, #1565C0, #1E88E5)',
+        borderRadius: 'var(--radius)',
+        padding: '24px 20px',
+        margin: '0 0 20px',
+        textAlign: 'center',
+        color: '#fff'
+      }
+    });
+    header.appendChild(el('div', {
+      style: { fontSize: '24px', fontWeight: '700', fontFamily: 'var(--fontDisplay)', marginBottom: '4px' }
+    }, 'SolidBase'));
+    header.appendChild(el('div', {
+      style: { fontSize: '12px', opacity: '0.85' }
+    }, 'Set up your login PIN'));
+    container.appendChild(header);
+
+    var content = el('div', { className: 'content', style: { maxWidth: '400px', margin: '0 auto' } });
+
+    // Info card
+    var infoCard = el('div', {
+      className: 'card card-glass',
+      style: { padding: '14px 16px', marginBottom: '16px', borderLeft: '3px solid #1565C0' }
+    });
+    infoCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6' } },
+      'Create a 6-digit PIN for quick sign-in. Your PIN is securely hashed and never stored in plain text. You can change it at any time.'));
+    content.appendChild(infoCard);
+
+    // PIN input
+    var pinLabel = el('label', {
+      htmlFor: 'pin-setup-input',
+      style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' }
+    }, 'New PIN');
+    content.appendChild(pinLabel);
+
+    var pinInput = el('input', {
+      id: 'pin-setup-input',
+      className: 'auth-input',
+      type: 'password',
+      inputMode: 'numeric',
+      maxLength: '6',
+      placeholder: '\u2022\u2022\u2022\u2022\u2022\u2022',
+      autocomplete: 'off',
+      style: { letterSpacing: '0.2em', fontSize: '20px', textAlign: 'center', marginBottom: '14px', width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }
+    });
+    content.appendChild(pinInput);
+
+    // Confirm PIN input
+    var confirmLabel = el('label', {
+      htmlFor: 'pin-setup-confirm',
+      style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' }
+    }, 'Confirm PIN');
+    content.appendChild(confirmLabel);
+
+    var confirmInput = el('input', {
+      id: 'pin-setup-confirm',
+      className: 'auth-input',
+      type: 'password',
+      inputMode: 'numeric',
+      maxLength: '6',
+      placeholder: '\u2022\u2022\u2022\u2022\u2022\u2022',
+      autocomplete: 'off',
+      style: { letterSpacing: '0.2em', fontSize: '20px', textAlign: 'center', marginBottom: '14px', width: '100%', boxSizing: 'border-box', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }
+    });
+    content.appendChild(confirmInput);
+
+    var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '18px', textAlign: 'center', marginBottom: '10px' } });
+    content.appendChild(statusMsg);
+
+    var submitBtn = el('button', {
+      className: 'btn',
+      style: { width: '100%', padding: '12px', fontSize: '14px', fontWeight: '600', borderRadius: 'var(--radius)', background: '#1565C0', color: '#fff', border: 'none', cursor: 'pointer' },
+      onClick: function() {
+        var pin = pinInput.value.trim();
+        var confirm = confirmInput.value.trim();
+        statusMsg.textContent = '';
+
+        if (!/^\d{6}$/.test(pin)) {
+          statusMsg.textContent = 'PIN must be exactly 6 digits.';
+          statusMsg.style.color = 'var(--danger)';
+          return;
+        }
+        if (pin !== confirm) {
+          statusMsg.textContent = 'PINs do not match.';
+          statusMsg.style.color = 'var(--danger)';
+          confirmInput.value = '';
+          try { confirmInput.focus(); } catch (_) {}
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving\u2026';
+
+        serverCall()
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              statusMsg.textContent = result.message || 'PIN saved!';
+              statusMsg.style.color = 'var(--success)';
+              pinInput.value = '';
+              confirmInput.value = '';
+              submitBtn.textContent = '\u2713 Saved';
+              setTimeout(function() {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save PIN';
+              }, 3000);
+            } else {
+              statusMsg.textContent = (result && result.message) || 'Failed to save PIN.';
+              statusMsg.style.color = 'var(--danger)';
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Save PIN';
+            }
+          })
+          .withFailureHandler(function(err) {
+            statusMsg.textContent = (err && err.message) || 'Server error. Try again.';
+            statusMsg.style.color = 'var(--danger)';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save PIN';
+          })
+          .memberSetOwnPIN(SESSION_TOKEN, pin);
+      }
+    }, 'Save PIN');
+    content.appendChild(submitBtn);
+
+    // Back link
+    content.appendChild(el('div', { style: { textAlign: 'center', marginTop: '16px' } }, [
+      el('button', {
+        style: { color: 'var(--accent)', fontSize: '13px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--fontBody)' },
+        onClick: function() { _handleTabNav('member', 'home'); }
+      }, '\u2190 Back to Home')
+    ]));
+
+    container.appendChild(content);
+
+    // Auto-focus
+    setTimeout(function() { try { pinInput.focus(); } catch (_) {} }, 50);
+
+    // Enter key handling
+    confirmInput.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') submitBtn.click();
+    });
   });
 }
 
@@ -2213,10 +2425,13 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
       { group: 'Reference' },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
-      { icon: '\uD83C\uDFDB', label: 'Org Chart', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
+      { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the union organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
+      { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'Agency structure & budget', locked: true, action: function() { _handleTabNav('member', 'maddsorgchart'); } },
       { group: 'Community' },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('member', 'qaforum'); } },
       { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
+      { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { renderSurveyFormPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { _handleTabNav('member', 'survey'); } },
       { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { _handleTabNav('member', 'feedback'); } },
       { group: 'Comms' },
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Messages and alerts', action: function() { _handleTabNav('member', 'notifications'); } },
@@ -2227,9 +2442,8 @@ function renderMemberMore(appContainer) {
       { divider: true },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { _handleTabNav('member', 'stewarddirectory'); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { _handleTabNav('member', 'profile'); } },
+      { icon: '\uD83D\uDD11', label: 'Set Up PIN', desc: 'Create or change your login PIN', action: function() { _handleTabNav('member', 'pinsetup'); } },
       { icon: '\uD83D\uDCCB', label: 'Report Card', desc: 'Your personal engagement score', action: function() { _handleTabNav('member', 'reportcard'); } },
-      { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { renderSurveyFormPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { _handleTabNav('member', 'survey'); } },
     ];
 
     menuItems.forEach(function(m) {
