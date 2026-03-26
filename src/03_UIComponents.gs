@@ -321,6 +321,7 @@ function createDashboardMenu() {
       .addItem('📄 Backfill Minutes → Drive Docs', 'BACKFILL_MINUTES_DRIVE_DOCS')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
+      .addItem('🔧 Repair Config Data Alignment', 'repairConfigData')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
       .addSeparator()

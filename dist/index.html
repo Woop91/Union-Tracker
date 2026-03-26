@@ -1368,10 +1368,15 @@
   if (loaderOrContainer.hasAttribute && loaderOrContainer.hasAttribute('aria-busy')) {
   loaderOrContainer.removeAttribute('aria-busy');
   }
+  
+  if (_navProgressPending) setTimeout(_navProgressDone, 400);
  }
 
  
  var _navProgressTimer = null;
+ var _navProgressPending = false;
+ var _navProgressSafetyTimer = null;
+ var _navCatsReturnTimer = null;
 
  
  function _ensureNavCats() {
@@ -1381,7 +1386,9 @@
   c.id = 'nav-cats';
   c.setAttribute('aria-hidden', 'true');
   
+  
   c.innerHTML =
+  '<span class="cat-wrap">' +
   '<svg class="nav-cat cat-lazy" viewBox="0 0 24 12" width="20" height="10">' +
    '<ellipse cx="11" cy="8.5" rx="7" ry="3" fill="currentColor"/>' +
    '<circle cx="17" cy="6" r="2.8" fill="currentColor"/>' +
@@ -1390,7 +1397,8 @@
    '<path d="M4,7.5 Q1,3.5 2.5,1.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
    '<line x1="15.5" y1="5.5" x2="16.2" y2="5.5" stroke="#4ade80" stroke-width="0.7" opacity="0.7"/>' +
    '<line x1="17.5" y1="5.5" x2="18.2" y2="5.5" stroke="#4ade80" stroke-width="0.7" opacity="0.7"/>' +
-  '</svg>' +
+  '</svg></span>' +
+  '<span class="cat-wrap">' +
   '<svg class="nav-cat cat-play1" viewBox="0 0 14 18" width="11" height="14">' +
    '<polygon points="3,6 2,2 5,5" fill="currentColor"/>' +
    '<polygon points="9,5 12,2 11,6" fill="currentColor"/>' +
@@ -1399,7 +1407,8 @@
    '<path d="M11,12 Q14,8 13,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
    '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
    '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
-  '</svg>' +
+  '</svg></span>' +
+  '<span class="cat-wrap">' +
   '<svg class="nav-cat cat-play2" viewBox="0 0 14 18" width="11" height="14">' +
    '<polygon points="3,6 1.5,2 5,5" fill="currentColor"/>' +
    '<polygon points="9,5 12.5,2 11,6" fill="currentColor"/>' +
@@ -1408,15 +1417,31 @@
    '<path d="M11,12 Q15,9 12,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
    '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
    '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
-  '</svg>';
+  '</svg></span>';
   document.body.appendChild(c);
   return c;
  }
 
  function _navCatsChase() {
   var cats = _ensureNavCats();
-  cats.classList.remove('pouncing');
+  var wraps = cats.querySelectorAll('.cat-wrap');
+  // If cats are walking back, capture the furthest cat's position and chase from there
+  if (cats.classList.contains('returning') && wraps.length) {
+  var maxX = 0;
+  for (var wi = 0; wi < wraps.length; wi++) {
+   var wMat = new DOMMatrix(getComputedStyle(wraps[wi]).transform);
+   if (wMat.m41 > maxX) maxX = wMat.m41;
+   wraps[wi].style.transition = 'none';
+   wraps[wi].style.transform = '';
+  }
+  cats.style.transition = 'none';
+  cats.style.transform = 'translateX(' + Math.round(maxX) + 'px)';
+  cats.offsetWidth; 
+  if (_navCatsReturnTimer) { clearTimeout(_navCatsReturnTimer); _navCatsReturnTimer = null; }
+  }
+  cats.classList.remove('pouncing', 'returning');
   cats.classList.add('chasing');
+  cats.style.transition = '';
   
   var targetX = Math.round(window.innerWidth * 0.82);
   cats.style.transform = 'translateX(' + targetX + 'px)';
@@ -1431,13 +1456,54 @@
   
   setTimeout(function() {
   cats.classList.remove('chasing', 'pouncing');
-  cats.style.transform = '';
+  _navCatsReturn(cats);
   }, 900);
+ }
+
+ 
+ function _navCatsReturn(cats) {
+  var wraps = cats.querySelectorAll('.cat-wrap');
+  if (!wraps.length) { cats.style.transform = ''; return; }
+  
+  var mat = new DOMMatrix(getComputedStyle(cats).transform);
+  var currentX = mat.m41 || 0;
+  if (currentX < 10) { cats.style.transform = ''; return; }
+  // Snap container back to origin — wrappers hold each cat's position
+  cats.style.transition = 'none';
+  cats.style.transform = '';
+  for (var i = 0; i < wraps.length; i++) {
+  wraps[i].style.transition = 'none';
+  wraps[i].style.transform = 'translateX(' + Math.round(currentX) + 'px)';
+  }
+  cats.classList.add('returning');
+  cats.offsetWidth; 
+  
+  for (var j = 0; j < wraps.length; j++) {
+  var dur = 5 + Math.random() * 10; 
+  wraps[j].style.transitionProperty = 'transform';
+  wraps[j].style.transitionDuration = dur.toFixed(1) + 's';
+  wraps[j].style.transitionTimingFunction = 'ease-in-out';
+  wraps[j].style.transform = 'translateX(0)';
+  }
+  
+  if (_navCatsReturnTimer) clearTimeout(_navCatsReturnTimer);
+  _navCatsReturnTimer = setTimeout(function() {
+  cats.classList.remove('returning');
+  for (var k = 0; k < wraps.length; k++) {
+   wraps[k].style.transition = '';
+   wraps[k].style.transform = '';
+  }
+  _navCatsReturnTimer = null;
+  }, 16000);
  }
 
  function _navProgressStart() {
   var bar = document.getElementById('nav-progress');
   if (!bar) return;
+  _navProgressPending = true;
+  
+  if (_navProgressSafetyTimer) { clearTimeout(_navProgressSafetyTimer); _navProgressSafetyTimer = null; }
+  _navProgressSafetyTimer = setTimeout(function() { if (_navProgressPending) _navProgressDone(); }, 10000);
   
   if (_navProgressTimer) { clearTimeout(_navProgressTimer); _navProgressTimer = null; }
   bar.style.transition = 'none';
@@ -1453,6 +1519,8 @@
   _navCatsChase();
  }
  function _navProgressDone() {
+  _navProgressPending = false;
+  if (_navProgressSafetyTimer) { clearTimeout(_navProgressSafetyTimer); _navProgressSafetyTimer = null; }
   var bar = document.getElementById('nav-progress');
   if (!bar) return;
   
@@ -1477,6 +1545,9 @@
  function _cleanupAppTimers() {
   
   if (_navProgressTimer) { clearTimeout(_navProgressTimer); _navProgressTimer = null; }
+  if (_navProgressSafetyTimer) { clearTimeout(_navProgressSafetyTimer); _navProgressSafetyTimer = null; }
+  if (_navCatsReturnTimer) { clearTimeout(_navCatsReturnTimer); _navCatsReturnTimer = null; }
+  _navProgressPending = false;
   
   if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null; }
   
@@ -2967,7 +3038,11 @@
   _splitRenderTarget = 'primary';
   _renderTabFresh(app, role, tabId, cacheId);
 
+  
+  
+  if (!_activePane || !_activePane.querySelector('.loading-spinner')) {
   _navProgressDone();
+  }
  }
 
  

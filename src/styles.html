@@ -358,6 +358,25 @@ button:focus-visible, [role="button"]:focus-visible {
   45% { transform: translateY(-10px) scale(1.2); }
   100%{ transform: translateY(0)     scale(1); }
 }
+/* ── Cat walk-back: independent return to start ── */
+.cat-wrap { display: inline-flex; }
+#nav-cats.returning { opacity: 0.4; }
+#nav-cats.returning .nav-cat { transform: scaleX(-1); }
+#nav-cats.returning .cat-play1,
+#nav-cats.returning .cat-play2 {
+  animation: cat-walk 0.5s ease-in-out infinite alternate;
+}
+#nav-cats.returning .cat-lazy {
+  animation: cat-saunter 0.8s ease-in-out infinite;
+}
+@keyframes cat-walk {
+  from { transform: scaleX(-1) translateY(0) rotate(-3deg); }
+  to   { transform: scaleX(-1) translateY(-2px) rotate(3deg); }
+}
+@keyframes cat-saunter {
+  0%,100% { transform: scaleX(-1) translateY(0); }
+  50%     { transform: scaleX(-1) translateY(-1px); }
+}
 @media(max-width:768px) { #nav-cats { display:none; } }
 @media(prefers-reduced-motion:reduce) { #nav-cats { display:none; } }
 

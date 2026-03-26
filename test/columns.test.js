@@ -573,3 +573,143 @@ describe('Audit log schemas', () => {
     expect(AUDIT_LOG_COLS.NEW_VALUE).toBeDefined();
   });
 });
+
+// ============================================================================
+// CONFIG_HEADER_MAP_ data type annotations
+// ============================================================================
+
+describe('CONFIG_HEADER_MAP_ type annotations', () => {
+  const VALID_TYPES = ['list', 'text', 'number', 'url', 'id', 'email', 'days', 'boolean', 'label', 'csv'];
+
+  test('every CONFIG_HEADER_MAP_ entry has a type field', () => {
+    const missing = CONFIG_HEADER_MAP_.filter(e => !e.type);
+    expect(missing.map(e => e.key)).toEqual([]);
+  });
+
+  test('all type values are from the allowed set', () => {
+    const invalid = CONFIG_HEADER_MAP_.filter(e => e.type && !VALID_TYPES.includes(e.type));
+    expect(invalid.map(e => `${e.key}: ${e.type}`)).toEqual([]);
+  });
+
+  test('CONFIG_DATA_VALIDATORS has a validator for every type', () => {
+    VALID_TYPES.forEach(t => {
+      expect(typeof CONFIG_DATA_VALIDATORS[t]).toBe('function');
+    });
+  });
+
+  test('no duplicate headers in CONFIG_HEADER_MAP_', () => {
+    const headers = CONFIG_HEADER_MAP_.map(e => e.header);
+    const dupes = headers.filter((h, i) => headers.indexOf(h) !== i);
+    expect(dupes).toEqual([]);
+  });
+
+  test('no duplicate keys in CONFIG_HEADER_MAP_', () => {
+    const keys = CONFIG_HEADER_MAP_.map(e => e.key);
+    const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+    expect(dupes).toEqual([]);
+  });
+});
+
+// ============================================================================
+// validateConfigValue_ — data type mismatch detection
+// ============================================================================
+
+describe('validateConfigValue_', () => {
+  test('empty values always pass', () => {
+    expect(validateConfigValue_('STEWARD_LABEL', '').valid).toBe(true);
+    expect(validateConfigValue_('ACCENT_HUE', null).valid).toBe(true);
+    expect(validateConfigValue_('DRIVE_FOLDER_ID', '  ').valid).toBe(true);
+  });
+
+  test('label type accepts short text', () => {
+    expect(validateConfigValue_('STEWARD_LABEL', 'Steward').valid).toBe(true);
+    expect(validateConfigValue_('MEMBER_LABEL', 'Member').valid).toBe(true);
+    expect(validateConfigValue_('LOGO_INITIALS', 'SB').valid).toBe(true);
+  });
+
+  test('label type rejects text over 50 chars', () => {
+    const long = 'A'.repeat(51);
+    expect(validateConfigValue_('STEWARD_LABEL', long).valid).toBe(false);
+  });
+
+  test('days type accepts positive integers', () => {
+    expect(validateConfigValue_('FILING_DEADLINE_DAYS', '21').valid).toBe(true);
+    expect(validateConfigValue_('COOKIE_DURATION_DAYS', '30').valid).toBe(true);
+  });
+
+  test('days type rejects non-numeric values', () => {
+    expect(validateConfigValue_('FILING_DEADLINE_DAYS', 'Steward').valid).toBe(false);
+    expect(validateConfigValue_('COOKIE_DURATION_DAYS', 'S.B.').valid).toBe(false);
+  });
+
+  test('number type accepts numeric values', () => {
+    expect(validateConfigValue_('ACCENT_HUE', '30').valid).toBe(true);
+    expect(validateConfigValue_('INSIGHTS_CACHE_TTL_MIN', '5').valid).toBe(true);
+  });
+
+  test('number type rejects text', () => {
+    expect(validateConfigValue_('ACCENT_HUE', 'blue').valid).toBe(false);
+    expect(validateConfigValue_('INSIGHTS_CACHE_TTL_MIN', 'Member').valid).toBe(false);
+  });
+
+  test('url type accepts URLs', () => {
+    expect(validateConfigValue_('ORG_WEBSITE', 'https://example.org').valid).toBe(true);
+    expect(validateConfigValue_('MOBILE_DASHBOARD_URL', 'https://app.example.com/dash').valid).toBe(true);
+  });
+
+  test('url type rejects non-URLs', () => {
+    expect(validateConfigValue_('ORG_WEBSITE', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('MOBILE_DASHBOARD_URL', 'Step II').valid).toBe(false);
+  });
+
+  test('id type accepts Google API IDs', () => {
+    expect(validateConfigValue_('DRIVE_FOLDER_ID', '1FuSUAKwVeDIWuZnLVENWTA1lrs7x-zNv').valid).toBe(true);
+  });
+
+  test('id type rejects short text or names', () => {
+    expect(validateConfigValue_('DRIVE_FOLDER_ID', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('ARCHIVE_FOLDER_ID', 'In Arbitration').valid).toBe(false);
+    expect(validateConfigValue_('PDF_FOLDER_ID', 'Step II').valid).toBe(false);
+  });
+
+  test('email type accepts email addresses', () => {
+    expect(validateConfigValue_('MAIN_CONTACT_EMAIL', 'user@example.org').valid).toBe(true);
+    expect(validateConfigValue_('TEST_NOTIFY_EMAIL', 'test@test.com').valid).toBe(true);
+  });
+
+  test('email type rejects non-email values', () => {
+    expect(validateConfigValue_('MAIN_CONTACT_EMAIL', '(000) 000-0000').valid).toBe(false);
+    expect(validateConfigValue_('CHIEF_STEWARD_EMAIL', 'Your Contact Name').valid).toBe(false);
+  });
+
+  test('boolean type accepts yes/no', () => {
+    expect(validateConfigValue_('SHOW_GRIEVANCES', 'yes').valid).toBe(true);
+    expect(validateConfigValue_('ENABLE_CORRELATION', 'no').valid).toBe(true);
+  });
+
+  test('boolean type rejects non-boolean text', () => {
+    expect(validateConfigValue_('SHOW_GRIEVANCES', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('BROADCAST_SCOPE_ALL', '30').valid).toBe(false);
+  });
+
+  test('csv type accepts comma-separated numbers', () => {
+    expect(validateConfigValue_('ALERT_DAYS', '3, 7, 14').valid).toBe(true);
+  });
+
+  // Key regression test: detect the exact abbreviation → STEWARD_LABEL mismatch
+  test('REGRESSION: detects org abbreviation in STEWARD_LABEL column (data shift)', () => {
+    // If "S.B." ends up in the STEWARD_LABEL column, it still passes label validation
+    // because it's short text. But we CAN catch shifted data in typed columns:
+    expect(validateConfigValue_('FILING_DEADLINE_DAYS', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('DRIVE_FOLDER_ID', 'Your Parent Union').valid).toBe(false);
+    expect(validateConfigValue_('ACCENT_HUE', 'UN').valid).toBe(false);
+    expect(validateConfigValue_('PDF_FOLDER_ID', 'In Arbitration').valid).toBe(false);
+    expect(validateConfigValue_('COOKIE_DURATION_DAYS', 'Member').valid).toBe(false);
+  });
+
+  test('unknown key returns invalid', () => {
+    const result = validateConfigValue_('NONEXISTENT_KEY', 'value');
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain('unknown key');
+  });
+});

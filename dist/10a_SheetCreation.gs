@@ -64,10 +64,10 @@ function createConfigSheet(ss) {
   } else {
     Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
 
-    // Migration: remove orphaned "Yes/No (Dropdowns)" column (was column E).
-    // Deleting the column shifts all data to the right of it left by 1,
-    // keeping headers and data aligned.
-    migrateRemoveYesNoColumn_(sheet);
+    // Migration: detect and remove orphaned columns left behind by past
+    // CONFIG_HEADER_MAP_ removals (Yes/No, Satisfaction Form URL, etc.).
+    // Deleting them shifts data left so it re-aligns with new headers.
+    var _migrated = _migrateOrphanedColumns(sheet);
   }
 
   // Row 1: Section Headers (grouped categories) — must match CONFIG_HEADER_MAP_ length (79 cols)
@@ -293,25 +293,96 @@ function createConfigSheet(ss) {
 }
 
 /**
- * Migration: removes the orphaned "Yes/No (Dropdowns)" column from existing Config sheets.
- * The column was removed from CONFIG_HEADER_MAP_ but existing sheets still have it.
- * Deleting the physical column shifts all data right of it left by 1, keeping
- * headers and data aligned when new headers are applied.
+ * General-purpose migration: detects and removes orphaned columns in the Config sheet.
+ *
+ * When a column is removed from CONFIG_HEADER_MAP_ (e.g. Yes/No, Satisfaction Form URL),
+ * existing sheets retain the physical column. This shifts all data to the right of it,
+ * causing headers and data to fall out of alignment.
+ *
+ * Strategy: walk actual row-2 headers alongside expected headers. When a mismatch is
+ * found (actual ≠ expected), the actual column is orphaned — delete it. Deleting
+ * shifts subsequent data left, restoring alignment.
+ *
+ * Works in two scenarios:
+ *  A) Old headers still present — orphan detected by header text mismatch.
+ *  B) Headers already overwritten — first 79 cols match, extras past col 79 are deleted.
+ *
  * @param {Sheet} sheet - The Config sheet
+ * @returns {number} Number of orphaned columns deleted
  * @private
  */
-function migrateRemoveYesNoColumn_(sheet) {
-  // Check row 2 for the old header — only migrate if it's still present
+function _migrateOrphanedColumns(sheet) {
+  var expected = getHeadersFromMap_(CONFIG_HEADER_MAP_);
   var maxCol = sheet.getMaxColumns();
-  if (maxCol < 5) return;
-  var row2 = sheet.getRange(2, 1, 1, Math.min(maxCol, 10)).getValues()[0];
-  for (var c = 0; c < row2.length; c++) {
-    if (String(row2[c]).trim() === 'Yes/No (Dropdowns)') {
-      sheet.deleteColumn(c + 1); // 1-indexed
-      Logger.log('migrateRemoveYesNoColumn_: deleted orphaned Yes/No column at position ' + (c + 1));
-      return;
+  if (maxCol <= expected.length) return 0;
+
+  var row2 = sheet.getRange(2, 1, 1, maxCol).getValues()[0];
+
+  // Walk both pointers: ci through actual columns, ei through expected headers.
+  // Matched pair → advance both. Mismatch → mark actual column as orphan.
+  var toDelete = [];
+  var ei = 0;
+  for (var ci = 0; ci < row2.length; ci++) {
+    if (ei >= expected.length) {
+      // All expected headers matched — remaining columns are extras
+      toDelete.push(ci + 1);
+      continue;
+    }
+    var actual = String(row2[ci]).trim();
+    if (actual === expected[ei]) {
+      ei++; // match
+    } else {
+      toDelete.push(ci + 1); // orphan
     }
   }
+
+  if (toDelete.length === 0) return 0;
+
+  // Delete right-to-left to preserve column indices
+  for (var d = toDelete.length - 1; d >= 0; d--) {
+    sheet.deleteColumn(toDelete[d]);
+  }
+  Logger.log('_migrateOrphanedColumns: deleted ' + toDelete.length +
+    ' orphaned column(s) — sheet now has ' + sheet.getMaxColumns() + ' columns');
+  return toDelete.length;
+}
+
+/**
+ * Repairs Config sheet data alignment.
+ * Clears all data rows (3+) and re-seeds defaults. Call from menu after
+ * orphaned-column migration if data is still misaligned.
+ *
+ * Safe to call multiple times — only writes default values.
+ * User-customized values in affected columns WILL be lost.
+ */
+function repairConfigData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.');
+    return;
+  }
+
+  var expected = getHeadersFromMap_(CONFIG_HEADER_MAP_);
+  var maxCol = sheet.getMaxColumns();
+
+  // Step 1: if sheet still has extra columns, run migration
+  if (maxCol > expected.length) {
+    var deleted = _migrateOrphanedColumns(sheet);
+    if (deleted > 0) {
+      ss.toast('Removed ' + deleted + ' orphaned column(s).', 'Migration', 3);
+    }
+  }
+
+  // Step 2: clear data rows and re-seed
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 3) {
+    sheet.getRange(3, 1, lastRow - 2, expected.length).clearContent();
+  }
+
+  // Re-run createConfigSheet with cleared data (isExistingSheet will be false since rows ≤ 2)
+  createConfigSheet(ss);
+  ss.toast('Config data repaired — default values re-seeded. Check and restore any custom values.', 'Repair Complete', 5);
 }
 
 /**

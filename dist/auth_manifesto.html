@@ -11,6 +11,18 @@ var _PHRASE_ZONES = [
  { xMin: 0.50, xMax: 0.92, yMin: 0.60, yMax: 0.88 }
 ];
 
+var _PHRASE_ZONES_6 = [
+ { xMin: 0.03, xMax: 0.45, yMin: 0.04, yMax: 0.25 },   
+ { xMin: 0.52, xMax: 0.95, yMin: 0.04, yMax: 0.25 },   
+ { xMin: 0.03, xMax: 0.40, yMin: 0.32, yMax: 0.58 },   
+ { xMin: 0.55, xMax: 0.95, yMin: 0.32, yMax: 0.58 },   
+ { xMin: 0.03, xMax: 0.45, yMin: 0.64, yMax: 0.90 },   
+ { xMin: 0.52, xMax: 0.95, yMin: 0.64, yMax: 0.90 }    
+];
+
+var _activeZones = _PHRASE_ZONES;
+var _phraseVisCount = 0;
+
 function injectAuthManifesto(authContainer) {
  if (document.getElementById('auth-manifesto-layer')) return;
 
@@ -19,17 +31,24 @@ function injectAuthManifesto(authContainer) {
  "The union is waiting for you.",
  "Your rights don't end when you leave.",
  "You are the change.",
- "Solidarity is not\na slogan. It's a practice."
+ "Solidarity is not\na slogan. It's a practice.",
+ "Together we bargain.\nAlone we beg.",
+ "Democracy doesn't stop\nat the workplace door.",
+ "The future is\ncollective."
  ];
 
  
+ var isDesktop = window.innerWidth > 768;
+ var phraseCount = isDesktop ? 6 : 3;
+ _activeZones = isDesktop ? _PHRASE_ZONES_6 : _PHRASE_ZONES;
+
  var shuffled = allPhrases.slice();
  for (var s = shuffled.length - 1; s > 0; s--) {
  var r = Math.floor(Math.random() * (s + 1));
  var tmp = shuffled[s]; shuffled[s] = shuffled[r]; shuffled[r] = tmp;
  }
- var picked = shuffled.slice(0, 3);
- var fontSizes = ['2.25rem', '1.5rem', '1.875rem']; 
+ var picked = shuffled.slice(0, phraseCount);
+ var fontSizes = ['2.25rem', '1.5rem', '1.875rem', '1.5rem', '1.625rem', '1.5rem'];
 
  var layer = document.createElement('div');
  layer.id = 'auth-manifesto-layer';
@@ -45,9 +64,10 @@ function injectAuthManifesto(authContainer) {
  });
  document.body.insertBefore(layer, document.body.firstChild);
 
- // Stagger starts with random offsets so they don't sync up
+ // Stagger starts so they don't sync up — tighter spacing with more phrases
+ var stagger = isDesktop ? 2500 : 3500;
  picked.forEach(function(_, i) {
- var delay = 1000 + Math.floor(Math.random() * 4000) + (i * 3500);
+ var delay = 1000 + Math.floor(Math.random() * 3000) + (i * stagger);
  setTimeout(function() { _animatePhrase(i); }, delay);
  });
 
@@ -58,7 +78,8 @@ function _animatePhrase(index) {
  var el = document.getElementById('auth-phrase-' + index);
  if (!el) return;
 
- var zone = _PHRASE_ZONES[index];
+ var zone = _activeZones[index];
+ if (!zone) return;
  var vw = window.innerWidth;
  var vh = window.innerHeight;
 
@@ -82,20 +103,29 @@ function _animatePhrase(index) {
  var isDark = document.documentElement.dataset.themeMode === 'dark';
  
  if (index === 0) {
-  el.style.opacity = isDark ? '0.55' : '0.50';
+  el.style.opacity = isDark ? '0.95' : '0.95';
  } else {
-  el.style.opacity = isDark ? '0.35' : '0.30';
+  el.style.opacity = isDark ? '0.55' : '0.50';
  }
+ _phraseVisCount++;
 
  
  var hold = 12000 + Math.floor(Math.random() * 6000);
- setTimeout(function() {
-  el.style.opacity = '0';
-  
-  var wait = 4000 + Math.floor(Math.random() * 4000);
-  setTimeout(function() { _animatePhrase(index); }, wait);
- }, hold);
+ setTimeout(function() { _fadeOutOrDefer(el, index); }, hold);
  }, 200);
+}
+
+function _fadeOutOrDefer(el, index) {
+ if (_phraseVisCount <= 1) {
+ 
+ setTimeout(function() { _fadeOutOrDefer(el, index); }, 800);
+ return;
+ }
+ _phraseVisCount--;
+ el.style.opacity = '0';
+ 
+ var wait = 4000 + Math.floor(Math.random() * 4000);
+ setTimeout(function() { _animatePhrase(index); }, wait);
 }
 
 var AUTH_QUOTES = [
