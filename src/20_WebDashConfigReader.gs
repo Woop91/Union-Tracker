@@ -36,8 +36,8 @@
 
 var ConfigReader = (function () {
 
-  var CACHE_KEY = 'ORG_CONFIG';
-  var CACHE_TTL = 21600; // 6 hours in seconds
+  var CACHE_KEY = 'ORG_CONFIG_v2';
+  var CACHE_TTL = 300; // 5 minutes in seconds
   // S3: In-execution memo — avoids repeated cache.get() + JSON.parse() within same request
   var _memo = null;
 

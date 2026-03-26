@@ -210,12 +210,12 @@ describe('ConfigReader.getConfig', function () {
     expect(cfg.orgName).toBe('My Organization');
   });
 
-  test('stores config in cache with 6h TTL (21600s)', function () {
+  test('stores config in cache with 5min TTL (300s)', function () {
     ConfigReader.getConfig(true);
     expect(mockCache.put).toHaveBeenCalledWith(
-      'ORG_CONFIG',
+      'ORG_CONFIG_v2',
       expect.any(String),
-      21600
+      300
     );
   });
 
