@@ -2867,6 +2867,30 @@ button:focus-visible, [role="button"]:focus-visible {
   border-left-style: dashed;
 }
 
+/* ── Sidebar quote widget — rotating quotes in desktop sidebar blank space ── */
+.sidebar-quote-widget {
+  margin: 16px 16px 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  min-height: 60px;
+}
+.sidebar-quote-widget.sqw-visible { opacity: 1; }
+.sqw-text {
+  font-size: 0.8rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--textMuted, #666);
+  margin-bottom: 6px;
+}
+.sqw-attr {
+  font-size: 0.675rem;
+  color: var(--textMuted, #888);
+  opacity: 0.7;
+  text-align: right;
+}
+
 /* ═══════════════════════════════════════
    RESPONSIVE — Mobile (<640px)
    ═══════════════════════════════════════ */

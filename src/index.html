@@ -1433,6 +1433,7 @@
      * Usage: call _navProgressStart() before render, _navProgressDone() after.
      * CSS handles the animation via #nav-progress in styles.html.
      */
+    var _sidebarQuoteTimer = null;
     var _navProgressTimer = null;
     var _navProgressPending = false;
     var _navProgressSafetyTimer = null;
@@ -1801,6 +1802,8 @@
       // Clear scatter cat timers
       for (var si = 0; si < _scatterCatTimers.length; si++) clearTimeout(_scatterCatTimers[si]);
       _scatterCatTimers.length = 0;
+      // Clear sidebar quote timer
+      if (_sidebarQuoteTimer) { clearInterval(_sidebarQuoteTimer); _sidebarQuoteTimer = null; }
       // Clear resize debounce timer
       if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null; }
       // Reset scroll-nav cooldown state
@@ -2547,6 +2550,33 @@
         el('span', { className: 'sidebar-item-icon' }, '\u21A9'),
         el('span', null, 'Sign Out')
       ]));
+
+      // ── Sidebar quote widget — fills blank space on desktop ──
+      if (isSidebarLayout() && typeof AUTH_QUOTES !== 'undefined') {
+        var quoteWrap = el('div', { className: 'sidebar-quote-widget' });
+        var quoteText = el('div', { className: 'sqw-text' });
+        var quoteAttr = el('div', { className: 'sqw-attr' });
+        quoteWrap.appendChild(quoteText);
+        quoteWrap.appendChild(quoteAttr);
+        sidebar.appendChild(quoteWrap);
+
+        var _sqPool = _shuffleArray(AUTH_QUOTES);
+        var _sqIdx = 0;
+        function _showSidebarQuote() {
+          var q = _sqPool[_sqIdx];
+          quoteWrap.classList.remove('sqw-visible');
+          setTimeout(function() {
+            quoteText.textContent = '\u201C' + q.text + '\u201D';
+            quoteAttr.textContent = '\u2014 ' + q.attr;
+            quoteWrap.classList.add('sqw-visible');
+            _sqIdx = (_sqIdx + 1) % _sqPool.length;
+          }, 600);
+        }
+        _showSidebarQuote();
+        // Clear any previous sidebar quote timer before starting new one
+        if (_sidebarQuoteTimer) clearInterval(_sidebarQuoteTimer);
+        _sidebarQuoteTimer = setInterval(_showSidebarQuote, 12000);
+      }
     }
 
     // Dev-only tabs filtered out in production mode

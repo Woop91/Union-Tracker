@@ -1373,6 +1373,7 @@
  }
 
  
+ var _sidebarQuoteTimer = null;
  var _navProgressTimer = null;
  var _navProgressPending = false;
  var _navProgressSafetyTimer = null;
@@ -1741,6 +1742,8 @@
   
   for (var si = 0; si < _scatterCatTimers.length; si++) clearTimeout(_scatterCatTimers[si]);
   _scatterCatTimers.length = 0;
+  
+  if (_sidebarQuoteTimer) { clearInterval(_sidebarQuoteTimer); _sidebarQuoteTimer = null; }
   
   if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null; }
   
@@ -2481,6 +2484,33 @@
   el('span', { className: 'sidebar-item-icon' }, '\u21A9'),
   el('span', null, 'Sign Out')
   ]));
+
+  
+  if (isSidebarLayout() && typeof AUTH_QUOTES !== 'undefined') {
+  var quoteWrap = el('div', { className: 'sidebar-quote-widget' });
+  var quoteText = el('div', { className: 'sqw-text' });
+  var quoteAttr = el('div', { className: 'sqw-attr' });
+  quoteWrap.appendChild(quoteText);
+  quoteWrap.appendChild(quoteAttr);
+  sidebar.appendChild(quoteWrap);
+
+  var _sqPool = _shuffleArray(AUTH_QUOTES);
+  var _sqIdx = 0;
+  function _showSidebarQuote() {
+   var q = _sqPool[_sqIdx];
+   quoteWrap.classList.remove('sqw-visible');
+   setTimeout(function() {
+   quoteText.textContent = '\u201C' + q.text + '\u201D';
+   quoteAttr.textContent = '\u2014 ' + q.attr;
+   quoteWrap.classList.add('sqw-visible');
+   _sqIdx = (_sqIdx + 1) % _sqPool.length;
+   }, 600);
+  }
+  _showSidebarQuote();
+  
+  if (_sidebarQuoteTimer) clearInterval(_sidebarQuoteTimer);
+  _sidebarQuoteTimer = setInterval(_showSidebarQuote, 12000);
+  }
  }
 
  
