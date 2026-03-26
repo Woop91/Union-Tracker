@@ -86,8 +86,9 @@ const HTML_FILES = [
   'grievance_form.html',
   'esign.html',
   'AdminSettings.html',
-  // Member Hub (design phase — not yet integrated into index.html)
+  // Member Hub + Knowledge widgets
   'auth_manifesto.html',
+  'negotiation_knowledge.html',
   'member_hub_styles.html',
   'member_hub_view.html',
 ];
@@ -298,7 +299,8 @@ const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
-// Files to exclude in production builds
+// Files to exclude in production builds.
+// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {
@@ -318,7 +320,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 36 .gs + 14 .html + 1 appsscript.json = 51 files
+  // Current prod capacity: 41 .gs + 17 .html + 1 appsscript.json = 59 files
   const GAS_FILE_WARN = 50;
   const GAS_FILE_LIMIT = 60;
   const prodFileCount = fileList.filter(f => !PROD_EXCLUDE.includes(f)).length;

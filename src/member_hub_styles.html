@@ -508,4 +508,163 @@ body.auth-active {
 .hal-steward  .hal-ico { background:rgba(239,68,68,0.12); }
 .hal-name { font-size:11px; font-weight:600; color:var(--text); }
 .hal-desc { font-size:10px; color:var(--muted); line-height:1.4; }
+
+/* ═══════════════════════════════════════════════════
+   NEGOTIATION KNOWLEDGE WIDGET — Styles
+   v4.41.0 — 2026-03-26
+═══════════════════════════════════════════════════ */
+
+/* ── Sidebar Knowledge (bottom of sidebar, tablet+ only) ── */
+.sidebar-knowledge {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  min-height: 60px;
+}
+.sidebar-knowledge.sk-visible { opacity: 1; }
+.sk-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.sk-quote {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+/* ── Inline Knowledge Widget (home page) ── */
+.neg-knowledge-widget {
+  margin: 0 16px 14px;
+  padding: 16px 18px;
+  background: rgba(var(--accentRGB,59,130,246), 0.04);
+  border: 1px solid rgba(var(--accentRGB,59,130,246), 0.14);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 80px;
+}
+.nkw-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.nkw-icon { font-size: 14px; }
+.nkw-label { opacity: 0.7; }
+
+.nkw-stage {
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+.nkw-stage.nkw-visible { opacity: 1; }
+
+.nkw-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  font-family: var(--fontDisplay, 'Bebas Neue', sans-serif);
+  letter-spacing: 0.02em;
+}
+.nkw-quote {
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(var(--textRGB,249,250,251), 0.68);
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+.nkw-attr {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.nkw-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nkw-bullet {
+  padding: 3px 0 3px 14px;
+  position: relative;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.nkw-bullet.nkw-bullet-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.nkw-bullet::before {
+  content: '\2192';
+  position: absolute;
+  left: 0;
+  font-size: 10px;
+  color: var(--accent);
+}
+
+/* ── Knowledge Strip (compact, for unused spaces) ── */
+.neg-knowledge-strip {
+  padding: 10px 16px;
+  background: rgba(var(--accentRGB,59,130,246), 0.03);
+  border-top: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  min-height: 32px;
+}
+.neg-knowledge-strip.nks-visible { opacity: 1; }
+.nks-text {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.nks-text strong {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Responsive: Mobile — hide bullets, keep compact ── */
+@media (max-width: 639px) {
+  .nkw-bullets { display: none; }
+  .neg-knowledge-widget { min-height: 60px; }
+  .neg-knowledge-strip { display: none; }
+}
+
+/* ── Responsive: Tablet+ — full experience ── */
+@media (min-width: 640px) {
+  .neg-knowledge-widget {
+    max-width: 860px;
+  }
+  .nkw-title { font-size: 15px; }
+  .nkw-quote { font-size: 13px; }
+  .nkw-bullet { font-size: 12px; padding-left: 16px; }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-knowledge,
+  .nkw-stage,
+  .nkw-bullet,
+  .neg-knowledge-strip { transition: none; }
+}
 </style>

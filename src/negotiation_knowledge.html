@@ -1,0 +1,408 @@
+<script>
+/**
+ * NEGOTIATION KNOWLEDGE WIDGET — Rotating educational tips
+ * v4.41.0 — 2026-03-26
+ *
+ * Continuously spoon-feeds negotiation knowledge to members and stewards.
+ * Title fades in → stays bright → bullets phase in one at a time →
+ * after all shown, set fades out → next set appears.
+ *
+ * On tablet/desktop: shows in sidebar footer + expanded inline widget
+ * On mobile: compact single-quote rotator in the home page
+ *
+ * HOW TO INTEGRATE:
+ *  1. Add <?!= include('negotiation_knowledge') ?> before </body> in index.html
+ *  2. Call renderNegotiationWidget(container) from member/steward home pages
+ *  3. Call renderSidebarKnowledge(sidebarEl) from renderSidebarItems() (tablet+)
+ *
+ * SOLIDBASE SAFE: union-agnostic language only.
+ */
+
+// ─── NEGOTIATION KNOWLEDGE SETS ────────────────────────────────────────
+// Each set has a title, an optional quote, and bullet points.
+// The widget cycles through sets. On mobile only title+quote are shown.
+// On tablet+ the full set with bullets is presented.
+
+var NEGOTIATION_SETS = [
+  {
+    title: 'What Is Negotiation?',
+    quote: { text: 'Let us never negotiate out of fear. But let us never fear to negotiate.', attr: 'John F. Kennedy' },
+    bullets: [
+      'A dialogue between two or more parties seeking mutual agreement.',
+      'It is not about winning or losing — it is about finding solutions.',
+      'Every conversation where something of value is at stake is a negotiation.'
+    ]
+  },
+  {
+    title: 'Mediation vs. Arbitration',
+    quote: { text: 'Mediation is not about who is right or wrong. It is about finding a path forward together.', attr: 'Labor tradition' },
+    bullets: [
+      'Mediation: neutral facilitator helps YOU decide. Non-binding.',
+      'Arbitration: neutral decision-maker renders a binding ruling.',
+      'Mediation preserves relationships. Arbitration delivers finality.',
+      'Try mediation first. Arbitration is your credible fallback.'
+    ]
+  },
+  {
+    title: 'BATNA',
+    quote: { text: 'Your BATNA is the standard against which any proposed agreement should be measured.', attr: 'Fisher & Ury, Getting to Yes' },
+    bullets: [
+      'Best Alternative To a Negotiated Agreement — your walk-away power.',
+      'The stronger your BATNA, the stronger your position at the table.',
+      'Never reveal a weak BATNA. Work to strengthen it first.',
+      'Always assess the other side\u2019s BATNA too.'
+    ]
+  },
+  {
+    title: 'The Anchor Point',
+    quote: { text: 'In any negotiation, the person who sets the anchor controls the range of discussion.', attr: 'Negotiation principle' },
+    bullets: [
+      'The first offer powerfully influences the final outcome.',
+      'Set an ambitious but defensible anchor — back it with facts.',
+      'If the other side anchors first, don\u2019t let it pull you.',
+      'Counter-anchor with objective criteria: contract, precedent, law.'
+    ]
+  },
+  {
+    title: 'The Flinch',
+    quote: { text: 'Your reaction to an offer is often more powerful than your counter-offer.', attr: 'Jim Camp' },
+    bullets: [
+      'When they make an offer, react visibly — even if it\u2019s reasonable.',
+      'A sharp inhale, raised eyebrow, or pause sends a clear signal.',
+      'Most people rush to close the gap when they see disapproval.',
+      'The flinch works because people are uncomfortable with rejection.'
+    ]
+  },
+  {
+    title: 'Use Silence',
+    quote: { text: 'Silence is a source of great strength.', attr: 'Lao Tzu' },
+    bullets: [
+      'After making a proposal, stop talking. Let the other side respond.',
+      'Silence creates pressure and space for the other party to fill.',
+      'Resist negotiating against yourself by speaking to fill the void.',
+      'The first person to speak after a proposal usually concedes.'
+    ]
+  },
+  {
+    title: 'When a Conversation Becomes a Negotiation',
+    quote: { text: 'If you\u2019re not at the table, you\u2019re on the menu.', attr: 'Labor tradition' },
+    bullets: [
+      'The moment someone makes a request that affects your rights — you\u2019re negotiating.',
+      'Informal hallway chats with management often shape outcomes before formal meetings.',
+      '"Just this once" is never just once — it sets a precedent.',
+      'If you feel pressure to answer immediately, that IS the negotiation.'
+    ]
+  },
+  {
+    title: 'Dealing with Hard Bargainers',
+    quote: { text: 'The best defense against dirty tactics is to recognize them. Once named, they lose their power.', attr: 'Fisher & Ury' },
+    bullets: [
+      'Take-it-or-leave-it: Almost always a bluff. Say "Let me take it back to the team."',
+      'Good Cop / Bad Cop: Treat them as one unit. Don\u2019t trust the "reasonable" one.',
+      'Intimidation: Stay calm. Don\u2019t match their energy. Suggest a break.',
+      'Name the tactic out loud — "It sounds like a take-it-or-leave-it" — to neutralize it.'
+    ]
+  },
+  {
+    title: 'Hard Bargainer: The Nibble',
+    quote: { text: 'Small concessions add up to big losses if you\u2019re not tracking them.', attr: 'Negotiation principle' },
+    bullets: [
+      'After the big issues are settled, they ask for "one small thing" — then another.',
+      'Each seems minor, so refusing feels petty. But they add up fast.',
+      'Counter: "We\u2019ve already reached agreement. Any changes reopen the whole discussion."',
+      'Track every concession on paper. Make the pattern visible.'
+    ]
+  },
+  {
+    title: 'Interests vs. Positions',
+    quote: { text: 'Behind opposed positions lie shared and compatible interests.', attr: 'Getting to Yes' },
+    bullets: [
+      'A position is what someone says they want. An interest is WHY they want it.',
+      'Ask "why?" and "why not?" to uncover what really matters.',
+      'Solutions that satisfy both sides\u2019 interests are the most durable.',
+      'Two people fighting over an orange: one wants the juice, one wants the peel.'
+    ]
+  },
+  {
+    title: 'Prepare Relentlessly',
+    quote: { text: 'By failing to prepare, you are preparing to fail.', attr: 'Benjamin Franklin' },
+    bullets: [
+      'Know the contract inside and out before you sit down.',
+      'Research past grievance outcomes and precedents.',
+      'Anticipate management\u2019s arguments and prepare rebuttals.',
+      'Bring documentation — facts beat opinions every time.'
+    ]
+  },
+  {
+    title: 'The ZOPA',
+    quote: { text: 'You don\u2019t get what you deserve. You get what you negotiate.', attr: 'Chester L. Karrass' },
+    bullets: [
+      'Zone of Possible Agreement: the overlap where a deal is possible.',
+      'If the zones don\u2019t overlap, you\u2019re heading to impasse or arbitration.',
+      'Your job: figure out where the ZOPA is and capture as much value as possible.',
+      'A strong BATNA shifts the ZOPA in your favor.'
+    ]
+  },
+  {
+    title: 'Never Accept the First Offer',
+    quote: { text: 'The first offer is never the best offer.', attr: 'Negotiation principle' },
+    bullets: [
+      'The first offer is almost always a test of where you stand.',
+      'Countering shows you are prepared and engaged.',
+      'Even if the offer seems fair, there is usually room to improve it.',
+      'Accepting too fast can leave value on the table — and signal weakness.'
+    ]
+  },
+  {
+    title: 'False Authority Trap',
+    quote: { text: 'Always ask: Do you have the authority to make a deal today?', attr: 'Negotiation principle' },
+    bullets: [
+      'They negotiate, reach agreement, then say "I need to check with my boss."',
+      'The boss rejects it and demands more concessions.',
+      'You\u2019ve invested time and energy — starting over feels worse than giving in.',
+      'Counter: Ask upfront who has final authority. Negotiate with them.'
+    ]
+  },
+  {
+    title: 'Control the Pace',
+    quote: { text: 'The person with the most patience almost always wins.', attr: 'Negotiation principle' },
+    bullets: [
+      'If they rush you, slow down. "Let me think about that."',
+      'If they stall, set deadlines and escalate when timelines are violated.',
+      'Never agree under pressure — a good deal today is still good tomorrow.',
+      'You do not have to answer right now. That is always acceptable.'
+    ]
+  },
+  {
+    title: 'Document Everything',
+    quote: { text: 'Hard bargainers rely on deniability. Written records eliminate that.', attr: 'Labor tradition' },
+    bullets: [
+      'Write down what was said, when, and by whom — immediately.',
+      'Never negotiate alone. Always have a witness.',
+      'Follow up verbal agreements with a written summary.',
+      'If it\u2019s not documented, it didn\u2019t happen.'
+    ]
+  },
+  {
+    title: 'The Power of "We"',
+    quote: { text: 'Coming together is a beginning, staying together is progress, and working together is success.', attr: 'Henry Ford' },
+    bullets: [
+      'Frame proposals in terms of mutual benefit: "How can we solve this?"',
+      'Collaborative language reduces defensiveness.',
+      'Even in adversarial settings, "we" language can shift dynamics.',
+      'The goal is a solution, not a surrender.'
+    ]
+  }
+];
+
+// ─── SIDEBAR KNOWLEDGE WIDGET (tablet+ only) ──────────────────────────
+// Small rotating quote at the bottom of the sidebar — always visible.
+// Cycles through a shuffled subset every 10 seconds.
+
+var _sidebarKnowledgeTimer = null;
+
+function renderSidebarKnowledge(sidebarEl) {
+  if (!sidebarEl) return;
+  // Don't double-render
+  if (sidebarEl.querySelector('.sidebar-knowledge')) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'sidebar-knowledge';
+  wrap.setAttribute('aria-label', 'Negotiation tip');
+
+  var titleEl = document.createElement('div');
+  titleEl.className = 'sk-title';
+  wrap.appendChild(titleEl);
+
+  var quoteEl = document.createElement('div');
+  quoteEl.className = 'sk-quote';
+  wrap.appendChild(quoteEl);
+
+  sidebarEl.appendChild(wrap);
+
+  // Shuffle and cycle
+  var pool = _shuffleArray(NEGOTIATION_SETS.slice());
+  var idx = 0;
+
+  function showNext() {
+    var set = pool[idx % pool.length];
+    // Fade out
+    wrap.classList.remove('sk-visible');
+    setTimeout(function() {
+      titleEl.textContent = set.title;
+      quoteEl.innerHTML = set.quote
+        ? '\u201C' + escapeHtml(set.quote.text) + '\u201D'
+        : '';
+      // Fade in
+      wrap.classList.add('sk-visible');
+      idx++;
+    }, 600);
+  }
+
+  showNext();
+  if (_sidebarKnowledgeTimer) clearInterval(_sidebarKnowledgeTimer);
+  _sidebarKnowledgeTimer = setInterval(showNext, 12000);
+}
+
+function stopSidebarKnowledge() {
+  if (_sidebarKnowledgeTimer) { clearInterval(_sidebarKnowledgeTimer); _sidebarKnowledgeTimer = null; }
+}
+
+// ─── INLINE KNOWLEDGE WIDGET (member/steward home page) ────────────────
+// Full set display: title fades in bright, stays, bullets phase in one
+// at a time, then the whole set fades out and the next one appears.
+// On mobile: title + quote only. On tablet+: full bullets.
+
+var _inlineKnowledgeTimer = null;
+var _inlineKnowledgeCleanups = [];
+
+function renderNegotiationWidget(container) {
+  if (!container) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'neg-knowledge-widget card-fade-in';
+
+  var header = document.createElement('div');
+  header.className = 'nkw-header';
+  header.innerHTML = '<span class="nkw-icon">\uD83E\uDD1D</span> <span class="nkw-label">Negotiation Knowledge</span>';
+  wrap.appendChild(header);
+
+  var stage = document.createElement('div');
+  stage.className = 'nkw-stage';
+  wrap.appendChild(stage);
+
+  container.appendChild(wrap);
+
+  // Shuffle pool
+  var pool = _shuffleArray(NEGOTIATION_SETS.slice());
+  var setIdx = 0;
+
+  function presentSet() {
+    var set = pool[setIdx % pool.length];
+    var isWide = window.innerWidth >= 640;
+
+    // Clear previous
+    stage.innerHTML = '';
+    stage.classList.remove('nkw-visible');
+
+    // Build title
+    var titleEl = document.createElement('div');
+    titleEl.className = 'nkw-title';
+    titleEl.textContent = set.title;
+    stage.appendChild(titleEl);
+
+    // Build quote
+    if (set.quote) {
+      var quoteEl = document.createElement('div');
+      quoteEl.className = 'nkw-quote';
+      quoteEl.innerHTML = '\u201C' + escapeHtml(set.quote.text) + '\u201D';
+      stage.appendChild(quoteEl);
+      if (set.quote.attr) {
+        var attrEl = document.createElement('div');
+        attrEl.className = 'nkw-attr';
+        attrEl.textContent = '\u2014 ' + set.quote.attr;
+        stage.appendChild(attrEl);
+      }
+    }
+
+    // Build bullets (tablet+ only — mobile gets title+quote only)
+    var bulletEls = [];
+    if (isWide && set.bullets && set.bullets.length > 0) {
+      var ul = document.createElement('ul');
+      ul.className = 'nkw-bullets';
+      set.bullets.forEach(function(b) {
+        var li = document.createElement('li');
+        li.className = 'nkw-bullet';
+        li.textContent = b;
+        ul.appendChild(li);
+        bulletEls.push(li);
+      });
+      stage.appendChild(ul);
+    }
+
+    // Phase 1: Fade in title (bright)
+    setTimeout(function() {
+      stage.classList.add('nkw-visible');
+    }, 100);
+
+    // Phase 2: Phase in bullets one at a time (tablet+ only)
+    var bulletDelay = 1200; // ms after title appears
+    var bulletInterval = 900; // ms between each bullet
+    var cleanupTimers = [];
+
+    bulletEls.forEach(function(bEl, i) {
+      var timer = setTimeout(function() {
+        bEl.classList.add('nkw-bullet-visible');
+      }, bulletDelay + (i * bulletInterval));
+      cleanupTimers.push(timer);
+    });
+
+    // Phase 3: Hold for a few seconds after all bullets shown, then fade out
+    var totalBulletTime = bulletDelay + (bulletEls.length * bulletInterval);
+    var holdTime = isWide ? 5000 : 6000; // hold longer on mobile (fewer items to read)
+
+    var fadeTimer = setTimeout(function() {
+      stage.classList.remove('nkw-visible');
+      // After fade-out transition, show next set
+      var nextTimer = setTimeout(function() {
+        setIdx++;
+        presentSet();
+      }, 800);
+      cleanupTimers.push(nextTimer);
+    }, totalBulletTime + holdTime);
+    cleanupTimers.push(fadeTimer);
+
+    // Store for cleanup
+    _inlineKnowledgeCleanups = cleanupTimers;
+  }
+
+  presentSet();
+
+  // Return cleanup function
+  return function() {
+    _inlineKnowledgeCleanups.forEach(function(t) { clearTimeout(t); });
+    _inlineKnowledgeCleanups = [];
+  };
+}
+
+// ─── COMPACT KNOWLEDGE STRIP (for unused spaces on tablet+) ────────────
+// A horizontal strip that can be placed in empty areas of the layout.
+// Shows a single rotating tip — title and one bullet at a time.
+
+function renderKnowledgeStrip(container) {
+  if (!container) return;
+
+  var strip = document.createElement('div');
+  strip.className = 'neg-knowledge-strip';
+
+  var textEl = document.createElement('div');
+  textEl.className = 'nks-text';
+  strip.appendChild(textEl);
+
+  container.appendChild(strip);
+
+  var pool = _shuffleArray(NEGOTIATION_SETS.slice());
+  var setIdx = 0;
+  var bulletIdx = 0;
+
+  function showNext() {
+    var set = pool[setIdx % pool.length];
+    var bullet = set.bullets ? set.bullets[bulletIdx % (set.bullets.length || 1)] : '';
+    strip.classList.remove('nks-visible');
+
+    setTimeout(function() {
+      textEl.innerHTML = '<strong>' + escapeHtml(set.title) + '</strong> \u2014 ' + escapeHtml(bullet);
+      strip.classList.add('nks-visible');
+
+      bulletIdx++;
+      if (!set.bullets || bulletIdx >= set.bullets.length) {
+        bulletIdx = 0;
+        setIdx++;
+      }
+    }, 500);
+  }
+
+  showNext();
+  return setInterval(showNext, 8000);
+}
+</script>

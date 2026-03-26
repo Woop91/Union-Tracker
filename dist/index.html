@@ -2274,6 +2274,11 @@
   }
 
   
+  if (isSidebarLayout() && typeof renderSidebarKnowledge === 'function') {
+  renderSidebarKnowledge(sidebar);
+  }
+
+  
   sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
   if (IS_DUAL_ROLE) {
   var switchRole = role === 'steward' ? 'member' : 'steward';
@@ -2543,7 +2548,6 @@
   { id: 'engagement', icon: '\uD83C\uDFAF', label: 'Engagement' },
   { group: 'Reference' },
   { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-  { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2559,7 +2563,6 @@
   { group: 'Temp' },
   { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
   { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
-  { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ];
   
   if (IS_ADMIN) {
@@ -3013,16 +3016,17 @@
  }
 
  
- function renderAgencyOrgChart(appContainer, role) {
+ function renderAgencyOrgChart(appContainer) {
+  var role = AppState.activeRole || 'member';
   renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
-  container.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--textMuted)">Configure your agency organizational chart in the Admin Settings.</div>';
+  container.appendChild(el('div', { className: 'empty-state' }, 'Configure your agency organizational chart in the Admin Settings.'));
   });
  }
 
  
- function renderPOMSReference(appContainer, role) {
-  renderPageLayout(appContainer, role, 'poms', function(container) {
-  container.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--textMuted)">POMS Reference is not available in this deployment.</div>';
+ function renderPOMSReference(app, role) {
+  renderPageLayout(app, role, 'poms', function(container) {
+  container.appendChild(el('div', { className: 'empty-state' }, 'POMS Reference is not available in this deployment.'));
   });
  }
 
@@ -3364,7 +3368,6 @@
    case 'cases': return renderMyCases;
    case 'profile': return renderUpdateProfile;
    case 'resources': return renderMemberResources;
-   case 'workload': return renderWorkloadTracker;
    case 'weeklyq': 
    case 'polls': return renderPollsPage;
    case 'survey': return renderSurveyResultsPage;
@@ -3381,6 +3384,7 @@
    case 'timeline': return renderMemberTimelinePage;
    case 'reportcard': return renderReportCard;
    case 'pinsetup': return renderPINSetup;
+   case 'workload': return renderWorkloadTracker;
    default: return renderMemberHome;
   }
   } else {
@@ -3405,9 +3409,9 @@
    case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
    case 'timeline': return renderStewardTimelinePage;
    case 'mentorship': return renderMentorshipPage;
-   case 'workload': return renderWorkloadTracker;
    case 'accesslog': return renderAccessLogPage;
    case 'engagement': return renderEngagementDashboard;
+   case 'workload': return renderWorkloadTracker;
    case 'failsafe': return renderFailsafePage;
    case 'search': return renderSearchPage;
    case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
@@ -4566,6 +4570,7 @@
 
   <?!= include('shared_components') ?>
   <?!= include('auth_manifesto') ?>
+  <?!= include('negotiation_knowledge') ?>
   <?!= include('member_hub_view') ?>
 
   <? if (view === 'auth') { ?>

@@ -6839,11 +6839,11 @@ function dataGetPomsReference(sessionToken) {
 
 
 /* ── POMS data removed (org-specific) ──────────────────────────────────
-   DDS-Dashboard includes ~280 POMS reference records here.
+   The upstream repo includes ~280 POMS reference records here.
    SolidBase omits this data. The dataGetPomsReference() stub above
    returns an empty array so the client gracefully shows "no results".
    ────────────────────────────────────────────────────────────────────── */
-// (POMS data records removed — see DDS-Dashboard for full dataset)
+// (POMS data records removed — see upstream repo for full dataset)
 // ═══════════════════════════════════════
 // USAGE TRACKING (v4.40.0 — production-enabled)
 // ═══════════════════════════════════════

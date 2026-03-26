@@ -639,7 +639,7 @@ describe('validateConfigValue_', () => {
 
   test('days type rejects non-numeric values', () => {
     expect(validateConfigValue_('FILING_DEADLINE_DAYS', 'Steward').valid).toBe(false);
-    expect(validateConfigValue_('COOKIE_DURATION_DAYS', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('COOKIE_DURATION_DAYS', 'D.D.S.').valid).toBe(false);
   });
 
   test('number type accepts numeric values', () => {
@@ -658,7 +658,7 @@ describe('validateConfigValue_', () => {
   });
 
   test('url type rejects non-URLs', () => {
-    expect(validateConfigValue_('ORG_WEBSITE', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('ORG_WEBSITE', 'D.D.S.').valid).toBe(false);
     expect(validateConfigValue_('MOBILE_DASHBOARD_URL', 'Step II').valid).toBe(false);
   });
 
@@ -667,7 +667,7 @@ describe('validateConfigValue_', () => {
   });
 
   test('id type rejects short text or names', () => {
-    expect(validateConfigValue_('DRIVE_FOLDER_ID', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('DRIVE_FOLDER_ID', 'D.D.S.').valid).toBe(false);
     expect(validateConfigValue_('ARCHIVE_FOLDER_ID', 'In Arbitration').valid).toBe(false);
     expect(validateConfigValue_('PDF_FOLDER_ID', 'Step II').valid).toBe(false);
   });
@@ -688,7 +688,7 @@ describe('validateConfigValue_', () => {
   });
 
   test('boolean type rejects non-boolean text', () => {
-    expect(validateConfigValue_('SHOW_GRIEVANCES', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('SHOW_GRIEVANCES', 'D.D.S.').valid).toBe(false);
     expect(validateConfigValue_('BROADCAST_SCOPE_ALL', '30').valid).toBe(false);
   });
 
@@ -696,11 +696,11 @@ describe('validateConfigValue_', () => {
     expect(validateConfigValue_('ALERT_DAYS', '3, 7, 14').valid).toBe(true);
   });
 
-  // Key regression test: detect the exact abbreviation → STEWARD_LABEL mismatch
+  // Key regression test: detect the exact D.D.S. → STEWARD_LABEL mismatch
   test('REGRESSION: detects org abbreviation in STEWARD_LABEL column (data shift)', () => {
-    // If "S.B." ends up in the STEWARD_LABEL column, it still passes label validation
+    // If "D.D.S." ends up in the STEWARD_LABEL column, it still passes label validation
     // because it's short text. But we CAN catch shifted data in typed columns:
-    expect(validateConfigValue_('FILING_DEADLINE_DAYS', 'S.B.').valid).toBe(false);
+    expect(validateConfigValue_('FILING_DEADLINE_DAYS', 'D.D.S.').valid).toBe(false);
     expect(validateConfigValue_('DRIVE_FOLDER_ID', 'Your Parent Union').valid).toBe(false);
     expect(validateConfigValue_('ACCENT_HUE', 'UN').valid).toBe(false);
     expect(validateConfigValue_('PDF_FOLDER_ID', 'In Arbitration').valid).toBe(false);

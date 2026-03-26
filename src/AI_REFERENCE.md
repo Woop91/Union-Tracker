@@ -30,14 +30,13 @@ Read these files **in this order** when onboarding to this codebase:
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
 **Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
-**Upstream:** `Woop91/DDS-Dashboard` (private). See SYNC-LOG.md for sync rules.
+**Upstream:** Private upstream repo. See SYNC-LOG.md for sync rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users) at your organization.
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED - DDS Script ID]`
-**SolidBase Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**Apps Script ID:** `[REDACTED — see .clasp.json]`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**

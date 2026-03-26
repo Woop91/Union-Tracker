@@ -277,6 +277,11 @@ function renderStewardDashboard(appContainer) {
  }).withFailureHandler(function() {  }).dataGetStewardFeedbackSummary(SESSION_TOKEN);
 
  
+ if (typeof renderNegotiationWidget === 'function') {
+  renderNegotiationWidget(container);
+ }
+
+ 
  var _st = createSubTabs([
   { id: 'list', label: 'List', render: function(c) { _renderCasesListSubTab(c); } },
   { id: 'calendar', label: 'Calendar', render: function(c) { _renderDeadlineCalendar(c); } }
@@ -2876,7 +2881,7 @@ function renderStewardResources(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
   { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
   ];
-  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Organization Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
   quickLinks.forEach(function(r) {
   if (!r.url) return;
@@ -3882,18 +3887,13 @@ function renderStewardMore(appContainer) {
  var menuItems = [
   { group: 'Manage' },
   { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
-  
   { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
   { group: 'Reference' },
-  
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
-  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the organization chart', action: function() { _handleTabNav('steward', 'orgchart'); } },
-  
   { group: 'Community' },
   { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('steward', 'qaforum'); } },
   { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create polls · view community results', action: function() { _handleTabNav('steward', 'polls'); } },
   { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { _handleTabNav('steward', 'surveytrack'); } },
-  { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { _handleTabNav('steward', 'feedback'); } },
   { group: 'Comms' },
   { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { _handleTabNav('steward', 'broadcast'); } },
   { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { _handleTabNav('steward', 'minutes'); } },
@@ -4756,7 +4756,9 @@ function _renderWorkloadInsights(container, wl, showDetail) {
 
  var totalSubmissions = d.totalSubmissions || 0;
  var memberCount = d.members || 0;
- grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting'));
+ grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
+ if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+ }));
 
  
  var avgs = d.averages || {};
@@ -4773,6 +4775,10 @@ function _renderWorkloadInsights(container, wl, showDetail) {
   }
   items.sort(function(a, b) { return b.count - a.count; });
   _renderInsightDetailList(panel, items, 'var(--info)');
+  var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
+  if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+  }}, 'View Workload Tracker \u2192');
+  panel.appendChild(navBtn);
  });
  }));
 

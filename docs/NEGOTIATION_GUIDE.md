@@ -146,9 +146,16 @@ A reference for union stewards and representatives covering essential negotiatio
 
 ### 6. The Flinch
 
-- When the other side makes an offer, react — even if it's reasonable.
+> "Your reaction to an offer is often more powerful than your counter-offer."
+> — *Jim Camp, Start with No*
+
+> "People don't just hear your words. They read your face, your posture, your silence. Use that."
+
+- When the other side makes an offer, react visibly — even if it's reasonable.
+- A sharp inhale, a raised eyebrow, a pause — these signals tell the other side their offer landed poorly.
 - A visible reaction signals that their offer is far from acceptable.
 - This often prompts them to soften their position before you even counter.
+- The flinch works because most people are uncomfortable with disapproval and will rush to close the gap.
 
 ### 7. Never Accept the First Offer
 
@@ -243,6 +250,114 @@ Union's Target ◄──────── ZOPA ────────► Mana
 
 ---
 
+## When Does a Conversation Become a Negotiation?
+
+Not every meeting is a negotiation — but the line is thinner than most people think. Understanding when a routine conversation shifts into negotiation territory is critical, because if you don't recognize it, you'll make concessions without realizing it.
+
+> "Every conversation where something of value is at stake is a negotiation — whether you treat it as one or not."
+
+> "The moment someone asks you for something you have the power to give or withhold, you are negotiating."
+
+### The Shift Happens When...
+
+1. **Someone makes a request or demand.** "Can you stay late?" "We need you to cover that shift." The moment a request is made that affects your rights, pay, schedule, or working conditions — you are negotiating.
+
+2. **Interests diverge.** A friendly discussion becomes a negotiation when what you want and what they want no longer align. The conversation may still be polite, but the stakes are real.
+
+3. **There is something to trade.** If both sides have something the other wants (your time, their approval, a schedule change, a grievance withdrawal), the dynamic is negotiation — even if nobody calls it that.
+
+4. **A decision is being shaped.** Informal "hallway conversations" with management often shape outcomes before formal meetings even happen. If a supervisor says "Let's just handle this between us," that's a negotiation. Proceed accordingly.
+
+5. **Precedent is being set.** If your response today will be used to justify expectations tomorrow, you are negotiating the future — not just the present. "You did it last time" is management's favorite anchor.
+
+### Warning Signs You're in a Negotiation Without Knowing It
+
+- Management frames a demand as a "favor" or "team effort"
+- You're being asked to agree to something verbally, without documentation
+- The phrase "just this once" is used — it is never just once
+- You feel pressure to answer immediately rather than consult your steward
+- The conversation moves from *what happened* to *what should happen next*
+
+> "If you're not at the table, you're on the menu. And if you don't know you're at the table, you're already being served."
+
+### What to Do When You Realize It
+
+- **Pause.** You do not have to answer right now. "Let me think about that" is always an acceptable response.
+- **Document.** Write down what was said, when, and by whom.
+- **Consult.** Talk to your steward before agreeing to anything.
+- **Never agree under pressure.** A good deal today will still be a good deal tomorrow.
+
+---
+
+## Dealing with Hard Bargainers
+
+Some people negotiate in good faith. Others don't. Hard bargainers use pressure, manipulation, and power plays to force concessions. Knowing their tactics makes you immune to them.
+
+> "The best defense against dirty tactics is to recognize them. Once named, they lose their power."
+> — *Roger Fisher & William Ury*
+
+> "Hard bargainers count on you being unprepared, emotional, or afraid. Be none of those things."
+
+### Common Hard Bargainer Tactics
+
+#### 1. The Take-It-or-Leave-It Ultimatum
+- **What they do:** Present their position as final and non-negotiable. "This is our best offer."
+- **Why it works:** It creates panic and pressure to accept before the "offer disappears."
+- **How to counter:** Call the bluff. Say: "I understand that's your position. Let me take it back to the team." Ultimatums almost always have room behind them.
+
+#### 2. Good Cop / Bad Cop
+- **What they do:** One person is aggressive and unreasonable; the other seems sympathetic and "on your side."
+- **Why it works:** You feel grateful for the "reasonable" one and are more willing to accept their terms.
+- **How to counter:** Treat them as one unit. Address your responses to both. Don't let the "good cop" earn undeserved trust.
+
+#### 3. The Nibble
+- **What they do:** After reaching agreement on the big issues, they ask for "one small thing" — then another, then another.
+- **Why it works:** Each request seems minor, so refusing feels petty. But they add up.
+- **How to counter:** Track every concession. When they nibble, say: "We've already reached agreement on terms. Any changes reopen the whole discussion."
+
+#### 4. Intimidation and Anger
+- **What they do:** Raise their voice, pound the table, use aggressive body language or veiled threats.
+- **Why it works:** Most people back down from conflict to restore comfort.
+- **How to counter:** Stay calm. Do not match their energy. Say: "I can see this is important to you. Let's take a break and come back to this." Anger is a tactic — don't reward it.
+
+> "Never let someone else's emotions dictate your decisions."
+
+#### 5. The Lowball / Highball
+- **What they do:** Open with an absurdly extreme position to shift the anchor in their favor.
+- **Why it works:** Even if you reject it, your counter-offer is pulled toward their extreme.
+- **How to counter:** Don't counter immediately. Instead, reframe: "That's not in the range of anything we can discuss. Let's start with what the contract says." Re-anchor with objective criteria.
+
+#### 6. Stalling and Delay
+- **What they do:** Drag out the process, miss deadlines, cancel meetings, "need more time to review."
+- **Why it works:** Delay favors whoever benefits from the status quo — usually management.
+- **How to counter:** Set deadlines. Document delays. Escalate if timelines in the grievance procedure are being violated. Time pressure works both ways — apply it.
+
+#### 7. The False Authority
+- **What they do:** Negotiate with you, reach tentative agreement, then say: "I'll need to check with my boss." The boss rejects it and demands more concessions.
+- **Why it works:** You've already invested time and emotional energy. Starting over feels worse than giving in.
+- **How to counter:** Ask upfront: "Do you have the authority to reach an agreement today?" If not, request to negotiate with someone who does.
+
+#### 8. The Personal Attack
+- **What they do:** Attack your credibility, experience, or motives instead of addressing the issue.
+- **Why it works:** It puts you on the defensive, shifting focus from the problem to you.
+- **How to counter:** Redirect: "I'd like to keep this focused on the issue. Let's get back to the contract language."
+
+### Rules for Facing Hard Bargainers
+
+1. **Never negotiate alone.** Always have a witness. Always have notes.
+2. **Stay on your feet.** If you feel emotional, take a break. Emotions are their weapon.
+3. **Name the tactic.** "It sounds like you're giving us a take-it-or-leave-it. Is that really your intent?" Naming it neutralizes it.
+4. **Control the pace.** You set the tempo. If they rush, slow down. If they stall, set deadlines.
+5. **Document everything.** Hard bargainers rely on deniability. Written records eliminate that.
+6. **Know your BATNA.** You can only stand firm if you know what happens if you walk away.
+7. **Never make concessions under duress.** Any agreement reached through intimidation can and should be challenged.
+
+> "The person with the most patience in a negotiation almost always wins."
+
+> "They want you to react. Refuse. Respond instead."
+
+---
+
 ## Quick Reference Card
 
 | Concept | One-Liner |
@@ -257,6 +372,10 @@ Union's Target ◄──────── ZOPA ────────► Mana
 | **Silence** | Let the other side fill the void |
 | **Interests vs. Positions** | Ask *why*, not just *what* |
 | **Objective Criteria** | Use facts, not feelings, to justify |
+| **Hard Bargainer** | Recognize the tactic, neutralize the power |
+| **Conversation vs. Negotiation** | If something of value is at stake, you're negotiating |
+| **Take-It-or-Leave-It** | Almost always a bluff — call it |
+| **Name the Tactic** | Saying it out loud strips its power |
 
 ---
 

@@ -35,11 +35,11 @@ Read these files **in this order** when onboarding to this codebase:
 **Architecture:** 45 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`. Production build excludes DevTools + DevMenu (43 .gs + 8 .html).
 **Current build:** 43 `.gs` + 8 `.html` files in `dist/` production (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**Apps Script ID:** `[REDACTED — see .clasp.json]`
+**Apps Script ID:** [REDACTED — see .clasp.json]
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
-- **Sync rules & WT exclusions** → **See SYNC-LOG.md**
+- **Sync rules & exclusions** → **See SYNC-LOG.md**
 - **`dist/` files are auto-generated.** Never edit directly. Edit `src/*.gs` files, then run `npm run build`.
 - **`dist/ConsolidatedDashboard.gs` is DELETED** as of v4.13.0. Build now copies individual files.
 - **`web-dashboard/` folder is LEGACY/ORPHANED.** Do not deploy or integrate it.
@@ -75,7 +75,7 @@ src/*.gs (45 files) + src/*.html (8 files)
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
-| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, weekly questions |
+| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets |
 | `26_` | Q&A Forum | Steward-member Q&A with steward-only answers, resolve/reopen |
 | `27_` | Timeline Service | Activity feed with inline edit, pagination, calendar links |
 | `28_` | Failsafe Service | Security & reliability guardrails |
@@ -121,7 +121,7 @@ doGet(e)
 - **Auth config:** `ScriptProperties` (no manual setup required — `initWebDashboardAuth()` handles first-time)
 
 ### HTML Serving Method
-As of v4.13.0, the build outputs individual `.html` files to `dist/`, enabling both `HtmlService.createHtmlOutput()` (inline strings) and `createTemplateFromFile()`/`createHtmlOutputFromFile()` (file-based). The SPA modules (19-24, 26-29) use file-based HTML. Legacy modules (04-13) still use inline HTML strings.
+As of v4.13.0, the build outputs individual `.html` files to `dist/`, enabling both `HtmlService.createHtmlOutput()` (inline strings) and `createTemplateFromFile()`/`createHtmlOutputFromFile()` (file-based). The SPA modules (19-25) use file-based HTML. Legacy modules (04-13) still use inline HTML strings.
 
 ---
 
@@ -228,7 +228,7 @@ Records **why** architectural choices were made, so future LLMs don't undo them.
 | 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
 | 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
 | 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
-| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ was SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). Both removed from SolidBase (org-specific feature). |
+| 2026-02-25 | Workload modules (`25_WorkloadService.gs`, `18_WorkloadTracker.gs`) removed from SolidBase | Org-specific feature — both workload modules excluded during sync from upstream. |
 
 ---
 
@@ -249,8 +249,6 @@ Records what each AI agent changed, when, and in which files.
 | 2026-02-25 | Claude (claude.ai) | Merged staging→Main: v4.13.0 SPA overhaul + notification bell/EventBus + individual-file build. Synced all 3 branches. | All `src/`, `dist/`, `build.js`, `CLAUDE.md` |
 | 2026-02-28 | Claude Code (Opus 4.6) | v4.18.1-security: Full security assessment + 7 remediations — auth default ON, magic link rate limiting, token cleanup trigger, timing attack fix, PIN token migration to PropertiesService, innerHTML→textContent, escapeForFormula | `00_Security.gs`, `19_WebDashAuth.gs`, `13_MemberSelfService.gs`, `14_MeetingCheckIn.gs`, `21_WebDashDataService.gs`, `CODE_REVIEW.md`, `CHANGELOG.md`, `FEATURES.md` |
 | 2026-03-19 | Claude (claude.ai) | v4.32.0: Workforce Mobility & Retention survey section added — Sections 13 + 13A, q80–q86 (q85 removed/folded), Looker columns, getSatisfactionSummary auto-includes via dynamic section key | `dist/10b_SurveyDocSheets.gs`, `src/10b_SurveyDocSheets.gs`, `dist/12_Features.gs`, `src/12_Features.gs`, `dist/01_Core.gs`, `src/01_Core.gs`, `AI_REFERENCE.md` |
-| 2026-03-22 | Claude (claude.ai) | DESIGN ITERATION (not yet released): Member Hub feature — 3 new HTML files created. `member_hub_styles.html` (auth manifesto + hub CSS), `auth_manifesto.html` (phrase bg + quote cycler JS), `member_hub_view.html` (renderMemberHub tab function). See integration instructions at top of each file. Union-agnostic. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html` |
-| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All files pushed to SolidBase Main. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
 
 ---
 
@@ -259,30 +257,7 @@ Records what each AI agent changed, when, and in which files.
 1. Bulk actions (flag/email/export)
 2. Deadline calendar view
 3. Grievance history for members
-4. ~~Welcome/landing page~~ → **IN PROGRESS: Member Hub** (design iteration, not yet released)
-
-## 🔨 IN PROGRESS — Member Hub (design phase, not released)
-
-**Feature:** Login screen manifesto + Member Hub tab for member view.
-
-**Files created (not yet integrated):**
-- `src/member_hub_styles.html` — CSS for auth manifesto background animation + hub tab layout
-- `src/auth_manifesto.html` — JS: `injectAuthManifesto()`, `startAuthQuoteCycler()`, `renderHubInlineQuotes()`
-- `src/member_hub_view.html` — JS: `renderMemberHub()` tab render function
-
-**Integration steps (DO NOT EXECUTE until approved for release):**
-1. Add `<?!= include('member_hub_styles') ?>` to `index.html` `<head>` block
-2. Add `<?!= include('auth_manifesto') ?>` before `</body>` in `index.html`
-3. Add `<?!= include('member_hub_view') ?>` before `</body>` in `index.html`
-4. In `auth_view.html` `showAuthChoose()`: call `injectAuthManifesto(container)` at top; wrap inner `wrapper` div with class `auth-glass-card`; append `<div id="auth-quote-wrap" class="auth-quote-wrap">` after card
-5. In `index.html` member tab nav array (Community group): add `{ id: 'memberhub', icon: '✊', label: 'Member Hub' }`
-6. In `index.html` member tab routing switch: add `case 'memberhub': return renderMemberHub;`
-
-**Design decisions:**
-- Login card: rgba(8,13,24,0.22) background, blur(3px) — intentionally transparent so bg phrases bleed through
-- Quotes: pool of 15, 3 picked per session for inline hub sections; full pool cycles on login screen every 8s
-- Action links wire to existing tabs: meetings, events, polls, unionstats, stewarddirectory
-- Member name personalization: uses `CURRENT_USER.name` split to first name only
+4. Welcome/landing page
 5. Events page with Join Virtual button
 
 See `PHASE2_PLAN.md` for details.
@@ -293,7 +268,7 @@ See `PHASE2_PLAN.md` for details.
 
 1. **Read CLAUDE.md first** — it has the most critical rules including column constant patterns, config write paths, and security patterns.
 2. **Read this file second** — it has architecture context, error history, and protected code.
-3. **Read SYNC-LOG.md** — SolidBase sync history and exclusion rules.
+3. **Read SYNC-LOG.md** — full exclusion registry with line numbers.
 4. **The `web-dashboard/` folder is dead code.** Do not deploy or integrate it.
 5. **Never edit `dist/` files directly.** Edit `src/*.gs` and run `npm run build` (copies individual files to dist).
 6. **Test with `npm run ci`** before pushing.
@@ -311,7 +286,7 @@ have been archived to `docs/AI_REFERENCE_ARCHIVE.md`. Refer there for past devel
 
 ---
 
-## REFACTOR LOG — ADHD → ComfortView rename (2026-03-21)
+## 🔄 REFACTOR LOG — ADHD → ComfortView rename (2026-03-21)
 
 **Reason:** Internal function names using `ADHD` were inconsistent with the user-facing "Comfort View" branding.
 
@@ -330,112 +305,57 @@ have been archived to `docs/AI_REFERENCE_ARCHIVE.md`. Refer there for past devel
 | `showADHDControlPanel` | `showComfortViewControlPanel` |
 | `'adhdSettings'` (prop key) | `'comfortViewSettings'` |
 
-**DATA MIGRATION NOTE:** Any existing users who had `adhdSettings` stored in PropertiesService will lose their saved Comfort View preferences on next load. They will fall back to `getDefaultComfortViewSettings_()`. This is acceptable one-time cost — defaults are safe.
+**⚠️ DATA MIGRATION NOTE:** Any existing users who had `adhdSettings` stored in PropertiesService will lose their saved Comfort View preferences on next load. They will fall back to `getDefaultComfortViewSettings_()`. This is acceptable one-time cost — defaults are safe.
+
+**Applied to:** SolidBase (commit `011cc88`).
 
 ---
 
-## DEFERRED FEATURE — Grievance Module Toggle (2026-03-21)
+## 🔑 DEV PIN LOGIN — v4.39.0 (2026-03-24)
 
-**Status:** NOT IMPLEMENTED — documented for future build. No code has been changed.
+**Branch:** `dev` only. Never merge to `Main` without explicit instruction.
 
-**Purpose:** Allow the grievance module to be toggled on/off via the Config tab without touching code. Useful for orgs that use SolidBase but do not have a grievance tracking workflow.
+### What was built
 
-**Precedent:** Follows the exact same pattern as `ENABLE_CORRELATION` (`17_CorrelationEngine.gs` + `CONFIG_HEADER_MAP_`).
+Three coordinated changes enabling PIN-only login for dev/feedback use. All gated on `IS_DEV_MODE`.
 
----
+#### 1. `src/13_MemberSelfService.gs` — Two new global functions
 
-### Config Change
+**`devAuthLoginByPIN(pin)`**
+- Called from client via `google.script.run`
+- Scans entire Member Directory for matching PIN hash
+- Uses existing `hashPIN(pin, memberId)` — hash includes memberId so scan is required
+- Global rate limit: 10 attempts / 15 min via CacheService key `DEV_PIN_SCAN_RATE`
+- Per-member lockout respected via `checkPINLockout()` (skips locked accounts silently)
+- On match: creates session token via `Auth.createSessionToken(email)`, returns `{ success, sessionToken, email, memberName }`
+- Audit logged as `DEV_PIN_LOGIN` or `DEV_PIN_LOGIN_FAIL`
+- Members with no email on file cannot log in (session system keys off email)
 
-**File:** `src/01_Core.gs`
-**Location:** End of `CONFIG_HEADER_MAP_` array, after `AUDIT_ARCHIVE_DAYS` entry.
-**What to add:**
-```js
-// ENABLE_GRIEVANCES: set to 'no' to hide all grievance features from the SPA.
-// Default blank or 'yes' = enabled (fully backward-compatible).
-{ key: 'ENABLE_GRIEVANCES', header: 'Enable Grievances' }
-```
+**`devStewardManageMemberPIN(sessionToken, memberEmail)`**
+- Requires steward/admin role via `_requireStewardAuth(sessionToken)`
+- Looks up member by email → gets memberId
+- Calls `generateMemberPIN()` + `hashPIN()` + writes hash to sheet
+- Returns `{ success, pin, memberName, isReset, message }` — **plaintext PIN returned once, never stored**
+- `isReset: true` if member already had a PIN hash set
+- Audit logged as `PIN_GENERATED_BY_STEWARD` or `PIN_RESET_BY_STEWARD`
 
----
+#### 2. `src/auth_view.html` — PIN login screen
 
-### ConfigReader Change
+- `showAuthChoose()`: Added DEV-only divider + "🔑 Sign in with PIN" button, wrapped in `IS_DEV_MODE` guard
+- New `showAuthPIN(container)` function: single numeric input, calls `devAuthLoginByPIN(pin)`, on success redirects to `WEB_APP_URL + '?sessionToken=...'` (identical pattern to magic link flow)
+- Back button returns to `showAuthChoose`
+- Error messages shown inline, input cleared on failure, Enter key supported
 
-**File:** `src/20_WebDashConfigReader.gs`
-**Location:** Inside `getConfig()`, in the `config = { ... }` object.
-**What to add:**
-```js
-enableGrievances: _readRow(CONFIG_COLS.ENABLE_GRIEVANCES) !== 'no',
-```
-**Why:** Exposes flag to the SPA client as a boolean. Blank or `'yes'` → `true`. Only explicit `'no'` disables it.
+#### 3. `src/steward_view.html` — Manage PIN button in member detail panel
 
----
+- Added "🔑 Manage PIN" button in `_showMemberDetail()` action row, wrapped in `IS_DEV_MODE` guard
+- On click: shows inline form with "Generate PIN" button
+- On success: renders one-time PIN display (large monospace, accent color) with Copy button
+- Copy button uses `navigator.clipboard.writeText()` with fallback
+- Dismisses cleanly via "Done" button
 
-### SPA Sidebar — `index.html`
-
-**File:** `src/index.html`
-**Location:** `_getSidebarTabs(role)` function (~line 2027).
-**Steward tabs to gate:** `cases` and `newgrievance`
-**Member tabs to gate:** `cases`
-**What to add:**
-```js
-// Steward list — wrap cases + newgrievance:
-...(CONFIG.enableGrievances ? [
-  { id: 'cases',        icon: '📋', label: 'Cases' },
-  { id: 'newgrievance', icon: '📝', label: 'New Grievance' },
-] : []),
-
-// Member list — wrap cases:
-...(CONFIG.enableGrievances ? [
-  { id: 'cases', icon: '📋', label: 'My Cases' },
-] : []),
-```
-
----
-
-### Steward View — `steward_view.html`
-
-Three guards needed:
-
-1. **Grievance stats block** on the home dashboard (~line 228, `dataGetGrievanceStats` call).
-   Wrap with: `if (CONFIG.enableGrievances) { ... }`
-
-2. **"Start Grievance" button** in member profile panel (~line 1254).
-   Wrap with: `if (CONFIG.enableGrievances) { ... }`
-
-3. **"Has Open Case" filter option** in member list search (~line 679 and ~line 800).
-   Wrap with: `if (CONFIG.enableGrievances) { ... }`
-
----
-
-### Member View — `member_view.html`
-
-Two guards needed:
-
-1. **Active case KPI chip** in the member dashboard KPI strip.
-   Wrap with: `if (CONFIG.enableGrievances) { ... }`
-
-2. **Open grievance badge** on member cards (~`hasOpenGrievance` references).
-   Wrap with: `if (CONFIG.enableGrievances) { ... }`
-
----
-
-### Server-Side Gate — `21_WebDashDataService.gs`
-
-All `dataGet*Grievance*` and `dataStartGrievance*` / `dataAdvanceGrievance*` wrapper functions should early-return when disabled:
-```js
-if (getConfigValue_(CONFIG_COLS.ENABLE_GRIEVANCES) === 'no') {
-  return { error: 'Grievance module is disabled.' };
-}
-```
-**Note:** Return a soft error object (not a `403` throw) so the SPA can handle gracefully without crashing the page.
-
----
-
-### Unresolved Questions (must decide before implementing)
-
-1. When `cases` tab is hidden for members — should deep-links to `#cases` redirect to `home`, or show a "not available" message?
-2. Should server-side endpoints return `{ error: '...' }` or `{ grievances: [] }` when disabled? (Soft error vs. empty data)
-
----
-
-### Version Tag for When Implemented
-Suggest codename: **"Grievance Module Toggle"**, version bump: minor (e.g. `4.33.2` or next available).
+### ⚠️ CORE RULES REMINDER
+- Everything dynamic — never hardcoded (sheet names from `SHEETS.*`, columns from `MEMBER_COLS.*`, PIN config from `PIN_CONFIG.*`)
+- Never delete or overwrite manually entered data
+- No assumptions — `_requireStewardAuth` gates all steward operations
+- These functions are dev-only — if IS_DEV_MODE check is ever removed, remove the functions too
