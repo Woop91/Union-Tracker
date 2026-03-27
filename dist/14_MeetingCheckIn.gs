@@ -150,13 +150,26 @@ function createMeeting(meetingData) {
     });
   }
 
+  // Generate QR check-in URL for in-person attendance
+  var qrInfo = null;
+  if (typeof getMeetingQRCode === 'function') {
+    try {
+      qrInfo = getMeetingQRCode(meetingId);
+    } catch (_qrErr) {
+      Logger.log('createMeeting: QR code generation skipped: ' + _qrErr.message);
+    }
+  }
+
   return {
     success: true,
     meetingId: meetingId,
+    qrUrl: qrInfo && qrInfo.success ? qrInfo.qrUrl : '',
+    checkInUrl: qrInfo && qrInfo.success ? qrInfo.checkInUrl : '',
     message: 'Meeting "' + meetingName + '" created (ID: ' + meetingId + ').' +
              (calendarEventId ? ' Calendar event added.' : '') +
              (notesDocUrl ? ' Meeting Notes doc created.' : '') +
-             (agendaDocUrl ? ' Meeting Agenda doc created.' : '')
+             (agendaDocUrl ? ' Meeting Agenda doc created.' : '') +
+             (qrInfo && qrInfo.success ? ' QR check-in code available.' : '')
   };
 }
 
@@ -1026,6 +1039,347 @@ function getMeetingCheckInHtml_() {
  */
 function webCheckInMember(meetingId, email, pin) {
   return processMeetingCheckIn(meetingId, email, pin);
+}
+
+// ============================================================================
+// QR CODE ATTENDANCE SYSTEM (v4.43.0)
+// ============================================================================
+
+/**
+ * Process a QR-based meeting check-in using phone number + PIN.
+ * Called from the mobile ?page=qr-checkin web route.
+ * Looks up member by phone number (normalized), verifies PIN, records attendance.
+ *
+ * @param {string} meetingId - The meeting to check into
+ * @param {string} phone - Member's phone number (any format)
+ * @param {string} pin - Member's PIN
+ * @returns {Object} { success, memberName, message } or { success: false, error }
+ */
+function processQRCheckIn(meetingId, phone, pin) {
+  if (!meetingId || !phone || !pin) {
+    return errorResponse('Meeting, phone number, and PIN are required');
+  }
+
+  phone = String(phone).trim();
+  pin = String(pin).trim();
+
+  // Normalize phone to digits only for comparison
+  var inputDigits = phone.replace(/\D/g, '');
+  if (inputDigits.length === 11 && inputDigits.charAt(0) === '1') {
+    inputDigits = inputDigits.substring(1); // Strip leading country code
+  }
+  if (inputDigits.length !== 10) {
+    return errorResponse('Please enter a valid 10-digit phone number');
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return errorResponse('System temporarily unavailable');
+
+  // Look up member by phone number
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) {
+    return errorResponse('System error: Member directory not found');
+  }
+
+  var memberData = memberSheet.getDataRange().getValues();
+  var memberId = null;
+  var memberName = '';
+  var memberEmail = '';
+  var storedHash = '';
+
+  for (var i = 1; i < memberData.length; i++) {
+    var rowPhone = String(memberData[i][MEMBER_COLS.PHONE - 1] || '').trim();
+    var rowDigits = rowPhone.replace(/\D/g, '');
+    if (rowDigits.length === 11 && rowDigits.charAt(0) === '1') {
+      rowDigits = rowDigits.substring(1);
+    }
+    if (rowDigits.length === 10 && rowDigits === inputDigits) {
+      memberId = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '');
+      memberName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
+                   String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
+      memberEmail = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
+      storedHash = String(memberData[i][MEMBER_PIN_COLS.PIN_HASH - 1] || '');
+      break;
+    }
+  }
+
+  if (!memberId) {
+    return errorResponse('No member found with that phone number');
+  }
+
+  // Check for lockout
+  if (typeof checkPINLockout === 'function') {
+    var lockoutStatus = checkPINLockout(memberId);
+    if (lockoutStatus.isLocked) {
+      return errorResponse('Account temporarily locked. Try again in ' + lockoutStatus.remainingMinutes + ' minutes.');
+    }
+  }
+
+  // Verify PIN
+  if (!storedHash) {
+    return errorResponse('PIN not set. Please contact your steward to set up your PIN.');
+  }
+
+  if (!verifyPIN(pin, memberId, storedHash)) {
+    if (typeof recordFailedPINAttempt === 'function') {
+      var attemptResult = recordFailedPINAttempt(memberId);
+      if (attemptResult.isNowLocked) {
+        return errorResponse('Too many failed attempts. Account locked for ' + PIN_CONFIG.LOCKOUT_MINUTES + ' minutes.');
+      }
+      return errorResponse('Invalid PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.');
+    }
+    return errorResponse('Invalid PIN');
+  }
+
+  // PIN correct — clear failed attempts
+  if (typeof clearPINAttempts === 'function') {
+    clearPINAttempts(memberId);
+  }
+
+  // Acquire lock to prevent TOCTOU race between duplicate check and appendRow
+  var checkInLock = LockService.getScriptLock();
+  if (!checkInLock.tryLock(10000)) {
+    return errorResponse('Check-in temporarily unavailable — please try again.');
+  }
+  try {
+    var checkInSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!checkInSheet) {
+      return errorResponse('Meeting check-in sheet not found');
+    }
+
+    var checkInData = checkInSheet.getDataRange().getValues();
+
+    // Check if already checked in
+    for (var j = 1; j < checkInData.length; j++) {
+      var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+      var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
+      if (rowMeetingId === meetingId && rowMemberId === memberId) {
+        return errorResponse(memberName.trim() + ' is already checked in to this meeting.');
+      }
+    }
+
+    // Find meeting details
+    var meetingName = '';
+    var meetingDate = '';
+    var meetingType = '';
+    var meetingFound = false;
+    for (var k = 1; k < checkInData.length; k++) {
+      if (String(checkInData[k][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+        meetingName = checkInData[k][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '';
+        meetingDate = checkInData[k][MEETING_CHECKIN_COLS.MEETING_DATE - 1] || '';
+        meetingType = checkInData[k][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '';
+        meetingFound = true;
+        break;
+      }
+    }
+
+    if (!meetingFound) {
+      return errorResponse('Meeting not found. The QR code may be invalid.');
+    }
+
+    // Record the check-in
+    checkInSheet.appendRow([
+      meetingId,
+      meetingName,
+      meetingDate,
+      meetingType,
+      memberId,
+      escapeForFormula(memberName.trim()),
+      new Date(),
+      escapeForFormula(memberEmail)
+    ]);
+
+    // Auto-activate Scheduled meetings on first check-in
+    for (var m = 1; m < checkInData.length; m++) {
+      if (String(checkInData[m][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+        var currentStatus = String(checkInData[m][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+        if (currentStatus === MEETING_STATUS.SCHEDULED) {
+          checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
+        }
+        break;
+      }
+    }
+  } finally {
+    checkInLock.releaseLock();
+  }
+
+  // Audit log
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('MEETING_QR_CHECKIN', {
+      meetingId: meetingId,
+      memberId: memberId,
+      method: 'qr_phone'
+    });
+  }
+
+  // Badge refresh
+  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+
+  return {
+    success: true,
+    memberName: memberName.trim(),
+    message: memberName.trim() + ' checked in successfully!'
+  };
+}
+
+/**
+ * Get the QR check-in URL for a specific meeting.
+ * Uses Google Charts API to generate a QR code image that encodes the
+ * web app URL with the meeting ID pre-filled.
+ *
+ * @param {string} meetingId - The meeting ID (e.g., MTG-20260327-001)
+ * @returns {Object} { success, qrUrl, checkInUrl } or { success: false, error }
+ */
+function getMeetingQRCode(meetingId) {
+  if (!meetingId) return errorResponse('Meeting ID is required');
+
+  var webAppUrl = '';
+  try {
+    webAppUrl = ScriptApp.getService().getUrl() || '';
+  } catch (_e) {
+    Logger.log('getMeetingQRCode: could not get web app URL: ' + _e.message);
+  }
+
+  if (!webAppUrl) {
+    return errorResponse('Web app URL unavailable. Ensure the script is deployed as a web app.');
+  }
+
+  var checkInUrl = webAppUrl + '?page=qr-checkin&meeting=' + encodeURIComponent(meetingId);
+
+  // Google Charts QR code API (free, no key needed, max 300x300)
+  var qrImageUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=' +
+    encodeURIComponent(checkInUrl) + '&choe=UTF-8';
+
+  return {
+    success: true,
+    qrUrl: qrImageUrl,
+    checkInUrl: checkInUrl,
+    meetingId: meetingId
+  };
+}
+
+/**
+ * Show a dialog with the QR code for a meeting.
+ * Stewards display or print this for members to scan at in-person meetings.
+ */
+function showMeetingQRCodeDialog() {
+  var html = HtmlService.createHtmlOutput(getMeetingQRCodeHtml_())
+    .setWidth(480)
+    .setHeight(620);
+  SpreadsheetApp.getUi().showModalDialog(html, '📱 Meeting QR Check-In Code');
+}
+
+/**
+ * QR Code display dialog HTML (steward-facing).
+ * Shows a dropdown of today's meetings + QR code image + print button.
+ * @private
+ * @returns {string} HTML content
+ */
+function getMeetingQRCodeHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0">' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;padding:20px}' +
+    '.card{background:white;border-radius:12px;padding:25px;box-shadow:0 2px 12px rgba(0,0,0,0.1)}' +
+    '.card h2{color:#059669;margin-bottom:16px;text-align:center;font-size:18px}' +
+    '.field{margin-bottom:16px}' +
+    '.field label{display:block;margin-bottom:6px;font-weight:600;color:#333;font-size:14px}' +
+    '.field select{width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:8px;font-size:15px}' +
+    '.field select:focus{outline:none;border-color:#059669}' +
+    '.qr-container{text-align:center;margin:20px 0;display:none}' +
+    '.qr-container img{border:8px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.15);border-radius:8px}' +
+    '.qr-instructions{text-align:center;font-size:14px;color:#555;margin:12px 0;line-height:1.5}' +
+    '.qr-meeting-name{text-align:center;font-weight:700;color:#059669;font-size:16px;margin:8px 0}' +
+    '.btn-row{display:flex;gap:10px;margin-top:16px}' +
+    '.btn{flex:1;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}' +
+    '.btn-print{background:#059669;color:white}' +
+    '.btn-print:hover{background:#047857}' +
+    '.btn-copy{background:#e0e0e0;color:#333}' +
+    '.btn-copy:hover{background:#d0d0d0}' +
+    '.error{color:#dc2626;font-size:14px;margin-top:10px;text-align:center;padding:10px;background:#fee2e2;border-radius:8px;display:none}' +
+    '.hint{font-size:12px;color:#888;text-align:center;margin-top:12px}' +
+    '@media print{body{background:white;padding:0}.card{box-shadow:none;border:none}.field,.btn-row,.hint,.error{display:none}.qr-container{display:block!important}}' +
+    '</style></head><body>' +
+    '<div class="card">' +
+    '<h2>Meeting QR Check-In</h2>' +
+    '<div class="field">' +
+    '<label for="meetingSelect">Select Meeting</label>' +
+    '<select id="meetingSelect" onchange="meetingSelected()">' +
+    '<option value="">Loading meetings...</option>' +
+    '</select>' +
+    '</div>' +
+    '<div id="qrContainer" class="qr-container">' +
+    '<div id="qrMeetingName" class="qr-meeting-name"></div>' +
+    '<img id="qrImage" src="" alt="QR Code" width="250" height="250">' +
+    '<div class="qr-instructions">Scan with your phone camera to check in.<br>Enter your phone number and PIN when prompted.</div>' +
+    '</div>' +
+    '<div class="btn-row" id="btnRow" style="display:none">' +
+    '<button class="btn btn-print" onclick="window.print()">Print QR Code</button>' +
+    '<button class="btn btn-copy" id="copyBtn" onclick="copyLink()">Copy Link</button>' +
+    '</div>' +
+    '<div id="error" class="error"></div>' +
+    '<div class="hint">Members scan this QR code with their phone, then enter their phone number and PIN to check in.</div>' +
+    '</div>' +
+    '<script>' +
+    getClientSideEscapeHtml() +
+    'var currentCheckInUrl="";' +
+    'google.script.run' +
+    '  .withSuccessHandler(function(result){' +
+    '    var sel=document.getElementById("meetingSelect");' +
+    '    if(!result.success||result.meetings.length===0){' +
+    '      sel.innerHTML="<option value=\\"\\">No meetings available today</option>";' +
+    '      return;' +
+    '    }' +
+    '    var html="<option value=\\"\\">-- Select a meeting --</option>";' +
+    '    result.meetings.forEach(function(m){' +
+    '      html+="<option value=\\""+escapeHtml(m.id)+"\\">"+escapeHtml(m.name)+" ("+escapeHtml(m.time)+")</option>";' +
+    '    });' +
+    '    sel.innerHTML=html;' +
+    '    if(result.meetings.length===1){sel.selectedIndex=1;meetingSelected()}' +
+    '  })' +
+    '  .withFailureHandler(function(){' +
+    '    document.getElementById("meetingSelect").innerHTML="<option value=\\"\\">Error loading meetings</option>"' +
+    '  })' +
+    '  .getCheckInEligibleMeetings();' +
+    'function meetingSelected(){' +
+    '  var meetingId=document.getElementById("meetingSelect").value;' +
+    '  if(!meetingId){' +
+    '    document.getElementById("qrContainer").style.display="none";' +
+    '    document.getElementById("btnRow").style.display="none";' +
+    '    return;' +
+    '  }' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(r){' +
+    '      if(r.success){' +
+    '        document.getElementById("qrImage").src=r.qrUrl;' +
+    '        document.getElementById("qrMeetingName").textContent=document.getElementById("meetingSelect").selectedOptions[0].textContent;' +
+    '        document.getElementById("qrContainer").style.display="block";' +
+    '        document.getElementById("btnRow").style.display="flex";' +
+    '        currentCheckInUrl=r.checkInUrl;' +
+    '      }else{' +
+    '        document.getElementById("error").textContent=r.error;' +
+    '        document.getElementById("error").style.display="block";' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e){' +
+    '      document.getElementById("error").textContent="Error: "+e.message;' +
+    '      document.getElementById("error").style.display="block";' +
+    '    })' +
+    '    .getMeetingQRCode(meetingId);' +
+    '}' +
+    'function copyLink(){' +
+    '  if(!currentCheckInUrl)return;' +
+    '  navigator.clipboard.writeText(currentCheckInUrl).then(function(){' +
+    '    document.getElementById("copyBtn").textContent="Copied!";' +
+    '    setTimeout(function(){document.getElementById("copyBtn").textContent="Copy Link"},2000);' +
+    '  }).catch(function(){' +
+    '    prompt("Copy this link:",currentCheckInUrl);' +
+    '  });' +
+    '}' +
+    '</script></body></html>';
 }
 
 // ============================================================================

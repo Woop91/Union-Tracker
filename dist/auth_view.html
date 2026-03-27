@@ -1,5 +1,127 @@
 <script>
 
+function _detectBiometricLabel() {
+ var ua = navigator.userAgent || '';
+ if (/iPad|iPhone|iPod/.test(ua)) return 'Face ID';
+ if (/Mac/.test(ua)) return 'Touch ID';
+ if (/Android/.test(ua)) return 'Fingerprint';
+ if (/Windows/.test(ua)) return 'Windows Hello';
+ return 'Biometrics';
+}
+
+function _trySaveCredential(displayName, pin) {
+ if (typeof PasswordCredential !== 'undefined' && navigator.credentials && navigator.credentials.store) {
+ try {
+  var cred = new PasswordCredential({
+  id: displayName,
+  password: pin,
+  name: displayName
+  });
+  navigator.credentials.store(cred).catch(function() {});
+ } catch (_) {}
+ }
+ try {
+ localStorage.setItem('dds_biometric_available', 'true');
+ localStorage.setItem('dds_biometric_name', (displayName || '').split(' ').map(function(w) { return w.charAt(0); }).join('').toUpperCase() || 'You');
+ } catch (_) {}
+}
+
+function _hasSavedCredentials() {
+ try { return localStorage.getItem('dds_biometric_available') === 'true'; } catch (_) { return false; }
+}
+
+function _getSavedCredentialName() {
+ try { return localStorage.getItem('dds_biometric_name') || ''; } catch (_) { return ''; }
+}
+
+function _clearSavedCredentials() {
+ try {
+ localStorage.removeItem('dds_biometric_available');
+ localStorage.removeItem('dds_biometric_name');
+ localStorage.removeItem('dds_credential_type');
+ localStorage.removeItem('dds_devicekey_prompted');
+ } catch (_) {}
+}
+
+function _tryGetSavedCredential(callback) {
+ if (typeof PasswordCredential === 'undefined' || !navigator.credentials || !navigator.credentials.get) {
+ callback(null);
+ return;
+ }
+ try {
+ navigator.credentials.get({ password: true, mediation: 'optional' })
+  .then(function(cred) { callback(cred); })
+  .catch(function() { callback(null); });
+ } catch (_) {
+ callback(null);
+ }
+}
+
+function _autoSubmitPIN(container, credentialValue) {
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'auth-container fade-in' });
+ var card = el('div', { className: 'auth-glass-card', style: { textAlign: 'center', padding: '40px 28px' } });
+ card.appendChild(el('div', { className: 'spinner', style: { marginBottom: '16px' } }));
+ card.appendChild(el('div', { className: 'auth-text', style: { fontSize: '14px' } }, 'Signing you in\u2026'));
+ wrapper.appendChild(card);
+ container.appendChild(wrapper);
+
+ function _onSuccess(result) {
+ if (result && result.success && result.sessionToken) {
+  if (WEB_APP_URL) {
+  window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
+  } else {
+  showAuthError(container, 'No app URL available. Contact admin.');
+  }
+ } else {
+  _clearSavedCredentials();
+  showAuthPIN(container);
+ }
+ }
+
+ function _onFailure() {
+ _clearSavedCredentials();
+ showAuthPIN(container);
+ }
+
+ 
+ var credType = 'pin';
+ try { credType = localStorage.getItem('dds_credential_type') || 'pin'; } catch (_) {}
+
+ if (credType === 'device_key') {
+ google.script.run
+  .withSuccessHandler(function(result) {
+  if (result && result.success) {
+   _onSuccess(result);
+  } else {
+   
+   google.script.run.withSuccessHandler(_onSuccess).withFailureHandler(_onFailure).devAuthLoginByPIN(credentialValue);
+  }
+  })
+  .withFailureHandler(function() {
+  google.script.run.withSuccessHandler(_onSuccess).withFailureHandler(_onFailure).devAuthLoginByPIN(credentialValue);
+  })
+  .authLoginWithDeviceKey(credentialValue);
+ } else {
+ google.script.run.withSuccessHandler(_onSuccess).withFailureHandler(_onFailure).devAuthLoginByPIN(credentialValue);
+ }
+}
+
+function _setupAuthFocusTrap(container) {
+ setTimeout(function() {
+ var card = container.querySelector('.auth-glass-card');
+ if (!card) return;
+ card.addEventListener('keydown', function(e) {
+  if (e.key !== 'Tab') return;
+  var focusable = card.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href], select, textarea');
+  if (!focusable.length) return;
+  var first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+ });
+ }, 100);
+}
+
 var _authEffectsInjected = false;
 function _injectAuthEffects() {
  if (_authEffectsInjected) return;
@@ -98,6 +220,62 @@ function showAuthChoose(container) {
  var btns = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' } });
 
  
+ 
+ if (_hasSavedCredentials()) {
+ var bioLabel = _detectBiometricLabel();
+ var bioName = _getSavedCredentialName();
+ var biometricBtn = el('button', {
+  className: 'btn btn-primary',
+  style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', width: '100%', fontSize: '15px', padding: '14px 20px' },
+  onClick: function() {
+  biometricBtn.disabled = true;
+  biometricBtn.textContent = 'Verifying\u2026';
+
+  
+  _tryGetSavedCredential(function(cred) {
+   if (cred && cred.password) {
+   
+   _autoSubmitPIN(container, cred.password);
+   } else {
+   
+   biometricBtn.disabled = false;
+   biometricBtn.innerHTML = '\uD83D\uDD12 Sign in with ' + escapeHtml(bioLabel);
+   
+   container.innerHTML = '';
+   var w = el('div', { className: 'auth-container fade-in' });
+   var c = el('div', { className: 'auth-glass-card', style: { textAlign: 'center', padding: '32px 28px' } });
+   c.appendChild(el('div', { style: { fontSize: '13px', color: '#d97706', padding: '16px', background: 'rgba(245,158,11,0.1)', borderRadius: '8px', lineHeight: '1.6' } },
+    escapeHtml(bioLabel) + ' could not verify your identity. Please enter your PIN instead.'));
+   w.appendChild(c);
+   container.appendChild(w);
+   setTimeout(function() { showAuthPIN(container); }, 1500);
+   }
+  });
+  }
+ });
+ biometricBtn.innerHTML = '\uD83D\uDD12 Sign in with ' + escapeHtml(bioLabel) +
+  (bioName ? '<span style="font-size:12px;opacity:0.8;margin-left:4px">(' + escapeHtml(bioName) + ')</span>' : '');
+ btns.appendChild(biometricBtn);
+
+ 
+ btns.appendChild(el('button', {
+  className: 'auth-muted',
+  style: { fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer', padding: '0', textAlign: 'center', textDecoration: 'underline', opacity: '0.6' },
+  onClick: function() {
+  _clearSavedCredentials();
+  showAuthChoose(container);
+  }
+ }, 'Forget saved credentials'));
+
+ 
+ var bioDivider = el('div', { className: 'auth-divider', style: { margin: '4px 0' } });
+ bioDivider.appendChild(el('div', { className: 'auth-divider-line' }));
+ bioDivider.appendChild(el('span', { className: 'auth-divider-text' }, 'OR'));
+ bioDivider.appendChild(el('div', { className: 'auth-divider-line' }));
+ btns.appendChild(bioDivider);
+ }
+
+ 
  var ssoError = (PAGE_DATA && PAGE_DATA.error) || null;
 
  
@@ -182,6 +360,7 @@ function showAuthChoose(container) {
  wrapper.appendChild(footer);
 
  container.appendChild(wrapper);
+ _setupAuthFocusTrap(container);
 }
 
 function showAuthPIN(container) {
@@ -199,37 +378,78 @@ function showAuthPIN(container) {
  card.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left', fontSize: '16px', letterSpacing: '0.02em' } }, 'Sign in with PIN'));
  card.appendChild(el('div', { className: 'auth-muted', style: { fontSize: '12px', marginBottom: '20px' } }, 'Enter your 6-digit member PIN.'));
 
+ 
+ var form = el('form', {
+ autocomplete: 'on',
+ onSubmit: function(e) { e.preventDefault(); doSubmit(); }
+ });
+ 
+ form.setAttribute('action', 'javascript:void(0)');
+ form.setAttribute('method', 'post');
+
+ 
+ 
+ var usernameInput = el('input', {
+ type: 'text',
+ name: 'username',
+ autocomplete: 'username',
+ tabIndex: -1,
+ 'aria-hidden': 'true',
+ style: { position: 'absolute', width: '1px', height: '1px', padding: '0', margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: '0' }
+ });
+ 
+ var savedName = _getSavedCredentialName();
+ if (savedName) usernameInput.value = savedName;
+ else usernameInput.value = CONFIG.orgName || 'Member Portal';
+ form.appendChild(usernameInput);
+
  var pinLabel = el('label', { htmlFor: 'dev-pin-input', className: 'auth-muted', style: { fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'PIN');
- card.appendChild(pinLabel);
+ form.appendChild(pinLabel);
 
  var pinInput = el('input', {
  id:           'dev-pin-input',
  className:    'auth-input',
+ name:         'pin',
  type:         'password',
  inputMode:    'numeric',
  maxLength:    '6',
  placeholder:  '\u2022\u2022\u2022\u2022\u2022\u2022',
- autocomplete: 'off',
+ autocomplete: 'current-password',
  style:        { letterSpacing: '0.2em', fontSize: '20px', textAlign: 'center' }
  });
- card.appendChild(pinInput);
+ form.appendChild(pinInput);
 
  var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '18px', margin: '8px 0', textAlign: 'center' } });
- card.appendChild(statusMsg);
+ form.appendChild(statusMsg);
 
  var submitBtn = el('button', {
  className: 'btn btn-primary',
- style:     { width: '100%', marginTop: '8px' },
- onClick:   doSubmit
+ type:      'submit',
+ style:     { width: '100%', marginTop: '8px' }
  }, 'Sign In');
- card.appendChild(submitBtn);
+ form.appendChild(submitBtn);
 
+ 
+ var forgotLink = el('div', { style: { textAlign: 'center', marginTop: '12px' } });
+ forgotLink.appendChild(el('button', {
+ className: 'auth-muted',
+ style: { fontSize: '12px', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', opacity: '0.7' },
+ onClick: function() { showForgotPIN(container); }
+ }, 'Forgot your PIN?'));
+ form.appendChild(forgotLink);
+
+ card.appendChild(form);
  wrapper.appendChild(card);
  container.appendChild(wrapper);
+ _setupAuthFocusTrap(container);
 
  setTimeout(function() { try { pinInput.focus(); } catch (_) {} }, 50);
- pinInput.addEventListener('keydown', function(ev) {
- if (ev.key === 'Enter') doSubmit();
+
+ 
+ pinInput.addEventListener('input', function() {
+ if (pinInput.value.length === 6 && /^\d{6}$/.test(pinInput.value)) {
+  doSubmit();
+ }
  });
 
  function doSubmit() {
@@ -248,6 +468,12 @@ function showAuthPIN(container) {
   if (result && result.success && result.sessionToken) {
    statusMsg.textContent = '\u2713 Matched. Signing you in\u2026';
    statusMsg.style.color = '#059669';
+
+   
+   var credName = result.name || result.memberId || 'Member';
+   usernameInput.value = credName;
+   _trySaveCredential(credName, pin);
+
    if (WEB_APP_URL) {
    window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
    } else {
@@ -290,24 +516,38 @@ function showAuthEmail(container) {
  card.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left', fontSize: '16px', letterSpacing: '0.02em' } }, 'Sign in with email'));
  card.appendChild(el('div', { className: 'auth-muted', style: { fontSize: '12px', marginTop: '4px', marginBottom: '24px', lineHeight: '1.5' } }, "We'll send a secure link. No password needed."));
 
+ 
+ var form = el('form', {
+ autocomplete: 'on',
+ onSubmit: function(e) {
+  e.preventDefault();
+  var email = emailInput.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+  showAuthSending(container, email, rememberMe.value);
+ }
+ });
+ form.setAttribute('action', 'javascript:void(0)');
+ form.setAttribute('method', 'post');
+
  var inputLabel = el('label', { htmlFor: 'auth-email-input', className: 'auth-muted', style: { fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'Email address');
- card.appendChild(inputLabel);
+ form.appendChild(inputLabel);
 
  var emailInput = el('input', {
  id: 'auth-email-input',
  className: 'auth-input',
+ name: 'email',
  type: 'email',
  placeholder: 'you@example.com',
  autocomplete: 'email',
  });
- card.appendChild(emailInput);
+ form.appendChild(emailInput);
 
  
- var rememberMe = { value: false };
- var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' }, role: 'switch', 'aria-checked': 'false', tabIndex: 0 });
+ var rememberMe = { value: true };
+ var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' }, role: 'switch', 'aria-checked': 'true', 'aria-label': 'Remember this device for ' + CONFIG.cookieDurationDays + ' days', tabIndex: 0 });
 
- var track = el('div', { className: 'auth-toggle-track' });
- var thumb = el('div', { className: 'auth-toggle-thumb', style: { left: '2px' } });
+ var track = el('div', { className: 'auth-toggle-track', style: { background: '#1f4a43' } });
+ var thumb = el('div', { className: 'auth-toggle-thumb', style: { left: '18px' } });
  track.appendChild(thumb);
  toggleContainer.appendChild(track);
  toggleContainer.appendChild(el('span', {}, 'Remember this device (' + CONFIG.cookieDurationDays + ' days)'));
@@ -322,30 +562,25 @@ function showAuthEmail(container) {
  toggleContainer.addEventListener('keydown', function(e) {
  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _toggleRememberMe(); }
  });
- card.appendChild(toggleContainer);
+ form.appendChild(toggleContainer);
 
  var submitBtn = el('button', {
  className: 'btn btn-primary',
- style: { marginTop: '8px', opacity: '0.5', width: '100%' },
- onClick: function() {
-  var email = emailInput.value.trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
-  showAuthSending(container, email, rememberMe.value);
- }
+ type: 'submit',
+ style: { marginTop: '8px', opacity: '0.5', width: '100%' }
  }, 'Send sign-in link');
- card.appendChild(submitBtn);
+ form.appendChild(submitBtn);
 
  emailInput.addEventListener('input', function() {
  var valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
  submitBtn.style.opacity = valid ? '1' : '0.5';
  });
- emailInput.addEventListener('keydown', function(e) {
- if (e.key === 'Enter') submitBtn.click();
- });
 
+ card.appendChild(form);
  wrapper.appendChild(card);
  container.appendChild(wrapper);
  emailInput.focus();
+ _setupAuthFocusTrap(container);
 }
 
 function showAuthSending(container, email, rememberMe) {
@@ -465,5 +700,90 @@ function showAuthError(container, message, email) {
 
  wrapper.appendChild(card);
  container.appendChild(wrapper);
+}
+
+function showForgotPIN(container) {
+ container.innerHTML = '';
+ var wrapper = el('div', { className: 'auth-container fade-in' });
+ var card = el('div', { className: 'auth-glass-card' });
+
+ card.appendChild(el('button', {
+ className: 'auth-back-btn',
+ style: { fontSize: '13px', marginBottom: '20px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '0' },
+ onClick: function() { showAuthPIN(container); }
+ }, '\u2190 Back'));
+
+ card.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left', fontSize: '16px', letterSpacing: '0.02em' } }, 'Reset your PIN'));
+ card.appendChild(el('div', { className: 'auth-muted', style: { fontSize: '12px', marginBottom: '20px', lineHeight: '1.5' } },
+ "Enter your email and we'll send you a new PIN."));
+
+ var form = el('form', {
+ autocomplete: 'on',
+ onSubmit: function(e) { e.preventDefault(); doReset(); }
+ });
+ form.setAttribute('action', 'javascript:void(0)');
+ form.setAttribute('method', 'post');
+
+ var emailLabel = el('label', { htmlFor: 'forgot-pin-email', className: 'auth-muted', style: { fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'Email address');
+ form.appendChild(emailLabel);
+
+ var emailInput = el('input', {
+ id: 'forgot-pin-email',
+ className: 'auth-input',
+ name: 'email',
+ type: 'email',
+ placeholder: 'you@example.com',
+ autocomplete: 'email'
+ });
+ form.appendChild(emailInput);
+
+ var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '18px', margin: '8px 0', textAlign: 'center' } });
+ form.appendChild(statusMsg);
+
+ var resetBtn = el('button', {
+ className: 'btn btn-primary',
+ type: 'submit',
+ style: { width: '100%', marginTop: '8px', opacity: '0.5' }
+ }, 'Send new PIN');
+ form.appendChild(resetBtn);
+
+ emailInput.addEventListener('input', function() {
+ var valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
+ resetBtn.style.opacity = valid ? '1' : '0.5';
+ });
+
+ card.appendChild(form);
+ wrapper.appendChild(card);
+ container.appendChild(wrapper);
+ _setupAuthFocusTrap(container);
+ emailInput.focus();
+
+ function doReset() {
+ var email = emailInput.value.trim();
+ if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  statusMsg.textContent = 'Enter a valid email address.';
+  statusMsg.style.color = '#dc2626';
+  return;
+ }
+ resetBtn.disabled = true;
+ resetBtn.textContent = 'Sending\u2026';
+ statusMsg.textContent = '';
+
+ google.script.run
+  .withSuccessHandler(function(result) {
+  statusMsg.textContent = (result && result.message) || 'Check your email for your new PIN.';
+  statusMsg.style.color = '#059669';
+  resetBtn.textContent = 'Sent';
+  
+  setTimeout(function() { showAuthPIN(container); }, 3000);
+  })
+  .withFailureHandler(function() {
+  statusMsg.textContent = 'Server error. Try again.';
+  statusMsg.style.color = '#dc2626';
+  resetBtn.disabled = false;
+  resetBtn.textContent = 'Send new PIN';
+  })
+  .devRequestPINReset(email);
+ }
 }
 </script>

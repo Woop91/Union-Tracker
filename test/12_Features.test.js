@@ -40,11 +40,11 @@ describe('EXTENSION_CONFIG', () => {
   });
 
   test('has MEMBER_SHEET name', () => {
-    expect(EXTENSION_CONFIG.MEMBER_SHEET).toBe('Member Directory');
+    expect(EXTENSION_CONFIG.MEMBER_SHEET).toBe(SHEETS.MEMBER_DIR);
   });
 
   test('has GRIEVANCE_SHEET name', () => {
-    expect(EXTENSION_CONFIG.GRIEVANCE_SHEET).toBe('Grievance Log');
+    expect(EXTENSION_CONFIG.GRIEVANCE_SHEET).toBe(SHEETS.GRIEVANCE_LOG);
   });
 
   test('has LEADER_ROLE_NAME', () => {

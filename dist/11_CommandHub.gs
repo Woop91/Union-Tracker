@@ -475,34 +475,49 @@ function applyTabColors_(ss) {
 
   // 🟣 Purple — Core Data (daily workflow)
   applyColor(SHEETS.MEMBER_DIR, TAB_COLORS.PURPLE);
-  applyColor('Member Directory', TAB_COLORS.PURPLE);
+  applyColor('Member Directory', TAB_COLORS.PURPLE);       // legacy fallback
   applyColor(SHEETS.GRIEVANCE_LOG, TAB_COLORS.PURPLE);
-  applyColor('Grievance Log', TAB_COLORS.PURPLE);
+  applyColor('Grievance Log', TAB_COLORS.PURPLE);           // legacy fallback
   applyColor(SHEETS.CASE_CHECKLIST, TAB_COLORS.PURPLE);
-  applyColor('Case Checklist', TAB_COLORS.PURPLE);
+  applyColor('Case Checklist', TAB_COLORS.PURPLE);          // legacy fallback
   applyColor(SHEETS.WORKLOAD_REPORTING, TAB_COLORS.PURPLE);
+  applyColor('Workload Reporting', TAB_COLORS.PURPLE);      // legacy fallback
 
   // 🟢 Green — Reference (look-up material)
   applyColor(SHEETS.RESOURCES, TAB_COLORS.GREEN);
   applyColor(SHEETS.GETTING_STARTED, TAB_COLORS.GREEN);
   applyColor(SHEETS.FAQ, TAB_COLORS.GREEN);
+  applyColor(SHEETS.FEATURES_REFERENCE, TAB_COLORS.GREEN);
+  applyColor(SHEETS.EDUCATION_ENGINE, TAB_COLORS.GREEN);
 
   // 🔵 Blue — Engagement (community data)
   applyColor(SHEETS.MEETING_ATTENDANCE, TAB_COLORS.BLUE);
   applyColor(SHEETS.MEETING_CHECKIN_LOG, TAB_COLORS.BLUE);
+  applyColor(SHEETS.VOLUNTEER_HOURS, TAB_COLORS.BLUE);
   applyColor(SHEETS.SATISFACTION, TAB_COLORS.BLUE);
-  applyColor('Member Satisfaction', TAB_COLORS.BLUE);
+  applyColor('Member Satisfaction', TAB_COLORS.BLUE);       // legacy fallback
   applyColor(SHEETS.FEEDBACK, TAB_COLORS.BLUE);
-  applyColor('Feedback & Development', TAB_COLORS.BLUE);
+  applyColor('Feedback & Development', TAB_COLORS.BLUE);    // legacy fallback
   applyColor(SHEETS.NOTIFICATIONS, TAB_COLORS.BLUE);
+  applyColor(SHEETS.PORTAL_EVENTS, TAB_COLORS.BLUE);
+  applyColor('Events', TAB_COLORS.BLUE);                    // legacy fallback
+  applyColor(SHEETS.PORTAL_MINUTES, TAB_COLORS.BLUE);
+  applyColor('MeetingMinutes', TAB_COLORS.BLUE);            // legacy fallback
 
   // 🟠 Orange — Config & Admin (owner editable)
   applyColor(SHEETS.SURVEY_QUESTIONS, TAB_COLORS.ORANGE);
   applyColor(SHEETS.RESOURCE_CONFIG, TAB_COLORS.ORANGE);
   applyColor(SHEETS.FUNCTION_CHECKLIST, TAB_COLORS.ORANGE);
+  applyColor('Function Checklist', TAB_COLORS.ORANGE);      // legacy fallback
   applyColor(SHEETS.CONFIG_GUIDE, TAB_COLORS.ORANGE);
   applyColor(SHEETS.CONFIG, TAB_COLORS.ORANGE);
-  applyColor('Config', TAB_COLORS.ORANGE);
+  applyColor('Config', TAB_COLORS.ORANGE);                  // legacy fallback
+  applyColor(SHEETS.SETTINGS_OVERVIEW, TAB_COLORS.ORANGE);
+  applyColor('Settings Overview', TAB_COLORS.ORANGE);       // legacy fallback
+  applyColor(SHEETS.TEST_RESULTS, TAB_COLORS.ORANGE);
+  applyColor('Test Results', TAB_COLORS.ORANGE);            // legacy fallback
+  applyColor(SHEETS.NON_MEMBER_CONTACTS, TAB_COLORS.ORANGE);
+  applyColor('Non member contacts', TAB_COLORS.ORANGE);     // legacy fallback
 
   Logger.log('Tab colors applied successfully');
 }

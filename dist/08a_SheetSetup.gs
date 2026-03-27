@@ -447,6 +447,22 @@ function _ensureGrievanceFeedbackSheet(ss) {
  */
 function getOrCreateSheet(ss, name) {
   var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    // Check for legacy (pre-emoji) name and auto-rename if found
+    if (typeof SHEET_LEGACY_NAMES_ !== 'undefined') {
+      var legacyNames = Object.keys(SHEET_LEGACY_NAMES_);
+      for (var i = 0; i < legacyNames.length; i++) {
+        if (SHEET_LEGACY_NAMES_[legacyNames[i]] === name) {
+          sheet = ss.getSheetByName(legacyNames[i]);
+          if (sheet) {
+            sheet.setName(name);
+            Logger.log('Auto-renamed sheet "' + legacyNames[i] + '" → "' + name + '"');
+            break;
+          }
+        }
+      }
+    }
+  }
   if (sheet) {
     // CRITICAL: Never clear sheets that contain user data.
     // Only clear if the sheet is empty (no data rows beyond header).
@@ -587,6 +603,63 @@ function setupHiddenSheets(ss) {
       wlArchive.getRange(1, 1).setValue('Workload Archive');
       setSheetVeryHidden_(wlArchive);
     }
+  }
+}
+
+// ============================================================================
+// SHEET TAB TITLE MIGRATION
+// ============================================================================
+
+/**
+ * Renames legacy (pre-emoji) sheet tabs to their new emoji-prefixed names.
+ * Idempotent — skips sheets already using the new name or not present.
+ * Called from onOpenDeferred_() so existing spreadsheets auto-migrate.
+ *
+ * @param {Spreadsheet} [ss] - The spreadsheet (defaults to active)
+ * @returns {string[]} Array of renamed sheet descriptions (for logging)
+ */
+function migrateSheetTabTitles_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return [];
+
+  var renamed = [];
+  var legacyNames = Object.keys(SHEET_LEGACY_NAMES_);
+
+  for (var i = 0; i < legacyNames.length; i++) {
+    var oldName = legacyNames[i];
+    var newName = SHEET_LEGACY_NAMES_[oldName];
+
+    // Skip if new name already exists (already migrated)
+    if (ss.getSheetByName(newName)) continue;
+
+    var sheet = ss.getSheetByName(oldName);
+    if (sheet) {
+      try {
+        sheet.setName(newName);
+        renamed.push(oldName + ' → ' + newName);
+      } catch (e) {
+        Logger.log('migrateSheetTabTitles_: failed to rename "' + oldName + '": ' + e.message);
+      }
+    }
+  }
+
+  if (renamed.length > 0) {
+    Logger.log('migrateSheetTabTitles_: renamed ' + renamed.length + ' sheet(s): ' + renamed.join(', '));
+  }
+  return renamed;
+}
+
+/**
+ * Manually apply emoji title prefixes to all sheet tabs.
+ * Can be called from Admin menu.
+ */
+function migrateSheetTabTitles() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var renamed = migrateSheetTabTitles_(ss);
+  if (renamed.length > 0) {
+    ss.toast('Renamed ' + renamed.length + ' tab(s):\n' + renamed.join('\n'), '📑 Tab Titles', 5);
+  } else {
+    ss.toast('All tabs already have emoji titles.', '📑 Tab Titles', 3);
   }
 }
 

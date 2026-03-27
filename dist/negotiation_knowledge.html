@@ -253,6 +253,40 @@ var NEGOTIATION_SETS = [
  }
 ];
 
+var _keEngineLoaded = false;
+
+function _loadNegotiationSetsFromEngine() {
+ if (_keEngineLoaded) return;
+ _keEngineLoaded = true;
+
+ if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+
+ google.script.run
+ .withSuccessHandler(function(items) {
+  if (!items || !items.length) return;
+  var sets = items.map(function(item) {
+  return {
+   title: item.title || '',
+   quote: item.content ? { text: item.content, attr: item.attribution || '' } : null,
+   bullets: item.bullets || []
+  };
+  });
+  if (sets.length > 0) {
+  NEGOTIATION_SETS = sets;
+  }
+ })
+ .withFailureHandler(function() {  })
+ .getKnowledgeContent('Home Widget', null, 'Negotiation Set');
+}
+
+if (typeof document !== 'undefined') {
+ if (document.readyState === 'loading') {
+ document.addEventListener('DOMContentLoaded', _loadNegotiationSetsFromEngine);
+ } else {
+ _loadNegotiationSetsFromEngine();
+ }
+}
+
 var _sidebarKnowledgeTimer = null;
 
 function renderSidebarKnowledge(sidebarEl) {

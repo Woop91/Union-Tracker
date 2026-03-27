@@ -4,46 +4,94 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [4.36.0] - 2026-03-24
+## [4.43.1] - 2026-03-27
 
 ### Added
-- **Modal Hub** — Centralized launcher for all 35+ dialogs, accessible from the Union Hub menu. Modals organized by category (Members, Cases & Grievances, Search & Analytics, Calendar & Meetings, Surveys & Polls, Tools & Productivity, Web App & Portal, Admin & System). Real-time search/filter across all modals. Master enable/disable toggle persisted to Config sheet.
-- **MODAL_REGISTRY** — New constant in `04a_UIMenus.gs` cataloging every modal with label, icon, description, and server function name. `launchModalFromHub()` validates function names against the registry before execution.
-- **ENABLE_MODAL_HUB** — New Config column and Admin Settings toggle (Branding & UX tab) to globally enable/disable all modals launched from the Modal Hub.
+- **One-tap webapp check-in** — When a meeting is active, logged-in members and stewards see a green "Check In" banner at the top of their dashboard. One tap records attendance (no PIN re-entry — already session-authenticated).
+- **Check-in confirmation** — Banner transitions to a "Checked In!" state after successful check-in, persists on re-render via DataCache.
+- **Batch data integration** — Active meeting data (`activeMeeting`) included in both member and steward batch payloads for zero-latency banner display.
+- **`dataWebAppCheckIn()` endpoint** — Session-authenticated one-tap check-in with TOCTOU lock protection and audit logging (`MEETING_WEBAPP_CHECKIN`).
+- **`.checkin-banner` CSS** — Green-themed banner with slide-in animation, responsive layout, and dark/light mode support.
+
+## [4.43.0] - 2026-03-27
+
+### Security
+- **PIN login: constant-time scan** — `devAuthLoginByPIN()` now iterates all members regardless of match position. Response time normalized to ~1–1.5s with random jitter to prevent timing-based attacks.
+- **Magic link: global session rate limit** — Added per-session rate limit (5 attempts/15min) on top of per-email limit to prevent email enumeration via rapid cross-email probing.
+- **Session token URL cleanup** — After SPA loads, `history.replaceState` strips `?sessionToken=` from the address bar to prevent token persistence in browser history.
+- **Biometric PII reduction** — `dds_biometric_name` in localStorage now stores initials only (e.g., "JD") instead of full member name.
+- **PIN rate limit error hardening** — `cache.remove()` and `clearPINAttempts()` wrapped in try/catch to prevent cascading errors on success cleanup.
+
+### Added
+- **Device key authentication** — After any login (SSO, magic link), a device key is silently registered and stored via the Credential Management API. On return visits, the biometric "Sign in with Face ID / Touch ID / Fingerprint" button now works for ALL users, not just PIN users.
+- **Auto-submit PIN** — PIN input auto-submits when 6 digits are entered, removing the need to tap "Sign In".
+- **QR code mobile attendance** — Stewards generate QR codes for meetings via `Calendar & Meetings > 📱 QR Code Check-In`. Members scan the QR code on their phone, enter their phone number and PIN, and attendance is recorded.
+- **Mobile check-in page** — New `?page=qr-checkin` web route serves a mobile-optimized, dark/light mode check-in page. No login required — authenticates per check-in via phone + PIN.
+- **Phone number authentication** — `processQRCheckIn()` looks up members by phone number (normalized 10-digit US) instead of email, with full PIN verification, lockout protection, and audit logging (`MEETING_QR_CHECKIN`).
+- **QR code generation** — `getMeetingQRCode()` generates QR code images via Google Charts API (free, no key needed). `createMeeting()` now includes QR URL in its response.
+- **Steward QR dialog** — `showMeetingQRCodeDialog()` displays a printable QR code for any active meeting, with copy-link and print support.
+- **Sheet tab emoji titles** — All 11 visible tabs that lacked emoji prefixes now have them for quick identification: ⚙️ Config, 👥 Member Directory, ⚖️ Grievance Log, ✅ Case Checklist, 🧪 Test Results, 🔧 Function Checklist, 📊 Workload Reporting, 🗓️ Events, 🗒️ Meeting Minutes, 🔍 Settings Overview, 📇 Non-Member Contacts.
+- **Auto-migration** — `migrateSheetTabTitles_()` runs on deferred open to auto-rename existing sheet tabs. Manual trigger available via Admin → Styling → 📑 Apply Tab Titles.
+- **Legacy name fallback** — `getOrCreateSheet()` and `applyTabColors_()` transparently handle both old and new tab names during the migration window.
+- **`SHEET_LEGACY_NAMES_`** constant maps pre-emoji → post-emoji names for backward compatibility.
+- **Self-service PIN reset** — New "Forgot your PIN?" link on PIN login screen. Members enter their email and receive a new PIN via email. Rate-limited (2/email/hour, 10 global/hour) with anti-enumeration generic responses. Server function: `devRequestPINReset()`.
+- **Knowledge Engine input validation** — `addKnowledgeContent()` and `updateKnowledgeContent()` now validate type, category, audience, and placement against allowed lists; enforce title (500) and content (10,000) character limits; validate priority range (1–9999); check end date is after start date.
+- **Knowledge Engine Manage tab search** — Stewards can now search/filter knowledge items by title, content, or ID in the Manage tab.
+- **Knowledge Engine deactivate confirmation** — Deactivating a knowledge item now requires confirmation.
+- **Auth focus trap** — Keyboard focus is now trapped within the auth card for accessibility (prevents tabbing into background elements).
+- **ARIA label on remember-me toggle** — Screen readers now announce the toggle's purpose and duration.
 
 ### Fixed
-- **Data service: error handling** — `dataApplyColorTheme()` and `dataMarkWelcomeDismissed()` now wrapped in try/catch.
-- **Data service: audit log column indices** — Replaced hardcoded array indices with `AUDIT_LOG_COLS` and `EVENT_AUDIT_COLS` constants.
-- **POMS Reference: XSS prevention** — Added `pesc()` escape function for all server-loaded data in `poms_reference.html`.
-- **Grievance Form: missing failure handler** — Added `.withFailureHandler()` to `getGrievanceFormOptions()`.
-- **Grievance Form: email injection** — `doEmail()` now validates email format and URI-encodes the recipient.
-
-## [4.35.1] - 2026-03-24
-
-### Added
-- **Dev PIN login** — Stewards can generate a 6-digit login PIN for any member from the Members tab detail panel (dev builds only). Members enter just the PIN on the login screen — no email needed. PINs are valid for 14 days and reusable. Completely disabled in production.
-- **Welcome Guide: back-button warning** — Mobile users see a prominent warning not to use the browser back button, directing them to the bottom navigation bar instead.
-- **More button pulsate** — The "More" button in the mobile bottom nav now pulsates to draw attention. Respects `prefers-reduced-motion`.
+- **`restoreKnowledgeContent()` missing lock** — Now wrapped in `withScriptLock_()` to prevent race conditions, matching all other CRUD operations.
+- **`getKnowledgeContentAll()` uncached** — Added 2-minute CacheService caching for steward Manage tab to reduce sheet reads.
+- **Biometric failure UX** — When biometric verification fails, users now see a brief explanation before being redirected to PIN entry instead of a silent fallback.
+- **Knowledge Engine cache invalidation** — `_invalidateKnowledgeCache_()` now also clears the steward `ke_all_steward` cache key.
+- **PIN lockout message** — Now uses `PIN_CONFIG.LOCKOUT_MINUTES` instead of hardcoded "15 minutes".
 
 ### Changed
-- **Member bottom nav reorganized** — Replaced "My Cases" and "Contact" with "Hub" (Member Hub) and "Alerts" (Notifications). Cases and steward contact remain accessible via the Member Hub and More menu.
+- **Remember-me default ON** — The "Remember this device" toggle on the email magic link form now defaults to checked, reducing repeat logins for most users.
+- **Biometric flow refactored** — `_autoSubmitPIN` now detects credential type (device key vs PIN) and routes to the appropriate server endpoint, with automatic fallback.
+- **Browse tab note** — Shows "active content only" hint with link to Manage tab.
+- **Form help text** — Bullets and Priority fields now show usage hints in the Knowledge Engine form.
 
-## [4.35.0] - 2026-03-24
+## [4.42.1] - 2026-03-27
+
+### Changed
+- **Rename: Education Engine → Knowledge Engine** — All references renamed across the codebase: sheet name (`📚 Knowledge Engine`), constants (`KNOWLEDGE_ENGINE`, `KNOWLEDGE_COLS`, `KNOWLEDGE_HEADER_MAP_`), API functions (`getKnowledgeContent`, `addKnowledgeContent`, `updateKnowledgeContent`, `deleteKnowledgeContent`, `restoreKnowledgeContent`), sheet factory (`createKnowledgeEngineSheet`), cache keys (`ke_` prefix), content IDs (`KE-` prefix), sidebar tab ("Knowledge"), and steward UI render function (`renderStewardKnowledge`).
+
+## [4.42.0] - 2026-03-27
 
 ### Added
-- **Welcome Guide tab** — New dedicated "Welcome Guide" tab in the web app SPA for both steward and member roles. Interactive getting-started page with expandable sections covering navigation basics, role-specific feature overviews, tips & shortcuts, and quick-launch buttons.
+- **Password manager support** — PIN and email login forms now use proper `<form>` elements with `autocomplete` attributes (`username`, `current-password`, `email`) so password managers (1Password, Bitwarden, Chrome, iOS Keychain, etc.) can detect, save, and autofill credentials.
+- **Biometric sign-in** — After a successful PIN login, credentials are saved via the Credential Management API (Chrome/Edge) and native form semantics (Safari/iOS Keychain). On return visits, a "Sign in with Face ID / Touch ID / Fingerprint / Windows Hello" button appears for one-tap biometric authentication.
+- **Platform-aware biometric labels** — Login button text adapts to the user's platform (Face ID on iPhone/iPad, Touch ID on Mac, Fingerprint on Android, Windows Hello on Windows).
+- **Auto-submit biometric flow** — When credentials are retrieved via the Credential Management API, the PIN is automatically submitted without user interaction.
+- **Forget saved credentials** — Users can clear stored biometric credentials from the login screen.
 
-## [4.34.5] - 2026-03-24
+## [4.41.0] - 2026-03-27
 
-### Fixed
-- **Auth: Android Google login** — SSO failure message now explains mobile cookie restrictions and directs users to the email link option.
-- **Auth: magic link single-use lockout** — Magic link auth now always creates a session token (24h short-lived if "Remember this device" is off, full duration if on), preventing users from being kicked to login on every page load after consuming the one-use token.
-- **Auth: remember-me default** — "Remember this device" toggle now defaults to ON for email link flow, since magic link tokens are one-use and users need session persistence.
+### Added
+- **Knowledge Engine** — New `📚 Knowledge Engine` sheet centralizes all educational content (quotes, tips, concepts, mini-lessons, manifesto phrases, negotiation sets) in one steward-managed location.
+- **Knowledge Engine API** — Server-side functions (`getKnowledgeContent`, `addKnowledgeContent`, `updateKnowledgeContent`, `deleteKnowledgeContent`, `restoreKnowledgeContent`) with 5-minute CacheService caching, steward-only CRUD, and `escapeForFormula` security.
+- **Knowledge Engine Management UI** — New "Knowledge" tab in steward sidebar with Browse (filterable by type/placement/search) and Manage (full CRUD with inline forms) sub-tabs.
+- **Knowledge Engine sheet factory** — `createKnowledgeEngineSheet()` auto-creates the sheet with seed data migrated from previously hardcoded arrays (26 negotiation sets, 14 manifesto phrases, 43 auth quotes).
+- **Dynamic content loading** — `negotiation_knowledge.html` and `auth_manifesto.html` now attempt to load content from the Knowledge Engine at runtime, falling back to hardcoded arrays if the sheet doesn't exist yet.
 
-## [4.34.4] - 2026-03-24
+### Changed
+- **negotiation_knowledge.html** — Added Knowledge Engine loader that replaces the hardcoded `NEGOTIATION_SETS` array with sheet-managed content when available.
+- **auth_manifesto.html** — Added Knowledge Engine loader for both manifesto phrases and auth quotes, with graceful fallback to hardcoded defaults.
+- **Steward sidebar navigation** — Added "Knowledge" tab (🎓) under the Reference group.
 
-### Fixed
-- **Survey visibility mismatch** — Steward view showed active survey but member view showed "No Survey Open". Root cause: `getSurveyQuestions()` cached the period status for 5 minutes, and `openNewSurveyPeriod()`/`archiveSurveyPeriod_()` did not invalidate the cache. Fix: period is now always fetched fresh via `getSurveyPeriod()` on every call (both cache-hit and cache-miss paths). Questions/sections remain cached. `openNewSurveyPeriod()` and `archiveSurveyPeriod_()` now also explicitly clear the cache key on period state change.
+## [4.40.0] - 2026-03-25
+
+### Changed
+- **PIN Login: GA release** — PIN login option now available in all environments (dev and production). Removed IS_DEV_MODE gates from login screen, steward PIN management, and server-side comments.
+- **Login page: black background** — Auth screen now uses a solid black background with glass card backdrop blur and enhanced box shadow.
+- **Login page: quote styling** — Quotes are now larger (15px), bolder (weight 500), fully white with text glow for better visibility against the black background.
+- **Branding** — Default org name fallback updated for login page.
+
+### Added
+- **Auth page: isDevMode flag** — `_serveAuth()` now includes `isDevMode` in PAGE_DATA for consistency with dashboard pages.
 
 ## [4.34.3] - 2026-03-23
 

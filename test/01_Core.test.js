@@ -143,9 +143,9 @@ describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => 
 
 describe('SHEETS constant', () => {
   test('has required sheet names', () => {
-    expect(SHEETS.CONFIG).toBe('Config');
-    expect(SHEETS.MEMBER_DIR).toBe('Member Directory');
-    expect(SHEETS.GRIEVANCE_LOG).toBe('Grievance Log');
+    expect(SHEETS.CONFIG).toBe('⚙️ Config');
+    expect(SHEETS.MEMBER_DIR).toBe('👥 Member Directory');
+    expect(SHEETS.GRIEVANCE_LOG).toBe('⚖️ Grievance Log');
     expect(SHEETS.AUDIT_LOG).toBe('_Audit_Log');
   });
 

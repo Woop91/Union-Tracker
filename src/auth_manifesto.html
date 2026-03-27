@@ -1,7 +1,7 @@
 <script>
 /**
  * AUTH MANIFESTO — Background phrases + quote cycler for login screen
- * Member Hub feature — v1.2.0 — 2026-03-25
+ * Member Hub feature — v4.41.0 — 2026-03-27 — Knowledge Engine integration
  *
  * HOW TO INTEGRATE:
  *  1. Add <?!= include('member_hub_styles') ?> in index.html <head>
@@ -44,25 +44,43 @@ var _PHRASE_ZONES_6 = [
 var _activeZones = _PHRASE_ZONES;
 var _phraseVisCount = 0;
 
+// Default manifesto phrases — fallback if Knowledge Engine hasn't loaded yet
+var _defaultManifestoPhrases = [
+  "Work stress doesn\u2019t\nclock out at 5.",
+  "The union is waiting for you.",
+  "Your rights don't end when you leave.",
+  "You are the change.",
+  "Solidarity is not\na slogan. It's a practice.",
+  "Together we bargain.\nAlone we beg.",
+  "The future is\ncollective.",
+  "Never fear\nto negotiate.",
+  "Be hard on the problem,\nsoft on the people.",
+  "Silence is\nstrength.",
+  "You get what\nyou negotiate.",
+  "Prepare\nrelentlessly.",
+  "Know your\nwalk-away.",
+  "Listen more\nthan you talk."
+];
+
+// Knowledge Engine can override this
+var _manifestoPhrases = null;
+
 function injectAuthManifesto(authContainer) {
   if (document.getElementById('auth-manifesto-layer')) return;
 
-  var allPhrases = [
-    "Work stress doesn\u2019t\nclock out at 5.",
-    "The union is waiting for you.",
-    "Your rights don't end when you leave.",
-    "You are the change.",
-    "Solidarity is not\na slogan. It's a practice.",
-    "Together we bargain.\nAlone we beg.",
-    "The future is\ncollective.",
-    "Never fear\nto negotiate.",
-    "Be hard on the problem,\nsoft on the people.",
-    "Silence is\nstrength.",
-    "You get what\nyou negotiate.",
-    "Prepare\nrelentlessly.",
-    "Know your\nwalk-away.",
-    "Listen more\nthan you talk."
-  ];
+  // Try to load from Knowledge Engine, then proceed with fallback
+  if (!_manifestoPhrases && typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(items) {
+        if (items && items.length >= 5) {
+          _manifestoPhrases = items.map(function(item) { return item.content || ''; });
+        }
+      })
+      .withFailureHandler(function() { /* use defaults */ })
+      .getKnowledgeContent('Auth Screen', null, 'Manifesto');
+  }
+
+  var allPhrases = _manifestoPhrases || _defaultManifestoPhrases;
 
   // Desktop (>768px): 6 phrases across 6 zones; mobile: 3 across 3
   var isDesktop = window.innerWidth > 768;
@@ -221,6 +239,41 @@ var AUTH_QUOTES = [
 ];
 
 var _authQuoteTimer = null;
+
+// ─── KNOWLEDGE ENGINE LOADER ──────────────────────────────────────────
+// Loads manifesto phrases and auth quotes from the Knowledge Engine sheet.
+// Falls back to the hardcoded arrays above if unavailable.
+
+var _authKeEngineLoaded = false;
+
+function _loadAuthContentFromEngine() {
+  if (_authKeEngineLoaded) return;
+  _authKeEngineLoaded = true;
+
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+
+  // Load inline quotes (for auth screen cycler + hub inline quotes)
+  google.script.run
+    .withSuccessHandler(function(items) {
+      if (!items || !items.length) return;
+      var quotes = items.map(function(item) {
+        return { text: item.content || '', attr: item.attribution || '' };
+      });
+      if (quotes.length >= 8) {
+        AUTH_QUOTES = quotes;
+      }
+    })
+    .withFailureHandler(function() { /* fallback to hardcoded */ })
+    .getKnowledgeContent('Inline Quote', null, 'Quote');
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _loadAuthContentFromEngine);
+  } else {
+    _loadAuthContentFromEngine();
+  }
+}
 
 function _shuffleArray(arr) {
   var a = arr.slice();

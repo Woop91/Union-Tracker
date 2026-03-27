@@ -70,6 +70,7 @@ function initMemberView(container) {
     if (batch.stewardInfo) DataCache.set('stewardInfo_' + CURRENT_USER.email, batch.stewardInfo);
     if (batch.surveyStatus) DataCache.set('surveyStatus_' + CURRENT_USER.email, batch.surveyStatus);
     if (batch.events && Array.isArray(batch.events)) DataCache.set('events', batch.events);
+    if (batch.activeMeeting) DataCache.set('activeMeeting', batch.activeMeeting);
     AppState.loading = false;
     renderMemberHome(container);
     _checkDeepLink('member');
@@ -554,6 +555,14 @@ function renderMemberHome(appContainer) {
         else container.appendChild(banner);
       }
     });
+
+    // ── Meeting check-in banner — one-tap attendance for authenticated users ──
+    var _cachedMeeting = DataCache.get('activeMeeting');
+    if (_cachedMeeting && _cachedMeeting.meetingId && !_cachedMeeting.alreadyCheckedIn) {
+      _renderCheckInBanner(container, _cachedMeeting);
+    } else if (_cachedMeeting && _cachedMeeting.alreadyCheckedIn) {
+      _renderCheckedInBanner(container, _cachedMeeting);
+    }
 
     // ── PIN session: show limited-access notice instead of personal data ────
     if (IS_PIN_SESSION) {
@@ -1891,7 +1900,7 @@ function renderMemberResources(appContainer) {
       { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
       { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
     ];
-    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Your Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     quickLinks.forEach(function(r) {
       if (!r.url) return;
@@ -3780,6 +3789,7 @@ function _surveyViewMeeting(vc, ctx) {
 
 function renderWorkloadTracker(appContainer) {
   var role = AppState.activeRole || 'member';
+  var headerFn = role === 'steward' ? _stewardHeader : _memberHeader;
   renderPageLayout(appContainer, role, 'workload', function(container) {
     container.innerHTML = '<div class="empty-state">Workload Tracker is not available in this deployment.</div>';
   });
@@ -3789,8 +3799,8 @@ function renderWorkloadTracker(appContainer) {
 
 var WT_SUB_CATS = {
   priority:   ['QDD','CAL','TERI','Aged Case','Congressional','Dire Need','Homeless',
-               'Presumptive Disability','COBRA','Aged','SOAR Involvement',
-               'MC/WW','100% P&T','Public Inquiry','Important (High)','Important (Medium)'],
+               'Presumptive Disability','COBRA','DDS Aged','SOAR Involvement',
+               'MC/WW','100% P&T','Public Inquiry','DDS Important (High)','DDS Important (Medium)'],
   pending:    ['New Cases','Immediate Action','No Activity 15+ Days',
                'No Activity 30+ Days','Internal QA Returns','Federal QA Returns','Approval Returns'],
   unread:     ['All Unread Documents','MER','CE Reports','Trailer Mail'],
@@ -5620,12 +5630,42 @@ function _renderUsageStatsContent(container, data) {
   }
 }
 
-function _renderWorkloadSummaryStats(container) {
-  container.innerHTML = '<div class="empty-state">Workload stats are not available in this deployment.</div>';
+function _renderWorkloadSummaryStats(container, getCached, setCache) {
+  var cached = getCached && getCached('workloadStats');
+  if (cached) { _renderWorkloadStatsContent(container, cached); return; }
+  showLoading(container, 'kpi');
+  serverCall().withSuccessHandler(function(data) {
+    if (setCache) setCache('workloadStats', data);
+    _renderWorkloadStatsContent(container, data);
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load workload stats.'));
+  }).dataGetWorkloadSummaryStats(SESSION_TOKEN);
 }
 
-function _renderWorkloadStatsContent(container) {
-  container.innerHTML = '<div class="empty-state">Workload stats are not available in this deployment.</div>';
+function _renderWorkloadStatsContent(container, data) {
+    container.innerHTML = '';
+    if (!data) {
+      container.appendChild(el('div', { className: 'empty-state' }, 'Workload summary unavailable.'));
+      return;
+    }
+
+    container.appendChild(el('div', { className: 'privacy-badge mb-14' }, '\uD83D\uDD12 Anonymized workload aggregate'));
+
+    var items = [
+      { label: 'Avg Caseload', value: (data.avgCaseload || 0).toFixed(1), color: 'var(--text)' },
+      { label: 'High Caseload %', value: (data.highCaseloadPct || 0) + '%', color: data.highCaseloadPct > 20 ? 'var(--danger)' : 'var(--success)' },
+      { label: 'Submission Rate', value: (data.submissionRate || 0) + '%', color: 'var(--accent)' },
+      { label: 'Trend', value: (data.trendDirection || 'stable').charAt(0).toUpperCase() + (data.trendDirection || 'stable').slice(1), color: data.trendDirection === 'increasing' ? 'var(--danger)' : 'var(--success)' },
+    ];
+    var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' } });
+    items.forEach(function(m) {
+      var card = el('div', { className: 'card card-glass', style: { padding: '16px', textAlign: 'center' } });
+      card.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '24px', fontWeight: '700', color: m.color } }, m.value));
+      card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, m.label));
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
 }
 
 // ═══════════════════════════════════════
@@ -7050,5 +7090,94 @@ function _renderNotificationPrefs(container) {
   }).dataGetDigestPreferences(SESSION_TOKEN);
 
   container.appendChild(card);
+}
+
+// ═══════════════════════════════════════
+// MEETING CHECK-IN BANNER (v4.43.0)
+// ═══════════════════════════════════════
+
+/**
+ * Renders a one-tap check-in banner for an active meeting.
+ * @param {HTMLElement} container - Parent container
+ * @param {Object} meeting - { meetingId, meetingName, meetingTime, meetingType }
+ */
+function _renderCheckInBanner(container, meeting) {
+  var banner = el('div', { className: 'checkin-banner fade-in' });
+  banner.appendChild(el('span', { className: 'checkin-banner-icon' }, '\u2705'));
+
+  var info = el('div', { className: 'checkin-banner-info' });
+  info.appendChild(el('div', { className: 'checkin-banner-title' }, escapeHtml(meeting.meetingName || 'Meeting Check-In')));
+  var detail = meeting.meetingType || '';
+  if (meeting.meetingTime) detail += (detail ? ' \u00B7 ' : '') + meeting.meetingTime;
+  if (detail) info.appendChild(el('div', { className: 'checkin-banner-detail' }, detail));
+  banner.appendChild(info);
+
+  var btn = el('button', {
+    className: 'checkin-banner-btn',
+    onClick: function() {
+      btn.disabled = true;
+      btn.textContent = 'Checking in\u2026';
+      serverCall()
+        .withSuccessHandler(function(r) {
+          if (r && r.success) {
+            // Replace banner with confirmed state
+            banner.innerHTML = '';
+            banner.appendChild(el('span', { className: 'checkin-banner-icon' }, '\uD83C\uDF89'));
+            var doneInfo = el('div', { className: 'checkin-banner-info' });
+            doneInfo.appendChild(el('div', { className: 'checkin-banner-title' }, 'Checked In!'));
+            doneInfo.appendChild(el('div', { className: 'checkin-banner-detail' }, escapeHtml(r.memberName || 'You') + ' \u2014 ' + escapeHtml(meeting.meetingName || '')));
+            banner.appendChild(doneInfo);
+            banner.appendChild(el('span', { className: 'checkin-banner-done' }, '\u2714 Done'));
+            // Update cache so banner stays confirmed on re-render
+            var cached = DataCache.get('activeMeeting');
+            if (cached) { cached.alreadyCheckedIn = true; DataCache.set('activeMeeting', cached); }
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'Check In';
+            if (r && r.alreadyCheckedIn) {
+              btn.textContent = '\u2714 Already In';
+              btn.disabled = true;
+            } else {
+              alert(r && r.error ? r.error : 'Check-in failed. Please try again.');
+            }
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Check In';
+          alert('Error: ' + (err && err.message ? err.message : 'Check-in failed'));
+        })
+        .dataWebAppCheckIn(SESSION_TOKEN, meeting.meetingId);
+    }
+  }, 'Check In');
+  banner.appendChild(btn);
+
+  // Insert after header, before first card
+  var firstCard = container.querySelector('.card, .content');
+  if (firstCard) container.insertBefore(banner, firstCard);
+  else container.appendChild(banner);
+}
+
+/**
+ * Renders a "you're checked in" confirmation banner.
+ * @param {HTMLElement} container - Parent container
+ * @param {Object} meeting - { meetingId, meetingName, meetingTime, meetingType }
+ */
+function _renderCheckedInBanner(container, meeting) {
+  var banner = el('div', { className: 'checkin-banner fade-in' });
+  banner.appendChild(el('span', { className: 'checkin-banner-icon' }, '\uD83C\uDF89'));
+
+  var info = el('div', { className: 'checkin-banner-info' });
+  info.appendChild(el('div', { className: 'checkin-banner-title' }, 'Checked In!'));
+  var detail = escapeHtml(meeting.meetingName || '');
+  if (meeting.meetingTime) detail += ' \u00B7 ' + meeting.meetingTime;
+  info.appendChild(el('div', { className: 'checkin-banner-detail' }, detail));
+  banner.appendChild(info);
+
+  banner.appendChild(el('span', { className: 'checkin-banner-done' }, '\u2714 Done'));
+
+  var firstCard = container.querySelector('.card, .content');
+  if (firstCard) container.insertBefore(banner, firstCard);
+  else container.appendChild(banner);
 }
 </script>

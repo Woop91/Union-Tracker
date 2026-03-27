@@ -23,10 +23,8 @@ var _PHRASE_ZONES_6 = [
 var _activeZones = _PHRASE_ZONES;
 var _phraseVisCount = 0;
 
-function injectAuthManifesto(authContainer) {
- if (document.getElementById('auth-manifesto-layer')) return;
-
- var allPhrases = [
+// Default manifesto phrases — fallback if Knowledge Engine hasn't loaded yet
+var _defaultManifestoPhrases = [
  "Work stress doesn\u2019t\nclock out at 5.",
  "The union is waiting for you.",
  "Your rights don't end when you leave.",
@@ -41,7 +39,26 @@ function injectAuthManifesto(authContainer) {
  "Prepare\nrelentlessly.",
  "Know your\nwalk-away.",
  "Listen more\nthan you talk."
- ];
+];
+
+var _manifestoPhrases = null;
+
+function injectAuthManifesto(authContainer) {
+ if (document.getElementById('auth-manifesto-layer')) return;
+
+ 
+ if (!_manifestoPhrases && typeof google !== 'undefined' && google.script && google.script.run) {
+ google.script.run
+  .withSuccessHandler(function(items) {
+  if (items && items.length >= 5) {
+   _manifestoPhrases = items.map(function(item) { return item.content || ''; });
+  }
+  })
+  .withFailureHandler(function() {  })
+  .getKnowledgeContent('Auth Screen', null, 'Manifesto');
+ }
+
+ var allPhrases = _manifestoPhrases || _defaultManifestoPhrases;
 
  
  var isDesktop = window.innerWidth > 768;
@@ -181,6 +198,37 @@ var AUTH_QUOTES = [
 ];
 
 var _authQuoteTimer = null;
+
+var _authKeEngineLoaded = false;
+
+function _loadAuthContentFromEngine() {
+ if (_authKeEngineLoaded) return;
+ _authKeEngineLoaded = true;
+
+ if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+
+ 
+ google.script.run
+ .withSuccessHandler(function(items) {
+  if (!items || !items.length) return;
+  var quotes = items.map(function(item) {
+  return { text: item.content || '', attr: item.attribution || '' };
+  });
+  if (quotes.length >= 8) {
+  AUTH_QUOTES = quotes;
+  }
+ })
+ .withFailureHandler(function() {  })
+ .getKnowledgeContent('Inline Quote', null, 'Quote');
+}
+
+if (typeof document !== 'undefined') {
+ if (document.readyState === 'loading') {
+ document.addEventListener('DOMContentLoaded', _loadAuthContentFromEngine);
+ } else {
+ _loadAuthContentFromEngine();
+ }
+}
 
 function _shuffleArray(arr) {
  var a = arr.slice();

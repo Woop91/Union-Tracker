@@ -1,7 +1,7 @@
 <script>
 /**
  * NEGOTIATION KNOWLEDGE WIDGET — Rotating educational tips
- * v4.41.0 — 2026-03-26
+ * v4.41.0 — 2026-03-27 — Knowledge Engine integration
  *
  * Continuously spoon-feeds negotiation knowledge to members and stewards.
  * Title fades in → stays bright → bullets phase in one at a time →
@@ -275,6 +275,46 @@ var NEGOTIATION_SETS = [
     ]
   }
 ];
+
+// ─── KNOWLEDGE ENGINE LOADER ──────────────────────────────────────────
+// Attempts to load negotiation sets from the 📚 Knowledge Engine sheet.
+// Falls back to the hardcoded NEGOTIATION_SETS above if unavailable.
+// Called once on page load. Replaces the global array when data arrives.
+
+var _keEngineLoaded = false;
+
+function _loadNegotiationSetsFromEngine() {
+  if (_keEngineLoaded) return;
+  _keEngineLoaded = true;
+
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+
+  google.script.run
+    .withSuccessHandler(function(items) {
+      if (!items || !items.length) return;
+      var sets = items.map(function(item) {
+        return {
+          title: item.title || '',
+          quote: item.content ? { text: item.content, attr: item.attribution || '' } : null,
+          bullets: item.bullets || []
+        };
+      });
+      if (sets.length > 0) {
+        NEGOTIATION_SETS = sets;
+      }
+    })
+    .withFailureHandler(function() { /* fallback to hardcoded */ })
+    .getKnowledgeContent('Home Widget', null, 'Negotiation Set');
+}
+
+// Auto-load when page is ready
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _loadNegotiationSetsFromEngine);
+  } else {
+    _loadNegotiationSetsFromEngine();
+  }
+}
 
 // ─── SIDEBAR KNOWLEDGE WIDGET (tablet+ only) ──────────────────────────
 // Small rotating quote at the bottom of the sidebar — always visible.

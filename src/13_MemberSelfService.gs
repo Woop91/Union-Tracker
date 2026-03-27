@@ -828,7 +828,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -923,7 +923,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -992,7 +992,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
@@ -1511,15 +1511,20 @@ function devAuthLoginByPIN(pin) {
   // ── Input validation ──────────────────────────────────────────────────────
   pin = String(pin || '').trim();
   if (!pin || !/^\d{4,6}$/.test(pin)) {
+    Utilities.sleep(100 + Math.floor(Math.random() * 200));
     return { success: false, message: 'PIN must be 4–6 digits.' };
   }
+
+  var startTime = Date.now();
 
   // ── Global rate limit — prevent blind brute-force before any row is matched ─
   var cache = CacheService.getScriptCache();
   var globalRateKey = 'DEV_PIN_SCAN_RATE';
   var globalAttempts = parseInt(cache.get(globalRateKey) || '0', 10);
+  var lockoutMinutes = (typeof PIN_CONFIG !== 'undefined' && PIN_CONFIG.LOCKOUT_MINUTES) || 15;
   if (globalAttempts >= 10) {
-    return { success: false, message: 'Too many attempts. Try again in 15 minutes.' };
+    Utilities.sleep(500 + Math.floor(Math.random() * 500));
+    return { success: false, message: 'Too many attempts. Try again in ' + lockoutMinutes + ' minutes.' };
   }
   cache.put(globalRateKey, String(globalAttempts + 1), 900); // 15 min window
 
@@ -1537,6 +1542,9 @@ function devAuthLoginByPIN(pin) {
   var fNameCol= MEMBER_COLS.FIRST_NAME - 1;
   var lNameCol= MEMBER_COLS.LAST_NAME  - 1;
 
+  // ── Constant-time scan — always iterate ALL members ──────────────────────
+  var matchResult = null;
+
   for (var i = 1; i < data.length; i++) {
     var storedHash = String(data[i][pinCol] || '').trim();
     if (!storedHash) continue; // skip members with no PIN set
@@ -1544,43 +1552,59 @@ function devAuthLoginByPIN(pin) {
     var memberId = String(data[i][idCol] || '').trim().toUpperCase();
     if (!memberId) continue;
 
-    // ── Per-member lockout check ──────────────────────────────────────────
+    // Per-member lockout check
+    var isLocked = false;
     if (typeof checkPINLockout === 'function') {
       var lockout = checkPINLockout(memberId);
-      if (lockout.isLocked) continue; // skip locked accounts silently
+      if (lockout.isLocked) isLocked = true;
     }
 
-    if (!verifyPIN(pin, memberId, storedHash)) continue;
+    // Always verify PIN (maintain constant iteration) but only accept if not locked
+    var isMatch = !isLocked && verifyPIN(pin, memberId, storedHash);
 
-    // ── Match found ───────────────────────────────────────────────────────
-    var email     = String(data[i][emailCol] || '').trim().toLowerCase();
-    var firstName = String(data[i][fNameCol] || '').trim();
-    var lastName  = String(data[i][lNameCol] || '').trim();
-    var memberName = (firstName + ' ' + lastName).trim() || memberId;
+    if (isMatch && !matchResult) {
+      matchResult = {
+        email: String(data[i][emailCol] || '').trim().toLowerCase(),
+        firstName: String(data[i][fNameCol] || '').trim(),
+        lastName: String(data[i][lNameCol] || '').trim(),
+        memberId: memberId
+      };
+      // Continue iterating — don't break early (constant time)
+    }
+  }
 
-    if (!email) {
-      // No email on record — can't create session (session system keys off email)
+  // ── Normalize response timing ─────────────────────────────────────────────
+  var elapsed = Date.now() - startTime;
+  var targetMs = 1000 + Math.floor(Math.random() * 500);
+  if (elapsed < targetMs) {
+    Utilities.sleep(targetMs - elapsed);
+  }
+
+  // ── Handle match ──────────────────────────────────────────────────────────
+  if (matchResult) {
+    if (!matchResult.email) {
       if (typeof logAuditEvent === 'function') {
-        logAuditEvent('DEV_PIN_LOGIN_NO_EMAIL', { memberId: memberId });
+        logAuditEvent('DEV_PIN_LOGIN_NO_EMAIL', { memberId: matchResult.memberId });
       }
       return { success: false, message: 'Account has no email on file. Contact your steward.' };
     }
 
     // Clear rate counters on success
-    cache.remove(globalRateKey);
-    if (typeof clearPINAttempts === 'function') clearPINAttempts(memberId);
+    try { cache.remove(globalRateKey); } catch (_) {}
+    try { if (typeof clearPINAttempts === 'function') clearPINAttempts(matchResult.memberId); } catch (_) {}
 
     // Create session token
-    var token = Auth.createSessionToken(email, 'pin');
+    var token = Auth.createSessionToken(matchResult.email, 'pin');
     if (token && typeof token === 'object' && token.error) {
       return { success: false, message: 'Session creation failed. Try again.' };
     }
 
     if (typeof logAuditEvent === 'function') {
-      logAuditEvent('DEV_PIN_LOGIN', { memberId: memberId, email: email });
+      logAuditEvent('DEV_PIN_LOGIN', { memberId: matchResult.memberId, email: matchResult.email });
     }
 
-    return { success: true, sessionToken: token, email: email, memberName: memberName };
+    var memberName = (matchResult.firstName + ' ' + matchResult.lastName).trim() || matchResult.memberId;
+    return { success: true, sessionToken: token, email: matchResult.email, memberName: memberName };
   }
 
   // ── No match ──────────────────────────────────────────────────────────────
@@ -1592,8 +1616,108 @@ function devAuthLoginByPIN(pin) {
     success: false,
     message: remaining > 0
       ? 'Incorrect PIN. ' + remaining + ' attempt' + (remaining === 1 ? '' : 's') + ' remaining.'
-      : 'Too many attempts. Try again in 15 minutes.'
+      : 'Too many attempts. Try again in ' + lockoutMinutes + ' minutes.'
   };
+}
+
+/**
+ * Self-service PIN reset — sends a reset email with a new temporary PIN.
+ * Rate-limited to prevent abuse. Uses the same generic response for
+ * both valid and invalid emails to prevent enumeration.
+ *
+ * @param {string} email - Member's email address
+ * @returns {Object} { success, message }
+ */
+function devRequestPINReset(email) {
+  email = String(email || '').trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    Utilities.sleep(200 + Math.floor(Math.random() * 300));
+    return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
+  }
+
+  // Rate limit — 2 per email per hour
+  var cache = CacheService.getScriptCache();
+  var rateKey = 'PIN_RESET_RATE_' + email;
+  var count = parseInt(cache.get(rateKey) || '0', 10);
+  if (count >= 2) {
+    Utilities.sleep(500 + Math.floor(Math.random() * 500));
+    return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
+  }
+  cache.put(rateKey, String(count + 1), 3600);
+
+  // Global rate limit — 10 resets per hour across all users
+  var globalKey = 'PIN_RESET_GLOBAL';
+  var globalCount = parseInt(cache.get(globalKey) || '0', 10);
+  if (globalCount >= 10) {
+    Utilities.sleep(500 + Math.floor(Math.random() * 500));
+    return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
+  }
+  cache.put(globalKey, String(globalCount + 1), 3600);
+
+  // Look up member
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
+
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
+
+  var data = sheet.getDataRange().getValues();
+  var emailCol = MEMBER_COLS.EMAIL - 1;
+  var idCol    = MEMBER_COLS.MEMBER_ID - 1;
+  var fNameCol = MEMBER_COLS.FIRST_NAME - 1;
+  var memberRow = -1;
+  var memberId = '';
+  var firstName = '';
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][emailCol] || '').trim().toLowerCase() === email) {
+      memberRow = i + 1;
+      memberId = String(data[i][idCol] || '').trim().toUpperCase();
+      firstName = String(data[i][fNameCol] || '').trim();
+      break;
+    }
+  }
+
+  if (memberRow === -1 || !memberId) {
+    // Simulate processing time to prevent enumeration
+    Utilities.sleep(500 + Math.floor(Math.random() * 500));
+    return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
+  }
+
+  // Generate new PIN, hash, and store
+  var newPin = generateMemberPIN();
+  var hashedPin = hashPIN(newPin, memberId);
+  sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
+
+  // Clear any lockout
+  try { if (typeof clearPINAttempts === 'function') clearPINAttempts(memberId); } catch (_) {}
+
+  // Send email with new PIN
+  var orgName = 'SolidBase';
+  try {
+    var config = ConfigReader.getConfig();
+    orgName = config.orgName || orgName;
+  } catch (_) {}
+
+  var subject = 'Your new PIN — ' + orgName;
+  var body = 'Hi ' + (firstName || 'Member') + ',\n\n' +
+    'Your PIN has been reset. Your new PIN is:\n\n' +
+    '    ' + newPin + '\n\n' +
+    'Use this PIN to sign in at the member portal.\n' +
+    'For security, please memorize this PIN — it will not be shown again.\n\n' +
+    '— ' + orgName;
+
+  try {
+    GmailApp.sendEmail(email, subject, body);
+  } catch (_gmailErr) {
+    try { MailApp.sendEmail(email, subject, body); } catch (_) {}
+  }
+
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('PIN_SELF_RESET', { memberId: memberId, email: email });
+  }
+
+  return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
 }
 
 /**

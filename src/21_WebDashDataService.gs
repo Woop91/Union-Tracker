@@ -3418,6 +3418,7 @@ var DataService = (function () {
       events: events,
       notificationCount: notifCount,
       memberTaskCount: memberTaskCount,
+      activeMeeting: _getActiveMeetingForCheckIn(email),
     };
   }
 
@@ -3489,6 +3490,7 @@ var DataService = (function () {
       overdueTaskCount: overdueTaskCount,
       notificationCount: notifCount,
       qaUnansweredCount: qaUnansweredCount,
+      activeMeeting: _getActiveMeetingForCheckIn(email),
     };
   }
 
@@ -6844,6 +6846,7 @@ function dataGetPomsReference(sessionToken) {
    returns an empty array so the client gracefully shows "no results".
    ────────────────────────────────────────────────────────────────────── */
 // (POMS data records removed — see upstream repo for full dataset)
+
 // ═══════════════════════════════════════
 // USAGE TRACKING (v4.40.0 — production-enabled)
 // ═══════════════════════════════════════
@@ -7110,4 +7113,180 @@ function dataGetUsageAnalytics(sessionToken, days) {
     Logger.log('dataGetUsageAnalytics error: ' + err.message);
     return { success: false, message: 'Analytics query failed.' };
   }
+}
+
+// ============================================================================
+// WEBAPP MEETING CHECK-IN (v4.43.0)
+// ============================================================================
+
+/**
+ * Returns the first active/eligible meeting for today, or null.
+ * Also checks whether the given email has already checked in.
+ * Used by batch data to power the in-app check-in banner.
+ *
+ * @param {string} email - Member email
+ * @returns {Object|null} { meetingId, meetingName, meetingTime, meetingType, alreadyCheckedIn }
+ * @private
+ */
+function _getActiveMeetingForCheckIn(email) {
+  try {
+    if (typeof getCheckInEligibleMeetings !== 'function') return null;
+    var result = getCheckInEligibleMeetings();
+    if (!result || !result.success || !result.meetings || result.meetings.length === 0) return null;
+
+    var meeting = result.meetings[0]; // First eligible meeting
+
+    // Check if this member already checked in
+    var alreadyCheckedIn = false;
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (ss) {
+        var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+        if (sheet && sheet.getLastRow() >= 2) {
+          var data = sheet.getDataRange().getValues();
+          var emailLower = String(email).toLowerCase().trim();
+          for (var i = 1; i < data.length; i++) {
+            var rowMeetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+            var rowEmail = String(data[i][MEETING_CHECKIN_COLS.EMAIL - 1] || '').toLowerCase().trim();
+            if (rowMeetingId === meeting.id && rowEmail === emailLower) {
+              alreadyCheckedIn = true;
+              break;
+            }
+          }
+        }
+      }
+    } catch (_e) { Logger.log('_getActiveMeetingForCheckIn alreadyCheckedIn check: ' + _e.message); }
+
+    return {
+      meetingId: meeting.id,
+      meetingName: meeting.name,
+      meetingTime: meeting.time || '',
+      meetingType: meeting.type || '',
+      alreadyCheckedIn: alreadyCheckedIn
+    };
+  } catch (_e) {
+    Logger.log('_getActiveMeetingForCheckIn error: ' + _e.message);
+    return null;
+  }
+}
+
+/**
+ * One-tap meeting check-in for authenticated webapp users.
+ * The user is already logged in (session-authenticated), so no PIN is needed.
+ * Looks up the member by their session email and records attendance.
+ *
+ * @param {string} sessionToken - Client session token
+ * @param {string} meetingId - The meeting to check into
+ * @returns {Object} { success, memberName, message } or { success: false, error }
+ */
+function dataWebAppCheckIn(sessionToken, meetingId) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, error: 'Please log in to check in.', authError: true };
+
+  if (!meetingId) return errorResponse('Meeting ID is required');
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return errorResponse('System temporarily unavailable');
+
+  // Look up member by email
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) return errorResponse('System error: Member directory not found');
+
+  var memberData = memberSheet.getDataRange().getValues();
+  var memberId = null;
+  var memberName = '';
+  var emailLower = String(email).toLowerCase().trim();
+
+  for (var i = 1; i < memberData.length; i++) {
+    var rowEmail = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
+    if (rowEmail === emailLower) {
+      memberId = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '');
+      memberName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
+                   String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
+      break;
+    }
+  }
+
+  if (!memberId) return errorResponse('No member found with your email address');
+
+  // Acquire lock to prevent TOCTOU race
+  var checkInLock = LockService.getScriptLock();
+  if (!checkInLock.tryLock(10000)) {
+    return errorResponse('Check-in temporarily unavailable — please try again.');
+  }
+  try {
+    var checkInSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!checkInSheet) return errorResponse('Meeting check-in sheet not found');
+
+    var checkInData = checkInSheet.getDataRange().getValues();
+
+    // Check duplicate
+    for (var j = 1; j < checkInData.length; j++) {
+      var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+      var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
+      if (rowMeetingId === meetingId && rowMemberId === memberId) {
+        return { success: true, memberName: memberName.trim(), message: 'You are already checked in!', alreadyCheckedIn: true };
+      }
+    }
+
+    // Find meeting details
+    var meetingName = '';
+    var meetingDate = '';
+    var meetingType = '';
+    var meetingFound = false;
+    for (var k = 1; k < checkInData.length; k++) {
+      if (String(checkInData[k][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+        meetingName = checkInData[k][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '';
+        meetingDate = checkInData[k][MEETING_CHECKIN_COLS.MEETING_DATE - 1] || '';
+        meetingType = checkInData[k][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '';
+        meetingFound = true;
+        break;
+      }
+    }
+
+    if (!meetingFound) return errorResponse('Meeting not found or no longer active.');
+
+    // Record check-in
+    checkInSheet.appendRow([
+      meetingId,
+      meetingName,
+      meetingDate,
+      meetingType,
+      memberId,
+      escapeForFormula(memberName.trim()),
+      new Date(),
+      escapeForFormula(email)
+    ]);
+
+    // Auto-activate Scheduled meetings
+    for (var m = 1; m < checkInData.length; m++) {
+      if (String(checkInData[m][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+        var currentStatus = String(checkInData[m][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+        if (currentStatus === MEETING_STATUS.SCHEDULED) {
+          checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
+        }
+        break;
+      }
+    }
+  } finally {
+    checkInLock.releaseLock();
+  }
+
+  // Audit log
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('MEETING_WEBAPP_CHECKIN', {
+      meetingId: meetingId,
+      memberId: memberId,
+      method: 'webapp_session'
+    });
+  }
+
+  // Badge refresh
+  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+
+  return {
+    success: true,
+    memberName: memberName.trim(),
+    message: memberName.trim() + ' checked in successfully!'
+  };
 }

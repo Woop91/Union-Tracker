@@ -31,6 +31,7 @@ function initStewardView(container) {
     AppState.taskCount = batch.taskCount || 0;
     AppState.overdueTaskCount = batch.overdueTaskCount || 0;
     AppState.qaUnansweredCount = batch.qaUnansweredCount || 0;
+    if (batch.activeMeeting) DataCache.set('activeMeeting', batch.activeMeeting);
     AppState.loading = false;
     renderStewardDashboard(container);
     _checkDeepLink('steward');
@@ -214,6 +215,14 @@ function renderStewardDashboard(appContainer) {
 
     // Welcome card — localStorage-based, shows until user dismisses
     _renderStewardWelcome(container);
+
+    // ── Meeting check-in banner — one-tap attendance for authenticated users ──
+    var _cachedMeeting = DataCache.get('activeMeeting');
+    if (_cachedMeeting && _cachedMeeting.meetingId && !_cachedMeeting.alreadyCheckedIn) {
+      _renderStewardCheckInBanner(container, _cachedMeeting);
+    } else if (_cachedMeeting && _cachedMeeting.alreadyCheckedIn) {
+      _renderStewardCheckedInBanner(container, _cachedMeeting);
+    }
 
     // KPIs — show org-wide fallback if steward has 0 assigned cases
     var kpis = AppState.kpis || {};
@@ -3022,7 +3031,7 @@ function renderStewardResources(appContainer) {
         { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
         { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
       ];
-      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Your Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
       quickLinks.forEach(function(r) {
         if (!r.url) return;
@@ -3348,6 +3357,371 @@ function renderStewardResources(appContainer) {
     content.appendChild(subContent);
     container.appendChild(content);
   });
+}
+
+// ═══════════════════════════════════════
+// STEWARD KNOWLEDGE ENGINE (v4.41.0)
+// ═══════════════════════════════════════
+
+/**
+ * Renders the Knowledge Engine management page for stewards.
+ * Browse and Manage sub-tabs for all educational content:
+ * quotes, tips, concepts, mini-lessons, manifesto phrases, negotiation sets.
+ */
+function renderStewardKnowledge(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'knowledge', function(container) {
+    _stewardHeader(container, 'Knowledge Engine', 'Manage all educational content displayed across the app');
+    var content = el('div', { className: 'content' });
+
+    var _st = createSubTabs([
+      { id: 'browse', label: 'Browse', render: function(c) { _renderEduBrowse(c); } },
+      { id: 'manage', label: 'Manage', render: function(c) { _renderEduManage(c); } }
+    ]);
+    var subTabBar = _st.bar, subContent = _st.content;
+
+    // ── Browse: view all active content with filters ──────────────────
+    function _renderEduBrowse(target) {
+      var filterBar = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' } });
+
+      // Type filter
+      var typeSelect = el('select', { className: 'form-select', style: { fontSize: '12px', padding: '4px 8px' } });
+      ['All Types', 'Quote', 'Tip', 'Concept', 'Mini-Lesson', 'Manifesto', 'Negotiation Set'].forEach(function(t) {
+        typeSelect.appendChild(el('option', { value: t === 'All Types' ? '' : t }, t));
+      });
+      filterBar.appendChild(typeSelect);
+
+      // Placement filter
+      var placeSelect = el('select', { className: 'form-select', style: { fontSize: '12px', padding: '4px 8px' } });
+      ['All Placements', 'Auth Screen', 'Home Widget', 'Sidebar', 'Hub Section', 'Inline Quote'].forEach(function(p) {
+        placeSelect.appendChild(el('option', { value: p === 'All Placements' ? '' : p }, p));
+      });
+      filterBar.appendChild(placeSelect);
+
+      // Search
+      var searchInput = el('input', { type: 'text', placeholder: 'Search content...', className: 'form-input', style: { fontSize: '12px', padding: '4px 8px', flex: '1', minWidth: '140px' } });
+      filterBar.appendChild(searchInput);
+
+      target.appendChild(filterBar);
+
+      var listWrap = el('div');
+      target.appendChild(listWrap);
+
+      function renderCards() {
+        listWrap.innerHTML = '';
+        var loading = el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Loading content...');
+        listWrap.appendChild(loading);
+
+        serverCall('getKnowledgeContent', [], function(items) {
+          listWrap.innerHTML = '';
+          listWrap.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', fontStyle: 'italic' } }, 'Showing active content only. Switch to Manage tab to see all items.'));
+          if (!items || !items.length) {
+            listWrap.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'No knowledge content found. Add content in the Manage tab.'));
+            return;
+          }
+
+          var typeFilter = typeSelect.value;
+          var placeFilter = placeSelect.value;
+          var search = (searchInput.value || '').toLowerCase().trim();
+
+          var filtered = items.filter(function(item) {
+            if (typeFilter && item.type !== typeFilter) return false;
+            if (placeFilter && item.placement !== placeFilter) return false;
+            if (search) {
+              var haystack = ((item.title || '') + ' ' + (item.content || '') + ' ' + (item.attribution || '') + ' ' + (item.bullets || []).join(' ')).toLowerCase();
+              if (haystack.indexOf(search) === -1) return false;
+            }
+            return true;
+          });
+
+          if (!filtered.length) {
+            listWrap.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'No content matches your filters.'));
+            return;
+          }
+
+          // Count badge
+          listWrap.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, filtered.length + ' item' + (filtered.length !== 1 ? 's' : '')));
+
+          filtered.forEach(function(item) {
+            var card = el('div', { className: 'card', style: { marginBottom: '8px', padding: '10px 14px' } });
+
+            // Header row
+            var hd = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' } });
+            var typeBadge = el('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: _eduTypeBg(item.type), color: '#fff', fontWeight: '600' } }, item.type);
+            hd.appendChild(typeBadge);
+            if (item.title) hd.appendChild(el('strong', { style: { fontSize: '13px' } }, item.title));
+            var placeBadge = el('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(100,100,100,0.3)', color: 'var(--text-muted)' } }, item.placement);
+            hd.appendChild(placeBadge);
+            card.appendChild(hd);
+
+            // Content
+            if (item.content) {
+              var contentEl = el('div', { style: { fontSize: '12px', color: 'var(--text)', marginBottom: '4px', fontStyle: item.type === 'Quote' ? 'italic' : 'normal' } });
+              contentEl.textContent = item.type === 'Quote' ? '\u201C' + item.content + '\u201D' : item.content;
+              card.appendChild(contentEl);
+            }
+
+            // Attribution
+            if (item.attribution) {
+              card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' } }, '\u2014 ' + item.attribution));
+            }
+
+            // Bullets
+            if (item.bullets && item.bullets.length) {
+              var ul = el('ul', { style: { fontSize: '11px', margin: '4px 0 0 16px', padding: '0', color: 'var(--text-muted)' } });
+              item.bullets.forEach(function(b) { ul.appendChild(el('li', {}, b)); });
+              card.appendChild(ul);
+            }
+
+            // Meta
+            var meta = el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', gap: '12px' } });
+            meta.appendChild(el('span', {}, item.id));
+            meta.appendChild(el('span', {}, 'Audience: ' + item.audience));
+            meta.appendChild(el('span', {}, 'Priority: ' + item.priority));
+            card.appendChild(meta);
+
+            listWrap.appendChild(card);
+          });
+        });
+      }
+
+      typeSelect.addEventListener('change', renderCards);
+      placeSelect.addEventListener('change', renderCards);
+      searchInput.addEventListener('input', renderCards);
+      renderCards();
+    }
+
+    // ── Manage: CRUD for all knowledge content ─────────────────────────
+    function _renderEduManage(target) {
+      var listWrap = el('div');
+      var formWrap = el('div');
+      target.appendChild(listWrap);
+      target.appendChild(formWrap);
+
+      var allItems = [];
+
+      function loadItems() {
+        listWrap.innerHTML = '';
+        var loading = el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Loading...');
+        listWrap.appendChild(loading);
+
+        serverCall('getKnowledgeContentAll', [], function(items) {
+          allItems = items || [];
+          renderList();
+        });
+      }
+
+      function renderList() {
+        listWrap.innerHTML = '';
+
+        // Toolbar — search + add
+        var toolbar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' } });
+        var addBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px' }, onClick: function() { showForm(null); } }, '+ Add Content');
+        toolbar.appendChild(addBtn);
+        var manageSearch = el('input', { type: 'text', placeholder: 'Search by title, content, or ID\u2026', className: 'form-input', style: { fontSize: '12px', padding: '4px 8px', flex: '1', minWidth: '140px' } });
+        toolbar.appendChild(manageSearch);
+        listWrap.appendChild(toolbar);
+
+        manageSearch.addEventListener('input', function() { filterManageList(manageSearch.value); });
+
+        if (!allItems.length) {
+          listWrap.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'No knowledge content yet.'));
+          return;
+        }
+
+        // Stats
+        var active = allItems.filter(function(i) { return i.active; }).length;
+        listWrap.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } },
+          allItems.length + ' total \u2022 ' + active + ' active \u2022 ' + (allItems.length - active) + ' inactive'));
+
+        allItems.forEach(function(item) {
+          var row = el('div', { className: 'card', style: { marginBottom: '6px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', opacity: item.active ? '1' : '0.5' } });
+
+          // Type badge
+          var badge = el('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: _eduTypeBg(item.type), color: '#fff', fontWeight: '600', flexShrink: '0' } }, item.type);
+          row.appendChild(badge);
+
+          // Title / content preview
+          var preview = item.title || (item.content || '').substring(0, 60) || '(untitled)';
+          var titleEl = el('div', { style: { flex: '1', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, preview);
+          row.appendChild(titleEl);
+
+          // Placement
+          row.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', flexShrink: '0' } }, item.placement));
+
+          // Edit button
+          var editBtn = el('button', { className: 'btn btn-sm', style: { fontSize: '11px', padding: '2px 8px' }, onClick: function() { showForm(item); } }, 'Edit');
+          row.appendChild(editBtn);
+
+          // Toggle active
+          var toggleBtn = el('button', { className: 'btn btn-sm', style: { fontSize: '11px', padding: '2px 8px' }, onClick: function() {
+            if (item.active && !confirm('Deactivate "' + (item.title || item.id) + '"? It can be reactivated later.')) return;
+            var fn = item.active ? 'deleteKnowledgeContent' : 'restoreKnowledgeContent';
+            serverCall(fn, [window._sessionToken || '', item.id], function(res) {
+              if (res && res.success) loadItems();
+              else alert((res && res.message) || 'Error');
+            });
+          } }, item.active ? 'Deactivate' : 'Activate');
+          row.appendChild(toggleBtn);
+
+          listWrap.appendChild(row);
+        });
+      }
+
+      function showForm(existing) {
+        formWrap.innerHTML = '';
+        var isEdit = !!existing;
+        var title = isEdit ? 'Edit: ' + (existing.title || existing.id) : 'Add New Content';
+
+        var form = el('div', { className: 'card', style: { padding: '16px', marginTop: '12px' } });
+        form.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px' } }, title));
+
+        // Type
+        var typeRow = _eduFormRow('Type');
+        var typeInput = el('select', { className: 'form-select' });
+        ['Quote', 'Tip', 'Concept', 'Mini-Lesson', 'Manifesto', 'Negotiation Set'].forEach(function(t) {
+          var opt = el('option', { value: t }, t);
+          if (existing && existing.type === t) opt.selected = true;
+          typeInput.appendChild(opt);
+        });
+        typeRow.appendChild(typeInput); form.appendChild(typeRow);
+
+        // Category
+        var catRow = _eduFormRow('Category');
+        var catInput = el('select', { className: 'form-select' });
+        ['Negotiation', 'Rights', 'Grievance', 'Safety', 'Labor', 'General'].forEach(function(c) {
+          var opt = el('option', { value: c }, c);
+          if (existing && existing.category === c) opt.selected = true;
+          catInput.appendChild(opt);
+        });
+        catRow.appendChild(catInput); form.appendChild(catRow);
+
+        // Title
+        var titleRow = _eduFormRow('Title');
+        var titleInput = el('input', { type: 'text', className: 'form-input', value: existing ? existing.title || '' : '', placeholder: 'Short title (e.g. "What Is BATNA?")' });
+        titleRow.appendChild(titleInput); form.appendChild(titleRow);
+
+        // Content
+        var contentRow = _eduFormRow('Content / Quote Text');
+        var contentInput = el('textarea', { className: 'form-input', rows: '3', placeholder: 'Main content text or quote', style: { resize: 'vertical' } });
+        contentInput.value = existing ? existing.content || '' : '';
+        contentRow.appendChild(contentInput); form.appendChild(contentRow);
+
+        // Attribution
+        var attrRow = _eduFormRow('Attribution');
+        var attrInput = el('input', { type: 'text', className: 'form-input', value: existing ? existing.attribution || '' : '', placeholder: 'Quote source (e.g. "John F. Kennedy")' });
+        attrRow.appendChild(attrInput); form.appendChild(attrRow);
+
+        // Bullets
+        var bulletsRow = _eduFormRow('Bullets (one per line, shown as list items)');
+        var bulletsInput = el('textarea', { className: 'form-input', rows: '4', placeholder: 'One bullet point per line', style: { resize: 'vertical' } });
+        bulletsInput.value = existing && existing.bullets ? existing.bullets.join('\n') : '';
+        bulletsRow.appendChild(bulletsInput); form.appendChild(bulletsRow);
+
+        // Audience
+        var audRow = _eduFormRow('Audience');
+        var audInput = el('select', { className: 'form-select' });
+        ['All', 'Members', 'Stewards'].forEach(function(a) {
+          var opt = el('option', { value: a }, a);
+          if (existing && existing.audience === a) opt.selected = true;
+          audInput.appendChild(opt);
+        });
+        audRow.appendChild(audInput); form.appendChild(audRow);
+
+        // Placement
+        var placeRow = _eduFormRow('Placement');
+        var placeInput = el('select', { className: 'form-select' });
+        ['Auth Screen', 'Home Widget', 'Sidebar', 'Hub Section', 'Inline Quote'].forEach(function(p) {
+          var opt = el('option', { value: p }, p);
+          if (existing && existing.placement === p) opt.selected = true;
+          placeInput.appendChild(opt);
+        });
+        placeRow.appendChild(placeInput); form.appendChild(placeRow);
+
+        // Priority
+        var prioRow = _eduFormRow('Priority (1\u20139999, lower = shown first)');
+        var prioInput = el('input', { type: 'number', className: 'form-input', value: existing ? String(existing.priority || 999) : '999', min: '1' });
+        prioRow.appendChild(prioInput); form.appendChild(prioRow);
+
+        // Buttons
+        var btns = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } });
+        var saveBtn = el('button', { className: 'btn btn-primary', style: { fontSize: '12px' }, onClick: function() {
+          var payload = {
+            type: typeInput.value,
+            category: catInput.value,
+            title: titleInput.value,
+            content: contentInput.value,
+            attribution: attrInput.value,
+            bullets: bulletsInput.value.split('\n').map(function(b) { return b.trim(); }).filter(function(b) { return b; }).join('|'),
+            audience: audInput.value,
+            placement: placeInput.value,
+            priority: parseInt(prioInput.value, 10) || 999
+          };
+
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving...';
+
+          if (isEdit) {
+            serverCall('updateKnowledgeContent', [window._sessionToken || '', existing.id, payload], function(res) {
+              saveBtn.disabled = false;
+              saveBtn.textContent = 'Save';
+              if (res && res.success) { formWrap.innerHTML = ''; loadItems(); }
+              else alert((res && res.message) || 'Error saving');
+            });
+          } else {
+            serverCall('addKnowledgeContent', [window._sessionToken || '', payload], function(res) {
+              saveBtn.disabled = false;
+              saveBtn.textContent = 'Save';
+              if (res && res.success) { formWrap.innerHTML = ''; loadItems(); }
+              else alert((res && res.message) || 'Error saving');
+            });
+          }
+        } }, 'Save');
+        btns.appendChild(saveBtn);
+
+        var cancelBtn = el('button', { className: 'btn', style: { fontSize: '12px' }, onClick: function() { formWrap.innerHTML = ''; } }, 'Cancel');
+        btns.appendChild(cancelBtn);
+        form.appendChild(btns);
+
+        formWrap.appendChild(form);
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function filterManageList(query) {
+        var search = (query || '').toLowerCase().trim();
+        var cards = listWrap.querySelectorAll('.card');
+        for (var ci = 0; ci < cards.length; ci++) {
+          var text = cards[ci].textContent.toLowerCase();
+          cards[ci].style.display = (!search || text.indexOf(search) >= 0) ? '' : 'none';
+        }
+      }
+
+      loadItems();
+    }
+
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+/** Knowledge type → badge color helper */
+function _eduTypeBg(type) {
+  switch (type) {
+    case 'Quote': return '#6366F1';
+    case 'Tip': return '#10B981';
+    case 'Concept': return '#F59E0B';
+    case 'Mini-Lesson': return '#3B82F6';
+    case 'Manifesto': return '#EC4899';
+    case 'Negotiation Set': return '#8B5CF6';
+    default: return '#6B7280';
+  }
+}
+
+/** Form row helper for Knowledge Engine forms */
+function _eduFormRow(label) {
+  var row = el('div', { style: { marginBottom: '10px' } });
+  row.appendChild(el('label', { style: { fontSize: '11px', fontWeight: '600', display: 'block', marginBottom: '3px', color: 'var(--text-muted)' } }, label));
+  return row;
 }
 
 // ═══════════════════════════════════════
@@ -4970,6 +5344,11 @@ function _renderMembershipInsights(container, ms, showDetail) {
 // PREDICTIVE WORKLOAD BALANCING (steward-only)
 // ═══════════════════════════════════════
 
+/**
+ * Renders workload prediction and rebalancing suggestion cards.
+ * Called from renderWorkloadTracker (in member_view.html) when role is steward.
+ * @param {Element} container - Container to append cards to
+ */
 function _renderWorkloadPredictions(container) {
   // No-op in SolidBase — WorkloadService not available
 }
@@ -5008,10 +5387,7 @@ function _renderWorkloadInsights(container, wl, showDetail) {
       }
       items.sort(function(a, b) { return b.count - a.count; });
       _renderInsightDetailList(panel, items, 'var(--info)');
-      var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
-        if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
-      }}, 'View Workload Tracker \u2192');
-      panel.appendChild(navBtn);
+      // Workload Tracker nav removed — not available in SolidBase
     });
   }));
 
@@ -9199,5 +9575,81 @@ function _loadAnalytics(container, days, statsGrid, perfGrid, tabsList, dailyCha
       statsGrid.innerHTML = '<div style="color:var(--danger);padding:12px">Failed to load analytics: ' + escapeHtml(String(err)) + '</div>';
     })
     .dataGetUsageAnalytics(SESSION_TOKEN, days);
+}
+
+// ═══════════════════════════════════════
+// MEETING CHECK-IN BANNER (v4.43.0)
+// ═══════════════════════════════════════
+
+function _renderStewardCheckInBanner(container, meeting) {
+  var banner = el('div', { className: 'checkin-banner fade-in' });
+  banner.appendChild(el('span', { className: 'checkin-banner-icon' }, '\u2705'));
+
+  var info = el('div', { className: 'checkin-banner-info' });
+  info.appendChild(el('div', { className: 'checkin-banner-title' }, escapeHtml(meeting.meetingName || 'Meeting Check-In')));
+  var detail = meeting.meetingType || '';
+  if (meeting.meetingTime) detail += (detail ? ' \u00B7 ' : '') + meeting.meetingTime;
+  if (detail) info.appendChild(el('div', { className: 'checkin-banner-detail' }, detail));
+  banner.appendChild(info);
+
+  var btn = el('button', {
+    className: 'checkin-banner-btn',
+    onClick: function() {
+      btn.disabled = true;
+      btn.textContent = 'Checking in\u2026';
+      serverCall()
+        .withSuccessHandler(function(r) {
+          if (r && r.success) {
+            banner.innerHTML = '';
+            banner.appendChild(el('span', { className: 'checkin-banner-icon' }, '\uD83C\uDF89'));
+            var doneInfo = el('div', { className: 'checkin-banner-info' });
+            doneInfo.appendChild(el('div', { className: 'checkin-banner-title' }, 'Checked In!'));
+            doneInfo.appendChild(el('div', { className: 'checkin-banner-detail' }, escapeHtml(r.memberName || 'You') + ' \u2014 ' + escapeHtml(meeting.meetingName || '')));
+            banner.appendChild(doneInfo);
+            banner.appendChild(el('span', { className: 'checkin-banner-done' }, '\u2714 Done'));
+            var cached = DataCache.get('activeMeeting');
+            if (cached) { cached.alreadyCheckedIn = true; DataCache.set('activeMeeting', cached); }
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'Check In';
+            if (r && r.alreadyCheckedIn) {
+              btn.textContent = '\u2714 Already In';
+              btn.disabled = true;
+            } else {
+              alert(r && r.error ? r.error : 'Check-in failed. Please try again.');
+            }
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Check In';
+          alert('Error: ' + (err && err.message ? err.message : 'Check-in failed'));
+        })
+        .dataWebAppCheckIn(SESSION_TOKEN, meeting.meetingId);
+    }
+  }, 'Check In');
+  banner.appendChild(btn);
+
+  var firstCard = container.querySelector('.card, .content, .kpi-strip');
+  if (firstCard) container.insertBefore(banner, firstCard);
+  else container.appendChild(banner);
+}
+
+function _renderStewardCheckedInBanner(container, meeting) {
+  var banner = el('div', { className: 'checkin-banner fade-in' });
+  banner.appendChild(el('span', { className: 'checkin-banner-icon' }, '\uD83C\uDF89'));
+
+  var info = el('div', { className: 'checkin-banner-info' });
+  info.appendChild(el('div', { className: 'checkin-banner-title' }, 'Checked In!'));
+  var detail = escapeHtml(meeting.meetingName || '');
+  if (meeting.meetingTime) detail += ' \u00B7 ' + meeting.meetingTime;
+  info.appendChild(el('div', { className: 'checkin-banner-detail' }, detail));
+  banner.appendChild(info);
+
+  banner.appendChild(el('span', { className: 'checkin-banner-done' }, '\u2714 Done'));
+
+  var firstCard = container.querySelector('.card, .content, .kpi-strip');
+  if (firstCard) container.insertBefore(banner, firstCard);
+  else container.appendChild(banner);
 }
 </script>

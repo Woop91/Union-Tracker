@@ -50,7 +50,8 @@ function createDashboardMenu() {
   // ============================================================================
   // MENU 1: Union Hub — Daily Operations
   // ============================================================================
-  ui.createMenu('📊 ' + localNumber + ' Union Hub')
+  var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? ' v' + VERSION_INFO.version : '';
+  ui.createMenu('📊 ' + localNumber + ' Union Hub' + ver)
     .addSubMenu(ui.createMenu('🔍 Search')
       .addItem('🔍 Desktop Search', 'showDesktopSearch')
       .addItem('⚡ Quick Search', 'showQuickSearch')
@@ -117,6 +118,7 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('📅 Calendar & Meetings')
       .addItem('📝 Setup New Meeting', 'showSetupMeetingDialog')
       .addItem('✅ Open Meeting Check-In', 'showMeetingCheckInDialog')
+      .addItem('📱 QR Code Check-In', 'showMeetingQRCodeDialog')
       .addItem('📅 Add New Event', 'showAddEventModal')
       .addItem('📝 Add Meeting Minutes', 'showAddMinutesModal')
       .addItem('📋 Take Attendance', 'showTakeAttendanceModal')
@@ -332,6 +334,7 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('🎨 Styling')
       .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
       .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('📑 Apply Tab Titles', 'migrateSheetTabTitles')
       .addItem('🖌️ Setup Theme Columns', 'setupThemeColumns'))
 
     .addSubMenu(ui.createMenu('🌐 Web App & Portal')
@@ -2081,7 +2084,7 @@ function sendMemberDashboardLink() {
       COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
-      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
+      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your SolidBase Access", body);
       ui.alert('Dashboard access link sent to ' + email);
     } catch (e) {
       ui.alert('Error sending email: ' + e.message);
@@ -3749,11 +3752,11 @@ function getWelcomeWizardHtml_() {
     '<script>' +
     'var step = 0, totalSteps = 4;' +
     'var steps = [' +
-    '  { title: "Welcome to Your Union Dashboard!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
+    '  { title: "Welcome to Your SolidBase!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
     '  { title: "Step 1: Organization Setup", desc: "Open the <strong>Config</strong> tab and fill in:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Organization Name</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Local Number</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Time Zone</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Contact Email</div>" },' +
     '  { title: "Step 2: Add Your First Members", desc: "Open <strong>Member Directory</strong> and add at least one member:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Add yourself as the first steward</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Import or manually add members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Assign steward roles</div>" },' +
     '  { title: "Step 3: Explore Key Features", desc: "Try these essential features:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Open Union Hub menu — explore Search & Members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Create a test grievance case</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Check the Getting Started tab for more guidance</div>" },' +
-    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using your Union Dashboard!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
+    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using your SolidBase!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
     '];' +
     'totalSteps = steps.length;' +
     'function render() {' +

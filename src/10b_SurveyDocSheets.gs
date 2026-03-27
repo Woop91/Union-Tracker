@@ -183,13 +183,13 @@ function createSurveyQuestionsSheet(ss) {
     // ── Section 13: Workforce Mobility & Retention ──────────────────────────
     // Always shown — gauges retention risk and transfer awareness across membership.
     // q82–q83 are conditional (Section 13A) on q81=Yes.
-    ['q80','13','WORKFORCE_RETENTION','Workforce Mobility','How likely are you to still be working at your current agency one year from now?','radio','Y','Y','Very Likely|Likely|Uncertain|Unlikely|Very Unlikely','','','','','','',''],
-    ['q81','13','WORKFORCE_RETENTION','Workforce Mobility','Are you currently exploring job opportunities outside your current agency?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 13A (q82, q83)'],
+    ['q80','13','WORKFORCE_RETENTION','Workforce Mobility','How likely are you to still be working here one year from now?','radio','Y','Y','Very Likely|Likely|Uncertain|Unlikely|Very Unlikely','','','','','','',''],
+    ['q81','13','WORKFORCE_RETENTION','Workforce Mobility','Are you currently exploring job opportunities outside your organization?','radio-branch','Y','Y','Yes|No','','','','','','','Branch: Yes → 13A (q82, q83)'],
     ['q84','13','WORKFORCE_RETENTION','Workforce Mobility','The union is effectively addressing the workplace factors that most influence members\' decisions to stay or leave.','slider-10','Y','Y','','','','','','Strongly Disagree','Strongly Agree',''],
-    ['q86','13','WORKFORCE_RETENTION','Workforce Mobility','What would most encourage you to stay at your current agency? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
-    // ── Section 13A: Considering Other Opportunities (Q81=Yes) ──────────────────────────────────
-    ['q82','13A','WORKFORCE_LEAVING','Outside Your Agency','What types of opportunities are you exploring outside your current agency? Select all that apply.','checkbox','Y','Y','Transfer to another state agency|Leaving state service entirely|Private sector|Non-profit or education|Not sure yet','q81','Yes','','2','','','Max 2 selections. Only shown if Q81=Yes. External options only.'],
-    ['q83','13A','WORKFORCE_LEAVING','Outside Your Agency','What are the primary reasons you are considering leaving? Select up to 3.','checkbox','Y','Y','Pay & Benefits|Workload / Caseload|Management & Supervision|Limited Advancement or Transfer Opportunities|Work-Life Balance|Return-to-Office Policy|Job Stress / Burnout|Workplace Culture|Other','q81','Yes','','3','','','Max 3 selections. Q85 transfer awareness folded into \"Limited Advancement or Transfer Opportunities\" option. Only shown if Q81=Yes']
+    ['q86','13','WORKFORCE_RETENTION','Workforce Mobility','What would most encourage you to stay at your organization? (optional)','paragraph','N','Y','','','','','','','','Optional open text'],
+    // ── Section 13A: Leaving Organization (Q81=Yes) ──────────────────────────────────
+    ['q82','13A','WORKFORCE_LEAVING','Exploring Outside Options','What types of opportunities are you exploring outside your organization? Select all that apply.','checkbox','Y','Y','Transfer to another MA state agency|Leaving state service entirely|Private sector|Non-profit or education|Not sure yet','q81','Yes','','2','','','Max 2 selections. Only shown if Q81=Yes. External options only.'],
+    ['q83','13A','WORKFORCE_LEAVING','Exploring Outside Options','What are the primary reasons you are considering leaving? Select up to 3.','checkbox','Y','Y','Pay & Benefits|Workload / Caseload|Management & Supervision|Limited Advancement or Transfer Opportunities|Work-Life Balance|Return-to-Office Policy|Job Stress / Burnout|Workplace Culture|Other','q81','Yes','','3','','','Max 3 selections. Q85 transfer awareness folded into \"Limited Advancement or Transfer Opportunities\" option. Only shown if Q81=Yes']
   ];
 
   // Build set of existing question IDs so we don't overwrite user edits
@@ -2037,7 +2037,7 @@ function createNotificationsSheet(ss) {
       'NOTIF-001',
       'All Members',
       'Announcement',
-      'Welcome to the Union Dashboard',
+      'Welcome to the SolidBase',
       'Your union dashboard is now live! Here you can check in to meetings, learn about your rights, and track grievance progress. Contact your steward if you have any questions.',
       'Normal',
       systemEmail,
@@ -2160,4 +2160,272 @@ function createResourceConfigSheet(ss) {
   sheet.getRange(1, 1, defaultCategories.length + 1, headers.length).createFilter();
 
   return sheet;
+}
+
+// ============================================================================
+// KNOWLEDGE ENGINE SHEET (v4.41.0)
+// ============================================================================
+// Centralized content management for all educational content displayed in the
+// webapp: negotiation knowledge sets, auth manifesto phrases, auth quotes,
+// member hub life/negotiation cards, and inline quotes. Replaces hardcoded
+// arrays in negotiation_knowledge.html, auth_manifesto.html, and
+// member_hub_view.html with a single steward-managed sheet.
+// ============================================================================
+
+/**
+ * Creates the 📚 Knowledge Engine sheet with seed content migrated from
+ * previously hardcoded arrays.
+ * @param {Spreadsheet} [ss] - Spreadsheet instance (defaults to active)
+ * @returns {Sheet} The created or existing sheet
+ */
+function createKnowledgeEngineSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+
+  // Don't recreate if exists
+  var existing = ss.getSheetByName(SHEETS.KNOWLEDGE_ENGINE);
+  if (existing) return existing;
+
+  var sheet = ss.insertSheet(SHEETS.KNOWLEDGE_ENGINE);
+
+  // Headers from header map (single source of truth — 01_Core.gs)
+  var headers = getHeadersFromMap_(KNOWLEDGE_HEADER_MAP_);
+  var headerRow = 1;
+  sheet.getRange(headerRow, 1, 1, headers.length).setValues([headers]);
+
+  // Header formatting
+  sheet.getRange(headerRow, 1, 1, headers.length)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(KNOWLEDGE_COLS.CONTENT_ID, 100);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.TYPE, 140);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.CATEGORY, 140);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.TITLE, 250);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.CONTENT, 500);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.ATTRIBUTION, 200);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.BULLETS, 500);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.AUDIENCE, 100);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.PLACEMENT, 140);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.ACTIVE, 60);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.PRIORITY, 70);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.START_DATE, 100);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.END_DATE, 100);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.DATE_ADDED, 100);
+  sheet.setColumnWidth(KNOWLEDGE_COLS.ADDED_BY, 140);
+
+  // Data validation — Type
+  var typeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Quote', 'Tip', 'Concept', 'Mini-Lesson', 'Manifesto', 'Negotiation Set'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, KNOWLEDGE_COLS.TYPE, 500).setDataValidation(typeRule);
+
+  // Data validation — Category
+  var catRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Negotiation', 'Rights', 'Grievance', 'Safety', 'Labor', 'General'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, KNOWLEDGE_COLS.CATEGORY, 500).setDataValidation(catRule);
+
+  // Data validation — Audience
+  var audRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['All', 'Members', 'Stewards'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, KNOWLEDGE_COLS.AUDIENCE, 500).setDataValidation(audRule);
+
+  // Data validation — Placement
+  var placeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Auth Screen', 'Home Widget', 'Sidebar', 'Hub Section', 'Inline Quote'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, KNOWLEDGE_COLS.PLACEMENT, 500).setDataValidation(placeRule);
+
+  // Data validation — Active
+  var activeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Yes', 'No'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, KNOWLEDGE_COLS.ACTIVE, 500).setDataValidation(activeRule);
+
+  // ── SEED DATA ─────────────────────────────────────────────────────────
+  var tz = Session.getScriptTimeZone();
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var seedRows = _buildKnowledgeSeedData_(today);
+
+  if (seedRows.length > 0) {
+    sheet.getRange(2, 1, seedRows.length, headers.length).setValues(seedRows);
+  }
+
+  // Wrap text on content and bullets columns
+  sheet.getRange(2, KNOWLEDGE_COLS.CONTENT, 500).setWrap(true);
+  sheet.getRange(2, KNOWLEDGE_COLS.BULLETS, 500).setWrap(true);
+
+  // Freeze header
+  sheet.setFrozenRows(1);
+
+  // Tab color — purple to distinguish from Resources (blue)
+  sheet.setTabColor('#7C3AED');
+
+  // Apply filter
+  var dataRange = sheet.getRange(1, 1, seedRows.length + 1, headers.length);
+  dataRange.createFilter();
+
+  return sheet;
+}
+
+/**
+ * Builds the seed data rows for the Knowledge Engine sheet.
+ * Migrates content from negotiation_knowledge.html, auth_manifesto.html,
+ * and member_hub_view.html into structured sheet rows.
+ * @param {string} today - Formatted date string
+ * @returns {Array<Array>} 2D array of seed rows
+ * @private
+ */
+function _buildKnowledgeSeedData_(today) {
+  var id = 0;
+  var rows = [];
+
+  function nextId() {
+    id++;
+    return 'KE-' + String(id).padStart(3, '0');
+  }
+
+  // ── NEGOTIATION SETS (from negotiation_knowledge.html) ─────────────
+  var negSets = [
+    { title: 'What Is Negotiation?', quote: 'Let us never negotiate out of fear. But let us never fear to negotiate.', attr: 'John F. Kennedy',
+      bullets: 'A dialogue between two or more parties seeking mutual agreement.|It is not about winning or losing \u2014 it is about finding solutions.|Every conversation where something of value is at stake is a negotiation.' },
+    { title: 'Mediation vs. Arbitration', quote: 'Mediation is not about who is right or wrong. It is about finding a path forward together.', attr: 'Labor tradition',
+      bullets: 'Mediation: neutral facilitator helps YOU decide. Non-binding.|Arbitration: neutral decision-maker renders a binding ruling.|Mediation preserves relationships. Arbitration delivers finality.|Try mediation first. Arbitration is your credible fallback.' },
+    { title: 'BATNA', quote: 'Your BATNA is the standard against which any proposed agreement should be measured.', attr: 'Fisher & Ury, Getting to Yes',
+      bullets: 'Best Alternative To a Negotiated Agreement \u2014 your walk-away power.|The stronger your BATNA, the stronger your position at the table.|Never reveal a weak BATNA. Work to strengthen it first.|Always assess the other side\u2019s BATNA too.' },
+    { title: 'The Anchor Point', quote: 'In any negotiation, the person who sets the anchor controls the range of discussion.', attr: 'Negotiation principle',
+      bullets: 'The first offer powerfully influences the final outcome.|Set an ambitious but defensible anchor \u2014 back it with facts.|If the other side anchors first, don\u2019t let it pull you.|Counter-anchor with objective criteria: contract, precedent, law.' },
+    { title: 'The Flinch', quote: 'Your reaction to an offer is often more powerful than your counter-offer.', attr: 'Jim Camp',
+      bullets: 'When they make an offer, react visibly \u2014 even if it\u2019s reasonable.|A sharp inhale, raised eyebrow, or pause sends a clear signal.|Most people rush to close the gap when they see disapproval.|The flinch works because people are uncomfortable with rejection.' },
+    { title: 'Use Silence', quote: 'Silence is a source of great strength.', attr: 'Lao Tzu',
+      bullets: 'After making a proposal, stop talking. Let the other side respond.|Silence creates pressure and space for the other party to fill.|Resist negotiating against yourself by speaking to fill the void.|The first person to speak after a proposal usually concedes.' },
+    { title: 'When a Conversation Becomes a Negotiation', quote: 'If you\u2019re not at the table, you\u2019re on the menu.', attr: 'Labor tradition',
+      bullets: 'The moment someone makes a request that affects your rights \u2014 you\u2019re negotiating.|Informal hallway chats with management often shape outcomes before formal meetings.|\u201CJust this once\u201D is never just once \u2014 it sets a precedent.|If you feel pressure to answer immediately, that IS the negotiation.' },
+    { title: 'Dealing with Hard Bargainers', quote: 'The best defense against dirty tactics is to recognize them. Once named, they lose their power.', attr: 'Fisher & Ury',
+      bullets: 'Take-it-or-leave-it: Almost always a bluff. Say \u201CLet me take it back to the team.\u201D|Good Cop / Bad Cop: Treat them as one unit. Don\u2019t trust the \u201Creasonable\u201D one.|Intimidation: Stay calm. Don\u2019t match their energy. Suggest a break.|Name the tactic out loud \u2014 \u201CIt sounds like a take-it-or-leave-it\u201D \u2014 to neutralize it.' },
+    { title: 'Hard Bargainer: The Nibble', quote: 'Small concessions add up to big losses if you\u2019re not tracking them.', attr: 'Negotiation principle',
+      bullets: 'After the big issues are settled, they ask for \u201Cone small thing\u201D \u2014 then another.|Each seems minor, so refusing feels petty. But they add up fast.|Counter: \u201CWe\u2019ve already reached agreement. Any changes reopen the whole discussion.\u201D|Track every concession on paper. Make the pattern visible.' },
+    { title: 'Interests vs. Positions', quote: 'Behind opposed positions lie shared and compatible interests.', attr: 'Getting to Yes',
+      bullets: 'A position is what someone says they want. An interest is WHY they want it.|Ask \u201Cwhy?\u201D and \u201Cwhy not?\u201D to uncover what really matters.|Solutions that satisfy both sides\u2019 interests are the most durable.|Two people fighting over an orange: one wants the juice, one wants the peel.' },
+    { title: 'Prepare Relentlessly', quote: 'By failing to prepare, you are preparing to fail.', attr: 'Benjamin Franklin',
+      bullets: 'Know the contract inside and out before you sit down.|Research past grievance outcomes and precedents.|Anticipate management\u2019s arguments and prepare rebuttals.|Bring documentation \u2014 facts beat opinions every time.' },
+    { title: 'The ZOPA', quote: 'You don\u2019t get what you deserve. You get what you negotiate.', attr: 'Chester L. Karrass',
+      bullets: 'Zone of Possible Agreement: the overlap where a deal is possible.|If the zones don\u2019t overlap, you\u2019re heading to impasse or arbitration.|Your job: figure out where the ZOPA is and capture as much value as possible.|A strong BATNA shifts the ZOPA in your favor.' },
+    { title: 'Never Accept the First Offer', quote: 'The first offer is never the best offer.', attr: 'Negotiation principle',
+      bullets: 'The first offer is almost always a test of where you stand.|Countering shows you are prepared and engaged.|Even if the offer seems fair, there is usually room to improve it.|Accepting too fast can leave value on the table \u2014 and signal weakness.' },
+    { title: 'False Authority Trap', quote: 'Always ask: Do you have the authority to make a deal today?', attr: 'Negotiation principle',
+      bullets: 'They negotiate, reach agreement, then say \u201CI need to check with my boss.\u201D|The boss rejects it and demands more concessions.|You\u2019ve invested time and energy \u2014 starting over feels worse than giving in.|Counter: Ask upfront who has final authority. Negotiate with them.' },
+    { title: 'Control the Pace', quote: 'The person with the most patience almost always wins.', attr: 'Negotiation principle',
+      bullets: 'If they rush you, slow down. \u201CLet me think about that.\u201D|If they stall, set deadlines and escalate when timelines are violated.|Never agree under pressure \u2014 a good deal today is still good tomorrow.|You do not have to answer right now. That is always acceptable.' },
+    { title: 'Document Everything', quote: 'Hard bargainers rely on deniability. Written records eliminate that.', attr: 'Labor tradition',
+      bullets: 'Write down what was said, when, and by whom \u2014 immediately.|Never negotiate alone. Always have a witness.|Follow up verbal agreements with a written summary.|If it\u2019s not documented, it didn\u2019t happen.' },
+    { title: 'The Power of "We"', quote: 'Coming together is a beginning, staying together is progress, and working together is success.', attr: 'Henry Ford',
+      bullets: 'Frame proposals in terms of mutual benefit: \u201CHow can we solve this?\u201D|Collaborative language reduces defensiveness.|Even in adversarial settings, \u201Cwe\u201D language can shift dynamics.|The goal is a solution, not a surrender.' },
+    { title: 'Five Negotiation Styles', quote: 'Effective negotiators don\u2019t have one style \u2014 they adapt to the situation.', attr: 'Negotiation wisdom',
+      bullets: 'Competing: Win-lose. Use when rights are clearly violated or urgency is high.|Collaborating: Win-win. Use when the relationship matters and issues are complex.|Compromising: Split the difference. Use when time is limited.|Avoiding: Withdraw or delay. Use when emotions need to cool.|Accommodating: Yield to preserve the relationship when building goodwill matters.' },
+    { title: 'Use Objective Criteria', quote: 'The more you bring standards of fairness to bear on your problem, the more likely you produce a wise and fair result.', attr: 'Getting to Yes',
+      bullets: 'Reference contract language, past practice, labor law, and industry standards.|Objective criteria depersonalize the negotiation.|They make your position harder to dismiss \u2014 facts beat opinions.|Ask: \u201CWhat standard should we use to decide this fairly?\u201D' },
+    { title: 'Know When to Walk Away', quote: 'A bad deal is worse than no deal. Always know your BATNA.', attr: 'Negotiation principle',
+      bullets: 'Walking away is not failure \u2014 it is a strategic choice.|A bad deal today sets a worse precedent for tomorrow.|Always refer back to your BATNA before accepting.|If it doesn\u2019t work today, it can work tomorrow.' },
+    { title: 'Hard Bargainer: Lowball / Highball', quote: 'He who speaks first sets the stage. He who speaks wisely sets the terms.', attr: 'Negotiation wisdom',
+      bullets: 'They open with an absurdly extreme position to shift the anchor.|Even if you reject it, your counter-offer gets pulled toward their extreme.|Don\u2019t counter immediately. Reframe: \u201CThat\u2019s not in any range we can discuss.\u201D|Re-anchor with objective criteria: contract language, past practice, law.' },
+    { title: 'Hard Bargainer: Stalling & Delay', quote: 'The person with the most patience in a negotiation almost always wins.', attr: 'Negotiation principle',
+      bullets: 'They drag out the process, miss deadlines, cancel meetings.|Delay favors whoever benefits from the status quo \u2014 usually management.|Set deadlines. Document delays. Escalate when timelines are violated.|Time pressure works both ways \u2014 apply it.' },
+    { title: 'Hard Bargainer: Personal Attacks', quote: 'Never let someone else\u2019s emotions dictate your decisions.', attr: 'Negotiation wisdom',
+      bullets: 'They attack your credibility, experience, or motives instead of the issue.|It puts you on the defensive, shifting focus from the problem to you.|Redirect: \u201CLet\u2019s keep this focused on the issue and the contract language.\u201D|Never take the bait \u2014 redirect every time.' },
+    { title: 'Listen More Than You Talk', quote: 'The cheap concession is to listen. The expensive one is to talk.', attr: 'Chris Voss',
+      bullets: 'Active listening reveals the other side\u2019s priorities, fears, and constraints.|Ask open-ended questions: \u201CHelp me understand your concern here.\u201D|Paraphrase back what you hear \u2014 it builds trust and ensures clarity.|The best negotiators are the best listeners.' },
+    { title: 'Strip the Emotion', quote: 'During a negotiation, it would be wise not to take anything personally.', attr: 'Brian Koslow',
+      bullets: 'Emotion clouds judgment and leads to reactive concessions.|If you feel emotional, take a break. Emotions are their weapon.|Separate how you feel from what the facts say.|Respond, don\u2019t react. They want you to react \u2014 refuse.' }
+  ];
+
+  for (var n = 0; n < negSets.length; n++) {
+    var s = negSets[n];
+    rows.push([nextId(), 'Negotiation Set', 'Negotiation', s.title, s.quote, s.attr, s.bullets, 'All', 'Home Widget', 'Yes', n + 1, '', '', today, 'System']);
+  }
+
+  // ── AUTH MANIFESTO PHRASES ──────────────────────────────────────────
+  var manifestoPhrases = [
+    "Work stress doesn\u2019t clock out at 5.",
+    "The union is waiting for you.",
+    "Your rights don't end when you leave.",
+    "You are the change.",
+    "Solidarity is not a slogan. It's a practice.",
+    "Together we bargain. Alone we beg.",
+    "The future is collective.",
+    "Never fear to negotiate.",
+    "Be hard on the problem, soft on the people.",
+    "Silence is strength.",
+    "You get what you negotiate.",
+    "Prepare relentlessly.",
+    "Know your walk-away.",
+    "Listen more than you talk."
+  ];
+
+  for (var m = 0; m < manifestoPhrases.length; m++) {
+    rows.push([nextId(), 'Manifesto', 'Labor', manifestoPhrases[m], manifestoPhrases[m], '', '', 'All', 'Auth Screen', 'Yes', m + 1, '', '', today, 'System']);
+  }
+
+  // ── AUTH QUOTES (login screen + hub inline quotes) ──────────────────
+  var authQuotes = [
+    { text: "An injury to one is an injury to all.", attr: "IWW motto" },
+    { text: "Don't mourn. Organize.", attr: "Joe Hill, 1915" },
+    { text: "Strong unions mean strong communities.", attr: "Labor tradition" },
+    { text: "Wages are not given. They are won.", attr: "Labor tradition" },
+    { text: "We don't need to be saved. We need to be heard.", attr: "Labor tradition" },
+    { text: "No work is insignificant. All labor that uplifts humanity has dignity.", attr: "Martin Luther King Jr." },
+    { text: "Power concedes nothing without a demand.", attr: "Frederick Douglass, 1857" },
+    { text: "The cause of labor is the cause of humanity.", attr: "Samuel Gompers" },
+    { text: "Workers built this country. Workers will rebuild it.", attr: "Labor tradition" },
+    { text: "The only answer to organized greed is organized labor.", attr: "Thomas Donahue" },
+    { text: "What workers need is their full share of the wealth they create.", attr: "Samuel Gompers" },
+    { text: "The contract is the floor, not the ceiling.", attr: "Labor tradition" },
+    { text: "You are the union.", attr: "Labor tradition" },
+    { text: "Collective action is individual protection.", attr: "Labor tradition" },
+    { text: "The union is only as strong as its members.", attr: "Labor tradition" },
+    { text: "Let us never negotiate out of fear. But let us never fear to negotiate.", attr: "John F. Kennedy" },
+    { text: "By failing to prepare, you are preparing to fail.", attr: "Benjamin Franklin" },
+    { text: "Be hard on the problem, soft on the people.", attr: "Fisher & Ury, Getting to Yes" },
+    { text: "Silence is a source of great strength.", attr: "Lao Tzu" },
+    { text: "You don't get what you deserve. You get what you negotiate.", attr: "Chester L. Karrass" },
+    { text: "The cheap concession is to listen. The expensive one is to talk.", attr: "Chris Voss" },
+    { text: "Courage is what it takes to stand up and speak; courage is also what it takes to sit down and listen.", attr: "Winston Churchill" },
+    { text: "Everything is negotiable. Whether or not the negotiation is easy is another thing.", attr: "Carrie Fisher" },
+    { text: "Know what you want, know what they want, and find where those two things meet.", attr: "Negotiation wisdom" },
+    { text: "A bad deal is worse than no deal. Always know your BATNA.", attr: "Negotiation principle" },
+    { text: "The best negotiators are the best listeners.", attr: "Negotiation wisdom" },
+    { text: "Coming together is a beginning, staying together is progress, and working together is success.", attr: "Henry Ford" },
+    { text: "The best defense against dirty tactics is to recognize them.", attr: "Fisher & Ury" },
+    { text: "If you're not at the table, you're on the menu.", attr: "Labor tradition" },
+    { text: "During a negotiation, it would be wise not to take anything personally.", attr: "Brian Koslow" },
+    { text: "The most difficult thing in any negotiation is making sure that you strip it of the emotion and deal with the facts.", attr: "Howard Baker" },
+    { text: "A negotiator should observe everything. You must be part Sherlock Holmes, part Sigmund Freud.", attr: "Victor Kiam" },
+    { text: "When the deal is too good, think twice.", attr: "Negotiation wisdom" },
+    { text: "The skilled negotiator knows that the other side's problem is your problem too.", attr: "Negotiation wisdom" },
+    { text: "The moment someone asks you for something you have the power to give or withhold, you are negotiating.", attr: "Negotiation wisdom" },
+    { text: "Hard bargainers count on you being unprepared, emotional, or afraid. Be none of those things.", attr: "Negotiation wisdom" },
+    { text: "Never let someone else's emotions dictate your decisions.", attr: "Negotiation wisdom" },
+    { text: "They want you to react. Refuse. Respond instead.", attr: "Negotiation wisdom" },
+    { text: "The art of negotiation is not about being the loudest voice in the room. It is about being the most prepared.", attr: "Negotiation wisdom" },
+    { text: "Negotiation is not a game. It is a process of finding solutions.", attr: "Negotiation wisdom" },
+    { text: "If you don't know where you'll go if this deal falls apart, you're negotiating blind.", attr: "Negotiation wisdom" },
+    { text: "Effective negotiators don't have one style \u2014 they adapt to the situation.", attr: "Negotiation wisdom" },
+    { text: "Arbitration is justice delivered by the chosen, not the appointed.", attr: "Labor tradition" }
+  ];
+
+  for (var q = 0; q < authQuotes.length; q++) {
+    rows.push([nextId(), 'Quote', 'Labor', '', authQuotes[q].text, authQuotes[q].attr, '', 'All', 'Inline Quote', 'Yes', q + 1, '', '', today, 'System']);
+  }
+
+  return rows;
 }

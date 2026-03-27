@@ -202,7 +202,19 @@ function createMockSpreadsheet(sheets) {
   (sheets || []).forEach(s => { sheetMap[s.getName()] = s; });
 
   return {
-    getSheetByName: jest.fn(name => sheetMap[name] || null),
+    getSheetByName: jest.fn(name => {
+      if (sheetMap[name]) return sheetMap[name];
+      // Fallback: check SHEET_LEGACY_NAMES_ for old→new mapping
+      if (typeof SHEET_LEGACY_NAMES_ !== 'undefined') {
+        var keys = Object.keys(SHEET_LEGACY_NAMES_);
+        for (var i = 0; i < keys.length; i++) {
+          if (SHEET_LEGACY_NAMES_[keys[i]] === name && sheetMap[keys[i]]) {
+            return sheetMap[keys[i]];
+          }
+        }
+      }
+      return null;
+    }),
     getSheets: jest.fn(() => sheets || []),
     toast: jest.fn(),
     insertSheet: jest.fn(name => {

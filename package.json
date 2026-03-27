@@ -1,6 +1,6 @@
 {
   "name": "solidbase-dashboard",
-  "version": "4.40.0",
+  "version": "4.43.1",
   "description": "SolidBase — Modular Union Steward Dashboard",
   "main": "build.js",
   "scripts": {

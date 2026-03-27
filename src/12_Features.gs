@@ -1250,8 +1250,8 @@ function syncChecklistCalcToGrievanceLog() {
 const EXTENSION_CONFIG = {
   HIDDEN_CALC_SHEET: "_Dashboard_Calc",
   DYNAMIC_FORMULA_ROW: 50,
-  MEMBER_SHEET: "Member Directory",
-  GRIEVANCE_SHEET: "Grievance Log",
+  MEMBER_SHEET: SHEETS.MEMBER_DIR,
+  GRIEVANCE_SHEET: SHEETS.GRIEVANCE_LOG,
   LEADER_ROLE_NAME: "Member Leader",
   CORE_COLUMN_COUNT: 32,
   CACHE_TTL_SECONDS: 300 // 5-minute cache for header maps

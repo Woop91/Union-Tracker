@@ -35,6 +35,7 @@ var Auth = (function () {
 
   var TOKEN_PREFIX = 'MAGIC_TOKEN_';
   var SESSION_PREFIX = 'SESSION_';
+  var DEVICE_KEY_PREFIX = 'DEVICE_KEY_';
 
   /**
    * Attempts to resolve the current user from available auth signals.
@@ -88,9 +89,21 @@ var Auth = (function () {
     try {
     email = String(email).trim().toLowerCase();
 
-    // Rate limiting — max 3 magic links per email per 15 minutes
+    // Cache reference — needed for both rate limiters below
     step = 'cache';
     var cache = CacheService.getScriptCache();
+
+    // Global session rate limit — prevent email enumeration via rapid attempts
+    var sessionId = Session.getTemporaryActiveUserKey() || 'anon';
+    var globalMagicKey = 'MAGIC_GLOBAL_' + sessionId;
+    var globalMagicCount = parseInt(cache.get(globalMagicKey) || '0', 10);
+    if (globalMagicCount >= 5) {
+      Utilities.sleep(500 + Math.floor(Math.random() * 500));
+      return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
+    }
+    cache.put(globalMagicKey, String(globalMagicCount + 1), 900);
+
+    // Rate limiting — max 3 magic links per email per 15 minutes
     var rateKey = 'MAGIC_RATE_' + email;
     var count = parseInt(cache.get(rateKey) || '0', 10);
     if (count >= 3) {
@@ -250,7 +263,7 @@ var Auth = (function () {
         var keys = Object.keys(allProps);
         for (var i = 0; i < keys.length; i++) {
           var k = keys[i];
-          if (k.indexOf('SESSION_') === 0 || k.indexOf('MAGIC_TOKEN_') === 0) {
+          if (k.indexOf('SESSION_') === 0 || k.indexOf('MAGIC_TOKEN_') === 0 || k.indexOf('DEVICE_KEY_') === 0) {
             try {
               var val = JSON.parse(allProps[k]);
               if (val.expiry && val.expiry < now) {
@@ -315,7 +328,7 @@ var Auth = (function () {
     var cleaned = 0;
 
     for (var key in all) {
-      if (key.indexOf(TOKEN_PREFIX) === 0 || key.indexOf(SESSION_PREFIX) === 0) {
+      if (key.indexOf(TOKEN_PREFIX) === 0 || key.indexOf(SESSION_PREFIX) === 0 || key.indexOf(DEVICE_KEY_PREFIX) === 0) {
         try {
           var data = JSON.parse(all[key]);
           if (data.expiry && data.expiry < now) {
@@ -483,6 +496,115 @@ var Auth = (function () {
       + '</div></body></html>';
   }
 
+  /**
+   * Hash a device key for storage lookup.
+   * @param {string} key
+   * @returns {string} hex-encoded SHA-256 hash
+   * @private
+   */
+  function _hashDeviceKey(key) {
+    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, key);
+    var hex = '';
+    for (var i = 0; i < digest.length; i++) {
+      hex += ('0' + (digest[i] & 0xff).toString(16)).slice(-2);
+    }
+    return hex;
+  }
+
+  /**
+   * Registers a device key for biometric/quick sign-in.
+   * Called after successful login to enable credential-manager-based re-auth.
+   * The device key is returned to the client for storage via PasswordCredential.
+   * Server stores only a hash → email mapping.
+   * @param {string} email - Verified user email (resolved server-side)
+   * @returns {Object} { success, deviceKey, displayName }
+   */
+  function registerDeviceKey(email) {
+    if (!email) return { success: false, message: 'No email provided.' };
+    email = String(email).trim().toLowerCase();
+
+    var deviceKey = _generateToken();
+    var hash = _hashDeviceKey(deviceKey);
+
+    // Device keys last 3x session duration (default 90 days)
+    var config;
+    try { config = ConfigReader.getConfig(); } catch (_) { config = {}; }
+    var ttl = (config.cookieDurationMs || 30 * 24 * 60 * 60 * 1000) * 3;
+
+    try {
+      var props = PropertiesService.getScriptProperties();
+      props.setProperty(DEVICE_KEY_PREFIX + hash, JSON.stringify({
+        email: email,
+        expiry: Date.now() + ttl,
+        created: Date.now()
+      }));
+    } catch (err) {
+      Logger.log('Auth.registerDeviceKey: storage failed: ' + err.message);
+      return { success: false, message: 'Could not register device key.' };
+    }
+
+    // Look up display name for credential manager label
+    var displayName = email;
+    try {
+      var userRecord = DataService.findUserByEmail(email);
+      if (userRecord && userRecord.name) displayName = userRecord.name;
+      else if (userRecord && userRecord.firstName) displayName = userRecord.firstName;
+    } catch (_) {}
+
+    return { success: true, deviceKey: deviceKey, displayName: displayName };
+  }
+
+  /**
+   * Authenticates via device key (biometric/quick sign-in flow).
+   * Looks up the hashed device key in ScriptProperties, creates a session token.
+   * @param {string} deviceKey - The plaintext device key from credential manager
+   * @returns {Object} { success, sessionToken, email, displayName } or error
+   */
+  function loginWithDeviceKey(deviceKey) {
+    if (!deviceKey) return { success: false, message: 'No device key provided.' };
+    deviceKey = String(deviceKey).trim();
+
+    var hash = _hashDeviceKey(deviceKey);
+    var props = PropertiesService.getScriptProperties();
+    var raw = props.getProperty(DEVICE_KEY_PREFIX + hash);
+    if (!raw) return { success: false, message: 'Device not recognized.' };
+
+    try {
+      var data = JSON.parse(raw);
+      if (data.expiry < Date.now()) {
+        props.deleteProperty(DEVICE_KEY_PREFIX + hash);
+        return { success: false, message: 'Device key expired. Please sign in again.' };
+      }
+
+      // Update last-used timestamp
+      data.lastUsed = Date.now();
+      props.setProperty(DEVICE_KEY_PREFIX + hash, JSON.stringify(data));
+
+      // Create session token
+      var token = createSessionToken(data.email, 'device_key');
+      if (token && typeof token === 'object' && token.error) {
+        return { success: false, message: 'Session creation failed.' };
+      }
+
+      // Look up display name
+      var displayName = data.email;
+      try {
+        var userRecord = DataService.findUserByEmail(data.email);
+        if (userRecord && userRecord.name) displayName = userRecord.name;
+        else if (userRecord && userRecord.firstName) displayName = userRecord.firstName;
+      } catch (_) {}
+
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('DEVICE_KEY_LOGIN', { email: data.email });
+      }
+
+      return { success: true, sessionToken: token, email: data.email, displayName: displayName };
+    } catch (err) {
+      Logger.log('Auth.loginWithDeviceKey error: ' + err.message);
+      return { success: false, message: 'Device key validation failed.' };
+    }
+  }
+
   // Public API
   return {
     resolveUser: resolveUser,
@@ -505,6 +627,8 @@ var Auth = (function () {
      * @param {string} token
      * @returns {boolean}
      */
+    registerDeviceKey: registerDeviceKey,
+    loginWithDeviceKey: loginWithDeviceKey,
     isPINSession: function(token) {
       if (!token) return false;
       var data = _getSessionData(token);
@@ -545,6 +669,31 @@ function authCreateSessionToken() {
 function authLogout(sessionToken) {
   Auth.invalidateSession(sessionToken);
   return { success: true };
+}
+
+/**
+ * Client-callable: Register a device key for biometric quick sign-in.
+ * Email resolved server-side from session — never trusts client-supplied email.
+ * @param {string} sessionToken - Current session token for identity resolution
+ * @returns {Object} { success, deviceKey, displayName }
+ */
+function authRegisterDeviceKey(sessionToken) {
+  var email = '';
+  try { email = Session.getActiveUser().getEmail(); } catch (_) {}
+  if (!email && sessionToken) {
+    email = Auth.resolveEmailFromToken(sessionToken);
+  }
+  if (!email) return { success: false, message: 'Not authenticated.' };
+  return Auth.registerDeviceKey(email);
+}
+
+/**
+ * Client-callable: Authenticate via device key (biometric flow).
+ * @param {string} deviceKey - The device key from credential manager
+ * @returns {Object} { success, sessionToken, email, displayName }
+ */
+function authLoginWithDeviceKey(deviceKey) {
+  return Auth.loginWithDeviceKey(deviceKey);
 }
 
 /**

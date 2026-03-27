@@ -2081,6 +2081,77 @@ button:focus-visible, [role="button"]:focus-visible {
   white-space: nowrap;
 }
 
+/* ─── Meeting Check-in Banner ───────── */
+.checkin-banner {
+  margin: 0 16px 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: rgba(5,150,105,0.10);
+  border: 1px solid rgba(5,150,105,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: checkinSlide 0.3s ease;
+}
+@keyframes checkinSlide {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.checkin-banner-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.checkin-banner-info {
+  flex: 1;
+  min-width: 0;
+}
+.checkin-banner-title {
+  font-family: var(--fontBody);
+  font-size: 0.8125rem;
+  color: var(--success);
+  font-weight: 700;
+}
+.checkin-banner-detail {
+  font-family: var(--fontBody);
+  font-size: 0.6875rem;
+  color: var(--muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.checkin-banner-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--success);
+  color: #fff;
+  font-family: var(--fontBody);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.checkin-banner-btn:hover {
+  opacity: 0.9;
+}
+.checkin-banner-btn:active {
+  transform: scale(0.97);
+}
+.checkin-banner-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.checkin-banner-done {
+  font-family: var(--fontBody);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--success);
+  white-space: nowrap;
+}
+
 /* ═══════════════════════════════════════
    BAR CHART (CSS-only)
    ═══════════════════════════════════════ */
