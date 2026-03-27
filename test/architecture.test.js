@@ -763,7 +763,7 @@ describe('A11b: Client-callable HTML endpoints have error handling', () => {
   // HTML-serving endpoints — serve static content, auth enforced by doGet().
   // No per-function auth check: Session.getActiveUser().getEmail() returns empty
   // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
-  // SolidBase: getPOMSReferenceHtml excluded (POMS not in SolidBase)
+  // SolidBase: getPOMSReferenceHtml is a stub (no try/catch needed)
   const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml'];
 
   htmlEndpoints.forEach(fn => {
@@ -1139,6 +1139,7 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataSetDefaultView',              // writes to ScriptProperties (per-user view preference, no DataService needed)
     'dataLogUsageEvents',              // writes directly to _Usage_Log sheet (usage tracking, no DataService needed)
     'dataGetUsageAnalytics',           // reads _Usage_Log sheet directly for admin analytics dashboard (v4.40.0)
+    'dataWebAppCheckIn',               // inline implementation: session-auth one-tap check-in with TOCTOU lock (v4.43.1)
   ];
 
   wrappers

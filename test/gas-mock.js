@@ -58,7 +58,8 @@ global.Session = {
   getEffectiveUser: jest.fn(() => ({
     getEmail: jest.fn(() => 'test@example.com')
   })),
-  getScriptTimeZone: jest.fn(() => 'America/Los_Angeles')
+  getScriptTimeZone: jest.fn(() => 'America/Los_Angeles'),
+  getTemporaryActiveUserKey: jest.fn(() => 'mock-session-key')
 };
 
 // --- PropertiesService ---
@@ -284,6 +285,13 @@ global.HtmlService = {
 global.MailApp = {
   sendEmail: jest.fn(),
   getRemainingDailyQuota: jest.fn(() => 100)
+};
+
+// --- GmailApp ---
+global.GmailApp = {
+  sendEmail: jest.fn(),
+  search: jest.fn(() => []),
+  createDraft: jest.fn()
 };
 
 // --- DriveApp ---

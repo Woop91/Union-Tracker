@@ -272,6 +272,13 @@ describe('Auth.resolveUser', function () {
 
 describe('Auth.sendMagicLink', function () {
 
+  beforeEach(function () {
+    // Reset email mocks between tests to prevent accumulated calls
+    GmailApp.sendEmail = jest.fn();
+    MailApp.sendEmail = jest.fn();
+    MailApp.getRemainingDailyQuota = jest.fn(function () { return 100; });
+  });
+
   test('returns success for valid email', function () {
     var result = Auth.sendMagicLink('user@test.com', false);
     expect(result.success).toBe(true);
@@ -307,6 +314,8 @@ describe('Auth.sendMagicLink', function () {
   });
 
   test('handles quota exhaustion', function () {
+    // Force GmailApp to fail so MailApp fallback is exercised
+    GmailApp.sendEmail = jest.fn(function () { throw new Error('GmailApp unavailable'); });
     MailApp.getRemainingDailyQuota = jest.fn(function () { return 0; });
     var result = Auth.sendMagicLink('user@test.com', false);
     expect(result.success).toBe(false);
@@ -314,6 +323,8 @@ describe('Auth.sendMagicLink', function () {
   });
 
   test('handles invalid email sendEmail error', function () {
+    // Force both GmailApp and MailApp to fail
+    GmailApp.sendEmail = jest.fn(function () { throw new Error('invalid email address'); });
     MailApp.sendEmail = jest.fn(function () {
       throw new Error('invalid email address');
     });
@@ -323,6 +334,8 @@ describe('Auth.sendMagicLink', function () {
   });
 
   test('handles generic sendEmail error', function () {
+    // Force both GmailApp and MailApp to fail
+    GmailApp.sendEmail = jest.fn(function () { throw new Error('Service unavailable'); });
     MailApp.sendEmail = jest.fn(function () {
       throw new Error('Service unavailable');
     });
@@ -333,30 +346,33 @@ describe('Auth.sendMagicLink', function () {
 
   test('creates remember link when rememberMe=true', function () {
     Auth.sendMagicLink('user@test.com', true);
-    var emailArgs = MailApp.sendEmail.mock.calls[0][0];
-    expect(emailArgs.htmlBody).toContain('remember=1');
+    // GmailApp is the primary sender — args: (to, subject, plainBody, options)
+    var emailOpts = GmailApp.sendEmail.mock.calls[0][3];
+    expect(emailOpts.htmlBody).toContain('remember=1');
   });
 
-  test('calls MailApp.sendEmail with correct parameters', function () {
+  test('calls GmailApp.sendEmail with correct parameters', function () {
     Auth.sendMagicLink('user@test.com', false);
-    expect(MailApp.sendEmail).toHaveBeenCalledTimes(1);
-    var emailArgs = MailApp.sendEmail.mock.calls[0][0];
-    expect(emailArgs.to).toBe('user@test.com');
-    expect(emailArgs.subject).toContain('Test Org');
-    expect(emailArgs.noReply).toBe(true);
+    expect(GmailApp.sendEmail).toHaveBeenCalledTimes(1);
+    // GmailApp.sendEmail(to, subject, plainBody, options)
+    expect(GmailApp.sendEmail.mock.calls[0][0]).toBe('user@test.com');
+    expect(GmailApp.sendEmail.mock.calls[0][1]).toContain('Test Org');
+    expect(GmailApp.sendEmail.mock.calls[0][3].noReply).toBe(false);
   });
 
   test('does not include remember param when rememberMe=false', function () {
     Auth.sendMagicLink('user@test.com', false);
-    var emailArgs = MailApp.sendEmail.mock.calls[0][0];
-    expect(emailArgs.htmlBody).not.toContain('remember=1');
+    var emailOpts = GmailApp.sendEmail.mock.calls[0][3];
+    expect(emailOpts.htmlBody).not.toContain('remember=1');
   });
 
-  test('handles quota check failure gracefully and proceeds to send', function () {
+  test('handles quota check failure gracefully and proceeds to send via MailApp fallback', function () {
+    // Force GmailApp to fail so MailApp fallback is exercised
+    GmailApp.sendEmail = jest.fn(function () { throw new Error('GmailApp unavailable'); });
     MailApp.getRemainingDailyQuota = jest.fn(function () {
       throw new Error('Quota check unavailable');
     });
-    // sendEmail should still be called since quota check failure is caught
+    // MailApp sendEmail should still be called since quota check failure is caught (defaults to 1)
     var result = Auth.sendMagicLink('user@test.com', false);
     expect(MailApp.sendEmail).toHaveBeenCalledTimes(1);
     expect(result.success).toBe(true);
@@ -372,10 +388,11 @@ describe('Auth.sendMagicLink', function () {
       })
     };
     Auth.sendMagicLink('user@test.com', false);
-    var emailArgs = MailApp.sendEmail.mock.calls[0][0];
+    // GmailApp is the primary sender
+    var emailOpts = GmailApp.sendEmail.mock.calls[0][3];
     // HTML entities should be escaped — raw tags should not appear
-    expect(emailArgs.htmlBody).not.toContain('<script>alert');
-    expect(emailArgs.htmlBody).not.toContain('<b>XSS</b>');
+    expect(emailOpts.htmlBody).not.toContain('<script>alert');
+    expect(emailOpts.htmlBody).not.toContain('<b>XSS</b>');
   });
 });
 

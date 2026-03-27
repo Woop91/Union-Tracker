@@ -46,8 +46,8 @@ function setupSheets() {
 beforeEach(() => {
   // Clear the DataService IIFE in-memory cache so each test gets fresh data
   if (typeof DataService !== 'undefined' && DataService._invalidateSheetCache) {
-    DataService._invalidateSheetCache('Grievance Log');
-    DataService._invalidateSheetCache('Member Directory');
+    DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
   }
   // Reset spreadsheet singleton so mock changes take effect
   if (typeof DataService !== 'undefined' && DataService._resetSSCache) {
@@ -320,7 +320,7 @@ describe('DataService.getGrievanceStats', () => {
 
 describe('DataService.getGrievanceHotSpots', () => {
   test('returns locations with 3+ grievances', () => {
-    DataService._invalidateSheetCache('Grievance Log');
+    DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     const headers = ['Grievance ID', 'Unit'];
     const data = [headers,
       ['G1', 'Hot Unit'], ['G2', 'Hot Unit'], ['G3', 'Hot Unit'],
@@ -338,7 +338,7 @@ describe('DataService.getGrievanceHotSpots', () => {
   });
 
   test('returns empty when no unit has 3+ cases', () => {
-    DataService._invalidateSheetCache('Grievance Log');
+    DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     const headers = ['Grievance ID', 'Unit'];
     const data = [headers, ['G1', 'A'], ['G2', 'B']];
     const grievSheet = createMockSheet('Grievance Log', data);
@@ -356,7 +356,7 @@ describe('DataService.getGrievanceHotSpots', () => {
 
 describe('DataService.getStewardDirectory', () => {
   test('returns steward records (unsorted — client applies smart sort)', () => {
-    DataService._invalidateSheetCache('Member Directory');
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
     const headers = ['Email', 'Name', 'Role', 'Work Location', 'Office Days', 'Phone', 'Unit'];
     const data = [headers,
       ['z@test.com', 'Zara', 'Steward', 'Office B', 'Mon-Fri', '555-0001', 'Unit 1'],
@@ -448,7 +448,7 @@ describe('dataGetBroadcastFilterOptions', () => {
   });
 
   test('returns filter options from member directory', () => {
-    DataService._invalidateSheetCache('Member Directory');
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
     const origAuth = global.checkWebAppAuthorization;
     global.checkWebAppAuthorization = jest.fn(() => ({
       isAuthorized: true, email: 'steward@test.com', role: 'steward'
@@ -546,8 +546,8 @@ describe('DataService.getStewardSurveyTracking', () => {
 
   beforeEach(() => {
     if (typeof DataService !== 'undefined' && DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Member Directory');
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
   });
 
@@ -658,7 +658,7 @@ describe('Deadline boundary conditions (_buildGrievanceRecord auto-detect)', () 
 
   function setupAndGetStats(rows) {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [HEADERS, ...rows];
     const grievSheet = createMockSheet('Grievance Log', data);
@@ -670,7 +670,7 @@ describe('Deadline boundary conditions (_buildGrievanceRecord auto-detect)', () 
 
   function setupAndGetCases(rows) {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [HEADERS, ...rows];
     const grievSheet = createMockSheet('Grievance Log', data);
@@ -713,7 +713,7 @@ describe('Deadline boundary conditions (_buildGrievanceRecord auto-detect)', () 
 
   test('deadline TODAY counts as dueSoon in getStewardKPIs', () => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const deadline = new Date(); // today
     const data = [HEADERS, [
@@ -808,7 +808,7 @@ describe('KPI computation parity (batch vs individual)', () => {
 
   function setupMixed() {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const now = Date.now();
     const rows = [
@@ -830,7 +830,7 @@ describe('KPI computation parity (batch vs individual)', () => {
     const kpisIndividual = DataService.getStewardKPIs('steward@test.com');
     // Reset cache to simulate fresh batch call
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     setupMixed();
     const batch = DataService.getBatchData('steward@test.com', 'steward');
@@ -880,7 +880,7 @@ describe('getGrievanceStats error resilience', () => {
 
   test('survives a row with fewer columns than header', () => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [
       HEADERS,
@@ -901,7 +901,7 @@ describe('getGrievanceStats error resilience', () => {
 
   test('survives a row with null/undefined values in date columns', () => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [
       HEADERS,
@@ -921,7 +921,7 @@ describe('getGrievanceStats error resilience', () => {
 
   test('survives a row with invalid date string in deadline column', () => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [
       HEADERS,
@@ -941,7 +941,7 @@ describe('getGrievanceStats error resilience', () => {
 
   test('returns available:false for empty grievance sheet (header only)', () => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [HEADERS]; // header only, no data rows
     const grievSheet = createMockSheet('Grievance Log', data);
@@ -955,7 +955,7 @@ describe('getGrievanceStats error resilience', () => {
 
   test('returns available:false when Grievance Log sheet missing', () => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     // Only member sheet, no grievance sheet
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
@@ -976,7 +976,7 @@ describe('getGrievanceStats error resilience', () => {
 describe('getGrievanceStats return shape contract', () => {
   beforeEach(() => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const headers = [
       'Grievance ID', 'Member Email', 'Status', 'Step', 'Deadline',
@@ -1011,7 +1011,7 @@ describe('getGrievanceStats return shape contract', () => {
 
   test('when available: false, does NOT include data keys', () => {
     if (DataService._invalidateSheetCache) {
-      DataService._invalidateSheetCache('Grievance Log');
+      DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const mockSS = createMockSpreadsheet([
       createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData()),
@@ -1246,7 +1246,7 @@ describe('v4.31.0 H1: _invalidateSheetCache clears _emailIndex', () => {
     expect(user1).not.toBeNull();
 
     // Invalidate and re-setup with different data
-    DataService._invalidateSheetCache('Member Directory');
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
     if (DataService._resetSSCache) DataService._resetSSCache();
     setupSheets();
 
