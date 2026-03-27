@@ -164,6 +164,20 @@ var AUTH_QUOTES = [
  { text: "Coming together is a beginning, staying together is progress, and working together is success.", attr: "Henry Ford" },
  { text: "The best defense against dirty tactics is to recognize them.", attr: "Fisher & Ury" },
  { text: "If you're not at the table, you're on the menu.", attr: "Labor tradition" },
+ { text: "During a negotiation, it would be wise not to take anything personally.", attr: "Brian Koslow" },
+ { text: "The most difficult thing in any negotiation is making sure that you strip it of the emotion and deal with the facts.", attr: "Howard Baker" },
+ { text: "A negotiator should observe everything. You must be part Sherlock Holmes, part Sigmund Freud.", attr: "Victor Kiam" },
+ { text: "When the deal is too good, think twice.", attr: "Negotiation wisdom" },
+ { text: "The skilled negotiator knows that the other side's problem is your problem too.", attr: "Negotiation wisdom" },
+ { text: "The moment someone asks you for something you have the power to give or withhold, you are negotiating.", attr: "Negotiation wisdom" },
+ { text: "Hard bargainers count on you being unprepared, emotional, or afraid. Be none of those things.", attr: "Negotiation wisdom" },
+ { text: "Never let someone else's emotions dictate your decisions.", attr: "Negotiation wisdom" },
+ { text: "They want you to react. Refuse. Respond instead.", attr: "Negotiation wisdom" },
+ { text: "The art of negotiation is not about being the loudest voice in the room. It is about being the most prepared.", attr: "Negotiation wisdom" },
+ { text: "Negotiation is not a game. It is a process of finding solutions.", attr: "Negotiation wisdom" },
+ { text: "If you don't know where you'll go if this deal falls apart, you're negotiating blind.", attr: "Negotiation wisdom" },
+ { text: "Effective negotiators don't have one style \u2014 they adapt to the situation.", attr: "Negotiation wisdom" },
+ { text: "Arbitration is justice delivered by the chosen, not the appointed.", attr: "Labor tradition" },
 ];
 
 var _authQuoteTimer = null;
@@ -225,15 +239,15 @@ function _pickHubQuotes(n) {
 }
 
 function renderHubInlineQuotes() {
- var ids = ['hub-quote-1', 'hub-quote-2', 'hub-quote-3'];
- var three = _pickHubQuotes(3);
+ var ids = ['hub-quote-1', 'hub-quote-2', 'hub-quote-3', 'hub-quote-4'];
+ var picks = _pickHubQuotes(ids.length);
  ids.forEach(function(id, i) {
  var el = document.getElementById(id);
- if (el && three[i]) {
+ if (el && picks[i]) {
   el.className = 'hub-inline-quote';
   el.innerHTML =
-  '<div class="hiq-text">\u201C' + three[i].text + '\u201D</div>' +
-  '<div class="hiq-attr">\u2014 ' + three[i].attr + '</div>';
+  '<div class="hiq-text">\u201C' + picks[i].text + '\u201D</div>' +
+  '<div class="hiq-attr">\u2014 ' + picks[i].attr + '</div>';
  }
  });
 }

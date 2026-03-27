@@ -509,6 +509,51 @@ body.auth-active {
 .hal-name { font-size:11px; font-weight:600; color:var(--text); }
 .hal-desc { font-size:10px; color:var(--muted); line-height:1.4; }
 
+/* ── Negotiation knowledge cards (Member Hub) ──── */
+.hub-neg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media(max-width:480px) { .hub-neg-grid { grid-template-columns: 1fr; } }
+
+.hub-neg-card {
+  background: var(--surface, rgba(255,255,255,0.04));
+  border: 1px solid var(--border); border-radius: 11px; padding: 14px;
+  cursor: pointer; transition: all 0.25s; position: relative; overflow: hidden;
+}
+.hub-neg-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  opacity:0; transition:opacity 0.25s; border-radius:11px 11px 0 0;
+}
+.hnc-batna::before   { background:#14B8A6; }
+.hnc-tactics::before { background:#EF4444; }
+.hnc-convo::before   { background:#8B5CF6; }
+.hnc-styles::before  { background:#3B82F6; }
+.hub-neg-card:hover,.hub-neg-card.hnc-open { background:rgba(255,255,255,0.07); border-color:rgba(255,255,255,0.14); }
+.hub-neg-card:hover::before,.hub-neg-card.hnc-open::before { opacity:1; }
+
+.hnc-hd { display:flex; align-items:center; gap:9px; margin-bottom:6px; }
+.hnc-ico { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.hnc-batna   .hnc-ico { background:rgba(20,184,166,0.12); }
+.hnc-tactics .hnc-ico { background:rgba(239,68,68,0.12); }
+.hnc-convo   .hnc-ico { background:rgba(139,92,246,0.12); }
+.hnc-styles  .hnc-ico { background:rgba(59,130,246,0.12); }
+.hnc-name { font-size:12px; font-weight:700; color:var(--text); }
+.hnc-tag  { font-size:11px; color:var(--muted); }
+.hnc-body { font-size:12px; color:var(--muted); line-height:1.6; max-height:0; overflow:hidden; opacity:0; transition:max-height 0.4s ease,opacity 0.3s ease; }
+.hub-neg-card.hnc-open .hnc-body { max-height:240px; opacity:1; }
+.hnc-pts { list-style:none; margin-top:7px; }
+.hnc-pts li { padding:2px 0 2px 13px; position:relative; font-size:11px; color:var(--muted); }
+.hnc-pts li::before { content:'\2192'; position:absolute; left:0; font-size:10px; }
+.hnc-batna   .hnc-pts li::before { color:#14B8A6; }
+.hnc-tactics .hnc-pts li::before { color:#EF4444; }
+.hnc-convo   .hnc-pts li::before { color:#8B5CF6; }
+.hnc-styles  .hnc-pts li::before { color:#3B82F6; }
+.hnc-hint { font-size:10px; color:rgba(255,255,255,0.18); margin-top:6px; letter-spacing:0.08em; text-transform:uppercase; transition:color 0.2s; }
+.hub-neg-card:hover .hnc-hint { color:rgba(255,255,255,0.36); }
+.hub-neg-card.hnc-open .hnc-hint { opacity:0; }
+
 /* ═══════════════════════════════════════════════════
    NEGOTIATION KNOWLEDGE WIDGET — Styles
    v4.41.0 — 2026-03-26

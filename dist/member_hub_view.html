@@ -122,6 +122,46 @@ function renderMemberHub(appContainer) {
  wrap.appendChild(el('div', { id: 'hub-quote-3' }));
 
  
+ wrap.appendChild(_hubSectionHd('Know your power at the table'));
+
+ var negCards = [
+  { cls:'hnc-batna', ico:'\uD83C\uDFAF', name:'BATNA', tag:'Your walk-away power',
+  body:'Your Best Alternative To a Negotiated Agreement is the strongest card you hold. The stronger your fallback, the stronger your position. Never reveal a weak BATNA \u2014 work to strengthen it first.',
+  pts:['Identify your alternatives before sitting down','Evaluate each one realistically \u2014 what\u2019s the best?','Strengthen your BATNA before entering negotiations','Always assess the other side\u2019s BATNA too'] },
+  { cls:'hnc-tactics', ico:'\uD83D\uDEE1\uFE0F', name:'Spot the Tactics', tag:'Recognize hard bargainers',
+  body:'Hard bargainers use pressure, manipulation, and power plays to force concessions. Once you can name their tactics, they lose their power. Recognition is your best defense.',
+  pts:['Take-it-or-leave-it: Almost always a bluff \u2014 don\u2019t panic','Good Cop / Bad Cop: Treat them as one unit','The Nibble: Track every concession on paper','Name the tactic out loud to neutralize it'] },
+  { cls:'hnc-convo', ico:'\uD83D\uDDE3\uFE0F', name:'Every Conversation Counts', tag:'When talk becomes negotiation',
+  body:'The moment someone makes a request that affects your rights, pay, or schedule \u2014 you\u2019re negotiating. Informal hallway chats with management shape outcomes before formal meetings even happen.',
+  pts:['\u201CJust this once\u201D is never just once \u2014 it sets precedent','If you feel pressure to answer immediately, that IS the negotiation','Never agree without consulting your steward','A good deal today is still good tomorrow'] },
+  { cls:'hnc-styles', ico:'\uD83C\uDFAD', name:'Adapt Your Style', tag:'Five approaches to negotiation',
+  body:'Effective negotiators don\u2019t have one style \u2014 they read the situation and adapt. Know when to compete, when to collaborate, and when to walk away.',
+  pts:['Competing: When rights are clearly violated or urgency is high','Collaborating: When the relationship matters and issues are complex','Compromising: When time is limited and both sides need resolution','Avoiding or Accommodating: When emotions need to cool or goodwill matters'] },
+ ];
+
+ var negGrid = el('div', { className: 'hub-neg-grid' });
+ negCards.forEach(function(c) {
+  var card = el('div', { className: 'hub-neg-card ' + c.cls, onClick: function() { _hncToggle(card); } });
+  var hd = el('div', { className: 'hnc-hd' });
+  var ico = el('div', { className: 'hnc-ico' }); ico.innerHTML = c.ico; hd.appendChild(ico);
+  var hdT = el('div');
+  hdT.appendChild(el('div', { className: 'hnc-name' }, c.name));
+  var tagEl = el('div', { className: 'hnc-tag' }); tagEl.innerHTML = c.tag; hdT.appendChild(tagEl);
+  hd.appendChild(hdT); card.appendChild(hd);
+  var body = el('div', { className: 'hnc-body' });
+  body.appendChild(el('p', { style:{marginBottom:'6px'} }, c.body));
+  var pts = el('ul', { className: 'hnc-pts' });
+  c.pts.forEach(function(p) { var li = el('li'); li.innerHTML = p; pts.appendChild(li); });
+  body.appendChild(pts); card.appendChild(body);
+  card.appendChild(el('div', { className: 'hnc-hint' }, 'Tap to expand'));
+  negGrid.appendChild(card);
+ });
+ wrap.appendChild(negGrid);
+
+ 
+ wrap.appendChild(el('div', { id: 'hub-quote-4' }));
+
+ 
  wrap.appendChild(_hubSectionHd('Take it further \u2014 collectively'));
 
  var wtrStrip = el('div', { className: 'hub-wtr-strip', onClick: function() { wtrStrip.classList.toggle('hub-wtr-open'); } });
@@ -213,6 +253,11 @@ function _hhcToggle(card) {
  var was = card.classList.contains('hhc-open');
  document.querySelectorAll('.hub-habit-card').forEach(function(c) { c.classList.remove('hhc-open'); });
  if (!was) card.classList.add('hhc-open');
+}
+function _hncToggle(card) {
+ var was = card.classList.contains('hnc-open');
+ document.querySelectorAll('.hub-neg-card').forEach(function(c) { c.classList.remove('hnc-open'); });
+ if (!was) card.classList.add('hnc-open');
 }
 
 function _hubSectionHd(label) {
