@@ -1,5 +1,5 @@
 /**
- * Build Script for SolidBase Dashboard
+ * Build Script for Dashboard
  * Copies individual source files into dist/ for multi-file CLASP deployment.
  * GAS V8 loads files in alphabetical filename order — numbered filenames
  * (00_, 01_, …) guarantee correct load order AND give the GAS editor a
@@ -53,7 +53,7 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules
+  // Web-dashboard SPA modules (load after all DDS modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -301,7 +301,7 @@ const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds.
-// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
+// SolidBase also excludes TestRunner/WebAppTests (DDS keeps them for in-app testing).
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {

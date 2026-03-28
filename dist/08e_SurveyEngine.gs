@@ -740,7 +740,7 @@ function pushSurveyOpenNotification_(periodName) {
         message:   'The ' + periodName + ' is now open. Your feedback is anonymous and helps shape your union. Complete it in the Member Portal.',
         priority:  'Normal',
         sentBy:    'system',
-        sentByName:'Union Dashboard',
+        sentByName:'SolidBase',
         // No expiry — stays until member dismisses or period closes
         expiresDate: '',
         recipient: 'All'

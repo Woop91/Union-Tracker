@@ -27,6 +27,7 @@ function initStewardView(container) {
  renderStewardDashboard(container);
  _checkDeepLink('steward');
  _prefetchInsights();
+ if (typeof _prefetchTopTabs === 'function') _prefetchTopTabs('steward');
  return;
  }
 
@@ -44,6 +45,7 @@ function initStewardView(container) {
   renderStewardDashboard(container);
   _checkDeepLink('steward');
   _prefetchInsights();
+  if (typeof _prefetchTopTabs === 'function') _prefetchTopTabs('steward');
  })
  .withFailureHandler(function() {
   AppState.cases = [];
@@ -71,8 +73,7 @@ function _prefetchInsights() {
   hotSpots: batch.hotSpots || [],
   perf: batch.perf || [],
   sat: batch.sat || { categories: [] },
-  memberStats: batch.memberStats || null,
-  workload: batch.workload || { available: false }
+  memberStats: batch.memberStats || null
   };
  }).withFailureHandler(function() {  }).dataGetInsightsBatch(SESSION_TOKEN);
  }, 3000);
@@ -874,120 +875,95 @@ function renderCaseList(container, filterOrCases, isFiltered) {
  }
 
  
- var CASE_PAGE_SIZE = 25;
- var _caseRenderCount = CASE_PAGE_SIZE;
+ // Renders first 25 items, then loads 25 more as user scrolls — no "Show more" button needed.
+ container.textContent = '';
+ LazyList.render(container, cases, function(c) {
+ var isOverdue = c.status === 'overdue';
+ var statusClass = c.status || 'active';
+ var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
 
- function _renderCasePage() {
- var frag = document.createDocumentFragment();
- var slice = cases.slice(0, _caseRenderCount);
+ var topRow = el('div', { className: 'flex-between-center' });
+ var leftGroup = el('div', { className: 'flex-row' });
 
- slice.forEach(function(c) {
-  var isOverdue = c.status === 'overdue';
-  var statusClass = c.status || 'active';
-  var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
-
-  var topRow = el('div', { className: 'flex-between-center' });
-  var leftGroup = el('div', { className: 'flex-row' });
-
-  
-  var checkbox = el('input', {
+ 
+ var checkbox = el('input', {
   type: 'checkbox',
   className: 'bulk-select-cb',
   'aria-label': 'Select case ' + c.id,
   onclick: function(ev) {
-   ev.stopPropagation();
-   _updateBulkToolbar();
+  ev.stopPropagation();
+  _updateBulkToolbar();
   }
-  });
-  checkbox.dataset.caseId = c.id;
-  checkbox.dataset.memberEmail = c.memberEmail || '';
-  leftGroup.appendChild(checkbox);
-  leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
-  leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
-  topRow.appendChild(leftGroup);
+ });
+ checkbox.dataset.caseId = c.id;
+ checkbox.dataset.memberEmail = c.memberEmail || '';
+ leftGroup.appendChild(checkbox);
+ leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
+ leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
+ topRow.appendChild(leftGroup);
 
-  var rightGroup = el('div', { className: 'flex-row', style: { gap: '6px', alignItems: 'center' } });
-  var deadlineSpan = el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: isOverdue ? 'var(--danger)' : 'var(--muted)', fontWeight: isOverdue ? '700' : '400' } });
-  deadlineSpan.textContent = c.deadlineDays !== null ? c.deadlineDays + 'd' : '\u2014';
-  rightGroup.appendChild(deadlineSpan);
-  
-  var handoffBtn = el('button', {
+ var rightGroup = el('div', { className: 'flex-row', style: { gap: '6px', alignItems: 'center' } });
+ var deadlineSpan = el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: isOverdue ? 'var(--danger)' : 'var(--muted)', fontWeight: isOverdue ? '700' : '400' } });
+ deadlineSpan.textContent = c.deadlineDays !== null ? c.deadlineDays + 'd' : '\u2014';
+ rightGroup.appendChild(deadlineSpan);
+ 
+ var handoffBtn = el('button', {
   className: 'icon-btn handoff-btn',
   title: 'Handoff Notes',
   'aria-label': 'Handoff notes for case ' + c.id,
   onclick: function(ev) { ev.stopPropagation(); _toggleHandoffPanel(card, c.id); }
-  }, '\uD83D\uDCDD');
-  rightGroup.appendChild(handoffBtn);
-  
-  var activityBtn = el('button', {
+ }, '\uD83D\uDCDD');
+ rightGroup.appendChild(handoffBtn);
+ 
+ var activityBtn = el('button', {
   className: 'icon-btn handoff-btn',
   title: 'Case Activity',
   'aria-label': 'Activity log for case ' + c.id,
   onclick: function(ev) { ev.stopPropagation(); _toggleActivityPanel(card, c.id); }
-  }, '\uD83D\uDCCA');
-  rightGroup.appendChild(activityBtn);
-  
-  var docBtn = el('button', {
+ }, '\uD83D\uDCCA');
+ rightGroup.appendChild(activityBtn);
+ 
+ var docBtn = el('button', {
   className: 'icon-btn handoff-btn',
   title: 'Document Checklist',
   'aria-label': 'Document checklist for case ' + c.id,
   onclick: function(ev) {
-   ev.stopPropagation();
-   _toggleDocChecklist(card, c.id, c.step, c.driveFolderId);
+  ev.stopPropagation();
+  _toggleDocChecklist(card, c.id, c.step, c.driveFolderId);
   }
-  }, '\uD83D\uDCCB');
-  rightGroup.appendChild(docBtn);
-  topRow.appendChild(rightGroup);
-  card.appendChild(topRow);
+ }, '\uD83D\uDCCB');
+ rightGroup.appendChild(docBtn);
+ topRow.appendChild(rightGroup);
+ card.appendChild(topRow);
 
-  var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
-  var memberDisplay = c.memberName || (c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown');
-  bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' } }, memberDisplay + ' \u00B7 ' + (c.step || '')));
-  bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' } }, c.unit || ''));
-  card.appendChild(bottomRow);
+ var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
+ var memberDisplay = c.memberName || (c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown');
+ bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' } }, memberDisplay + ' \u00B7 ' + (c.step || '')));
+ bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' } }, c.unit || ''));
+ card.appendChild(bottomRow);
 
-  
-  var checklistArea = el('div', { style: { display: 'none', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } });
-  var checklistLoaded = false;
-  card.setAttribute('aria-expanded', 'false');
-  card.appendChild(checklistArea);
-  card.addEventListener('click', function(ev) {
+ 
+ var checklistArea = el('div', { style: { display: 'none', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } });
+ var checklistLoaded = false;
+ card.setAttribute('aria-expanded', 'false');
+ card.appendChild(checklistArea);
+ card.addEventListener('click', function(ev) {
   ev.stopPropagation();
   var showing = checklistArea.style.display !== 'none';
   checklistArea.style.display = showing ? 'none' : 'block';
   card.setAttribute('aria-expanded', String(!showing));
   if (!showing && !checklistLoaded) {
-   checklistLoaded = true;
-   _renderCaseChecklist(checklistArea, c.id);
+  checklistLoaded = true;
+  _renderCaseChecklist(checklistArea, c.id);
   }
   
   if (!showing) {
-   _checkEscalationRecommendation(card, c.id);
+  _checkEscalationRecommendation(card, c.id);
   }
-  });
-
-  frag.appendChild(card);
  });
 
- container.innerHTML = '';
- container.appendChild(frag);
-
- // "Show more" button if there are remaining cases
- if (_caseRenderCount < cases.length) {
-  var remaining = cases.length - _caseRenderCount;
-  var showMoreBtn = el('button', {
-  className: 'btn btn-secondary',
-  style: { width: '100%', margin: '8px 0', fontSize: '12px' },
-  onClick: function() {
-   _caseRenderCount += CASE_PAGE_SIZE;
-   _renderCasePage();
-  }
-  }, 'Show more (' + remaining + ' remaining)');
-  container.appendChild(showMoreBtn);
- }
- }
-
- _renderCasePage();
+ return card;
+ }, { pageSize: 25 });
 }
 
 var _refreshNavBadgesTimer = null;
@@ -1574,7 +1550,7 @@ function renderStewardMembers(appContainer) {
 
 function _renderBulkMembers(content, appContainer, _prefetchedStats) {
  function _onMembersLoaded(members) {
-  content.innerHTML = '';
+  content.textContent = '';
   if (!members || members.length === 0) {
   
   var msg = (members && members.length === 0)
@@ -1620,7 +1596,7 @@ function _renderBulkMembers(content, appContainer, _prefetchedStats) {
   renderFilteredMembers(listArea, members, '');
  }
  function _onMembersFailed(err) {
-  content.innerHTML = '';
+  content.textContent = '';
   var msg = (err && err.message) ? err.message : String(err || '');
   var isNetwork = msg.indexOf('HTTP 0') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('Connection failure') !== -1;
   var userMsg = isNetwork
@@ -1650,7 +1626,7 @@ function _renderBulkMembers(content, appContainer, _prefetchedStats) {
 }
 
 function _renderPaginatedMembers(content, appContainer, counts, _prefetchedStats) {
- content.innerHTML = '';
+ content.textContent = '';
 
  
  _renderMemberKPIs(content, counts.total, counts.withGrievances, null);
@@ -1784,7 +1760,7 @@ var _memberPageSize = 20;
 var _expandedMemberEmail = null;
 
 function renderFilteredMembers(container, members, query) {
- container.innerHTML = '';
+ container.textContent = '';
  var filtered = query ? members.filter(function(m) {
  return (m.name || '').toLowerCase().indexOf(query) !== -1 ||
    (m.email || '').toLowerCase().indexOf(query) !== -1 ||
@@ -2536,7 +2512,7 @@ function renderStewardNotifications(appContainer) {
  function _renderNotifInbox(target) {
   showLoading(target, 'list');
   serverCall().withSuccessHandler(function(notifications) {
-  target.innerHTML = '';
+  target.textContent = '';
   if (!notifications || notifications.length === 0) {
    var empty = el('div', { style: { textAlign: 'center', padding: '48px 16px' } });
    empty.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
@@ -4356,10 +4332,9 @@ function _renderContactForm(container) {
  var _memberAc = createAutocomplete({
  placeholder: 'Type name or email...',
  loadData: function(cb) {
-  serverCall()
-  .withSuccessHandler(function(m) { cb(m || []); })
-  .withFailureHandler(function() { cb([]); })
-  .dataGetAllMembers(SESSION_TOKEN);
+  var _k = 'stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || '');
+  DataCache.cachedCall(_k, 'dataGetAllMembers', [SESSION_TOKEN],
+  function(m) { cb(m || []); }, function() { cb([]); }, DataCache.STABLE_TTL);
  },
  onSelect: function() {}
  });
@@ -4413,7 +4388,7 @@ function _renderContactForm(container) {
 function _renderRecentContacts(container) {
  showLoading(container, 'list');
  serverCall().withSuccessHandler(function(log) {
- container.innerHTML = '';
+ container.textContent = '';
  if (!log || log.length === 0) {
   container.appendChild(el('div', { className: 'empty-state-sm' }, 'No contacts logged yet.'));
   return;
@@ -4436,10 +4411,9 @@ function _renderContactByMember(container) {
  var _bmAc = createAutocomplete({
  placeholder: 'Type name or email...',
  loadData: function(cb) {
-  serverCall()
-  .withSuccessHandler(function(m) { cb(m || []); })
-  .withFailureHandler(function() { cb([]); })
-  .dataGetAllMembers(SESSION_TOKEN);
+  var _k = 'stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || '');
+  DataCache.cachedCall(_k, 'dataGetAllMembers', [SESSION_TOKEN],
+  function(m) { cb(m || []); }, function() { cb([]); }, DataCache.STABLE_TTL);
  },
  onSelect: function() {}
  });
@@ -4800,12 +4774,12 @@ function renderInsightsPage(appContainer) {
  var cacheAge = cache ? (Date.now() - (cache.ts || 0)) : Infinity;
 
  if (cache && cacheAge < CACHE_TTL) {
-  _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats, cache.workload);
+  _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
   return;
  }
  if (cache) {
   
-  _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats, cache.workload);
+  _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
  } else {
   showLoading(content);
  }
@@ -4818,17 +4792,15 @@ function renderInsightsPage(appContainer) {
   var perfData = batch.perf || (cache && cache.perf) || [];
   var satData = batch.sat || (cache && cache.sat) || { categories: [] };
   var memberStatsData = batch.memberStats || (cache && cache.memberStats) || null;
-  var workloadData = batch.workload || (cache && cache.workload) || { available: false };
-  AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData, memberStats: memberStatsData, workload: workloadData };
-  _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData);
+  AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData, memberStats: memberStatsData };
+  _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData);
  }).withFailureHandler(function() {
   var statsData = (cache && cache.stats) || { available: false };
   var hotSpotsData = (cache && cache.hotSpots) || [];
   var perfData = (cache && cache.perf) || [];
   var satData = (cache && cache.sat) || { categories: [] };
   var memberStatsData = (cache && cache.memberStats) || null;
-  var workloadData = (cache && cache.workload) || { available: false };
-  _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData);
+  _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData);
  }).dataGetInsightsBatch(SESSION_TOKEN);
  });
 }
@@ -4943,7 +4915,7 @@ function _renderReportPreview(container, report) {
  container.appendChild(preview);
 }
 
-function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData) {
+function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData) {
  content.innerHTML = '';
  
  var detailPanel = el('div', { style: { display: 'none', marginBottom: '16px' } });
@@ -5013,7 +4985,6 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
  _renderFiledVsResolved(mainContent, statsData);
  }
  if (memberStatsData && memberStatsData.available) _renderMembershipInsights(mainContent, memberStatsData, showDetail);
- if (workloadData && (workloadData.success || workloadData.data)) _renderWorkloadInsights(mainContent, workloadData, showDetail);
  if (perfData && perfData.length > 0) _renderPerformanceSection(mainContent, perfData, showDetail);
  if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(mainContent, satData, showDetail);
 
@@ -5095,150 +5066,6 @@ function _renderMembershipInsights(container, ms, showDetail) {
   _renderInsightDetailList(panel, unitEntries, 'var(--warning)');
  });
  }));
-
- section.appendChild(grid);
- container.appendChild(section);
-}
-
-function _renderWorkloadPredictions(container) {
- 
- var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
- card.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Workload Predictions'));
-
- var predictionContent = el('div');
- card.appendChild(predictionContent);
-
- serverCall().withSuccessHandler(function(pred) {
- if (!pred) return;
-
- var trendIcon = pred.trend === 'increasing' ? '\uD83D\uDCC8' : pred.trend === 'decreasing' ? '\uD83D\uDCC9' : '\u27A1\uFE0F';
- var trendColor = pred.trend === 'increasing' ? '#ef4444' : pred.trend === 'decreasing' ? '#22c55e' : 'var(--muted)';
-
- var row = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' } });
-
- var currentBox = el('div', { style: { textAlign: 'center' } });
- currentBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700' } }, String(pred.current)));
- currentBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Current'));
- row.appendChild(currentBox);
-
- row.appendChild(el('span', { style: { fontSize: '20px', color: trendColor } }, trendIcon));
-
- var predictedBox = el('div', { style: { textAlign: 'center' } });
- predictedBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700', color: trendColor } }, String(pred.predicted)));
- predictedBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Predicted'));
- row.appendChild(predictedBox);
-
- predictionContent.appendChild(row);
-
- 
- if (pred.history && pred.history.length > 0) {
-  var maxVal = Math.max.apply(null, pred.history) || 1;
-  var spark = el('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '2px', height: '40px', marginTop: '12px' } });
-  pred.history.forEach(function(v) {
-  var pct = Math.round((v / maxVal) * 100);
-  spark.appendChild(el('div', {
-   style: { flex: '1', height: pct + '%', background: 'var(--accent)', borderRadius: '2px 2px 0 0', minHeight: '2px' },
-   title: String(v) + ' items'
-  }));
-  });
-  predictionContent.appendChild(spark);
-  predictionContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Recent workload history'));
- }
- }).withFailureHandler(function() {
- predictionContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load predictions.'));
- }).dataGetWorkloadPrediction(SESSION_TOKEN, '');
-
- container.appendChild(card);
-
- 
- var rebalCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
- rebalCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Rebalancing Suggestions'));
-
- var suggestContent = el('div');
- rebalCard.appendChild(suggestContent);
-
- serverCall().withSuccessHandler(function(suggestions) {
- if (!suggestions || suggestions.length === 0) {
-  suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Workload is balanced across stewards.'));
-  return;
- }
- suggestions.forEach(function(s) {
-  var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
-
-  var leftCol = el('div');
-  leftCol.appendChild(el('div', { style: { fontWeight: '500', fontSize: '14px' } }, escapeHtml(s.stewardEmail)));
-  leftCol.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, escapeHtml(s.suggestion)));
-  row.appendChild(leftCol);
-
-  var rightCol = el('div', { style: { textAlign: 'right', fontSize: '13px' } });
-  rightCol.appendChild(el('div', { style: { fontWeight: '600' } }, s.currentLoad + ' cases'));
-  rightCol.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'avg: ' + s.averageLoad));
-  row.appendChild(rightCol);
-
-  suggestContent.appendChild(row);
- });
- }).withFailureHandler(function() {
- suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load suggestions.'));
- }).dataGetRebalancingSuggestions(SESSION_TOKEN);
-
- container.appendChild(rebalCard);
-}
-
-function _renderWorkloadInsights(container, wl, showDetail) {
- 
- var d = (wl && wl.data) || wl || {};
- if (!d || (!d.totalSubmissions && !d.categories)) return;
-
- var section = el('div', { className: 'mb-16' });
- section.appendChild(el('div', { style: {
- fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
- color: 'var(--text)', marginBottom: '12px',
- }}, 'Workload Overview'));
-
- var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '12px' } });
-
- var totalSubmissions = d.totalSubmissions || 0;
- var memberCount = d.members || 0;
- grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
- if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
- }));
-
- 
- var avgs = d.averages || {};
- var avgPriority = parseFloat(avgs['Priority Cases']) || 0;
- var avgPending = parseFloat(avgs['Pending Cases']) || 0;
- var avgAged = parseFloat(avgs['Aged Cases']) || 0;
-
- grid.appendChild(_insightCard('AVG PRIORITY CASES', avgPriority > 5 ? 'var(--danger)' : 'var(--success)', String(avgPriority), 'Per steward average', function() {
- if (showDetail) showDetail('Workload Breakdown', function(panel) {
-  
-  var items = [];
-  for (var key in avgs) {
-  items.push({ label: key + ' (avg)', count: parseFloat(avgs[key]) || 0 });
-  }
-  items.sort(function(a, b) { return b.count - a.count; });
-  _renderInsightDetailList(panel, items, 'var(--info)');
-  var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
-  if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
-  }}, 'View Workload Tracker \u2192');
-  panel.appendChild(navBtn);
- });
- }));
-
- grid.appendChild(_insightCard('AVG PENDING', avgPending > 10 ? 'var(--warning)' : 'var(--success)', String(avgPending), 'Cases awaiting action'));
- grid.appendChild(_insightCard('AVG AGED CASES', avgAged > 3 ? 'var(--danger)' : 'var(--success)', String(avgAged), 'Cases 60+ days old'));
-
- 
- var avgOvertime = parseFloat(avgs['Overtime Hours']) || 0;
- if (avgOvertime > 0) {
- grid.appendChild(_insightCard('AVG OVERTIME', avgOvertime > 10 ? 'var(--danger)' : 'var(--warning)', String(avgOvertime) + 'h', 'Hours per steward'));
- }
- var avgFTE = parseFloat(avgs['Full-Time Employees']) || parseFloat(avgs['FTE Count']) || 0;
- var avgPTE = parseFloat(avgs['Part-Time Employees']) || parseFloat(avgs['PTE Count']) || 0;
- if (avgFTE > 0 || avgPTE > 0) {
- var mixRatio = avgFTE > 0 ? Math.round((avgFTE / (avgFTE + avgPTE)) * 100) : 0;
- grid.appendChild(_insightCard('EMPLOYMENT MIX', 'var(--accent)', mixRatio + '% FT', 'FT: ' + avgFTE + ' / PT: ' + avgPTE + ' avg'));
- }
 
  section.appendChild(grid);
  container.appendChild(section);
@@ -7384,7 +7211,7 @@ function renderTestRunnerPage(appContainer) {
  var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--card)', border: '2px solid var(--accent)', boxShadow: '0 2px 12px rgba(0,0,0,0.4)' } });
 
  
- var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'loginlink', 'contacts', 'emailtypes', 'webapp', 'configrd', 'portal', 'weeklyq', 'workload', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
+ var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'loginlink', 'contacts', 'emailtypes', 'webapp', 'configrd', 'portal', 'weeklyq', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
  var runAllBtn = el('button', {
   className: 'btn btn-primary',
   style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
@@ -7461,7 +7288,6 @@ function renderTestRunnerPage(appContainer) {
   { value: 'configrd', label: 'ConfigReader' },
   { value: 'portal', label: 'Portal Sheets' },
   { value: 'weeklyq', label: 'Weekly Questions' },
-  { value: 'workload', label: 'Workload Service' },
   { value: 'qaforum', label: 'QA Forum' },
   { value: 'timeline', label: 'Timeline Service' },
   { value: 'failsafe', label: 'Failsafe Service' },
@@ -8205,16 +8031,18 @@ function renderNewGrievanceForm(appContainer) {
  var _grMemberCache = null;
  function _grLoadMembers(cb) {
   if (_grMemberCache) { cb(_grMemberCache); return; }
-  serverCall().withSuccessHandler(function(result) {
-  _grMemberCache = result && result.success !== false
+  var _k = 'stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || '');
+  DataCache.cachedCall(_k, 'dataGetAllMembers', [SESSION_TOKEN],
+  function(result) {
+   _grMemberCache = result && result.success !== false
    ? (Array.isArray(result) ? result : (result.members || []))
    : [];
-  cb(_grMemberCache);
-  }).withFailureHandler(function() {
-  _grMemberCache = [];
-  searchCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)' } }, 'Failed to load members.'));
-  cb(_grMemberCache);
-  }).dataGetAllMembers(SESSION_TOKEN);
+   cb(_grMemberCache);
+  }, function() {
+   _grMemberCache = [];
+   searchCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)' } }, 'Failed to load members.'));
+   cb(_grMemberCache);
+  }, DataCache.STABLE_TTL);
  }
  
  _grLoadMembers(function() { if (selectedMember) _selectMember(selectedMember); });

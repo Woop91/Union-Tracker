@@ -646,6 +646,10 @@ function wqSetStewardQuestion(sessionToken, text, options) {
 function wqSubmitPoolQuestion(sessionToken, text, options) {
   var e = _resolveCallerEmail(sessionToken);
   if (!e) return { success: false, message: 'Not authenticated.' };
+  // PIN sessions cannot submit poll questions
+  if (typeof Auth !== 'undefined' && Auth.isPINSession && Auth.isPINSession(sessionToken)) {
+    return { success: false, message: 'Poll submissions require full sign-in. Please sign in with Google or email link.' };
+  }
   // v4.28.1: server-side dues gate — non-paying members cannot submit to pool
   if (typeof DataService !== 'undefined') {
     var rec = DataService.findUserByEmail(e);

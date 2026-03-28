@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.44.0] - 2026-03-28
+
+### Added
+- **Dynamic background tab prefetch** — After home page renders, `requestIdleCallback` prefetches data for the user's top 3 most-visited tabs. No artificial delay — fires immediately via idle callback, staggered 1.5s apart to avoid saturating the 4-concurrent-call throttle.
+- **Per-user tab frequency tracking** — `_recordTabFrequency()` stores per-role tab visit counts in `localStorage` (`dds_tabFreq`). `_getTopTabs()` reads this to determine which tabs to prefetch, with sensible defaults for first-time users (steward: members/tasks/notifications; member: events/stewarddirectory/notifications).
+- **`_PREFETCH_REGISTRY`** — Extensible map of tabId → DataCache warmup function. Currently supports: `members`, `events`, `stewarddirectory`, `survey`. Tabs not in the registry are skipped (their render functions use raw `serverCall`).
+- **`STATS_TTL` (60 min)** — New DataCache tier for KPI stats, counts, and aggregations that don't need real-time freshness.
+- **Request deduplication** — `_dedupMap` in `_throttledServerCall` coalesces identical in-flight server calls. If `dataGetAllMembers` is already pending and another component requests it, the second caller piggybacks on the first — no duplicate server round-trip.
+- **Cases list infinite scroll** — Replaced manual "Show More" button with `LazyList.render()` using `IntersectionObserver`. Renders 25 cases initially, auto-loads 25 more as user scrolls. Zero-click, zero-wait.
+- **Visibility-based refresh** — `visibilitychange` listener silently re-fetches batch data when user returns to the tab after 30+ minutes away. Keeps KPIs, badges, and case counts fresh for all-day sessions without polling.
+- **Expanded prefetch registry** — Added `tasks`, `contactlog`, `cases` (member), `mytasks`, `notifications` to `_PREFETCH_REGISTRY`. Now 9 tabs can be dynamically prefetched based on user frequency.
+- **dataGetAllMembers cache consolidation** — All 4 call sites in steward_view.html now use `DataCache.cachedCall` with the same cache key (`stewardMembers_<email>`). Combined with request dedup, this means at most 1 server call regardless of how many components need member data.
+
+### Changed
+- **innerHTML → textContent clears** — Heavy container clears in Members, Contact Log, Notifications, and Cases switched from `innerHTML = ''` to `textContent = ''` (avoids HTML parser overhead on clears).
+- **DataCache default TTL** — Increased from 2 minutes to 15 minutes, reducing redundant server calls on tab switches.
+- **DataCache stable TTL** — Increased from 5 minutes to 30 minutes for member/steward directories.
+- **SWR TTL** — Extended from 30 minutes to 2 hours for instant return-visit rendering.
+- **Notifications tab** — Removed from always-fresh list; now cached like other tabs for faster revisits.
+
 ## [4.43.1] - 2026-03-27
 
 ### Added
@@ -88,7 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **PIN Login: GA release** — PIN login option now available in all environments (dev and production). Removed IS_DEV_MODE gates from login screen, steward PIN management, and server-side comments.
 - **Login page: black background** — Auth screen now uses a solid black background with glass card backdrop blur and enhanced box shadow.
 - **Login page: quote styling** — Quotes are now larger (15px), bolder (weight 500), fully white with text glow for better visibility against the black background.
-- **Branding** — Default org name fallback updated for login page.
+- **SolidBase branding** — Default org name fallback changed from "Dashboard" to "SolidBase" for the login page.
 
 ### Added
 - **Auth page: isDevMode flag** — `_serveAuth()` now includes `isDevMode` in PAGE_DATA for consistency with dashboard pages.

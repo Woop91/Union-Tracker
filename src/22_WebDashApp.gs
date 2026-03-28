@@ -104,7 +104,7 @@ function doGetWebDashboard(e) {
     config = ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
-    config = { orgName: 'SB', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -809,7 +809,26 @@ function getOrgChartHtml() {
   }
 }
 
-// getAgencyOrgChartHtml and getPOMSReferenceHtml removed — SolidBase excludes org-specific features
+/**
+ * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
+ * Loaded on-demand when the user navigates to the Agency Org Chart tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
+ */
+function getAgencyOrgChartHtml() {
+  try {
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_agency_org_chart_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('agency_org_chart').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    Logger.log('getAgencyOrgChartHtml error: ' + e.message);
+    return '<div class="empty-state">Agency org chart could not be loaded.</div>';
+  }
+}
 
 /**
  * Returns the published web app URL. Used by client-side logout

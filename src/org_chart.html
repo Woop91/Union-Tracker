@@ -1,9 +1,5 @@
 <style>
-
-/* ─── RESET ───────────────────────────────────────────────────── */
 .madds-embed *, .madds-embed *::before, .madds-embed *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-/* ─── TOKENS ─────────────────────────────────────────────────── */
 .madds-embed {
   --bg:      #0c0e14;
   --surf:    #13161e;
@@ -19,7 +15,6 @@
   --ff-disp: 'DM Serif Display', Georgia, serif;
   --ff-body: 'DM Sans', system-ui, sans-serif;
 }
-
 .madds-embed {
   background: var(--bg);
   color: var(--txt);
@@ -28,87 +23,82 @@
   line-height: 1.5;
   min-height: auto;
   max-width: 100%;
-  padding: 24px 16px;
+  padding: 24px 16px 40px;
+  overflow-x: hidden;
 }
-
 .madds-embed.light {
   --bg:    #f5f6fa;
   --surf:  #ffffff;
   --surf2: #eef0f6;
   --bdr:   rgba(0,0,0,0.08);
-  --txt:   #1a1d26;
-  --mute:  #6b7280;
-  --dim:   #9ca3af;
+  --txt:   #1a1d29;
+  --mute:  #5a6377;
+  --dim:   #9aa0b0;
 }
-
-.madds-embed h1 {
-  font-family: var(--ff-disp);
-  font-size: 1.8rem;
-  color: var(--gold);
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-.madds-embed .oc-subtitle {
-  text-align: center;
-  color: var(--mute);
-  font-size: 0.85rem;
-  margin-bottom: 24px;
-}
-
 .madds-embed .oc-placeholder {
-  background: var(--surf);
-  border: 1px solid var(--bdr);
-  border-radius: 12px;
-  padding: 40px 24px;
   text-align: center;
+  padding: 60px 20px;
   max-width: 600px;
   margin: 0 auto;
 }
-
-.madds-embed .oc-placeholder .oc-icon {
-  font-size: 3rem;
+.madds-embed .oc-placeholder h2 {
+  font-family: var(--ff-disp);
+  font-size: 1.5rem;
+  color: var(--gold);
   margin-bottom: 16px;
 }
-
 .madds-embed .oc-placeholder p {
   color: var(--mute);
   font-size: 0.9rem;
   line-height: 1.6;
   margin-bottom: 12px;
 }
-
-.madds-embed .oc-placeholder p:last-child {
-  margin-bottom: 0;
-}
-
-.madds-embed .oc-placeholder .oc-hint {
-  color: var(--dim);
-  font-size: 0.78rem;
-  font-style: italic;
+.madds-embed .oc-toggle {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: var(--surf2);
+  border: 1px solid var(--bdr);
+  color: var(--mute);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
 }
 </style>
 
-<div class="madds-embed">
-  <h1>Union Organization Chart</h1>
-  <div class="oc-subtitle">Your Union's Leadership & Structure</div>
-
+<div class="madds-embed" style="position:relative;">
+  <button id="madds-mode-toggle" class="oc-toggle" onclick="maddstoggleMode()">☀️ Light</button>
   <div class="oc-placeholder">
-    <div class="oc-icon">&#127963;</div>
-    <p><strong>Organization chart not yet configured.</strong></p>
-    <p>This tab will display your union's organizational structure, leadership hierarchy, chapter contacts, and committee details once configured by an administrator.</p>
-    <p class="oc-hint">To set up your org chart, replace this placeholder file (org_chart.html) with your union's organizational data.</p>
+    <h2>Union Organization Chart</h2>
+    <p>This is a placeholder for your union's organization chart.</p>
+    <p>To customize this page, replace the contents of <code>org_chart.html</code> with your union's leadership structure, chapter breakdown, and contact information.</p>
+    <p style="color:var(--dim);font-size:0.78rem;margin-top:24px;">SolidBase — Generic template. Customize for your local.</p>
   </div>
 </div>
 
 <script>
-// Theme sync — matches SPA dark/light mode
+function maddstoggleMode() {
+  var el = document.querySelector('.madds-embed');
+  if (!el) return;
+  el.classList.toggle('light');
+  var btn = document.getElementById('madds-mode-toggle');
+  if (btn) btn.textContent = el.classList.contains('light') ? '🌙 Dark' : '☀️ Light';
+}
+
 (function() {
-  var embed = document.querySelector('.madds-embed');
-  if (!embed) return;
-  // Check if parent app is in light mode
-  if (typeof AppState !== 'undefined' && !AppState.isDark) {
-    embed.classList.add('light');
+  var isLight = false;
+  try {
+    if (typeof AppState !== 'undefined') { isLight = !AppState.isDark; }
+    else { var v = localStorage.getItem('dds_isDark'); isLight = v === 'false'; }
+  } catch(e) {
+    isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  }
+  if (isLight) {
+    var _me = document.querySelector('.madds-embed');
+    if (_me) _me.classList.add('light');
+    var btn = document.getElementById('madds-mode-toggle');
+    if (btn) btn.textContent = '🌙 Dark';
   }
 })();
 </script>

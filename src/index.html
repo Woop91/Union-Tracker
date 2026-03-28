@@ -254,10 +254,10 @@
         var raw = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
         if (!raw) return;
         var parsed = JSON.parse(raw);
-        // v4.40.0: SWR TTL increased from 5 min to 30 min — returning users get
-        // instant render from cached data while fresh batch loads in background.
+        // v4.44.0: SWR TTL increased to 2 hours — returning users get instant
+        // render from cached data while fresh batch loads in background.
         // Fresh data always overwrites SWR render when it arrives (line 147).
-        if (Date.now() - parsed.ts > 1800000) return;
+        if (Date.now() - parsed.ts > 7200000) return;
         if (parsed.data) {
           _preloadedBatch = parsed.data;
           // Don't set _preloadReady — let the fresh server call complete and overwrite
@@ -379,84 +379,6 @@
       // ── Forced palettes for themes that override role colors ──
       // Each key has a .light and .dark variant so the dark/light toggle works.
       var FORCED_PALETTES = {
-        brutalist: {
-          light: {
-            bg: '#f5f0e8', surface: '#fff', surfaceAlt: '#f0ede4', raised: '#fff',
-            text: '#111', 'text-secondary': '#666', muted: '#888',
-            card: '#fff', 'bg-tertiary': '#eae6dc',
-            success: '#00aa44', warning: '#cc8800', danger: '#ff3333', info: '#2a5298',
-            border: '#111', radius: '0px',
-            accent: '#ff3333', accentDim: '#cc0000', accentGlow: 'rgba(255,51,51,0.2)',
-            accentBg: 'rgba(255,51,51,0.06)', accentBorder: 'rgba(255,51,51,0.3)',
-            fontBody: "'Space Mono', monospace",
-            fontDisplay: "'Bebas Neue', sans-serif",
-            mode: 'light',
-          },
-          dark: {
-            bg: '#0a0a08', surface: '#141410', surfaceAlt: '#1a1a16', raised: '#1e1e1a',
-            text: '#e8e4dc', 'text-secondary': '#aaa89e', muted: '#777570',
-            card: '#141410', 'bg-tertiary': '#1e1e1a',
-            success: '#22cc55', warning: '#dd9922', danger: '#ff4444', info: '#5588cc',
-            border: '#e8e4dc', radius: '0px',
-            accent: '#ff4444', accentDim: '#cc2222', accentGlow: 'rgba(255,68,68,0.25)',
-            accentBg: 'rgba(255,68,68,0.08)', accentBorder: 'rgba(255,68,68,0.3)',
-            fontBody: "'Space Mono', monospace",
-            fontDisplay: "'Bebas Neue', sans-serif",
-            mode: 'dark',
-          },
-        },
-        retroOS: {
-          light: {
-            bg: '#008080', surface: '#c0c0c0', surfaceAlt: '#d0d0d0', raised: '#c0c0c0',
-            text: '#000', 'text-secondary': '#444', muted: '#808080',
-            card: '#c0c0c0', 'bg-tertiary': '#b0b0b0',
-            success: '#008000', warning: '#808000', danger: '#cc0000', info: '#000080',
-            border: '#808080', radius: '0px',
-            accent: '#000080', accentDim: '#000066', accentGlow: 'rgba(0,0,128,0.2)',
-            accentBg: 'rgba(0,0,128,0.08)', accentBorder: 'rgba(0,0,128,0.3)',
-            fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'JetBrains Mono', monospace",
-            mode: 'light',
-          },
-          dark: {
-            bg: '#003838', surface: '#505058', surfaceAlt: '#5a5a62', raised: '#606068',
-            text: '#e0e0e0', 'text-secondary': '#b0b0b0', muted: '#808088',
-            card: '#505058', 'bg-tertiary': '#484850',
-            success: '#44cc44', warning: '#cccc44', danger: '#ee4444', info: '#6688ff',
-            border: '#808088', radius: '0px',
-            accent: '#6688ff', accentDim: '#4466cc', accentGlow: 'rgba(102,136,255,0.25)',
-            accentBg: 'rgba(102,136,255,0.10)', accentBorder: 'rgba(102,136,255,0.3)',
-            fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'JetBrains Mono', monospace",
-            mode: 'dark',
-          },
-        },
-        comic: {
-          light: {
-            bg: '#fffbe6', surface: '#fffde7', surfaceAlt: '#fff8cc', raised: '#fffde7',
-            text: '#111', 'text-secondary': '#555', muted: '#666',
-            card: '#fffde7', 'bg-tertiary': '#fff3b0',
-            success: '#2e7d32', warning: '#e65100', danger: '#c62828', info: '#1565c0',
-            border: '#111', radius: '0px',
-            accent: '#ff1744', accentDim: '#c4001d', accentGlow: 'rgba(255,23,68,0.2)',
-            accentBg: 'rgba(255,23,68,0.06)', accentBorder: 'rgba(255,23,68,0.3)',
-            fontBody: "'DM Sans', sans-serif",
-            fontDisplay: "'Bangers', cursive",
-            mode: 'light',
-          },
-          dark: {
-            bg: '#1a1520', surface: '#221c2a', surfaceAlt: '#2a2232', raised: '#2e2638',
-            text: '#f0e8f5', 'text-secondary': '#b0a8c0', muted: '#887898',
-            card: '#221c2a', 'bg-tertiary': '#2a2232',
-            success: '#4ade80', warning: '#f59e0b', danger: '#ef4444', info: '#60a5fa',
-            border: '#f0e8f5', radius: '0px',
-            accent: '#ff2d5e', accentDim: '#d4002e', accentGlow: 'rgba(255,45,94,0.25)',
-            accentBg: 'rgba(255,45,94,0.08)', accentBorder: 'rgba(255,45,94,0.3)',
-            fontBody: "'DM Sans', sans-serif",
-            fontDisplay: "'Bangers', cursive",
-            mode: 'dark',
-          },
-        },
         glassArchive: {
           dark: {
             bg: '#0d0d19', surface: '#181827', surfaceAlt: '#121220', raised: '#1e1e2f',
@@ -516,7 +438,7 @@
         cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
         tasks: '#f59e0b', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-        resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+        resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
         polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
         events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
         testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -526,13 +448,8 @@
       // ── Visual Style Definitions ──
       var styles = {
         'default':    { tid: 'default',    label: 'Default',     emoji: '\u26A1', desc: 'Clean, professional — auto follows dark/light', type: 'default' },
-        'blobLava':   { tid: 'blobLava',   label: 'Blob Lava',   emoji: '\uD83C\uDF0B', desc: 'Molten morphing accents — organic, alive', type: 'default' },
         'cyberpunk':  { tid: 'cyberpunk',  label: 'Cyberpunk',   emoji: '\uD83D\uDD32', desc: 'Pixel terminal — CRT scanlines, neon red', type: 'extra' },
         'shatter':    { tid: 'shatter',    label: 'Shatter',     emoji: '\uD83D\uDC8E', desc: 'Angular crystalline — fractured geometry', type: 'extra' },
-        'liquidPour': { tid: 'liquidPour', label: 'Liquid Pour', emoji: '\uD83E\uDDEA', desc: 'Bubbly, fluid, bouncy — everything rounds', type: 'extra' },
-        'brutalist':  { tid: 'brutalist',  label: 'Brutalist',   emoji: '\uD83D\uDD28', desc: 'Raw newspaper punk — hard shadows, no mercy', type: 'extra' },
-        'retroOS':    { tid: 'retroOS',    label: 'Retro OS',    emoji: '\uD83D\uDDA5', desc: 'Windows 95 — beveled borders, teal desktop', type: 'extra' },
-        'comic':      { tid: 'comic',      label: 'Comic',       emoji: '\uD83D\uDCA5', desc: 'Pop art halftone — bold outlines, POW!', type: 'extra' },
         'glassArchive': { tid: 'glassArchive', label: 'Glass Archive', emoji: '\uD83D\uDD2E', desc: 'Ethereal glassmorphism — frosted panes, neon purple', type: 'extra' },
         'digitalSteward': { tid: 'digitalSteward', label: 'Digital Steward', emoji: '\uD83D\uDCF0', desc: 'Editorial broadsheet — paper-like tonal layering', type: 'extra' },
       };
@@ -614,11 +531,16 @@
         // 3. Manage CRT overlay elements for cyberpunk
         _manageCrtOverlay(isCyber);
 
-        // 4. Sync embedded component themes (org chart)
+        // 4. Sync embedded component themes (org chart, agency chart)
         var embedRoot = document.querySelector('.madds-embed');
         if (embedRoot) {
           if (!AppState.isDark) embedRoot.classList.add('light');
           else embedRoot.classList.remove('light');
+        }
+        var agencyRoot = document.querySelector('.agency-oc');
+        if (agencyRoot) {
+          if (AppState.isDark) agencyRoot.classList.add('dark');
+          else agencyRoot.classList.remove('dark');
         }
       }
 
@@ -680,10 +602,7 @@
       var _loadedThemeFonts = {};
       function _loadThemeFonts(themeId) {
         if (_loadedThemeFonts[themeId]) return;
-        var fontMap = {
-          comic: 'Bangers&display=swap&family=Righteous&display=swap',
-          brutalist: 'Bebas+Neue&display=swap&family=Space+Mono:wght@400;700&display=swap'
-        };
+        var fontMap = {};
         if (!fontMap[themeId]) return;
         var link = document.createElement('link');
         link.rel = 'stylesheet';
@@ -908,10 +827,11 @@
     // ═══════════════════════════════════════
     var DataCache = (function() {
       var _cache = {};
-      var DEFAULT_TTL = 120000; // 2 minutes
+      var DEFAULT_TTL = 900000; // 15 minutes — reduced server calls for general data
       // C6: Longer TTLs for stable data (member directory, config rarely change)
-      var STABLE_TTL = 300000; // 5 minutes — for member directory, steward directory
+      var STABLE_TTL = 1800000; // 30 minutes — for member directory, steward directory
       var CONFIG_TTL = 300000; // 5 minutes — for config data (reduced from 30m to avoid stale feature gates)
+      var STATS_TTL = 3600000; // 60 minutes — for KPI stats, counts, aggregations
 
       function get(key) {
         var entry = _cache[key];
@@ -952,7 +872,7 @@
         });
       }
 
-      return { get: get, set: set, has: has, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL };
+      return { get: get, set: set, has: has, invalidate: invalidate, cachedCall: cachedCall, STABLE_TTL: STABLE_TTL, CONFIG_TTL: CONFIG_TTL, STATS_TTL: STATS_TTL };
     })();
 
     // ═══════════════════════════════════════
@@ -981,6 +901,11 @@
       }
     }
 
+    // v4.44.0: REQUEST DEDUPLICATION — If the same function+args is already in-flight,
+    // piggyback on the pending call instead of making a duplicate server request.
+    // Key = fnName + JSON.stringify(args). Cleared on completion.
+    var _dedupMap = {}; // key → { ok: [callbacks], fail: [callbacks] }
+
     /** Queue-aware entry point: limits concurrent calls, then delegates to retry logic */
     function _throttledServerCall(fnName, args, onSuccess, onFailure) {
       if (!CircuitBreaker.canCall()) {
@@ -989,10 +914,41 @@
         }
         return;
       }
+
+      // Dedup: if an identical call is already pending, piggyback on it
+      var dedupKey = fnName + '|' + JSON.stringify(args || []);
+      if (_dedupMap[dedupKey]) {
+        _dedupMap[dedupKey].ok.push(onSuccess);
+        _dedupMap[dedupKey].fail.push(onFailure);
+        return;
+      }
+
+      // Register this call for dedup
+      _dedupMap[dedupKey] = { ok: [onSuccess], fail: [onFailure] };
+
+      var wrappedSuccess = function(result) {
+        var entry = _dedupMap[dedupKey];
+        delete _dedupMap[dedupKey];
+        if (entry) {
+          for (var i = 0; i < entry.ok.length; i++) {
+            try { if (typeof entry.ok[i] === 'function') entry.ok[i](result); } catch (_) {}
+          }
+        }
+      };
+      var wrappedFailure = function(err) {
+        var entry = _dedupMap[dedupKey];
+        delete _dedupMap[dedupKey];
+        if (entry) {
+          for (var i = 0; i < entry.fail.length; i++) {
+            try { if (typeof entry.fail[i] === 'function') entry.fail[i](err); } catch (_) {}
+          }
+        }
+      };
+
       if (_inFlight < _MAX_CONCURRENT) {
-        _serverCallWithRetry(fnName, args, onSuccess, onFailure, 0);
+        _serverCallWithRetry(fnName, args, wrappedSuccess, wrappedFailure, 0);
       } else {
-        _callQueue.push({ fn: fnName, args: args, ok: onSuccess, fail: onFailure });
+        _callQueue.push({ fn: fnName, args: args, ok: wrappedSuccess, fail: wrappedFailure });
       }
     }
 
@@ -1104,6 +1060,134 @@
     var _scheduleIdle = (typeof requestIdleCallback === 'function')
       ? function(fn) { requestIdleCallback(fn, { timeout: 2000 }); }
       : function(fn) { setTimeout(fn, 16); };
+
+    // ═══════════════════════════════════════
+    // v4.44.0: BACKGROUND TAB PREFETCH — After the home page renders, use idle
+    // time to prefetch data for the user's most-visited tabs. Tab frequency is
+    // tracked in localStorage via _tabFrequency and read back on next visit.
+    //
+    // Priority: home page gets 100% priority. Prefetch fires via
+    // requestIdleCallback immediately after home renders (no artificial delay).
+    // Calls are staggered 1.5s apart to stay under the 4-concurrent-call throttle.
+    // ═══════════════════════════════════════
+    var _tabPrefetchDone = false;
+    var _TAB_FREQ_KEY = 'dds_tabFreq';
+    var _MAX_PREFETCH = 3;
+
+    /**
+     * Records a tab visit for frequency tracking. Called from _handleTabNav.
+     * Stores per-role counts in localStorage: { steward: { cases: 12, members: 8 }, member: { ... } }
+     */
+    function _recordTabFrequency(role, tabId) {
+      // Skip home/cases (already loaded), always-fresh tabs, and utility tabs
+      if (tabId === 'home' || tabId === 'cases' || tabId === 'more' || tabId === 'more_steward' ||
+          tabId === '_member_more' || tabId === '_steward_more') return;
+      try {
+        var raw = localStorage.getItem(_TAB_FREQ_KEY);
+        var freq = raw ? JSON.parse(raw) : {};
+        if (!freq[role]) freq[role] = {};
+        freq[role][tabId] = (freq[role][tabId] || 0) + 1;
+        safeLSSet(_TAB_FREQ_KEY, JSON.stringify(freq));
+      } catch (_) {}
+    }
+
+    /**
+     * Returns the user's top N most-visited tabs for a role, excluding home/cases.
+     * Falls back to sensible defaults if no history exists yet.
+     */
+    function _getTopTabs(role, n) {
+      var defaults = role === 'steward'
+        ? ['members', 'tasks', 'notifications']
+        : ['events', 'stewarddirectory', 'notifications'];
+      try {
+        var raw = localStorage.getItem(_TAB_FREQ_KEY);
+        if (!raw) return defaults.slice(0, n);
+        var freq = JSON.parse(raw);
+        var roleCounts = freq[role];
+        if (!roleCounts || Object.keys(roleCounts).length === 0) return defaults.slice(0, n);
+        // Sort by frequency descending
+        var sorted = Object.keys(roleCounts).sort(function(a, b) {
+          return roleCounts[b] - roleCounts[a];
+        });
+        return sorted.slice(0, n);
+      } catch (_) { return defaults.slice(0, n); }
+    }
+
+    /**
+     * Prefetch registry: maps tabId → function that warms DataCache for that tab.
+     * Only tabs whose render functions use DataCache.cachedCall benefit from this.
+     * Tabs not in this map are skipped (their render functions use raw serverCall).
+     */
+    var _PREFETCH_REGISTRY = (function() {
+      var _n = function() {};
+      var _email = (CURRENT_USER && CURRENT_USER.email) || '';
+      return {
+        // ── Steward tabs ──
+        members: function() {
+          DataCache.cachedCall('stewardMembers_' + _email, 'dataGetAllMembers', [SESSION_TOKEN],
+            _n, _n, DataCache.STABLE_TTL);
+        },
+        tasks: function() {
+          // Steward tasks don't use cachedCall natively, but warming the dedup layer
+          // means if user clicks Tasks shortly after, the in-flight request is reused
+          DataCache.cachedCall('tasks_open_' + _email, 'dataGetTasks', [SESSION_TOKEN, 'open'],
+            _n, _n, DataCache.STATS_TTL);
+        },
+        contactlog: function() {
+          DataCache.cachedCall('contactLog_' + _email, 'dataGetStewardContactLog', [SESSION_TOKEN],
+            _n, _n, DataCache.STATS_TTL);
+        },
+        // ── Member tabs ──
+        events: function() {
+          DataCache.cachedCall('events', 'dataGetUpcomingEvents', [SESSION_TOKEN, 10],
+            _n, _n, DataCache.STATS_TTL);
+        },
+        stewarddirectory: function() {
+          DataCache.cachedCall('stewardDirectory', 'dataGetStewardDirectory', [SESSION_TOKEN],
+            _n, _n, DataCache.STABLE_TTL);
+        },
+        cases: function() {
+          DataCache.cachedCall('memberGrievances_' + _email, 'dataGetMemberGrievances', [SESSION_TOKEN],
+            _n, _n, DataCache.STABLE_TTL);
+        },
+        mytasks: function() {
+          DataCache.cachedCall('memberTasks_' + _email, 'dataGetMemberTasks', [SESSION_TOKEN],
+            _n, _n, DataCache.STATS_TTL);
+        },
+        // ── Shared tabs (both roles) ──
+        survey: function() {
+          DataCache.cachedCall('surveyStatus_' + _email, 'dataGetSurveyStatus', [SESSION_TOKEN],
+            _n, _n, DataCache.STATS_TTL);
+        },
+        notifications: function() {
+          var role = (typeof AppState !== 'undefined' && AppState.activeRole) || 'member';
+          DataCache.cachedCall('notifications_' + role, 'getWebAppNotifications', [SESSION_TOKEN, role],
+            _n, _n, DataCache.STATS_TTL);
+        }
+      };
+    })();
+
+    /**
+     * Queues background data prefetches for top tabs. Called once after home renders.
+     * Uses requestIdleCallback directly — no artificial delay. Staggered 1.5s apart.
+     * @param {string} role - 'steward' or 'member'
+     */
+    function _prefetchTopTabs(role) {
+      if (_tabPrefetchDone) return;
+      _tabPrefetchDone = true;
+
+      var topTabs = _getTopTabs(role, _MAX_PREFETCH);
+      var queued = 0;
+
+      for (var i = 0; i < topTabs.length; i++) {
+        var prefetchFn = _PREFETCH_REGISTRY[topTabs[i]];
+        if (!prefetchFn) continue; // tab has no prefetchable data — skip
+        (function(fn, delay) {
+          setTimeout(function() { _scheduleIdle(fn); }, delay);
+        })(prefetchFn, queued * 1500);
+        queued++;
+      }
+    }
 
     // ═══════════════════════════════════════
     // APP STATE
@@ -2634,6 +2718,7 @@
         { group: 'Reference' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
+        { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2942,7 +3027,52 @@
       });
     }
 
-    // Agency Org Chart and POMS Reference removed — SolidBase excludes org-specific features
+    /**
+     * Agency Org Chart — loads agency_org_chart.html lazily.
+     * Agency structure, budget, personnel hierarchy.
+     */
+    function renderAgencyOrgChart(appContainer, role) {
+      var mySwitch = _navSwitchId;
+      var myGen = _renderGeneration;
+      renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
+        showLoading(container);
+        google.script.run
+          .withSuccessHandler(function(html) {
+            if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return;
+            container.innerHTML = '';
+            container.classList.add('orgchart-content');
+            var wrap = el('div');
+            wrap.innerHTML = html;
+            container.appendChild(wrap);
+            // Re-execute <script> tags from agency_org_chart.html
+            wrap.querySelectorAll('script').forEach(function(old) {
+              try {
+                var s = document.createElement('script');
+                s.textContent = old.textContent;
+                old.parentNode.removeChild(old);
+                document.head.appendChild(s);
+              } catch (scriptErr) {
+                console.error('Agency org chart script re-execution failed:', scriptErr);
+              }
+            });
+            // Sync agency chart theme with AppState dark/light mode
+            var agencyRoot = wrap.querySelector('.agency-oc');
+            if (agencyRoot) {
+              if (AppState.isDark) agencyRoot.classList.add('dark');
+              else agencyRoot.classList.remove('dark');
+            }
+            // Run init if available
+            if (typeof window.agencyOC_init === 'function') {
+              try { window.agencyOC_init(); } catch (_e) { /* already ran */ }
+            }
+          })
+          .withFailureHandler(function(err) {
+            container.innerHTML = '';
+            container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load agency org chart.'));
+          })
+          .getAgencyOrgChartHtml();
+      });
+    }
 
     // ═══════════════════════════════════════
     // TAB PANE CACHE — keeps rendered tab panes alive in the DOM (display:none).
@@ -2971,7 +3101,8 @@
     }
 
     // Tabs that must always re-render (forms, mutation state, must be fresh)
-    var _ALWAYS_FRESH_TABS = { notifications: 1, feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
+    // v4.44.0: notifications removed — now cached with on-demand refresh button
+    var _ALWAYS_FRESH_TABS = { feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
 
     /** Invalidate cached tab pane(s) — call after data mutations */
     function _invalidateTabCache(tabId) {
@@ -3026,6 +3157,7 @@
 
       // DEV: track tab navigation for usage analytics
       if (typeof UsageTracker !== 'undefined') UsageTracker.trackTab(tabId);
+      _recordTabFrequency(role, tabId);
 
       // ── SPLIT VIEW ROUTING ──
       // When split-view is active, determine which panel receives this navigation
@@ -3123,8 +3255,21 @@
         _navProgressDone();
         return;
       }
-      // maddsorgchart and poms routing removed — SolidBase excludes org-specific features
-
+      if (tabId === 'maddsorgchart') {
+        if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
+          if (typeof _renderDuesGate === 'function') {
+            _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
+          }
+          _navProgressDone();
+          return;
+        }
+        _hideAllVisiblePanes();
+        _splitRenderTarget = 'primary';
+        renderAgencyOrgChart(app, role);
+        _activePane = _layoutCache.content;
+        _navProgressDone();
+        return;
+      }
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 
@@ -4439,6 +4584,37 @@
             }
           });
           window.addEventListener('offline', _updateOnlineStatus);
+
+          // v4.44.0: VISIBILITY-BASED REFRESH — When user returns to this tab
+          // after being away 30+ minutes, silently refresh batch data in the
+          // background. Keeps KPIs, badges, and case lists current for all-day
+          // sessions without polling.
+          var _lastVisibilityRefresh = Date.now();
+          var _VISIBILITY_REFRESH_INTERVAL = 1800000; // 30 minutes
+          document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState !== 'visible') return;
+            if (Date.now() - _lastVisibilityRefresh < _VISIBILITY_REFRESH_INTERVAL) return;
+            _lastVisibilityRefresh = Date.now();
+            if (!navigator.onLine) return;
+            if (!AppState.activeRole || !SESSION_TOKEN) return;
+            // Silently re-fetch batch data — updates AppState + SWR cache
+            try {
+              google.script.run
+                .withSuccessHandler(function(batch) {
+                  if (!batch) return;
+                  safeLSSet('dds_batchData_' + AppState.activeRole, JSON.stringify({ ts: Date.now(), data: batch }));
+                  // Update AppState counts for badge freshness
+                  if (batch.notificationCount !== undefined) AppState.notificationCount = batch.notificationCount;
+                  if (batch.taskCount !== undefined) AppState.taskCount = batch.taskCount;
+                  if (batch.overdueTaskCount !== undefined) AppState.overdueTaskCount = batch.overdueTaskCount;
+                  if (batch.qaUnansweredCount !== undefined) AppState.qaUnansweredCount = batch.qaUnansweredCount;
+                  if (batch.memberTaskCount !== undefined) AppState.memberTaskCount = batch.memberTaskCount;
+                  if (batch.memberCount !== undefined) AppState.memberCount = batch.memberCount;
+                })
+                .withFailureHandler(function() { /* best effort — ignore */ })
+                .dataGetBatchData(SESSION_TOKEN);
+            } catch (_) {}
+          });
 
           // Cache critical data to localStorage on each successful load
           if (typeof AppState !== 'undefined') {

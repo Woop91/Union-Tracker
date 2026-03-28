@@ -801,14 +801,6 @@ describe('G19: More menu items have route handlers', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
 
-  // SolidBase excludes some org-specific tab routes (workload, poms, maddsorgchart).
-  // Stale _handleTabNav references may exist in view files (e.g. insights section)
-  // but should not cause test failures since the routes are intentionally removed.
-  const _excludedRoutes = new Set();
-  if (!indexCode.includes("case 'workload':") && !indexCode.includes("tabId === 'workload'")) _excludedRoutes.add('workload');
-  if (!indexCode.includes("tabId === 'poms'")) _excludedRoutes.add('poms');
-  if (!indexCode.includes("tabId === 'maddsorgchart'")) _excludedRoutes.add('maddsorgchart');
-
   function extractMenuTabIds(code) {
     const ids = [];
     const navRegex = /_handleTabNav\(\s*'[^']*'\s*,\s*'([^']+)'\s*\)/g;
@@ -832,7 +824,7 @@ describe('G19: More menu items have route handlers', () => {
 
   test('all steward More menu tab IDs have route handlers', () => {
     const stewardMenuTabs = extractMenuTabIds(stewardCode);
-    const unhandled = stewardMenuTabs.filter(id => !handledIds.has(id) && !_excludedRoutes.has(id));
+    const unhandled = stewardMenuTabs.filter(id => !handledIds.has(id));
     if (unhandled.length > 0) {
       // eslint-disable-next-line no-console
       console.warn('Steward More menu tabs with no route handler:', unhandled);
@@ -842,7 +834,7 @@ describe('G19: More menu items have route handlers', () => {
 
   test('all member More menu tab IDs have route handlers', () => {
     const memberMenuTabs = extractMenuTabIds(memberCode);
-    const unhandled = memberMenuTabs.filter(id => !handledIds.has(id) && !_excludedRoutes.has(id));
+    const unhandled = memberMenuTabs.filter(id => !handledIds.has(id));
     if (unhandled.length > 0) {
       // eslint-disable-next-line no-console
       console.warn('Member More menu tabs with no route handler:', unhandled);
@@ -859,11 +851,7 @@ describe('G19: More menu items have route handlers', () => {
 // instead of "Program Operations Manual System". This guard prevents the wrong
 // acronym expansion from reappearing.
 
-// SolidBase excludes POMS — skip description accuracy tests if POMS is not present
-const _hasPOMSInSteward = read('steward_view.html').includes('Program Operations Manual System');
-const _hasPOMSInMember = read('member_view.html').includes('Program Operations Manual System');
-const _hasPOMS = _hasPOMSInSteward || _hasPOMSInMember;
-(_hasPOMS ? describe : describe.skip)('G20: POMS description accuracy', () => {
+describe.skip('G20: POMS description accuracy (POMS removed from SolidBase)', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
 
@@ -940,9 +928,7 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
 // G22: Workload Tracker frontend invariants
 // ============================================================================
 
-// SolidBase excludes workload tracker — skip if WT_CATEGORIES not in member_view
-const _hasWorkloadUI = read('member_view.html').includes('var WT_CATEGORIES');
-(_hasWorkloadUI ? describe : describe.skip)('G22 — Workload Tracker frontend invariants', () => {
+describe.skip('G22 — Workload Tracker frontend invariants (removed from SolidBase)', () => {
   const memberView = read('member_view.html');
 
   test('WT_CAT_KEY_LABELS map is defined from WT_CATEGORIES', () => {
@@ -1052,9 +1038,7 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  // SolidBase excludes renderPOMSReference — skip if not present
-  const _hasPOMSRender = read('index.html').includes('function renderPOMSReference');
-  (_hasPOMSRender ? test : test.skip)('renderPOMSReference async callback checks _navSwitchId', () => {
+  test.skip('renderPOMSReference async callback checks _navSwitchId (POMS removed from SolidBase)', () => {
     const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
     expect(fnBody).toMatch(/_navSwitchId/);
   });
@@ -1132,9 +1116,7 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  // SolidBase excludes POMS routing — skip if not present
-  const _hasPOMSRoute = read('index.html').includes("tabId === 'poms'");
-  (_hasPOMSRoute ? test : test.skip)('poms early-return uses _hideAllVisiblePanes', () => {
+  test.skip('poms early-return uses _hideAllVisiblePanes (POMS removed from SolidBase)', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
     expect(pomsBlock).not.toBeNull();
@@ -1285,7 +1267,7 @@ describe('G25b: Mobile header switch buttons reset navigation state', () => {
 // had letter-spacing: 0.5px, causing characters to be too close together and
 // hard to read. Fix: increased to 1.5px.
 
-describe('G26: Comic theme bold text letter spacing', () => {
+describe.skip('G26: Comic theme bold text letter spacing (comic theme removed from SolidBase)', () => {
   const stylesCode = read('styles.html');
 
   test('comic theme bold text has letter-spacing >= 1px', () => {
