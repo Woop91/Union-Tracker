@@ -2037,7 +2037,7 @@ function createNotificationsSheet(ss) {
       'NOTIF-001',
       'All Members',
       'Announcement',
-      'Welcome to the SolidBase',
+      'Welcome to the Union Dashboard',
       'Your union dashboard is now live! Here you can check in to meetings, learn about your rights, and track grievance progress. Contact your steward if you have any questions.',
       'Normal',
       systemEmail,

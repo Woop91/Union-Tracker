@@ -1,7 +1,7 @@
 # Web App Performance Research
 
 **Date:** 2026-03-12
-**Scope:** SolidBase web app (GAS-hosted SPA)
+**Scope:** DDS-Dashboard web app (GAS-hosted SPA)
 **Goal:** Identify all opportunities to improve load time, responsiveness, and perceived performance.
 
 ---

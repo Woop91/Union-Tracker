@@ -886,6 +886,6 @@ function padRight(str, len) {
  *
  * Note: onGrievanceFormSubmit() is defined in 05_Integrations.gs
  *
- * @author SEIU Local Development Team
+ * @author Development Team
  * @version 4.43.1
  */

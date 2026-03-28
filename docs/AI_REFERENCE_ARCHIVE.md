@@ -1068,9 +1068,9 @@ Contract Article → Know Your Rights → Grievance Process → Forms & Template
 
 ## v4.22.6 — MADDS Org Chart Default (2026-03-06)
 
-**Change summary:** Replaced `src/org_chart.html` with the MADDS (Main Internal Breakout) chart sourced from the `Woop91/509d` repository (`org-chart/MADDS.html`, last updated 2026-03-01). This is now the default Org Chart view for both SolidBase and Union-Tracker.
+**Change summary:** Replaced `src/org_chart.html` with the MADDS (Main Internal Breakout) chart sourced from the `Woop91/509d` repository (`org-chart/MADDS.html`, last updated 2026-03-01). This is now the default Org Chart view for both DDS-Dashboard and Union-Tracker.
 
-**Source:** `509d/org-chart/MADDS.html` — Full Your Union Local organizational chart including: President → Officers → Chief of Staff → Directors → Coordinators → Public Sector Chapters (Your Organization expanded by default) → Other Chapters. Also contains Role Descriptions, Financial Overview, Staff Directory & Compensation, Career Paths, and Chapter Advisors & Internal Organizers sections.
+**Source:** `509d/org-chart/MADDS.html` — Full SEIU Local 509 organizational chart including: President → Officers → Chief of Staff → Directors → Coordinators → Public Sector Chapters (MassAbility expanded by default) → Other Chapters. Also contains Role Descriptions, Financial Overview, Staff Directory & Compensation, Career Paths, and Chapter Advisors & Internal Organizers sections.
 
 **Embedding approach (critical — do not revert):**
 The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the following conversions were made:
@@ -1094,7 +1094,7 @@ The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the follo
 - Do NOT rename `org_chart.html` — the GAS server function is hardcoded to `'org_chart'` filename.
 - If updating MADDS.html from the 509d repo, re-run the scoping conversions above — do NOT paste the raw standalone HTML directly.
 - Keep `.madds-embed` as the wrapper class and `#madds-mode-toggle` as the toggle ID.
-- The 509d repo is the source of truth for the chart content; the converted fragment lives in SolidBase and Union-Tracker `src/`.
+- The 509d repo is the source of truth for the chart content; the converted fragment lives in DDS-Dashboard and Union-Tracker `src/`.
 
 ---
 
@@ -1103,7 +1103,7 @@ The MADDS chart is a standalone HTML page. To embed it in the GAS SPA, the follo
 ### Change
 Added `scripts/sync-org-chart.js` — a Node.js script that fetches `MADDS.html`
 from the private `Woop91/509d` repo (GitHub Contents API) and transforms it into
-the SPA-compatible `src/org_chart.html` used by SolidBase.
+the SPA-compatible `src/org_chart.html` used by DDS-Dashboard.
 
 ### Wire-up
 - `package.json` → `"sync-org-chart": "node scripts/sync-org-chart.js"` (manual, not pre-deploy)
@@ -1181,7 +1181,7 @@ Sender email = 'system', Sender name = 'Q&A Forum'.
 ### [2026-03-07] sync-org-chart.js v2 — Multi-repo, All Branches
 
 Updated to commit org_chart.html to all branches of both repos:
-- `SolidBase` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
+- `DDS-Dashboard` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
 - `Union-Tracker` (Main, staging): `src/org_chart.html`, `dist/org_chart.html`
 
 MADDS is now the sole org chart. Skip logic prevents empty commits when file is unchanged.
@@ -2339,7 +2339,7 @@ Every bug from the 2026-03-08/09 session would have been caught by automated tes
 ### Design Rationale
 - **Failure-only**: Daily success emails are noise. If you want proof tests ran, check the SPA panel.
 - **Config tab over hardcoded**: Follows "everything dynamic" rule. Admins can change the email without code changes.
-- **Quota guard**: Your Organization uses MailApp for other notifications too — don't compete for the 100/day limit.
+- **Quota guard**: MassAbility DDS uses MailApp for other notifications too — don't compete for the 100/day limit.
 - **HTML + plain-text**: HTML renders in Gmail/Outlook; plain-text is the fallback for text-only clients.
 
 ## v4.25.3 — Deadline Config Completeness (2026-03-09)
@@ -2932,7 +2932,7 @@ Total: 54 test suites, 2,744 tests passing (previously 41 suites, 2,446 tests).
 
 ## 🔍 CONTRACT AUDIT + FIXES — 2026-03-11 (v4.25.9, Batch 3)
 
-### Verified Contract: Your Union Local Unit 8 CBA (2024–2026), Article 23
+### Verified Contract: SEIU Local 509 Unit 8 CBA (2024–2026), Article 23
 Source: MA DOC Grievance Policy 270.03 for Bargaining Units 8 & 10 (July 2025).
 
 **Actual Unit 8 Grievance Deadlines (calendar days unless noted):**

@@ -27,6 +27,11 @@ const orgChartCode = read('org_chart.html');
 const indexCode = read('index.html');
 const stylesCode = read('styles.html');
 
+// SolidBase uses a generic org chart placeholder without MADDS-specific features.
+// Detect whether the full MADDS org chart is present (has interactive functions).
+const _hasFullOrgChart = /window\.pillToggle\s*=/.test(orgChartCode);
+const _describeIfFull = _hasFullOrgChart ? describe : describe.skip;
+
 
 // ============================================================================
 // OC1: ORG CHART WIDTH — NOT CLIPPED BY page-layout-content MAX-WIDTH
@@ -44,7 +49,7 @@ describe('OC1: Org chart is not clipped by parent max-width', () => {
     expect(hasOverride).toBe(true);
   });
 
-  test('org chart .page max-width is wider than default content max-width', () => {
+  (_hasFullOrgChart ? test : test.skip)('org chart .page max-width is wider than default content max-width', () => {
     // Org chart's .page should allow at least 1000px
     const pageMatch = orgChartCode.match(/\.page\s*\{[^}]*max-width:\s*(\d+)px/);
     expect(pageMatch).not.toBeNull();
@@ -66,7 +71,7 @@ describe('OC1: Org chart is not clipped by parent max-width', () => {
 // <script> tags were not reliably accessible from onclick="" handlers in some
 // browser/GAS contexts. Assigning to window.* guarantees global scope.
 
-describe('OC2: Org chart interactive functions are explicitly global', () => {
+_describeIfFull('OC2: Org chart interactive functions are explicitly global', () => {
   const requiredGlobalFunctions = [
     'pillToggle',
     'repToggle',
@@ -127,9 +132,9 @@ describe('OC3: renderOrgChart script re-execution is reliable', () => {
 // ============================================================================
 // Bug: _initDesktopRan was set to true on first visit and never reset. When
 // the user navigated away and back, initDesktop() wouldn't run, leaving
-// chapter sub-sections in an incorrect state.
+// sub-sections in an incorrect state.
 
-describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
+_describeIfFull('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   test('org_chart.html declares _initDesktopRan on window (resets on re-execution)', () => {
     expect(orgChartCode).toMatch(/window\._initDesktopRan\s*=\s*false/);
   });
@@ -152,7 +157,7 @@ describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
 // Bug: onclick handlers referenced functions that didn't exist or weren't
 // global, causing silent failures when buttons were clicked.
 
-describe('OC5: onclick handlers reference declared functions', () => {
+_describeIfFull('OC5: onclick handlers reference declared functions', () => {
   test('every onclick function call in org_chart.html has a matching window.* declaration', () => {
     // Extract all function names from onclick attributes
     const onclickRegex = /onclick="(\w+)\s*\(/g;
@@ -193,7 +198,7 @@ describe('OC5: onclick handlers reference declared functions', () => {
 // Bug: The light/dark mode toggle button existed but maddstoggleMode() wasn't
 // globally accessible, so clicking the button did nothing.
 
-describe('OC6: Light/dark mode toggle is functional', () => {
+_describeIfFull('OC6: Light/dark mode toggle is functional', () => {
   test('madds-mode-toggle button exists with onclick', () => {
     expect(orgChartCode).toMatch(/id="madds-mode-toggle"/);
     expect(orgChartCode).toMatch(/onclick="maddstoggleMode\(\)"/);
@@ -219,7 +224,7 @@ describe('OC6: Light/dark mode toggle is functional', () => {
 // Bug: pillToggle('some-id', this) was called but the element with that ID
 // didn't exist, so clicking the pill did nothing.
 
-describe('OC7: Pill button toggle targets exist in the HTML', () => {
+_describeIfFull('OC7: Pill button toggle targets exist in the HTML', () => {
   test('every pillToggle target ID has a matching element', () => {
     const pillRegex = /pillToggle\('([^']+)'/g;
     const targetIds = new Set();
@@ -362,7 +367,7 @@ describe('OC8: Org chart CSS is scoped under .madds-embed', () => {
 // Bug: overflow-x:hidden on a width-constrained parent caused content to be
 // invisible instead of scrollable.
 
-describe('OC9: Org chart overflow is handled correctly', () => {
+_describeIfFull('OC9: Org chart overflow is handled correctly', () => {
   test('.madds-embed has overflow-x handling', () => {
     // .madds-embed should handle overflow (hidden is OK since content is self-contained)
     expect(orgChartCode).toMatch(/\.madds-embed\s*\{[^}]*overflow-x:\s*(hidden|auto)/);

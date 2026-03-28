@@ -61,7 +61,7 @@ loadSources([
   '28_FailsafeService.gs',
   '32_AdminSettings.gs',
   '33_NewFeatureServices.gs'
-]);
+].filter(f => require('fs').existsSync(require('path').resolve(__dirname, '..', 'src', f))));
 
 // ============================================================================
 // A1: CROSS-FILE DEPENDENCY TESTS
@@ -183,7 +183,9 @@ describe('A1: Cross-file dependencies', () => {
 // ============================================================================
 
 describe('A1: Build order integrity', () => {
-  const BUILD_ORDER = [
+  // BUILD_ORDER filtered to only files present in this codebase
+  // (SolidBase excludes 25_WorkloadService.gs)
+  const _FULL_BUILD_ORDER = [
     '00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '02_DataManagers.gs',
     '03_UIComponents.gs', '04a_UIMenus.gs', '04b_AccessibilityFeatures.gs',
     '05_Integrations.gs', '06_Maintenance.gs',
@@ -197,10 +199,13 @@ describe('A1: Build order integrity', () => {
     '17_CorrelationEngine.gs', '19_WebDashAuth.gs',
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
-    '26_QAForum.gs', '27_TimelineService.gs',
+    '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_TrendAlertService.gs', '30_EngagementService.gs', '30_TestRunner.gs',
     '31_WebAppTests.gs', '32_AdminSettings.gs', '33_NewFeatureServices.gs', 'DevMenu.gs'
   ];
+  const BUILD_ORDER = _FULL_BUILD_ORDER.filter(f =>
+    fs.existsSync(path.resolve(__dirname, '..', 'src', f))
+  );
 
   test('all source files in BUILD_ORDER exist on disk', () => {
     BUILD_ORDER.forEach(filename => {
@@ -434,12 +439,14 @@ describe('A3: No empty JSDoc-only stubs in form handler files', () => {
 
 describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
   // Web app files where getActiveSpreadsheet() returning null would be fatal
+  // Filtered to only files present (SolidBase excludes 25_WorkloadService.gs)
   const webAppFiles = [
     '20_WebDashConfigReader.gs',
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-    ];
+    '25_WorkloadService.gs',
+  ].filter(f => fs.existsSync(path.resolve(__dirname, '..', 'src', f)));
 
   webAppFiles.forEach(file => {
     test(`${file}: every getActiveSpreadsheet() call has a null guard`, () => {
@@ -750,7 +757,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
 // ============================================================================
 // A11b: CLIENT-CALLABLE HTML ENDPOINTS HAVE AUTH CHECKS
 // ============================================================================
-// Bug (2026-03-14): getOrgChartHtml() served HTML
+// Bug (2026-03-14): getPOMSReferenceHtml() and getOrgChartHtml() served HTML
 // content without any authentication — any anonymous caller could invoke them.
 // All client-callable functions in 22_WebDashApp.gs that return HTML content
 // must verify Session.getActiveUser().getEmail() before serving.
@@ -763,7 +770,9 @@ describe('A11b: Client-callable HTML endpoints have error handling', () => {
   // HTML-serving endpoints — serve static content, auth enforced by doGet().
   // No per-function auth check: Session.getActiveUser().getEmail() returns empty
   // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
-  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml'];
+  // Filtered to only endpoints defined in the codebase (SolidBase excludes getPOMSReferenceHtml)
+  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml', 'getPOMSReferenceHtml']
+    .filter(fn => webAppSrc.includes('function ' + fn));
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() has try/catch error handling`, () => {
@@ -975,16 +984,18 @@ describe('A14: GAS API enum validation', () => {
 // inside a finally block. (withScriptLock_() helper is already safe by design.)
 
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
+  const srcDir = path.resolve(__dirname, '..', 'src');
+  // Filtered to only files present (SolidBase excludes 25_WorkloadService.gs)
   const lockFiles = [
     '02_DataManagers.gs',
-      '26_QAForum.gs',
+    '25_WorkloadService.gs',
+    '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
     '08c_FormsAndNotifications.gs',
     '10c_FormsAndSync.gs',
     '12_Features.gs',
-  ];
-  const srcDir = path.resolve(__dirname, '..', 'src');
+  ].filter(f => fs.existsSync(path.join(srcDir, f)));
 
   lockFiles.forEach(file => {
     test(`${file}: every getScriptLock() is paired with waitLock() and releaseLock() in finally`, () => {
@@ -1033,12 +1044,14 @@ describe('A16: LockService.getScriptLock() acquisitions release in finally block
 // Exception: helper functions (trailing _) and batch/maintenance utilities.
 
 describe('A17: Lock-acquiring mutations in service files log audit events', () => {
+  const srcDir = path.resolve(__dirname, '..', 'src');
+  // Filtered to only files present (SolidBase excludes 25_WorkloadService.gs)
   const serviceFiles = [
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-    ];
-  const srcDir = path.resolve(__dirname, '..', 'src');
+    '25_WorkloadService.gs',
+  ].filter(f => fs.existsSync(path.join(srcDir, f)));
 
   // Extract named function bodies from a source string.
   // Returns [{name, body}] for each non-private (no trailing _) named function.

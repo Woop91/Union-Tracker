@@ -1,5 +1,5 @@
 /**
- * Build Script for Dashboard
+ * Build Script for SolidBase Dashboard
  * Copies individual source files into dist/ for multi-file CLASP deployment.
  * GAS V8 loads files in alphabetical filename order — numbered filenames
  * (00_, 01_, …) guarantee correct load order AND give the GAS editor a
@@ -53,7 +53,7 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules (load after all core modules)
+  // Web-dashboard SPA modules
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -321,7 +321,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 38 .gs + 15 .html + 1 appsscript.json = 54 files
+  // Current prod capacity: 41 .gs + 17 .html + 1 appsscript.json = 59 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
   const gsFileCount = isProd

@@ -10,7 +10,7 @@
  *     (3) Route to correct view (auth_view for login, steward_view for
  *         stewards, member_view for members)
  *     (4) Config + user data injection into HTML template
- *   Deep-link support: ?page=home opens specific SPA tab after auth.
+ *   Deep-link support: ?page=<tabId> opens specific SPA tab after auth.
  *   Token-authenticated pages: ?page=esign (e-sig), ?page=rsvp (meeting RSVP).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -104,7 +104,7 @@ function doGetWebDashboard(e) {
     config = ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
-    config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'SB', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -809,6 +809,7 @@ function getOrgChartHtml() {
   }
 }
 
+// getAgencyOrgChartHtml and getPOMSReferenceHtml removed — SolidBase excludes org-specific features
 
 /**
  * Returns the published web app URL. Used by client-side logout

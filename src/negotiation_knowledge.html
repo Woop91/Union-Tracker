@@ -318,7 +318,7 @@ if (typeof document !== 'undefined') {
 
 // ─── SIDEBAR KNOWLEDGE WIDGET (tablet+ only) ──────────────────────────
 // Small rotating quote at the bottom of the sidebar — always visible.
-// Cycles through a shuffled subset every 10 seconds.
+// Cycles through a shuffled subset every 24 seconds.
 
 var _sidebarKnowledgeTimer = null;
 
@@ -357,16 +357,17 @@ function renderSidebarKnowledge(sidebarEl) {
       // Fade in
       wrap.classList.add('sk-visible');
       idx++;
-    }, 600);
+    }, 2000);
+    // Schedule next with jitter so widgets don't sync up
+    _sidebarKnowledgeTimer = setTimeout(showNext, 24000 + Math.floor(Math.random() * 8000));
   }
 
   showNext();
-  if (_sidebarKnowledgeTimer) clearInterval(_sidebarKnowledgeTimer);
-  _sidebarKnowledgeTimer = setInterval(showNext, 12000);
+  if (_sidebarKnowledgeTimer) clearTimeout(_sidebarKnowledgeTimer);
 }
 
 function stopSidebarKnowledge() {
-  if (_sidebarKnowledgeTimer) { clearInterval(_sidebarKnowledgeTimer); _sidebarKnowledgeTimer = null; }
+  if (_sidebarKnowledgeTimer) { clearTimeout(_sidebarKnowledgeTimer); _sidebarKnowledgeTimer = null; }
 }
 
 // ─── INLINE KNOWLEDGE WIDGET (member/steward home page) ────────────────
@@ -447,8 +448,8 @@ function renderNegotiationWidget(container) {
     }, 100);
 
     // Phase 2: Phase in bullets one at a time (tablet+ only)
-    var bulletDelay = 1200; // ms after title appears
-    var bulletInterval = 900; // ms between each bullet
+    var bulletDelay = 2400; // ms after title appears
+    var bulletInterval = 1800; // ms between each bullet
     var cleanupTimers = [];
 
     bulletEls.forEach(function(bEl, i) {
@@ -460,15 +461,16 @@ function renderNegotiationWidget(container) {
 
     // Phase 3: Hold for a few seconds after all bullets shown, then fade out
     var totalBulletTime = bulletDelay + (bulletEls.length * bulletInterval);
-    var holdTime = isWide ? 5000 : 6000; // hold longer on mobile (fewer items to read)
+    // Jitter so widgets don't all refresh at once
+    var holdTime = (isWide ? 10000 : 12000) + Math.floor(Math.random() * 6000);
 
     var fadeTimer = setTimeout(function() {
       stage.classList.remove('nkw-visible');
-      // After fade-out transition, show next set
+      // After fade-out transition (1.8s CSS), show next set
       var nextTimer = setTimeout(function() {
         setIdx++;
         presentSet();
-      }, 800);
+      }, 2000);
       cleanupTimers.push(nextTimer);
     }, totalBulletTime + holdTime);
     cleanupTimers.push(fadeTimer);
@@ -506,6 +508,7 @@ function renderKnowledgeStrip(container) {
   var setIdx = 0;
   var bulletIdx = 0;
 
+  var _stripTimer = null;
   function showNext() {
     var set = pool[setIdx % pool.length];
     var bullet = set.bullets ? set.bullets[bulletIdx % (set.bullets.length || 1)] : '';
@@ -520,10 +523,12 @@ function renderKnowledgeStrip(container) {
         bulletIdx = 0;
         setIdx++;
       }
-    }, 500);
+    }, 2000);
+    // Jitter so strips across tabs don't sync up
+    _stripTimer = setTimeout(showNext, 16000 + Math.floor(Math.random() * 6000));
   }
 
   showNext();
-  return setInterval(showNext, 8000);
+  return _stripTimer;
 }
 </script>

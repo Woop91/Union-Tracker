@@ -479,12 +479,38 @@
    mode: 'light',
    },
   },
+  digitalSteward: {
+   light: {
+   bg: '#f7f9fb', surface: '#ffffff', surfaceAlt: '#f2f4f6', raised: '#ffffff',
+   text: '#191c1e', 'text-secondary': '#484551', muted: '#797582',
+   card: '#ffffff', 'bg-tertiary': '#eceef0',
+   success: '#006878', warning: '#d97706', danger: '#ba1a1a', info: '#006878',
+   border: 'rgba(202,196,211,0.15)', radius: '12px',
+   accent: '#6536e8', accentDim: '#4d04d0', accentGlow: 'rgba(101,54,232,0.2)',
+   accentBg: 'rgba(101,54,232,0.06)', accentBorder: 'rgba(101,54,232,0.15)',
+   fontBody: "'Manrope', sans-serif",
+   fontDisplay: "'Manrope', sans-serif",
+   mode: 'light',
+   },
+   dark: {
+   bg: '#111318', surface: '#1a1c22', surfaceAlt: '#15171c', raised: '#1e2028',
+   text: '#e0e3e5', 'text-secondary': '#aba9ba', muted: '#797582',
+   card: '#1a1c22', 'bg-tertiary': '#222430',
+   success: '#69d5e8', warning: '#fbbf24', danger: '#ff6e84', info: '#69d5e8',
+   border: 'rgba(202,196,211,0.1)', radius: '12px',
+   accent: '#b4a1ff', accentDim: '#6536e8', accentGlow: 'rgba(180,161,255,0.25)',
+   accentBg: 'rgba(180,161,255,0.08)', accentBorder: 'rgba(180,161,255,0.2)',
+   fontBody: "'Manrope', sans-serif",
+   fontDisplay: "'Manrope', sans-serif",
+   mode: 'dark',
+   },
+  },
   };
 
   
   var TAB_COLORS = {
   cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-  tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
+  tasks: '#f59e0b', home: '#ff3366',
   more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
   resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
   polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
@@ -504,6 +530,7 @@
   'retroOS':    { tid: 'retroOS',    label: 'Retro OS',    emoji: '\uD83D\uDDA5', desc: 'Windows 95 — beveled borders, teal desktop', type: 'extra' },
   'comic':      { tid: 'comic',      label: 'Comic',       emoji: '\uD83D\uDCA5', desc: 'Pop art halftone — bold outlines, POW!', type: 'extra' },
   'glassArchive': { tid: 'glassArchive', label: 'Glass Archive', emoji: '\uD83D\uDD2E', desc: 'Ethereal glassmorphism — frosted panes, neon purple', type: 'extra' },
+  'digitalSteward': { tid: 'digitalSteward', label: 'Digital Steward', emoji: '\uD83D\uDCF0', desc: 'Editorial broadsheet — paper-like tonal layering', type: 'extra' },
   };
 
   function getTabColor(tabId) { return TAB_COLORS[tabId] || '#8b5cf6'; }
@@ -2328,6 +2355,33 @@
   }
 
   
+  if (isSidebarLayout() && typeof AUTH_QUOTES !== 'undefined') {
+  var quoteWrap = el('div', { className: 'sidebar-quote-widget' });
+  var quoteText = el('div', { className: 'sqw-text' });
+  var quoteAttr = el('div', { className: 'sqw-attr' });
+  quoteWrap.appendChild(quoteText);
+  quoteWrap.appendChild(quoteAttr);
+  sidebar.appendChild(quoteWrap);
+
+  var _sqPool = _shuffleArray(AUTH_QUOTES);
+  var _sqIdx = 0;
+  function _showSidebarQuote() {
+   var q = _sqPool[_sqIdx];
+   quoteWrap.classList.remove('sqw-visible');
+   setTimeout(function() {
+   quoteText.textContent = '\u201C' + q.text + '\u201D';
+   quoteAttr.textContent = '\u2014 ' + q.attr;
+   quoteWrap.classList.add('sqw-visible');
+   _sqIdx = (_sqIdx + 1) % _sqPool.length;
+   }, 600);
+  }
+  _showSidebarQuote();
+  
+  if (_sidebarQuoteTimer) clearInterval(_sidebarQuoteTimer);
+  _sidebarQuoteTimer = setInterval(_showSidebarQuote, 12000);
+  }
+
+  
   if (isSidebarLayout() && typeof renderSidebarKnowledge === 'function') {
   renderSidebarKnowledge(sidebar);
   }
@@ -2451,33 +2505,6 @@
    className: 'sidebar-version',
    style: { padding: '8px 16px 4px', fontSize: '11px', opacity: '0.4', textAlign: 'center' }
   }, 'v' + APP_VERSION));
-  }
-
-  
-  if (isSidebarLayout() && typeof AUTH_QUOTES !== 'undefined') {
-  var quoteWrap = el('div', { className: 'sidebar-quote-widget' });
-  var quoteText = el('div', { className: 'sqw-text' });
-  var quoteAttr = el('div', { className: 'sqw-attr' });
-  quoteWrap.appendChild(quoteText);
-  quoteWrap.appendChild(quoteAttr);
-  sidebar.appendChild(quoteWrap);
-
-  var _sqPool = _shuffleArray(AUTH_QUOTES);
-  var _sqIdx = 0;
-  function _showSidebarQuote() {
-   var q = _sqPool[_sqIdx];
-   quoteWrap.classList.remove('sqw-visible');
-   setTimeout(function() {
-   quoteText.textContent = '\u201C' + q.text + '\u201D';
-   quoteAttr.textContent = '\u2014 ' + q.attr;
-   quoteWrap.classList.add('sqw-visible');
-   _sqIdx = (_sqIdx + 1) % _sqPool.length;
-   }, 600);
-  }
-  _showSidebarQuote();
-  
-  if (_sidebarQuoteTimer) clearInterval(_sidebarQuoteTimer);
-  _sidebarQuoteTimer = setInterval(_showSidebarQuote, 12000);
   }
  }
 
@@ -2855,6 +2882,8 @@
  }
 
  
+
+ 
  
  
  
@@ -3028,6 +3057,7 @@
   _navProgressDone();
   return;
   }
+  
 
   
   if (switchId !== _navSwitchId) { _navProgressDone(); return; }

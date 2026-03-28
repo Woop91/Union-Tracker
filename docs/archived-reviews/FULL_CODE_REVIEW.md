@@ -1,4 +1,4 @@
-# SolidBase — Full Code Quality Review
+# DDS Dashboard — Full Code Quality Review
 
 **Date:** 2026-02-28
 **Scope:** Every line of code across 47 files (76,649 lines)
@@ -317,7 +317,7 @@ Multiple functions make individual `getRange().setValue()` calls per row instead
 ### Hardcoded Values Violating Project Rules (10+ findings)
 - 60+ hardcoded satisfaction survey column indices
 - Hardcoded sheet names: `'Config'`, `'_Survey_Tracking'`, `'PortalMemberDirectory'`, etc.
-- Hardcoded org names: "Your Union Local", "Your Organization"
+- Hardcoded org names: "SEIU 509", "MassAbility DDS"
 - Magic numbers: steward workload thresholds (5, 8), row limits (50, 100, 998)
 - Grievance type values hardcoded in formula sheet
 - Column letter `E` hardcoded in calc formula sheet

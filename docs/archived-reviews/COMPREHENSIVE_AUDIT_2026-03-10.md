@@ -1,4 +1,4 @@
-# 🔍 SolidBase — Comprehensive Code Audit Report
+# 🔍 DDS-Dashboard — Comprehensive Code Audit Report
 # Date: 2026-03-10 | Version Audited: v4.25.7 | Auditor: Claude Opus 4.6
 
 ---
@@ -205,7 +205,7 @@ Per SYNC-LOG.md, three files need `typeof` guards for Workload Tracker's absence
 `emitDataChanged`, `emitEditEvent`, `emitFormEvent`, `emitSyncComplete` in `15_EventBus.gs` are all defined but never called. The Event Bus appears to be scaffolded but not integrated into the data mutation pipeline.
 
 ### 4.3 Hardcoded Org References in DevTools
-`07_DevTools.gs` contains Your Union Local-specific emails (`bargaining@seiu509.org`, etc.) — acceptable since DevTools is excluded from production builds.
+`07_DevTools.gs` contains SEIU 509-specific emails (`bargaining@seiu509.org`, etc.) — acceptable since DevTools is excluded from production builds.
 
 ### 4.4 getLastRow() Without Empty-Sheet Safety
 Several `getLastRow()` calls could return 0 on empty sheets, causing `getRange(2, 1, 0, ...)` which throws. Should use `Math.max(sheet.getLastRow() - 1, 0)`.
