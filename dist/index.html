@@ -453,6 +453,32 @@
    mode: 'dark',
    },
   },
+  glassArchive: {
+   dark: {
+   bg: '#0d0d19', surface: '#181827', surfaceAlt: '#121220', raised: '#1e1e2f',
+   text: '#e9e6f8', 'text-secondary': '#aba9ba', muted: '#757484',
+   card: '#181827', 'bg-tertiary': '#242436',
+   success: '#81ecff', warning: '#fbbf24', danger: '#ff6e84', info: '#81ecff',
+   border: 'rgba(71,70,85,0.15)', radius: '16px',
+   accent: '#b6a0ff', accentDim: '#7e51ff', accentGlow: 'rgba(182,160,255,0.3)',
+   accentBg: 'rgba(182,160,255,0.08)', accentBorder: 'rgba(182,160,255,0.25)',
+   fontBody: "'Manrope', sans-serif",
+   fontDisplay: "'Manrope', sans-serif",
+   mode: 'dark',
+   },
+   light: {
+   bg: '#f0eef8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#e8e6f2', raised: 'rgba(255,255,255,0.92)',
+   text: '#1a1a2e', 'text-secondary': '#5c5c7a', muted: '#7d7b96',
+   card: 'rgba(255,255,255,0.85)', 'bg-tertiary': '#dbd8ec',
+   success: '#0891b2', warning: '#d97706', danger: '#dc2626', info: '#0891b2',
+   border: 'rgba(0,0,0,0.08)', radius: '16px',
+   accent: '#7e51ff', accentDim: '#6834eb', accentGlow: 'rgba(126,81,255,0.2)',
+   accentBg: 'rgba(126,81,255,0.08)', accentBorder: 'rgba(126,81,255,0.2)',
+   fontBody: "'Manrope', sans-serif",
+   fontDisplay: "'Manrope', sans-serif",
+   mode: 'light',
+   },
+  },
   };
 
   
@@ -477,6 +503,7 @@
   'brutalist':  { tid: 'brutalist',  label: 'Brutalist',   emoji: '\uD83D\uDD28', desc: 'Raw newspaper punk — hard shadows, no mercy', type: 'extra' },
   'retroOS':    { tid: 'retroOS',    label: 'Retro OS',    emoji: '\uD83D\uDDA5', desc: 'Windows 95 — beveled borders, teal desktop', type: 'extra' },
   'comic':      { tid: 'comic',      label: 'Comic',       emoji: '\uD83D\uDCA5', desc: 'Pop art halftone — bold outlines, POW!', type: 'extra' },
+  'glassArchive': { tid: 'glassArchive', label: 'Glass Archive', emoji: '\uD83D\uDD2E', desc: 'Ethereal glassmorphism — frosted panes, neon purple', type: 'extra' },
   };
 
   function getTabColor(tabId) { return TAB_COLORS[tabId] || '#8b5cf6'; }
