@@ -33,9 +33,10 @@ git add dist/ > /dev/null 2>&1
 # Step 3: Deploy guards + SPA integrity (catches routing, auth, sheet, parity bugs)
 echo ""
 echo "[3/3] Running deploy guards..."
-npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail 2>&1 | tail -5
+npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail 2>&1
+GUARD_EXIT=$?
 
-if [ $? -ne 0 ]; then
+if [ $GUARD_EXIT -ne 0 ]; then
   echo ""
   echo "Deploy guard tests failed. Run 'npm run test:guards' for details."
   exit 1

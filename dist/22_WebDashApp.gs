@@ -10,7 +10,7 @@
  *     (3) Route to correct view (auth_view for login, steward_view for
  *         stewards, member_view for members)
  *     (4) Config + user data injection into HTML template
- *   Deep-link support: ?page=workload opens specific SPA tab after auth.
+ *   Deep-link support: ?page=home opens specific SPA tab after auth.
  *   Token-authenticated pages: ?page=esign (e-sig), ?page=rsvp (meeting RSVP).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -809,23 +809,6 @@ function getOrgChartHtml() {
   }
 }
 
-/**
- * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * SolidBase stub — agency_org_chart.html is not included in this deployment.
- * @returns {string} Placeholder HTML directing admins to configure their own chart
- */
-function getAgencyOrgChartHtml() {
-  return '<div class="empty-state">Configure your agency organizational chart in the Admin Settings.</div>';
-}
-
-/**
- * Client-callable: Returns the POMS Reference HTML for lazy-loading.
- * SolidBase stub — poms_reference.html is not included in this deployment.
- * @returns {string} Stub message indicating POMS is unavailable
- */
-function getPOMSReferenceHtml() {
-  return '<div class="empty-state">POMS Reference is not available in this deployment.</div>';
-}
 
 /**
  * Returns the published web app URL. Used by client-side logout

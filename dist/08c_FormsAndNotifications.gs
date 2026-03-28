@@ -297,7 +297,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * SolidBase Dashboard including:
+ * SEIU Local Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -311,8 +311,8 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author Development Team
- * @version 4.33.0
+ * @author SEIU Local
+ * @version 4.43.1
  */
 
 // ============================================================================
@@ -432,7 +432,7 @@ function checkDeadlinesAndNotify_() {
 
   body += '\n\nView your dashboard: ' + ss.getUrl();
 
-  MailApp.sendEmail(email, subject, body);
+  safeSendEmail_({ to: email, subject: subject, body: body });
 }
 
 /**
@@ -449,12 +449,13 @@ function testDeadlineNotifications() {
   if (response !== ui.Button.YES) return;
 
   try {
-    MailApp.sendEmail(email,
-      COMMAND_CONFIG.SYSTEM_NAME + ' Test Notification',
-      'This is a test notification from your ' + COMMAND_CONFIG.SYSTEM_NAME + '.\n\n' +
+    safeSendEmail_({
+      to: email,
+      subject: COMMAND_CONFIG.SYSTEM_NAME + ' Test Notification',
+      body: 'This is a test notification from your ' + COMMAND_CONFIG.SYSTEM_NAME + '.\n\n' +
       'If you received this email, notifications are working correctly!\n\n' +
       'Dashboard: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl()
-    );
+    });
     ui.alert('Test Sent', 'Test email sent to ' + email + '\n\nCheck your inbox!', ui.ButtonSet.OK);
   } catch (e) {
     ui.alert('Error', 'Failed to send test email: ' + e.message, ui.ButtonSet.OK);
@@ -624,7 +625,7 @@ function sendStewardDeadlineAlerts() {
       grievances.length + ' Grievance Deadline(s) - ' + stewardName;
 
     try {
-      MailApp.sendEmail({
+      safeSendEmail_({
         to: email,
         subject: subject,
         body: body,
@@ -751,7 +752,7 @@ function executeSendRandomSurveyEmails(opts) {
         'Thank you for being a member!\n\n' +
         getOrgNameFromConfig_();
 
-      MailApp.sendEmail({
+      safeSendEmail_({
         to: member.email,
         subject: opts.subject,
         body: body,
@@ -1131,7 +1132,7 @@ function sendSurveyCompletionReminders() {
       body += 'Thank you for your participation.\n\n' +
         'In Solidarity,\n' + orgName;
 
-      MailApp.sendEmail({
+      safeSendEmail_({
         to: email,
         subject: (typeof COMMAND_CONFIG !== 'undefined' ? COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX : '') + 'Survey Completion Reminder',
         body: body
@@ -1265,7 +1266,7 @@ function showSurveyTrackingDialog() {
  * - logAuditEvent() function (from core module)
  *
  * @author Union Membership System
- * @version 4.33.0
+ * @version 4.43.1
  * ============================================================================
  */
 

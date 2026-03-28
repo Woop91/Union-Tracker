@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | SolidBase sync flow, Workload Tracker exclusion registry |
+| 3 | **SYNC-LOG.md** | DDS↔Union-Tracker sync flow, Workload Tracker exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -30,13 +30,13 @@ Read these files **in this order** when onboarding to this codebase:
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
 **Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
-**Upstream:** Private upstream repo. See SYNC-LOG.md for sync rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users) at your organization.
+**Target users:** Union stewards (power users) and members (casual users).
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**Apps Script ID:** `[REDACTED — see .clasp.json]`
+**DDS Apps Script ID:** `[REDACTED - DDS Script ID]`
+**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -202,7 +202,7 @@ Features: Material Design UI, Weingarten Rights, live steward search, PII scrubb
 | 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
 | 2026-02-23 | GitHub token `ghp_FTE8...` expired | Token rotated | User generated new token | ✅ |
 | 2026-02-23 | Token `ghp_q3Zd...` lacked `repo` scope | Wrong scope selected | User generated third token with correct scope | ✅ |
-| 2026-02-25 | Memory had default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
+| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
 | 2026-02-25 | Expired token `ghp_FTE8...` still in memory | Token rotated but memory stale | Updated memory to `ghp_7MY0...` | ✅ |
 
 ---
@@ -245,7 +245,7 @@ Records what each AI agent changed, when, and in which files.
 | 2026-02-25 | Claude (claude.ai) | Merged staging→Main: v4.13.0 SPA overhaul + notification bell/EventBus + individual-file build. Synced all 3 branches. | All `src/`, `dist/`, `build.js`, `CLAUDE.md` |
 | 2026-02-28 | Claude Code (Opus 4.6) | v4.18.1-security: Full security assessment + 7 remediations — auth default ON, magic link rate limiting, token cleanup trigger, timing attack fix, PIN token migration to PropertiesService, innerHTML→textContent, escapeForFormula | `00_Security.gs`, `19_WebDashAuth.gs`, `13_MemberSelfService.gs`, `14_MeetingCheckIn.gs`, `21_WebDashDataService.gs`, `CODE_REVIEW.md`, `CHANGELOG.md`, `FEATURES.md` |
 | 2026-03-22 | Claude (claude.ai) | DESIGN ITERATION (not yet released): Member Hub feature — 3 new GAS files created. `member_hub_styles.html` (auth manifesto + hub CSS), `auth_manifesto.html` (phrase bg + quote cycler JS), `member_hub_view.html` (renderMemberHub tab function). Standalone prototype: `member-hub.html`. See integration instructions at top of each file. Union-agnostic — identical copy goes to SolidBase. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html` |
-| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All GAS files updated and pushed to Main. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
+| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All GAS files updated and pushed to DDS Main + SolidBase staging. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
 | 2026-03-23 | Claude (claude.ai) | COMMITTED v1.1.1: Login card opacity dropped to 0.06, blur removed entirely — phrases fully visible through card. Added measureAndHidePhrases() to auth_manifesto.html — suppresses any phrase wider than viewport on mobile so no clipped text appears. CSS overflow:hidden fallback added to phrase elements. Resize listener recalculates on orientation change. | `member_hub_styles.html`, `auth_manifesto.html` |
 
 ---
@@ -497,11 +497,11 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 ## [2026-03-24] agency_org_chart.html — Added (New File)
 
 ### What was done
-- Prepped standalone Agency Org Chart HTML file for GAS SPA integration
+- Prepped standalone Agency Org Chart HTML file for GAS SPA integration (DDS-only feature, not included in SolidBase)
 - Converted from full standalone HTML document to a GAS include partial
 
 ### Source
-- Input: `Agency_Org_Chart.html` (936 lines, standalone)
+- Input: Agency org chart HTML (936 lines, standalone)
 - Output: `src/agency_org_chart.html` + `dist/agency_org_chart.html` (1056 lines, GAS partial)
 
 ### Transformations applied
@@ -516,19 +516,19 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 ### Integration
 - Include in GAS SPA via: `<?= include('agency_org_chart') ?>`
 - No routing hook added yet — needs to be wired into SPA navigation manually
-- CSS variables are SELF-CONTAINED (separate from main app theme variables) — no conflicts
+- CSS variables are SELF-CONTAINED (separate from DDS theme variables) — no conflicts
 
 ### File features
 - 6 tabs: Org Chart, Budget Summary, Budget Tracking, Historical Budget, Historical Spending, Agency Info
 - Interactive salary history modal (10 staff/leadership records, 2017-2026)
-- Collapsible internal org panel (expanded by default)
+- Collapsible DDS internal org panel (expanded by default)
 - EOHHS sibling agencies toggle
 - Support Divisions group toggle (5 offices)
 - 5 collapsible sub-lists (Community Living, Voc Rehab, General Counsel, Financial, Learning/Dev, HR, Excellence & Innovation)
-- Position descriptions for VDE I/II/III/IV (job grades and salary ranges)
+- Position descriptions for VDE I/II/III/IV (DDS job grades and salary ranges)
 - Full budget tables: FY2023-FY2026 GAA, historical spending, budget tracking
 - Agency quick facts, EOHHS contacts
 
 ### ⚠️ Pending
 - NOT yet wired into index.html SPA navigation — needs manual step
-- Internal org chart data is point-in-time (2025/2026 actual) — not dynamic from sheet
+- DDS internal org chart data is point-in-time (2025/2026 actual) — not dynamic from sheet

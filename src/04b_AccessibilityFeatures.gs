@@ -567,16 +567,17 @@ function processMemberImport(csvData) {
       var values = parseCSVLine_(lines[i]);
       if (!values || values.length === 0) continue;
 
-      // Build row data
+      // Build row data — escapeForFormula on all string inputs to prevent formula injection
+      var _eff = typeof escapeForFormula === 'function' ? escapeForFormula : function(v) { return v; };
       var rowData = [];
-      rowData[MEMBER_COLS.FIRST_NAME - 1] = values[columnMap.firstName] || '';
-      rowData[MEMBER_COLS.LAST_NAME - 1] = values[columnMap.lastName] || '';
-      rowData[MEMBER_COLS.EMAIL - 1] = columnMap.email !== undefined ? values[columnMap.email] || '' : '';
-      rowData[MEMBER_COLS.PHONE - 1] = columnMap.phone !== undefined ? values[columnMap.phone] || '' : '';
-      rowData[MEMBER_COLS.JOB_TITLE - 1] = columnMap.jobTitle !== undefined ? values[columnMap.jobTitle] || '' : '';
-      rowData[MEMBER_COLS.UNIT - 1] = columnMap.unit !== undefined ? values[columnMap.unit] || '' : '';
-      rowData[MEMBER_COLS.WORK_LOCATION - 1] = columnMap.workLocation !== undefined ? values[columnMap.workLocation] || '' : '';
-      rowData[MEMBER_COLS.SUPERVISOR - 1] = columnMap.supervisor !== undefined ? values[columnMap.supervisor] || '' : '';
+      rowData[MEMBER_COLS.FIRST_NAME - 1] = _eff(values[columnMap.firstName] || '');
+      rowData[MEMBER_COLS.LAST_NAME - 1] = _eff(values[columnMap.lastName] || '');
+      rowData[MEMBER_COLS.EMAIL - 1] = columnMap.email !== undefined ? _eff(values[columnMap.email] || '') : '';
+      rowData[MEMBER_COLS.PHONE - 1] = columnMap.phone !== undefined ? _eff(values[columnMap.phone] || '') : '';
+      rowData[MEMBER_COLS.JOB_TITLE - 1] = columnMap.jobTitle !== undefined ? _eff(values[columnMap.jobTitle] || '') : '';
+      rowData[MEMBER_COLS.UNIT - 1] = columnMap.unit !== undefined ? _eff(values[columnMap.unit] || '') : '';
+      rowData[MEMBER_COLS.WORK_LOCATION - 1] = columnMap.workLocation !== undefined ? _eff(values[columnMap.workLocation] || '') : '';
+      rowData[MEMBER_COLS.SUPERVISOR - 1] = columnMap.supervisor !== undefined ? _eff(values[columnMap.supervisor] || '') : '';
       rowData[MEMBER_COLS.IS_STEWARD - 1] = columnMap.isSteward !== undefined ? (values[columnMap.isSteward] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'No';
       rowData[MEMBER_COLS.DUES_PAYING - 1] = columnMap.duesPaying !== undefined ? (values[columnMap.duesPaying] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'Yes';
 

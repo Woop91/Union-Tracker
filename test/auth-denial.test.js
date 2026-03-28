@@ -70,6 +70,10 @@ loadSources([
 
 const INVALID_TOKEN = 'invalid-token-that-does-not-exist';
 
+// Track skipped functions so we can fail if too many are undefined
+const skippedFunctions = [];
+const MAX_ALLOWED_SKIPS = 5;
+
 beforeEach(() => {
   // Make SSO return nothing (non-SSO user)
   global.Session.getActiveUser.mockReturnValue({
@@ -200,7 +204,7 @@ describe('Auth denial: DataService wrappers return safe empty values', () => {
     test(`${name}() does not throw when unauthenticated`, () => {
       const fn = global[name];
       if (typeof fn !== 'function') {
-        // Function doesn't exist yet (possibly pending implementation)
+        skippedFunctions.push(name);
         console.warn(`  SKIP: ${name} is not defined`);
         return;
       }
@@ -237,7 +241,7 @@ describe('Auth denial: QA Forum wrappers', () => {
   qaFunctions.forEach(({ name, args }) => {
     test(`${name}() does not throw when unauthenticated`, () => {
       const fn = global[name];
-      if (typeof fn !== 'function') { console.warn(`  SKIP: ${name}`); return; }
+      if (typeof fn !== 'function') { skippedFunctions.push(name); console.warn(`  SKIP: ${name}`); return; }
       expect(() => fn(...args)).not.toThrow();
     });
 
@@ -270,7 +274,7 @@ describe('Auth denial: Weekly Questions wrappers', () => {
   wqFunctions.forEach(({ name, args }) => {
     test(`${name}() does not throw when unauthenticated`, () => {
       const fn = global[name];
-      if (typeof fn !== 'function') { console.warn(`  SKIP: ${name}`); return; }
+      if (typeof fn !== 'function') { skippedFunctions.push(name); console.warn(`  SKIP: ${name}`); return; }
       expect(() => fn(...args)).not.toThrow();
     });
 
@@ -301,7 +305,7 @@ describe('Auth denial: Timeline Service wrappers', () => {
   tlFunctions.forEach(({ name, args }) => {
     test(`${name}() does not throw when unauthenticated`, () => {
       const fn = global[name];
-      if (typeof fn !== 'function') { console.warn(`  SKIP: ${name}`); return; }
+      if (typeof fn !== 'function') { skippedFunctions.push(name); console.warn(`  SKIP: ${name}`); return; }
       expect(() => fn(...args)).not.toThrow();
     });
 
@@ -332,7 +336,7 @@ describe('Auth denial: Failsafe Service wrappers', () => {
   fsFunctions.forEach(({ name, args }) => {
     test(`${name}() does not throw when unauthenticated`, () => {
       const fn = global[name];
-      if (typeof fn !== 'function') { console.warn(`  SKIP: ${name}`); return; }
+      if (typeof fn !== 'function') { skippedFunctions.push(name); console.warn(`  SKIP: ${name}`); return; }
       expect(() => fn(...args)).not.toThrow();
     });
 
@@ -360,7 +364,7 @@ describe('Auth denial: Survey Engine wrappers', () => {
   surveyFunctions.forEach(({ name, args }) => {
     test(`${name}() does not throw when unauthenticated`, () => {
       const fn = global[name];
-      if (typeof fn !== 'function') { console.warn(`  SKIP: ${name}`); return; }
+      if (typeof fn !== 'function') { skippedFunctions.push(name); console.warn(`  SKIP: ${name}`); return; }
       expect(() => fn(...args)).not.toThrow();
     });
 
@@ -504,5 +508,19 @@ describe('Auth denial: Resource mutation endpoints return safe values', () => {
 
   test('getWebAppResourcesListAll() does not throw when auth denied', () => {
     expect(() => global.getWebAppResourcesListAll()).not.toThrow();
+  });
+});
+
+
+// ============================================================================
+// Summary: Fail if too many functions were skipped
+// ============================================================================
+
+describe('Auth denial: skip budget', () => {
+  test(`no more than ${MAX_ALLOWED_SKIPS} functions should be undefined`, () => {
+    if (skippedFunctions.length > 0) {
+      console.warn(`Skipped ${skippedFunctions.length} undefined function(s): ${skippedFunctions.join(', ')}`);
+    }
+    expect(skippedFunctions.length).toBeLessThanOrEqual(MAX_ALLOWED_SKIPS);
   });
 });

@@ -263,8 +263,8 @@ function _buildQuoteCycler(wrap) {
  var div = document.createElement('div');
  div.className = 'auth-quote-item' + (i === 0 ? ' aq-visible' : '');
  div.innerHTML =
-  '<div class="aq-text">\u201C' + q.text + '\u201D</div>' +
-  '<div class="aq-attr">\u2014 ' + q.attr + '</div>';
+  '<div class="aq-text">\u201C' + escapeHtml(q.text) + '\u201D</div>' +
+  '<div class="aq-attr">\u2014 ' + escapeHtml(q.attr) + '</div>';
  wrap.appendChild(div);
  });
 
@@ -294,8 +294,8 @@ function renderHubInlineQuotes() {
  if (el && picks[i]) {
   el.className = 'hub-inline-quote';
   el.innerHTML =
-  '<div class="hiq-text">\u201C' + picks[i].text + '\u201D</div>' +
-  '<div class="hiq-attr">\u2014 ' + picks[i].attr + '</div>';
+  '<div class="hiq-text">\u201C' + escapeHtml(picks[i].text) + '\u201D</div>' +
+  '<div class="hiq-attr">\u2014 ' + escapeHtml(picks[i].attr) + '</div>';
  }
  });
 }

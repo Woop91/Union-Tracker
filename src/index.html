@@ -15,8 +15,8 @@
   <meta name="theme-color" content="#6366f1">
   <!-- PERF: Non-render-blocking font load — prevents font CSS from blocking first paint.
        display=swap ensures text is visible immediately with fallback fonts. -->
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;800&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;800&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
 
   <?!= include('styles') ?>
   <?!= include('member_hub_styles') ?>
@@ -298,7 +298,7 @@
             success: '#4ade80', warning: '#facc15', danger: '#ef4444', info: '#60a5fa',
             border: '#1a1a1a', radius: '10px',
             fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            fontDisplay: "'JetBrains Mono', monospace",
             mode: 'dark',
           },
           light: {
@@ -308,7 +308,7 @@
             success: '#16a34a', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
             border: '#e2e2ea', radius: '10px',
             fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            fontDisplay: "'JetBrains Mono', monospace",
             mode: 'light',
           }
         },
@@ -319,8 +319,8 @@
             card: 'rgba(255,255,255,0.04)', 'bg-tertiary': 'rgba(255,255,255,0.07)',
             success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
             border: 'rgba(255,255,255,0.08)', radius: '20px',
-            fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            fontBody: "'JetBrains Mono', monospace",
+            fontDisplay: "'JetBrains Mono', monospace",
             mode: 'dark',
           },
           light: {
@@ -329,8 +329,8 @@
             card: 'rgba(255,255,255,0.85)', 'bg-tertiary': 'rgba(0,0,0,0.04)',
             success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
             border: 'rgba(0,0,0,0.08)', radius: '20px',
-            fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            fontBody: "'JetBrains Mono', monospace",
+            fontDisplay: "'JetBrains Mono', monospace",
             mode: 'light',
           }
         }
@@ -370,8 +370,8 @@
           border: 'rgba(' + base.rgb + ',0.12)', radius: '0px',
           accent: base.solid, accentDim: base.dim, accentGlow: 'rgba(' + base.rgb + ',0.3)',
           accentBg: 'rgba(' + base.rgb + ',0.06)', accentBorder: 'rgba(' + base.rgb + ',0.2)',
-          fontBody: "'Share Tech Mono', monospace",
-          fontDisplay: "'Press Start 2P', monospace",
+          fontBody: "'JetBrains Mono', monospace",
+          fontDisplay: "'JetBrains Mono', monospace",
           mode: 'dark',
         };
       }
@@ -414,8 +414,8 @@
             border: '#808080', radius: '0px',
             accent: '#000080', accentDim: '#000066', accentGlow: 'rgba(0,0,128,0.2)',
             accentBg: 'rgba(0,0,128,0.08)', accentBorder: 'rgba(0,0,128,0.3)',
-            fontBody: "'Pixelify Sans', system-ui",
-            fontDisplay: "'Pixelify Sans', system-ui",
+            fontBody: "'JetBrains Mono', monospace",
+            fontDisplay: "'JetBrains Mono', monospace",
             mode: 'light',
           },
           dark: {
@@ -426,8 +426,8 @@
             border: '#808088', radius: '0px',
             accent: '#6688ff', accentDim: '#4466cc', accentGlow: 'rgba(102,136,255,0.25)',
             accentBg: 'rgba(102,136,255,0.10)', accentBorder: 'rgba(102,136,255,0.3)',
-            fontBody: "'Pixelify Sans', system-ui",
-            fontDisplay: "'Pixelify Sans', system-ui",
+            fontBody: "'JetBrains Mono', monospace",
+            fontDisplay: "'JetBrains Mono', monospace",
             mode: 'dark',
           },
         },
@@ -464,7 +464,7 @@
         cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
         tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
+        resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
         polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
         events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
         testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -560,16 +560,11 @@
         // 3. Manage CRT overlay elements for cyberpunk
         _manageCrtOverlay(isCyber);
 
-        // 4. Sync embedded component themes (org chart, agency chart, POMS)
+        // 4. Sync embedded component themes (org chart)
         var embedRoot = document.querySelector('.madds-embed');
         if (embedRoot) {
           if (!AppState.isDark) embedRoot.classList.add('light');
           else embedRoot.classList.remove('light');
-        }
-        var agencyRoot = document.querySelector('.agency-oc');
-        if (agencyRoot) {
-          if (AppState.isDark) agencyRoot.classList.add('dark');
-          else agencyRoot.classList.remove('dark');
         }
       }
 
@@ -632,8 +627,6 @@
       function _loadThemeFonts(themeId) {
         if (_loadedThemeFonts[themeId]) return;
         var fontMap = {
-          cyberpunk: 'Press+Start+2P&display=swap&family=Share+Tech+Mono&display=swap&family=Silkscreen&display=swap',
-          retroOS: 'Pixelify+Sans&display=swap&family=Orbitron:wght@400;700&display=swap',
           comic: 'Bangers&display=swap&family=Righteous&display=swap',
           brutalist: 'Bebas+Neue&display=swap&family=Space+Mono:wght@400;700&display=swap'
         };
@@ -676,21 +669,7 @@
     // ═══════════════════════════════════════
     // SAFE TEXT — HTML escape for dynamic data in innerHTML
     // ═══════════════════════════════════════
-    /**
-     * Escapes HTML special characters to prevent XSS when inserting
-     * dynamic data into innerHTML. Used by member_view and steward_view.
-     * @param {*} str - Value to escape (coerced to string)
-     * @returns {string} HTML-safe string
-     */
-    function safeText(str) {
-      if (str == null) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
+    // safeText already defined as alias for escapeHtml (line 75)
 
     /** Generate a simple unique key for idempotent mutation dedup */
     function _genIdemKey() {
@@ -2009,7 +1988,7 @@
       // Fire-and-forget usage analytics (v4.31.3)
       try {
         if (typeof SESSION_TOKEN !== 'undefined' && SESSION_TOKEN && activeTab) {
-          google.script.run.dataLogTabVisit(SESSION_TOKEN, activeTab, role || '');
+          google.script.run.withFailureHandler(function(){}).dataLogTabVisit(SESSION_TOKEN, activeTab, role || '');
         }
       } catch (_ua) { /* non-critical */ }
 
@@ -2033,6 +2012,7 @@
 
           var newSecContent = el('div', { className: 'page-layout-content' });
           contentFn(newSecContent);
+          if (typeof renderKnowledgeStrip === 'function' && !newSecContent.querySelector('.neg-knowledge-widget')) { renderKnowledgeStrip(newSecContent); }
           secPanel.appendChild(newSecContent);
           _layoutCache.secondaryContent = newSecContent;
 
@@ -2055,6 +2035,7 @@
 
           var newContent = el('div', { className: 'page-layout-content', id: 'main-content', role: 'main' });
           contentFn(newContent);
+          if (typeof renderKnowledgeStrip === 'function' && !newContent.querySelector('.neg-knowledge-widget')) { renderKnowledgeStrip(newContent); }
           targetParent.appendChild(newContent);
           _layoutCache.content = newContent;
 
@@ -2092,6 +2073,7 @@
       var content = el('div', { className: 'page-layout-content', id: 'main-content', role: 'main' });
       try {
         contentFn(content);
+        if (typeof renderKnowledgeStrip === 'function' && !content.querySelector('.neg-knowledge-widget')) { renderKnowledgeStrip(content); }
       } catch (contentErr) {
         console.error('Content render error:', contentErr);
         content.innerHTML = '';
@@ -2557,7 +2539,6 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
-        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { group: 'Reference' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
@@ -2843,23 +2824,6 @@
       });
     }
 
-    /**
-     * Agency Org Chart — stub for SolidBase (no agency_org_chart.html).
-     */
-    function renderAgencyOrgChart(appContainer, role) {
-      renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
-        container.appendChild(el('div', { className: 'empty-state' }, 'Configure your agency organizational chart in the Admin Settings.'));
-      });
-    }
-
-    /**
-     * POMS Reference — stub for SolidBase (no poms_reference.html).
-     */
-    function renderPOMSReference(app, role) {
-      renderPageLayout(app, role, 'poms', function(container) {
-        container.appendChild(el('div', { className: 'empty-state' }, 'POMS Reference is not available in this deployment.'));
-      });
-    }
 
     // ═══════════════════════════════════════
     // TAB PANE CACHE — keeps rendered tab panes alive in the DOM (display:none).
@@ -3040,29 +3004,6 @@
         _navProgressDone();
         return;
       }
-      if (tabId === 'maddsorgchart') {
-        if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
-          if (typeof _renderDuesGate === 'function') {
-            _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
-          }
-          _navProgressDone();
-          return;
-        }
-        _hideAllVisiblePanes();
-        _splitRenderTarget = 'primary';
-        renderAgencyOrgChart(app, role);
-        _activePane = _layoutCache.content;
-        _navProgressDone();
-        return;
-      }
-      if (tabId === 'poms') {
-        _hideAllVisiblePanes();
-        _splitRenderTarget = 'primary';
-        renderPOMSReference(app, role);
-        _activePane = _layoutCache.content;
-        _navProgressDone();
-        return;
-      }
 
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
@@ -3204,7 +3145,6 @@
           case 'cases': return renderMyCases;
           case 'profile': return renderUpdateProfile;
           case 'resources': return renderMemberResources;
-          case 'workload': return renderWorkloadTracker;
           case 'weeklyq': // legacy deep-link
           case 'polls': return renderPollsPage;
           case 'survey': return renderSurveyResultsPage;
@@ -3246,7 +3186,6 @@
           case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
           case 'timeline': return renderStewardTimelinePage;
           case 'mentorship': return renderMentorshipPage;
-          case 'workload': return renderWorkloadTracker;
           case 'accesslog': return renderAccessLogPage;
           case 'engagement': return renderEngagementDashboard;
           case 'failsafe': return renderFailsafePage;

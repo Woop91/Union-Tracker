@@ -25,7 +25,7 @@
  *
  * DEPENDENCIES:
  *   Depends on: 01_Core.gs (SHEETS).
- *   Used by: 24_WeeklyQuestions.gs, 25_WorkloadService.gs, 26_QAForum.gs,
+ *   Used by: 24_WeeklyQuestions.gs, 26_QAForum.gs,
  *            27_TimelineService.gs, and SPA views.
  *
  * Note: FlashPolls/PollResponses removed v4.24.0 — replaced by 24_WeeklyQuestions.gs.
@@ -118,7 +118,9 @@ function portalGetOrCreateSheet_(name, headers, hidden) {
       .setBackground(SHEET_COLORS.HEADER_NAVY)
       .setFontColor(SHEET_COLORS.BG_WHITE);
     sheet.setFrozenRows(1);
-    if (hidden) sheet.hideSheet();
+    if (hidden) {
+      if (typeof setSheetVeryHidden_ === 'function') setSheetVeryHidden_(sheet); else sheet.hideSheet();
+    }
   }
   return sheet;
 }

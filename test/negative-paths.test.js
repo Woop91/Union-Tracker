@@ -334,9 +334,9 @@ describe('Lock contention handling', () => {
       releaseLock: jest.fn()
     });
 
-    expect(() => {
-      FailsafeService.updateDigestConfig('user@test.com', { enabled: true });
-    }).toThrow(/lock/i);
+    var result = FailsafeService.updateDigestConfig('user@test.com', { enabled: true });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/lock|acquire/i);
 
     // Restore lock mock
     LockService.getScriptLock.mockReturnValue({

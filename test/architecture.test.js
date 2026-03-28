@@ -439,7 +439,7 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-  ];
+    ];
 
   webAppFiles.forEach(file => {
     test(`${file}: every getActiveSpreadsheet() call has a null guard`, () => {
@@ -750,7 +750,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
 // ============================================================================
 // A11b: CLIENT-CALLABLE HTML ENDPOINTS HAVE AUTH CHECKS
 // ============================================================================
-// Bug (2026-03-14): getPOMSReferenceHtml() and getOrgChartHtml() served HTML
+// Bug (2026-03-14): getOrgChartHtml() served HTML
 // content without any authentication — any anonymous caller could invoke them.
 // All client-callable functions in 22_WebDashApp.gs that return HTML content
 // must verify Session.getActiveUser().getEmail() before serving.
@@ -763,7 +763,6 @@ describe('A11b: Client-callable HTML endpoints have error handling', () => {
   // HTML-serving endpoints — serve static content, auth enforced by doGet().
   // No per-function auth check: Session.getActiveUser().getEmail() returns empty
   // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
-  // SolidBase: getPOMSReferenceHtml is a stub (no try/catch needed)
   const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml'];
 
   htmlEndpoints.forEach(fn => {
@@ -978,7 +977,7 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
-    '26_QAForum.gs',
+      '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
     '08c_FormsAndNotifications.gs',
@@ -1038,7 +1037,7 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-  ];
+    ];
   const srcDir = path.resolve(__dirname, '..', 'src');
 
   // Extract named function bodies from a source string.

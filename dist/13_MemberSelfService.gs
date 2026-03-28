@@ -30,7 +30,7 @@
  *   Used by 14_MeetingCheckIn.gs (authenticateMember, verifyPIN, hashPIN),
  *   the SPA self-service view, and menu items.
  *
- * @version 4.33.0
+ * @version 4.43.1
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -170,6 +170,12 @@ function verifyPIN(pin, memberId, storedHash) {
  */
 function assignMemberPIN(memberId, options) {
   options = options || {};
+
+  // Auth check: only stewards/admins may assign PINs
+  var callerRole = typeof getUserRole_ === 'function' ? getUserRole_(Session.getActiveUser().getEmail()) : null;
+  if (callerRole !== 'steward' && callerRole !== 'admin' && callerRole !== 'both') {
+    return errorResponse('Authorization required: steward or admin access needed', 'assignMemberPIN');
+  }
 
   if (!memberId) {
     return errorResponse('Member ID is required', 'assignMemberPIN');
@@ -1305,8 +1311,12 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
     var callerEmail = '';
     try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
-    // If caller email is available, verify they match or have elevated role
-    if (callerEmail && callerEmail !== email) {
+    // Verify caller authorization — if we can't identify the caller in
+    // Execute-as-Me context, deny access (prevents unauthenticated lookups)
+    if (!callerEmail) {
+      return { success: false, history: [], error: 'Unable to verify caller identity.' };
+    }
+    if (callerEmail !== email) {
       var callerRole = typeof getUserRole_ === 'function' ? getUserRole_(callerEmail) : 'member';
       if (callerRole !== 'admin' && callerRole !== 'steward') {
         return { success: false, history: [], error: 'Not authorized to view another member\'s history.' };
@@ -1462,11 +1472,34 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
   if (!e) return { success: false, message: 'Not authenticated.' };
 
   if (step === 'pin' && data && data.pin) {
-    // Use existing PIN assignment
-    if (typeof assignMemberPIN === 'function') {
-      return assignMemberPIN(e, { pin: data.pin });
+    // Member self-set PIN: look up member ID from email, hash supplied PIN, store it
+    var pin = String(data.pin).trim();
+    if (pin.length < 6 || !/^\d+$/.test(pin)) {
+      return { success: false, message: 'PIN must be at least 6 digits.' };
     }
-    return { success: false, message: 'PIN service unavailable.' };
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'System error.' };
+    var mSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!mSheet) return { success: false, message: 'System configuration error.' };
+    var mData = mSheet.getDataRange().getValues();
+    var memberId = null;
+    var memberRow = -1;
+    for (var mi = 1; mi < mData.length; mi++) {
+      if (String(mData[mi][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim() === e.toLowerCase().trim()) {
+        memberId = String(mData[mi][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+        memberRow = mi + 1;
+        break;
+      }
+    }
+    if (!memberId || memberRow === -1) return { success: false, message: 'Member record not found.' };
+    var existingHash = mData[memberRow - 1][PIN_CONFIG.PIN_COLUMN - 1];
+    if (existingHash) return { success: false, message: 'PIN already set. Use PIN reset instead.' };
+    var hashedPin = hashPIN(pin, memberId);
+    mSheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('PIN_SELF_SET', { memberId: memberId, email: e });
+    }
+    return { success: true, message: 'PIN set successfully.' };
   }
 
   if (step === 'contact' && data) {
@@ -1693,10 +1726,12 @@ function devRequestPINReset(email) {
   try { if (typeof clearPINAttempts === 'function') clearPINAttempts(memberId); } catch (_) {}
 
   // Send email with new PIN
-  var orgName = 'SolidBase';
+  var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Union') : 'Your Union';
   try {
-    var config = ConfigReader.getConfig();
-    orgName = config.orgName || orgName;
+    if (orgName === 'Your Union' && typeof ConfigReader !== 'undefined') {
+      var config = ConfigReader.getConfig();
+      orgName = config.orgName || orgName;
+    }
   } catch (_) {}
 
   var subject = 'Your new PIN — ' + orgName;

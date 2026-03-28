@@ -521,7 +521,7 @@ function navigateToRecord(id, type) {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Theme management and visual settings functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
@@ -1148,7 +1148,7 @@ function refreshAllVisuals() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Mobile interface components and dashboard functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
@@ -1414,7 +1414,7 @@ function showMyAssignedGrievances() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Quick actions menu and member email functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
@@ -1671,6 +1671,7 @@ function quickUpdateGrievanceStatus(row, newStatus) {
     var closeCol = GRIEVANCE_COLS.DATE_CLOSED;
     if (!sheet.getRange(row, closeCol).getValue()) sheet.getRange(row, closeCol).setValue(new Date());
   }
+  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
   ss.toast('Grievance status updated to: ' + newStatus, 'Status Updated', 3);
 }
 
@@ -2108,7 +2109,7 @@ function sendMemberDashboardLink() {
  * - UIService.gs (getCommonStyles)
  *
  * @fileoverview Search dialog UI components
- * @version 4.33.0
+ * @version 4.43.1
  */
 
 // ============================================================================
@@ -3254,10 +3255,12 @@ function modalLookupMemberName(memberId) {
     var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!sheet) return '';
     var data = sheet.getDataRange().getValues();
+    var idCol    = MEMBER_COLS.MEMBER_ID - 1;
+    var fnCol    = MEMBER_COLS.FIRST_NAME - 1;
+    var lnCol    = MEMBER_COLS.LAST_NAME - 1;
     for (var r = 1; r < data.length; r++) {
-      if (String(data[r][0]).trim() === String(memberId).trim()) {
-        // Column B = First Name, Column C = Last Name (typical layout)
-        return String(data[r][1] || '') + ' ' + String(data[r][2] || '');
+      if (String(data[r][idCol]).trim() === String(memberId).trim()) {
+        return String(data[r][fnCol] || '') + ' ' + String(data[r][lnCol] || '');
       }
     }
     return '';
@@ -3444,13 +3447,17 @@ function modalGetMemberList() {
     if (!sheet) return [];
 
     var data = sheet.getDataRange().getValues();
+    var idCol    = MEMBER_COLS.MEMBER_ID - 1;
+    var fnCol    = MEMBER_COLS.FIRST_NAME - 1;
+    var lnCol    = MEMBER_COLS.LAST_NAME - 1;
+    var emCol    = MEMBER_COLS.EMAIL - 1;
     var members = [];
     for (var r = 1; r < data.length; r++) {
-      var id = String(data[r][0] || '').trim();
-      var name = String(data[r][1] || '').trim();
-      if (data[r].length > 2) name += ' ' + String(data[r][2] || '').trim();
+      var id = String(data[r][idCol] || '').trim();
+      var name = String(data[r][fnCol] || '').trim();
+      if (data[r].length > lnCol) name += ' ' + String(data[r][lnCol] || '').trim();
       if (id && name.trim()) {
-        members.push({ id: escapeHtml(id), name: escapeHtml(name.trim()), email: String(data[r][3] || '') });
+        members.push({ id: escapeHtml(id), name: escapeHtml(name.trim()), email: String(data[r][emCol] || '') });
       }
     }
     return members;

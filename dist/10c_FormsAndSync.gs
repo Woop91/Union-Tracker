@@ -391,8 +391,9 @@ function showGrievanceFiles() {
         'Folder is empty.\n\nWould you like to open the folder to add files?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
+        var safeUrl = String(folderUrl).replace(/[<>"']/g, '');
         var html = HtmlService.createHtmlOutput(
-          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
+          '<script>window.open(' + JSON.stringify(safeUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }
@@ -401,8 +402,9 @@ function showGrievanceFiles() {
         fileList.join('\n') + '\n\nOpen folder in Drive?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
+        var safeUrl2 = String(folderUrl).replace(/[<>"']/g, '');
         html = HtmlService.createHtmlOutput(
-          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
+          '<script>window.open(' + JSON.stringify(safeUrl2) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }

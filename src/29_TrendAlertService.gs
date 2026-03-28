@@ -92,16 +92,11 @@ var TrendAlertService = (function () {
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet || sheet.getLastRow() < 2) return alerts;
       var data = sheet.getDataRange().getValues();
-      var headers = data[0];
 
-      // Find Date Filed and Work Location columns
-      var dateCol = -1, locCol = -1;
-      for (var c = 0; c < headers.length; c++) {
-        var h = String(headers[c]).toLowerCase().trim();
-        if (h === 'date filed') dateCol = c;
-        if (h === 'work location' || h === 'location') locCol = c;
-      }
-      if (dateCol === -1 || locCol === -1) return alerts;
+      // Use GRIEVANCE_COLS constants (1-indexed) for dynamic column access
+      var dateCol = GRIEVANCE_COLS.DATE_FILED - 1;
+      var locCol = GRIEVANCE_COLS.LOCATION - 1;
+      if (dateCol < 0 || locCol < 0) return alerts;
 
       var now = new Date();
       var day7ago = new Date(now.getTime() - 7 * 86400000);
@@ -229,16 +224,11 @@ var TrendAlertService = (function () {
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet || sheet.getLastRow() < 2) return alerts;
       var data = sheet.getDataRange().getValues();
-      var headers = data[0];
 
-      // Find columns
-      var statusCol = -1, resolvedDateCol = -1;
-      for (var c = 0; c < headers.length; c++) {
-        var h = String(headers[c]).toLowerCase().trim();
-        if (h === 'status') statusCol = c;
-        if (h === 'resolution date' || h === 'resolved date' || h === 'date resolved') resolvedDateCol = c;
-      }
-      if (statusCol === -1) return alerts;
+      // Use GRIEVANCE_COLS constants (1-indexed) for dynamic column access
+      var statusCol = GRIEVANCE_COLS.STATUS - 1;
+      var resolvedDateCol = GRIEVANCE_COLS.DATE_CLOSED - 1;
+      if (statusCol < 0) return alerts;
 
       var now = new Date();
       var day90ago = new Date(now.getTime() - 90 * 86400000);
@@ -299,15 +289,11 @@ var TrendAlertService = (function () {
       var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (!sheet || sheet.getLastRow() < 2) return alerts;
       var data = sheet.getDataRange().getValues();
-      var headers = data[0];
 
-      var deadlineCol = -1, statusCol = -1;
-      for (var c = 0; c < headers.length; c++) {
-        var h = String(headers[c]).toLowerCase().trim();
-        if (h === 'next action due' || h === 'deadline') deadlineCol = c;
-        if (h === 'status') statusCol = c;
-      }
-      if (deadlineCol === -1) return alerts;
+      // Use GRIEVANCE_COLS constants (1-indexed) for dynamic column access
+      var deadlineCol = GRIEVANCE_COLS.NEXT_ACTION_DUE - 1;
+      var statusCol = GRIEVANCE_COLS.STATUS - 1;
+      if (deadlineCol < 0) return alerts;
 
       var now = new Date();
       var thisMonth = now.getFullYear() * 12 + now.getMonth();

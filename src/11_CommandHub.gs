@@ -29,7 +29,7 @@
  *   Used by 00_Security.gs (COMMAND_CONFIG for email templates), menu items
  *   in 03_, and strategic analysis features.
  *
- * @version 4.33.0
+ * @version 4.43.1
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -2054,7 +2054,7 @@ function searchPrecedentsData(query, outcomeFilter) {
  * - PII safety utilities
  *
  * @fileoverview Member portal service with PII protection
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  * ============================================================================
  */

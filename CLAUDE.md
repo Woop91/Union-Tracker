@@ -12,21 +12,24 @@
 
 ## Tech Stack
 
-- **Version:** 4.32.0 (`package.json` + `src/01_Core.gs:VERSION_INFO`)
+- **Version:** 4.43.1 (`package.json` + `src/01_Core.gs:VERSION_INFO`)
 - **Runtime:** Google Apps Script V8 (ES2020), `America/New_York`
 - **Build:** Node >=18, ESLint v9, Jest 29, Husky 9
 - **Deploy:** CLASP, GitHub Actions CI
-- **Source:** 42 `.gs` + 8 `.html` (~94K lines) | **Tests:** 59 Jest + GAS TestRunner (48+ tests)
+- **Source:** 38 `.gs` + 15 `.html` (~113K lines) | **Tests:** 56 Jest suites + GAS TestRunner
 - **Scopes:** 10 (spreadsheets, drive, docs, gmail, calendar, external requests, userinfo, scriptapp, container.ui, send_mail)
 
 ## Permissions
 
-Claude has **full access** to the **SolidBase** repo (local + remote). For anything outside, ask user.
+Claude has **full access** to **SolidBase** repo (local + remote). For anything outside, ask user.
 
 ## Repos & Sync
 
 - **SolidBase** (public): `Main` (production)
-- Apps Script ID: `[REDACTED — see .clasp.json]`
+- SB Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+
+**Commit order:** Main first → merge to staging. Never commit directly to staging.
+**Sync flow:** `DDS Main → DDS staging` and `DDS Main → UT Main → UT staging`.
 
 **Version tracking:** Semver on every commit. Update `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
 
@@ -127,4 +130,4 @@ Canonical: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are ou
 - `CHANGELOG.md` — Version history
 - `FEATURES.md` — Feature docs
 - `DEVELOPER_GUIDE.md` — Developer onboarding
-- `SYNC-LOG.md` — Upstream sync history
+- `SYNC-LOG.md` — DDS↔UT sync history

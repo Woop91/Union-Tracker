@@ -30,7 +30,7 @@
  *   Depends on 01_Core.gs (SHEETS), CalendarApp, DriveApp (GAS built-ins).
  *   Used by SPA timeline views and event management features.
  *
- * @version 4.33.0
+ * @version 4.43.1
  */
 
 var TimelineService = (function () {
@@ -275,8 +275,8 @@ var TimelineService = (function () {
       sheet.appendRow([
         id, _sanitize(data.title.substring(0, 200)), eventDate,
         _sanitize((data.description || '').substring(0, 2000)), cat,
-        data.calendarEventId || '', driveIds, driveNames,
-        data.meetingMinutesId || '', stewardEmail.toLowerCase().trim(), now, now
+        _sanitize(data.calendarEventId || ''), _sanitize(driveIds), _sanitize(driveNames),
+        _sanitize(data.meetingMinutesId || ''), stewardEmail.toLowerCase().trim(), now, now
       ]);
       _cacheInvalidate();
       logAuditEvent('TIMELINE_EVENT_ADDED', 'Event ' + id + ' by ' + stewardEmail);

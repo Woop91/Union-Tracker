@@ -70,10 +70,10 @@ var EngagementService = (function () {
     var total = 0;
     var completed = 0;
     for (var i = 0; i < surveyData.length; i++) {
-      var rowEmail = String(surveyData[i][2] || '').toLowerCase().trim(); // EMAIL col (index 2)
+      var rowEmail = String(surveyData[i][2] || '').toLowerCase().trim(); // EMAIL col per _Survey_Assignments schema (col C, index 2)
       if (rowEmail === emailLower) {
         total++;
-        var status = String(surveyData[i][5] || '').toLowerCase().trim(); // CURRENT_STATUS (index 5)
+        var status = String(surveyData[i][5] || '').toLowerCase().trim(); // CURRENT_STATUS per _Survey_Assignments schema (col F, index 5)
         if (status === 'completed') completed++;
       }
     }
@@ -93,9 +93,9 @@ var EngagementService = (function () {
     var day90ago = new Date(now.getTime() - 90 * 86400000);
 
     for (var i = 0; i < checkInData.length; i++) {
-      var ciEmail = String(checkInData[i][7] || '').toLowerCase().trim(); // EMAIL col (index 7)
+      var ciEmail = String(checkInData[i][7] || '').toLowerCase().trim(); // EMAIL col per _Meeting_Check_In schema (col H, index 7)
       if (ciEmail !== emailLower) continue;
-      var ciDate = checkInData[i][2]; // MEETING_DATE (index 2)
+      var ciDate = checkInData[i][2]; // MEETING_DATE per _Meeting_Check_In schema (col C, index 2)
       if (ciDate instanceof Date && ciDate >= day90ago) attended++;
     }
     return Math.min(100, Math.round((attended / Math.max(totalMeetings90d, 1)) * 100));
@@ -112,12 +112,12 @@ var EngagementService = (function () {
 
     if (qaData) {
       for (var i = 0; i < qaData.length; i++) {
-        if (String(qaData[i][1] || '').toLowerCase().trim() === emailLower) posts++;
+        if (String(qaData[i][1] || '').toLowerCase().trim() === emailLower) posts++; // Author Email per _QA_Forum schema (col B, index 1)
       }
     }
     if (answerData) {
       for (var j = 0; j < answerData.length; j++) {
-        if (String(answerData[j][1] || '').toLowerCase().trim() === emailLower) answers++;
+        if (String(answerData[j][2] || '').toLowerCase().trim() === emailLower) answers++; // Author Email per _QA_Answers schema (col C, index 2)
       }
     }
     return Math.min(100, posts * 10 + answers * 15);
@@ -135,9 +135,9 @@ var EngagementService = (function () {
     var day90ago = new Date(now.getTime() - 90 * 86400000);
 
     for (var i = 0; i < workloadData.length; i++) {
-      var wEmail = String(workloadData[i][1] || '').toLowerCase().trim();
+      var wEmail = String(workloadData[i][1] || '').toLowerCase().trim(); // EMAIL per _Workload_Submissions schema (col B, index 1)
       if (wEmail !== emailLower) continue;
-      var wDate = workloadData[i][0];
+      var wDate = workloadData[i][0]; // TIMESTAMP per _Workload_Submissions schema (col A, index 0)
       if (wDate instanceof Date && wDate >= day90ago) submissions++;
     }
     // ~13 weeks in 90 days, 1 per week is excellent
@@ -154,9 +154,9 @@ var EngagementService = (function () {
     var latestContact = null;
 
     for (var i = 0; i < contactData.length; i++) {
-      var cEmail = String(contactData[i][2] || '').toLowerCase().trim(); // member email
+      var cEmail = String(contactData[i][2] || '').toLowerCase().trim(); // MEMBER_EMAIL per _Contact_Log schema (col C, index 2)
       if (cEmail !== emailLower) continue;
-      var cDate = contactData[i][0]; // timestamp
+      var cDate = contactData[i][0]; // TIMESTAMP per _Contact_Log schema (col A, index 0)
       if (cDate instanceof Date && (!latestContact || cDate > latestContact)) {
         latestContact = cDate;
       }

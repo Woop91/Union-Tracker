@@ -31,7 +31,7 @@
  *   13_MemberSelfService.gs (PIN auth).
  *   Used by menu items in 03_.
  *
- * @version 4.33.0
+ * @version 4.43.1
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -57,6 +57,12 @@ function showSetupMeetingDialog() {
  * @returns {Object} { success, meetingId, error }
  */
 function createMeeting(meetingData) {
+  // Auth check: only stewards/admins may create meetings
+  var callerRole = typeof getUserRole_ === 'function' ? getUserRole_(Session.getActiveUser().getEmail()) : null;
+  if (callerRole !== 'steward' && callerRole !== 'admin' && callerRole !== 'both') {
+    return errorResponse('Authorization required: steward or admin access needed', 'createMeeting');
+  }
+
   if (!meetingData || !meetingData.name || !meetingData.date) {
     return errorResponse('Meeting name and date are required');
   }
@@ -363,7 +369,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
   }
 
   if (!memberId) {
-    return errorResponse('No member found with that email address');
+    return errorResponse('Invalid credentials. Please check your information and try again.');
   }
 
   // Check for lockout
@@ -1104,7 +1110,7 @@ function processQRCheckIn(meetingId, phone, pin) {
   }
 
   if (!memberId) {
-    return errorResponse('No member found with that phone number');
+    return errorResponse('Invalid credentials. Please check your information and try again.');
   }
 
   // Check for lockout

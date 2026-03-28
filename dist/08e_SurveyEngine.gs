@@ -47,6 +47,12 @@
  * Safe to re-run — each step is idempotent.
  */
 function initSurveyEngine() {
+  // Auth check: only admins/stewards may initialize the survey engine
+  var callerRole = typeof getUserRole_ === 'function' ? getUserRole_(Session.getActiveUser().getEmail()) : null;
+  if (callerRole !== 'steward' && callerRole !== 'admin' && callerRole !== 'both') {
+    SpreadsheetApp.getUi().alert('Authorization required: steward or admin access needed.');
+    return;
+  }
   var ui = SpreadsheetApp.getUi();
   var log = [];
 

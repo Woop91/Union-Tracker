@@ -56,7 +56,7 @@
  *                21_WebDashDataService.gs, 22_WebDashApp.gs, all HTML templates.
  *
  * @fileoverview Security utilities — XSS, formula injection, RBAC, PII masking
- * @version 4.33.0
+ * @version 4.43.1
  */
 
 // ============================================================================

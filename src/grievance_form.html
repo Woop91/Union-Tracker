@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grievance Form</title>
+<title>Grievance Form — SolidBase</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -321,7 +321,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
         </select>
       </div>
       <div style="text-align:left;">
-        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong>&mdash;</strong>
+        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong>509</strong>
       </div>
     </div>
   </div>
@@ -341,7 +341,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <div class="irow">
     <label for="agency" class="lbl">AGENCY:</label>
-    <input id="agency" class="fi" type="text" style="width:1.3in;" value="" title="Agency">
+    <input id="agency" class="fi" type="text" style="width:1.3in;" value="" title="Enter your agency name">
     <span class="lbl" style="margin-left:6px;">REGION:</span>
     <select id="region" class="fi" style="width:1.3in;" onchange="autoFillLocation()">
       <option value=""></option>
@@ -426,7 +426,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <!-- WAIVER 1 -->
   <div class="whead">Alliance Waiver of Right to Appeal Disciplinary Action to Civil Service Commission</div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the union and employer, per the applicable contract period.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the union and the employer.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my demotion, suspension or discharge effective on<input id="w1date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -458,7 +458,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
     Acknowledgement of Alliance Waiver of Right to Arbitrate Claims of Discriminatory<br>
     Termination Filed in Multiple Forums
   </div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the union and employer, per the applicable contract period.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the union and the employer.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my discharge effective on <input id="w2date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -515,7 +515,7 @@ function buildBody(){
     "MANAGER(S)       : "+dash([v("managers"),v("managers2")].filter(Boolean).join(", ")),
     "ARTICLE(S)       : "+dash(v("articles")),
     "STEP #           : "+dash(v("step")),
-    "BARGAINING UNIT  : (see config)",
+    "BARGAINING UNIT  : 509",
     "",sep,
     "STATEMENT OF VIOLATION:",
     ([v("statement"),v("statement2")].filter(Boolean).join("\n"))||"(not provided)",
@@ -541,7 +541,7 @@ function buildBody(){
 function doEmail(){
   const to=prompt("Recipient email address:");
   if(!to)return;
-  const sub=encodeURIComponent("Grievance Form \u2014 "+(v("grievant")||"Grievant"));
+  const sub=encodeURIComponent("Grievance \u2014 "+(v("grievant")||"Grievant"));
   window.location.href="mailto:"+to+"?subject="+sub+"&body="+encodeURIComponent(buildBody());
   showToast("Opening email client\u2026");
 }
@@ -634,7 +634,7 @@ if(typeof google !== 'undefined' && google.script && google.script.run){
     if(!opts) return;
     if(opts.managers && opts.managers.length) { MANAGERS = opts.managers; _rebuildManagerSelects(); }
     if(opts.officeLocations && opts.officeLocations.length) _rebuildRegionSelect(opts.officeLocations);
-  }).getGrievanceFormOptions();
+  }).withFailureHandler(function(){}).getGrievanceFormOptions();
 }
 
 function validateDate(el){

@@ -34,7 +34,7 @@
  *   constants for verification). Used by menu items (Admin > Run Tests),
  *   daily trigger, and the SPA TestRunner tab.
  *
- * @version 4.33.0
+ * @version 4.43.1
  */
 
 /* ========================================================================
@@ -877,8 +877,6 @@ function _getTestRegistry() {
     { name: 'test_webapp_getWebAppUrlExists',              fn: test_webapp_getWebAppUrlExists },
     { name: 'test_webapp_getWebAppUrlReturnsString',       fn: test_webapp_getWebAppUrlReturnsString },
     { name: 'test_webapp_orgChartHtmlExists',              fn: test_webapp_orgChartHtmlExists },
-    { name: 'test_webapp_pomsReferenceHtmlExists',         fn: test_webapp_pomsReferenceHtmlExists },
-    { name: 'test_webapp_pomsReferenceHtmlReturnsContent', fn: test_webapp_pomsReferenceHtmlReturnsContent },
     { name: 'test_webapp_orgChartHtmlReturnsContent',      fn: test_webapp_orgChartHtmlReturnsContent },
     { name: 'test_webapp_diagnoseWebAppExists',            fn: test_webapp_diagnoseWebAppExists },
     { name: 'test_webapp_diagnoseWebAppRunsClean',         fn: test_webapp_diagnoseWebAppRunsClean },
@@ -918,16 +916,6 @@ function _getTestRegistry() {
     { name: 'test_weeklyq_getPollFrequencyCallable',       fn: test_weeklyq_getPollFrequencyCallable },
     { name: 'test_weeklyq_wrappersRejectNullToken',        fn: test_weeklyq_wrappersRejectNullToken },
     { name: 'test_weeklyq_autoSelectExists',               fn: test_weeklyq_autoSelectExists },
-
-    // ── workload suite (WorkloadService module, categories) ──
-    { name: 'test_workload_moduleExists',                  fn: test_workload_moduleExists },
-    { name: 'test_workload_publicAPIComplete',             fn: test_workload_publicAPIComplete },
-    { name: 'test_workload_subCategoriesExposed',          fn: test_workload_subCategoriesExposed },
-    { name: 'test_workload_categoryLabelsExposed',         fn: test_workload_categoryLabelsExposed },
-    { name: 'test_workload_getSubCategoriesCallable',      fn: test_workload_getSubCategoriesCallable },
-    { name: 'test_workload_globalWrappersExist',           fn: test_workload_globalWrappersExist },
-    { name: 'test_workload_triggerHandlersExist',          fn: test_workload_triggerHandlersExist },
-    { name: 'test_workload_wrappersRejectNullToken',       fn: test_workload_wrappersRejectNullToken },
 
     // ── qaforum suite (QAForum module, question retrieval) ──
     { name: 'test_qaforum_moduleExists',                   fn: test_qaforum_moduleExists },

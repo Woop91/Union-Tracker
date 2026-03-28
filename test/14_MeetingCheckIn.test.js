@@ -23,6 +23,11 @@ loadSources([
 // ============================================================================
 
 describe('createMeeting', () => {
+  beforeEach(() => {
+    // Auth mock: createMeeting requires steward/admin role
+    global.getUserRole_ = jest.fn(() => 'steward');
+  });
+
   test('rejects null input', () => {
     var result = createMeeting(null);
     expect(result.success).toBe(false);
@@ -214,7 +219,7 @@ describe('processMeetingCheckIn', () => {
 
     var result = processMeetingCheckIn('MTG-001', 'unknown@example.com', '123456');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('No member found');
+    expect(result.error).toContain('Invalid credentials');
   });
 });
 

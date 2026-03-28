@@ -29,7 +29,7 @@
  *   Depends on 01_Core.gs (SHEETS), 06_Maintenance.gs (logAuditEvent).
  *   Used by SPA Q&A views and the navigation badge system.
  *
- * @version 4.33.0
+ * @version 4.43.1
  */
 
 var QAForum = (function () {

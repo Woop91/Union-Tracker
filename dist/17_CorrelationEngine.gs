@@ -30,7 +30,7 @@
  *   Depends on 01_Core.gs (SHEETS, CONFIG_COLS), 10_Main.gs (getConfigValue_).
  *   Used by the SPA analytics views and dashboard enhancement features.
  *
- * @version 4.33.0
+ * @version 4.43.1
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -711,8 +711,9 @@ function correlateCaseloadVsWinRate_(data) {
 }
 
 /**
- * Correlation 10: Volunteer hours rate vs engagement rate by location
- * Question: Are locations with more volunteer activity also more engaged overall?
+ * Correlation 10: Email engagement vs meeting attendance by location
+ * Question: Are locations with higher email open rates also more engaged in meetings?
+ * Note: Originally planned as volunteer vs engagement, but uses email/meeting proxies instead.
  */
 function correlateVolunteerVsEngagement_(data) {
   var partByLoc = data.participationByLocation || {};

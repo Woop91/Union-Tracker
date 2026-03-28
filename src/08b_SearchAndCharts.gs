@@ -434,7 +434,7 @@ function getMemberList() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Chart generation and display functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
@@ -886,6 +886,6 @@ function padRight(str, len) {
  *
  * Note: onGrievanceFormSubmit() is defined in 05_Integrations.gs
  *
- * @author Development Team
- * @version 4.33.0
+ * @author SEIU Local Development Team
+ * @version 4.43.1
  */

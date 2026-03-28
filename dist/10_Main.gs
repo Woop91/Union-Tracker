@@ -651,6 +651,8 @@ function handleGrievanceEdit(e) {
     }
   }
 
+  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+
   // If step dates changed, recalculate deadlines (using dynamic column references)
   // H-36: Skip downstream recalculation if the edited column IS itself a deadline
   // column — that would overwrite the steward's manual edit.
@@ -1811,6 +1813,9 @@ function showNewMemberDialog() {
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Union Status</label>
+              <!-- TODO: These options are hardcoded; they should match the values in the Config sheet.
+                   Dynamically injecting options would require a template evaluation refactor since
+                   this HTML is pre-generated server-side via HtmlService. -->
               <select class="form-select" id="unionStatus">
                 <option value="Full Member">Full Member</option>
                 <option value="Agency Fee">Agency Fee</option>

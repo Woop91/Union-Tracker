@@ -44,7 +44,7 @@
  *                05_Integrations.gs, 12_Features.gs, test suites
  *
  * @fileoverview Shared constants and lock helper — loaded first in build order
- * @version 4.33.0
+ * @version 4.43.1
  */
 
 // ============================================================================

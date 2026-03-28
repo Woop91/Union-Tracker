@@ -25,18 +25,28 @@ echo "  SolidBase Safe Deploy Pipeline"
 echo "═══════════════════════════════════════"
 echo ""
 
-# Step 1: Build prod with minification
-echo "[1/4] Building with build:prod --minify..."
+# Step 1: Lint
+echo "[1/6] Running lint..."
+npm run lint
+echo ""
+
+# Step 2: Build prod with minification
+echo "[2/6] Building with build:prod --minify..."
 npm run build:prod
 echo ""
 
-# Step 2: Run deploy guards
-echo "[2/4] Running deploy guards (210 tests)..."
+# Step 3: Run deploy guards
+echo "[3/6] Running deploy guards..."
 npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail 2>&1 | tail -5
 echo ""
 
-# Step 3: HTML size budget check
-echo "[3/4] Checking HTML size budget..."
+# Step 4: Run unit tests
+echo "[4/6] Running unit tests..."
+npm run test:unit
+echo ""
+
+# Step 5: HTML size budget check
+echo "[5/6] Checking HTML size budget..."
 MAX_KB=820
 INDEX_SIZE=$(wc -c < dist/index.html)
 STYLES_SIZE=$(wc -c < dist/styles.html)
@@ -60,11 +70,11 @@ fi
 echo -e "${GREEN}  All payloads under limit.${NC}"
 echo ""
 
-# Step 4: Push to GAS
+# Step 6: Push to GAS
 if [ "$DRY_RUN" = true ]; then
-  echo -e "${YELLOW}[4/4] DRY RUN — skipping clasp push${NC}"
+  echo -e "${YELLOW}[6/6] DRY RUN — skipping clasp push${NC}"
 else
-  echo "[4/4] Pushing to GAS..."
+  echo "[6/6] Pushing to GAS..."
   npx clasp push --force
 fi
 

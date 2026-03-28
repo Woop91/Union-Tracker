@@ -44,7 +44,7 @@
  *     and form submission handlers.
  *
  * @fileoverview Member directory and grievance data operations
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 00_DataAccess.gs
  * @requires 00_Security.gs
  * @requires 01_Core.gs
@@ -1482,7 +1482,11 @@ function showExportMembersDialog() {
       ui.alert('Access Denied', 'Steward or admin access is required to export member data.', ui.ButtonSet.OK);
       return;
     }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) {
+    Logger.log('showExportMembersDialog auth check failed: ' + (_e.message || _e));
+    ui.alert('Error', 'Unable to verify authorization. Please try again.', ui.ButtonSet.OK);
+    return;
+  }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -1525,7 +1529,7 @@ function showExportMembersDialog() {
  * UI components are in 04a_UIMenus.gs, integrations in 05_Integrations.gs.
  *
  * @fileoverview Grievance lifecycle management
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Core.gs
  */
 
@@ -1599,6 +1603,7 @@ function startNewGrievance(grievanceData) {
         createdBy: Session.getActiveUser().getEmail()
       });
 
+      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
       return {
         success: true,
         grievanceId: grievanceId,
@@ -1868,9 +1873,10 @@ function advanceGrievanceStep(grievanceId, options) {
         updates.push({ col: stepCols.due, val: responseDue });
       }
       // Removed erroneous 'Pending' write — STATUS is already set above
-    } else {
-      updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
+    // Step 4 (Arbitration) has no step-specific date columns — STATUS is set
+    // to 'In Arbitration' above and LAST_UPDATED is recorded. DATE_CLOSED is
+    // NOT set here; it should only be written when the grievance is resolved.
 
     // Add notes if provided — escape once at the final write point only
     if (options.notes) {
@@ -1897,6 +1903,7 @@ function advanceGrievanceStep(grievanceId, options) {
       advancedBy: Session.getActiveUser().getEmail()
     });
 
+    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
     return {
       success: true,
       grievanceId: grievanceId,
@@ -2064,6 +2071,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
         sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, numRows, 1).setValues(resolutionCol);
       }
 
+      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
       return {
         success: true,
         updatedCount: updatedCount,
@@ -2363,6 +2371,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
         resolvedBy: Session.getActiveUser().getEmail()
       });
 
+      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
       return {
         success: true,
         grievanceId: grievanceId,

@@ -1055,9 +1055,9 @@ var DataService = (function () {
         if (ss) {
           var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
           if (memberSheet && memberSheet.getLastRow() >= 2) {
-            var mHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
-            var emailIdx = mHeaders.indexOf('Email');
-            var locIdx = mHeaders.indexOf('Work Location');
+            // Use MEMBER_COLS constants (1-indexed) for dynamic column access
+            var emailIdx = MEMBER_COLS.EMAIL - 1;
+            var locIdx = MEMBER_COLS.WORK_LOCATION - 1;
             if (emailIdx >= 0 && locIdx >= 0) {
               var mData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
               for (var i = 0; i < mData.length; i++) {
@@ -1822,7 +1822,7 @@ var DataService = (function () {
     // Also check the IS_STEWARD column (set by seed and manual entry)
     var isStewardRaw = String(_getVal(row, colMap, HEADERS.memberIsSteward, '')).trim().toLowerCase();
     if (isStewardRaw === 'yes' || isStewardRaw === 'true' || isStewardRaw === '1') {
-      if (role === 'member') role = 'steward';  // Upgrade role if only 'member'
+      if (role === 'member') role = 'both';  // Upgrade to dual-role (member + steward)
     }
 
     var hasGrievance = String(_getVal(row, colMap, HEADERS.memberHasOpenGrievance, '')).trim().toLowerCase();
@@ -2174,16 +2174,12 @@ var DataService = (function () {
         var memberDir = ss.getSheetByName(MEMBER_SHEET);
         if (memberDir) {
           var mData    = memberDir.getDataRange().getValues();
-          var mHeaders = mData[0];
-          var emailIdx = -1, recentContactIdx = -1, contactStewardIdx = -1, contactNotesIdx = -1;
-          for (var h = 0; h < mHeaders.length; h++) {
-            var hLow = String(mHeaders[h]).toLowerCase().trim();
-            if (hLow === 'email')                emailIdx          = h;
-            else if (hLow === 'recent contact date') recentContactIdx  = h;
-            else if (hLow === 'contact steward')     contactStewardIdx = h;
-            else if (hLow === 'contact notes')       contactNotesIdx   = h;
-          }
-          if (emailIdx !== -1) {
+          // Use MEMBER_COLS constants (1-indexed, subtract 1 for array access)
+          var emailIdx          = MEMBER_COLS.EMAIL - 1;
+          var recentContactIdx  = MEMBER_COLS.RECENT_CONTACT_DATE - 1;
+          var contactStewardIdx = MEMBER_COLS.CONTACT_STEWARD - 1;
+          var contactNotesIdx   = MEMBER_COLS.CONTACT_NOTES - 1;
+          if (emailIdx >= 0) {
             var mEmailNorm = memberEmail.toLowerCase().trim();
             for (var r = 1; r < mData.length; r++) {
               if (String(mData[r][emailIdx]).toLowerCase().trim() === mEmailNorm) {
@@ -2448,7 +2444,7 @@ var DataService = (function () {
       'member', stewardEmail.toLowerCase().trim()
     ]);
     _invalidateSheetCache(SHEETS.STEWARD_TASKS);
-    logAuditEvent('MEMBER_TASK_CREATED', 'Task ' + id + ' assigned to ' + memberEmail + ' by ' + stewardEmail);
+    if (typeof logAuditEvent === 'function') logAuditEvent('MEMBER_TASK_CREATED', 'Task ' + id + ' assigned to ' + memberEmail + ' by ' + stewardEmail);
     return { success: true, message: 'Task assigned to member.', taskId: id };
   }
 
@@ -2507,7 +2503,7 @@ var DataService = (function () {
         sheet.getRange(i + 1, 7).setValue('completed');
         sheet.getRange(i + 1, 10).setValue(new Date());
         _invalidateSheetCache(SHEETS.STEWARD_TASKS);
-        logAuditEvent('MEMBER_TASK_COMPLETED', 'Task ' + taskId + ' completed by ' + memberEmail);
+        if (typeof logAuditEvent === 'function') logAuditEvent('MEMBER_TASK_COMPLETED', 'Task ' + taskId + ' completed by ' + memberEmail);
         return { success: true };
       }
     }
@@ -2532,7 +2528,7 @@ var DataService = (function () {
         sheet.getRange(i + 1, 7).setValue('completed');
         sheet.getRange(i + 1, 10).setValue(new Date());
         _invalidateSheetCache(SHEETS.STEWARD_TASKS);
-        logAuditEvent('MEMBER_TASK_COMPLETED_BY_STEWARD', 'Task ' + taskId + ' marked complete by steward ' + stewardEmail);
+        if (typeof logAuditEvent === 'function') logAuditEvent('MEMBER_TASK_COMPLETED_BY_STEWARD', 'Task ' + taskId + ' marked complete by steward ' + stewardEmail);
         return { success: true };
       }
     }
@@ -6825,27 +6821,9 @@ function dataBulkSendEmail(sessionToken, memberEmails, subject, body) {
 
 
 // ═══════════════════════════════════════
-// POMS REFERENCE DATA — SolidBase stub
+// (POMS Reference removed — org-specific feature)
 // ═══════════════════════════════════════
 
-/**
- * SolidBase stub — POMS reference data is not included in this deployment.
- * @param {string} sessionToken
- * @returns {Array} Always returns empty array
- */
-function dataGetPomsReference(sessionToken) {
-  var e = _resolveCallerEmail(sessionToken);
-  if (!e) return [];
-  return [];  // SolidBase: POMS data removed — not applicable to this deployment
-}
-
-
-/* ── POMS data removed (org-specific) ──────────────────────────────────
-   The upstream repo includes ~280 POMS reference records here.
-   SolidBase omits this data. The dataGetPomsReference() stub above
-   returns an empty array so the client gracefully shows "no results".
-   ────────────────────────────────────────────────────────────────────── */
-// (POMS data records removed — see upstream repo for full dataset)
 
 // ═══════════════════════════════════════
 // USAGE TRACKING (v4.40.0 — production-enabled)

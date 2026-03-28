@@ -1379,7 +1379,7 @@ function getSheetLastRow(sheet) {
  * - 01_Utilities.gs (getColumnLetter, getConfigValues, getJobMetadataByMemberCol)
  *
  * @author Claude Code Assistant
- * @version 4.33.0
+ * @version 4.43.1
  * ============================================================================
  */
 

@@ -29,7 +29,7 @@
  *   Used by 10_Main.gs (onEdit dispatches events), and any module that
  *   subscribes to sheet edit events.
  *
- * @version 4.33.0
+ * @version 4.43.1
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -63,7 +63,7 @@ var EventBus = (function() {
         listeners_[eventName] = [];
       }
 
-      var subId = options.id || ('sub_' + eventName + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+      var subId = options.id || ('sub_' + eventName + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
       listeners_[eventName].push({
         id: subId,

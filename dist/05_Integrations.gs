@@ -361,6 +361,7 @@ function getOrCreateMemberAdminFolder(memberEmail) {
     // ── 2. Resolve member display name from Member Directory ─────────────────
     var memberFolderName = '';
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
     var mSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (mSheet) {
       var mData = mSheet.getDataRange().getValues();
@@ -578,6 +579,7 @@ function cleanupEmptyDriveFolders() {
   var resolvedIds = {};
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('No active spreadsheet');
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
     if (sheet && sheet.getLastRow() > 1) {
       var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.STATUS).getValues();
@@ -1664,7 +1666,9 @@ function sendEmailToMember(memberId, subject, body) {
 
     // Strip HTML tags from subject — email subjects are plain text only
     var safeSubject = String(subject || '').replace(/<[^>]*>/g, '').trim();
-    var safeBody = String(body || '');
+    // Sanitize HTML body — strip tags if not explicitly HTML, or escape dangerous patterns
+    var safeBody = String(body || '').replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '');
 
     safeSendEmail_({
       to: email,
@@ -4391,7 +4395,7 @@ function generateGrievancePDF_(formData) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || 'Your Agency',
+      'agency':     formData.agency     || '',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4525,7 +4529,7 @@ function generateDraftGrievancePDF_(formData, grievanceId, documentHash) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || 'Your Agency',
+      'agency':     formData.agency     || '',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4610,7 +4614,7 @@ function generateSignedGrievancePDF_(formData, grievanceId, documentHash, sigBas
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || 'Your Agency',
+      'agency':     formData.agency     || '',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4930,7 +4934,7 @@ function submitGrievanceSignature(sigToken, sigBase64) {
       grievant:   memberName,
       jobtitle:   '', // from member dir if available
       startdate:  hireDateStr,
-      agency:     'Your Agency',
+      agency:     '',
       region:     regionVal,
       workloc:    workLoc,
       articles:   grievanceObj.articles,
@@ -5167,7 +5171,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
       grievant:   memberData.firstName + ' ' + memberData.lastName,
       jobtitle:   formOverrides.jobtitle || memberData.jobTitle,
       startdate:  formOverrides.startdate || hireDateStr,
-      agency:     formOverrides.agency || 'Your Agency',
+      agency:     formOverrides.agency || '',
       region:     formOverrides.region || regionVal,
       workloc:    formOverrides.workloc || memberData.workLocation,
       managers:   formOverrides.managers || memberData.manager || memberData.supervisor,

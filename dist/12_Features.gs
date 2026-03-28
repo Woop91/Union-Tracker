@@ -30,7 +30,7 @@
  *   00_Security.gs (escapeForFormula).
  *   Used by menu items in 03_, daily trigger reminders, and the SPA.
  *
- * @version 4.33.0
+ * @version 4.43.1
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */

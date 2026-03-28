@@ -6,7 +6,7 @@
  *   organization-specific settings from the Config tab and returns them as a
  *   JavaScript object. Uses a three-tier caching strategy:
  *     (1) in-execution memo (avoids repeated JSON.parse within same request)
- *     (2) CacheService (6-hour TTL, persists across requests)
+ *     (2) CacheService (5-minute TTL, persists across requests)
  *     (3) sheet read (fallback when cache misses)
  *   Config tab layout: row 2=headers, row 3=values, indexed via CONFIG_COLS
  *   from 01_Core.gs.

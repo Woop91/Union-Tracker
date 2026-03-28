@@ -1388,7 +1388,8 @@ function _renderMemberWelcome(container) {
     { icon: '\uD83D\uDCDE', label: 'Contact Steward', tab: 'contact' },
     { icon: '\u2753', label: 'Ask a Question', tab: 'qa' },
     { icon: '\uD83D\uDCDA', label: 'Resources', tab: 'resources' },
-    { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' }
+    { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' },
+    { icon: '\uD83D\uDCCA', label: 'Workload', tab: 'workload' }
   ].forEach(function (qa) {
     var actionCard = el('div', {
       className: 'card card-clickable',
@@ -1900,7 +1901,7 @@ function renderMemberResources(appContainer) {
       { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
       { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
     ];
-    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Your Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     quickLinks.forEach(function(r) {
       if (!r.url) return;
@@ -2444,7 +2445,7 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
       { group: 'Reference' },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
-      { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
+      { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the union organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
       { group: 'Community' },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('member', 'qaforum'); } },
       { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
@@ -3791,7 +3792,58 @@ function renderWorkloadTracker(appContainer) {
   var role = AppState.activeRole || 'member';
   var headerFn = role === 'steward' ? _stewardHeader : _memberHeader;
   renderPageLayout(appContainer, role, 'workload', function(container) {
-    container.innerHTML = '<div class="empty-state">Workload Tracker is not available in this deployment.</div>';
+    try {
+      headerFn(container, 'Workload Tracker');
+
+      if (!CURRENT_USER || !CURRENT_USER.email) {
+        container.appendChild(el('div', { className: 'empty-state' }, 'Authentication required. Please sign in again.'));
+        return;
+      }
+
+      var content = el('div', { className: 'content' });
+
+      // Steward-only: show predictive workload balancing section
+      // _renderWorkloadPredictions is defined in steward_view.html
+      if (role === 'steward' && typeof _renderWorkloadPredictions === 'function') {
+        _renderWorkloadPredictions(content);
+      }
+
+      var activeSubTab = 'submit';
+      var subTabBar = el('div', { className: 'sub-tabs' });
+      var subContent = el('div');
+
+      function refreshSubTabs() {
+        subTabBar.innerHTML = '';
+        ['submit', 'history', 'stats', 'reminders'].forEach(function(tab) {
+          subTabBar.appendChild(el('button', {
+            className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+            onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+          }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+        });
+      }
+      function renderSubContent() {
+        subContent.innerHTML = '';
+        try {
+          if (activeSubTab === 'submit') _renderWTSubmit(subContent);
+          else if (activeSubTab === 'history') _renderWTHistory(subContent);
+          else if (activeSubTab === 'stats') _renderWTStats(subContent);
+          else if (activeSubTab === 'reminders') _renderWTReminders(subContent);
+        } catch (subErr) {
+          console.error('Workload sub-tab render error:', subErr);
+          subContent.appendChild(el('div', { className: 'empty-state' }, 'Something went wrong loading this tab. Please try again.'));
+        }
+      }
+
+      refreshSubTabs();
+      renderSubContent();
+      content.appendChild(subTabBar);
+      content.appendChild(subContent);
+      container.appendChild(content);
+    } catch (wtErr) {
+      console.error('Workload Tracker render error:', wtErr);
+      container.innerHTML = '';
+      container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load Workload Tracker. Please try again.'));
+    }
   });
 }
 

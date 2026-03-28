@@ -13,7 +13,7 @@ const { loadSources } = require('./load-source');
 global.logAuditEvent = jest.fn();
 global.getGrievanceById = jest.fn();
 global.updateGrievanceFolderLink = jest.fn();
-global.sanitizeFolderName = jest.fn(name => name.replace(/[^a-zA-Z0-9\s\-_.,]/g, ''));
+// sanitizeFolderName is loaded from 05_Integrations.gs via loadSources — no mock needed
 global.BATCH_LIMITS = {
   MAX_EXECUTION_TIME_MS: 300000,
   MAX_API_CALLS_PER_BATCH: 50,

@@ -7,7 +7,7 @@
  *   Data resilience system with scheduled email digests and Google Drive CSV
  *   backups. Members can opt into periodic email digests of their grievance/
  *   workload/task data. Automatic weekly Drive backups export key sheets as
- *   CSV files to a SolidBase_Backups folder. Maintains maximum 52 backup
+ *   CSV files to a DDS_Dashboard_Backups folder. Maintains maximum 52 backup
  *   files (~1 year of weekly backups per sheet).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -30,12 +30,12 @@
  *   CacheService. Used by weekly backup trigger and member digest
  *   preferences in the SPA.
  *
- * @version 4.33.0
+ * @version 4.43.1
  */
 
 var FailsafeService = (function () {
 
-  var BACKUP_FOLDER_NAME = 'SolidBase_Backups';
+  var BACKUP_FOLDER_NAME = 'DDS_Dashboard_Backups';
   var MAX_BACKUP_FILES = 52; // ~1 year of weekly backups per sheet
 
   // ═══════════════════════════════════════
@@ -145,7 +145,9 @@ var FailsafeService = (function () {
 
     // M10: Acquire lock BEFORE reading sheet to prevent stale-read race
     var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    if (!lock.tryLock(10000)) {
+      return { success: false, message: 'Could not acquire lock. Please try again.' };
+    }
     try {
       if (sheet.getLastRow() > 1) {
         var data = sheet.getDataRange().getValues();

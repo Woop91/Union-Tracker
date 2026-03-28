@@ -959,8 +959,8 @@ function dataGetHandoffNotes(sessionToken, caseId) { var s = _requireStewardAuth
 function dataAddHandoffNote(sessionToken, caseId, noteText, toSteward) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.addHandoffNote(s, caseId, noteText, toSteward); }
 /** @param {string} sessionToken @param {string} noteId @returns {Object} Archive result. */
 function dataArchiveHandoffNote(sessionToken, noteId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.archiveHandoffNote(noteId); }
-/** @returns {void} Initializes handoff notes sheet. */
-function dataInitHandoffNotes() { return HandoffService.initSheet(); }
+/** @returns {void} Initializes handoff notes sheet. Steward-only. */
+function dataInitHandoffNotes(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.initSheet(); }
 
 // --- Mentorship (steward-only) ---
 /** @param {string} sessionToken @returns {Array} Active mentorship pairings. */
@@ -1028,9 +1028,11 @@ var TwoFactorService = (function () {
    * @returns {string} 6-digit code
    */
   function _generateCode() {
+    // Use UUID-derived digits for better entropy than Math.random()
+    var uuid = Utilities.getUuid().replace(/[^0-9]/g, '');
     var code = '';
     for (var i = 0; i < CODE_LENGTH; i++) {
-      code += Math.floor(Math.random() * 10);
+      code += uuid.charAt(i % uuid.length);
     }
     return code;
   }
@@ -1457,7 +1459,8 @@ var SMSService = (function () {
     if (!isConfigured()) {
       return { success: false, error: 'Twilio not configured.' };
     }
-    return _sendViaTwilio(toPhone, 'Test message from SolidBase. If you received this, SMS is working!');
+    var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Dashboard') : 'Dashboard';
+    return _sendViaTwilio(toPhone, 'Test message from ' + orgName + '. If you received this, SMS is working!');
   }
 
   /**

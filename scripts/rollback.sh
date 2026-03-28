@@ -6,7 +6,7 @@ set -euo pipefail
 SHA="${1:?Usage: rollback.sh <git-sha>}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-echo "=== SolidBase Dashboard Rollback ==="
+echo "=== SolidBase Rollback ==="
 echo "Target commit: $SHA"
 
 # Verify the SHA exists
@@ -42,6 +42,11 @@ fi
 # Checkout dist/ from the target commit
 git checkout "$SHA" -- dist/
 echo "Restored dist/ from $SHA"
+
+# Commit the rollback so it's recorded in history
+git add dist/
+git commit -m "Rollback dist/ to $SHA"
+echo "Committed rollback to git history."
 
 # Push to GAS
 echo "Pushing to Google Apps Script..."

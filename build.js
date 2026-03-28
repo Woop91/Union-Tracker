@@ -227,8 +227,9 @@ function build(fileList) {
       process.exit(1);
     }
 
-    fs.copyFileSync(src, dest);
-    const lineCount = fs.readFileSync(src, 'utf8').split('\n').length;
+    var content = fs.readFileSync(src, 'utf8').replace(/\r\n/g, '\n');
+    fs.writeFileSync(dest, content, 'utf8');
+    const lineCount = content.split('\n').length;
     totalLines += lineCount;
     copiedGs++;
     console.log(`  Copied: ${file} (${lineCount} lines)`);
@@ -320,19 +321,21 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 41 .gs + 17 .html + 1 appsscript.json = 59 files
-  const GAS_FILE_WARN = 50;
-  const GAS_FILE_LIMIT = 60;
-  const prodFileCount = fileList.filter(f => !PROD_EXCLUDE.includes(f)).length;
-  const totalDeployFiles = prodFileCount + HTML_FILES.length + 1; // +1 for appsscript.json
+  // Current prod capacity: 38 .gs + 15 .html + 1 appsscript.json = 54 files
+  const GAS_FILE_WARN = 55;
+  const GAS_FILE_LIMIT = 65;
+  const gsFileCount = isProd
+    ? fileList.filter(f => !PROD_EXCLUDE.includes(f)).length
+    : fileList.length;
+  const totalDeployFiles = gsFileCount + HTML_FILES.length + 1; // +1 for appsscript.json
   if (totalDeployFiles > GAS_FILE_LIMIT) {
     console.error(`\n❌ ERROR: Prod file count (${totalDeployFiles}) exceeds limit of ${GAS_FILE_LIMIT}.`);
-    console.error(`   .gs files: ${prodFileCount}, .html files: ${HTML_FILES.length}, manifest: 1`);
+    console.error(`   .gs files: ${gsFileCount}, .html files: ${HTML_FILES.length}, manifest: 1`);
     console.error('   Consider consolidating smaller modules before adding new files.\n');
     process.exit(1);
   } else if (totalDeployFiles > GAS_FILE_WARN) {
     console.warn(`\n⚠️  WARNING: Prod file count (${totalDeployFiles}) is approaching limit of ${GAS_FILE_LIMIT}.`);
-    console.warn(`   .gs files: ${prodFileCount}, .html files: ${HTML_FILES.length}, manifest: 1\n`);
+    console.warn(`   .gs files: ${gsFileCount}, .html files: ${HTML_FILES.length}, manifest: 1\n`);
   }
 
   // Auto-clean before build to prevent orphaned files from persisting

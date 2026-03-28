@@ -104,7 +104,7 @@ describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => 
     'STEP3_APPEAL_DUE', 'STEP3_APPEAL_FILED', 'DATE_CLOSED',
     'DAYS_OPEN', 'NEXT_ACTION_DUE', 'DAYS_TO_DEADLINE',
     'ARTICLES', 'ISSUE_CATEGORY',
-    'MEMBER_EMAIL', 'UNIT', 'LOCATION', 'STEWARD',
+    'MEMBER_EMAIL', 'LOCATION', 'STEWARD',
     'RESOLUTION',
     'MESSAGE_ALERT', 'COORDINATOR_MESSAGE', 'ACKNOWLEDGED_BY', 'ACKNOWLEDGED_DATE',
     'DRIVE_FOLDER_ID', 'DRIVE_FOLDER_URL',
@@ -114,9 +114,9 @@ describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => 
 
   fieldsToCheck.forEach(field => {
     test(`GRIEVANCE_COLS.${field} - 1 === GRIEVANCE_COLUMNS.${field}`, () => {
-      if (GRIEVANCE_COLS[field] !== undefined && GRIEVANCE_COLUMNS[field] !== undefined) {
-        expect(GRIEVANCE_COLS[field] - 1).toBe(GRIEVANCE_COLUMNS[field]);
-      }
+      expect(GRIEVANCE_COLS[field]).toBeDefined();
+      expect(GRIEVANCE_COLUMNS[field]).toBeDefined();
+      expect(GRIEVANCE_COLS[field] - 1).toBe(GRIEVANCE_COLUMNS[field]);
     });
   });
 

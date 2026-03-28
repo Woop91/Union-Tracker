@@ -657,7 +657,7 @@ function getRepairDialogHtml_(diagnostics) {
     '<button class="btn btn-primary" onclick="runRepair()">Run Repair</button>' +
     '</div>' +
     '<script>' +
-    'function runRepair(){google.script.run.withSuccessHandler(function(){google.script.host.close()}).REPAIR_DASHBOARD()}' +
+    'function runRepair(){google.script.run.withSuccessHandler(function(){google.script.host.close()}).withFailureHandler(function(e){document.body.innerHTML="<p style=color:red>Repair failed: "+e.message+"</p>"}).REPAIR_DASHBOARD()}' +
     '</script></body></html>';
 }
 
@@ -849,7 +849,7 @@ function getDiagnosticsDialogHtml_(results) {
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview Caching and performance optimization functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
@@ -1250,7 +1250,7 @@ function showCacheStatusDashboard() {
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview Undo/redo system functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
@@ -1630,7 +1630,7 @@ function exportUndoHistoryToSheet() {
  * from accidentally triggering high-intensity system scans.
  *
  * @fileoverview Administrative and maintenance utilities
- * @version 4.33.0
+ * @version 4.43.1
  * @requires Constants.gs
  */
 
@@ -2376,7 +2376,7 @@ function saveSettings(settings) {
  * - Enhanced audit logging
  * - Auto-archive for closed grievances
  *
- * @version 4.33.0
+ * @version 4.43.1
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 

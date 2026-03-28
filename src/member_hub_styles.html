@@ -330,6 +330,48 @@ body.auth-active {
   .auth-manifesto-phrase { transition: none; }
 }
 
+/* ── MANROPE TYPOGRAPHY — KNOWLEDGE ENGINE ONLY ──
+   "Emphasis through Contrast" — Manrope geometric
+   sans-serif applied to knowledge engine surfaces.
+   Base text: light weight, soft lavender-tinted.
+   Emphasis: extrabold bright white that "pops."
+──────────────────────────────────────────────────── */
+
+/* Knowledge Engine typography tokens */
+:root {
+  --ke-base: rgba(196, 210, 235, 0.85);
+  --ke-emphasis: #f8fafc;
+}
+[data-theme-mode="light"] {
+  --ke-base: rgba(71, 85, 105, 0.85);
+  --ke-emphasis: #1e293b;
+}
+
+/* Apply Manrope to all Knowledge Engine surfaces */
+.neg-knowledge-widget,
+.sidebar-knowledge,
+.neg-knowledge-strip {
+  font-family: 'Manrope', var(--fontBody, sans-serif);
+}
+
+/* KE base text: Manrope 300, soft lavender-tinted */
+.nkw-quote, .nkw-bullet, .nkw-attr,
+.sk-quote,
+.nks-text {
+  font-family: 'Manrope', var(--fontBody, sans-serif);
+  font-weight: 300;
+  color: var(--ke-base);
+}
+
+/* KE emphasis: Manrope 800, bright white */
+.nkw-title,
+.sk-title,
+.nks-text strong {
+  font-family: 'Manrope', var(--fontBody, sans-serif);
+  font-weight: 800;
+  color: var(--ke-emphasis);
+}
+
 /* ── MEMBER HUB TAB ──────────────────────────────── */
 .hub-hero { margin-bottom: 30px; }
 
@@ -376,7 +418,8 @@ body.auth-active {
 .hub-life-card {
   background: var(--surface, rgba(255,255,255,0.04));
   border: 1px solid var(--border); border-radius: 11px; padding: 14px;
-  cursor: pointer; transition: all 0.25s; position: relative; overflow: hidden;
+  cursor: pointer; transition: background 0.25s, border-color 0.25s; position: relative; overflow: hidden;
+  animation: hub-blob-morph 9s ease-in-out infinite; will-change: border-radius;
 }
 .hub-life-card::before {
   content:''; position:absolute; top:0; left:0; right:0; height:2px;
@@ -422,7 +465,8 @@ body.auth-active {
 .hub-habit-card {
   background: var(--surface, rgba(255,255,255,0.04));
   border: 1px solid var(--border); border-radius: 10px; padding: 12px 13px;
-  cursor: pointer; transition: all 0.25s; position: relative; overflow: hidden;
+  cursor: pointer; transition: background 0.25s, border-color 0.25s; position: relative; overflow: hidden;
+  animation: hub-blob-morph-sm 11s ease-in-out infinite; will-change: border-radius;
 }
 .hub-habit-card::after {
   content:''; position:absolute; top:0; left:0; bottom:0;
@@ -520,7 +564,8 @@ body.auth-active {
 .hub-neg-card {
   background: var(--surface, rgba(255,255,255,0.04));
   border: 1px solid var(--border); border-radius: 11px; padding: 14px;
-  cursor: pointer; transition: all 0.25s; position: relative; overflow: hidden;
+  cursor: pointer; transition: background 0.25s, border-color 0.25s; position: relative; overflow: hidden;
+  animation: hub-blob-morph 10s ease-in-out infinite; will-change: border-radius;
 }
 .hub-neg-card::before {
   content:''; position:absolute; top:0; left:0; right:0; height:2px;
@@ -554,6 +599,113 @@ body.auth-active {
 .hub-neg-card:hover .hnc-hint { color:rgba(255,255,255,0.36); }
 .hub-neg-card.hnc-open .hnc-hint { opacity:0; }
 
+/* ── Liquid Blob Morph — member hub cards ─────────────────────────────
+   v4.18.2 — applies organic border-radius morph to all three hub card
+   families. Uses two keyframe sets (11px base / 10px base) so habit
+   cards stay proportional. Pauses on open state to avoid fighting the
+   expand transition. Stagger delays prevent all cards morphing in sync.
+   transition changed from 'all' → explicit props so animation isn't
+   overridden by the transition shorthand on hover.
+──────────────────────────────────────────────────────────────────── */
+@keyframes hub-blob-morph {
+  0%,100% { border-radius: 11px; }
+  20%     { border-radius: 18px 11px 15px 9px / 11px 15px 9px 18px; }
+  40%     { border-radius: 9px 18px 11px 15px / 15px 9px 18px 11px; }
+  60%     { border-radius: 15px 9px 18px 11px / 9px 18px 11px 15px; }
+  80%     { border-radius: 11px 15px 9px 18px / 18px 11px 15px 9px; }
+}
+@keyframes hub-blob-morph-sm {
+  0%,100% { border-radius: 10px; }
+  20%     { border-radius: 16px 10px 14px 8px / 10px 14px 8px 16px; }
+  40%     { border-radius: 8px 16px 10px 14px / 14px 8px 16px 10px; }
+  60%     { border-radius: 14px 8px 16px 10px / 8px 16px 10px 14px; }
+  80%     { border-radius: 10px 14px 8px 16px / 16px 10px 14px 8px; }
+}
+/* Stagger — each card starts at a different phase so the grid breathes */
+.hub-life-card:nth-child(2)  { animation-delay: -2.5s; }
+.hub-life-card:nth-child(3)  { animation-delay: -5s; }
+.hub-life-card:nth-child(4)  { animation-delay: -7s; }
+.hub-habit-card:nth-child(2) { animation-delay: -1.8s; }
+.hub-habit-card:nth-child(3) { animation-delay: -3.6s; }
+.hub-habit-card:nth-child(4) { animation-delay: -5.4s; }
+.hub-habit-card:nth-child(5) { animation-delay: -7.2s; }
+.hub-habit-card:nth-child(6) { animation-delay: -9s; }
+.hub-neg-card:nth-child(2)   { animation-delay: -2s; }
+.hub-neg-card:nth-child(3)   { animation-delay: -4s; }
+.hub-neg-card:nth-child(4)   { animation-delay: -6s; }
+/* Pause morph when card is expanded — prevents border-radius fighting expand */
+.hub-life-card.hlc-open,
+.hub-habit-card.hhc-open,
+.hub-neg-card.hnc-open { animation-play-state: paused; }
+
+/* ── Liquid Mercury Gauge — member hub KPI cards ──────────────────────
+   v4.18.3 — circular fluid-fill gauge for percentage-based KPI cards
+   (Win Rate, Survey Response %, etc.). Wrap .kpi-card content in
+   .merc-gauge to activate. The fill height is driven by --merc-pct
+   CSS custom property set inline (e.g. style="--merc-pct:71%").
+   Only activates on member role (Glass Depth). Steward view untouched.
+──────────────────────────────────────────────────────────────────────── */
+@keyframes merc-fill-rise {
+  from { height: 0%; }
+  to   { height: var(--merc-pct, 70%); }
+}
+@keyframes merc-shimmer {
+  0%,100% { opacity: 0.35; transform: rotate(-30deg) translateX(-10px); }
+  50%      { opacity: 0.55; transform: rotate(-30deg) translateX(10px); }
+}
+@keyframes merc-surface-wave {
+  0%,100% { border-radius: 44% 56% 48% 52% / 52% 48% 56% 44%; }
+  50%      { border-radius: 52% 48% 56% 44% / 44% 56% 48% 52%; }
+}
+
+.merc-gauge {
+  position: relative;
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  border: 2px solid rgba(150,200,255,0.22);
+  overflow: hidden;
+  margin: 0 auto 8px;
+  background: rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+.merc-gauge::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: var(--merc-pct, 70%);
+  background: linear-gradient(
+    180deg,
+    rgba(120,190,255,0.25) 0%,
+    rgba(80,160,255,0.65)  40%,
+    rgba(40,130,255,0.90)  100%
+  );
+  border-radius: 44% 56% 48% 52% / 52% 48% 56% 44%;
+  animation: merc-fill-rise 1.4s cubic-bezier(0.34,1.56,0.64,1) both,
+             merc-surface-wave 3s ease-in-out 1.4s infinite;
+  will-change: border-radius;
+}
+.merc-gauge::after {
+  content: '';
+  position: absolute;
+  top: 14%; left: 18%;
+  width: 30%; height: 20%;
+  background: rgba(255,255,255,0.38);
+  border-radius: 50%;
+  transform: rotate(-30deg);
+  animation: merc-shimmer 3.5s ease-in-out infinite;
+}
+.merc-gauge .merc-val {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700;
+  color: #d0eaff;
+  font-family: var(--fontBody, 'Plus Jakarta Sans', sans-serif);
+  letter-spacing: -0.02em;
+  z-index: 2;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
 /* ═══════════════════════════════════════════════════
    NEGOTIATION KNOWLEDGE WIDGET — Styles
    v4.41.0 — 2026-03-26
@@ -570,17 +722,16 @@ body.auth-active {
 .sidebar-knowledge.sk-visible { opacity: 1; }
 .sk-title {
   font-size: 10px;
-  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--accent);
   margin-bottom: 6px;
+  /* color + weight from Manrope KE system */
 }
 .sk-quote {
   font-size: 11px;
   font-style: italic;
-  color: var(--muted);
   line-height: 1.55;
+  /* color + weight from Manrope KE system */
 }
 
 /* ── Inline Knowledge Widget (home page) ── */
@@ -617,25 +768,23 @@ body.auth-active {
 
 .nkw-title {
   font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
   margin-bottom: 6px;
-  font-family: var(--fontDisplay, 'Bebas Neue', sans-serif);
   letter-spacing: 0.02em;
+  /* font-family, weight, color set by Manrope Knowledge Engine styles above */
 }
 .nkw-quote {
   font-size: 12px;
   font-style: italic;
-  color: rgba(var(--textRGB,249,250,251), 0.68);
   line-height: 1.6;
   margin-bottom: 4px;
+  /* color + weight from Manrope KE system */
 }
 .nkw-attr {
   font-size: 9px;
-  color: var(--muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 8px;
+  /* color + weight from Manrope KE system */
 }
 
 .nkw-bullets {
@@ -647,11 +796,11 @@ body.auth-active {
   padding: 3px 0 3px 14px;
   position: relative;
   font-size: 12px;
-  color: var(--muted);
   line-height: 1.55;
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 0.5s ease, transform 0.5s ease;
+  /* color + weight from Manrope KE system */
 }
 .nkw-bullet.nkw-bullet-visible {
   opacity: 1;
@@ -665,9 +814,10 @@ body.auth-active {
   color: var(--accent);
 }
 
-/* ── Knowledge Strip (compact, for unused spaces) ── */
+/* ── Knowledge Strip (bottom of every tab via renderPageLayout) ── */
 .neg-knowledge-strip {
   padding: 10px 16px;
+  margin-top: 18px;
   background: rgba(var(--accentRGB,59,130,246), 0.03);
   border-top: 1px solid var(--border);
   opacity: 0;
@@ -677,22 +827,20 @@ body.auth-active {
 .neg-knowledge-strip.nks-visible { opacity: 1; }
 .nks-text {
   font-size: 11px;
-  color: var(--muted);
   line-height: 1.5;
+  /* color + weight from Manrope KE system */
 }
 .nks-text strong {
-  color: var(--accent);
-  font-weight: 700;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  /* color + weight from Manrope KE system */
 }
 
 /* ── Responsive: Mobile — hide bullets, keep compact ── */
 @media (max-width: 639px) {
   .nkw-bullets { display: none; }
   .neg-knowledge-widget { min-height: 60px; }
-  .neg-knowledge-strip { display: none; }
 }
 
 /* ── Responsive: Tablet+ — full experience ── */

@@ -102,7 +102,7 @@ describe('computeAverage_', () => {
   });
 
   test('handles mixed numeric and string-number values', () => {
-    // '5' is a string, not typeof number, so should be skipped
+    // '5' is a numeric string — computeAverage_ treats it as a number and includes it
     expect(computeAverage_([3, '5', 7], 0, 2)).toBe(5);
   });
 

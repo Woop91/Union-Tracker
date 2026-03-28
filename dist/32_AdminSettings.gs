@@ -247,7 +247,8 @@ function adminGetSettings() {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (!configSheet) return { success: false, error: 'Config sheet not found' };
 
-    var isOwner = ss.getOwner().getEmail().toLowerCase() === email.toLowerCase();
+    var owner = ss.getOwner();
+    var isOwner = owner ? owner.getEmail().toLowerCase() === email.toLowerCase() : false;
 
     // Batch read: entire row 3 + full data block for list columns
     var lastCol = configSheet.getLastColumn();
@@ -327,7 +328,8 @@ function adminSaveSettings(changes) {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (!configSheet) return { success: false, error: 'Config sheet not found' };
 
-    var isOwner = ss.getOwner().getEmail().toLowerCase() === email.toLowerCase();
+    var owner = ss.getOwner();
+    var isOwner = owner ? owner.getEmail().toLowerCase() === email.toLowerCase() : false;
     var saved = 0;
 
     var keys = Object.keys(changes);

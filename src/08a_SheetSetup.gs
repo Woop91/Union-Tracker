@@ -676,7 +676,7 @@ function migrateSheetTabTitles() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Data validation and multi-select functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
@@ -1045,7 +1045,7 @@ function removeMultiSelectTrigger() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Search and navigation functions
- * @version 4.33.0
+ * @version 4.43.1
  * @requires 01_Constants.gs
  */
 
