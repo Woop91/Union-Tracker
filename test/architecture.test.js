@@ -741,6 +741,7 @@ describe('A11: Server-exposed functions have auth checks', () => {
         const body = match[1];
         const hasAuth = body.includes('_resolveCallerEmail') ||
                         body.includes('_requireStewardAuth') ||
+                        body.includes('_requireLeaderAuth') ||
                         body.includes('checkWebAppAuthorization');
         expect(hasAuth).toBe(true);
       });

@@ -43,6 +43,7 @@
  var AUTH_METHOD = PAGE_DATA.authMethod || 'sso';
  var IS_PIN_SESSION = AUTH_METHOD === 'pin';
  var IS_ADMIN = PAGE_DATA.isAdmin || false;
+ var IS_LEADER = PAGE_DATA.isLeader || false;
  var APP_VERSION = PAGE_DATA.appVersion || '';
  var SESSION_TOKEN = PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
  var INITIAL_TAB = PAGE_DATA.initialTab || null;
@@ -2006,12 +2007,43 @@
 
   function _redirectToLogout() {
   
-  if (WEB_APP_URL) {
+  // Redirecting to WEB_APP_URL can fail with "refused to connect" when the
+  
+  // Google's login redirect is blocked by X-Frame-Options.
+  var overlay = document.getElementById('logout-overlay');
+  if (!overlay) {
+   
+   if (WEB_APP_URL) {
    try { window.top.location.href = WEB_APP_URL + '?loggedout=1'; } catch (_e) {
-   window.location.href = WEB_APP_URL + '?loggedout=1';
+    window.location.href = WEB_APP_URL + '?loggedout=1';
    }
-  } else {
-   try { window.top.location.reload(); } catch (_e2) { window.location.reload(); }
+   }
+   return;
+  }
+
+  overlay.innerHTML =
+   '<div style="text-align:center;max-width:320px;padding:0 20px">' +
+   '<div style="width:56px;height:56px;border-radius:50%;background:rgba(5,150,105,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">' +
+    '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+   '</div>' +
+   '<div class="logout-text" style="opacity:1;color:#fff;font-size:17px;font-weight:600;margin-bottom:6px">Signed out</div>' +
+   '<div style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:28px">Your session has been cleared.</div>' +
+   '<button id="logout-signin-btn" style="background:#fff;color:#111;border:none;border-radius:10px;padding:12px 32px;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.02em;transition:transform 0.15s ease">Sign in again</button>' +
+   '</div>';
+
+  var btn = document.getElementById('logout-signin-btn');
+  if (btn) {
+   btn.addEventListener('click', function() {
+   btn.textContent = 'Loading\u2026';
+   btn.disabled = true;
+   if (WEB_APP_URL) {
+    try { window.top.location.href = WEB_APP_URL; } catch (_e) {
+    window.location.href = WEB_APP_URL;
+    }
+   } else {
+    try { window.top.location.reload(); } catch (_e2) { window.location.reload(); }
+   }
+   });
   }
   }
 
@@ -2718,7 +2750,7 @@
   }
   return _filterDevTabs(stewardTabs);
   }
-  return [
+  var memberTabs = [
   { id: 'memberhub', icon: '\u270A', label: 'Member Hub' },
   { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
   { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
@@ -2747,6 +2779,17 @@
   { id: 'reportcard', icon: '\uD83D\uDCCB', label: 'Report Card' },
   { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
   ];
+  
+  if (IS_LEADER) {
+  
+  var divIdx = memberTabs.length - 5;
+  memberTabs.splice(divIdx, 0,
+   { divider: true },
+   { group: 'Leadership' },
+   { id: 'leaderhub', icon: '\uD83C\uDFC5', label: 'Leader Hub' }
+  );
+  }
+  return memberTabs;
  }
 
  
@@ -3497,6 +3540,7 @@
    case 'timeline': return renderMemberTimelinePage;
    case 'reportcard': return renderReportCard;
    case 'pinsetup': return renderPINSetup;
+   case 'leaderhub': return renderLeaderHub;
    default: return renderMemberHome;
   }
   } else {
@@ -4031,7 +4075,8 @@
  var _backSwipe = (function() {
   var _startX = 0, _startY = 0, _currentX = 0;
   var _tracking = false;
-  var _edgeZone = 30;  
+  var _edgeMin = 15;   // skip browser's own back-gesture zone (0-15px)
+  var _edgeZone = 50;  
   var _threshold = 60; 
   var _cooldown = false;
 
@@ -4042,7 +4087,9 @@
   _startX = touch.clientX;
   _startY = touch.clientY;
   _currentX = _startX;
-  _tracking = _startX <= _edgeZone;
+  // Track if touch starts outside the browser's back-gesture zone but
+  
+  _tracking = _startX >= _edgeMin && _startX <= _edgeZone;
   }
 
   function move(e) {
@@ -4080,13 +4127,23 @@
   setTimeout(function() { _cooldown = false; }, 600);
   }
 
-  return { start: start, move: move, end: end };
+  function inject() {
+  if (LayoutState.mode !== 'mobile') return;
+  var existing = document.querySelector('.back-swipe-hint');
+  if (existing) return;
+  var hint = document.createElement('div');
+  hint.className = 'back-swipe-hint';
+  document.body.appendChild(hint);
+  }
+
+  return { start: start, move: move, end: end, inject: inject };
  })();
 
  if (CURRENT_VIEW !== 'auth' && CURRENT_VIEW !== 'error') {
   document.addEventListener('touchstart', _backSwipe.start, { passive: true });
   document.addEventListener('touchmove', _backSwipe.move, { passive: false });
   document.addEventListener('touchend', _backSwipe.end, { passive: true });
+  setTimeout(function() { _backSwipe.inject(); }, 500);
  }
 
  

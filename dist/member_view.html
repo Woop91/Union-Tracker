@@ -7011,4 +7011,328 @@ function _renderCheckedInBanner(container, meeting) {
  if (firstCard) container.insertBefore(banner, firstCard);
  else container.appendChild(banner);
 }
+
+function renderLeaderHub(appContainer) {
+ renderPageLayout(appContainer, 'member', 'leaderhub', function(container) {
+ _memberHeader(container, 'Leader Hub', 'Your unit at a glance');
+
+ var content = el('div', { className: 'content' });
+
+ 
+ var mentorBanner = el('div', { id: 'leader-mentor-banner' });
+ content.appendChild(mentorBanner);
+ serverCall().withSuccessHandler(function(mentor) {
+  if (mentor && mentor.mentorEmail) {
+  var banner = el('div', { className: 'card ' + _TC, style: { padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' } });
+  banner.appendChild(el('span', { style: { fontSize: '20px' } }, '\uD83C\uDF93'));
+  var info = el('div');
+  info.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-secondary)' } }, 'Your Mentor'));
+  info.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px' } }, escapeHtml(mentor.mentorName || mentor.mentorEmail)));
+  if (mentor.started) info.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, 'Since ' + escapeHtml(String(mentor.started))));
+  banner.appendChild(info);
+  mentorBanner.appendChild(banner);
+  }
+ }).withFailureHandler(function() {}).dataGetLeaderMentor(SESSION_TOKEN);
+
+ 
+ var tabs = createSubTabs([
+  { id: 'engagement', label: 'Engagement', render: _renderLeaderEngagement },
+  { id: 'broadcast', label: 'Broadcast', render: _renderLeaderBroadcast },
+  { id: 'outreach', label: 'Outreach Log', render: _renderLeaderOutreach }
+ ]);
+ content.appendChild(tabs.bar);
+ content.appendChild(tabs.content);
+ container.appendChild(content);
+ });
+}
+
+function _renderLeaderEngagement(tabContent) {
+ showLoading(tabContent, 'list');
+ serverCall().withSuccessHandler(function(data) {
+ tabContent.innerHTML = '';
+ if (!data || !data.success) {
+  tabContent.appendChild(el('div', { className: 'card ' + _TC, style: { padding: '20px', color: 'var(--text-secondary)', textAlign: 'center' } },
+  (data && data.message) || 'Unable to load engagement data.'));
+  return;
+ }
+
+ 
+ var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '16px' } });
+ var kpiData = [
+  { label: 'Unit', value: data.unitName || 'N/A', color: 'var(--accent)' },
+  { label: 'Members', value: String(data.memberCount), color: 'hsl(200,70%,55%)' },
+  { label: 'Avg Score', value: data.avgScore != null ? Math.round(data.avgScore) : '--', color: _engagementColor(data.avgScore) }
+ ];
+ kpiData.forEach(function(kpi) {
+  var card = el('div', { className: 'card ' + _TC, style: { padding: '14px', textAlign: 'center' } });
+  card.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '700', color: kpi.color } }, String(kpi.value)));
+  card.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-secondary)', marginTop: '4px' } }, kpi.label));
+  kpis.appendChild(card);
+ });
+ tabContent.appendChild(kpis);
+
+ 
+ if (!data.members || data.members.length === 0) {
+  tabContent.appendChild(el('div', { className: 'card ' + _TC, style: { padding: '20px', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' } },
+  'No members found in your unit.'));
+  return;
+ }
+
+ var listHeader = el('div', { style: { fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' } }, 'Member Scores');
+ tabContent.appendChild(listHeader);
+
+ data.members.forEach(function(m) {
+  var card = el('div', { className: 'card ' + _TC, style: { padding: '12px 16px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+
+  var left = el('div');
+  left.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px' } }, escapeHtml(m.name || m.email)));
+  if (m.email && m.name) left.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, escapeHtml(m.email)));
+  card.appendChild(left);
+
+  var right = el('div', { style: { textAlign: 'right' } });
+  var scoreVal = m.composite != null ? Math.round(m.composite) : '--';
+  right.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: _engagementColor(m.composite) } }, String(scoreVal)));
+  if (m.trend) right.appendChild(el('div', { style: { fontSize: '12px' } }, m.trend === 'increasing' ? '\u2191' : m.trend === 'decreasing' ? '\u2193' : '\u2192'));
+  card.appendChild(right);
+
+  tabContent.appendChild(card);
+ });
+ }).withFailureHandler(function(err) {
+ tabContent.innerHTML = '';
+ tabContent.appendChild(el('div', { className: 'card', style: { padding: '20px', color: 'var(--danger, #ef4444)', textAlign: 'center' } },
+  'Failed to load engagement data: ' + (err && err.message || 'server error')));
+ }).dataGetLeaderDashboard(SESSION_TOKEN);
+}
+
+function _engagementColor(score) {
+ if (score == null) return 'var(--text-secondary)';
+ if (score >= 70) return 'var(--success, #22c55e)';
+ if (score >= 40) return 'hsl(40,80%,55%)';
+ return 'var(--danger, #ef4444)';
+}
+
+function _renderLeaderBroadcast(tabContent) {
+ var subjectInput = el('input', { className: 'form-input', type: 'text', placeholder: 'Subject (optional)', style: { width: '100%', marginBottom: '10px' } });
+ var messageArea = el('textarea', { className: 'form-input', placeholder: 'Write your message to unit members...', style: { width: '100%', minHeight: '140px', resize: 'vertical', marginBottom: '10px' } });
+ var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '8px' } });
+ var charCount = el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'right', marginBottom: '8px' } }, '0 characters');
+ var sendBtn = el('button', { className: 'btn btn-primary ' + _TB, style: { width: '100%' },
+ onClick: function() {
+  var msg = messageArea.value.trim();
+  if (!msg) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger, #ef4444)'; return; }
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending...';
+  statusMsg.textContent = '';
+  serverCall().withSuccessHandler(function(r) {
+  sendBtn.disabled = false;
+  sendBtn.textContent = 'Send to Unit';
+  if (r && r.success) {
+   statusMsg.textContent = r.message || ('Sent to ' + r.sentCount + ' member(s).');
+   statusMsg.style.color = 'var(--success, #22c55e)';
+   messageArea.value = '';
+   subjectInput.value = '';
+   charCount.textContent = '0 characters';
+   if (r.failedCount > 0) statusMsg.textContent += ' (' + r.failedCount + ' failed)';
+  } else {
+   statusMsg.textContent = (r && r.message) || 'Failed to send.';
+   statusMsg.style.color = 'var(--danger, #ef4444)';
+  }
+  }).withFailureHandler(function() {
+  sendBtn.disabled = false;
+  sendBtn.textContent = 'Send to Unit';
+  statusMsg.textContent = 'Server error.';
+  statusMsg.style.color = 'var(--danger, #ef4444)';
+  }).dataLeaderBroadcast(SESSION_TOKEN, messageArea.value.trim(), subjectInput.value.trim());
+ }
+ }, 'Send to Unit');
+
+ messageArea.addEventListener('input', function() {
+ charCount.textContent = messageArea.value.length + ' characters';
+ });
+
+ 
+ var previewBox = el('div', { className: 'card ' + _TC, style: { padding: '12px 16px', marginBottom: '16px', fontSize: '13px' } });
+ previewBox.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '4px' } }, 'Recipients'));
+ var previewText = el('div', { style: { color: 'var(--text-secondary)' } }, 'Loading unit members...');
+ previewBox.appendChild(previewText);
+ tabContent.appendChild(previewBox);
+
+ serverCall().withSuccessHandler(function(members) {
+ if (!members || members.length === 0) {
+  previewText.textContent = 'No members found in your unit.';
+  sendBtn.disabled = true;
+ } else {
+  previewText.textContent = members.length + ' member(s) in your unit will receive this message.';
+ }
+ }).withFailureHandler(function() {
+ previewText.textContent = 'Unable to load recipients.';
+ }).dataGetLeaderUnitMembers(SESSION_TOKEN);
+
+ var formCard = el('div', { className: 'card ' + _TC, style: { padding: '16px' } });
+ formCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px', marginBottom: '12px' } }, 'Compose Message'));
+ formCard.appendChild(subjectInput);
+ formCard.appendChild(messageArea);
+ formCard.appendChild(charCount);
+ formCard.appendChild(statusMsg);
+ formCard.appendChild(sendBtn);
+ tabContent.appendChild(formCard);
+}
+
+function _renderLeaderOutreach(tabContent) {
+ 
+ var formCard = el('div', { className: 'card ' + _TC, style: { padding: '16px', marginBottom: '16px' } });
+ formCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px', marginBottom: '12px' } }, 'Log Outreach'));
+
+ 
+ var memberInput = el('input', { className: 'form-input', type: 'text', placeholder: 'Member name or email', style: { width: '100%', marginBottom: '8px' } });
+ var memberSuggestions = el('div', { style: { position: 'relative' } });
+ var memberDropdown = el('div', { style: { display: 'none', position: 'absolute', top: '0', left: '0', right: '0', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', maxHeight: '150px', overflowY: 'auto', zIndex: '10', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } });
+ memberSuggestions.appendChild(memberDropdown);
+ var _unitMembers = [];
+ var _selectedMember = { email: '', name: '' };
+
+ serverCall().withSuccessHandler(function(members) {
+ _unitMembers = members || [];
+ }).withFailureHandler(function() {}).dataGetLeaderUnitMembers(SESSION_TOKEN);
+
+ memberInput.addEventListener('input', function() {
+ var q = memberInput.value.toLowerCase().trim();
+ _selectedMember = { email: '', name: '' };
+ if (!q || q.length < 2) { memberDropdown.style.display = 'none'; return; }
+ memberDropdown.innerHTML = '';
+ var matches = _unitMembers.filter(function(m) {
+  return (m.name && m.name.toLowerCase().indexOf(q) >= 0) || (m.email && m.email.toLowerCase().indexOf(q) >= 0);
+ }).slice(0, 8);
+ if (matches.length === 0) { memberDropdown.style.display = 'none'; return; }
+ matches.forEach(function(m) {
+  var opt = el('div', {
+  style: { padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)' },
+  onClick: function() {
+   _selectedMember = { email: m.email, name: m.name };
+   memberInput.value = m.name + ' (' + m.email + ')';
+   memberDropdown.style.display = 'none';
+  }
+  });
+  opt.appendChild(el('div', { style: { fontWeight: '600' } }, escapeHtml(m.name)));
+  opt.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, escapeHtml(m.email)));
+  memberDropdown.appendChild(opt);
+ });
+ memberDropdown.style.display = 'block';
+ });
+
+ formCard.appendChild(memberInput);
+ formCard.appendChild(memberSuggestions);
+
+ 
+ var typeLabel = el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' } }, 'Contact Type');
+ formCard.appendChild(typeLabel);
+ var typeRow = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' } });
+ var _selectedType = '';
+ var typeOptions = [
+ { value: 'Phone', icon: '\uD83D\uDCDE' },
+ { value: 'Email', icon: '\u2709\uFE0F' },
+ { value: 'In Person', icon: '\uD83D\uDC64' },
+ { value: 'Text', icon: '\uD83D\uDCAC' }
+ ];
+ var typeBtns = [];
+ typeOptions.forEach(function(t) {
+ var btn = el('button', {
+  className: 'btn btn-secondary',
+  style: { fontSize: '13px', padding: '6px 12px' },
+  onClick: function() {
+  _selectedType = t.value;
+  typeBtns.forEach(function(b) {
+   b.style.background = '';
+   b.style.color = '';
+  });
+  btn.style.background = 'var(--accent)';
+  btn.style.color = '#fff';
+  }
+ }, t.icon + ' ' + t.value);
+ typeBtns.push(btn);
+ typeRow.appendChild(btn);
+ });
+ formCard.appendChild(typeRow);
+
+ 
+ var notesArea = el('textarea', { className: 'form-input', placeholder: 'Notes about the interaction...', style: { width: '100%', minHeight: '80px', resize: 'vertical', marginBottom: '10px' } });
+ formCard.appendChild(notesArea);
+
+ 
+ var formMsg = el('div', { style: { fontSize: '13px', minHeight: '18px', marginBottom: '8px' } });
+ formCard.appendChild(formMsg);
+ var logBtn = el('button', { className: 'btn btn-primary ' + _TB, style: { width: '100%' },
+ onClick: function() {
+  if (!_selectedMember.email) { formMsg.textContent = 'Select a member from the dropdown.'; formMsg.style.color = 'var(--danger, #ef4444)'; return; }
+  if (!_selectedType) { formMsg.textContent = 'Choose a contact type.'; formMsg.style.color = 'var(--danger, #ef4444)'; return; }
+  logBtn.disabled = true;
+  logBtn.textContent = 'Logging...';
+  formMsg.textContent = '';
+  serverCall().withSuccessHandler(function(r) {
+  logBtn.disabled = false;
+  logBtn.textContent = 'Log Outreach';
+  if (r && r.success) {
+   formMsg.textContent = 'Logged!';
+   formMsg.style.color = 'var(--success, #22c55e)';
+   memberInput.value = '';
+   notesArea.value = '';
+   _selectedMember = { email: '', name: '' };
+   _selectedType = '';
+   typeBtns.forEach(function(b) { b.style.background = ''; b.style.color = ''; });
+   
+   _loadLeaderOutreachLog(logList);
+   setTimeout(function() { formMsg.textContent = ''; }, 2000);
+  } else {
+   formMsg.textContent = (r && r.message) || 'Failed to log.';
+   formMsg.style.color = 'var(--danger, #ef4444)';
+  }
+  }).withFailureHandler(function() {
+  logBtn.disabled = false;
+  logBtn.textContent = 'Log Outreach';
+  formMsg.textContent = 'Server error.';
+  formMsg.style.color = 'var(--danger, #ef4444)';
+  }).dataLogLeaderOutreach(SESSION_TOKEN, _selectedMember.email, _selectedType, notesArea.value.trim(), _selectedMember.name);
+ }
+ }, 'Log Outreach');
+ formCard.appendChild(logBtn);
+ tabContent.appendChild(formCard);
+
+ 
+ var logHeader = el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' } }, 'Recent Outreach');
+ tabContent.appendChild(logHeader);
+ var logList = el('div');
+ logList.appendChild(el('div', { style: { padding: '16px', color: 'var(--text-secondary)' } }, 'Loading...'));
+ tabContent.appendChild(logList);
+
+ _loadLeaderOutreachLog(logList);
+}
+
+function _loadLeaderOutreachLog(logList) {
+ serverCall().withSuccessHandler(function(entries) {
+ logList.innerHTML = '';
+ if (!entries || entries.length === 0) {
+  logList.appendChild(el('div', { className: 'card ' + _TC, style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center' } },
+  'No outreach logged yet. Use the form above to log your first contact.'));
+  return;
+ }
+ entries.slice(0, 30).forEach(function(entry) {
+  var card = el('div', { className: 'card ' + _TC, style: { padding: '12px 16px', marginBottom: '6px' } });
+  var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  var nameEl = el('div', { style: { fontWeight: '600', fontSize: '14px' } }, escapeHtml(entry.memberName || entry.memberEmail || 'Unknown'));
+  top.appendChild(nameEl);
+  var typeColors = { 'Phone': 'hsl(200,70%,55%)', 'Email': 'hsl(250,70%,68%)', 'In Person': 'hsl(150,60%,50%)', 'Text': 'hsl(40,80%,55%)' };
+  var typeBadge = el('span', {
+  style: { padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', background: typeColors[entry.type] || 'var(--border)', color: '#fff' }
+  }, escapeHtml(entry.type || ''));
+  top.appendChild(typeBadge);
+  card.appendChild(top);
+  if (entry.notes) card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' } }, escapeHtml(entry.notes)));
+  if (entry.date) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' } }, escapeHtml(String(entry.date))));
+  logList.appendChild(card);
+ });
+ }).withFailureHandler(function() {
+ logList.innerHTML = '';
+ logList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load outreach log.'));
+ }).dataGetLeaderOutreachLog(SESSION_TOKEN);
+}
 </script>

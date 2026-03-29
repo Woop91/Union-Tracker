@@ -152,6 +152,7 @@ function doGetWebDashboard(e) {
             duesStatus: 'Active',
             phone: '',
             isBootstrapAdmin: true,
+            isLeader: false,
           };
           // H5: Audit log bootstrap admin access
           if (typeof recordSecurityEvent === 'function') {
@@ -301,6 +302,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab, aut
       } catch (_) { return false; }
     })(),
     appVersion: (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '',
+    isLeader: userRecord.isLeader || false,
   });
 
   return template.evaluate()

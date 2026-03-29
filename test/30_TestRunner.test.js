@@ -193,8 +193,9 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
     // onboarding wizard — v4.34.x, case activity log — v4.34.0,
     // access log viewer — v4.36.0, grievance initiation — v4.36.0,
     // default view preference — v4.37.1, usage analytics — v4.40.0,
-    // webapp one-tap check-in — v4.43.1)
-    expect(untested.length).toBeLessThanOrEqual(52);
+    // webapp one-tap check-in — v4.43.1,
+    // leader hub endpoints — v4.46.0)
+    expect(untested.length).toBeLessThanOrEqual(58);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {

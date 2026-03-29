@@ -3813,6 +3813,20 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 .swipe-edge-hint.hidden { opacity: 0; }
 
+/* Back-swipe edge hint — left edge cue for "More" menu */
+.back-swipe-hint {
+  position: fixed; top: 50%; left: 0;
+  transform: translateY(-50%);
+  width: 4px; height: 40px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+  opacity: 0.25;
+  z-index: 150;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.back-swipe-hint.hidden { opacity: 0; }
+
 /* ═══════════════════════════════════════
    RESPONSIVE — Tablet (640-1024px)
    ═══════════════════════════════════════ */
@@ -3822,7 +3836,7 @@ button:focus-visible, [role="button"]:focus-visible {
   .bottom-nav { display: none; }
   .sidebar-nav { display: block; }
   /* Swipe panel hidden on tablet+ — sidebar handles navigation */
-  .swipe-panel, .swipe-panel-scrim, .swipe-edge-hint { display: none !important; }
+  .swipe-panel, .swipe-panel-scrim, .swipe-edge-hint, .back-swipe-hint { display: none !important; }
   .kpi-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .fab { bottom: 24px; right: 24px; }
   .info-grid-responsive { grid-template-columns: repeat(2, 1fr); }
@@ -4423,7 +4437,7 @@ button:focus-visible, [role="button"]:focus-visible {
    PRINT STYLESHEET
    ═══════════════════════════════════════ */
 @media print {
-  .sidebar-nav, .bottom-nav, .nav-progress, .glow-bar, .swipe-panel, .swipe-panel-scrim, .swipe-edge-hint,
+  .sidebar-nav, .bottom-nav, .nav-progress, .glow-bar, .swipe-panel, .swipe-panel-scrim, .swipe-edge-hint, .back-swipe-hint,
   .crt-overlay, .crt-scan-beam, .crt-pixel-grid,
   .fab-button, .idle-logout-overlay, .bulk-toolbar { display: none !important; }
   .page-layout-content { margin: 0 !important; max-width: 100% !important; }

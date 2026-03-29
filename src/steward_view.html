@@ -9315,11 +9315,21 @@ function renderMentorshipPage(appContainer) {
     suggestSection.appendChild(suggestList);
     content.appendChild(suggestSection);
 
+    // v4.46.0: Leader Mentees section
+    var leaderSection = el('div', { style: { marginBottom: '24px' } });
+    leaderSection.appendChild(el('h3', { style: { fontSize: '16px', marginBottom: '4px' } }, 'Leader Mentees'));
+    leaderSection.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' } }, 'Member Leaders in your organization. Claim a leader to mentor them.'));
+    var leaderList = el('div', { id: 'mentorship-leaders' });
+    leaderList.appendChild(el('div', { style: { padding: '16px', color: 'var(--text-secondary)' } }, 'Loading...'));
+    leaderSection.appendChild(leaderList);
+    content.appendChild(leaderSection);
+
     container.appendChild(content);
 
     // Load data
     _loadMentorshipPairings(activeList);
     _loadMentorshipSuggestions(suggestList);
+    _loadLeaderMentees(leaderList);
   });
 }
 
@@ -9446,6 +9456,89 @@ function _loadMentorshipSuggestions(suggestList) {
     suggestList.innerHTML = '';
     suggestList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load suggestions.'));
   }).dataGetMentorshipSuggestions(SESSION_TOKEN);
+}
+
+// ── Leader Mentees (v4.46.0) ──
+function _loadLeaderMentees(leaderList) {
+  serverCall().withSuccessHandler(function(leaders) {
+    leaderList.innerHTML = '';
+    if (!leaders || leaders.length === 0) {
+      leaderList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } },
+        'No Member Leaders found. Use the admin menu to set up the Member Leader role.'));
+      return;
+    }
+    var myEmail = (CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email.toLowerCase() : '';
+    leaders.forEach(function(l) {
+      var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '8px' } });
+      var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+
+      var info = el('div');
+      info.appendChild(el('div', { style: { fontWeight: '600' } }, '\uD83C\uDFC5 ' + escapeHtml(l.name)));
+      var details = [];
+      if (l.unit) details.push(l.unit);
+      if (l.location) details.push(l.location);
+      if (details.length > 0) {
+        info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, escapeHtml(details.join(' \u00B7 '))));
+      }
+      info.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, escapeHtml(l.email)));
+      header.appendChild(info);
+
+      var actions = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } });
+
+      if (l.mentorEmail) {
+        // Already mentored
+        var isMine = l.mentorEmail.toLowerCase() === myEmail;
+        var mentorLabel = isMine ? 'You' : escapeHtml(l.mentorEmail);
+        actions.appendChild(el('span', {
+          style: { padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600',
+            background: isMine ? 'var(--success, #22c55e)' : 'var(--border-subtle, #e5e7eb)', color: isMine ? '#fff' : 'var(--text)' }
+        }, '\uD83C\uDF93 ' + mentorLabel));
+        if (isMine && l.mentorPairingId) {
+          actions.appendChild(el('button', {
+            className: 'btn btn-ghost', style: { fontSize: '12px' },
+            onClick: function() {
+              if (confirm('Release mentorship of ' + l.name + '?')) {
+                serverCall().withSuccessHandler(function(r) {
+                  if (r && r.success) _loadLeaderMentees(leaderList);
+                }).dataCloseMentorshipPairing(SESSION_TOKEN, l.mentorPairingId);
+              }
+            }
+          }, 'Release'));
+        }
+      } else {
+        // Unclaimed — offer to claim
+        var claimBtn = el('button', {
+          className: 'btn btn-primary', style: { fontSize: '13px' },
+          onClick: function() {
+            claimBtn.disabled = true;
+            claimBtn.textContent = 'Claiming...';
+            serverCall().withSuccessHandler(function(r) {
+              if (r && r.success) {
+                _loadLeaderMentees(leaderList);
+                // Also refresh active pairings list
+                var activeList = document.getElementById('mentorship-active');
+                if (activeList) _loadMentorshipPairings(activeList);
+              } else {
+                claimBtn.disabled = false;
+                claimBtn.textContent = 'Mentor';
+              }
+            }).withFailureHandler(function() {
+              claimBtn.disabled = false;
+              claimBtn.textContent = 'Mentor';
+            }).dataCreateMentorshipPairing(SESSION_TOKEN, myEmail, l.email, 'Leader mentorship');
+          }
+        }, 'Mentor');
+        actions.appendChild(claimBtn);
+      }
+
+      header.appendChild(actions);
+      card.appendChild(header);
+      leaderList.appendChild(card);
+    });
+  }).withFailureHandler(function() {
+    leaderList.innerHTML = '';
+    leaderList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load Member Leaders.'));
+  }).dataGetMemberLeaders(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -974,6 +974,32 @@ function dataCloseMentorshipPairing(sessionToken, pairingId) { var s = _requireS
 /** @param {string} sessionToken @returns {Array} Suggested mentor-mentee pairings. */
 function dataGetMentorshipSuggestions(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return MentorshipService.suggestPairings(); }
 
+// --- Leader Mentorship (steward-only) ---
+/** @param {string} sessionToken @returns {Array} All Member Leaders with mentor info. */
+function dataGetMemberLeaders(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return [];
+  var leaders = (typeof loadMemberData_ === 'function') ? loadMemberData_().leaders : [];
+  // Enrich with mentorship pairing info
+  var pairings = (typeof MentorshipService !== 'undefined' && typeof MentorshipService.getPairings === 'function') ? MentorshipService.getPairings() : [];
+  var mentorMap = {};
+  for (var i = 0; i < pairings.length; i++) {
+    if (pairings[i].menteeEmail) mentorMap[pairings[i].menteeEmail.toLowerCase()] = pairings[i];
+  }
+  return leaders.map(function(l) {
+    var pairing = mentorMap[l.email.toLowerCase()] || null;
+    return {
+      name: l.name,
+      email: l.email,
+      unit: l.unit,
+      location: l.location,
+      mentorEmail: pairing ? pairing.mentorEmail : null,
+      mentorPairingId: pairing ? pairing.id : null,
+      mentorStarted: pairing ? pairing.started : null
+    };
+  });
+}
+
 // --- Communication Log (steward-only) ---
 /** @param {string} sessionToken @param {string} memberEmail @param {string} type @param {string} subject @param {string} notes @returns {Object} Result. */
 function dataLogCommunication(sessionToken, memberEmail, type, subject, notes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return CommunicationLogService.logCommunication(s, memberEmail, type, subject, notes); }

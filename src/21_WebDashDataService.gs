@@ -1824,6 +1824,7 @@ var DataService = (function () {
     if (isStewardRaw === 'yes' || isStewardRaw === 'true' || isStewardRaw === '1') {
       if (role === 'member') role = 'both';  // Upgrade to dual-role (member + steward)
     }
+    var isLeader = isStewardRaw === 'member leader';
 
     var hasGrievance = String(_getVal(row, colMap, HEADERS.memberHasOpenGrievance, '')).trim().toLowerCase();
 
@@ -1860,6 +1861,7 @@ var DataService = (function () {
       officeDays: String(_getVal(row, colMap, HEADERS.memberOfficeDays, '')).trim(),
       assignedSteward: String(_getVal(row, colMap, HEADERS.memberAssignedSteward, '')).trim().toLowerCase(),
       isSteward: role === 'steward' || role === 'both',
+      isLeader: isLeader,
       hasOpenGrievance: hasGrievance === 'yes' || hasGrievance === 'true' || hasGrievance === '1',
       street: String(_getVal(row, colMap, HEADERS.memberStreet, '')).trim(),
       city: String(_getVal(row, colMap, HEADERS.memberCity, '')).trim(),
@@ -4609,6 +4611,54 @@ var DataService = (function () {
     };
   }
 
+  // v4.46.0 — Leader Hub helpers
+  /**
+   * Returns members filtered by unit.
+   * @param {string} unit
+   * @returns {Object[]} [{ name, email, unit }]
+   */
+  function getUnitMembers(unit) {
+    if (!unit) return [];
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return [];
+    var members = [];
+    for (var i = 1; i < cached.data.length; i++) {
+      var rec = _buildUserRecord(cached.data[i], cached.colMap);
+      if (rec.unit === unit && rec.email) {
+        members.push({ name: rec.name, email: rec.email, unit: rec.unit });
+      }
+    }
+    return members;
+  }
+
+  /**
+   * Sends a broadcast email to members in a specific unit.
+   * @param {string} senderEmail - Leader/steward email (used as replyTo)
+   * @param {string} senderName - Display name for subject fallback
+   * @param {string} unit - Target unit name
+   * @param {string} message - Email body
+   * @param {string} [subject] - Optional email subject
+   * @returns {Object} { success, sentCount, failedCount, message }
+   */
+  function sendUnitBroadcast(senderEmail, senderName, unit, message, subject) {
+    var unitMembers = getUnitMembers(unit);
+    // Exclude the sender from the recipient list
+    unitMembers = unitMembers.filter(function(m) { return m.email.toLowerCase() !== senderEmail.toLowerCase(); });
+    if (unitMembers.length === 0) return { success: false, sentCount: 0, failedCount: 0, message: 'No members found in unit.' };
+    var subj = (subject && subject.trim()) ? subject.trim() : (senderName + ' \u2014 ' + unit + ' Update');
+    var sentCount = 0, failedCount = 0;
+    for (var j = 0; j < unitMembers.length; j++) {
+      try {
+        MailApp.sendEmail({ to: unitMembers[j].email, subject: subj, body: message.trim(), replyTo: senderEmail });
+        sentCount++;
+      } catch (_e) {
+        Logger.log('Unit broadcast send failed for ' + unitMembers[j].email + ': ' + (_e.message || _e));
+        failedCount++;
+      }
+    }
+    return { success: true, sentCount: sentCount, failedCount: failedCount, message: 'Sent to ' + sentCount + ' member(s).' };
+  }
+
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -4694,6 +4744,9 @@ var DataService = (function () {
     submitGrievanceFeedback: submitGrievanceFeedback,
     getGrievanceFeedbackStats: getGrievanceFeedbackStats,
     getStewardFeedbackSummary: getStewardFeedbackSummary,
+    // v4.46.0 — Leader Hub
+    getUnitMembers: getUnitMembers,
+    sendUnitBroadcast: sendUnitBroadcast,
   };
 
 })();
@@ -7562,4 +7615,139 @@ function dataWebAppCheckIn(sessionToken, meetingId) {
     memberName: memberName.trim(),
     message: memberName.trim() + ' checked in successfully!'
   };
+}
+
+// ═══════════════════════════════════════
+// MEMBER LEADER DATA ENDPOINTS
+// ═══════════════════════════════════════
+// v4.46.0 — Leader Hub: unit-scoped engagement, broadcast, outreach log
+
+/**
+ * Auth helper for Member Leader endpoints. Returns leader info or null.
+ * @param {string} sessionToken
+ * @returns {Object|null} { email, unit, name } or null
+ */
+function _requireLeaderAuth(sessionToken) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return null;
+  var user = DataService.findUserByEmail(email);
+  if (!user) return null;
+  // Allow leaders and stewards/admins to access leader endpoints
+  if (user.isLeader || user.isSteward) return { email: email, unit: user.unit || '', name: user.name || '' };
+  return null;
+}
+
+/**
+ * Returns engagement metrics for the leader's unit members.
+ * @param {string} sessionToken
+ * @returns {Object} { success, unitName, memberCount, avgScore, members[] }
+ */
+function dataGetLeaderDashboard(sessionToken) {
+  var leader = _requireLeaderAuth(sessionToken);
+  if (!leader) return { success: false, message: 'Leader access required.' };
+  if (!leader.unit) return { success: false, message: 'No unit assigned to your profile.' };
+  // DataService.getUnitMembers provides fallback roster; EngagementService enriches with scores
+  var roster = DataService.getUnitMembers(leader.unit);
+  if (typeof EngagementService !== 'undefined' && typeof EngagementService.getScoreboard === 'function') {
+    var scores = EngagementService.getScoreboard({ filterUnit: leader.unit, pageSize: 100, sortBy: 'composite' });
+    return { success: true, unitName: leader.unit, memberCount: scores.totalRows || 0, avgScore: scores.avgScore || 0, members: scores.items || [] };
+  }
+  var members = roster.map(function(m) { return { name: m.name, email: m.email, unit: m.unit, composite: null, trend: '' }; });
+  return { success: true, unitName: leader.unit, memberCount: members.length, avgScore: 0, members: members };
+}
+
+/**
+ * Returns members in the leader's unit for broadcast/outreach autocomplete.
+ * @param {string} sessionToken
+ * @returns {Object[]} [{ name, email }]
+ */
+function dataGetLeaderUnitMembers(sessionToken) {
+  var leader = _requireLeaderAuth(sessionToken);
+  if (!leader || !leader.unit) return [];
+  return DataService.getUnitMembers(leader.unit).filter(function(m) {
+    return m.email.toLowerCase() !== leader.email;
+  }).map(function(m) { return { name: m.name, email: m.email }; });
+}
+
+/**
+ * Sends a broadcast email to members in the leader's unit.
+ * @param {string} sessionToken
+ * @param {string} message - Email body
+ * @param {string} [subject] - Email subject (defaults to unit update)
+ * @returns {Object} { success, sentCount, failedCount, message }
+ */
+function dataLeaderBroadcast(sessionToken, message, subject) {
+  var leader = _requireLeaderAuth(sessionToken);
+  if (!leader) return { success: false, sentCount: 0, message: 'Leader access required.' };
+  if (!message || !message.trim()) return { success: false, sentCount: 0, message: 'Message is required.' };
+  if (!leader.unit) return { success: false, sentCount: 0, message: 'No unit assigned to your profile.' };
+
+  var result = DataService.sendUnitBroadcast(leader.email, leader.name, leader.unit, message, subject);
+
+  if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
+    logAuditEvent(AUDIT_EVENTS.BROADCAST_SENT || 'LEADER_BROADCAST', {
+      leaderEmail: leader.email,
+      unit: leader.unit,
+      sentCount: result.sentCount,
+      failedCount: result.failedCount,
+      scope: 'unit'
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Logs a member outreach contact from a leader. Reuses the steward contact log.
+ * @param {string} sessionToken
+ * @param {string} memberEmail
+ * @param {string} contactType - 'Phone', 'Email', 'In Person', 'Text'
+ * @param {string} notes
+ * @param {string} [memberName]
+ * @returns {Object} { success, message }
+ */
+function dataLogLeaderOutreach(sessionToken, memberEmail, contactType, notes, memberName) {
+  var leader = _requireLeaderAuth(sessionToken);
+  if (!leader) return { success: false, message: 'Leader access required.' };
+  if (!memberEmail) return { success: false, message: 'Member email is required.' };
+  if (!contactType) return { success: false, message: 'Contact type is required.' };
+  return withScriptLock_(function() {
+    return DataService.logMemberContact(leader.email, memberEmail, contactType, notes || '', '', memberName || '');
+  });
+}
+
+/**
+ * Returns the leader's outreach log (most recent 100 entries).
+ * @param {string} sessionToken
+ * @returns {Object[]} Array of contact log entries
+ */
+function dataGetLeaderOutreachLog(sessionToken) {
+  var leader = _requireLeaderAuth(sessionToken);
+  if (!leader) return [];
+  return DataService.getStewardContactLog(leader.email);
+}
+
+/**
+ * Returns the leader's mentor steward info (from mentorship pairings).
+ * @param {string} sessionToken
+ * @returns {Object|null} { mentorEmail, mentorName, started, notes } or null
+ */
+function dataGetLeaderMentor(sessionToken) {
+  var leader = _requireLeaderAuth(sessionToken);
+  if (!leader) return null;
+  if (typeof MentorshipService === 'undefined' || typeof MentorshipService.getPairings !== 'function') return null;
+  var pairings = MentorshipService.getPairings();
+  for (var i = 0; i < pairings.length; i++) {
+    if (pairings[i].menteeEmail && pairings[i].menteeEmail.toLowerCase() === leader.email) {
+      // Resolve mentor name from DataService.findUserByEmail if available
+      var mentorRec = DataService.findUserByEmail(pairings[i].mentorEmail);
+      return {
+        mentorEmail: pairings[i].mentorEmail,
+        mentorName: (mentorRec && mentorRec.name) || pairings[i].mentorEmail,
+        started: pairings[i].started || '',
+        notes: pairings[i].notes || ''
+      };
+    }
+  }
+  return null;
 }
