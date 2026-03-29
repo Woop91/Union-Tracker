@@ -239,13 +239,18 @@
   cb.id = 'toggle-' + field.key;
   cb.checked = (_settings[field.key] || '').toLowerCase() === 'yes';
   cb.disabled = isDisabled;
-  cb.addEventListener('change', (function(key, tid) {
+  cb.addEventListener('change', (function(key, tid, originalValue) {
   return function() {
+   var currentValue = this.checked ? 'yes' : 'no';
    if (!_dirty[tid]) _dirty[tid] = {};
+   if (currentValue === originalValue) {
+   delete _dirty[tid][key];
+   } else {
    _dirty[tid][key] = true;
+   }
    updateSaveButton();
   };
-  })(field.key, tabId));
+  })(field.key, tabId, (_settings[field.key] || '').toLowerCase() === 'yes' ? 'yes' : 'no'));
   toggle.appendChild(cb);
   var slider = document.createElement('span');
   slider.className = 'slider';

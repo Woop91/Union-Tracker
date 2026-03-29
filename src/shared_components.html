@@ -5,6 +5,14 @@
  * Eliminates duplicated KPI strips, sub-tab bars, autocomplete, and pagination.
  */
 
+// ── Theme layout class constants (multi-class: only active theme's CSS fires) ──
+var _TC = 'ds-card-editorial ga-card-glass ac-hud-panel';   // theme card
+var _TL = 'ds-label ga-label ac-label';                      // theme label
+var _TD = 'ds-display ga-display ac-display';                // theme display
+var _TB = 'ds-gradient-btn ga-gradient-btn ac-gradient-btn'; // theme button
+var _TI = 'ds-input ga-input ac-input';                      // theme input
+var _TG = 'ds-bento ga-bento ac-bento';                       // theme grid
+
 // ═══════════════════════════════════════
 // KPI STRIP
 // ═══════════════════════════════════════
@@ -23,11 +31,11 @@ function renderKPIStrip(container, items, options) {
   var cols = options.columns || items.length;
   var style = { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' };
   if (options.marginBottom) style.marginBottom = options.marginBottom;
-  var strip = el('div', { className: 'kpi-grid', style: style });
+  var strip = el('div', { className: 'kpi-grid ' + _TG, style: style });
 
   items.forEach(function(kpi) {
-    var card = el('div', { className: 'kpi-card' });
-    card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+    var card = el('div', { className: 'kpi-card ' + _TC });
+    card.appendChild(el('div', { className: 'kpi-label ' + _TL }, kpi.label));
     var val = el('div', { className: 'kpi-value' }, String(kpi.value));
     if (kpi.color) val.style.color = kpi.color;
     card.appendChild(val);
@@ -558,14 +566,15 @@ function show2FAModal(onVerified, options) {
  * @param {Object} [options] - Options for the 2FA modal
  */
 function withTwoFactor(serverFn, options) {
-  serverFn(function(result) {
+  function _handler(result) {
     if (result && result.requires2FA) {
       show2FAModal(function() {
-        // After verification, retry the original operation
-        serverFn(function() {}); // no-op callback; the original handler will fire
+        // After verification, retry the original operation with the same interceptor
+        serverFn(_handler);
       }, options);
     }
-  });
+  }
+  serverFn(_handler);
 }
 
 </script>

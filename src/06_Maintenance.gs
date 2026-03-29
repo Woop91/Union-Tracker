@@ -530,6 +530,12 @@ function UPDATE_ALL_SHEETS() {
  * @returns {void}
  */
 function removeDeprecatedTabs() {
+  var ui = SpreadsheetApp.getUi();
+  var confirm = ui.alert('Remove Deprecated Tabs',
+    'This will permanently delete deprecated sheets. This cannot be undone.\n\nContinue?',
+    ui.ButtonSet.YES_NO);
+  if (confirm !== ui.Button.YES) return;
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   // Exact-match names — delete if name matches exactly
   var deleteMatches = [
@@ -1366,7 +1372,8 @@ function undoLastAction() {
   var history = getUndoHistory();
 
   if (history.currentIndex === 0) {
-    throw new Error('Nothing to undo');
+    SpreadsheetApp.getActiveSpreadsheet().toast('Nothing to undo.', 'Undo', 3);
+    return;
   }
 
   var action = history.actions[history.currentIndex - 1];
@@ -1387,7 +1394,8 @@ function redoLastAction() {
   var history = getUndoHistory();
 
   if (history.currentIndex >= history.actions.length) {
-    throw new Error('Nothing to redo');
+    SpreadsheetApp.getActiveSpreadsheet().toast('Nothing to redo.', 'Redo', 3);
+    return;
   }
 
   var action = history.actions[history.currentIndex];

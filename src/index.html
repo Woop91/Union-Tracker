@@ -15,8 +15,8 @@
   <meta name="theme-color" content="#6366f1">
   <!-- PERF: Non-render-blocking font load — prevents font CSS from blocking first paint.
        display=swap ensures text is visible immediately with fallback fonts. -->
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;800&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;800&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
 
   <?!= include('styles') ?>
   <?!= include('member_hub_styles') ?>
@@ -391,21 +391,25 @@
             fontBody: "'Manrope', sans-serif",
             fontDisplay: "'Manrope', sans-serif",
             mode: 'dark',
-          },
-          light: {
-            bg: '#f0eef8', surface: 'rgba(255,255,255,0.85)', surfaceAlt: '#e8e6f2', raised: 'rgba(255,255,255,0.92)',
-            text: '#1a1a2e', 'text-secondary': '#5c5c7a', muted: '#7d7b96',
-            card: 'rgba(255,255,255,0.85)', 'bg-tertiary': '#dbd8ec',
-            success: '#0891b2', warning: '#d97706', danger: '#dc2626', info: '#0891b2',
-            border: 'rgba(0,0,0,0.08)', radius: '16px',
-            accent: '#7e51ff', accentDim: '#6834eb', accentGlow: 'rgba(126,81,255,0.2)',
-            accentBg: 'rgba(126,81,255,0.08)', accentBorder: 'rgba(126,81,255,0.2)',
-            fontBody: "'Manrope', sans-serif",
-            fontDisplay: "'Manrope', sans-serif",
-            mode: 'light',
+            // MD3 surface hierarchy
+            'surface-container': '#181827', 'surface-container-low': '#121220',
+            'surface-container-lowest': '#000000', 'surface-container-high': '#1e1e2f',
+            'surface-container-highest': '#242436', 'surface-dim': '#0d0d19',
+            'surface-bright': '#2a2a3e', 'surface-variant': '#242436', 'surface-tint': '#b6a0ff',
+            // MD3 semantic colors
+            'on-surface': '#e9e6f8', 'on-surface-variant': '#aba9ba',
+            primary: '#b6a0ff', 'primary-container': '#a98fff', 'primary-dim': '#7e51ff',
+            'on-primary': '#340090', 'on-primary-container': '#280072',
+            secondary: '#dfe2eb', 'secondary-container': '#43474e',
+            'on-secondary': '#4e5259', 'on-secondary-container': '#cdd0d9',
+            tertiary: '#81ecff', 'tertiary-container': '#00e3fd',
+            'on-tertiary': '#005762', 'on-tertiary-container': '#004d57',
+            'error-container': '#a70138', 'on-error': '#490013', 'on-error-container': '#ffb2b9',
+            outline: '#757484', 'outline-variant': '#474655',
+            'inverse-surface': '#e9e6f8', 'inverse-on-surface': '#0d0d19', 'inverse-primary': '#6834eb',
           },
         },
-        digitalSteward: {
+        editorial: {
           light: {
             bg: '#f7f9fb', surface: '#ffffff', surfaceAlt: '#f2f4f6', raised: '#ffffff',
             text: '#191c1e', 'text-secondary': '#484551', muted: '#797582',
@@ -417,28 +421,90 @@
             fontBody: "'Manrope', sans-serif",
             fontDisplay: "'Manrope', sans-serif",
             mode: 'light',
+            // MD3 surface hierarchy
+            'surface-container': '#eceef0', 'surface-container-low': '#f2f4f6',
+            'surface-container-lowest': '#ffffff', 'surface-container-high': '#e6e8ea',
+            'surface-container-highest': '#e0e3e5', 'surface-dim': '#d8dadc',
+            'surface-bright': '#f7f9fb', 'surface-variant': '#e0e3e5', 'surface-tint': '#6536e8',
+            // MD3 semantic colors
+            'on-surface': '#191c1e', 'on-surface-variant': '#484551',
+            primary: '#6536e8', 'primary-container': '#b4a1ff',
+            'on-primary': '#ffffff', 'on-primary-container': '#4700c4',
+            secondary: '#006878', 'secondary-container': '#8ae8fd',
+            'on-secondary': '#ffffff', 'on-secondary-container': '#006979',
+            tertiary: '#006875', 'tertiary-container': '#4dbdcf',
+            'on-tertiary': '#ffffff', 'on-tertiary-container': '#004953',
+            'error-container': '#ffdad6', 'on-error': '#ffffff', 'on-error-container': '#93000a',
+            outline: '#797582', 'outline-variant': '#cac4d3',
+            'inverse-surface': '#2d3133', 'inverse-on-surface': '#eff1f3', 'inverse-primary': '#ccbeff',
           },
+        },
+        analogCommander: {
           dark: {
-            bg: '#111318', surface: '#1a1c22', surfaceAlt: '#15171c', raised: '#1e2028',
-            text: '#e0e3e5', 'text-secondary': '#aba9ba', muted: '#797582',
-            card: '#1a1c22', 'bg-tertiary': '#222430',
-            success: '#69d5e8', warning: '#fbbf24', danger: '#ff6e84', info: '#69d5e8',
-            border: 'rgba(202,196,211,0.1)', radius: '12px',
-            accent: '#b4a1ff', accentDim: '#6536e8', accentGlow: 'rgba(180,161,255,0.25)',
-            accentBg: 'rgba(180,161,255,0.08)', accentBorder: 'rgba(180,161,255,0.2)',
-            fontBody: "'Manrope', sans-serif",
-            fontDisplay: "'Manrope', sans-serif",
+            bg: '#0e0e0e', surface: '#191919', surfaceAlt: '#131313', raised: '#1f1f1f',
+            text: '#ffffff', 'text-secondary': '#ababab', muted: '#757575',
+            card: '#191919', 'bg-tertiary': '#262626',
+            success: '#cafd00', warning: '#fbbf24', danger: '#ff7351', info: '#c1fffe',
+            border: 'rgba(72,72,72,0.15)', radius: '0px',
+            accent: '#f3ffca', accentDim: '#cafd00', accentGlow: 'rgba(202,253,0,0.2)',
+            accentBg: 'rgba(202,253,0,0.06)', accentBorder: 'rgba(202,253,0,0.2)',
+            fontBody: "'Space Grotesk', sans-serif",
+            fontDisplay: "'Space Grotesk', sans-serif",
             mode: 'dark',
+            // MD3 surface hierarchy
+            'surface-container': '#191919', 'surface-container-low': '#131313',
+            'surface-container-lowest': '#000000', 'surface-container-high': '#1f1f1f',
+            'surface-container-highest': '#262626', 'surface-dim': '#0e0e0e',
+            'surface-bright': '#2c2c2c', 'surface-variant': '#262626', 'surface-tint': '#f3ffca',
+            // MD3 semantic colors
+            'on-surface': '#ffffff', 'on-surface-variant': '#ababab',
+            primary: '#f3ffca', 'primary-container': '#cafd00',
+            'on-primary': '#516700', 'on-primary-container': '#4a5e00',
+            secondary: '#ff51fa', 'secondary-container': '#a900a9',
+            'on-secondary': '#400040', 'on-secondary-container': '#fff5f9',
+            tertiary: '#c1fffe', 'tertiary-container': '#00ffff',
+            'on-tertiary': '#006767', 'on-tertiary-container': '#005d5d',
+            'error-container': '#b92902', 'on-error': '#450900', 'on-error-container': '#ffd2c8',
+            outline: '#757575', 'outline-variant': '#484848',
+            'inverse-surface': '#f9f9f9', 'inverse-on-surface': '#555555', 'inverse-primary': '#516700',
+          },
+          light: {
+            bg: '#f0f0f0', surface: '#ffffff', surfaceAlt: '#e8e8e8', raised: '#ffffff',
+            text: '#0e0e0e', 'text-secondary': '#555555', muted: '#757575',
+            card: '#ffffff', 'bg-tertiary': '#e0e0e0',
+            success: '#516700', warning: '#d97706', danger: '#d53d18', info: '#006767',
+            border: 'rgba(72,72,72,0.15)', radius: '0px',
+            accent: '#516700', accentDim: '#3a4a00', accentGlow: 'rgba(81,103,0,0.15)',
+            accentBg: 'rgba(81,103,0,0.06)', accentBorder: 'rgba(81,103,0,0.15)',
+            fontBody: "'Space Grotesk', sans-serif",
+            fontDisplay: "'Space Grotesk', sans-serif",
+            mode: 'light',
+            // MD3 surface hierarchy (light)
+            'surface-container': '#e8e8e8', 'surface-container-low': '#efefef',
+            'surface-container-lowest': '#ffffff', 'surface-container-high': '#dedede',
+            'surface-container-highest': '#d4d4d4', 'surface-dim': '#d8d8d8',
+            'surface-bright': '#f0f0f0', 'surface-variant': '#e0e0e0', 'surface-tint': '#516700',
+            // MD3 semantic colors (light)
+            'on-surface': '#0e0e0e', 'on-surface-variant': '#555555',
+            primary: '#516700', 'primary-container': '#cafd00',
+            'on-primary': '#ffffff', 'on-primary-container': '#3a4a00',
+            secondary: '#920091', 'secondary-container': '#ffa6f3',
+            'on-secondary': '#ffffff', 'on-secondary-container': '#620061',
+            tertiary: '#006767', 'tertiary-container': '#a6f4ff',
+            'on-tertiary': '#ffffff', 'on-tertiary-container': '#004949',
+            'error-container': '#ffdad6', 'on-error': '#ffffff', 'on-error-container': '#93000a',
+            outline: '#757575', 'outline-variant': '#c8c8c8',
+            'inverse-surface': '#2c2c2c', 'inverse-on-surface': '#f0f0f0', 'inverse-primary': '#cafd00',
           },
         },
       };
 
-      // ── Per-tab accent colors (used by blob/shatter/liquid themes) ──
+      // ── Per-tab accent colors (used by shatter theme) ──
       var TAB_COLORS = {
         cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-        tasks: '#f59e0b', home: '#ff3366',
+        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-        resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
+        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
         polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
         events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
         testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -451,7 +517,8 @@
         'cyberpunk':  { tid: 'cyberpunk',  label: 'Cyberpunk',   emoji: '\uD83D\uDD32', desc: 'Pixel terminal — CRT scanlines, neon red', type: 'extra' },
         'shatter':    { tid: 'shatter',    label: 'Shatter',     emoji: '\uD83D\uDC8E', desc: 'Angular crystalline — fractured geometry', type: 'extra' },
         'glassArchive': { tid: 'glassArchive', label: 'Glass Archive', emoji: '\uD83D\uDD2E', desc: 'Ethereal glassmorphism — frosted panes, neon purple', type: 'extra' },
-        'digitalSteward': { tid: 'digitalSteward', label: 'Digital Steward', emoji: '\uD83D\uDCF0', desc: 'Editorial broadsheet — paper-like tonal layering', type: 'extra' },
+        'editorial': { tid: 'editorial', label: 'Digital Steward', emoji: '\uD83D\uDCF0', desc: 'Paper-first editorial — clean tonal layering', type: 'extra' },
+        'analogCommander': { tid: 'analogCommander', label: 'Analog Commander', emoji: '\uD83D\uDDA5', desc: 'Tactical HUD — zero-radius brutalism, neon green', type: 'extra' },
       };
 
       function getTabColor(tabId) { return TAB_COLORS[tabId] || '#8b5cf6'; }
@@ -514,7 +581,10 @@
           }
         } else if (FORCED_PALETTES[styleId]) {
           var fp = FORCED_PALETTES[styleId];
-          applyTheme(AppState.isDark ? fp.dark : fp.light);
+          // Single-mode themes: use the only available mode regardless of toggle
+          if (fp.dark && !fp.light) { applyTheme(fp.dark); }
+          else if (fp.light && !fp.dark) { applyTheme(fp.light); }
+          else { applyTheme(AppState.isDark ? fp.dark : fp.light); }
           document.body.classList.remove('cyber-multi');
         } else {
           var t = getTheme(AppState.activeRole || 'member', AppState.isDark);
@@ -531,7 +601,7 @@
         // 3. Manage CRT overlay elements for cyberpunk
         _manageCrtOverlay(isCyber);
 
-        // 4. Sync embedded component themes (org chart, agency chart)
+        // 4. Sync embedded component themes (org chart, agency chart, POMS)
         var embedRoot = document.querySelector('.madds-embed');
         if (embedRoot) {
           if (!AppState.isDark) embedRoot.classList.add('light');
@@ -541,6 +611,11 @@
         if (agencyRoot) {
           if (AppState.isDark) agencyRoot.classList.add('dark');
           else agencyRoot.classList.remove('dark');
+        }
+        var pomsRoot = document.querySelector('.poms-root');
+        if (pomsRoot) {
+          if (AppState.isDark) pomsRoot.classList.add('poms-dark');
+          else pomsRoot.classList.remove('poms-dark');
         }
       }
 
@@ -626,6 +701,13 @@
         init: init,
         palette: palette,
         styles: styles,
+        // Single-mode check: returns true if current forced palette has only one mode
+        isSingleMode: function() {
+          var sid = AppState.navTheme || 'default';
+          var fp = FORCED_PALETTES[sid];
+          if (!fp) return false;
+          return (fp.dark && !fp.light) || (fp.light && !fp.dark);
+        },
         // Cyberpunk neon API
         CYBER_NEONS: CYBER_NEONS,
         setCyberNeon: setCyberNeon,
@@ -2171,7 +2253,7 @@
             }
           }
 
-          var newContent = el('div', { className: 'page-layout-content', id: 'main-content', role: 'main' });
+          var newContent = el('div', { className: 'page-layout-content ds-body ga-body ac-body', id: 'main-content', role: 'main' });
           contentFn(newContent);
           if (typeof renderKnowledgeStrip === 'function' && !newContent.querySelector('.neg-knowledge-widget')) { renderKnowledgeStrip(newContent); }
           targetParent.appendChild(newContent);
@@ -2208,7 +2290,7 @@
       renderSidebarItems(sidebar, role, activeTab);
       layout.appendChild(sidebar);
 
-      var content = el('div', { className: 'page-layout-content', id: 'main-content', role: 'main' });
+      var content = el('div', { className: 'page-layout-content ds-body ga-body ac-body', id: 'main-content', role: 'main' });
       try {
         contentFn(content);
         if (typeof renderKnowledgeStrip === 'function' && !content.querySelector('.neg-knowledge-widget')) { renderKnowledgeStrip(content); }
@@ -2403,6 +2485,33 @@
       header.appendChild(bellWrap);
       sidebar.appendChild(header);
 
+      // ── Sidebar quote widget — positioned at top, right after header ──
+      if (isSidebarLayout() && typeof AUTH_QUOTES !== 'undefined') {
+        var quoteWrap = el('div', { className: 'sidebar-quote-widget' });
+        var quoteText = el('div', { className: 'sqw-text' });
+        var quoteAttr = el('div', { className: 'sqw-attr' });
+        quoteWrap.appendChild(quoteText);
+        quoteWrap.appendChild(quoteAttr);
+        sidebar.appendChild(quoteWrap);
+
+        var _sqPool = _shuffleArray(AUTH_QUOTES);
+        var _sqIdx = 0;
+        function _showSidebarQuote() {
+          var q = _sqPool[_sqIdx];
+          quoteWrap.classList.remove('sqw-visible');
+          setTimeout(function() {
+            quoteText.textContent = '\u201C' + q.text + '\u201D';
+            quoteAttr.textContent = '\u2014 ' + q.attr;
+            quoteWrap.classList.add('sqw-visible');
+            _sqIdx = (_sqIdx + 1) % _sqPool.length;
+          }, 600);
+        }
+        _showSidebarQuote();
+        // Clear any previous sidebar quote timer before starting new one
+        if (_sidebarQuoteTimer) clearInterval(_sidebarQuoteTimer);
+        _sidebarQuoteTimer = setInterval(_showSidebarQuote, 12000);
+      }
+
       var _splitEnabled = SplitView.isEnabled();
       var _secondaryTab = _splitEnabled ? SplitView.getSecondaryTab() : null;
       var _splitTarget = _splitEnabled ? SplitView.getTarget() : 'primary';
@@ -2499,33 +2608,6 @@
         sidebar.appendChild(splitSection);
       }
 
-      // ── Sidebar quote widget — positioned in top half after nav tabs ──
-      if (isSidebarLayout() && typeof AUTH_QUOTES !== 'undefined') {
-        var quoteWrap = el('div', { className: 'sidebar-quote-widget' });
-        var quoteText = el('div', { className: 'sqw-text' });
-        var quoteAttr = el('div', { className: 'sqw-attr' });
-        quoteWrap.appendChild(quoteText);
-        quoteWrap.appendChild(quoteAttr);
-        sidebar.appendChild(quoteWrap);
-
-        var _sqPool = _shuffleArray(AUTH_QUOTES);
-        var _sqIdx = 0;
-        function _showSidebarQuote() {
-          var q = _sqPool[_sqIdx];
-          quoteWrap.classList.remove('sqw-visible');
-          setTimeout(function() {
-            quoteText.textContent = '\u201C' + q.text + '\u201D';
-            quoteAttr.textContent = '\u2014 ' + q.attr;
-            quoteWrap.classList.add('sqw-visible');
-            _sqIdx = (_sqIdx + 1) % _sqPool.length;
-          }, 600);
-        }
-        _showSidebarQuote();
-        // Clear any previous sidebar quote timer before starting new one
-        if (_sidebarQuoteTimer) clearInterval(_sidebarQuoteTimer);
-        _sidebarQuoteTimer = setInterval(_showSidebarQuote, 12000);
-      }
-
       // Negotiation Knowledge — sidebar footer (tablet+ only)
       if (isSidebarLayout() && typeof renderSidebarKnowledge === 'function') {
         renderSidebarKnowledge(sidebar);
@@ -2587,18 +2669,21 @@
           defaultLabelEl
         ]));
       }
-      sidebar.appendChild(el('div', {
-        className: 'sidebar-item',
-        onClick: function() {
-          AppState.isDark = !AppState.isDark;
-          safeLSSet('dds_isDark', AppState.isDark);
-          UnifiedTheme.apply();
-          _handleTabNav(role, activeTab);
-        }
-      }, [
-        el('span', { className: 'sidebar-item-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'),
-        el('span', null, AppState.isDark ? 'Light Mode' : 'Dark Mode')
-      ]));
+      // Hide dark/light toggle for single-mode themes (e.g. Glass Archive = dark only)
+      if (!UnifiedTheme.isSingleMode()) {
+        sidebar.appendChild(el('div', {
+          className: 'sidebar-item',
+          onClick: function() {
+            AppState.isDark = !AppState.isDark;
+            safeLSSet('dds_isDark', AppState.isDark);
+            UnifiedTheme.apply();
+            _handleTabNav(role, activeTab);
+          }
+        }, [
+          el('span', { className: 'sidebar-item-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'),
+          el('span', null, AppState.isDark ? 'Light Mode' : 'Dark Mode')
+        ]));
+      }
 
       // ── Visual Style Picker (sidebar) ──
       var _stylePickerOpen = false;
@@ -2714,8 +2799,10 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { group: 'Reference' },
+        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
         { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
@@ -2749,24 +2836,26 @@
         style: { fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-secondary, #888)', padding: '8px 0 4px' }
       }, 'Appearance'));
 
-      // ── Dark / Light Mode Toggle ──
-      var darkLightCard = el('div', { className: 'card card-glass', style: { padding: '12px 14px', marginBottom: '8px' } });
-      var darkLightItem = el('div', {
-        className: 'more-menu-item', style: { cursor: 'pointer', padding: '0' },
-        onClick: function() {
-          AppState.isDark = !AppState.isDark;
-          safeLSSet('dds_isDark', AppState.isDark);
-          UnifiedTheme.apply();
-          _handleTabNav(role, moreTab);
-        }
-      });
-      darkLightItem.appendChild(el('span', { className: 'more-menu-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
-      var dlText = el('div', { style: { flex: '1' } });
-      dlText.appendChild(el('div', { className: 'more-menu-label' }, AppState.isDark ? 'Light Mode' : 'Dark Mode'));
-      dlText.appendChild(el('div', { className: 'more-menu-desc' }, AppState.isDark ? 'Switch to light theme' : 'Switch to dark theme'));
-      darkLightItem.appendChild(dlText);
-      darkLightCard.appendChild(darkLightItem);
-      container.appendChild(darkLightCard);
+      // ── Dark / Light Mode Toggle (hidden for single-mode themes) ──
+      if (!UnifiedTheme.isSingleMode()) {
+        var darkLightCard = el('div', { className: 'card card-glass', style: { padding: '12px 14px', marginBottom: '8px' } });
+        var darkLightItem = el('div', {
+          className: 'more-menu-item', style: { cursor: 'pointer', padding: '0' },
+          onClick: function() {
+            AppState.isDark = !AppState.isDark;
+            safeLSSet('dds_isDark', AppState.isDark);
+            UnifiedTheme.apply();
+            _handleTabNav(role, moreTab);
+          }
+        });
+        darkLightItem.appendChild(el('span', { className: 'more-menu-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
+        var dlText = el('div', { style: { flex: '1' } });
+        dlText.appendChild(el('div', { className: 'more-menu-label' }, AppState.isDark ? 'Light Mode' : 'Dark Mode'));
+        dlText.appendChild(el('div', { className: 'more-menu-desc' }, AppState.isDark ? 'Switch to light theme' : 'Switch to dark theme'));
+        darkLightItem.appendChild(dlText);
+        darkLightCard.appendChild(darkLightItem);
+        container.appendChild(darkLightCard);
+      }
 
       // ── Visual Style Picker (mobile) ──
       var styleCard = el('div', { className: 'card card-glass', style: { padding: '12px 14px', marginBottom: '8px' } });
@@ -3014,6 +3103,17 @@
               if (!AppState.isDark) embedRoot.classList.add('light');
               else embedRoot.classList.remove('light');
             }
+            // Safety net: define pillToggle if script re-execution failed to define it
+            if (typeof window.pillToggle !== 'function') {
+              window.pillToggle = function(id, btn) {
+                var target = document.getElementById(id);
+                if (!target) return;
+                var isOpen = target.style.display !== 'none';
+                target.style.display = isOpen ? 'none' : 'block';
+                btn.textContent = btn.textContent.replace(isOpen ? '\u25BE' : '\u25B8', isOpen ? '\u25B8' : '\u25BE');
+                btn.setAttribute('aria-expanded', String(!isOpen));
+              };
+            }
             // Safety net: ensure org chart init runs even if DOMContentLoaded already fired
             if (typeof window.initDesktop === 'function') {
               try { window.initDesktop(); } catch (_e) { /* already ran or not available */ }
@@ -3028,8 +3128,8 @@
     }
 
     /**
-     * Agency Org Chart — loads agency_org_chart.html lazily.
-     * Agency structure, budget, personnel hierarchy.
+     * Agency Org Chart (MADDS) — loads agency_org_chart.html lazily.
+     * Agency structure, budget, personnel, hierarchy.
      */
     function renderAgencyOrgChart(appContainer, role) {
       var mySwitch = _navSwitchId;
@@ -3071,6 +3171,52 @@
             container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load agency org chart.'));
           })
           .getAgencyOrgChartHtml();
+      });
+    }
+
+    /**
+     * POMS Reference — loads poms_reference.html lazily, same pattern as org chart.
+     * Contains 78 POMS sections, 17 flowcharts, search, ratings, bookmarks, notes.
+     */
+    function renderPOMSReference(appContainer, role) {
+      var mySwitch = _navSwitchId;
+      var myGen = _renderGeneration; // H7: capture render generation at request time
+      renderPageLayout(appContainer, role, 'poms', function(container) {
+        showLoading(container);
+        // Set container to fill height for POMS app shell
+        container.style.height = 'calc(100vh - 56px)';
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+        google.script.run
+          .withSuccessHandler(function(html) {
+            if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; // user already navigated away
+            container.innerHTML = '';
+            var wrap = el('div');
+            wrap.style.height = '100%';
+            wrap.innerHTML = html;
+            container.appendChild(wrap);
+            // Sync POMS theme with AppState dark/light mode
+            var pomsRoot = wrap.querySelector('.poms-root');
+            if (pomsRoot) {
+              if (AppState.isDark) pomsRoot.classList.add('poms-dark');
+              else pomsRoot.classList.remove('poms-dark');
+            }
+            // Re-execute <script> tags from poms_reference.html
+            wrap.querySelectorAll('script').forEach(function(old) {
+              try {
+                var s = document.createElement('script');
+                s.textContent = old.textContent;
+                old.parentNode.replaceChild(s, old);
+              } catch (scriptErr) {
+                console.error('POMS script re-execution failed:', scriptErr);
+              }
+            });
+          })
+          .withFailureHandler(function(err) {
+            container.innerHTML = '';
+            container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load POMS Reference.'));
+          })
+          .getPOMSReferenceHtml();
       });
     }
 
@@ -3198,8 +3344,8 @@
       if (!_isSplitSecondary) window.scrollTo(0, 0);
 
       // Handle "More" menus for both roles (mobile bottom-nav)
-      if (tabId === 'more' || tabId === '_member_more') { _hideAllVisiblePanes(); _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
-      if (tabId === 'more_steward' || tabId === '_steward_more') { _hideAllVisiblePanes(); _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
+      if (tabId === 'more' || tabId === '_member_more') { AppState.activeTab = 'more'; _hideAllVisiblePanes(); _navProgressDone(); renderMemberMore(app); _activePane = _layoutCache.content; return; }
+      if (tabId === 'more_steward' || tabId === '_steward_more') { AppState.activeTab = 'more_steward'; _hideAllVisiblePanes(); _navProgressDone(); renderStewardMore(app); _activePane = _layoutCache.content; return; }
 
       // ── SPLIT VIEW: secondary panel rendering ──
       if (_isSplitSecondary && _layoutCache.splitSecondary) {
@@ -3270,6 +3416,15 @@
         _navProgressDone();
         return;
       }
+      if (tabId === 'poms') {
+        _hideAllVisiblePanes();
+        _splitRenderTarget = 'primary';
+        renderPOMSReference(app, role);
+        _activePane = _layoutCache.content;
+        _navProgressDone();
+        return;
+      }
+
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 
@@ -3410,9 +3565,11 @@
           case 'cases': return renderMyCases;
           case 'profile': return renderUpdateProfile;
           case 'resources': return renderMemberResources;
+          case 'workload': return renderWorkloadTracker;
           case 'weeklyq': // legacy deep-link
           case 'polls': return renderPollsPage;
           case 'survey': return renderSurveyResultsPage;
+          case 'surveyform': return renderSurveyFormPage;
           case 'unionstats': return renderUnionStatsPage;
           case 'events': return renderEventsPage;
           case 'stewarddirectory': return renderStewardContact;
@@ -3451,6 +3608,7 @@
           case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
           case 'timeline': return renderStewardTimelinePage;
           case 'mentorship': return renderMentorshipPage;
+          case 'workload': return renderWorkloadTracker;
           case 'accesslog': return renderAccessLogPage;
           case 'engagement': return renderEngagementDashboard;
           case 'failsafe': return renderFailsafePage;
@@ -4545,45 +4703,9 @@
         // ============================================================================
         // OFFLINE MODE (v4.36.0 — Feature 10)
         // ============================================================================
+        // Offline mode v4.36.0 — banner + queue drain handled by _showOfflineBanner/_hideOfflineBanner (line 855).
+        // This IIFE only adds the visibility-based refresh and localStorage caching below.
         (function() {
-          function _updateOnlineStatus() {
-            var banner = document.getElementById('_offline-banner');
-            if (!navigator.onLine) {
-              if (!banner) {
-                banner = el('div', {
-                  id: '_offline-banner',
-                  style: { position: 'fixed', top: '0', left: '0', right: '0', padding: '8px 16px', background: '#f97316', color: '#fff', textAlign: 'center', fontSize: '13px', fontWeight: '600', zIndex: '9999' }
-                }, 'You are offline. Showing cached data. Changes will sync when reconnected.');
-                document.body.prepend(banner);
-              }
-              // Disable form buttons
-              document.querySelectorAll('.btn-primary, .btn-secondary').forEach(function(btn) {
-                if (!btn.dataset.offlineDisabled) {
-                  btn.dataset.offlineDisabled = 'true';
-                  btn.dataset.origDisabled = btn.disabled ? 'true' : '';
-                  btn.disabled = true;
-                }
-              });
-            } else {
-              if (banner) banner.remove();
-              // Re-enable buttons
-              document.querySelectorAll('[data-offline-disabled]').forEach(function(btn) {
-                btn.disabled = btn.dataset.origDisabled === 'true';
-                delete btn.dataset.offlineDisabled;
-                delete btn.dataset.origDisabled;
-              });
-            }
-          }
-
-          window.addEventListener('online', function() {
-            _updateOnlineStatus();
-            // Re-fetch data on reconnect
-            if (typeof AppState !== 'undefined' && AppState.activeRole) {
-              var initFn = AppState.activeRole === 'steward' ? 'dataGetStewardDashboardInit' : 'dataGetMemberHomeInit';
-              try { google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {})[initFn](SESSION_TOKEN); } catch(_) { /* offline reconnect — best effort */ }
-            }
-          });
-          window.addEventListener('offline', _updateOnlineStatus);
 
           // v4.44.0: VISIBILITY-BASED REFRESH — When user returns to this tab
           // after being away 30+ minutes, silently refresh batch data in the

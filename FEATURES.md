@@ -3,7 +3,7 @@
 **Version:** 4.30.0 | **Codename:** Review Findings Complete
 **Last Updated:** March 2026
 
-> **New in v4.30.0:** 41-item code review implementation, unified theme engine (8 visual styles), performance/scale hardening (8K+ members), resilience hardening (circuit breaker, retry, error boundaries), 2,900+ tests across 58 suites
+> **New in v4.30.0:** 41-item code review implementation, unified theme engine (6 visual styles), performance/scale hardening (8K+ members), resilience hardening (circuit breaker, retry, error boundaries), 2,900+ tests across 58 suites
 
 This document provides a comprehensive, searchable reference of all features in the Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -956,7 +956,7 @@ Organization chart visualization for the MADDS org chart.
 | **4.30.0** | 41-item code review implementation, console.error migration, structured error codes, 2,900+ tests |
 | **4.29.0** | Timeline 7 bug fixes, notification 6 fixes, resilience hardening (3 tiers), error boundaries |
 | **4.28.0** | Speed optimizations (10 items), batch init, DataCache, pagination, unified color themes, OLED dark mode |
-| **4.27.0** | Unified Theme Engine: 8 visual styles (cyberpunk CRT, blob lava, shatter, brutalist, etc.), neon zones |
+| **4.27.0** | Unified Theme Engine: 6 visual styles (cyberpunk CRT, shatter, glass archive, editorial, analog commander), neon zones |
 | **4.26.0** | Timeline refactor (dynamic categories, split steward/member views) |
 | **4.25.14** | ~200 unused functions removed, shimmer skeleton, progress bar system, org chart collapse defaults |
 | **4.24.4** | Auth sweep complete across all web dashboard APIs, QAForum wrapper fixes, Q_COLS API exposed |

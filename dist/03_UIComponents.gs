@@ -135,6 +135,14 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('📁 Open Google Drive', 'openGoogleDrive'))
 
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData')
+      .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
+      .addSeparator()
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))
+
     .addSubMenu(ui.createMenu('📋 Surveys & Polls')
       .addItem('📂 Open New Survey Period', 'menuOpenNewSurveyPeriod')
       .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
@@ -205,10 +213,6 @@ function createDashboardMenu() {
       .addItem('📧 CC Connection Status', 'showConstantContactStatus')
       .addItem('🔌 CC Disconnect', 'disconnectConstantContact')
       .addSeparator()
-      .addItem('📊 Setup Looker Studio Sheets', 'setupLookerIntegration')
-      .addItem('📊 Refresh Looker Data', 'refreshLookerData')
-      .addItem('📊 Refresh Looker Anon Data', 'refreshLookerAnonData')
-      .addSeparator()
       .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
       .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
 
@@ -247,6 +251,7 @@ function createDashboardMenu() {
       .addItem('--- INITIALIZE ALL ---', 'initializeDashboard')
       .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
       .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets')
+      .addItem('⚙️ Workload: Initialize Sheets', 'initWorkloadTrackerSheets')
       .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addSeparator()
@@ -255,6 +260,7 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
+      .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem')
       .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
       .addSeparator()
       .addItem('--- SYNC & REFRESH ---', 'syncAllData')
@@ -285,6 +291,7 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
       .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets')
+      .addItem('⚙️ Workload: Initialize Sheets', 'initWorkloadTrackerSheets')
       .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
       .addSeparator()
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
@@ -300,7 +307,9 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
-      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger'))
+      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
+      .addSeparator()
+      .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem'))
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
@@ -2072,7 +2081,7 @@ function sendMemberDashboardLink() {
       COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
-      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your SolidBase Access", body);
+      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
       ui.alert('Dashboard access link sent to ' + email);
     } catch (e) {
       ui.alert('Error sending email: ' + e.message);
@@ -3746,11 +3755,11 @@ function getWelcomeWizardHtml_() {
     '<script>' +
     'var step = 0, totalSteps = 4;' +
     'var steps = [' +
-    '  { title: "Welcome to SolidBase!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
+    '  { title: "Welcome to Your Union Dashboard!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
     '  { title: "Step 1: Organization Setup", desc: "Open the <strong>Config</strong> tab and fill in:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Organization Name</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Local Number</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Time Zone</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Contact Email</div>" },' +
     '  { title: "Step 2: Add Your First Members", desc: "Open <strong>Member Directory</strong> and add at least one member:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Add yourself as the first steward</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Import or manually add members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Assign steward roles</div>" },' +
     '  { title: "Step 3: Explore Key Features", desc: "Try these essential features:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Open Union Hub menu — explore Search & Members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Create a test grievance case</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Check the Getting Started tab for more guidance</div>" },' +
-    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using SolidBase!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
+    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using your Union Dashboard!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
     '];' +
     'totalSteps = steps.length;' +
     'function render() {' +

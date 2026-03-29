@@ -1,6 +1,6 @@
 # Strategic Command Center
 
-**Version 4.30.0** | SolidBase for Google Sheets
+**Version 4.30.0** | Union Steward Dashboard for Google Sheets
 
 A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 43-file modular architecture, 8 HTML templates, and a full SPA web dashboard. 2,900+ automated tests across 58 suites.
 
@@ -71,8 +71,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Woop91/SolidBase.git
-   cd SolidBase
+   git clone https://github.com/Woop91/DDS-Dashboard.git
+   cd DDS-Dashboard
    ```
 
 2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
@@ -97,8 +97,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone and install:**
 
    ```bash
-   git clone https://github.com/Woop91/SolidBase.git
-   cd SolidBase
+   git clone https://github.com/Woop91/DDS-Dashboard.git
+   cd DDS-Dashboard
    npm install
    ```
 
@@ -342,7 +342,7 @@ After that, you have **43 production `.gs` files + 8 `.html` files** and a clean
 - Column auto-migration for Member Directory and Grievance Log
 
 ### Unified Theme Engine (v4.27.0)
-- 8 visual styles: default, cyberpunk, blob lava, shatter, liquid pour, brutalist, retro OS, comic
+- 6 visual styles: default, cyberpunk, shatter, glass archive, editorial, analog commander
 - Multi-neon cyberpunk with zone-specific colors (sidebar, title, buttons, table, KPIs)
 - Cyberpunk CRT overlays, pixel terminal fonts, and neon color picker
 - Sheet themes + webapp accent colors linked via accentHue (8 color themes)
@@ -534,8 +534,8 @@ These sheets power the auto-updating columns. You don't need to edit them.
 ### Setup
 
 ```bash
-git clone https://github.com/Woop91/SolidBase.git
-cd SolidBase
+git clone https://github.com/Woop91/DDS-Dashboard.git
+cd DDS-Dashboard
 npm install
 ```
 
@@ -709,7 +709,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 | **4.29.0** | 2026-03-14 | Timeline 7 bug fixes, notification 6 fixes, auto-expire badge, archive pill safety |
 | **4.28.8** | 2026-03-14 | Unified color theme system, OLED dark mode, auth sweep (100+ endpoints), tab race fix |
 | **4.28.0** | 2026-03-14 | Speed optimizations (10 items), batch init endpoint, DataCache, pagination, PropertiesService monitoring |
-| **4.27.0** | 2026-03-15 | Unified Theme Engine: 8 visual styles, cyberpunk CRT overlays, multi-neon zones, lazy-load fonts |
+| **4.27.0** | 2026-03-15 | Unified Theme Engine: 6 visual styles, cyberpunk CRT overlays, multi-neon zones, lazy-load fonts |
 | **4.26.0** | 2026-03-13 | Timeline refactor (dynamic categories, split steward/member views) |
 | **4.25.14** | 2026-03-13 | ~200 unused functions removed, org chart collapse defaults, progress bar system, shimmer skeleton |
 | **4.24.4** | 2026-03-07 | Auth sweep complete, Q_COLS API, FlashPolls removed, QAForum double-paren fix |

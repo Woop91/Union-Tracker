@@ -849,7 +849,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -944,7 +944,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -1013,7 +1013,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
@@ -1785,6 +1785,76 @@ function devRequestPINReset(email) {
  * @param {string} memberEmail  - Email of the member to generate PIN for
  * @returns {Object} { success, pin, memberName, isReset, message }
  */
+/**
+ * Member sets their own PIN from the web app PIN Setup page.
+ * Requires member auth via session token. PIN must be exactly 6 digits.
+ *
+ * @param {string} sessionToken - Member's session token
+ * @param {string} pin          - The new 6-digit PIN chosen by the member
+ * @param {string} [idemKey]    - Idempotency key (optional)
+ * @returns {Object} { success, message }
+ */
+function memberSetOwnPIN(sessionToken, pin, idemKey) {
+  // ── Auth: resolve member email from session ────────────────────────────────
+  var email;
+  try {
+    email = Session.getActiveUser().getEmail();
+    if (!email && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
+      email = Auth.resolveEmailFromToken(sessionToken);
+    }
+  } catch (_e) {
+    if (typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
+      email = Auth.resolveEmailFromToken(sessionToken);
+    }
+  }
+  if (!email) return { success: false, message: 'Authentication required.' };
+  email = String(email).trim().toLowerCase();
+
+  // ── Validate PIN ──────────────────────────────────────────────────────────
+  pin = String(pin || '').trim();
+  if (!/^\d{6}$/.test(pin)) {
+    return { success: false, message: 'PIN must be exactly 6 digits.' };
+  }
+
+  // ── Find member row ───────────────────────────────────────────────────────
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) return { success: false, message: 'Member directory not found.' };
+
+  var data     = sheet.getDataRange().getValues();
+  var emailCol = MEMBER_COLS.EMAIL     - 1;
+  var idCol    = MEMBER_COLS.MEMBER_ID - 1;
+  var pinCol   = PIN_CONFIG.PIN_COLUMN - 1;
+
+  var memberRow = -1;
+  var memberId  = '';
+  var hadPIN    = false;
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][emailCol] || '').trim().toLowerCase() !== email) continue;
+    memberRow = i + 1;
+    memberId  = String(data[i][idCol] || '').trim().toUpperCase();
+    hadPIN    = String(data[i][pinCol] || '').trim().length > 0;
+    break;
+  }
+
+  if (memberRow === -1) return { success: false, message: 'Member not found.' };
+  if (!memberId) return { success: false, message: 'No Member ID on file — cannot set PIN.' };
+
+  // ── Hash and store ────────────────────────────────────────────────────────
+  var hashedPin = hashPIN(pin, memberId);
+  sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
+
+  var action = hadPIN ? 'PIN_RESET_BY_MEMBER' : 'PIN_SET_BY_MEMBER';
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent(action, { memberId: memberId, memberEmail: email });
+  }
+
+  return { success: true, message: hadPIN ? 'PIN updated successfully.' : 'PIN set successfully.' };
+}
+
 function devStewardManageMemberPIN(sessionToken, memberEmail) {
   // ── Auth: steward/admin only ───────────────────────────────────────────────
   var stewardEmail = _requireStewardAuth(sessionToken);

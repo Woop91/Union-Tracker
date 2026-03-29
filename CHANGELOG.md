@@ -108,7 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **PIN Login: GA release** — PIN login option now available in all environments (dev and production). Removed IS_DEV_MODE gates from login screen, steward PIN management, and server-side comments.
 - **Login page: black background** — Auth screen now uses a solid black background with glass card backdrop blur and enhanced box shadow.
 - **Login page: quote styling** — Quotes are now larger (15px), bolder (weight 500), fully white with text glow for better visibility against the black background.
-- **SolidBase branding** — Default org name fallback changed from "Dashboard" to "SolidBase" for the login page.
+- **DDS branding** — Default org name fallback changed from "Dashboard" to "DDS" for the DDS repo login page.
 
 ### Added
 - **Auth page: isDevMode flag** — `_serveAuth()` now includes `isDevMode` in PAGE_DATA for consistency with dashboard pages.
@@ -166,7 +166,7 @@ All other security features (ACCESS_CONTROL, DASHBOARD_MEMBER_AUTH, ERROR_LOGGIN
 - **BUG-TASKS-03: Steward task completion** — `createMemberTask` was writing `memberEmail` to column 2 instead of `stewardEmail`.
 - **Tab stacking: panels showing side-by-side** — Added `_hideAllVisiblePanes()` helper.
 - **Switch to Member: dead sidebar button** — Resets cached state before view switch.
-- **Comic theme: bold text letter-spacing** — Increased from `0.5px` to `1.5px`.
+- **Theme cleanup** — Removed 5 novelty themes (Comic, Brutalist, Retro OS, Liquid Pour, Blob Lava); 6 themes remain.
 - **getMyFeedback: dead FEEDBACK_COLS.TYPE reference** — Now aliases to CATEGORY.
 - **Mobile: Missing theme options** — Added dark/light toggle and color picker to mobile More menu.
 - **Null guards: getSheetByName()** — Added guards to ~40 unguarded calls across 16 files.

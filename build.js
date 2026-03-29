@@ -53,7 +53,7 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules (load after all DDS modules)
+  // Web-dashboard SPA modules (load after all core modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -301,7 +301,7 @@ const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds.
-// SolidBase also excludes TestRunner/WebAppTests (DDS keeps them for in-app testing).
+// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {
@@ -321,7 +321,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 41 .gs + 17 .html + 1 appsscript.json = 59 files
+  // Current prod capacity: 38 .gs + 15 .html + 1 appsscript.json = 54 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
   const gsFileCount = isProd

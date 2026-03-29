@@ -60,6 +60,7 @@ function buildDevMenu() {
     .addItem('Initialize All Refresh Functions', 'devWrap_InitAllRefresh')
     .addItem('Initialize Survey Engine', 'devWrap_InitSurveyEngine')
     .addItem('Initialize Poll Sheets', 'devWrap_InitPollSheets')
+    .addItem('Workload: Initialize Sheets', 'devWrap_InitWorkloadSheets')
     .addSeparator()
 
     // SECTION B — Group 2: Refresh & Data Ops
@@ -78,6 +79,7 @@ function buildDevMenu() {
     .addItem('Install Quarterly Trigger', 'devWrap_InstallQuarterlyTrigger')
     .addItem('Install Weekly Reminder Trigger', 'devWrap_InstallWeeklyReminderTrigger')
     .addItem('Install Community Poll Draw Trigger', 'devWrap_InstallCommunityPollTrigger')
+    .addItem('Workload: Setup Reminders', 'devWrap_WorkloadSetupReminders')
     .addItem('Install onOpen Deferred Trigger', 'devWrap_InstallOnOpenDeferred')
     .addSeparator()
 
@@ -134,7 +136,8 @@ function devRunAll_Initialize() {
     { name: 'Initialize All Install Functions', fn: initializeDashboard },
     { name: 'Initialize All Refresh Functions', fn: refreshAllFormulas },
     { name: 'Initialize Survey Engine', fn: initSurveyEngine },
-    { name: 'Initialize Poll Sheets', fn: wqInitSheets }
+    { name: 'Initialize Poll Sheets', fn: wqInitSheets },
+    { name: 'Workload: Initialize Sheets', fn: initWorkloadTrackerSheets }
   ]);
 }
 
@@ -159,6 +162,7 @@ function devRunAll_Triggers() {
     { name: 'Install Quarterly Trigger', fn: setupQuarterlyTrigger },
     { name: 'Install Weekly Reminder Trigger', fn: setupWeeklyReminderTrigger },
     { name: 'Install Community Poll Draw Trigger', fn: setupCommunityPollTrigger },
+    { name: 'Workload: Setup Reminders', fn: setupWorkloadReminderSystem },
     { name: 'Install onOpen Deferred Trigger', fn: setupOpenDeferredTrigger }
   ]);
 }
@@ -229,6 +233,11 @@ function devWrap_InitPollSheets() {
   devWrap_('Initialize Poll Sheets', wqInitSheets);
 }
 
+/** Dev menu: initializes workload tracker sheets. */
+function devWrap_InitWorkloadSheets() {
+  devWrap_('Workload: Initialize Sheets', initWorkloadTrackerSheets);
+}
+
 // ============================================================================
 // INDIVIDUAL WRAPPERS — Group 2: Refresh & Data Ops
 // ============================================================================
@@ -295,6 +304,11 @@ function devWrap_InstallWeeklyReminderTrigger() {
 /** Dev menu: installs the community poll draw trigger. */
 function devWrap_InstallCommunityPollTrigger() {
   devWrap_('Install Community Poll Draw Trigger', setupCommunityPollTrigger);
+}
+
+/** Dev menu: sets up workload reminder system. */
+function devWrap_WorkloadSetupReminders() {
+  devWrap_('Workload: Setup Reminders', setupWorkloadReminderSystem);
 }
 
 /** Dev menu: installs the onOpen deferred trigger. */

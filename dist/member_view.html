@@ -9,7 +9,7 @@ function _renderPINRestricted(appContainer, sectionLabel) {
  content.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '12px' } }, 'Personal Information Restricted'));
  content.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6', maxWidth: '360px', margin: '0 auto 24px' } },
   'PIN login provides limited access. To view ' + sectionLabel.toLowerCase() + ', sign in with Google or use an email sign-in link.'));
- var loginBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '8px' },
+ var loginBtn = el('button', { className: 'btn btn-primary ' + _TB, style: { marginTop: '8px' },
   onClick: function() { handleLogout(); }
  }, 'Sign In with Full Access');
  content.appendChild(loginBtn);
@@ -101,8 +101,8 @@ function _generateVCard(name, email, phone, org, title) {
 function _memberHeader(container, title, subtitle) {
  var header = el('div', { className: 'page-header' });
  var headerLeft = el('div', { className: 'page-header-left' });
- headerLeft.appendChild(el('div', { className: 'page-title' }, title));
- if (subtitle) headerLeft.appendChild(el('div', { className: 'page-subtitle' }, subtitle));
+ headerLeft.appendChild(el('div', { className: 'page-title ' + _TD }, title));
+ if (subtitle) headerLeft.appendChild(el('div', { className: 'page-subtitle ' + _TL }, subtitle));
  header.appendChild(headerLeft);
 
  var headerRight = el('div', { className: 'page-header-right' });
@@ -135,7 +135,7 @@ function _renderDuesGate(appContainer, featureName, backFn) {
  renderPageLayout(appContainer, 'member', 'dues-gate', function(container) {
  _memberHeader(container, featureName);
  var content = el('div', { className: 'content' });
- var card = el('div', { className: 'card', style: { textAlign: 'center', padding: '32px 24px' } });
+ var card = el('div', { className: 'card ' + _TC, style: { textAlign: 'center', padding: '32px 24px' } });
  card.appendChild(el('div', { style: { fontSize: '40px', marginBottom: '12px' } }, '\uD83D\uDD12'));
  card.appendChild(el('h3', { style: { margin: '0 0 10px', fontSize: '17px' } }, 'Membership Dues Required'));
  card.appendChild(el('p', { style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6', margin: '0 0 20px' } },
@@ -193,7 +193,7 @@ function _renderOnboardingWizard(container) {
  var skipBtn = el('button', { className: 'btn', style: { background: 'transparent', color: 'var(--muted)', border: 'none', fontSize: '13px', cursor: 'pointer' }, onClick: function() {
  _dismissOnboarding();
  } }, 'Skip for now');
- var nextBtn = el('button', { className: 'btn btn-primary', onClick: function() { handleNext(); } }, 'Next');
+ var nextBtn = el('button', { className: 'btn btn-primary ' + _TB, onClick: function() { handleNext(); } }, 'Next');
  actionsRow.appendChild(backBtn);
  actionsRow.appendChild(skipBtn);
  actionsRow.appendChild(nextBtn);
@@ -242,13 +242,13 @@ function _renderOnboardingWizard(container) {
   nextBtn.textContent = 'Next';
   var pinGroup = el('div', { className: 'form-group' });
   pinGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-pin' }, 'PIN (4\u20136 digits)'));
-  var pinInput = el('input', { id: 'onboard-pin', className: 'form-input', type: 'password', placeholder: 'Enter PIN', maxLength: '6', inputMode: 'numeric', autocomplete: 'new-password' });
+  var pinInput = el('input', { id: 'onboard-pin', className: 'form-input ' + _TI, type: 'password', placeholder: 'Enter PIN', maxLength: '6', inputMode: 'numeric', autocomplete: 'new-password' });
   pinGroup.appendChild(pinInput);
   stepContent.appendChild(pinGroup);
 
   var confirmGroup = el('div', { className: 'form-group' });
   confirmGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-pin-confirm' }, 'Confirm PIN'));
-  var confirmInput = el('input', { id: 'onboard-pin-confirm', className: 'form-input', type: 'password', placeholder: 'Re-enter PIN', maxLength: '6', inputMode: 'numeric', autocomplete: 'new-password' });
+  var confirmInput = el('input', { id: 'onboard-pin-confirm', className: 'form-input ' + _TI, type: 'password', placeholder: 'Re-enter PIN', maxLength: '6', inputMode: 'numeric', autocomplete: 'new-password' });
   confirmGroup.appendChild(confirmInput);
   stepContent.appendChild(confirmGroup);
 
@@ -261,13 +261,13 @@ function _renderOnboardingWizard(container) {
   nextBtn.textContent = 'Next';
   var phoneGroup = el('div', { className: 'form-group' });
   phoneGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-phone' }, 'Phone Number'));
-  var phoneInput = el('input', { id: 'onboard-phone', className: 'form-input', type: 'tel', placeholder: '(555) 123-4567' });
+  var phoneInput = el('input', { id: 'onboard-phone', className: 'form-input ' + _TI, type: 'tel', placeholder: '(555) 123-4567' });
   phoneGroup.appendChild(phoneInput);
   stepContent.appendChild(phoneGroup);
 
   var addrGroup = el('div', { className: 'form-group' });
   addrGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-address' }, 'Street Address'));
-  var addrInput = el('input', { id: 'onboard-address', className: 'form-input', type: 'text', placeholder: '123 Main St' });
+  var addrInput = el('input', { id: 'onboard-address', className: 'form-input ' + _TI, type: 'text', placeholder: '123 Main St' });
   addrGroup.appendChild(addrInput);
   stepContent.appendChild(addrGroup);
 
@@ -498,7 +498,7 @@ function renderMemberHome(appContainer) {
   banner.appendChild(el('button', {
    className: 'survey-banner-btn',
    onClick: function() {
-   renderSurveyFormPage(document.getElementById('app'));
+   _handleTabNav('member', 'surveyform');
    }
   }, 'Take Survey'));
   
@@ -518,12 +518,12 @@ function renderMemberHome(appContainer) {
 
  
  if (IS_PIN_SESSION) {
-  var pinNotice = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '20px', textAlign: 'center' } });
+  var pinNotice = el('div', { className: 'card card-glass ' + _TC, style: { margin: '0 16px 14px', padding: '20px', textAlign: 'center' } });
   pinNotice.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, '\uD83D\uDD12'));
   pinNotice.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Limited Access Mode'));
   pinNotice.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6' } },
   'You\u2019re signed in with a PIN. Personal information (cases, profile, steward contact) is only available when signed in with Google or email link.'));
-  pinNotice.appendChild(el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' },
+  pinNotice.appendChild(el('button', { className: 'btn btn-primary ' + _TB, style: { marginTop: '12px', fontSize: '12px' },
   onClick: function() { handleLogout(); }
   }, 'Sign In with Full Access'));
   container.appendChild(pinNotice);
@@ -535,7 +535,7 @@ function renderMemberHome(appContainer) {
  if (activeG) {
   renderGrievanceCard(container, activeG);
  } else {
-  var noCase = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px', textAlign: 'center' } });
+  var noCase = el('div', { className: 'card card-glass ' + _TC, style: { margin: '0 16px 14px', padding: '16px', textAlign: 'center' } });
   noCase.appendChild(el('div', { style: { fontSize: '20px', marginBottom: '6px' } }, '\u2705'));
   noCase.appendChild(el('div', { className: 'text-base-muted' }, 'No active cases'));
   container.appendChild(noCase);
@@ -547,8 +547,8 @@ function renderMemberHome(appContainer) {
  DataCache.cachedCall('memberHistory_' + CURRENT_USER.email, 'dataGetMemberGrievanceHistory', [SESSION_TOKEN], function(result) {
   if (!result || !result.success || !result.history || result.history.length === 0) return;
   var items = result.history.slice(0, 2);
-  var previewCard = el('div', { className: 'card card-glass', style: { padding: '14px 16px' } });
-  previewCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' } }, 'Past Cases'));
+  var previewCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px 16px' } });
+  previewCard.appendChild(el('div', { className: _TL, style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' } }, 'Past Cases'));
   items.forEach(function(h) {
   var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' } });
   row.appendChild(el('span', { className: 'text-sm-text' }, (h.grievanceId || 'Case') + (h.issueCategory ? ' \u00B7 ' + h.issueCategory : '')));
@@ -573,8 +573,8 @@ function renderMemberHome(appContainer) {
  });
 
  
- var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
- stewardCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Your ' + CONFIG.stewardLabel));
+ var stewardCard = el('div', { className: 'card card-glass ' + _TC, style: { margin: '0 16px 14px', padding: '16px' } });
+ stewardCard.appendChild(el('div', { className: _TL, style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Your ' + CONFIG.stewardLabel));
  var stewardName = el('div', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Loading...');
  stewardCard.appendChild(stewardName);
  var stewardActions = el('div', { className: 'flex-wrap-gap' });
@@ -586,26 +586,34 @@ function renderMemberHome(appContainer) {
   stewardName.textContent = info.name || info.email;
   stewardActions.appendChild(el('a', {
    href: 'mailto:' + info.email,
-   style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+   target: '_blank',
+   style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block', textDecoration: 'none', cursor: 'pointer' }
   }, '\u2709\uFE0F ' + info.email));
   if (info.phone) {
    stewardActions.appendChild(el('a', {
    href: 'tel:' + info.phone,
-   style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+   target: '_blank',
+   style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block', textDecoration: 'none', cursor: 'pointer' }
    }, '\uD83D\uDCDE ' + info.phone));
   }
   } else {
   stewardName.textContent = 'Not assigned';
   stewardActions.appendChild(el('button', {
-   style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+   style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', cursor: 'pointer' },
    onClick: function() { _handleTabNav('member', 'stewarddirectory'); }
   }, 'Find a ' + CONFIG.stewardLabel));
   }
+ }, function() {
+  stewardName.textContent = 'Unable to load';
+  stewardActions.appendChild(el('button', {
+  style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', cursor: 'pointer' },
+  onClick: function() { _handleTabNav('member', 'stewarddirectory'); }
+  }, 'Find a ' + CONFIG.stewardLabel));
  });
  } 
 
  
- var statsStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
+ var statsStrip = el('div', { className: 'kpi-grid ' + _TG, style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
  var notifKpi = el('div', { className: 'kpi-card card-fade-in' });
  notifKpi.appendChild(el('div', { className: 'kpi-label' }, 'Notifications'));
  var notifVal = el('div', { className: 'kpi-value' }, '--');
@@ -644,7 +652,7 @@ function renderMemberHome(appContainer) {
 
  
  var eventsSection = el('div', { className: 'content mb-14' });
- eventsSection.appendChild(el('h3', { className: 'section-title' }, 'Upcoming Events'));
+ eventsSection.appendChild(el('h3', { className: 'section-title ' + _TL }, 'Upcoming Events'));
  var eventsArea = el('div');
  eventsSection.appendChild(eventsArea);
  container.appendChild(eventsSection);
@@ -665,7 +673,7 @@ function renderMemberHome(appContainer) {
   return;
   }
   events.slice(0, 3).forEach(function(ev, i) {
-  var card = el('div', { className: 'card card-glass card-fade-in card-accent-border', style: { padding: '14px 16px', animationDelay: (i * 0.1) + 's' } });
+  var card = el('div', { className: 'card card-glass card-fade-in card-accent-border ' + _TC, style: { padding: '14px 16px', animationDelay: (i * 0.1) + 's' } });
   card.appendChild(el('div', { className: 'display-title-sm' }, ev.title));
   var startDate = new Date(ev.startTime);
   var dateStr = startDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -694,7 +702,7 @@ function renderMemberHome(appContainer) {
 
  
  var res = el('div', { className: 'content' });
- res.appendChild(el('h3', { className: 'section-title' }, 'Quick Links'));
+ res.appendChild(el('h3', { className: 'section-title ' + _TL }, 'Quick Links'));
  var links = [
   { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights', tab: 'resources' },
   { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case', tab: 'cases' },
@@ -702,7 +710,7 @@ function renderMemberHome(appContainer) {
  ];
  links.forEach(function(r) {
   var item = el('div', {
-  className: 'card card-glass card-clickable card-fade-in',
+  className: 'card card-glass card-clickable card-fade-in ' + _TC,
   style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', cursor: 'pointer' },
   onClick: function() { _handleTabNav('member', r.tab); }
   });
@@ -719,7 +727,7 @@ function renderMemberHome(appContainer) {
 }
 
 function _renderGrievanceFeedbackPrompt(container, pending) {
- var card = el('div', { className: 'card card-glass card-fade-in', style: { margin: '0 16px 14px', padding: '18px', border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.05)' } });
+ var card = el('div', { className: 'card card-glass card-fade-in ' + _TC, style: { margin: '0 16px 14px', padding: '18px', border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.05)' } });
 
  
  var header = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' } });
@@ -796,7 +804,7 @@ function _renderGrievanceFeedbackPrompt(container, pending) {
  
  var actions = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } });
  var submitBtn = el('button', {
- className: 'btn btn-primary',
+ className: 'btn btn-primary ' + _TB,
  style: { flex: '1', fontSize: '13px', padding: '10px' },
  onClick: function() {
   
@@ -851,13 +859,13 @@ function renderGrievanceCard(parentContainer, g) {
  var dl = g.deadlineDays;
  var dc = dl !== null && dl < 0 ? 'var(--danger)' : dl !== null && dl <= 3 ? 'var(--warning)' : dl !== null && dl <= 7 ? 'var(--info)' : 'var(--success)';
 
- var card = el('div', { className: 'card card-glass card-clickable', style: { margin: '0 16px 14px', padding: '22px', position: 'relative', overflow: 'hidden' },
+ var card = el('div', { className: 'card card-glass card-clickable ' + _TC, style: { margin: '0 16px 14px', padding: '22px', position: 'relative', overflow: 'hidden' },
  onClick: function() { renderGrievanceDetail(document.getElementById('app'), g); }
  });
 
  var sc = g.status === 'overdue' ? 'danger' : g.status === 'active' ? 'warning' : 'info';
  card.appendChild(el('div', { className: 'glow-bar ' + sc }));
- card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' } }, 'Your Active Grievance'));
+ card.appendChild(el('div', { className: _TL, style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' } }, 'Your Active Grievance'));
  card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, g.step || 'Grievance'));
  card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '14px' } }, g.id + ' \u00B7 Filed ' + (g.filed || 'N/A')));
 
@@ -899,7 +907,7 @@ function renderGrievanceDetail(appContainer, g) {
  var dl = g.deadlineDays;
  var dc = dl !== null && dl < 0 ? 'var(--danger)' : dl !== null && dl <= 3 ? 'var(--warning)' : dl !== null && dl <= 7 ? 'var(--info)' : 'var(--success)';
 
- var detailCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '20px', position: 'relative', overflow: 'hidden' } });
+ var detailCard = el('div', { className: 'card card-glass ' + _TC, style: { margin: '0 16px 14px', padding: '20px', position: 'relative', overflow: 'hidden' } });
  var sc = g.status === 'overdue' ? 'danger' : g.status === 'active' ? 'warning' : 'info';
  detailCard.appendChild(el('div', { className: 'glow-bar ' + sc, style: { top: '0', bottom: 'auto' } }));
 
@@ -926,7 +934,7 @@ function renderGrievanceDetail(appContainer, g) {
 
  
  var timelineSection = el('div', { style: { padding: '0 16px' } });
- timelineSection.appendChild(el('h3', { className: 'section-title' }, 'Timeline'));
+ timelineSection.appendChild(el('h3', { className: 'section-title ' + _TL }, 'Timeline'));
  var steps = [];
  if (g.filed) steps.push({ date: g.filed, event: 'Grievance filed', done: true });
  if (g.step) {
@@ -953,7 +961,7 @@ function renderGrievanceDetail(appContainer, g) {
  
  if (g.signatureStatus === 'Pending' && g.signatureToken) {
   var sigSection = el('div', { style: { padding: '0 16px', marginBottom: '14px' } });
-  var sigCard = el('div', { className: 'card card-glass', style: { padding: '20px', border: '1px solid rgba(217,119,6,.25)', background: 'rgba(217,119,6,.05)' } });
+  var sigCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '20px', border: '1px solid rgba(217,119,6,.25)', background: 'rgba(217,119,6,.05)' } });
   sigCard.appendChild(el('div', { style: { fontSize: '15px', fontWeight: '700', color: 'var(--warning)', marginBottom: '6px' } }, '\u270D\uFE0F Signature Required'));
   sigCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginBottom: '14px' } },
   'Your steward has prepared this grievance on your behalf. Please review the details above and sign to authorize filing.'));
@@ -972,7 +980,7 @@ function renderGrievanceDetail(appContainer, g) {
   container.appendChild(sigSection);
  } else if (g.signatureStatus === 'Signed') {
   var signedSection = el('div', { style: { padding: '0 16px', marginBottom: '14px' } });
-  var signedCard = el('div', { className: 'card card-glass', style: { padding: '16px', border: '1px solid rgba(5,150,105,.25)', background: 'rgba(5,150,105,.05)' } });
+  var signedCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '16px', border: '1px solid rgba(5,150,105,.25)', background: 'rgba(5,150,105,.05)' } });
   signedCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--success)' } }, '\u2713 Signed & Filed'));
   signedCard.appendChild(el('div', { className: 'text-xs-muted-mt-4' },
   'This grievance has been signed and officially filed.' + (g.signedDate ? ' Signed on ' + g.signedDate + '.' : '')));
@@ -986,8 +994,8 @@ function renderGrievanceDetail(appContainer, g) {
  
  if (g.steward) {
   var contactSection = el('div', { style: { padding: '12px 16px' } });
-  var contactCard = el('div', { className: 'card card-glass p-16' });
-  contactCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, CONFIG.stewardLabel));
+  var contactCard = el('div', { className: 'card card-glass p-16 ' + _TC });
+  contactCard.appendChild(el('div', { className: _TL, style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, CONFIG.stewardLabel));
   var cName = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Loading...');
   contactCard.appendChild(cName);
   var contactBtns = el('div', { className: 'flex-wrap-gap' });
@@ -1021,7 +1029,7 @@ function renderMyCases(appContainer) {
  var content = el('div', { className: 'content' });
  if (AppState.grievances.length === 0) {
   
-  var kyrCard = el('div', { className: 'card card-glass', style: { padding: '20px', marginBottom: '12px' } });
+  var kyrCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '20px', marginBottom: '12px' } });
   kyrCard.appendChild(el('div', { style: { fontSize: '28px', marginBottom: '8px', textAlign: 'center' } }, '\u2696\uFE0F'));
   kyrCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)', textAlign: 'center', marginBottom: '10px' } }, 'Know Your Rights'));
   var rights = [
@@ -1040,7 +1048,7 @@ function renderMyCases(appContainer) {
 
   
   var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
-  var startBtn = el('button', { className: 'btn btn-primary', style: { flex: '1', fontSize: '13px', padding: '12px' }, onClick: function() {
+  var startBtn = el('button', { className: 'btn btn-primary ' + _TB, style: { flex: '1', fontSize: '13px', padding: '12px' }, onClick: function() {
   _showGrievanceIntakeForm(content);
   } }, '\uD83D\uDCDD Start a Grievance');
   var folderBtn = el('button', { className: 'btn', style: { flex: '1', fontSize: '13px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }, onClick: function() {
@@ -1063,7 +1071,7 @@ function renderMyCases(appContainer) {
   // Active cases exist — show compact "Start New" action bar at top
   var newCaseBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px' } });
   newCaseBar.appendChild(el('button', {
-  className: 'btn btn-primary', style: { flex: '1', fontSize: '12px', padding: '9px' },
+  className: 'btn btn-primary ' + _TB, style: { flex: '1', fontSize: '12px', padding: '9px' },
   onClick: function() { content.innerHTML = ''; _showGrievanceIntakeForm(content); }
   }, '\uD83D\uDCDD Start New Grievance'));
   newCaseBar.appendChild(el('button', {
@@ -1094,7 +1102,7 @@ function renderMyCases(appContainer) {
 
 function _showGrievanceIntakeForm(parentContent) {
  parentContent.textContent = '';
- var form = el('div', { className: 'card card-glass', style: { padding: '18px' } });
+ var form = el('div', { className: 'card card-glass ' + _TC, style: { padding: '18px' } });
  form.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)', marginBottom: '14px' } }, 'Start a Grievance Draft'));
 
  var fields = {};
@@ -1124,7 +1132,7 @@ function _showGrievanceIntakeForm(parentContent) {
  form.appendChild(statusMsg);
 
  var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '14px' } });
- var submitBtn = el('button', { className: 'btn btn-primary flex-1', onClick: function() {
+ var submitBtn = el('button', { className: 'btn btn-primary flex-1 ' + _TB, onClick: function() {
  var title = fields.title.value.trim();
  var category = fields.category.value;
  var description = fields.description.value.trim();
@@ -1135,11 +1143,11 @@ function _showGrievanceIntakeForm(parentContent) {
  serverCall().withSuccessHandler(function(r) {
   if (r && r.success) {
   parentContent.innerHTML = '';
-  var done = el('div', { className: 'card card-glass', style: { padding: '24px', textAlign: 'center' } });
+  var done = el('div', { className: 'card card-glass ' + _TC, style: { padding: '24px', textAlign: 'center' } });
   done.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '\u2705'));
   done.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)' } }, 'Draft Submitted'));
   done.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px' } }, 'Your steward will be notified to follow up.'));
-  done.appendChild(el('button', { className: 'btn btn-primary', style: { marginTop: '14px' }, onClick: function() {
+  done.appendChild(el('button', { className: 'btn btn-primary ' + _TB, style: { marginTop: '14px' }, onClick: function() {
    serverCall().withSuccessHandler(function(g) {
    AppState.grievances = g || [];
    _invalidateTabCache('cases'); _handleTabNav('member', 'cases');
@@ -1186,7 +1194,7 @@ function _renderPastCasesSection(parentContainer) {
  }
  });
  var titleWrap = el('div', { className: 'flex-row' });
- titleWrap.appendChild(el('h3', { className: 'section-title', style: { margin: '0' } }, 'Past Cases'));
+ titleWrap.appendChild(el('h3', { className: 'section-title ' + _TL, style: { margin: '0' } }, 'Past Cases'));
  var toggleIcon = el('span', { className: 'text-sm-muted' }, '\u25BE');
  titleWrap.appendChild(toggleIcon);
  headerRow.appendChild(titleWrap);
@@ -1212,7 +1220,7 @@ function _loadPastCases(listArea, headerRow) {
  result.history.forEach(function(h, idx) {
   var outcomeColor = _getOutcomeColor(h.status);
   var card = el('div', {
-  className: 'card card-glass card-fade-in',
+  className: 'card card-glass card-fade-in ' + _TC,
   style: { padding: '14px 16px', marginBottom: '6px', borderLeft: '3px solid ' + outcomeColor, animationDelay: (idx * 60) + 'ms' }
   });
 
@@ -1272,7 +1280,7 @@ function _renderMemberWelcome(container) {
  try { userName = CURRENT_USER && CURRENT_USER.firstName ? CURRENT_USER.firstName : ''; } catch (_e) {  }
 
  var card = el('div', {
- className: 'card card-glass card-fade-in',
+ className: 'card card-glass card-fade-in ' + _TC,
  style: {
   padding: '24px 20px',
   margin: '0 16px 14px',
@@ -1299,29 +1307,36 @@ function _renderMemberWelcome(container) {
  card.appendChild(header);
 
  card.appendChild(el('div', {
+ className: 'ds-cadence ga-cadence',
  style: { color: 'var(--muted)', marginTop: '6px', marginBottom: '16px', fontSize: '14px' }
  }, 'Your union dashboard \u2014 here are some things you can do:'));
 
  var grid = el('div', {
+ className: _TG,
  style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }
  });
 
  [
  { icon: '\uD83D\uDCCB', label: 'My Cases', tab: 'cases' },
- { icon: '\uD83D\uDCDE', label: 'Contact Steward', tab: 'contact' },
- { icon: '\u2753', label: 'Ask a Question', tab: 'qa' },
+ { icon: '\uD83D\uDCDE', label: 'Contact Steward', tab: 'stewarddirectory' },
+ { icon: '\u2753', label: 'Ask a Question', tab: 'qaforum' },
  { icon: '\uD83D\uDCDA', label: 'Resources', tab: 'resources' },
- { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' }
+ { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' },
+ { icon: '\uD83D\uDCCA', label: 'Workload', tab: 'workload' }
  ].forEach(function (qa) {
- var actionCard = el('div', {
-  className: 'card card-clickable',
+ var actionCard = el('button', {
+  type: 'button',
+  className: 'card-clickable',
   style: {
   padding: '12px',
   textAlign: 'center',
   cursor: 'pointer',
   background: 'var(--surface)',
   border: '1px solid var(--border)',
-  borderRadius: '10px'
+  borderRadius: '10px',
+  fontFamily: 'var(--fontBody)',
+  color: 'var(--text)',
+  width: '100%'
   },
   onClick: function () { _handleTabNav('member', qa.tab); }
  });
@@ -1353,7 +1368,7 @@ function _maybeShowMemberWelcome(slot) {
  if (!data || !data.isFirstVisit) return;
 
  var card = el('div', {
-  className: 'card card-glass card-fade-in',
+  className: 'card card-glass card-fade-in ' + _TC,
   style: {
   padding: '24px 20px',
   margin: '0 16px 14px',
@@ -1370,17 +1385,19 @@ function _maybeShowMemberWelcome(slot) {
  }, 'Welcome, ' + safeName + '!'));
 
  card.appendChild(el('div', {
+  className: 'ds-cadence ga-cadence',
   style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.5', marginBottom: '16px' }
  }, 'This is your ' + CONFIG.memberLabel + ' dashboard. View your grievance cases, update your contact info, access union resources, and stay connected with your ' + CONFIG.stewardLabel.toLowerCase() + '.'));
 
  
  var grid = el('div', {
+  className: _TG,
   style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }
  });
 
  (data.quickActions || []).forEach(function(qa) {
   var actionCard = el('div', {
-  className: 'card card-clickable',
+  className: 'card card-clickable ' + _TC,
   style: {
    padding: '12px',
    textAlign: 'center',
@@ -1446,14 +1463,14 @@ function renderStewardContact(appContainer) {
  serverCall().withSuccessHandler(function(info) {
   assignedSection.innerHTML = '';
 
-  var sectionLabel = el('div', { style: {
+  var sectionLabel = el('div', { className: _TL, style: {
   fontSize: '10px', fontWeight: '700', color: 'var(--muted)',
   textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px'
   }}, 'Your ' + CONFIG.stewardLabel);
   assignedSection.appendChild(sectionLabel);
 
   if (info) {
-  var card = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '8px' } });
+  var card = el('div', { className: 'card card-glass ' + _TC, style: { padding: '16px', marginBottom: '8px' } });
 
   
   var nameRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' } });
@@ -1509,7 +1526,7 @@ function renderStewardContact(appContainer) {
 
   } else {
   
-  var emptyCard = el('div', { className: 'card card-glass', style: { padding: '18px', textAlign: 'center' } });
+  var emptyCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '18px', textAlign: 'center' } });
   emptyCard.appendChild(el('div', { style: { fontSize: '28px', marginBottom: '8px' } }, '👤'));
   emptyCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, 'No ' + CONFIG.stewardLabel + ' assigned'));
   emptyCard.appendChild(el('div', { className: 'text-sm-muted-mb-12' }, 'Select one from the directory below.'));
@@ -1547,7 +1564,7 @@ function _showStewardPicker(targetSection) {
   return;
  }
  stewards.forEach(function(s) {
-  var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', marginBottom: '6px' } });
+  var item = el('div', { className: 'card card-glass card-clickable ' + _TC, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', marginBottom: '6px' } });
   item.appendChild(el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase()));
   var info = el('div', { className: 'flex-1' });
   info.appendChild(el('div', { className: 'member-list-name' }, s.name || s.email));
@@ -1577,7 +1594,7 @@ function _showStewardPicker(targetSection) {
 
 function _renderStewardCard(s, i, myLoc, inOfficeToday) {
  var card = el('div', {
- className: 'card card-glass card-fade-in',
+ className: 'card card-glass card-fade-in ' + _TC,
  style: { padding: '13px 15px', marginBottom: '6px', cursor: 'pointer', animationDelay: (i * 0.04) + 's' },
  });
  var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '11px' } });
@@ -1606,10 +1623,21 @@ function _renderStewardCard(s, i, myLoc, inOfficeToday) {
  className: 'btn btn-secondary', style: { width: 'auto', flex: '1', fontSize: '11px', padding: '7px 10px' },
  onClick: function(e) { e.stopPropagation(); _generateVCard(s.name, s.email, s.phone, s.workLocation ? (CONFIG.orgName || '') + ';' + s.workLocation : null, s.unit ? CONFIG.stewardLabel + ' - ' + s.unit : null); }
  }, '\uD83D\uDCBE Save Contact'));
- btnRow.appendChild(el('button', {
+ var selectBtn = el('button', {
  className: 'btn', style: { width: 'auto', flex: '1', fontSize: '11px', padding: '7px 10px' },
- onClick: function(e) { e.stopPropagation(); serverCall().withSuccessHandler(function(result) { if (result && result.success) _handleTabNav('member', 'stewarddirectory'); }).dataMemberAssignSteward(SESSION_TOKEN, s.email); }
- }, 'Select as my ' + CONFIG.stewardLabel));
+ onClick: function(e) {
+  e.stopPropagation();
+  var origText = selectBtn.textContent;
+  selectBtn.textContent = '\u2026'; selectBtn.disabled = true;
+  serverCall().withSuccessHandler(function(result) {
+  if (result && result.success) { _invalidateTabCache('home'); _handleTabNav('member', 'home'); }
+  else { selectBtn.textContent = origText; selectBtn.disabled = false; }
+  }).withFailureHandler(function() {
+  selectBtn.textContent = origText; selectBtn.disabled = false;
+  }).dataMemberAssignSteward(SESSION_TOKEN, s.email);
+ }
+ }, 'Select as my ' + CONFIG.stewardLabel);
+ btnRow.appendChild(selectBtn);
  details.appendChild(btnRow);
  card.appendChild(details);
  topRow.setAttribute('role', 'button');
@@ -1643,11 +1671,10 @@ function _renderMemberDirectory(target) {
 
  
  var searchInput = el('input', {
-  className: 'search-input',
+  className: 'search-input mb-8',
   placeholder: 'Search by name or location\u2026',
   'aria-label': 'Search steward directory by name or location',
   role: 'searchbox',
-  className: 'mb-8',
  });
  target.appendChild(searchInput);
 
@@ -1806,7 +1833,7 @@ function renderMemberResources(appContainer) {
  quickLinks.forEach(function(r) {
   if (!r.url) return;
   var item = el('div', {
-  className: 'card card-glass card-clickable',
+  className: 'card card-glass card-clickable ' + _TC,
   style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
   onClick: function() {
    window.open(r.url, '_blank');
@@ -1826,7 +1853,7 @@ function renderMemberResources(appContainer) {
  var hubSection = el('div', { style: { marginTop: '24px' } });
  hubSection.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)', marginBottom: '12px' } }, 'Know Your Rights'));
 
- var searchInput = el('input', { className: 'search-input form-input mb-8', placeholder: 'Search resources...' });
+ var searchInput = el('input', { className: 'search-input form-input mb-8 ' + _TI, placeholder: 'Search resources...' });
  hubSection.appendChild(searchInput);
 
  var pillsWrap = el('div', { className: 'res-pills' });
@@ -1885,7 +1912,7 @@ function renderMemberResources(appContainer) {
 
   filtered.forEach(function(r, idx) {
   var card = el('div', {
-   className: 'card card-glass res-card card-clickable card-fade-in',
+   className: 'card card-glass res-card card-clickable card-fade-in ' + _TC,
    role: 'button',
    tabIndex: 0,
    'aria-expanded': 'false',
@@ -2001,8 +2028,8 @@ function renderUpdateProfile(appContainer) {
   { label: 'Hire Date', value: profile.hireDate || profile.joined || '' },
   { label: 'Email Open Rate', value: profile.openRate ? (String(profile.openRate).indexOf('%') !== -1 ? profile.openRate : profile.openRate + '%') : '' },
   ];
-  var infoSection = el('div', { className: 'card card-glass', style: { padding: '14px 16px', marginBottom: '14px' } });
-  infoSection.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, 'Account Info'));
+  var infoSection = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px 16px', marginBottom: '14px' } });
+  infoSection.appendChild(el('div', { className: _TL, style: { fontSize: '10px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, 'Account Info'));
   infoFields.forEach(function(f) {
   if (!f.value) return;
   var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0' } });
@@ -2028,7 +2055,7 @@ function renderUpdateProfile(appContainer) {
   var fieldId = _profileIdMap[f.key] || ('profile-' + f.key);
   var group = el('div', { className: 'form-group' });
   group.appendChild(el('label', { className: 'form-label', htmlFor: fieldId }, f.label));
-  var input = el('input', { id: fieldId, className: 'form-input', value: f.value || '', placeholder: f.label });
+  var input = el('input', { id: fieldId, className: 'form-input ' + _TI, value: f.value || '', placeholder: f.label });
   inputs[f.key] = input;
   group.appendChild(input);
   form.appendChild(group);
@@ -2037,7 +2064,7 @@ function renderUpdateProfile(appContainer) {
   var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', minHeight: '20px' } });
   form.appendChild(statusMsg);
 
-  var saveBtn = el('button', { className: 'btn btn-primary', onClick: function() {
+  var saveBtn = el('button', { className: 'btn btn-primary ' + _TB, onClick: function() {
   var updates = {};
   for (var k in inputs) updates[k] = inputs[k].value.trim();
   
@@ -2099,10 +2126,10 @@ function renderPINSetup(appContainer) {
 
  
  var infoCard = el('div', {
-  className: 'card card-glass',
+  className: 'card card-glass ' + _TC,
   style: { padding: '14px 16px', marginBottom: '16px', borderLeft: '3px solid #1565C0' }
  });
- infoCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6' } },
+ infoCard.appendChild(el('div', { className: 'ds-cadence ga-cadence', style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6' } },
   'Create a 6-digit PIN for quick sign-in. Your PIN is securely hashed and never stored in plain text. You can change it at any time.'));
  content.appendChild(infoCard);
 
@@ -2196,7 +2223,7 @@ function renderPINSetup(appContainer) {
    submitBtn.disabled = false;
    submitBtn.textContent = 'Save PIN';
    })
-   .memberSetOwnPIN(SESSION_TOKEN, pin);
+   .memberSetOwnPIN(SESSION_TOKEN, pin, _genIdemKey());
   }
  }, 'Save PIN');
  content.appendChild(submitBtn);
@@ -2251,7 +2278,7 @@ function renderMemberNotifications(appContainer) {
   var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
   visible.forEach(function(n, idx) {
   var card = el('div', {
-   className: 'card card-glass notif-card card-fade-in' + (n.priority === 'Urgent' ? ' notif-urgent-border' : ''),
+   className: 'card card-glass notif-card card-fade-in ' + _TC + (n.priority === 'Urgent' ? ' notif-urgent-border' : ''),
    style: { animationDelay: (idx * 60) + 'ms' }
   });
 
@@ -2326,15 +2353,17 @@ function renderMemberMore(appContainer) {
  var menuItems = [
   { group: 'Manage' },
   { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', badge: AppState.memberTaskCount || 0, action: function() { _handleTabNav('member', 'mytasks'); } },
+  { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { _handleTabNav('member', 'workload'); } },
   { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
   { group: 'Reference' },
+  { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('member', 'poms'); } },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
-  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View your union organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
+  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the union organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
   { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'Agency structure & budget', locked: true, action: function() { _handleTabNav('member', 'maddsorgchart'); } },
   { group: 'Community' },
   { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('member', 'qaforum'); } },
   { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
-  { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { renderSurveyFormPage(document.getElementById('app')); } },
+  { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { _handleTabNav('member', 'surveyform'); } },
   { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { _handleTabNav('member', 'survey'); } },
   { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { _handleTabNav('member', 'feedback'); } },
   { group: 'Comms' },
@@ -3079,7 +3108,7 @@ function _showSurveyError(stepContainer, navRow, message, responses, appContaine
  serverCall().withSuccessHandler(function(result) {
   stepContainer.innerHTML = '';
   if (result && result.success) {
-  clearProgress();
+  if (window._surveyDraft) { window._surveyDraft.periodId = null; window._surveyDraft.responses = {}; window._surveyDraft.stepKey = null; }
   var doneCard = el('div', { className: 'card card-glass fade-in', style: { padding: '30px', textAlign: 'center' } });
   doneCard.appendChild(el('div', { style: { fontSize: '56px', marginBottom: '12px' } }, '\u2705'));
   doneCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Thank you!'));
@@ -3093,7 +3122,7 @@ function _showSurveyError(stepContainer, navRow, message, responses, appContaine
   _showSurveyError(stepContainer, navRow, err2.message || 'Still failing. Your responses are saved locally.', responses, appContainer);
  }).dataSubmitSurveyResponse(null, responses);
  } }, 'Retry'));
- errCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { renderSurveyFormPage(document.getElementById('app')); } }, 'Back to Survey'));
+ errCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { _handleTabNav('member', 'surveyform'); } }, 'Back to Survey'));
  stepContainer.appendChild(errCard);
 }
 
@@ -3111,7 +3140,7 @@ function renderSurveyResultsPage(appContainer) {
   var THRESHOLD = 10;
   if (!data.responseCount || data.responseCount < THRESHOLD) {
   var pct = THRESHOLD > 0 ? Math.round((data.responseCount / THRESHOLD) * 100) : 0;
-  var card = el('div', { className: 'card card-glass', style: { padding: '22px', textAlign: 'center' } });
+  var card = el('div', { className: 'card card-glass ' + _TC, style: { padding: '22px', textAlign: 'center' } });
   card.appendChild(el('div', { className: 'emoji-lg' }, '\uD83D\uDCCA'));
   card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Not enough responses yet'));
   card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, (data.responseCount || 0) + ' of ' + THRESHOLD + ' needed'));
@@ -3157,7 +3186,7 @@ function renderSurveyResultsPage(appContainer) {
    banner.appendChild(el('button', {
     className: 'btn btn-primary',
     style: { fontSize: '13px', whiteSpace: 'nowrap', flexShrink: '0' },
-    onClick: function() { renderSurveyFormPage(document.getElementById('app')); }
+    onClick: function() { _handleTabNav('member', 'surveyform'); }
    }, 'Take Survey'));
    content.insertBefore(banner, content.firstChild);
    }
@@ -3641,6 +3670,809 @@ function _surveyViewMeeting(vc, ctx) {
  vc.appendChild(cd);
 }
 
+function renderWorkloadTracker(appContainer) {
+ var role = AppState.activeRole || 'member';
+ var headerFn = role === 'steward' ? _stewardHeader : _memberHeader;
+ renderPageLayout(appContainer, role, 'workload', function(container) {
+ try {
+  headerFn(container, 'Workload Tracker');
+
+  if (!CURRENT_USER || !CURRENT_USER.email) {
+  container.appendChild(el('div', { className: 'empty-state' }, 'Authentication required. Please sign in again.'));
+  return;
+  }
+
+  var content = el('div', { className: 'content' });
+
+  
+  
+  if (role === 'steward' && typeof _renderWorkloadPredictions === 'function') {
+  _renderWorkloadPredictions(content);
+  }
+
+  var activeSubTab = 'submit';
+  var subTabBar = el('div', { className: 'sub-tabs' });
+  var subContent = el('div');
+
+  function refreshSubTabs() {
+  subTabBar.innerHTML = '';
+  ['submit', 'history', 'stats', 'reminders'].forEach(function(tab) {
+   subTabBar.appendChild(el('button', {
+   className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+   onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+   }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+  });
+  }
+  function renderSubContent() {
+  subContent.innerHTML = '';
+  try {
+   if (activeSubTab === 'submit') _renderWTSubmit(subContent);
+   else if (activeSubTab === 'history') _renderWTHistory(subContent);
+   else if (activeSubTab === 'stats') _renderWTStats(subContent);
+   else if (activeSubTab === 'reminders') _renderWTReminders(subContent);
+  } catch (subErr) {
+   console.error('Workload sub-tab render error:', subErr);
+   subContent.appendChild(el('div', { className: 'empty-state' }, 'Something went wrong loading this tab. Please try again.'));
+  }
+  }
+
+  refreshSubTabs();
+  renderSubContent();
+  content.appendChild(subTabBar);
+  content.appendChild(subContent);
+  container.appendChild(content);
+ } catch (wtErr) {
+  console.error('Workload Tracker render error:', wtErr);
+  container.innerHTML = '';
+  container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load Workload Tracker. Please try again.'));
+ }
+ });
+}
+
+var WT_SUB_CATS = {
+ priority:   ['QDD','CAL','TERI','Aged Case','Congressional','Dire Need','Homeless',
+    'Presumptive Disability','COBRA','DDS Aged','SOAR Involvement',
+    'MC/WW','100% P&T','Public Inquiry','DDS Important (High)','DDS Important (Medium)'],
+ pending:    ['New Cases','Immediate Action','No Activity 15+ Days',
+    'No Activity 30+ Days','Internal QA Returns','Federal QA Returns','Approval Returns'],
+ unread:     ['All Unread Documents','MER','CE Reports','Trailer Mail'],
+ todo:       ['Follow-Ups Due','Unread Case Notes','Delivery Failures','Updates'],
+ referrals:  ['MC/PC','General'],
+ ce:         ['All CE Activities','Scheduled','Not Kept','Under Review'],
+ assistance: ['Outbound'],
+ aged:       ['60-89 Days','90-119 Days','120-179 Days','180+ Days']
+};
+var WT_CAT_KEYS = ['priority','pending','unread','todo','referrals','ce','assistance','aged'];
+
+var WT_CATEGORIES = [
+ { id: 't1', label: 'Priority Cases',      key: 'priority',   warnAt: 50 },
+ { id: 't2', label: 'Pending Cases',       key: 'pending',    warnAt: 100 },
+ { id: 't3', label: 'Unread Documents',    key: 'unread',     warnAt: 50 },
+ { id: 't4', label: 'To-Do Items',         key: 'todo',       warnAt: 50 },
+ { id: 't5', label: 'Sent Referrals',      key: 'referrals',  warnAt: 0 },
+ { id: 't6', label: 'CE Activities',       key: 'ce',         warnAt: 0 },
+ { id: 't7', label: 'Assistance Requests', key: 'assistance', warnAt: 0 },
+ { id: 't8', label: 'Aged Cases',          key: 'aged',       warnAt: 30 }
+];
+
+var WT_CAT_KEY_LABELS = {};
+WT_CATEGORIES.forEach(function(c) { WT_CAT_KEY_LABELS[c.key] = c.label; });
+
+function _renderWTSubmit(container) {
+ var inputs = {};
+ var subData = {};
+ var selectedPrivacy = 'Unit';
+ var savedFormKey = 'wt_draft_' + CURRENT_USER.email;
+
+ 
+ var _draftDebounce = null;
+ function _saveDraft() {
+ clearTimeout(_draftDebounce);
+ _draftDebounce = setTimeout(function() {
+  try {
+  var fd = _wtCollectFormData(inputs, subData, selectedPrivacy);
+  localStorage.setItem(savedFormKey, JSON.stringify(fd));
+  } catch (_e) {  }
+ }, 400);
+ }
+ function _loadDraft() {
+ try {
+  var raw = localStorage.getItem(savedFormKey);
+  return raw ? JSON.parse(raw) : null;
+ } catch (_e) { return null; }
+ }
+ function _clearDraft() {
+ try { localStorage.removeItem(savedFormKey); } catch (_e) {  }
+ }
+
+ 
+ var lastSubKey = 'wt_lastSub_' + CURRENT_USER.email;
+ var lastSubDate = null;
+ try { lastSubDate = localStorage.getItem(lastSubKey); } catch (_e) {  }
+ if (lastSubDate) {
+ container.appendChild(el('div', { className: 'wt-last-submitted' },
+  'Last submitted: ' + lastSubDate));
+ }
+
+ 
+ container.appendChild(el('div', { className: 'wt-section-title' }, 'Caseload Categories'));
+ var grid = el('div', { className: 'wt-grid' });
+
+ WT_CATEGORIES.forEach(function(cat, idx) {
+ var item = el('div', { className: 'wt-grid-item' });
+ var head = el('div', { className: 'wt-grid-head' });
+ head.appendChild(el('span', { className: 'wt-grid-label' }, cat.label));
+ var numInput = el('input', {
+  type: 'number', className: 'wt-grid-input', min: '0', max: '999',
+  value: '0', placeholder: '0'
+ });
+ numInput.addEventListener('input', function() {
+  var v = parseInt(numInput.value) || 0;
+  if (cat.warnAt > 0 && v >= cat.warnAt) item.classList.add('warn');
+  else item.classList.remove('warn');
+  _saveDraft();
+ });
+ inputs[cat.id] = numInput;
+ head.appendChild(numInput);
+ item.appendChild(head);
+
+ 
+ var subs = WT_SUB_CATS[cat.key];
+ if (subs && subs.length > 0) {
+  var detailBtn = el('button', { className: 'wt-detail-btn',
+  onClick: function() { _openSubModal(cat, idx, numInput, subData); }
+  }, '+ detail');
+  item.appendChild(detailBtn);
+ }
+
+ var warn = el('div', { className: 'wt-warn-label' }, 'High caseload');
+ item.appendChild(warn);
+ grid.appendChild(item);
+ });
+ container.appendChild(grid);
+
+ 
+ container.appendChild(el('div', { className: 'wt-section' }));
+ container.appendChild(el('div', { className: 'wt-section-title', style: { marginTop: '18px' } }, 'Weekly Cases Assigned'));
+ var weeklyRow = el('div', { style: { display: 'flex', gap: '10px', alignItems: 'center' } });
+ var weeklySelect = el('select', { className: 'form-select', style: { width: '140px' } });
+ [{ v: '15', l: '15 Cases' }, { v: '12', l: '12 Cases' }, { v: '18', l: '18 Cases' }, { v: 'manual', l: 'Manual Entry' }].forEach(function(o) {
+ weeklySelect.appendChild(el('option', { value: o.v }, o.l));
+ });
+ var weeklyManual = el('input', { type: 'number', className: 'wt-grid-input', min: '1', max: '999',
+ placeholder: '#', style: { display: 'none' } });
+ weeklySelect.addEventListener('change', function() {
+ weeklyManual.style.display = weeklySelect.value === 'manual' ? '' : 'none';
+ _saveDraft();
+ });
+ weeklyManual.addEventListener('input', _saveDraft);
+ inputs.weeklySelect = weeklySelect;
+ inputs.weeklyManual = weeklyManual;
+ weeklyRow.appendChild(weeklySelect);
+ weeklyRow.appendChild(weeklyManual);
+ container.appendChild(weeklyRow);
+
+ 
+ container.appendChild(el('div', { className: 'wt-section-title', style: { marginTop: '18px' } }, 'Employment & Status'));
+ var empRow = el('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } });
+ var empSelect = el('select', { className: 'form-select', style: { width: '140px' } });
+ empSelect.appendChild(el('option', { value: 'Full-time' }, 'Full-time'));
+ empSelect.appendChild(el('option', { value: 'Part-time' }, 'Part-time'));
+ var ptInput = el('input', { type: 'number', className: 'wt-grid-input', min: '1', max: '40',
+ placeholder: 'hrs', style: { display: 'none', width: '60px' } });
+ empSelect.addEventListener('change', function() {
+ ptInput.style.display = empSelect.value === 'Part-time' ? '' : 'none';
+ _saveDraft();
+ });
+ ptInput.addEventListener('input', _saveDraft);
+ inputs.empSelect = empSelect;
+ inputs.ptInput = ptInput;
+ empRow.appendChild(el('label', { className: 'text-base' }, 'Employment'));
+ empRow.appendChild(empSelect);
+ empRow.appendChild(ptInput);
+ container.appendChild(empRow);
+
+ 
+ var planRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' } });
+ var planCheck = el('input', { type: 'checkbox' });
+ inputs.planCheck = planCheck;
+ planRow.appendChild(planCheck);
+ planRow.appendChild(el('label', { className: 'text-base' }, 'Currently on Workflow Plan'));
+ container.appendChild(planRow);
+
+ 
+ var otRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' } });
+ var otCheck = el('input', { type: 'checkbox' });
+ var otInput = el('input', { type: 'number', className: 'wt-grid-input', min: '0', max: '999',
+ placeholder: 'hrs', style: { display: 'none', width: '70px' } });
+ otCheck.addEventListener('change', function() { otInput.style.display = otCheck.checked ? '' : 'none'; _saveDraft(); });
+ otInput.addEventListener('input', _saveDraft);
+ planCheck.addEventListener('change', _saveDraft);
+ inputs.otCheck = otCheck;
+ inputs.otInput = otInput;
+ otRow.appendChild(otCheck);
+ otRow.appendChild(el('label', { className: 'text-base' }, 'Tracking Overtime'));
+ otRow.appendChild(otInput);
+ container.appendChild(otRow);
+
+ 
+ container.appendChild(el('div', { className: 'wt-section-title', style: { marginTop: '18px' } }, 'Time Off This Period'));
+ var leaveSection = el('div', { className: 'wt-leave-section' });
+ var leaveType = el('select', { className: 'form-select', style: { width: '150px' } });
+ ['', 'Vacation', 'Sick', 'Personal', 'Bereavement', 'Other'].forEach(function(t) {
+ leaveType.appendChild(el('option', { value: t }, t || 'None'));
+ });
+ inputs.leaveType = leaveType;
+
+ var leaveDetails = el('div', { style: { display: 'none' } });
+ var leavePlanned = el('select', { className: 'form-select', style: { width: '120px' } });
+ leavePlanned.appendChild(el('option', { value: '' }, '--'));
+ leavePlanned.appendChild(el('option', { value: 'Planned' }, 'Planned'));
+ leavePlanned.appendChild(el('option', { value: 'Unplanned' }, 'Unplanned'));
+ inputs.leavePlanned = leavePlanned;
+ var leaveStart = el('input', { type: 'date', style: { width: '140px' } });
+ var leaveEnd = el('input', { type: 'date', style: { width: '140px' } });
+ inputs.leaveStart = leaveStart;
+ inputs.leaveEnd = leaveEnd;
+ var noIntake = el('select', { className: 'form-select', style: { width: '180px' } });
+ noIntake.appendChild(el('option', { value: '' }, '--'));
+ noIntake.appendChild(el('option', { value: 'before' }, 'Day before leave'));
+ noIntake.appendChild(el('option', { value: 'return' }, 'Day of return'));
+ inputs.noIntake = noIntake;
+ var halfDay = el('input', { type: 'checkbox' });
+ inputs.halfDay = halfDay;
+
+ leaveDetails.appendChild(_wlRow('Planned', leavePlanned));
+ leaveDetails.appendChild(_wlRow('Start', leaveStart));
+ leaveDetails.appendChild(_wlRow('End', leaveEnd));
+ leaveDetails.appendChild(_wlRow('No-Intake Day', noIntake));
+ var hdRow = el('div', { className: 'wt-leave-row' });
+ hdRow.appendChild(el('label', {}, 'Half Day'));
+ hdRow.appendChild(halfDay);
+ leaveDetails.appendChild(hdRow);
+
+ leaveType.addEventListener('change', function() {
+ leaveDetails.style.display = leaveType.value ? '' : 'none';
+ _saveDraft();
+ });
+ leavePlanned.addEventListener('change', _saveDraft);
+ leaveStart.addEventListener('change', _saveDraft);
+ leaveEnd.addEventListener('change', _saveDraft);
+ noIntake.addEventListener('change', _saveDraft);
+ halfDay.addEventListener('change', _saveDraft);
+
+ leaveSection.appendChild(_wlRow('Leave Type', leaveType));
+ leaveSection.appendChild(leaveDetails);
+ container.appendChild(leaveSection);
+
+ 
+ container.appendChild(el('div', { className: 'wt-section-title', style: { marginTop: '18px' } }, 'Privacy & Reciprocity'));
+ var privacyOptions = [
+ { val: 'Unit', name: 'Unit Anonymized', desc: 'Shared with unit ID only. You can view collective stats.' },
+ { val: 'Agency', name: 'Agency Anonymized', desc: 'Shared with agency ID only. You can view collective stats.' }
+ ];
+ privacyOptions.forEach(function(opt) {
+ var card = el('div', {
+  className: 'wt-privacy-option' + (selectedPrivacy === opt.val ? ' selected' : ''),
+  onClick: function() {
+  selectedPrivacy = opt.val;
+  container.querySelectorAll('.wt-privacy-option').forEach(function(c) { c.classList.remove('selected'); });
+  card.classList.add('selected');
+  if (typeof _saveDraft === 'function') _saveDraft();
+  }
+ });
+ var info = el('div');
+ info.appendChild(el('div', { className: 'wt-privacy-name' }, opt.name));
+ info.appendChild(el('div', { className: 'wt-privacy-desc' }, opt.desc));
+ card.appendChild(info);
+ container.appendChild(card);
+ });
+
+ 
+ var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '12px', minHeight: '20px' } });
+ var btnRow = el('div', { style: { display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' } });
+
+ 
+ var clearState = { cleared: false, backup: null };
+ var clearBtn = el('button', { className: 'wt-clear-btn',
+ onClick: function() {
+  if (!clearState.cleared) {
+  clearState.backup = _wtCollectFormData(inputs, subData, selectedPrivacy);
+  _wtClearForm(inputs, subData);
+  selectedPrivacy = 'Unit';
+  container.querySelectorAll('.wt-privacy-option').forEach(function(c, i) {
+   c.classList.toggle('selected', i === 0);
+  });
+  clearBtn.textContent = 'Restore Last Entry';
+  clearState.cleared = true;
+  _clearDraft();
+  } else {
+  if (clearState.backup) _wtRestoreForm(inputs, clearState.backup);
+  clearBtn.textContent = 'Clear All';
+  clearState.cleared = false;
+  _saveDraft();
+  }
+ }
+ }, 'Clear All');
+ btnRow.appendChild(clearBtn);
+
+ 
+ btnRow.appendChild(el('button', {
+ className: 'btn btn-primary',
+ onClick: function() {
+  var formData = _wtCollectFormData(inputs, subData, selectedPrivacy);
+  statusMsg.textContent = 'Submitting...';
+  statusMsg.style.color = 'var(--muted)';
+  serverCall().withSuccessHandler(function(result) {
+  if (typeof result === 'string' && result.indexOf('Error') === 0) {
+   statusMsg.textContent = result;
+   statusMsg.style.color = 'var(--danger)';
+  } else {
+   _clearDraft();
+   try { localStorage.setItem(lastSubKey, new Date().toLocaleDateString()); } catch (_e) {  }
+   container.innerHTML = '';
+   var card = el('div', { className: 'confirm-card' });
+   card.appendChild(el('div', { className: 'confirm-icon' }, '\u2705'));
+   card.appendChild(el('div', { className: 'confirm-title' }, 'Submitted!'));
+   card.appendChild(el('div', { className: 'confirm-text' }, 'Your workload data has been securely recorded. This data helps your union track caseload trends and advocate for better working conditions.'));
+   card.appendChild(el('button', {
+   className: 'btn btn-secondary', style: { marginTop: '16px' },
+   onClick: function() { container.innerHTML = ''; _renderWTSubmit(container); }
+   }, 'Submit Another'));
+   container.appendChild(card);
+  }
+  }).withFailureHandler(function() {
+  statusMsg.textContent = 'Error submitting. Try again.';
+  statusMsg.style.color = 'var(--danger)';
+  }).processWorkloadFormSSO(SESSION_TOKEN, formData);
+ }
+ }, 'Submit to Secure Ledger'));
+
+ btnRow.appendChild(statusMsg);
+ container.appendChild(btnRow);
+
+ 
+ var draft = _loadDraft();
+ if (draft) {
+ _wtRestoreForm(inputs, draft);
+ if (draft.privacy && draft.privacy !== selectedPrivacy) {
+  selectedPrivacy = draft.privacy;
+  container.querySelectorAll('.wt-privacy-option').forEach(function(c) {
+  var isMatch = c.querySelector('.wt-privacy-name');
+  if (isMatch) {
+   var txt = isMatch.textContent;
+   c.classList.toggle('selected', txt.indexOf(draft.privacy) !== -1);
+  }
+  });
+ }
+ 
+ WT_CATEGORIES.forEach(function(cat) {
+  var inp = inputs[cat.id];
+  if (inp) inp.dispatchEvent(new Event('input'));
+ });
+ }
+}
+
+function _wlRow(label, input) {
+ var row = el('div', { className: 'wt-leave-row' });
+ row.appendChild(el('label', {}, label));
+ row.appendChild(input);
+ return row;
+}
+
+function _wtCollectFormData(inputs, subData, privacy) {
+ var fd = {};
+ for (var i = 1; i <= 8; i++) fd['t' + i] = parseInt(inputs['t' + i].value) || 0;
+ fd.weekly_cases = inputs.weeklySelect.value === 'manual' ? inputs.weeklyManual.value : inputs.weeklySelect.value;
+ fd.weekly_cases_option = inputs.weeklySelect.value;
+ fd.weekly_cases_manual = inputs.weeklyManual.value;
+ fd.employment_type = inputs.empSelect.value;
+ fd.part_time_hours = inputs.ptInput.value;
+ fd.on_plan = inputs.planCheck.checked;
+ fd.overtime_enabled = inputs.otCheck.checked;
+ fd.overtime_hours = inputs.otInput.value;
+ fd.leave_type = inputs.leaveType.value;
+ fd.leave_planned = inputs.leavePlanned.value;
+ fd.leave_start = inputs.leaveStart.value;
+ fd.leave_end = inputs.leaveEnd.value;
+ fd.no_intake_choice = inputs.noIntake.value;
+ fd.half_day = inputs.halfDay.checked;
+ fd.privacy = privacy;
+ 
+ for (var ci = 0; ci < WT_CAT_KEYS.length; ci++) {
+ var catKey = WT_CAT_KEYS[ci];
+ var subs = WT_SUB_CATS[catKey];
+ for (var si = 0; si < subs.length; si++) {
+  fd['sub_' + (ci + 1) + '_' + si] = (subData[catKey] && subData[catKey][si]) || 0;
+ }
+ }
+ return fd;
+}
+
+function _wtClearForm(inputs, subData) {
+ for (var i = 1; i <= 8; i++) { inputs['t' + i].value = '0'; inputs['t' + i].parentElement.parentElement.classList.remove('warn'); }
+ inputs.weeklySelect.value = '15';
+ inputs.weeklyManual.value = '';
+ inputs.weeklyManual.style.display = 'none';
+ inputs.empSelect.value = 'Full-time';
+ inputs.ptInput.value = '';
+ inputs.ptInput.style.display = 'none';
+ inputs.planCheck.checked = false;
+ inputs.otCheck.checked = false;
+ inputs.otInput.value = '';
+ inputs.otInput.style.display = 'none';
+ inputs.leaveType.value = '';
+ inputs.leavePlanned.value = '';
+ inputs.leaveStart.value = '';
+ inputs.leaveEnd.value = '';
+ inputs.noIntake.value = '';
+ inputs.halfDay.checked = false;
+ for (var k in subData) delete subData[k];
+}
+
+function _wtRestoreForm(inputs, backup) {
+ for (var i = 1; i <= 8; i++) inputs['t' + i].value = backup['t' + i] || 0;
+ inputs.weeklySelect.value = backup.weekly_cases_option || '15';
+ inputs.weeklyManual.value = backup.weekly_cases_manual || '';
+ inputs.weeklyManual.style.display = inputs.weeklySelect.value === 'manual' ? '' : 'none';
+ inputs.empSelect.value = backup.employment_type || 'Full-time';
+ inputs.ptInput.value = backup.part_time_hours || '';
+ inputs.ptInput.style.display = inputs.empSelect.value === 'Part-time' ? '' : 'none';
+ inputs.planCheck.checked = !!backup.on_plan;
+ inputs.otCheck.checked = !!backup.overtime_enabled;
+ inputs.otInput.value = backup.overtime_hours || '';
+ inputs.otInput.style.display = inputs.otCheck.checked ? '' : 'none';
+ inputs.leaveType.value = backup.leave_type || '';
+ inputs.leavePlanned.value = backup.leave_planned || '';
+ inputs.leaveStart.value = backup.leave_start || '';
+ inputs.leaveEnd.value = backup.leave_end || '';
+ inputs.noIntake.value = backup.no_intake_choice || '';
+ inputs.halfDay.checked = !!backup.half_day;
+}
+
+function _openSubModal(cat, catIdx, mainInput, subData) {
+ var subs = WT_SUB_CATS[cat.key];
+ if (!subData[cat.key]) subData[cat.key] = {};
+
+ var _prevFocus = document.activeElement;
+ var overlay = el('div', { className: 'wt-modal-overlay' });
+ var modal = el('div', { className: 'wt-modal' });
+ modal.appendChild(el('div', { className: 'wt-modal-title' }, cat.label + ' \u2014 Breakdown'));
+
+ var subInputs = [];
+ var totalEl = el('span', {}, '0');
+
+ function updateTotal() {
+ var sum = 0;
+ for (var s = 0; s < subInputs.length; s++) sum += parseInt(subInputs[s].value) || 0;
+ totalEl.textContent = String(sum);
+ }
+
+ subs.forEach(function(name, si) {
+ var row = el('div', { className: 'wt-sub-row' });
+ row.appendChild(el('span', {}, name));
+ var inp = el('input', { type: 'number', min: '0', max: '999', value: String(subData[cat.key][si] || 0) });
+ inp.addEventListener('input', updateTotal);
+ subInputs.push(inp);
+ row.appendChild(inp);
+ modal.appendChild(row);
+ });
+
+ var totalRow = el('div', { className: 'wt-modal-total' });
+ totalRow.appendChild(el('span', {}, 'Total'));
+ totalRow.appendChild(totalEl);
+ modal.appendChild(totalRow);
+ updateTotal();
+
+ var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '14px', justifyContent: 'flex-end' } });
+ btnRow.appendChild(el('button', { className: 'btn btn-secondary',
+ onClick: function() { overlay.remove(); if (_prevFocus && _prevFocus.focus) _prevFocus.focus(); }
+ }, 'Cancel'));
+ btnRow.appendChild(el('button', { className: 'btn btn-primary',
+ onClick: function() {
+  var sum = 0;
+  for (var s = 0; s < subInputs.length; s++) {
+  var v = parseInt(subInputs[s].value) || 0;
+  subData[cat.key][s] = v;
+  sum += v;
+  }
+  mainInput.value = String(sum);
+  mainInput.dispatchEvent(new Event('input'));
+  overlay.remove();
+  if (_prevFocus && _prevFocus.focus) _prevFocus.focus();
+ }
+ }, 'Apply'));
+ modal.appendChild(btnRow);
+
+ overlay.appendChild(modal);
+ overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.remove(); if (_prevFocus && _prevFocus.focus) _prevFocus.focus(); } });
+ document.body.appendChild(overlay);
+}
+
+function _renderWTHistory(container) {
+ showLoading(container, 'list');
+ serverCall().withSuccessHandler(function(result) {
+ container.innerHTML = '';
+ if (!result || !result.success || !result.history || result.history.length === 0) {
+  container.appendChild(el('div', { className: 'empty-state-sm' }, 'No submissions yet.'));
+  return;
+ }
+
+ 
+ var exportBtn = el('button', { className: 'btn btn-secondary', style: { marginBottom: '12px', fontSize: '12px' },
+  onClick: function() {
+  exportBtn.textContent = 'Exporting...';
+  serverCall().withSuccessHandler(function(csv) {
+   if (!csv) { exportBtn.textContent = 'No data'; return; }
+   var blob = new Blob([csv], { type: 'text/csv' });
+   var url = URL.createObjectURL(blob);
+   var a = document.createElement('a');
+   a.href = url; a.download = 'workload_history.csv'; a.click();
+   URL.revokeObjectURL(url);
+   exportBtn.textContent = 'Export CSV';
+  }).exportWorkloadHistoryCSV(SESSION_TOKEN);
+  }
+ }, 'Export CSV');
+ container.appendChild(exportBtn);
+
+ 
+ if (result.summary) {
+  var s = result.summary;
+  var summaryCard = el('div', { className: 'wt-history-card mb-14' });
+  summaryCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '13px', marginBottom: '6px' } }, 'Summary'));
+  summaryCard.appendChild(el('div', { className: 'wt-history-meta' },
+  s.totalSubmissions + ' submissions \u00B7 ' + (s.firstSubmission || '?') + ' \u2013 ' + (s.lastSubmission || '?')));
+  if (s.overtime && s.overtime.totalHours > 0) {
+  summaryCard.appendChild(el('div', { className: 'wt-history-meta' },
+   'Overtime: ' + s.overtime.totalHours + ' hrs total, ' + s.overtime.averagePerSubmission + ' avg/submission'));
+  }
+  container.appendChild(summaryCard);
+ }
+
+ var labels = ['Pri', 'Pend', 'Doc', 'ToDo', 'Ref', 'CE', 'Asst', 'Aged'];
+ result.history.forEach(function(entry) {
+  var card = el('div', { className: 'wt-history-card' });
+  card.appendChild(el('div', { className: 'wt-history-date' }, entry.dateDisplay || (entry.date ? new Date(entry.date).toLocaleDateString() : 'Unknown')));
+  var grid = el('div', { className: 'wt-history-grid' });
+  for (var i = 0; i < 8; i++) {
+  var cell = el('div', { className: 'wt-history-cell' });
+  cell.appendChild(el('div', { className: 'wt-history-cell-label' }, labels[i]));
+  cell.appendChild(el('div', { className: 'wt-history-cell-val' }, String(entry['t' + (i + 1)] || 0)));
+  grid.appendChild(cell);
+  }
+  card.appendChild(grid);
+
+  
+  var meta = [];
+  if (entry.weeklyCases) meta.push('Weekly: ' + entry.weeklyCases);
+  if (entry.employment && entry.employment !== 'Full-time') meta.push(entry.employment + (entry.ptHours ? ' (' + entry.ptHours + 'h)' : ''));
+  if (entry.leaveType) meta.push('Leave: ' + entry.leaveType);
+  if (entry.overtime !== '' && entry.overtime !== null && entry.overtime !== undefined) meta.push('OT: ' + entry.overtime + 'h');
+  if (entry.privacy) meta.push(entry.privacy);
+  if (entry.onPlan === 'Yes') meta.push('On Plan');
+  if (meta.length > 0) {
+  card.appendChild(el('div', { className: 'wt-history-meta' }, meta.join(' \u00B7 ')));
+  }
+
+  
+  if (entry.subCategories && Object.keys(entry.subCategories).length > 0) {
+  var subDiv = el('div', { style: { display: 'none', marginTop: '8px', fontSize: '12px', color: 'var(--muted)' } });
+  for (var ck in entry.subCategories) {
+   var catLabel = WT_CAT_KEY_LABELS[ck] || (ck.charAt(0).toUpperCase() + ck.slice(1));
+   var catSubs = entry.subCategories[ck];
+   if (catSubs && typeof catSubs === 'object') {
+   for (var sk in catSubs) {
+    if (Number(catSubs[sk]) > 0) subDiv.appendChild(el('div', {}, catLabel + ' \u203A ' + sk + ': ' + catSubs[sk]));
+   }
+   }
+  }
+  if (subDiv.children.length > 0) {
+   card.appendChild(el('button', { className: 'wt-history-expand-btn',
+   onClick: function() {
+    var vis = subDiv.style.display === 'none';
+    subDiv.style.display = vis ? '' : 'none';
+    this.textContent = vis ? '\u25B2 Hide details' : '\u25BC Show details';
+   }
+   }, '\u25BC Show details'));
+   card.appendChild(subDiv);
+  }
+  }
+
+  container.appendChild(card);
+ });
+ }).getWorkloadHistorySSO(SESSION_TOKEN);
+}
+
+function _renderWTStats(container) {
+ showLoading(container, 'kpi');
+ serverCall().withSuccessHandler(function(result) {
+ container.innerHTML = '';
+
+ 
+ if (result && result.reciprocityBlocked) {
+  var blockCard = el('div', { className: 'confirm-card' });
+  blockCard.appendChild(el('div', { className: 'confirm-icon' }, '\uD83D\uDD12'));
+  blockCard.appendChild(el('div', { className: 'confirm-title' }, 'Access Restricted'));
+  blockCard.appendChild(el('div', { className: 'confirm-text' },
+  result.message || 'You must share your data to view collective statistics. Change your privacy setting to Unit or Agency Anonymized.'));
+  container.appendChild(blockCard);
+  return;
+ }
+
+ if (!result || !result.success || !result.data) {
+  container.appendChild(el('div', { className: 'empty-state-sm' }, 'No data available.'));
+  return;
+ }
+ var d = result.data;
+
+ 
+ container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '6px' } },
+  d.totalSubmissions + ' shared submissions from ' + d.members + ' members'));
+ if (result.userSharingStartDate) {
+  container.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '14px' } },
+  'Showing data from your sharing start: ' + result.userSharingStartDate));
+ }
+
+ 
+ var statGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
+ if (d.overtime) {
+  statGrid.appendChild(_wtStatCard(d.overtime.totalHours, 'OT Hours'));
+  statGrid.appendChild(_wtStatCard(d.overtime.percentReporting + '%', 'Report OT'));
+  statGrid.appendChild(_wtStatCard(d.overtime.averagePerSubmission, 'Avg OT/Sub'));
+ }
+ container.appendChild(statGrid);
+
+ 
+ var avgs = d.averages || {};
+ var barMax = 1;
+ for (var bk in avgs) { var bv = parseFloat(avgs[bk]) || 0; if (bv > barMax) barMax = bv; }
+ container.appendChild(el('div', { className: 'wt-section-title' }, 'Category Averages'));
+ for (var cat in avgs) {
+  var row = el('div', { className: 'bar-chart-row' });
+  row.appendChild(el('div', { className: 'bar-chart-label' }, cat));
+  var val = parseFloat(avgs[cat]) || 0;
+  var pct = Math.min(100, Math.round((val / barMax) * 100));
+  var track = el('div', { className: 'bar-chart-track' });
+  track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: Math.max(pct, 2) + '%', background: 'var(--accent)' } }));
+  row.appendChild(track);
+  row.appendChild(el('div', { className: 'bar-chart-value' }, avgs[cat]));
+  container.appendChild(row);
+ }
+
+ 
+ if (d.employment) {
+  container.appendChild(el('div', { className: 'wt-section-title', style: { marginTop: '16px' } }, 'Employment'));
+  var empText = 'Full-time: ' + (d.employment['Full-time'] || 0) + ' \u00B7 Part-time: ' + (d.employment['Part-time'] || 0);
+  container.appendChild(el('div', { className: 'text-base' }, empText));
+ }
+
+ 
+ if (d.workflowPlan) {
+  container.appendChild(el('div', { className: 'wt-section-title', style: { marginTop: '12px' } }, 'Workflow Plan'));
+  var planText = 'On Plan: ' + (d.workflowPlan.Yes || 0) + ' \u00B7 Not on Plan: ' + (d.workflowPlan.No || 0);
+  container.appendChild(el('div', { className: 'text-base' }, planText));
+ }
+
+ 
+ if (d.subCategoryTotals && Object.keys(d.subCategoryTotals).length > 0) {
+  container.appendChild(el('div', { className: 'wt-section-title', style: { marginTop: '16px' } }, 'Sub-Category Totals'));
+  for (var sck in d.subCategoryTotals) {
+  var scData = d.subCategoryTotals[sck];
+  if (!scData || Object.keys(scData).length === 0) continue;
+  var scDiv = el('div', { className: 'mb-8' });
+  scDiv.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } },
+   WT_CAT_KEY_LABELS[sck] || (sck.charAt(0).toUpperCase() + sck.slice(1))));
+  for (var scName in scData) {
+   if (Number(scData[scName]) > 0) {
+   scDiv.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', paddingLeft: '10px' } },
+    scName + ': ' + scData[scName]));
+   }
+  }
+  container.appendChild(scDiv);
+  }
+ }
+ }).withFailureHandler(function() {
+ container.innerHTML = '';
+ container.appendChild(el('div', { className: 'empty-state-sm' }, 'Unable to load statistics.'));
+ }).getWorkloadDashboardDataSSO(SESSION_TOKEN);
+}
+
+function _wtStatCard(value, label) {
+ var card = el('div', { className: 'wt-stat-card' });
+ card.appendChild(el('div', { className: 'wt-stat-value' }, String(value)));
+ card.appendChild(el('div', { className: 'wt-stat-label' }, label));
+ return card;
+}
+
+function _renderWTReminders(container) {
+ showLoading(container, 'form');
+ serverCall().withSuccessHandler(function(prefs) {
+ container.innerHTML = '';
+ prefs = prefs || { enabled: false, frequency: 'weekly', day: 'monday', time: '08:00' };
+
+ var card = el('div', { className: 'glass-card card-fade-in' });
+ card.appendChild(el('div', { className: 'section-title' }, 'Email Reminders'));
+ card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } },
+  'Get periodic email reminders to submit your workload data.'));
+
+ 
+ var toggleRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' } });
+ toggleRow.appendChild(el('label', { className: 'form-label', style: { margin: 0 } }, 'Enabled'));
+ var toggle = el('input', { type: 'checkbox', checked: prefs.enabled });
+ toggleRow.appendChild(toggle);
+ card.appendChild(toggleRow);
+
+ 
+ var freqGroup = el('div', { className: 'form-group' });
+ freqGroup.appendChild(el('label', { className: 'form-label' }, 'Frequency'));
+ var freqSelect = el('select', { className: 'form-select' });
+ ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly'].forEach(function(f) {
+  freqSelect.appendChild(el('option', { value: f, selected: prefs.frequency === f },
+  f.charAt(0).toUpperCase() + f.slice(1)));
+ });
+ freqGroup.appendChild(freqSelect);
+ card.appendChild(freqGroup);
+
+ 
+ var dayGroup = el('div', { className: 'form-group' });
+ dayGroup.appendChild(el('label', { className: 'form-label' }, 'Day'));
+ var daySelect = el('select', { className: 'form-select' });
+ ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(function(d) {
+  daySelect.appendChild(el('option', { value: d, selected: prefs.day === d },
+  d.charAt(0).toUpperCase() + d.slice(1)));
+ });
+ dayGroup.appendChild(daySelect);
+ card.appendChild(dayGroup);
+ function updateDayVis() {
+  dayGroup.style.display = (freqSelect.value === 'weekly' || freqSelect.value === 'biweekly') ? '' : 'none';
+ }
+ freqSelect.addEventListener('change', updateDayVis);
+ updateDayVis();
+
+ 
+ var timeGroup = el('div', { className: 'form-group' });
+ timeGroup.appendChild(el('label', { className: 'form-label' }, 'Time'));
+ var timeSelect = el('select', { className: 'form-select' });
+ ['08:00', '09:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'].forEach(function(t) {
+  timeSelect.appendChild(el('option', { value: t, selected: prefs.time === t }, t));
+ });
+ timeGroup.appendChild(timeSelect);
+ card.appendChild(timeGroup);
+
+ var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', minHeight: '20px' } });
+
+ card.appendChild(el('button', {
+  className: 'btn btn-primary', style: { marginTop: '10px' },
+  onClick: function() {
+  statusMsg.textContent = 'Saving...';
+  statusMsg.style.color = 'var(--muted)';
+  serverCall().withSuccessHandler(function(res) {
+   if (res && res.success) {
+   statusMsg.textContent = 'Preferences saved!';
+   statusMsg.style.color = 'var(--accent)';
+   } else {
+   statusMsg.textContent = 'Error saving.';
+   statusMsg.style.color = 'var(--danger)';
+   }
+  }).withFailureHandler(function() {
+   statusMsg.textContent = 'Error saving. Try again.';
+   statusMsg.style.color = 'var(--danger)';
+  }).setWorkloadReminderSSO(SESSION_TOKEN, {
+   enabled: toggle.checked,
+   frequency: freqSelect.value,
+   day: daySelect.value,
+   time: timeSelect.value
+  });
+  }
+ }, 'Save Preferences'));
+ card.appendChild(statusMsg);
+ container.appendChild(card);
+ }).withFailureHandler(function() {
+ container.innerHTML = '';
+ container.appendChild(el('div', { className: 'empty-state-sm' }, 'Unable to load reminder settings.'));
+ }).getWorkloadReminderSSO(SESSION_TOKEN);
+}
+
 function renderEventsPage(appContainer) {
  var role = AppState.activeRole || 'member';
  
@@ -3799,7 +4631,7 @@ function renderEventsPage(appContainer) {
   return;
   }
   events.forEach(function(ev, i) {
-  var card = el('div', { className: 'card card-glass card-fade-in card-accent-border', style: { padding: '16px', animationDelay: (i * 0.08) + 's' } });
+  var card = el('div', { className: 'card card-glass card-fade-in card-accent-border ' + _TC, style: { padding: '16px', animationDelay: (i * 0.08) + 's' } });
   card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)' } }, ev.title));
   var startDate = new Date(ev.startTime);
   var endDate = new Date(ev.endTime);
@@ -3845,7 +4677,7 @@ function renderUnionStatsPage(appContainer) {
  if (!AppState.unionStatsCache) AppState.unionStatsCache = {};
  var cache = AppState.unionStatsCache;
 
- var statTabs = ['grievances', 'hot spots', 'membership', 'engagement', 'resources', 'usage'];
+ var statTabs = ['grievances', 'hot spots', 'membership', 'engagement', 'resources', 'usage', 'workload'];
  function refreshSubTabs() {
   subTabBar.innerHTML = '';
   statTabs.forEach(function(tab) {
@@ -3872,6 +4704,7 @@ function renderUnionStatsPage(appContainer) {
   else if (activeSubTab === 'engagement') _renderEngagementStats(subContent, _getCached, _setCache);
   else if (activeSubTab === 'resources') _renderResourceStats(subContent, _getCached, _setCache);
   else if (activeSubTab === 'usage') _renderUsageStats(subContent, _getCached, _setCache);
+  else if (activeSubTab === 'workload') _renderWorkloadSummaryStats(subContent, _getCached, _setCache);
   else _renderMembershipStats(subContent, _getCached, _setCache);
  }
 
@@ -4705,6 +5538,44 @@ function _renderUsageStatsContent(container, data) {
  }
 }
 
+function _renderWorkloadSummaryStats(container, getCached, setCache) {
+ var cached = getCached && getCached('workloadStats');
+ if (cached) { _renderWorkloadStatsContent(container, cached); return; }
+ showLoading(container, 'kpi');
+ serverCall().withSuccessHandler(function(data) {
+ if (setCache) setCache('workloadStats', data);
+ _renderWorkloadStatsContent(container, data);
+ }).withFailureHandler(function() {
+ container.innerHTML = '';
+ container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load workload stats.'));
+ }).dataGetWorkloadSummaryStats(SESSION_TOKEN);
+}
+
+function _renderWorkloadStatsContent(container, data) {
+ container.innerHTML = '';
+ if (!data) {
+  container.appendChild(el('div', { className: 'empty-state' }, 'Workload summary unavailable.'));
+  return;
+ }
+
+ container.appendChild(el('div', { className: 'privacy-badge mb-14' }, '\uD83D\uDD12 Anonymized workload aggregate'));
+
+ var items = [
+  { label: 'Avg Caseload', value: (data.avgCaseload || 0).toFixed(1), color: 'var(--text)' },
+  { label: 'High Caseload %', value: (data.highCaseloadPct || 0) + '%', color: data.highCaseloadPct > 20 ? 'var(--danger)' : 'var(--success)' },
+  { label: 'Submission Rate', value: (data.submissionRate || 0) + '%', color: 'var(--accent)' },
+  { label: 'Trend', value: (data.trendDirection || 'stable').charAt(0).toUpperCase() + (data.trendDirection || 'stable').slice(1), color: data.trendDirection === 'increasing' ? 'var(--danger)' : 'var(--success)' },
+ ];
+ var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' } });
+ items.forEach(function(m) {
+  var card = el('div', { className: 'card card-glass', style: { padding: '16px', textAlign: 'center' } });
+  card.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '24px', fontWeight: '700', color: m.color } }, m.value));
+  card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, m.label));
+  grid.appendChild(card);
+ });
+ container.appendChild(grid);
+}
+
 function _renderMemberCaseChecklist(container, caseId) {
  var section = el('div', { style: { padding: '0 16px 12px' } });
  section.appendChild(el('h3', { className: 'section-title' }, 'Case Checklist'));
@@ -4904,7 +5775,7 @@ function renderReportCard(appContainer) {
   { label: 'Steward Contact', value: scores.scores.contact, tip: 'Stay in touch with your steward', color: 'hsl(340,65%,55%)' }
   ];
 
-  var dimCard = el('div', { className: 'card card-glass', style: { padding: '14px' } });
+  var dimCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px' } });
   dimCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text)', marginBottom: '12px' } }, 'Score Breakdown'));
   dims.forEach(function(dim) {
   var row = el('div', { style: { marginBottom: '10px' } });
@@ -4925,10 +5796,10 @@ function renderReportCard(appContainer) {
   content.appendChild(dimCard);
 
   
-  var actCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginTop: '12px' } });
+  var actCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px', marginTop: '12px' } });
   actCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, 'Activity Summary'));
 
-  var statsGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } });
+  var statsGrid = el('div', { className: _TG, style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } });
 
   
   var meetCard = el('div', { style: { textAlign: 'center', padding: '10px', borderRadius: '10px', background: 'var(--accentBg)' } });
@@ -5265,9 +6136,9 @@ function renderMinutesPage(appContainer) {
  
  
  
- var grievCta = el('div', { className: 'card card-glass', style: { padding: '12px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } });
+ var grievCta = el('div', { className: 'card card-glass ' + _TC, style: { padding: '12px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } });
  grievCta.appendChild(el('span', { className: 'text-base' }, 'Have a workplace issue?'));
- grievCta.appendChild(el('button', { className: 'btn btn-primary', style: { fontSize: '12px', padding: '6px 12px' },
+ grievCta.appendChild(el('button', { className: 'btn btn-primary ' + _TB, style: { fontSize: '12px', padding: '6px 12px' },
   onClick: function() {
   var app = document.getElementById('app');
   if (app) renderMyCases(app);
@@ -5296,7 +6167,7 @@ function renderMinutesPage(appContainer) {
   pageSize: 10,
   emptyText: 'No matching minutes.',
   renderItem: function(listArea, m) {
-   var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
+   var card = el('div', { className: 'card card-glass card-clickable ' + _TC, style: { padding: '14px', marginBottom: '8px' } });
    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
    header.appendChild(el('span', { className: 'display-title-sm' }, m.title));
    header.appendChild(el('span', { className: 'text-xs-muted' }, m.meetingDate));
@@ -5568,7 +6439,7 @@ function renderQAForum(appContainer, role) {
   });
   
   if (useOrgWide) {
-  caller.qaGetOrgWideQuestions(SESSION_TOKEN, currentPage, 20, currentSort);
+  caller.qaGetOrgWideQuestions(SESSION_TOKEN, currentPage, 20, currentSort, showResolved);
   } else {
   caller.qaGetQuestions(SESSION_TOKEN, currentPage, 20, currentSort, showResolved);
   }

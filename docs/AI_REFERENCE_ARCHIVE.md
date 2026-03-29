@@ -2416,32 +2416,31 @@ This 558 KB total is near HtmlService limits. **P1 fix needed**: lazy-load only 
 ### What was added
 5 switchable navigation visual themes, stored per-user in localStorage.
 
-### Theme definitions
+### Theme definitions (updated v4.45.0)
 | Theme ID | Label | Type | Visual |
 |----------|-------|------|--------|
 | `default` | Default | default | Standard nav — follows dark/light mode |
-| `blobLava` | Blob Lava | default | Morphing lava-lamp blob tracks active tab |
 | `cyberpunk` | Cyberpunk | extra | Grid lines, scanlines, hard neon glow per tab |
 | `shatter` | Shatter | extra | Colored shard blocks per tab, flash-on-select |
-| `liquidPour` | Liquid Pour | extra | Floating bubble-style nav items with per-tab color |
+| `glassArchive` | Glass Archive | extra | Ethereal glassmorphism — frosted panes, neon purple |
+| `editorial` | Editorial | extra | Editorial broadsheet — paper-like tonal layering |
+| `analogCommander` | Analog Commander | extra | Tactical HUD — zero-radius brutalism, neon green |
 
 ### Architecture
-1. **NavThemes engine** (`index.html`): Singleton object providing theme registry, per-tab color mapping, localStorage persistence (`dds_navTheme` key), body class management (`nav-theme-{id}`).
-2. **Per-tab accent colors** (`NavThemes.TAB_COLORS`): Every sidebar/bottom tab ID mapped to a distinct color — used by blob indicator, shatter blocks, and liquid bubbles.
-3. **CSS themes** (`styles.html`): 5 theme rulesets scoped via `.nav-theme-{id}` body class. Includes CSS animations: `blobMorph`, `blobPulse`, `cpGridMove`, `cpScanline`, `cpFlicker`, `shatterGlow`, `bubbleFloat1/2`, `bubblePop`.
-4. **Blob indicator** (`steward_view.html` `renderBottomNav`): For blobLava and cyberpunk themes, a `.nav-blob-indicator` div is added to `.bottom-nav` and positioned via `requestAnimationFrame` to sit behind the active tab. CSS vars `--blob-color`, `--blob-glow` drive coloring.
-5. **Theme picker** (`index.html` `renderSidebarItems`): Expandable panel in sidebar under "Nav Style" item. Shows all 5 themes with emoji, label, description, DEFAULT/EXTRA badge, and checkmark for active.
+1. **UnifiedTheme engine** (`index.html`): Singleton object providing theme registry, per-tab color mapping, localStorage persistence (`dds_navTheme` key), body class management (`theme-{id} nav-theme-{id}`).
+2. **Per-tab accent colors** (`UnifiedTheme` `TAB_COLORS`): Every sidebar/bottom tab ID mapped to a distinct color — used by shatter blocks.
+3. **CSS themes** (`styles.html`): Theme rulesets scoped via `.theme-{id}` body class. Includes CSS animations: `cpGridMove`, `cpScanline`, `cpFlicker`, `shatterGlow`.
+4. **Forced palettes** (`FORCED_PALETTES`): glassArchive, editorial, and analogCommander override role colors with full dark/light palette variants.
+5. **Theme picker** (`index.html` `renderSidebarItems`): Expandable panel in sidebar under "Visual Style" item. Shows all 6 themes with emoji, label, and description.
 
 ### How it works — dynamic, never hardcoded
-- Tab colors come from `NavThemes.TAB_COLORS` map — adding new tabs auto-inherits default color
-- Theme preference persisted in localStorage, read on init
+- Tab colors come from `UnifiedTheme` `TAB_COLORS` map — adding new tabs auto-inherits default color
+- Theme preference persisted in localStorage (`dds_navTheme`), read on init
 - Body class controls all visual styling — zero inline style overrides for themes
-- Sidebar active items get `--blob-color` CSS var set dynamically per tab
 
 ### Files modified
-1. `src/index.html` — AppState.navTheme, NavThemes engine, NavThemes.init() in initApp(), sidebar theme picker, sidebar active item color vars
-2. `src/styles.html` — 5 theme CSS rulesets (~200 lines), theme picker UI styles
-3. `src/steward_view.html` — renderBottomNav rewritten with blob indicator, per-tab colors, theme-aware rendering
+1. `src/index.html` — AppState.navTheme, UnifiedTheme engine, UnifiedTheme.init() in initApp(), sidebar theme picker
+2. `src/styles.html` — Theme CSS rulesets (cyberpunk, shatter), theme picker UI styles
 
 ### IMPORTANT rules preserved
 - Everything dynamic, nothing hardcoded

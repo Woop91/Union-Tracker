@@ -84,7 +84,8 @@ function _prefetchInsights() {
         hotSpots: batch.hotSpots || [],
         perf: batch.perf || [],
         sat: batch.sat || { categories: [] },
-        memberStats: batch.memberStats || null
+        memberStats: batch.memberStats || null,
+        workload: batch.workload || { available: false }
       };
     }).withFailureHandler(function() { /* optional prefetch — ignore errors */ }).dataGetInsightsBatch(SESSION_TOKEN);
   }, 3000);
@@ -97,7 +98,7 @@ function _prefetchInsights() {
 function _stewardHeader(container, title, subtitle) {
   var header = el('div', { className: 'page-header' });
   var headerLeft = el('div', { className: 'page-header-left' });
-  headerLeft.appendChild(el('div', { className: 'page-title' }, title));
+  headerLeft.appendChild(el('div', { className: 'page-title ' + _TD }, title));
   if (subtitle) headerLeft.appendChild(el('div', { className: 'page-subtitle' }, subtitle));
   header.appendChild(headerLeft);
 
@@ -157,11 +158,11 @@ function _renderMobileQuickToolbar(container) {
 // ═══════════════════════════════════════
 
 function _renderStewardFeedbackCard(container, fb) {
-  var card = el('div', { className: 'card card-glass card-fade-in', style: { margin: '0 0 14px', padding: '16px' } });
+  var card = el('div', { className: 'card card-glass card-fade-in ' + _TC, style: { margin: '0 0 14px', padding: '16px' } });
 
   // Header row
   var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
-  header.appendChild(el('div', { className: 'display-title-sm' }, 'Your Feedback Scores'));
+  header.appendChild(el('div', { className: 'display-title-sm ' + _TL }, 'Your Feedback Scores'));
   header.appendChild(el('div', { className: 'text-xs-muted' }, fb.totalFeedback + ' rating' + (fb.totalFeedback !== 1 ? 's' : '')));
   card.appendChild(header);
 
@@ -277,7 +278,7 @@ function renderStewardDashboard(appContainer) {
     container.appendChild(alertSlot);
     serverCall().withSuccessHandler(function(alerts) {
       if (!alerts || alerts.length === 0) return;
-      var alertCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '12px', border: '1px solid var(--warning, #eab308)', background: 'rgba(234, 179, 8, 0.05)' } });
+      var alertCard = el('div', { className: 'card ' + _TC, style: { padding: '12px', marginBottom: '12px', border: '1px solid var(--warning, #eab308)', background: 'rgba(234, 179, 8, 0.05)' } });
       alertCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--warning, #eab308)', marginBottom: '8px' } }, 'Trend Alerts (' + alerts.length + ')'));
       alerts.forEach(function(alert) {
         var row = el('div', { style: { padding: '8px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' } });
@@ -587,7 +588,7 @@ function _renderStewardWelcome(container) {
   try { if (localStorage.getItem('dds_steward_welcomed') === 'true') return; } catch (_e) { return; }
 
   var card = el('div', {
-    className: 'card card-glass card-fade-in',
+    className: 'card card-glass card-fade-in ' + _TC,
     style: {
       padding: '24px 20px',
       margin: '0 0 14px',
@@ -633,7 +634,7 @@ function _renderStewardWelcome(container) {
 
   quickActions.forEach(function (qa) {
     var actionCard = el('div', {
-      className: 'card card-clickable',
+      className: 'card card-clickable ' + _TC,
       style: {
         padding: '12px',
         textAlign: 'center',
@@ -678,7 +679,7 @@ function _maybeShowWelcome(slot, viewRole) {
     if (!data || !data.isFirstVisit) return;
 
     var card = el('div', {
-      className: 'card card-glass card-fade-in',
+      className: 'card card-glass card-fade-in ' + _TC,
       style: {
         padding: '24px 20px',
         margin: '0 0 14px',
@@ -705,7 +706,7 @@ function _maybeShowWelcome(slot, viewRole) {
 
     (data.quickActions || []).forEach(function(qa) {
       var actionCard = el('div', {
-        className: 'card card-clickable',
+        className: 'card card-clickable ' + _TC,
         style: {
           padding: '12px',
           textAlign: 'center',
@@ -771,7 +772,7 @@ function _renderCasesFinderPanel(container, cases, onFilterChange) {
 
   // Header
   var header = el('div', { className: 'finder-panel-header' });
-  header.appendChild(el('div', { className: 'finder-panel-title' }, 'Case Finder'));
+  header.appendChild(el('div', { className: 'finder-panel-title ' + _TL }, 'Case Finder'));
   var badge = el('div', { className: 'finder-panel-badge', 'aria-live': 'polite' }, cases.length + ' cases');
   header.appendChild(badge);
   panel.appendChild(header);
@@ -819,7 +820,7 @@ function _renderCasesFinderPanel(container, cases, onFilterChange) {
   cases.forEach(function(c) { if (c.step) steps[c.step] = true; });
   var stepKeys = Object.keys(steps).sort();
   if (stepKeys.length > 1) {
-    var stepSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '5px 8px' }, 'aria-label': 'Filter by step' });
+    var stepSelect = el('select', { className: 'form-select ' + _TI, style: { width: 'auto', fontSize: '12px', padding: '5px 8px' }, 'aria-label': 'Filter by step' });
     stepSelect.appendChild(el('option', { value: '' }, 'All Steps'));
     stepKeys.forEach(function(s) { stepSelect.appendChild(el('option', { value: s }, s)); });
     stepSelect.addEventListener('change', function() { filterState.step = stepSelect.value; _fireChange(); });
@@ -831,7 +832,7 @@ function _renderCasesFinderPanel(container, cases, onFilterChange) {
   cases.forEach(function(c) { if (c.unit) units[c.unit] = true; });
   var unitKeys = Object.keys(units).sort();
   if (unitKeys.length > 1) {
-    var unitSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '5px 8px' }, 'aria-label': 'Filter by unit' });
+    var unitSelect = el('select', { className: 'form-select ' + _TI, style: { width: 'auto', fontSize: '12px', padding: '5px 8px' }, 'aria-label': 'Filter by unit' });
     unitSelect.appendChild(el('option', { value: '' }, 'All Units'));
     unitKeys.forEach(function(u) { unitSelect.appendChild(el('option', { value: u }, u)); });
     unitSelect.addEventListener('change', function() { filterState.unit = unitSelect.value; _fireChange(); });
@@ -913,8 +914,9 @@ function renderCaseList(container, filterOrCases, isFiltered) {
     }
   }
 
+  var filterLabel = isFiltered ? 'matching' : (filter || 'matching');
   if (cases.length === 0) {
-    if (filter === 'all' && AppState.cases.length === 0) {
+    if (!isFiltered && filter === 'all' && AppState.cases.length === 0) {
       // No cases at all — show agency-wide stats as fallback
       var agencySlot = el('div', { style: { textAlign: 'center', padding: '20px 0' } });
       agencySlot.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', marginBottom: '14px' } }, 'No cases currently assigned to you.'));
@@ -931,14 +933,14 @@ function renderCaseList(container, filterOrCases, isFiltered) {
         if (typeof ChartHelper !== 'undefined') {
           var sLabels = Object.keys(data.byStatus);
           var sData = sLabels.map(function(k) { return data.byStatus[k]; });
-          var sCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '8px', textAlign: 'left' } });
+          var sCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px', marginBottom: '8px', textAlign: 'left' } });
           sCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Status Breakdown'));
           ChartHelper.createDoughnutChart(sCard, 'agency-status-chart', sLabels, sData);
           agencyCharts.appendChild(sCard);
           if (data.byStep) {
             var stLabels = Object.keys(data.byStep);
             var stData = stLabels.map(function(k) { return data.byStep[k]; });
-            var stCard = el('div', { className: 'card card-glass', style: { padding: '14px', textAlign: 'left' } });
+            var stCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px', textAlign: 'left' } });
             stCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Step'));
             ChartHelper.createBarChart(stCard, 'agency-step-chart', stLabels, [{ label: 'Count', data: stData }]);
             agencyCharts.appendChild(stCard);
@@ -949,7 +951,7 @@ function renderCaseList(container, filterOrCases, isFiltered) {
       }).dataGetGrievanceStats(SESSION_TOKEN);
     } else {
       container.appendChild(el('div', { className: 'empty-state-lg' },
-        'No ' + filter + ' cases.'));
+        'No ' + filterLabel + ' cases.'));
     }
     return;
   }
@@ -960,7 +962,7 @@ function renderCaseList(container, filterOrCases, isFiltered) {
   LazyList.render(container, cases, function(c) {
     var isOverdue = c.status === 'overdue';
     var statusClass = c.status || 'active';
-    var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
+    var card = el('div', { className: 'card card-clickable ' + _TC, style: { padding: '11px 14px', marginBottom: '6px' } });
 
     var topRow = el('div', { className: 'flex-between-center' });
     var leftGroup = el('div', { className: 'flex-row' });
@@ -1119,7 +1121,7 @@ function _renderMemberFinderPanel(container, members, onFilterChange) {
 
   // Header
   var header = el('div', { className: 'finder-panel-header' });
-  header.appendChild(el('div', { className: 'finder-panel-title' }, 'Member Finder'));
+  header.appendChild(el('div', { className: 'finder-panel-title ' + _TL }, 'Member Finder'));
   var badge = el('div', { className: 'finder-panel-badge', 'aria-live': 'polite' }, members.length + ' members');
   header.appendChild(badge);
   panel.appendChild(header);
@@ -1624,7 +1626,7 @@ function renderStewardMembers(appContainer) {
       // If members already rendered, insert chart before the finder panel
       var finderEl = content.querySelector('.finder-panel');
       if (finderEl && stats && stats.byLocation && typeof ChartHelper !== 'undefined') {
-        var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
+        var locCard = el('div', { className: 'card ' + _TC, style: { padding: '12px', marginBottom: '14px' } });
         var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
         locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
         var lLabels = Object.keys(stats.byLocation);
@@ -1679,7 +1681,7 @@ function _renderBulkMembers(content, appContainer, _prefetchedStats) {
 
       // OPT-6: If stats already arrived from parallel call, render chart now
       if (_prefetchedStats && _prefetchedStats.byLocation && typeof ChartHelper !== 'undefined') {
-        var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
+        var locCard = el('div', { className: 'card ' + _TC, style: { padding: '12px', marginBottom: '14px' } });
         var locLabel = _prefetchedStats.scope === 'all' ? 'All Members by Location' : 'By Location';
         locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
         var lLabels = Object.keys(_prefetchedStats.byLocation);
@@ -1745,7 +1747,7 @@ function _renderPaginatedMembers(content, appContainer, counts, _prefetchedStats
 
   // Filter controls (server-side filtering)
   var controlRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } });
-  var filterSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
+  var filterSelect = el('select', { className: 'form-select ' + _TI, style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
   filterSelect.appendChild(el('option', { value: 'all' }, 'All Members'));
   filterSelect.appendChild(el('option', { value: 'assigned' }, 'Assigned to Me'));
   filterSelect.appendChild(el('option', { value: 'grievance' }, 'Has Open Case'));
@@ -1855,7 +1857,7 @@ function _renderMemberKPIs(container, total, activeGrievances, myCount) {
 
 function _renderStatsChart(container, stats) {
   if (stats && stats.byLocation && typeof ChartHelper !== 'undefined') {
-    var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
+    var locCard = el('div', { className: 'card ' + _TC, style: { padding: '12px', marginBottom: '14px' } });
     var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
     locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
     var lLabels = Object.keys(stats.byLocation);
@@ -2117,7 +2119,7 @@ function _showMemberDetail(container, itemEl, member) {
       var form = el('div', { style: { borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' } });
       form.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '\uD83D\uDD14 Send Notification — ' + (member.name || member.email)));
 
-      var subjectInput = el('input', { className: 'form-input mb-6', placeholder: 'Subject...' });
+      var subjectInput = el('input', { className: 'form-input mb-6 ' + _TI, placeholder: 'Subject...' });
       var bodyInput = el('textarea', { className: 'msg-textarea', placeholder: 'Message body...', style: { minHeight: '70px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' } });
       form.appendChild(subjectInput);
       form.appendChild(bodyInput);
@@ -2197,9 +2199,7 @@ function _showMemberDetail(container, itemEl, member) {
     onClick: function() {
       // Pre-select member and navigate to grievance form
       _grievancePreselectedMember = member;
-      if (typeof navigateTo === 'function') {
-        navigateTo('newgrievance');
-      }
+      _handleTabNav('steward', 'newgrievance');
     }
   }, '\uD83D\uDCDD Start Grievance');
 
@@ -2280,7 +2280,7 @@ function _showMemberDetail(container, itemEl, member) {
                 pinStatus.textContent = 'Server error. Try again.';
                 pinStatus.style.color = 'var(--danger)';
               })
-              .stewardManageMemberPIN(SESSION_TOKEN, member.email);
+              .devStewardManageMemberPIN(SESSION_TOKEN, member.email);
           }
         }, '\uD83D\uDD11 Generate PIN');
 
@@ -2319,13 +2319,13 @@ function _showCommLogPanel(parentContainer, memberEmail) {
   // Log new contact form
   var form = el('div', { style: { marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle, var(--border))' } });
 
-  var typeSelect = el('select', { className: 'form-input', style: { marginBottom: '6px' } });
+  var typeSelect = el('select', { className: 'form-input ' + _TI, style: { marginBottom: '6px' } });
   ['email', 'call', 'meeting', 'text', 'other'].forEach(function(t) {
     typeSelect.appendChild(el('option', { value: t }, t.charAt(0).toUpperCase() + t.slice(1)));
   });
   form.appendChild(typeSelect);
 
-  var subjectInput = el('input', { type: 'text', className: 'form-input', placeholder: 'Subject...', style: { marginBottom: '6px' } });
+  var subjectInput = el('input', { type: 'text', className: 'form-input ' + _TI, placeholder: 'Subject...', style: { marginBottom: '6px' } });
   form.appendChild(subjectInput);
 
   var notesInput = el('textarea', { className: 'msg-textarea', placeholder: 'Notes (optional)...', style: { minHeight: '50px', marginBottom: '6px', width: '100%', boxSizing: 'border-box' } });
@@ -2573,7 +2573,7 @@ function renderBroadcast(appContainer) {
     subjectGroup.appendChild(subjectHint);
     var subjectInput = el('input', {
       type: 'text',
-      className: 'form-input',
+      className: 'form-input ' + _TI,
       placeholder: CONFIG.orgAbbrev + ' - Message from your ' + CONFIG.stewardLabel,
       style: { width: '100%', boxSizing: 'border-box' }
     });
@@ -2590,8 +2590,8 @@ function renderBroadcast(appContainer) {
     var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
     content.appendChild(statusMsg);
 
-    content.appendChild(el('button', {
-      className: 'btn btn-primary',
+    var sendBtn = el('button', {
+      className: 'btn btn-primary ' + _TB,
       onClick: function() {
         var msg = msgTextarea.value.trim();
         if (!msg) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger)'; return; }
@@ -2602,18 +2602,22 @@ function renderBroadcast(appContainer) {
         if (days.length > 0) filter.officeDays = days.join(',');
         if (selectedDuesPaying) filter.duesPaying = selectedDuesPaying;
         var customSubject = subjectInput.value.trim() || null;
+        sendBtn.disabled = true;
         statusMsg.textContent = 'Sending...';
         statusMsg.style.color = 'var(--muted)';
         serverCall().withSuccessHandler(function(result) {
+          sendBtn.disabled = false;
           statusMsg.textContent = result && result.success ? result.message : (result && result.message) || 'Error sending.';
           statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
           if (result && result.success) { msgTextarea.value = ''; subjectInput.value = ''; }
         }).withFailureHandler(function() {
+          sendBtn.disabled = false;
           statusMsg.textContent = 'Error sending. Try again.';
           statusMsg.style.color = 'var(--danger)';
         }).dataSendBroadcast(SESSION_TOKEN, filter, msg, customSubject);
       }
-    }, 'Send Broadcast'));
+    }, 'Send Broadcast');
+    content.appendChild(sendBtn);
 
     container.appendChild(content);
   });
@@ -2661,7 +2665,7 @@ function renderStewardNotifications(appContainer) {
         var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
         notifications.forEach(function(n, idx) {
           var card = el('div', {
-            className: 'card card-glass notif-card card-fade-in' + (n.priority === 'Urgent' ? ' notif-urgent-border' : ''),
+            className: 'card card-glass notif-card card-fade-in ' + _TC + (n.priority === 'Urgent' ? ' notif-urgent-border' : ''),
             style: { animationDelay: (idx * 60) + 'ms' }
           });
           var top = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } });
@@ -2754,7 +2758,7 @@ function renderStewardNotifications(appContainer) {
       }
 
       function buildIndividualPicker() {
-        var searchInput = el('input', { className: 'form-input mb-8', placeholder: 'Search members...' });
+        var searchInput = el('input', { className: 'form-input mb-8 ' + _TI, placeholder: 'Search members...' });
         var listWrap = el('div', { style: { maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' } });
         recipientArea.appendChild(searchInput);
         recipientArea.appendChild(listWrap);
@@ -2788,7 +2792,7 @@ function renderStewardNotifications(appContainer) {
       // Type
       var typeGroup = el('div', { className: 'form-group' });
       typeGroup.appendChild(el('label', { className: 'form-label' }, 'Type'));
-      var typeSelect = el('select', { className: 'form-input' });
+      var typeSelect = el('select', { className: 'form-input ' + _TI });
       ['Steward Message', 'Announcement', 'Deadline', 'System'].forEach(function(t) {
         typeSelect.appendChild(el('option', { value: t }, t));
       });
@@ -2807,13 +2811,13 @@ function renderStewardNotifications(appContainer) {
       prioBar.appendChild(urgentBtn);
 
       // Title + Message
-      var titleInput = el('input', { className: 'form-input', placeholder: 'Notification title' });
+      var titleInput = el('input', { className: 'form-input ' + _TI, placeholder: 'Notification title' });
       var msgTextarea = el('textarea', { className: 'msg-textarea', placeholder: 'Write your message...' });
 
       // Expires
       var expiresGroup = el('div', { className: 'form-group' });
       expiresGroup.appendChild(el('label', { className: 'form-label' }, 'Expires (optional)'));
-      var expiresInput = el('input', { className: 'form-input', type: 'date' });
+      var expiresInput = el('input', { className: 'form-input ' + _TI, type: 'date' });
       expiresGroup.appendChild(expiresInput);
 
       // Dismiss Mode (v4.22.0)
@@ -2843,7 +2847,7 @@ function renderStewardNotifications(appContainer) {
 
       var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
 
-      var sendBtn = el('button', { className: 'btn btn-primary', onClick: function() {
+      var sendBtn = el('button', { className: 'btn btn-primary ' + _TB, onClick: function() {
         if (!selectedRecipient) { statusMsg.textContent = 'Please select a recipient.'; statusMsg.style.color = 'var(--danger)'; return; }
         if (!titleInput.value.trim()) { statusMsg.textContent = 'Please enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
         if (!msgTextarea.value.trim()) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger)'; return; }
@@ -3012,7 +3016,7 @@ function renderStewardResources(appContainer) {
       quickLinks.forEach(function(r) {
         if (!r.url) return;
         var item = el('div', {
-          className: 'card card-clickable',
+          className: 'card card-clickable ' + _TC,
           style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
           onClick: function() {
             window.open(r.url, '_blank');
@@ -3021,7 +3025,7 @@ function renderStewardResources(appContainer) {
         });
         item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
         var tg = el('div', { className: 'flex-1' });
-        tg.appendChild(el('div', { className: 'display-section' }, r.label));
+        tg.appendChild(el('div', { className: 'display-section ' + _TL }, r.label));
         tg.appendChild(el('div', { className: 'text-xs-muted' }, r.sub));
         item.appendChild(tg);
         item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
@@ -3081,7 +3085,7 @@ function renderStewardResources(appContainer) {
           return;
         }
         filtered.forEach(function(r, idx) {
-          var card = el('div', { className: 'card card-glass res-card card-clickable card-fade-in', style: { animationDelay: (idx * 50) + 'ms' } });
+          var card = el('div', { className: 'card card-glass res-card card-clickable card-fade-in ' + _TC, style: { animationDelay: (idx * 50) + 'ms' } });
           card.appendChild(el('div', { className: 'res-card-icon' }, r.icon || '\uD83D\uDCC4'));
           card.appendChild(el('span', { className: 'notif-type-badge notif-type-announcement', style: { fontSize: '10px', marginBottom: '6px' } }, r.category));
           card.appendChild(el('div', { className: 'res-card-title' }, r.title));
@@ -3284,7 +3288,7 @@ function renderStewardResources(appContainer) {
         formWrap.appendChild(statusMsg);
 
         var btnRow = el('div', { className: 'flex-gap-8' });
-        var saveBtn = el('button', { className: 'btn btn-primary', onClick: function() {
+        var saveBtn = el('button', { className: 'btn btn-primary ' + _TB, onClick: function() {
           if (!fields.title.value.trim()) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
           saveBtn.textContent = 'Saving...';
           saveBtn.disabled = true;
@@ -3387,7 +3391,7 @@ function renderStewardKnowledge(appContainer) {
         var loading = el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Loading content...');
         listWrap.appendChild(loading);
 
-        serverCall('getKnowledgeContent', [], function(items) {
+        serverCall().withSuccessHandler(function(items) {
           listWrap.innerHTML = '';
           listWrap.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', fontStyle: 'italic' } }, 'Showing active content only. Switch to Manage tab to see all items.'));
           if (!items || !items.length) {
@@ -3457,7 +3461,11 @@ function renderStewardKnowledge(appContainer) {
 
             listWrap.appendChild(card);
           });
-        });
+        }).withFailureHandler(function() {
+          listWrap.innerHTML = '';
+          listWrap.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--danger)' } }, 'Failed to load content.'));
+          listWrap.appendChild(el('button', { className: 'btn btn-sm', style: { margin: '8px auto', display: 'block' }, onClick: renderCards }, 'Retry'));
+        }).getKnowledgeContent(SESSION_TOKEN);
       }
 
       typeSelect.addEventListener('change', renderCards);
@@ -3480,10 +3488,14 @@ function renderStewardKnowledge(appContainer) {
         var loading = el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Loading...');
         listWrap.appendChild(loading);
 
-        serverCall('getKnowledgeContentAll', [], function(items) {
+        serverCall().withSuccessHandler(function(items) {
           allItems = items || [];
           renderList();
-        });
+        }).withFailureHandler(function() {
+          listWrap.innerHTML = '';
+          listWrap.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--danger)' } }, 'Failed to load content.'));
+          listWrap.appendChild(el('button', { className: 'btn btn-sm', style: { margin: '8px auto', display: 'block' }, onClick: loadItems }, 'Retry'));
+        }).getKnowledgeContentAll(SESSION_TOKEN);
       }
 
       function renderList() {
@@ -3532,10 +3544,10 @@ function renderStewardKnowledge(appContainer) {
           var toggleBtn = el('button', { className: 'btn btn-sm', style: { fontSize: '11px', padding: '2px 8px' }, onClick: function() {
             if (item.active && !confirm('Deactivate "' + (item.title || item.id) + '"? It can be reactivated later.')) return;
             var fn = item.active ? 'deleteKnowledgeContent' : 'restoreKnowledgeContent';
-            serverCall(fn, [window._sessionToken || '', item.id], function(res) {
+            serverCall().withSuccessHandler(function(res) {
               if (res && res.success) loadItems();
               else alert((res && res.message) || 'Error');
-            });
+            }).withFailureHandler(function() { alert('Network error. Please try again.'); })[fn](SESSION_TOKEN, item.id);
           } }, item.active ? 'Deactivate' : 'Activate');
           row.appendChild(toggleBtn);
 
@@ -3637,19 +3649,19 @@ function renderStewardKnowledge(appContainer) {
           saveBtn.textContent = 'Saving...';
 
           if (isEdit) {
-            serverCall('updateKnowledgeContent', [window._sessionToken || '', existing.id, payload], function(res) {
+            serverCall().withSuccessHandler(function(res) {
               saveBtn.disabled = false;
               saveBtn.textContent = 'Save';
               if (res && res.success) { formWrap.innerHTML = ''; loadItems(); }
               else alert((res && res.message) || 'Error saving');
-            });
+            }).withFailureHandler(function() { saveBtn.disabled = false; saveBtn.textContent = 'Save'; alert('Network error. Please try again.'); }).updateKnowledgeContent(SESSION_TOKEN, existing.id, payload);
           } else {
-            serverCall('addKnowledgeContent', [window._sessionToken || '', payload], function(res) {
+            serverCall().withSuccessHandler(function(res) {
               saveBtn.disabled = false;
               saveBtn.textContent = 'Save';
               if (res && res.success) { formWrap.innerHTML = ''; loadItems(); }
               else alert((res && res.message) || 'Error saving');
-            });
+            }).withFailureHandler(function() { saveBtn.disabled = false; saveBtn.textContent = 'Save'; alert('Network error. Please try again.'); }).addKnowledgeContent(SESSION_TOKEN, payload);
           }
         } }, 'Save');
         btns.appendChild(saveBtn);
@@ -3713,7 +3725,7 @@ function _renderKnowledgeBase(container) {
   // Add Article button (steward-only — always visible in steward view)
   var addFormContainer = el('div', { style: { display: 'none' } });
   var addBtn = el('button', {
-    className: 'btn btn-primary',
+    className: 'btn btn-primary ' + _TB,
     style: { marginBottom: '12px' },
     onclick: function() {
       var isVisible = addFormContainer.style.display !== 'none';
@@ -3730,7 +3742,7 @@ function _renderKnowledgeBase(container) {
   var searchInput = el('input', { type: 'text', className: 'form-input search-input', placeholder: 'Search contract articles...' });
   searchInput.style.flex = '1';
   var searchBtn = el('button', {
-    className: 'btn btn-primary',
+    className: 'btn btn-primary ' + _TB,
     onclick: function() { _searchArticles(searchInput.value, resultsContainer); }
   }, 'Search');
   searchRow.appendChild(searchInput);
@@ -3767,7 +3779,7 @@ function _searchArticles(query, container) {
 
     articles.forEach(function(article) {
       var card = el('div', {
-        className: 'card card-clickable',
+        className: 'card card-clickable ' + _TC,
         style: { padding: '14px', marginBottom: '8px', cursor: 'pointer' },
         onclick: function() { _showArticleDetail(container, article.id); }
       });
@@ -3830,7 +3842,7 @@ function _showArticleDetail(parentContainer, articleId) {
     }, '\u2190 Back to Articles');
     parentContainer.appendChild(backBtn);
 
-    var detail = el('div', { className: 'card', style: { padding: '20px' } });
+    var detail = el('div', { className: 'card ' + _TC, style: { padding: '20px' } });
     detail.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '4px' } }, 'Article ' + escapeHtml(String(article.articleNumber || ''))));
     detail.appendChild(el('h2', { style: { fontSize: '18px', marginBottom: '12px' } }, escapeHtml(String(article.title || ''))));
 
@@ -3903,7 +3915,7 @@ function _renderAddArticleForm(container) {
   });
 
   var saveBtn = el('button', {
-    className: 'btn btn-primary',
+    className: 'btn btn-primary ' + _TB,
     onclick: function() {
       var num = inputs['kb-num'].value.trim();
       var title = inputs['kb-title'].value.trim();
@@ -4003,9 +4015,9 @@ function renderSurveyTracking(appContainer) {
 
         // ── Overall progress bar ───────────────────────────────────────
         if (total > 0) {
-          var progCard = el('div', { className: 'card p-16-mb-10' });
+          var progCard = el('div', { className: 'card p-16-mb-10 ' + _TC });
           var progHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
-          progHeader.appendChild(el('div', { className: 'display-title-sm' }, 'Response Rate'));
+          progHeader.appendChild(el('div', { className: 'display-title-sm ' + _TL }, 'Response Rate'));
           progHeader.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '700', color: rate >= 80 ? 'var(--success)' : rate >= 50 ? 'var(--warning)' : 'var(--danger)' } }, rate + '%'));
           progCard.appendChild(progHeader);
 
@@ -4313,11 +4325,11 @@ function renderStewardMore(appContainer) {
     var content = el('div', { className: 'content' });
 
     // ── Share Phone toggle card ───────────────────────────────────────────
-    var phoneCard = el('div', { className: 'card card-glass', style: { padding: '14px 16px', marginBottom: '14px' } });
+    var phoneCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px 16px', marginBottom: '14px' } });
     var phoneRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
     phoneRow.appendChild(el('span', { style: { fontSize: '18px', flexShrink: '0' } }, '📞'));
     var phoneLabel = el('div', { className: 'flex-1' });
-    phoneLabel.appendChild(el('div', { className: 'display-section' }, 'Share My Phone Number'));
+    phoneLabel.appendChild(el('div', { className: 'display-section ' + _TL }, 'Share My Phone Number'));
     phoneLabel.appendChild(el('div', { className: 'text-xs-muted-mt-2' }, 'Allow members to see your phone in the directory'));
     phoneRow.appendChild(phoneLabel);
 
@@ -4404,16 +4416,21 @@ function renderStewardMore(appContainer) {
         setTimeout(function() { saveRow.style.display = 'none'; }, 3000);
       }).dataUpdateProfile(SESSION_TOKEN, { sharePhone: newVal ? 'Yes' : 'No' });
     }
-    toggleTrack.addEventListener('click', _doToggle);
-    toggleInput.addEventListener('change', function() { toggleInput.checked = _currentVal; _doToggle(); });
+    toggleTrack.addEventListener('click', function(e) {
+      // Prevent double-fire: ignore clicks on the hidden input itself (which also fires change)
+      if (e.target === toggleInput) return;
+      _doToggle();
+    });
 
     content.appendChild(phoneCard);
     // ─────────────────────────────────────────────────────────────────────
     var menuItems = [
       { group: 'Manage' },
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
       { group: 'Reference' },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('steward', 'poms'); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
       { group: 'Community' },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('steward', 'qaforum'); } },
@@ -4523,7 +4540,7 @@ function renderContactLog(appContainer) {
 
 function _renderContactForm(container) {
   var typeIcons = { 'Phone': '\uD83D\uDCDE', 'Email': '\u2709\uFE0F', 'In Person': '\uD83D\uDC64', 'Text': '\uD83D\uDCAC' };
-  container.appendChild(el('h3', { className: 'section-title' }, 'Log a Contact'));
+  container.appendChild(el('h3', { className: 'section-title ' + _TL }, 'Log a Contact'));
 
   var _memberAc = createAutocomplete({
     placeholder: 'Type name or email...',
@@ -4567,7 +4584,7 @@ function _renderContactForm(container) {
   container.appendChild(statusMsg);
 
   container.appendChild(el('button', {
-    className: 'btn btn-primary',
+    className: 'btn btn-primary ' + _TB,
     onClick: function() {
       var email = memberInput.value.trim();
       if (!email) { statusMsg.textContent = 'Enter a member email.'; statusMsg.style.color = 'var(--danger)'; return; }
@@ -4590,9 +4607,9 @@ function _renderRecentContacts(container) {
       return;
     }
     log.slice(0, 20).forEach(function(entry) {
-      var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px' } });
+      var card = el('div', { className: 'card ' + _TC, style: { padding: '12px 16px', marginBottom: '6px' } });
       var top = el('div', { className: 'flex-between' });
-      top.appendChild(el('span', { className: 'display-section' }, entry.memberName || (entry.memberEmail ? entry.memberEmail.split('@')[0] : '')));
+      top.appendChild(el('span', { className: 'display-section ' + _TL }, entry.memberName || (entry.memberEmail ? entry.memberEmail.split('@')[0] : '')));
       top.appendChild(el('span', { className: 'text-xs-muted' }, entry.date));
       card.appendChild(top);
       card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)' } }, entry.type));
@@ -4603,7 +4620,7 @@ function _renderRecentContacts(container) {
 }
 
 function _renderContactByMember(container) {
-  container.appendChild(el('h3', { className: 'section-title' }, 'Look Up by Member'));
+  container.appendChild(el('h3', { className: 'section-title ' + _TL }, 'Look Up by Member'));
   var _bmAc = createAutocomplete({
     placeholder: 'Type name or email...',
     loadData: function(cb) {
@@ -4632,7 +4649,7 @@ function _renderContactByMember(container) {
           return;
         }
         history.forEach(function(entry) {
-          var card = el('div', { className: 'card', style: { padding: '10px 14px', marginBottom: '4px' } });
+          var card = el('div', { className: 'card ' + _TC, style: { padding: '10px 14px', marginBottom: '4px' } });
           var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between' } });
           topRow.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600' } }, entry.type));
           topRow.appendChild(el('span', { className: 'text-xs-muted' }, entry.date));
@@ -4691,7 +4708,7 @@ function _renderTaskList(container, statusFilter) {
       var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
       var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
       var top = el('div', { className: 'flex-between' });
-      top.appendChild(el('div', { className: 'display-section' }, task.title));
+      top.appendChild(el('div', { className: 'display-section ' + _TL }, task.title));
       if (task.dueDate) top.appendChild(el('span', { style: { fontSize: '10px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, task.dueDate));
       card.appendChild(top);
       if (task.memberEmail) card.appendChild(el('div', { className: 'text-xs-muted' }, task.memberEmail.split('@')[0]));
@@ -4825,7 +4842,7 @@ function _renderStewardMemberTasks(container) {
       var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
       var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
       var top = el('div', { className: 'flex-between' });
-      top.appendChild(el('div', { className: 'display-section' }, task.title));
+      top.appendChild(el('div', { className: 'display-section ' + _TL }, task.title));
       var statusColor = task.status === 'completed' ? 'var(--success)' : 'var(--accent)';
       top.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', color: statusColor, background: statusColor + '18', padding: '2px 8px', borderRadius: '8px' } }, task.status));
       card.appendChild(top);
@@ -4861,7 +4878,7 @@ function _renderStewardMemberTasks(container) {
 }
 
 function _renderNewTaskForm(container, onCreated) {
-  container.appendChild(el('h3', { className: 'section-title' }, 'Create Task'));
+  container.appendChild(el('h3', { className: 'section-title ' + _TL }, 'Create Task'));
 
   // Assignee type toggle: Steward vs Member
   var assigneeType = 'steward';
@@ -4878,7 +4895,7 @@ function _renderNewTaskForm(container, onCreated) {
   // Member email field (shown when assignee type is member)
   var memberEmailGroup = el('div', { className: 'form-group', style: { display: 'none' } });
   memberEmailGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
-  var memberEmailInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  var memberEmailInput = el('input', { className: 'form-input ' + _TI, placeholder: 'member@example.com' });
   memberEmailGroup.appendChild(memberEmailInput);
   container.appendChild(memberEmailGroup);
 
@@ -4886,7 +4903,7 @@ function _renderNewTaskForm(container, onCreated) {
   var assignSelect = null;
   var assignGroup = el('div', { className: 'form-group', style: { display: 'none' } });
   assignGroup.appendChild(el('label', { className: 'form-label' }, 'Assign to steward'));
-  assignSelect = el('select', { className: 'form-select' });
+  assignSelect = el('select', { className: 'form-select ' + _TI });
   assignSelect.appendChild(el('option', { value: '' }, 'Myself'));
   assignGroup.appendChild(assignSelect);
   container.appendChild(assignGroup);
@@ -4914,7 +4931,7 @@ function _renderNewTaskForm(container, onCreated) {
 
   var titleGroup = el('div', { className: 'form-group' });
   titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
-  var titleInput = el('input', { className: 'form-input', placeholder: 'e.g., Check in on member' });
+  var titleInput = el('input', { className: 'form-input ' + _TI, placeholder: 'e.g., Check in on member' });
   titleGroup.appendChild(titleInput);
   container.appendChild(titleGroup);
 
@@ -4926,13 +4943,13 @@ function _renderNewTaskForm(container, onCreated) {
 
   var memberGroup = el('div', { className: 'form-group' });
   memberGroup.appendChild(el('label', { className: 'form-label' }, 'Related Member (optional, for steward tasks)'));
-  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  var memberInput = el('input', { className: 'form-input ' + _TI, placeholder: 'member@example.com' });
   memberGroup.appendChild(memberInput);
   container.appendChild(memberGroup);
 
   var priGroup = el('div', { className: 'form-group' });
   priGroup.appendChild(el('label', { className: 'form-label' }, 'Priority'));
-  var priSelect = el('select', { className: 'form-select' });
+  var priSelect = el('select', { className: 'form-select ' + _TI });
   ['medium', 'high', 'low'].forEach(function(p) {
     var opt = el('option', { value: p }, p.charAt(0).toUpperCase() + p.slice(1));
     priSelect.appendChild(opt);
@@ -4942,7 +4959,7 @@ function _renderNewTaskForm(container, onCreated) {
 
   var dueGroup = el('div', { className: 'form-group' });
   dueGroup.appendChild(el('label', { className: 'form-label' }, 'Due Date (optional)'));
-  var dueInput = el('input', { className: 'form-input', type: 'date' });
+  var dueInput = el('input', { className: 'form-input ' + _TI, type: 'date' });
   dueGroup.appendChild(dueInput);
   container.appendChild(dueGroup);
 
@@ -4950,7 +4967,7 @@ function _renderNewTaskForm(container, onCreated) {
   container.appendChild(statusMsg);
 
   container.appendChild(el('button', {
-    className: 'btn btn-primary',
+    className: 'btn btn-primary ' + _TB,
     onClick: function() {
       var title = titleInput.value.trim();
       if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
@@ -4973,7 +4990,7 @@ function _renderNewTaskForm(container, onCreated) {
         } else {
           serverCall().withSuccessHandler(function(r) {
             if (r && r.success) { if (typeof _refreshNavBadges === 'function') _refreshNavBadges(); onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-          }).withFailureHandler(function(e) { statusMsg.textContent = 'Network error creating task.'; statusMsg.style.color = 'var(--danger)'; console.error(e.message); }).dataCreateTask(SESSION_TOKEN, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '', _genIdemKey());
+          }).withFailureHandler(function(e) { statusMsg.textContent = 'Network error creating task.'; statusMsg.style.color = 'var(--danger)'; console.error(e.message); }).dataCreateTask(SESSION_TOKEN, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '', '', _genIdemKey());
         }
       }
     }
@@ -4999,12 +5016,12 @@ function renderInsightsPage(appContainer) {
     var cacheAge = cache ? (Date.now() - (cache.ts || 0)) : Infinity;
 
     if (cache && cacheAge < CACHE_TTL) {
-      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats, cache.workload);
       return;
     }
     if (cache) {
       // Stale: render stale immediately, refresh in background
-      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats);
+      _renderInsightsContent(content, cache.stats, cache.hotSpots, cache.perf, cache.sat, cache.memberStats, cache.workload);
     } else {
       showLoading(content);
     }
@@ -5017,15 +5034,17 @@ function renderInsightsPage(appContainer) {
       var perfData = batch.perf || (cache && cache.perf) || [];
       var satData = batch.sat || (cache && cache.sat) || { categories: [] };
       var memberStatsData = batch.memberStats || (cache && cache.memberStats) || null;
-      AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData, memberStats: memberStatsData };
-      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData);
+      var workloadData = batch.workload || (cache && cache.workload) || { available: false };
+      AppState.insightsCache = { ts: Date.now(), stats: statsData, hotSpots: hotSpotsData, perf: perfData, sat: satData, memberStats: memberStatsData, workload: workloadData };
+      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData);
     }).withFailureHandler(function() {
       var statsData = (cache && cache.stats) || { available: false };
       var hotSpotsData = (cache && cache.hotSpots) || [];
       var perfData = (cache && cache.perf) || [];
       var satData = (cache && cache.sat) || { categories: [] };
       var memberStatsData = (cache && cache.memberStats) || null;
-      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData);
+      var workloadData = (cache && cache.workload) || { available: false };
+      _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData);
     }).dataGetInsightsBatch(SESSION_TOKEN);
   });
 }
@@ -5040,7 +5059,7 @@ function renderInsightsPage(appContainer) {
  * @param {HTMLElement} container - Parent container to append card to.
  */
 function _renderReportGenerator(container) {
-  var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+  var card = el('div', { className: 'card ' + _TC, style: { padding: '16px', marginBottom: '16px' } });
   card.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Generate Report'));
 
   // Date range picker
@@ -5063,7 +5082,7 @@ function _renderReportGenerator(container) {
 
   var previewContainer = el('div', {});
 
-  var genBtn = el('button', { className: 'btn btn-primary',
+  var genBtn = el('button', { className: 'btn btn-primary ' + _TB,
     onclick: function() {
       genBtn.disabled = true;
       genBtn.textContent = 'Generating...';
@@ -5155,7 +5174,7 @@ function _renderReportPreview(container, report) {
   container.appendChild(preview);
 }
 
-function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData) {
+function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satData, memberStatsData, workloadData) {
   content.innerHTML = '';
   // Detail panel for drill-down views
   var detailPanel = el('div', { style: { display: 'none', marginBottom: '16px' } });
@@ -5225,6 +5244,7 @@ function _renderInsightsContent(content, statsData, hotSpotsData, perfData, satD
     _renderFiledVsResolved(mainContent, statsData);
   }
   if (memberStatsData && memberStatsData.available) _renderMembershipInsights(mainContent, memberStatsData, showDetail);
+  if (workloadData && (workloadData.success || workloadData.data)) _renderWorkloadInsights(mainContent, workloadData, showDetail);
   if (perfData && perfData.length > 0) _renderPerformanceSection(mainContent, perfData, showDetail);
   if (satData && satData.categories && satData.categories.length > 0) _renderSatisfactionSection(mainContent, satData, showDetail);
 
@@ -5311,10 +5331,163 @@ function _renderMembershipInsights(container, ms, showDetail) {
   container.appendChild(section);
 }
 
+// ═══════════════════════════════════════
+// PREDICTIVE WORKLOAD BALANCING (steward-only)
+// ═══════════════════════════════════════
+
+/**
+ * Renders workload prediction and rebalancing suggestion cards.
+ * Called from renderWorkloadTracker (in member_view.html) when role is steward.
+ * @param {Element} container - Container to append cards to
+ */
+function _renderWorkloadPredictions(container) {
+  // Prediction card
+  var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+  card.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Workload Predictions'));
+
+  var predictionContent = el('div');
+  card.appendChild(predictionContent);
+
+  serverCall().withSuccessHandler(function(pred) {
+    if (!pred) return;
+
+    var trendIcon = pred.trend === 'increasing' ? '\uD83D\uDCC8' : pred.trend === 'decreasing' ? '\uD83D\uDCC9' : '\u27A1\uFE0F';
+    var trendColor = pred.trend === 'increasing' ? '#ef4444' : pred.trend === 'decreasing' ? '#22c55e' : 'var(--muted)';
+
+    var row = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' } });
+
+    var currentBox = el('div', { style: { textAlign: 'center' } });
+    currentBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700' } }, String(pred.current)));
+    currentBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Current'));
+    row.appendChild(currentBox);
+
+    row.appendChild(el('span', { style: { fontSize: '20px', color: trendColor } }, trendIcon));
+
+    var predictedBox = el('div', { style: { textAlign: 'center' } });
+    predictedBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700', color: trendColor } }, String(pred.predicted)));
+    predictedBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Predicted'));
+    row.appendChild(predictedBox);
+
+    predictionContent.appendChild(row);
+
+    // Mini sparkline (CSS bars for history)
+    if (pred.history && pred.history.length > 0) {
+      var maxVal = Math.max.apply(null, pred.history) || 1;
+      var spark = el('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '2px', height: '40px', marginTop: '12px' } });
+      pred.history.forEach(function(v) {
+        var pct = Math.round((v / maxVal) * 100);
+        spark.appendChild(el('div', {
+          style: { flex: '1', height: pct + '%', background: 'var(--accent)', borderRadius: '2px 2px 0 0', minHeight: '2px' },
+          title: String(v) + ' items'
+        }));
+      });
+      predictionContent.appendChild(spark);
+      predictionContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Recent workload history'));
+    }
+  }).withFailureHandler(function() {
+    predictionContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load predictions.'));
+  }).dataGetWorkloadPrediction(SESSION_TOKEN, '');
+
+  container.appendChild(card);
+
+  // Rebalancing suggestions card
+  var rebalCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+  rebalCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Rebalancing Suggestions'));
+
+  var suggestContent = el('div');
+  rebalCard.appendChild(suggestContent);
+
+  serverCall().withSuccessHandler(function(suggestions) {
+    if (!suggestions || suggestions.length === 0) {
+      suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Workload is balanced across stewards.'));
+      return;
+    }
+    suggestions.forEach(function(s) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
+
+      var leftCol = el('div');
+      leftCol.appendChild(el('div', { style: { fontWeight: '500', fontSize: '14px' } }, escapeHtml(s.stewardEmail)));
+      leftCol.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, escapeHtml(s.suggestion)));
+      row.appendChild(leftCol);
+
+      var rightCol = el('div', { style: { textAlign: 'right', fontSize: '13px' } });
+      rightCol.appendChild(el('div', { style: { fontWeight: '600' } }, s.currentLoad + ' cases'));
+      rightCol.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'avg: ' + s.averageLoad));
+      row.appendChild(rightCol);
+
+      suggestContent.appendChild(row);
+    });
+  }).withFailureHandler(function() {
+    suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load suggestions.'));
+  }).dataGetRebalancingSuggestions(SESSION_TOKEN);
+
+  container.appendChild(rebalCard);
+}
+
+function _renderWorkloadInsights(container, wl, showDetail) {
+  // Workload data is nested: { success, data: { totalSubmissions, members, categories, averages } }
+  var d = (wl && wl.data) || wl || {};
+  if (!d || (!d.totalSubmissions && !d.categories)) return;
+
+  var section = el('div', { className: 'mb-16' });
+  section.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
+    color: 'var(--text)', marginBottom: '12px',
+  }}, 'Workload Overview'));
+
+  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '12px' } });
+
+  var totalSubmissions = d.totalSubmissions || 0;
+  var memberCount = d.members || 0;
+  grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
+    if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+  }));
+
+  // Extract averages from the data — averages keys are CATEGORY_LABELS values
+  var avgs = d.averages || {};
+  var avgPriority = parseFloat(avgs['Priority Cases']) || 0;
+  var avgPending = parseFloat(avgs['Pending Cases']) || 0;
+  var avgAged = parseFloat(avgs['Aged Cases']) || 0;
+
+  grid.appendChild(_insightCard('AVG PRIORITY CASES', avgPriority > 5 ? 'var(--danger)' : 'var(--success)', String(avgPriority), 'Per steward average', function() {
+    if (showDetail) showDetail('Workload Breakdown', function(panel) {
+      // Build items from all category averages
+      var items = [];
+      for (var key in avgs) {
+        items.push({ label: key + ' (avg)', count: parseFloat(avgs[key]) || 0 });
+      }
+      items.sort(function(a, b) { return b.count - a.count; });
+      _renderInsightDetailList(panel, items, 'var(--info)');
+      var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
+        if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
+      }}, 'View Workload Tracker \u2192');
+      panel.appendChild(navBtn);
+    });
+  }));
+
+  grid.appendChild(_insightCard('AVG PENDING', avgPending > 10 ? 'var(--warning)' : 'var(--success)', String(avgPending), 'Cases awaiting action'));
+  grid.appendChild(_insightCard('AVG AGED CASES', avgAged > 3 ? 'var(--danger)' : 'var(--success)', String(avgAged), 'Cases 60+ days old'));
+
+  // Overtime and employment mix from workload data
+  var avgOvertime = parseFloat(avgs['Overtime Hours']) || 0;
+  if (avgOvertime > 0) {
+    grid.appendChild(_insightCard('AVG OVERTIME', avgOvertime > 10 ? 'var(--danger)' : 'var(--warning)', String(avgOvertime) + 'h', 'Hours per steward'));
+  }
+  var avgFTE = parseFloat(avgs['Full-Time Employees']) || parseFloat(avgs['FTE Count']) || 0;
+  var avgPTE = parseFloat(avgs['Part-Time Employees']) || parseFloat(avgs['PTE Count']) || 0;
+  if (avgFTE > 0 || avgPTE > 0) {
+    var mixRatio = avgFTE > 0 ? Math.round((avgFTE / (avgFTE + avgPTE)) * 100) : 0;
+    grid.appendChild(_insightCard('EMPLOYMENT MIX', 'var(--accent)', mixRatio + '% FT', 'FT: ' + avgFTE + ' / PT: ' + avgPTE + ' avg'));
+  }
+
+  section.appendChild(grid);
+  container.appendChild(section);
+}
+
 function _fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
 function _insightCard(title, color, mainText, subText, onClick) {
-  var card = el('div', { className: 'card card-glass', style: {
+  var card = el('div', { className: 'card card-glass ' + _TC, style: {
     padding: '16px 18px', borderLeft: '3px solid ' + color,
     background: color + '08',
     cursor: onClick ? 'pointer' : 'default',
@@ -5432,7 +5605,7 @@ function _renderQuickInsights(container, stats, hotSpots, showDetail) {
 function _renderFiledVsResolved(container, stats) {
   if (typeof ChartHelper === 'undefined' || !stats.monthly || stats.monthly.length === 0) return;
 
-  var chartCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '16px' } });
+  var chartCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '16px', marginBottom: '16px' } });
   chartCard.appendChild(el('div', { style: {
     fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
     color: 'var(--text)', marginBottom: '12px',
@@ -5520,7 +5693,7 @@ function _renderPerformanceSection(container, perfData, showDetail) {
   section.appendChild(statsRow);
 
   // Top performers table
-  var tableCard = el('div', { className: 'card card-glass', style: { padding: '14px', overflow: 'auto' } });
+  var tableCard = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px', overflow: 'auto' } });
   var table = el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: 'var(--fontBody)' } });
   var thead = el('tr');
   ['Name', 'Cases', 'Won', 'Win%', 'Avg Days', 'Score'].forEach(function(h) {
@@ -5555,7 +5728,7 @@ function _renderSatisfactionSection(container, trends, showDetail) {
 
   // Overall score card — clickable for category drill-down
   var scoreColor = trends.overall >= 7 ? 'var(--success)' : trends.overall >= 5 ? 'var(--warning)' : 'var(--danger)';
-  var overallCard = el('div', { className: 'card card-glass', style: {
+  var overallCard = el('div', { className: 'card card-glass ' + _TC, style: {
     padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px',
     cursor: showDetail ? 'pointer' : 'default', transition: 'transform 0.15s ease',
   }});
@@ -6560,7 +6733,7 @@ function _renderLivePollsSteward(container) {
     }
     container.appendChild(el('div', { className: 'privacy-badge mb-14' }, '🔒 Votes are anonymous — individual responses are never stored'));
     data.questions.forEach(function(q) {
-      var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '10px' } });
+      var card = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px', marginBottom: '10px' } });
       var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' } });
       var titleCol = el('div');
       titleCol.appendChild(el('div', { className: 'display-title-sm' }, q.text));
@@ -6851,7 +7024,7 @@ function _renderMinutesList(container) {
       }
 
       slice.forEach(function(m) {
-        var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
+        var card = el('div', { className: 'card card-glass card-clickable ' + _TC, style: { padding: '14px', marginBottom: '8px' } });
         var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
         header.appendChild(el('span', { className: 'display-title-sm' }, m.title));
         header.appendChild(el('span', { className: 'text-xs-muted' }, m.meetingDate));
@@ -7582,7 +7755,7 @@ function renderTestRunnerPage(appContainer) {
     var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--card)', border: '2px solid var(--accent)', boxShadow: '0 2px 12px rgba(0,0,0,0.4)' } });
 
     // Run All sequentially — runs each suite one at a time to avoid GAS 6-min limit
-    var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'loginlink', 'contacts', 'emailtypes', 'webapp', 'configrd', 'portal', 'weeklyq', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
+    var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'loginlink', 'contacts', 'emailtypes', 'webapp', 'configrd', 'portal', 'weeklyq', 'workload', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
     var runAllBtn = el('button', {
       className: 'btn btn-primary',
       style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
@@ -7659,6 +7832,7 @@ function renderTestRunnerPage(appContainer) {
       { value: 'configrd', label: 'ConfigReader' },
       { value: 'portal', label: 'Portal Sheets' },
       { value: 'weeklyq', label: 'Weekly Questions' },
+      { value: 'workload', label: 'Workload Service' },
       { value: 'qaforum', label: 'QA Forum' },
       { value: 'timeline', label: 'Timeline Service' },
       { value: 'failsafe', label: 'Failsafe Service' },
@@ -7885,7 +8059,7 @@ function _renderTestResults(container, results, statusEl) {
 // ═══════════════════════════════════════
 function renderStewardTimelinePage(appContainer) {
   renderPageLayout(appContainer, 'steward', 'timeline', function(container) {
-    container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Timeline')));
+    container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title ' + _TD }, 'Timeline')));
 
     var content = el('div', { className: 'content' });
     var filterYear = '';
@@ -9280,11 +9454,10 @@ function _loadMentorshipSuggestions(suggestList) {
 // Data sourced from _Usage_Log sheet via dataGetUsageAnalytics().
 // ═══════════════════════════════════════════════════════════════════════
 
-function renderAnalyticsPage(container) {
-  if (!IS_ADMIN) { container.innerHTML = '<div class="card" style="padding:24px;color:var(--danger)">Admin access required.</div>'; return; }
+function renderAnalyticsPage(appContainer) {
+  if (!IS_ADMIN) { appContainer.innerHTML = '<div class="card" style="padding:24px;color:var(--danger)">Admin access required.</div>'; return; }
 
-  var content = _layoutCache.content || container;
-  content.innerHTML = '';
+  renderPageLayout(appContainer, 'steward', 'analytics', function(content) {
 
   var header = el('div', { style: { marginBottom: '24px' } });
   header.appendChild(el('div', { style: { fontSize: '1.25rem', fontWeight: '700', color: 'var(--text)' } }, 'Usage Analytics'));
@@ -9345,6 +9518,7 @@ function renderAnalyticsPage(container) {
 
   // Load initial data
   _loadAnalytics(content, 7, statsGrid, perfGrid, tabsList, dailyChart, errList, userPerfList);
+  }); // end renderPageLayout
 }
 
 function _loadAnalytics(container, days, statsGrid, perfGrid, tabsList, dailyChart, errList, userPerfList) {
@@ -9355,8 +9529,7 @@ function _loadAnalytics(container, days, statsGrid, perfGrid, tabsList, dailyCha
   errList.innerHTML = '';
   userPerfList.innerHTML = '';
 
-  google.script.run
-    .withSuccessHandler(function(result) {
+  serverCall().withSuccessHandler(function(result) {
       if (!result || !result.success) {
         statsGrid.innerHTML = '<div style="color:var(--danger);padding:12px">' + escapeHtml(result && result.message || 'Failed to load.') + '</div>';
         return;

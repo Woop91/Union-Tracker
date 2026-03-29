@@ -1397,7 +1397,7 @@ function syncGrievanceToMemberDirectory() {
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!grievanceSheet || !memberSheet) {
-    Logger.log('Required sheets not found for grievance sync');
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Required sheets not found for grievance sync.', 'Sync Error', 5); } catch (_) {}
     return;
   }
 
@@ -1496,7 +1496,7 @@ function syncGrievanceFormulasToLog() {
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!grievanceSheet || !memberSheet) {
-    Logger.log('Required sheets not found for grievance formula sync');
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Required sheets not found for formula sync.', 'Sync Error', 5); } catch (_) {}
     return;
   }
 
@@ -1747,7 +1747,7 @@ function syncMemberToGrievanceLog() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!lookupSheet || !grievanceSheet) {
-    Logger.log('Required sheets not found for member sync');
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Required sheets not found for member sync.', 'Sync Error', 5); } catch (_) {}
     return;
   }
 

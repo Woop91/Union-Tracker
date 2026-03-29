@@ -105,6 +105,13 @@ function isDashboardMemberAuthRequired() {
  * When enabled, all dashboard pages require member PIN login
  */
 function enableDashboardMemberAuth() {
+  var ui = SpreadsheetApp.getUi();
+  var confirm = ui.alert('Enable Dashboard Authentication',
+    'This will require ALL members to log in with a PIN to access dashboards.\n\n' +
+    'Make sure all members have PINs generated first. Continue?',
+    ui.ButtonSet.YES_NO);
+  if (confirm !== ui.Button.YES) return;
+
   var props = PropertiesService.getScriptProperties();
   props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'true');
   Logger.log('Dashboard member authentication ENABLED');
@@ -646,7 +653,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     // Mask PII in details before including in email
     var safeDetails = maskObjectPII_(details, true);
 
-    var systemName = 'SolidBase';
+    var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }
@@ -770,7 +777,7 @@ function sendDailySecurityDigest() {
 
     if (recipients.length === 0) return;
 
-    var systemName = 'SolidBase';
+    var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }

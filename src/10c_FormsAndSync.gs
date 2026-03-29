@@ -371,7 +371,7 @@ function showGrievanceFiles() {
       'No folder exists for ' + grievanceId + '.\n\nWould you like to create one?',
       ui.ButtonSet.YES_NO);
     if (response === ui.Button.YES) {
-      setupDriveFolderForGrievance();
+      setupDriveFolderForGrievance(grievanceId);
     }
     return;
   }

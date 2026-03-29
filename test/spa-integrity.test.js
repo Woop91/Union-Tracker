@@ -213,24 +213,24 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
 // Bug: isDualRole was only true when role === 'both'. Since most stewards have
 // role === 'steward' (not 'both'), the member view toggle never appeared.
 
-describe('G10: isDualRole includes stewards', () => {
+describe('G10: isDualRole is only true for dual-role users', () => {
   const webAppCode = read('22_WebDashApp.gs');
 
-  test('isDualRole condition includes role === steward', () => {
+  test('isDualRole condition is role === both', () => {
     // Find the isDualRole line in pageData construction
     const match = webAppCode.match(/isDualRole:\s*(.+)/);
     expect(match).not.toBeNull();
 
-    const condition = match[1];
-    // Must include steward check — not just 'both'
-    expect(condition).toMatch(/role\s*===\s*'steward'/);
+    const condition = match[1].trim().replace(/,$/, '');
+    // Only dual-role ('both') users should have isDualRole — not pure stewards
+    expect(condition).toBe("role === 'both'");
   });
 
-  test('isDualRole is NOT just role === both', () => {
+  test('isDualRole does NOT include pure stewards', () => {
     const match = webAppCode.match(/isDualRole:\s*(.+)/);
     const condition = match[1].trim().replace(/,$/, '');
-    // Should not be exactly "role === 'both'" — that's the old broken condition
-    expect(condition).not.toBe("role === 'both'");
+    // Pure stewards should not get isDualRole — that exposed member view to non-dual users
+    expect(condition).not.toMatch(/role\s*===\s*'steward'/);
   });
 });
 
@@ -1256,28 +1256,5 @@ describe('G25b: Mobile header switch buttons reset navigation state', () => {
       memberView.indexOf("activeRole = 'steward'") + 100
     );
     expect(switchBlock).toContain('_tabPanesRole = null');
-  });
-});
-
-
-// ============================================================================
-// G26: COMIC THEME BOLD TEXT LETTER SPACING
-// ============================================================================
-// Bug (2026-03-18): In the comic theme, bold text (<strong>/<b>) in .main-content
-// had letter-spacing: 0.5px, causing characters to be too close together and
-// hard to read. Fix: increased to 1.5px.
-
-describe.skip('G26: Comic theme bold text letter spacing (comic theme removed from SolidBase)', () => {
-  const stylesCode = read('styles.html');
-
-  test('comic theme bold text has letter-spacing >= 1px', () => {
-    const match = stylesCode.match(/\.theme-comic\s+\.main-content\s+strong[^{]*\{[^}]*letter-spacing:\s*([\d.]+)px/);
-    expect(match).not.toBeNull();
-    const spacing = parseFloat(match[1]);
-    expect(spacing).toBeGreaterThanOrEqual(1);
-  });
-
-  test('comic theme bold text letter-spacing is not set to 0.5px (known bad value)', () => {
-    expect(stylesCode).not.toMatch(/\.theme-comic\s+\.main-content\s+strong[^{]*\{[^}]*letter-spacing:\s*0\.5px/);
   });
 });

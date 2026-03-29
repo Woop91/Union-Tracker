@@ -375,7 +375,7 @@ function initCanvas(wrap) {
     CTX.lineJoin = 'round';
     CTX.lineWidth = 2.5;
     CTX.strokeStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#e5e7eb' : '#1a1a2e';
-    if (imgData) { try { CTX.putImageData(imgData, 0, 0); } catch (_e) { /* dimension mismatch — user re-signs */ } }
+    if (imgData) { try { CTX.putImageData(imgData, 0, 0); } catch (_e) { /* dimension mismatch — reset so blank canvas cannot be submitted */ HAS_DRAWN = false; if (canvasWrap) canvasWrap.classList.remove('active'); } }
   }
   window.addEventListener('resize', _resizeCanvas);
   window.addEventListener('orientationchange', function() { setTimeout(_resizeCanvas, 200); });
