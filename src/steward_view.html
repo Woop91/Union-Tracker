@@ -1124,6 +1124,15 @@ function _renderMemberFinderPanel(container, members, onFilterChange) {
   header.appendChild(el('div', { className: 'finder-panel-title ' + _TL }, 'Member Finder'));
   var badge = el('div', { className: 'finder-panel-badge', 'aria-live': 'polite' }, members.length + ' members');
   header.appendChild(badge);
+  // ── Add Member button ─────────────────────────────────────────────────────
+  header.appendChild(el('button', {
+    className: 'btn-primary',
+    style: { fontSize: '12px', padding: '5px 14px', borderRadius: '8px', marginLeft: 'auto' },
+    onClick: function() { showAddMemberModal(function() {
+      // Refresh member list after successful add
+      if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'members');
+    }); }
+  }, '+ Add Member'));
   panel.appendChild(header);
 
   // Body
@@ -6284,6 +6293,187 @@ function renderStewardDirectoryPage(appContainer) {
       content.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load directory.'));
     }).dataGetStewardDirectory(SESSION_TOKEN);
   });
+}
+
+// ═══════════════════════════════════════
+// ADD MEMBER MODAL (v4.49.0)
+// Steward-only. Fetches Config-driven dropdowns, writes to Member Directory.
+// ═══════════════════════════════════════
+
+function showAddMemberModal(onSuccess) {
+  var overlay = el('div', {
+    style: { position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.55)', zIndex: '10000',
+             display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  });
+
+  var modal = el('div', {
+    style: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px',
+             padding: '24px', width: 'min(500px, calc(100vw - 32px))', maxHeight: '90vh',
+             overflowY: 'auto', fontFamily: 'var(--fontBody)' }
+  });
+
+  // ── Title row ──────────────────────────────────────────────────────────────
+  var titleRow = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' } });
+  titleRow.appendChild(el('div', { className: 'display-title-sm' }, '👤 Add New Member'));
+  titleRow.appendChild(el('button', {
+    style: { background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--muted)', lineHeight: '1' },
+    onClick: function() { document.body.removeChild(overlay); }
+  }, '×'));
+  modal.appendChild(titleRow);
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  var formArea = el('div');
+  formArea.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)', fontSize: '13px' } }, 'Loading options…'));
+  modal.appendChild(formArea);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // ── Fetch Config dropdowns then render form ────────────────────────────────
+  serverCall().withSuccessHandler(function(opts) {
+    formArea.innerHTML = '';
+    if (!opts || !opts.success) {
+      formArea.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '13px' } }, 'Failed to load options. Please try again.'));
+      return;
+    }
+
+    var inputs = {};
+
+    function _field(id, label, required) {
+      var g = el('div', { style: { marginBottom: '10px' } });
+      g.appendChild(el('label', { style: { display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' } }, label + (required ? ' *' : '')));
+      return g;
+    }
+
+    function _textInput(id, placeholder, type) {
+      var inp = el('input', {
+        type: type || 'text',
+        placeholder: placeholder || '',
+        style: { width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)',
+                 background: 'var(--surface)', color: 'var(--text)', fontSize: '14px',
+                 fontFamily: 'var(--fontBody)', boxSizing: 'border-box' }
+      });
+      inputs[id] = inp;
+      return inp;
+    }
+
+    function _selectInput(id, options) {
+      var sel = el('select', {
+        style: { width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)',
+                 background: 'var(--surface)', color: 'var(--text)', fontSize: '14px',
+                 fontFamily: 'var(--fontBody)', boxSizing: 'border-box' }
+      });
+      sel.appendChild(el('option', { value: '' }, '— Select —'));
+      (options || []).forEach(function(v) { sel.appendChild(el('option', { value: v }, v)); });
+      inputs[id] = sel;
+      return sel;
+    }
+
+    // Row helper — two fields side by side
+    function _row(a, b) {
+      var r = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
+      r.appendChild(a); r.appendChild(b);
+      return r;
+    }
+
+    // Name row
+    var gFirst = _field('firstName', 'First Name', true); gFirst.appendChild(_textInput('firstName', 'First'));
+    var gLast  = _field('lastName',  'Last Name',  true); gLast.appendChild(_textInput('lastName',  'Last'));
+    formArea.appendChild(_row(gFirst, gLast));
+
+    // Email + Phone
+    var gEmail = _field('email', 'Email', false); gEmail.appendChild(_textInput('email', 'work@email.com', 'email'));
+    var gPhone = _field('phone', 'Phone', false); gPhone.appendChild(_textInput('phone', '555-123-4567', 'tel'));
+    formArea.appendChild(_row(gEmail, gPhone));
+
+    // Job Title + Work Location (Config-driven dropdowns)
+    var gTitle = _field('jobTitle', 'Job Title', false); gTitle.appendChild(_selectInput('jobTitle', opts.jobTitles));
+    var gLoc   = _field('workLocation', 'Work Location', false); gLoc.appendChild(_selectInput('workLocation', opts.locations));
+    formArea.appendChild(_row(gTitle, gLoc));
+
+    // Unit + Dues Status
+    var gUnit = _field('unit', 'Unit', false); gUnit.appendChild(_selectInput('unit', opts.units));
+    var gDues = _field('duesStatus', 'Dues Status', false); gDues.appendChild(_selectInput('duesStatus', opts.duesStatuses));
+    formArea.appendChild(_row(gUnit, gDues));
+
+    // Supervisor + Manager
+    var gSup = _field('supervisor', 'Supervisor', false); gSup.appendChild(_selectInput('supervisor', opts.supervisors));
+    var gMgr = _field('manager',    'Manager',    false); gMgr.appendChild(_selectInput('manager',    opts.managers));
+    formArea.appendChild(_row(gSup, gMgr));
+
+    // Employee ID + Hire Date
+    var gEmpId   = _field('employeeId', 'Employee ID', false); gEmpId.appendChild(_textInput('employeeId', 'EMP-0000'));
+    var gHire    = _field('hireDate',   'Hire Date',   false); gHire.appendChild(_textInput('hireDate', '', 'date'));
+    formArea.appendChild(_row(gEmpId, gHire));
+
+    // Status message
+    var statusMsg = el('div', { style: { fontSize: '12px', marginTop: '4px', minHeight: '18px' } });
+    formArea.appendChild(statusMsg);
+
+    // Action buttons
+    var actRow = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' } });
+    actRow.appendChild(el('button', {
+      style: { fontSize: '13px', padding: '8px 20px', borderRadius: '8px', background: 'var(--surface)',
+               color: 'var(--muted)', border: '1px solid var(--border)', fontWeight: '600', cursor: 'pointer' },
+      onClick: function() { document.body.removeChild(overlay); }
+    }, 'Cancel'));
+
+    var saveBtn = el('button', {
+      className: 'btn-primary',
+      style: { fontSize: '13px', padding: '8px 24px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
+      onClick: function() {
+        var fn = inputs['firstName'].value.trim();
+        var ln = inputs['lastName'].value.trim();
+        if (!fn || !ln) {
+          statusMsg.textContent = 'First and Last Name are required.';
+          statusMsg.style.color = 'var(--danger)';
+          return;
+        }
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        statusMsg.textContent = '';
+        var payload = {
+          firstName:    fn,
+          lastName:     ln,
+          email:        inputs['email'].value.trim(),
+          phone:        inputs['phone'].value.trim(),
+          jobTitle:     inputs['jobTitle'].value,
+          workLocation: inputs['workLocation'].value,
+          unit:         inputs['unit'].value,
+          duesStatus:   inputs['duesStatus'].value || 'Current',
+          supervisor:   inputs['supervisor'].value,
+          manager:      inputs['manager'].value,
+          employeeId:   inputs['employeeId'].value.trim(),
+          hireDate:     inputs['hireDate'].value || ''
+        };
+        serverCall()
+          .withSuccessHandler(function(res) {
+            if (res && res.success) {
+              document.body.removeChild(overlay);
+              showToast('✅ ' + fn + ' ' + ln + ' added (ID: ' + res.memberId + ')', 'success');
+              if (typeof onSuccess === 'function') onSuccess(res.memberId);
+            } else {
+              statusMsg.textContent = (res && res.error) || 'Failed to add member.';
+              statusMsg.style.color = 'var(--danger)';
+              saveBtn.disabled = false;
+              saveBtn.textContent = 'Add Member';
+            }
+          })
+          .withFailureHandler(function(err) {
+            statusMsg.textContent = 'Server error: ' + (err && err.message || 'Unknown error');
+            statusMsg.style.color = 'var(--danger)';
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Add Member';
+          })
+          .dataAddMemberFromWebapp(SESSION_TOKEN, payload);
+      }
+    }, 'Add Member');
+    actRow.appendChild(saveBtn);
+    formArea.appendChild(actRow);
+
+  }).withFailureHandler(function() {
+    formArea.innerHTML = '';
+    formArea.appendChild(el('div', { style: { color: 'var(--danger)', fontSize: '13px', padding: '12px 0' } }, 'Failed to load form options.'));
+  }).dataGetAddMemberOptions(SESSION_TOKEN);
 }
 
 // ═══════════════════════════════════════

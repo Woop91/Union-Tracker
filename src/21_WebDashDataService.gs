@@ -5161,6 +5161,82 @@ function dataUpdateNonMemberContact(sessionToken, contactId, data) { var s = _re
 /** @param {string} sessionToken @param {string} contactId @returns {Object} Delete non-member contact. Steward-only. */
 function dataDeleteNonMemberContact(sessionToken, contactId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.deleteNonMemberContact(contactId); } catch (err) { Logger.log('dataDeleteNonMemberContact error: ' + err.message); return { success: false, error: err.message }; } }); }
 
+// ─── ADD MEMBER (webapp) ──────────────────────────────────────────────────────
+/** @param {string} sessionToken @returns {Object} Config-driven dropdown options for the Add Member form. Steward-only. */
+function dataGetAddMemberOptions(sessionToken) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, error: 'Not authorized.' };
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, error: 'Spreadsheet not found.' };
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    function _configList(col) {
+      if (!configSheet || !col || col < 1) return [];
+      try {
+        var lr = configSheet.getLastRow();
+        if (lr < 3) return [];
+        return configSheet.getRange(3, col, lr - 2, 1).getValues()
+          .map(function(r) { return String(r[0]).trim(); })
+          .filter(function(v) { return v !== ''; });
+      } catch (_e) { return []; }
+    }
+    return {
+      success: true,
+      jobTitles:     _configList(CONFIG_COLS.JOB_TITLES),
+      locations:     _configList(CONFIG_COLS.OFFICE_LOCATIONS),
+      units:         _configList(CONFIG_COLS.UNITS),
+      supervisors:   _configList(CONFIG_COLS.SUPERVISORS),
+      managers:      _configList(CONFIG_COLS.MANAGERS),
+      duesStatuses:  _configList(CONFIG_COLS.DUES_STATUSES)
+    };
+  } catch (err) {
+    Logger.log('dataGetAddMemberOptions error: ' + err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * @param {string} sessionToken
+ * @param {Object} memberData  — { firstName, lastName, email, phone, jobTitle, workLocation,
+ *                                 unit, supervisor, manager, employeeId, hireDate, duesStatus }
+ * @returns {Object} { success, memberId, message } or { success: false, error }
+ * Steward-only. Calls addMember() in 02_DataManagers.gs via withScriptLock_.
+ */
+function dataAddMemberFromWebapp(sessionToken, memberData) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, error: 'Not authorized.' };
+  if (!memberData || !memberData.firstName || !memberData.lastName) {
+    return { success: false, error: 'First and Last Name are required.' };
+  }
+  return withScriptLock_(function() {
+    try {
+      var memberId = addMember({
+        firstName:    String(memberData.firstName  || '').trim(),
+        lastName:     String(memberData.lastName   || '').trim(),
+        email:        String(memberData.email       || '').trim().toLowerCase(),
+        phone:        String(memberData.phone       || '').trim(),
+        jobTitle:     String(memberData.jobTitle    || '').trim(),
+        workLocation: String(memberData.workLocation|| '').trim(),
+        unit:         String(memberData.unit        || '').trim(),
+        supervisor:   String(memberData.supervisor  || '').trim(),
+        manager:      String(memberData.manager     || '').trim(),
+        employeeId:   String(memberData.employeeId  || '').trim(),
+        hireDate:     memberData.hireDate ? memberData.hireDate : '',
+        duesStatus:   String(memberData.duesStatus  || 'Current').trim()
+      });
+      logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+        memberId: memberId,
+        name: memberData.firstName + ' ' + memberData.lastName,
+        addedBy: s.email
+      });
+      return { success: true, memberId: memberId, message: 'Member added successfully.' };
+    } catch (err) {
+      Logger.log('dataAddMemberFromWebapp error: ' + err.message);
+      return { success: false, error: err.message };
+    }
+  });
+}
+
 /** @param {string} sessionToken @returns {Object} Org-wide grievance statistics. Requires steward auth. */
 function dataGetGrievanceStats(sessionToken) { if (!_isGrievancesEnabled()) return { available: false }; var s = _requireStewardAuth(sessionToken); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
 /** @param {string} sessionToken @returns {Object[]} Grievance hotspot locations. Requires steward auth. */

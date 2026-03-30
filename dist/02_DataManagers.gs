@@ -78,14 +78,20 @@ function addMember(memberData) {
     // Build row array and write with single setValues call (F1: batch write)
     var totalCols = sheet.getLastColumn() || Object.keys(MEMBER_COLS).length;
     var rowData = new Array(totalCols).fill('');
-    rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
-    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
-    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
-    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
-    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
-    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+    rowData[MEMBER_COLS.MEMBER_ID - 1]     = escapeForFormula(memberId);
+    rowData[MEMBER_COLS.FIRST_NAME - 1]    = escapeForFormula(memberData.firstName    || '');
+    rowData[MEMBER_COLS.LAST_NAME - 1]     = escapeForFormula(memberData.lastName     || '');
+    rowData[MEMBER_COLS.EMAIL - 1]         = escapeForFormula(memberData.email        || '');
+    rowData[MEMBER_COLS.PHONE - 1]         = escapeForFormula(memberData.phone        || '');
+    rowData[MEMBER_COLS.JOB_TITLE - 1]     = escapeForFormula(memberData.jobTitle     || '');
     rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
-    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+    rowData[MEMBER_COLS.UNIT - 1]          = escapeForFormula(memberData.unit         || '');
+    if (MEMBER_COLS.SUPERVISOR)   rowData[MEMBER_COLS.SUPERVISOR - 1]   = escapeForFormula(memberData.supervisor  || '');
+    if (MEMBER_COLS.MANAGER)      rowData[MEMBER_COLS.MANAGER - 1]      = escapeForFormula(memberData.manager     || '');
+    if (MEMBER_COLS.EMPLOYEE_ID)  rowData[MEMBER_COLS.EMPLOYEE_ID - 1]  = escapeForFormula(memberData.employeeId  || '');
+    if (MEMBER_COLS.HIRE_DATE && memberData.hireDate) rowData[MEMBER_COLS.HIRE_DATE - 1] = new Date(memberData.hireDate);
+    if (MEMBER_COLS.DUES_STATUS)  rowData[MEMBER_COLS.DUES_STATUS - 1]  = escapeForFormula(memberData.duesStatus  || 'Current');
+    if (MEMBER_COLS.IS_STEWARD)   rowData[MEMBER_COLS.IS_STEWARD - 1]   = 'No'; // default — promote separately
     // REL-03: Wrap sheet write in try/catch with contextual error message
     try {
       sheet.getRange(newRow, 1, 1, totalCols).setValues([rowData]);

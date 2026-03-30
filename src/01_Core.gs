@@ -389,7 +389,7 @@ function getDriveRootFolderName_() {
  * Get organization name from Config sheet, falling back to default.
  * Single source of truth for the org name used across the system.
  * @private
- * @returns {string} Organization name (e.g., "SEIU Local")
+ * @returns {string} Organization name (e.g., "Your Local")
  */
 // M-43: _cachedOrgName / _cachedSystemName / _cachedLocalNumber are intentionally
 // never invalidated. In Google Apps Script, each script execution is short-lived
@@ -1329,6 +1329,7 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'STEP3_RESPONSE_DAYS',  header: 'Step III Response Days',             type: 'days' },
   { key: 'ARBITRATION_DEMAND_DAYS', header: 'Arbitration Demand Days',         type: 'days' },
   { key: 'BEST_TIMES',            header: 'Best Times to Contact',             type: 'list' },
+  { key: 'DUES_STATUSES',         header: 'Dues Statuses',                     type: 'list' },  // Editable list of valid dues status values (e.g. Current, Past Due, Inactive, Fee Payer, Exempt)
   { key: 'CONTRACT_GRIEVANCE',    header: 'Contract Article (Grievance)',      type: 'text' },
   { key: 'CONTRACT_DISCIPLINE',   header: 'Contract Article (Discipline)',     type: 'text' },
   { key: 'CONTRACT_WORKLOAD',     header: 'Contract Article (Workload)',       type: 'text' },

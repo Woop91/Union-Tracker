@@ -395,6 +395,11 @@ function seedConfigData() {
     'Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'
   ])) seededAny = true;
 
+  // Dues Statuses — valid values for Member Directory "Dues Status" column
+  if (seedIfEmpty(CONFIG_COLS.DUES_STATUSES, [
+    'Current', 'Past Due', 'Inactive', 'Fee Payer', 'Exempt'
+  ])) seededAny = true;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // USER-CONFIGURABLE VALUES (Organization-specific dropdowns)
   // ═══════════════════════════════════════════════════════════════════════════

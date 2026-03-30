@@ -1140,6 +1140,8 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataLogUsageEvents',              // writes directly to _Usage_Log sheet (usage tracking, no DataService needed)
     'dataGetUsageAnalytics',           // reads _Usage_Log sheet directly for admin analytics dashboard (v4.40.0)
     'dataWebAppCheckIn',               // inline implementation: session-auth one-tap check-in with TOCTOU lock (v4.43.1)
+    'dataGetAddMemberOptions',         // reads Config sheet directly for form dropdown options (v4.49.0)
+    'dataAddMemberFromWebapp',         // delegates to addMember() in 02_DataManagers.gs (v4.49.0)
   ];
 
   wrappers
