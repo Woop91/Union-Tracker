@@ -1818,3 +1818,29 @@ function ensureGrievanceArchiveSheet_(ss) {
   Logger.log('Created grievance archive sheet: ' + SHEETS.GRIEVANCE_ARCHIVE);
   return archive;
 }
+
+/**
+ * Ensures the Non-Member Contacts sheet exists. Creates with headers if missing.
+ * @param {Spreadsheet} [ss] - Spreadsheet instance (defaults to active)
+ * @returns {Sheet} The Non-Member Contacts sheet
+ */
+function ensureNonMemberContactsSheet_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.NON_MEMBER_CONTACTS) || ss.getSheetByName('Non member contacts');
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(SHEETS.NON_MEMBER_CONTACTS);
+  var headers = getNMCHeaders();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(1);
+
+  // Category validation dropdown
+  var catRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Management', 'Legal', 'HR', 'Union Rep', 'Ally', 'Other'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NMC_COLS.CATEGORY, 500, 1).setDataValidation(catRule);
+
+  Logger.log('Created Non-Member Contacts sheet: ' + SHEETS.NON_MEMBER_CONTACTS);
+  return sheet;
+}

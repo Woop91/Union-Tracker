@@ -1159,6 +1159,34 @@ var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
 var PII_MEMBER_COLS = [MEMBER_COLS.STREET_ADDRESS, MEMBER_COLS.CITY, MEMBER_COLS.STATE, MEMBER_COLS.ZIP_CODE];
 
 // ============================================================================
+// NON-MEMBER CONTACTS COLUMNS — Auto-derived from header map (v4.48.0)
+// External contacts: management, legal, HR, union reps, allies.
+// ============================================================================
+
+var NMC_HEADER_MAP_ = [
+  { key: 'CONTACT_ID',    header: 'Contact ID' },
+  { key: 'FIRST_NAME',    header: 'First Name' },
+  { key: 'LAST_NAME',     header: 'Last Name' },
+  { key: 'JOB_TITLE',     header: 'Job Title' },
+  { key: 'WORK_LOCATION', header: 'Work Location' },
+  { key: 'UNIT',          header: 'Unit' },
+  { key: 'EMAIL',         header: 'Email' },
+  { key: 'PHONE',         header: 'Phone' },
+  { key: 'CATEGORY',      header: 'Category' },
+  { key: 'NOTES',         header: 'Notes' }
+];
+
+var NMC_COLS = buildColsFromMap_(NMC_HEADER_MAP_);
+
+/**
+ * Returns ordered header labels for Non-Member Contacts sheet.
+ * @returns {Array<string>}
+ */
+function getNMCHeaders() {
+  return NMC_HEADER_MAP_.map(function(e) { return e.header; });
+}
+
+// ============================================================================
 // MEETING CHECK-IN LOG COLUMNS — Auto-derived from header map
 // ============================================================================
 

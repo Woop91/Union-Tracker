@@ -4659,6 +4659,101 @@ var DataService = (function () {
     return { success: true, sentCount: sentCount, failedCount: failedCount, message: 'Sent to ' + sentCount + ' member(s).' };
   }
 
+  // ── Non-Member Contacts (v4.48.0) ──
+  function getNonMemberContacts() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return [];
+    var sheet = ss.getSheetByName(SHEETS.NON_MEMBER_CONTACTS);
+    if (!sheet || sheet.getLastRow() < 2) return [];
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, NMC_HEADER_MAP_.length).getValues();
+    return data.map(function(row) {
+      return {
+        contactId:    String(row[NMC_COLS.CONTACT_ID - 1] || ''),
+        firstName:    String(row[NMC_COLS.FIRST_NAME - 1] || ''),
+        lastName:     String(row[NMC_COLS.LAST_NAME - 1] || ''),
+        jobTitle:     String(row[NMC_COLS.JOB_TITLE - 1] || ''),
+        workLocation: String(row[NMC_COLS.WORK_LOCATION - 1] || ''),
+        unit:         String(row[NMC_COLS.UNIT - 1] || ''),
+        email:        String(row[NMC_COLS.EMAIL - 1] || ''),
+        phone:        String(row[NMC_COLS.PHONE - 1] || ''),
+        category:     String(row[NMC_COLS.CATEGORY - 1] || ''),
+        notes:        String(row[NMC_COLS.NOTES - 1] || '')
+      };
+    }).filter(function(c) { return c.firstName || c.lastName; });
+  }
+
+  function addNonMemberContact(contactData) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, error: 'No spreadsheet.' };
+    var sheet = ss.getSheetByName(SHEETS.NON_MEMBER_CONTACTS);
+    if (!sheet) sheet = ensureNonMemberContactsSheet_(ss);
+    var lastRow = sheet.getLastRow();
+    var nextNum = 1;
+    if (lastRow >= 2) {
+      var ids = sheet.getRange(2, NMC_COLS.CONTACT_ID, lastRow - 1, 1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        var m = String(ids[i][0]).match(/NMC-(\d+)/);
+        if (m) nextNum = Math.max(nextNum, parseInt(m[1], 10) + 1);
+      }
+    }
+    var contactId = 'NMC-' + String(nextNum).padStart(3, '0');
+    var row = [];
+    row[NMC_COLS.CONTACT_ID - 1]    = contactId;
+    row[NMC_COLS.FIRST_NAME - 1]    = escapeForFormula(contactData.firstName || '');
+    row[NMC_COLS.LAST_NAME - 1]     = escapeForFormula(contactData.lastName || '');
+    row[NMC_COLS.JOB_TITLE - 1]     = escapeForFormula(contactData.jobTitle || '');
+    row[NMC_COLS.WORK_LOCATION - 1] = escapeForFormula(contactData.workLocation || '');
+    row[NMC_COLS.UNIT - 1]          = escapeForFormula(contactData.unit || '');
+    row[NMC_COLS.EMAIL - 1]         = escapeForFormula(contactData.email || '');
+    row[NMC_COLS.PHONE - 1]         = escapeForFormula(contactData.phone || '');
+    row[NMC_COLS.CATEGORY - 1]      = escapeForFormula(contactData.category || 'Other');
+    row[NMC_COLS.NOTES - 1]         = escapeForFormula(contactData.notes || '');
+    sheet.appendRow(row);
+    return { success: true, contactId: contactId };
+  }
+
+  function updateNonMemberContact(contactId, updateData) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, error: 'No spreadsheet.' };
+    var sheet = ss.getSheetByName(SHEETS.NON_MEMBER_CONTACTS);
+    if (!sheet) return { success: false, error: 'Sheet not found.' };
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: false, error: 'Contact not found.' };
+    var ids = sheet.getRange(2, NMC_COLS.CONTACT_ID, lastRow - 1, 1).getValues();
+    var rowIdx = -1;
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === contactId) { rowIdx = i + 2; break; }
+    }
+    if (rowIdx === -1) return { success: false, error: 'Contact not found.' };
+    if (updateData.firstName !== undefined)    sheet.getRange(rowIdx, NMC_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+    if (updateData.lastName !== undefined)     sheet.getRange(rowIdx, NMC_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+    if (updateData.jobTitle !== undefined)     sheet.getRange(rowIdx, NMC_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+    if (updateData.workLocation !== undefined) sheet.getRange(rowIdx, NMC_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+    if (updateData.unit !== undefined)         sheet.getRange(rowIdx, NMC_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+    if (updateData.email !== undefined)        sheet.getRange(rowIdx, NMC_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+    if (updateData.phone !== undefined)        sheet.getRange(rowIdx, NMC_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+    if (updateData.category !== undefined)     sheet.getRange(rowIdx, NMC_COLS.CATEGORY).setValue(escapeForFormula(updateData.category));
+    if (updateData.notes !== undefined)        sheet.getRange(rowIdx, NMC_COLS.NOTES).setValue(escapeForFormula(updateData.notes));
+    return { success: true };
+  }
+
+  function deleteNonMemberContact(contactId) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, error: 'No spreadsheet.' };
+    var sheet = ss.getSheetByName(SHEETS.NON_MEMBER_CONTACTS);
+    if (!sheet) return { success: false, error: 'Sheet not found.' };
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: false, error: 'Contact not found.' };
+    var ids = sheet.getRange(2, NMC_COLS.CONTACT_ID, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === contactId) {
+        sheet.deleteRow(i + 2);
+        return { success: true };
+      }
+    }
+    return { success: false, error: 'Contact not found.' };
+  }
+
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -4747,6 +4842,11 @@ var DataService = (function () {
     // v4.46.0 — Leader Hub
     getUnitMembers: getUnitMembers,
     sendUnitBroadcast: sendUnitBroadcast,
+    // v4.48.0 — Non-Member Contacts
+    getNonMemberContacts: getNonMemberContacts,
+    addNonMemberContact: addNonMemberContact,
+    updateNonMemberContact: updateNonMemberContact,
+    deleteNonMemberContact: deleteNonMemberContact,
   };
 
 })();
@@ -5047,6 +5147,20 @@ function dataGetStewardDirectory(sessionToken) {
     return [];
   }
 }
+// ═══════════════════════════════════════
+// NON-MEMBER CONTACTS (v4.48.0)
+// Steward-only CRUD for external contacts (management, legal, HR, allies).
+// ═══════════════════════════════════════
+
+/** @param {string} sessionToken @returns {Object[]} Non-member contacts. Steward-only. */
+function dataGetNonMemberContacts(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; try { return DataService.getNonMemberContacts(); } catch (err) { Logger.log('dataGetNonMemberContacts error: ' + err.message); return []; } }
+/** @param {string} sessionToken @param {Object} data @returns {Object} Add non-member contact. Steward-only. */
+function dataAddNonMemberContact(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.addNonMemberContact(data); } catch (err) { Logger.log('dataAddNonMemberContact error: ' + err.message); return { success: false, error: err.message }; } }); }
+/** @param {string} sessionToken @param {string} contactId @param {Object} data @returns {Object} Update non-member contact. Steward-only. */
+function dataUpdateNonMemberContact(sessionToken, contactId, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.updateNonMemberContact(contactId, data); } catch (err) { Logger.log('dataUpdateNonMemberContact error: ' + err.message); return { success: false, error: err.message }; } }); }
+/** @param {string} sessionToken @param {string} contactId @returns {Object} Delete non-member contact. Steward-only. */
+function dataDeleteNonMemberContact(sessionToken, contactId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.deleteNonMemberContact(contactId); } catch (err) { Logger.log('dataDeleteNonMemberContact error: ' + err.message); return { success: false, error: err.message }; } }); }
+
 /** @param {string} sessionToken @returns {Object} Org-wide grievance statistics. Requires steward auth. */
 function dataGetGrievanceStats(sessionToken) { if (!_isGrievancesEnabled()) return { available: false }; var s = _requireStewardAuth(sessionToken); if (!s) return { available: false }; return DataService.getGrievanceStats(); }
 /** @param {string} sessionToken @returns {Object[]} Grievance hotspot locations. Requires steward auth. */

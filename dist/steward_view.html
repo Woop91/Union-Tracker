@@ -5988,11 +5988,242 @@ function renderStewardDirectoryPage(appContainer) {
   });
   }
   renderList('', '');
+
+  
+  renderNonMemberContactsSection(content);
  }).withFailureHandler(function() {
   content.innerHTML = '';
   content.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load directory.'));
  }).dataGetStewardDirectory(SESSION_TOKEN);
  });
+}
+
+function renderNonMemberContactsSection(parentContainer) {
+ var section = el('div', { style: { marginTop: '32px' } });
+ var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } });
+ header.appendChild(el('div', { className: 'display-title-sm' }, 'Non-Member Contacts'));
+ var addBtn = el('button', {
+ className: 'btn-primary',
+ style: { fontSize: '12px', padding: '6px 16px', borderRadius: '8px' },
+ onClick: function() { showNMCModal(null); }
+ }, '+ Add Contact');
+ header.appendChild(addBtn);
+ section.appendChild(header);
+ section.appendChild(el('div', { className: 'text-xs-muted', style: { marginBottom: '12px' } }, 'Management, legal, HR, union reps, and other external contacts.'));
+
+ var nmcList = el('div');
+ section.appendChild(nmcList);
+ showLoading(nmcList, 'member-list');
+
+ serverCall().withSuccessHandler(function(contacts) {
+ _renderNMCList(nmcList, contacts || []);
+ }).withFailureHandler(function() {
+ nmcList.innerHTML = '';
+ nmcList.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load contacts.'));
+ }).dataGetNonMemberContacts(SESSION_TOKEN);
+
+ parentContainer.appendChild(section);
+}
+
+function _renderNMCList(container, contacts) {
+ container.innerHTML = '';
+ if (!contacts.length) {
+ container.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: '13px' } },
+  'No non-member contacts yet. Click "+ Add Contact" to get started.'));
+ return;
+ }
+
+ 
+ var catColors = { Management: '#e67e22', Legal: '#8e44ad', HR: '#2980b9', 'Union Rep': '#27ae60', Ally: '#16a085', Other: '#7f8c8d' };
+
+ contacts.forEach(function(c, i) {
+ var card = el('div', {
+  className: 'card card-glass card-fade-in',
+  style: { padding: '14px 16px', marginBottom: '6px', cursor: 'pointer', animationDelay: (i * 0.04) + 's' }
+ });
+ var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
+ var initials = ((c.firstName || '').charAt(0) + (c.lastName || '').charAt(0)).toUpperCase() || '?';
+ topRow.appendChild(el('div', { className: 'member-list-avatar', style: { background: 'var(--warning)', color: '#fff' } }, initials));
+ var info = el('div', { className: 'flex-1' });
+ info.appendChild(el('div', { className: 'display-title-sm' }, (c.firstName + ' ' + c.lastName).trim()));
+ var meta = [];
+ if (c.jobTitle) meta.push(c.jobTitle);
+ if (c.workLocation) meta.push(c.workLocation);
+ if (c.unit) meta.push(c.unit);
+ info.appendChild(el('div', { className: 'text-xs-muted' }, meta.join(' \u00B7 ')));
+ topRow.appendChild(info);
+ if (c.category) {
+  var badgeColor = catColors[c.category] || catColors.Other;
+  topRow.appendChild(el('span', {
+  style: { fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: badgeColor, color: '#fff', whiteSpace: 'nowrap' }
+  }, c.category));
+ }
+ card.appendChild(topRow);
+
+ 
+ var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
+ if (c.email) details.appendChild(el('a', { href: 'mailto:' + c.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, '\u2709\uFE0F ' + c.email));
+ if (c.phone) details.appendChild(el('a', { href: 'tel:' + c.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '4px' } }, '\uD83D\uDCDE ' + c.phone));
+ if (c.notes) details.appendChild(el('div', { className: 'text-xs-muted', style: { marginTop: '4px', fontStyle: 'italic' } }, c.notes));
+
+ var actions = el('div', { style: { display: 'flex', gap: '8px', marginTop: '8px' } });
+ actions.appendChild(el('button', {
+  style: { fontSize: '11px', padding: '4px 12px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', fontWeight: '600' },
+  onClick: function(e) { e.stopPropagation(); showNMCModal(c); }
+ }, 'Edit'));
+ actions.appendChild(el('button', {
+  style: { fontSize: '11px', padding: '4px 12px', borderRadius: '6px', background: 'var(--danger)', color: '#fff', fontWeight: '600' },
+  onClick: function(e) {
+  e.stopPropagation();
+  if (!confirm('Delete ' + c.firstName + ' ' + c.lastName + '?')) return;
+  serverCall().withSuccessHandler(function(res) {
+   if (res && res.success) {
+   card.style.display = 'none';
+   showToast(c.firstName + ' ' + c.lastName + ' deleted.', 'success');
+   } else {
+   showToast((res && res.error) || 'Delete failed.', 'error');
+   }
+  }).dataDeleteNonMemberContact(SESSION_TOKEN, c.contactId);
+  }
+ }, 'Delete'));
+ 
+ actions.appendChild(el('button', {
+  style: { fontSize: '11px', padding: '4px 12px', borderRadius: '6px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', fontWeight: '600' },
+  onClick: function(e) {
+  e.stopPropagation();
+  var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + c.firstName + ' ' + c.lastName + '\n';
+  if (c.email) vcf += 'EMAIL:' + c.email + '\n';
+  if (c.phone) vcf += 'TEL:' + c.phone + '\n';
+  if (c.jobTitle) vcf += 'TITLE:' + c.jobTitle + '\n';
+  if (c.workLocation) vcf += 'ORG:' + c.workLocation + '\n';
+  vcf += 'END:VCARD';
+  var blob = new Blob([vcf], { type: 'text/vcard' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = (c.firstName + '_' + c.lastName).replace(/\s+/g, '_') + '.vcf';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  }
+ }, '\uD83D\uDCBE Save'));
+ details.appendChild(actions);
+ card.appendChild(details);
+
+ card.addEventListener('click', function() {
+  var isHidden = details.style.display === 'none';
+  details.style.display = isHidden ? 'block' : 'none';
+  card.setAttribute('aria-expanded', String(isHidden));
+ });
+ container.appendChild(card);
+ });
+}
+
+function showNMCModal(existing) {
+ var isEdit = !!existing;
+ var overlay = el('div', {
+ style: { position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.5)', zIndex: '10000', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+ });
+ var modal = el('div', {
+ style: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px', width: 'min(440px, calc(100vw - 32px))', maxHeight: '90vh', overflowY: 'auto' }
+ });
+ modal.appendChild(el('div', { className: 'display-title-sm', style: { marginBottom: '16px' } }, isEdit ? 'Edit Contact' : 'Add Non-Member Contact'));
+
+ var fields = [
+ { id: 'nmc-first',    label: 'First Name *',    val: (existing && existing.firstName) || '' },
+ { id: 'nmc-last',     label: 'Last Name *',     val: (existing && existing.lastName) || '' },
+ { id: 'nmc-title',    label: 'Job Title',        val: (existing && existing.jobTitle) || '' },
+ { id: 'nmc-location', label: 'Work Location',    val: (existing && existing.workLocation) || '' },
+ { id: 'nmc-unit',     label: 'Unit / Dept',      val: (existing && existing.unit) || '' },
+ { id: 'nmc-email',    label: 'Email',             val: (existing && existing.email) || '', type: 'email' },
+ { id: 'nmc-phone',    label: 'Phone',             val: (existing && existing.phone) || '', type: 'tel' }
+ ];
+
+ var inputs = {};
+ fields.forEach(function(f) {
+ var group = el('div', { style: { marginBottom: '10px' } });
+ group.appendChild(el('label', { style: { display: 'block', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' } }, f.label));
+ var inp = el('input', {
+  type: f.type || 'text',
+  value: f.val,
+  style: { width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '14px', fontFamily: 'var(--fontBody)', boxSizing: 'border-box' }
+ });
+ inputs[f.id] = inp;
+ group.appendChild(inp);
+ modal.appendChild(group);
+ });
+
+ 
+ var catGroup = el('div', { style: { marginBottom: '10px' } });
+ catGroup.appendChild(el('label', { style: { display: 'block', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' } }, 'Category'));
+ var catSel = el('select', {
+ style: { width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '14px', fontFamily: 'var(--fontBody)' }
+ });
+ ['Management', 'Legal', 'HR', 'Union Rep', 'Ally', 'Other'].forEach(function(cat) {
+ var opt = el('option', { value: cat }, cat);
+ if (existing && existing.category === cat) opt.selected = true;
+ catSel.appendChild(opt);
+ });
+ catGroup.appendChild(catSel);
+ modal.appendChild(catGroup);
+
+ 
+ var notesGroup = el('div', { style: { marginBottom: '16px' } });
+ notesGroup.appendChild(el('label', { style: { display: 'block', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' } }, 'Notes'));
+ var notesInput = el('textarea', {
+ style: { width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '14px', fontFamily: 'var(--fontBody)', minHeight: '60px', resize: 'vertical', boxSizing: 'border-box' }
+ });
+ notesInput.value = (existing && existing.notes) || '';
+ notesGroup.appendChild(notesInput);
+ modal.appendChild(notesGroup);
+
+ 
+ var actRow = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } });
+ actRow.appendChild(el('button', {
+ style: { fontSize: '13px', padding: '8px 20px', borderRadius: '8px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', fontWeight: '600', cursor: 'pointer' },
+ onClick: function() { document.body.removeChild(overlay); }
+ }, 'Cancel'));
+ actRow.appendChild(el('button', {
+ className: 'btn-primary',
+ style: { fontSize: '13px', padding: '8px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
+ onClick: function() {
+  var contactData = {
+  firstName:    inputs['nmc-first'].value.trim(),
+  lastName:     inputs['nmc-last'].value.trim(),
+  jobTitle:     inputs['nmc-title'].value.trim(),
+  workLocation: inputs['nmc-location'].value.trim(),
+  unit:         inputs['nmc-unit'].value.trim(),
+  email:        inputs['nmc-email'].value.trim(),
+  phone:        inputs['nmc-phone'].value.trim(),
+  category:     catSel.value,
+  notes:        notesInput.value.trim()
+  };
+  if (!contactData.firstName && !contactData.lastName) {
+  showToast('Name is required.', 'error');
+  return;
+  }
+  document.body.removeChild(overlay);
+  if (isEdit) {
+  serverCall().withSuccessHandler(function(res) {
+   if (res && res.success) {
+   showToast('Contact updated.', 'success');
+   _handleTabNav(AppState.activeRole, 'stewarddirectory');
+   } else { showToast((res && res.error) || 'Update failed.', 'error'); }
+  }).dataUpdateNonMemberContact(SESSION_TOKEN, existing.contactId, contactData);
+  } else {
+  serverCall().withSuccessHandler(function(res) {
+   if (res && res.success) {
+   showToast('Contact added.', 'success');
+   _handleTabNav(AppState.activeRole, 'stewarddirectory');
+   } else { showToast((res && res.error) || 'Add failed.', 'error'); }
+  }).dataAddNonMemberContact(SESSION_TOKEN, contactData);
+  }
+ }
+ }, isEdit ? 'Save Changes' : 'Add Contact'));
+ modal.appendChild(actRow);
+
+ overlay.appendChild(modal);
+ overlay.addEventListener('click', function(e) { if (e.target === overlay) document.body.removeChild(overlay); });
+ document.body.appendChild(overlay);
+ inputs['nmc-first'].focus();
 }
 
 function _checkEscalationRecommendation(card, caseId) {
