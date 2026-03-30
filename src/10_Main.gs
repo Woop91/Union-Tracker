@@ -230,8 +230,22 @@ function onSelectionChange(e) {
   if (!e || !e.range) return;
 
   try {
-    var autoOpen = PropertiesService.getUserProperties()
-      .getProperty('multiSelectAutoOpen');
+    var props = PropertiesService.getUserProperties();
+
+    // ── Tab Modal auto-open (v4.48.0) ──
+    // Detect sheet tab switches and show contextual modals.
+    var currentSheet = e.range.getSheet().getName();
+    var lastSheet = props.getProperty('tabModal_lastSheet');
+    if (currentSheet !== lastSheet) {
+      props.setProperty('tabModal_lastSheet', currentSheet);
+      // Only fire on actual tab change (not initial load or same-tab clicks)
+      if (lastSheet !== null) {
+        onTabSwitch_(currentSheet);
+      }
+    }
+
+    // ── Multi-select auto-open ──
+    var autoOpen = props.getProperty('multiSelectAutoOpen');
     // Default is ON — only skip if user has explicitly disabled it ('false').
     // Absence of the property (fresh install) means enabled.
     if (autoOpen === 'false') return;
@@ -240,6 +254,51 @@ function onSelectionChange(e) {
       onSelectionChangeMultiSelect(e);
     }
   } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+}
+
+/**
+ * Called when the user switches to a different sheet tab.
+ * Looks up TAB_MODAL_REGISTRY and shows the contextual modal if:
+ *   1. Tab modals are enabled in Config (ENABLE_TAB_MODALS ≠ 'no')
+ *   2. The user hasn't dismissed the modal for this tab
+ * @param {string} sheetName - Name of the newly-activated sheet
+ * @private
+ */
+function onTabSwitch_(sheetName) {
+  try {
+    if (typeof TAB_MODAL_REGISTRY === 'undefined') return;
+    if (typeof isTabModalsEnabled_ === 'function' && !isTabModalsEnabled_()) return;
+
+    for (var i = 0; i < TAB_MODAL_REGISTRY.length; i++) {
+      var entry = TAB_MODAL_REGISTRY[i];
+      if (entry.sheet === sheetName) {
+        // Check per-user dismissal
+        var sheetKey = '';
+        for (var k in SHEETS) {
+          if (SHEETS[k] === sheetName) { sheetKey = k; break; }
+        }
+        if (sheetKey && typeof isTabModalDismissed_ === 'function' && isTabModalDismissed_(sheetKey)) return;
+
+        // Call the modal show function
+        // GAS V8: all .gs functions share global namespace, use lookup map
+        var fnMap = {
+          showTabModalConfig: typeof showTabModalConfig === 'function' ? showTabModalConfig : null,
+          showTabModalMemberDirectory: typeof showTabModalMemberDirectory === 'function' ? showTabModalMemberDirectory : null,
+          showTabModalGrievanceLog: typeof showTabModalGrievanceLog === 'function' ? showTabModalGrievanceLog : null,
+          showTabModalCaseChecklist: typeof showTabModalCaseChecklist === 'function' ? showTabModalCaseChecklist : null,
+          showTabModalFeedback: typeof showTabModalFeedback === 'function' ? showTabModalFeedback : null,
+          showTabModalVolunteerHours: typeof showTabModalVolunteerHours === 'function' ? showTabModalVolunteerHours : null,
+          showTabModalMeetingAttendance: typeof showTabModalMeetingAttendance === 'function' ? showTabModalMeetingAttendance : null,
+          showTabModalMeetingCheckIn: typeof showTabModalMeetingCheckIn === 'function' ? showTabModalMeetingCheckIn : null,
+          showTabModalResources: typeof showTabModalResources === 'function' ? showTabModalResources : null
+        };
+        if (fnMap[entry.fn]) {
+          fnMap[entry.fn]();
+        }
+        return;
+      }
+    }
+  } catch (_e) { Logger.log('onTabSwitch_ error: ' + (_e.message || _e)); }
 }
 
 /**

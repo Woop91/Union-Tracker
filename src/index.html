@@ -503,9 +503,9 @@
       // ── Per-tab accent colors (used by shatter theme) ──
       var TAB_COLORS = {
         cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-        tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
+        tasks: '#f59e0b', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-        poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
+        resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
         polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
         events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
         testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -602,21 +602,11 @@
         // 3. Manage CRT overlay elements for cyberpunk
         _manageCrtOverlay(isCyber);
 
-        // 4. Sync embedded component themes (org chart, agency chart, POMS)
-        var embedRoot = document.querySelector('.madds-embed');
+        // 4. Sync embedded component themes (org chart)
+        var embedRoot = document.querySelector('.sb-embed');
         if (embedRoot) {
           if (!AppState.isDark) embedRoot.classList.add('light');
           else embedRoot.classList.remove('light');
-        }
-        var agencyRoot = document.querySelector('.agency-oc');
-        if (agencyRoot) {
-          if (AppState.isDark) agencyRoot.classList.add('dark');
-          else agencyRoot.classList.remove('dark');
-        }
-        var pomsRoot = document.querySelector('.poms-root');
-        if (pomsRoot) {
-          if (AppState.isDark) pomsRoot.classList.add('poms-dark');
-          else pomsRoot.classList.remove('poms-dark');
         }
       }
 
@@ -1543,12 +1533,16 @@
           children.forEach(function(child) {
             if (typeof child === 'string') {
               elem.appendChild(document.createTextNode(child));
-            } else if (child) {
+            } else if (child instanceof Node) {
               elem.appendChild(child);
+            } else if (child != null && child !== false) {
+              elem.appendChild(document.createTextNode(String(child)));
             }
           });
-        } else {
+        } else if (children instanceof Node) {
           elem.appendChild(children);
+        } else {
+          elem.appendChild(document.createTextNode(String(children)));
         }
       }
       return elem;
@@ -2831,13 +2825,10 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { group: 'Manage' },
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
-        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { group: 'Reference' },
-        { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
-        { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -3141,7 +3132,7 @@
               }
             });
             // Sync org chart theme with AppState dark/light mode
-            var embedRoot = wrap.querySelector('.madds-embed');
+            var embedRoot = wrap.querySelector('.sb-embed');
             if (embedRoot) {
               if (!AppState.isDark) embedRoot.classList.add('light');
               else embedRoot.classList.remove('light');
@@ -3167,99 +3158,6 @@
             container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load org chart.'));
           })
           .getOrgChartHtml();
-      });
-    }
-
-    /**
-     * Agency Org Chart (MADDS) — loads agency_org_chart.html lazily.
-     * Agency structure, budget, personnel, hierarchy.
-     */
-    function renderAgencyOrgChart(appContainer, role) {
-      var mySwitch = _navSwitchId;
-      var myGen = _renderGeneration;
-      renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
-        showLoading(container);
-        google.script.run
-          .withSuccessHandler(function(html) {
-            if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return;
-            container.innerHTML = '';
-            container.classList.add('orgchart-content');
-            var wrap = el('div');
-            wrap.innerHTML = html;
-            container.appendChild(wrap);
-            // Re-execute <script> tags from agency_org_chart.html
-            wrap.querySelectorAll('script').forEach(function(old) {
-              try {
-                var s = document.createElement('script');
-                s.textContent = old.textContent;
-                old.parentNode.removeChild(old);
-                document.head.appendChild(s);
-              } catch (scriptErr) {
-                console.error('Agency org chart script re-execution failed:', scriptErr);
-              }
-            });
-            // Sync agency chart theme with AppState dark/light mode
-            var agencyRoot = wrap.querySelector('.agency-oc');
-            if (agencyRoot) {
-              if (AppState.isDark) agencyRoot.classList.add('dark');
-              else agencyRoot.classList.remove('dark');
-            }
-            // Run init if available
-            if (typeof window.agencyOC_init === 'function') {
-              try { window.agencyOC_init(); } catch (_e) { /* already ran */ }
-            }
-          })
-          .withFailureHandler(function(err) {
-            container.innerHTML = '';
-            container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load agency org chart.'));
-          })
-          .getAgencyOrgChartHtml();
-      });
-    }
-
-    /**
-     * POMS Reference — loads poms_reference.html lazily, same pattern as org chart.
-     * Contains 78 POMS sections, 17 flowcharts, search, ratings, bookmarks, notes.
-     */
-    function renderPOMSReference(appContainer, role) {
-      var mySwitch = _navSwitchId;
-      var myGen = _renderGeneration; // H7: capture render generation at request time
-      renderPageLayout(appContainer, role, 'poms', function(container) {
-        showLoading(container);
-        // Set container to fill height for POMS app shell
-        container.style.height = 'calc(100vh - 56px)';
-        container.style.padding = '0';
-        container.style.overflow = 'hidden';
-        google.script.run
-          .withSuccessHandler(function(html) {
-            if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; // user already navigated away
-            container.innerHTML = '';
-            var wrap = el('div');
-            wrap.style.height = '100%';
-            wrap.innerHTML = html;
-            container.appendChild(wrap);
-            // Sync POMS theme with AppState dark/light mode
-            var pomsRoot = wrap.querySelector('.poms-root');
-            if (pomsRoot) {
-              if (AppState.isDark) pomsRoot.classList.add('poms-dark');
-              else pomsRoot.classList.remove('poms-dark');
-            }
-            // Re-execute <script> tags from poms_reference.html
-            wrap.querySelectorAll('script').forEach(function(old) {
-              try {
-                var s = document.createElement('script');
-                s.textContent = old.textContent;
-                old.parentNode.replaceChild(s, old);
-              } catch (scriptErr) {
-                console.error('POMS script re-execution failed:', scriptErr);
-              }
-            });
-          })
-          .withFailureHandler(function(err) {
-            container.innerHTML = '';
-            container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load POMS Reference.'));
-          })
-          .getPOMSReferenceHtml();
       });
     }
 
@@ -3444,30 +3342,6 @@
         _navProgressDone();
         return;
       }
-      if (tabId === 'maddsorgchart') {
-        if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
-          if (typeof _renderDuesGate === 'function') {
-            _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
-          }
-          _navProgressDone();
-          return;
-        }
-        _hideAllVisiblePanes();
-        _splitRenderTarget = 'primary';
-        renderAgencyOrgChart(app, role);
-        _activePane = _layoutCache.content;
-        _navProgressDone();
-        return;
-      }
-      if (tabId === 'poms') {
-        _hideAllVisiblePanes();
-        _splitRenderTarget = 'primary';
-        renderPOMSReference(app, role);
-        _activePane = _layoutCache.content;
-        _navProgressDone();
-        return;
-      }
-
       // ── Stale-switch guard: a newer click already fired, bail out ──
       if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 
@@ -3608,7 +3482,6 @@
           case 'cases': return renderMyCases;
           case 'profile': return renderUpdateProfile;
           case 'resources': return renderMemberResources;
-          case 'workload': return renderWorkloadTracker;
           case 'weeklyq': // legacy deep-link
           case 'polls': return renderPollsPage;
           case 'survey': return renderSurveyResultsPage;
@@ -3652,7 +3525,6 @@
           case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
           case 'timeline': return renderStewardTimelinePage;
           case 'mentorship': return renderMentorshipPage;
-          case 'workload': return renderWorkloadTracker;
           case 'accesslog': return renderAccessLogPage;
           case 'engagement': return renderEngagementDashboard;
           case 'failsafe': return renderFailsafePage;

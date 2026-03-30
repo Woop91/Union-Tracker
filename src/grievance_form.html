@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grievance Form — SolidBase</title>
+<title>Grievance Form</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -288,7 +288,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 <body>
 
 <div class="toolbar">
-  <span>Grievance Form — SolidBase &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
+  <span>Grievance Form &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
   <button class="tbtn go" onclick="doEmail()">&#9993; Email</button>
   <button class="tbtn" onclick="window.print()">&#9113; Print&thinsp;/&thinsp;Save PDF</button>
   <button class="tbtn" onclick="doClear()">&#10005; Clear</button>
@@ -341,7 +341,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <div class="irow">
     <label for="agency" class="lbl">AGENCY:</label>
-    <input id="agency" class="fi" type="text" style="width:1.3in;" value="" title="Enter agency name">
+    <input id="agency" class="fi" type="text" style="width:1.3in;" value="" title="Enter your agency name">
     <span class="lbl" style="margin-left:6px;">REGION:</span>
     <select id="region" class="fi" style="width:1.3in;" onchange="autoFillLocation()">
       <option value=""></option>
@@ -426,7 +426,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <!-- WAIVER 1 -->
   <div class="whead">Alliance Waiver of Right to Appeal Disciplinary Action to Civil Service Commission</div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Union and the Employer.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Alliance, AFSCME/SEIU, AFL-CIO Units 8 &amp; 10, effective January 1, 2014 to December 31, 2016.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my demotion, suspension or discharge effective on<input id="w1date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -458,7 +458,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
     Acknowledgement of Alliance Waiver of Right to Arbitrate Claims of Discriminatory<br>
     Termination Filed in Multiple Forums
   </div>
-  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Union and the Employer.</div>
+  <div style="font-size:8.5pt;line-height:1.5;margin-bottom:4pt;white-space:nowrap;">Collective Bargaining Agreement between the Alliance, AFSCME/SEIU, AFL-CIO Units 8 &amp; 10, effective January 1, 2014 to December 31, 2016.</div>
   <div style="font-size:9.5pt;line-height:1.65;margin-bottom:4pt;">
     I wish to submit the attached grievance under Article 23A, Grievance Procedure and Article 23, Arbitration of Disciplinary Action, appealing
     my discharge effective on <input id="w2date" class="fi" type="date" style="width:1.2in;height:22px;vertical-align:baseline;" onchange="validateDate(this)"><span class="date-msg"></span>.
@@ -541,7 +541,7 @@ function buildBody(){
 function doEmail(){
   const to=prompt("Recipient email address:");
   if(!to)return;
-  const subText="Grievance Report \u2014 "+(v("grievant")||"Grievant");
+  const subText="Grievance \u2014 "+(v("grievant")||"Grievant");
   const body=buildBody();
   const mailtoUrl="mailto:"+to+"?subject="+encodeURIComponent(subText)+"&body="+encodeURIComponent(body);
   if(mailtoUrl.length>1900){

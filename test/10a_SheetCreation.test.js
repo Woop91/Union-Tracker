@@ -103,7 +103,7 @@ describe('Config section header parity', () => {
     expect(src).toContain('var sectionHeaders');
   });
 
-  test('sectionHeaders element count matches CONFIG_HEADER_MAP_ length (80)', () => {
+  test('sectionHeaders element count matches CONFIG_HEADER_MAP_ length (81)', () => {
     // Extract the sectionHeaders array definition from source
     const match = src.match(/var sectionHeaders\s*=\s*\[([\s\S]*?)\];/);
     expect(match).not.toBeNull();
@@ -114,8 +114,8 @@ describe('Config section header parity', () => {
     expect(elements.length).toBe(CONFIG_HEADER_MAP_.length);
   });
 
-  test('CONFIG_HEADER_MAP_ has exactly 80 entries', () => {
-    expect(CONFIG_HEADER_MAP_.length).toBe(80);
+  test('CONFIG_HEADER_MAP_ has exactly 81 entries', () => {
+    expect(CONFIG_HEADER_MAP_.length).toBe(81);
   });
 });
 

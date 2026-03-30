@@ -69,7 +69,7 @@ var PIN_CONFIG = {
   MAX_ATTEMPTS: 5,                  // Max failed attempts before lockout
   LOCKOUT_MINUTES: 15,              // Lockout duration in minutes
   SESSION_DURATION_MINUTES: 30,     // Session duration before re-auth required
-  get PIN_COLUMN() { return (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.PIN_HASH) ? MEMBER_COLS.PIN_HASH : 33; },
+  get PIN_COLUMN() { return (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.PIN_HASH) ? MEMBER_COLS.PIN_HASH : 34; },
   SALT_PROPERTY: 'MEMBER_PIN_SALT', // Property key for salt storage
   RESET_TOKEN_EXPIRY_MINUTES: 30,   // Reset token expiration time
   RESET_TOKEN_PREFIX: 'pin_reset_'  // Cache key prefix for reset tokens
@@ -77,11 +77,11 @@ var PIN_CONFIG = {
 
 /**
  * Member self-service column mapping
- * Column AG (33) stores the hashed PIN
+ * Column AH (34) stores the hashed PIN
  * @const {Object}
  */
 var MEMBER_PIN_COLS = {
-  get PIN_HASH() { return (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.PIN_HASH) ? MEMBER_COLS.PIN_HASH : 33; }
+  get PIN_HASH() { return (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.PIN_HASH) ? MEMBER_COLS.PIN_HASH : 34; }
 };
 
 // ============================================================================

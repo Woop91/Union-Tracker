@@ -104,7 +104,7 @@ function doGetWebDashboard(e) {
     config = ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
-    config = { orgName: 'DDS', orgAbbrev: 'DDS', logoInitials: 'DDS', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -358,12 +358,12 @@ function _sanitizeConfig(config) {
     }
   } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
   return {
-    orgName: config.orgName,
-    orgAbbrev: config.orgAbbrev,
-    logoInitials: config.logoInitials,
+    orgName: String(config.orgName || ''),
+    orgAbbrev: String(config.orgAbbrev || ''),
+    logoInitials: String(config.logoInitials || ''),
     accentHue: userHue,
-    stewardLabel: config.stewardLabel,
-    memberLabel: config.memberLabel,
+    stewardLabel: String(config.stewardLabel || 'Steward'),
+    memberLabel: String(config.memberLabel || 'Member'),
     magicLinkExpiryDays: config.magicLinkExpiryDays,
     cookieDurationDays: config.cookieDurationDays,
     calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
@@ -789,7 +789,7 @@ function getMemberViewHtml() {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
+ * @returns {string} Raw HTML content (CSS-scoped under .sb-embed), or error message
  */
 function getOrgChartHtml() {
   try {
@@ -812,48 +812,19 @@ function getOrgChartHtml() {
 }
 
 /**
- * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
+ * Client-callable stub: Agency Org Chart is not available in SolidBase.
+ * @returns {string} Stub message
  */
 function getAgencyOrgChartHtml() {
-  try {
-    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
-    var cacheKey = 'HTML_agency_org_chart_' + ver;
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get(cacheKey);
-    if (cached) return cached;
-    var html = HtmlService.createHtmlOutputFromFile('agency_org_chart').getContent();
-    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
-    return html;
-  } catch (e) {
-    Logger.log('getAgencyOrgChartHtml error: ' + e.message);
-    return '<div class="empty-state">Agency org chart could not be loaded.</div>';
-  }
+  return '<div class="empty-state">Agency org chart is not available in SolidBase.</div>';
 }
 
 /**
- * Client-callable: Returns the POMS Reference HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the POMS Reference tab.
- * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
+ * Client-callable stub: POMS Reference is not available in SolidBase.
+ * @returns {string} Stub message
  */
 function getPOMSReferenceHtml() {
-  try {
-    // No auth check — user already authenticated via doGet().
-    // Session.getActiveUser().getEmail() returns empty for magic-link users.
-    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
-    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
-    var cacheKey = 'HTML_poms_ref_' + ver;
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get(cacheKey);
-    if (cached) return cached;
-    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
-    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
-    return html;
-  } catch (e) {
-    Logger.log('getPOMSReferenceHtml error: ' + e.message);
-    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
-  }
+  return '<div class="empty-state">POMS Reference is not available in SolidBase.</div>';
 }
 
 /**

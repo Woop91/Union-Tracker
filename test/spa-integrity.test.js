@@ -851,7 +851,7 @@ describe('G19: More menu items have route handlers', () => {
 // instead of "Program Operations Manual System". This guard prevents the wrong
 // acronym expansion from reappearing.
 
-describe.skip('G20: POMS description accuracy (POMS removed from SolidBase)', () => {
+describe.skip('G20: POMS description accuracy (SolidBase: POMS excluded)', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
 
@@ -928,7 +928,7 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
 // G22: Workload Tracker frontend invariants
 // ============================================================================
 
-describe.skip('G22 — Workload Tracker frontend invariants (removed from SolidBase)', () => {
+describe.skip('G22 — Workload Tracker frontend invariants (SolidBase: workload excluded)', () => {
   const memberView = read('member_view.html');
 
   test('WT_CAT_KEY_LABELS map is defined from WT_CATEGORIES', () => {
@@ -1038,10 +1038,8 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  test.skip('renderPOMSReference async callback checks _navSwitchId (POMS removed from SolidBase)', () => {
-    const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
-    expect(fnBody).toMatch(/_navSwitchId/);
-  });
+  // SolidBase: POMS excluded — renderPOMSReference removed
+  test.skip('renderPOMSReference async callback checks _navSwitchId (SolidBase: POMS excluded)', () => {});
 });
 
 // Helper: extract a function body by name (brace-counting)
@@ -1116,12 +1114,8 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  test.skip('poms early-return uses _hideAllVisiblePanes (POMS removed from SolidBase)', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
-    expect(pomsBlock).not.toBeNull();
-    expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
-  });
+  // SolidBase: POMS excluded — poms routing removed
+  test.skip('poms early-return uses _hideAllVisiblePanes (SolidBase: POMS excluded)', () => {});
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');

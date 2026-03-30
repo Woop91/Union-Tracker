@@ -289,6 +289,75 @@ have been archived to `docs/AI_REFERENCE_ARCHIVE.md`. Refer there for past devel
 
 ---
 
+## 📝 CHANGE LOG — Dues Statuses Config-driven (v4.49.1) — 2026-03-29
+
+### What changed
+**Rule fix: Nothing is hardcoded. `Dues Status` dropdown is now Config-driven.**
+
+#### `01_Core.gs` — `CONFIG_HEADER_MAP_`
+- Added `{ key: 'DUES_STATUSES', header: 'Dues Statuses', type: 'list' }` after `BEST_TIMES`
+- `CONFIG_COLS.DUES_STATUSES` now auto-derived like all other Config columns
+
+#### `07_DevTools.gs` — `seedConfigData()`
+- Added seed block for `CONFIG_COLS.DUES_STATUSES` with defaults:
+  `['Current', 'Past Due', 'Inactive', 'Fee Payer', 'Exempt']`
+- Seed runs on first setup only — safe to re-run (skips if column already has values)
+
+#### `21_WebDashDataService.gs` — `dataGetAddMemberOptions()`
+- Removed hardcoded `duesStatuses` array
+- Now reads `_configList(CONFIG_COLS.DUES_STATUSES)` dynamically from Config tab
+- **RULE: If the Config tab has no Dues Statuses values, run seedConfigData() or
+  add values manually to the `Dues Statuses` column in the Config sheet.**
+
+### CORRECTED from v4.49.0 notes
+- Previous note said: "Dues Status is NOT in CONFIG_HEADER_MAP_ — hardcoded 5-value list"
+- That was wrong. It is NOW in CONFIG_HEADER_MAP_ and fully Config-driven.
+
+---
+
+## 📝 CHANGE LOG — Add Member from Webapp (v4.49.0) — 2026-03-29
+
+### What was added
+**Feature: Stewards can add new members AND non-member contacts directly from the webapp.**
+
+#### `02_DataManagers.gs` — `addMember()` field expansion
+- Was missing: `supervisor`, `manager`, `employeeId`, `hireDate`, `duesStatus`, `IS_STEWARD` default
+- All fields now written via `MEMBER_COLS` constants — never hardcoded column index
+- `IS_STEWARD` defaults to `'No'` — promote separately via existing steward workflow
+- `HIRE_DATE` only written if a value is provided (avoids spurious date errors)
+
+#### `21_WebDashDataService.gs` — 2 new server wrappers
+- **`dataGetAddMemberOptions(sessionToken)`** — steward-auth-gated. Reads Job Titles, Locations,
+  Units, Supervisors, Managers from Config tab dynamically via `_configList()` pattern.
+  Returns hardcoded `duesStatuses` array (Current/Past Due/Inactive/Fee Payer/Exempt) since
+  Dues Status has no Config list column.
+- **`dataAddMemberFromWebapp(sessionToken, memberData)`** — steward-auth-gated. Validates
+  firstName+lastName required. Calls `addMember()` in 02_DataManagers.gs via `withScriptLock_`.
+  Logs audit event with steward's server-resolved email (not client-supplied).
+
+#### `steward_view.html` — 2 UI additions
+- **`showAddMemberModal(onSuccess)`** — overlay modal. Fields: First/Last Name (required),
+  Email, Phone, Job Title (dropdown), Work Location (dropdown), Unit (dropdown), Dues Status
+  (dropdown), Supervisor (dropdown), Manager (dropdown), Employee ID, Hire Date.
+  Dropdowns fetched from Config on modal open — always current, never stale.
+  On success: shows toast with new Member ID, calls `onSuccess()` to reload Members tab.
+- **`+ Add Member` button** — added to Member Finder panel header (right side), visible in
+  both bulk and paginated member list views.
+
+### Non-member contacts (existing — no change)
+- Already fully built at bottom of Contact tab (`renderNonMemberContactsSection`)
+- `showNMCModal()` handles add/edit
+- Sheet tab: `📇 Non-Member Contacts` — recreatable via Sheet Setup if missing
+
+### RULES — do not violate
+- `dataAddMemberFromWebapp` must remain steward-auth-gated — never expose to member role
+- Dropdown options always fetched from Config tab at runtime — never hardcode lists in UI
+- `addMember()` uses `MEMBER_COLS` constants only — never column index literals
+- `Dues Status` is NOT in CONFIG_HEADER_MAP — hardcoded 5-value list in `dataGetAddMemberOptions`
+  (if this needs to become Config-driven, add a `Dues Statuses` list column to CONFIG_HEADER_MAP_)
+
+---
+
 ## 🔄 REFACTOR LOG — ADHD → ComfortView rename (2026-03-21)
 
 **Reason:** Internal function names using `ADHD` were inconsistent with the user-facing "Comfort View" branding.

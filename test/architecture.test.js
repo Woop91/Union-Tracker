@@ -764,7 +764,8 @@ describe('A11b: Client-callable HTML endpoints have error handling', () => {
   // HTML-serving endpoints — serve static content, auth enforced by doGet().
   // No per-function auth check: Session.getActiveUser().getEmail() returns empty
   // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
-  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml']; // getPOMSReferenceHtml removed (POMS excluded from SolidBase)
+  // SolidBase: getPOMSReferenceHtml is a stub (POMS excluded) — no try/catch needed
+  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml'];
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() has try/catch error handling`, () => {

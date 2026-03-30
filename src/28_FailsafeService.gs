@@ -7,7 +7,7 @@
  *   Data resilience system with scheduled email digests and Google Drive CSV
  *   backups. Members can opt into periodic email digests of their grievance/
  *   workload/task data. Automatic weekly Drive backups export key sheets as
- *   CSV files to a SolidBase_Backups folder. Maintains maximum 52 backup
+ *   CSV files to a DDS_Dashboard_Backups folder. Maintains maximum 52 backup
  *   files (~1 year of weekly backups per sheet).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -35,7 +35,7 @@
 
 var FailsafeService = (function () {
 
-  var BACKUP_FOLDER_NAME = 'SolidBase_Backups';
+  var BACKUP_FOLDER_NAME = 'DDS_Dashboard_Backups';
   var MAX_BACKUP_FILES = 52; // ~1 year of weekly backups per sheet
 
   // ═══════════════════════════════════════

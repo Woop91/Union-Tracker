@@ -391,7 +391,7 @@ describe('G6: dist/ files are in sync with src/', () => {
 
   test('dist/ does not contain dev-only files (must be built with --prod)', () => {
     // Test runner included in prod — tab gated by IS_DEV_MODE, endpoints by steward auth
-    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs'];
+    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
     const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
     expect(found).toEqual([]);
   });
@@ -550,7 +550,7 @@ describe('G9: Nav tabs and handlers are in sync', () => {
   });
 
   // Member-only tabs (removed from steward nav)
-  const memberOnlyTabs = ['orgchart', 'maddsorgchart']; // 'poms' removed (POMS excluded from SolidBase)
+  const memberOnlyTabs = ['orgchart'];
   memberOnlyTabs.forEach(tabId => {
     test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
       const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
@@ -599,7 +599,6 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   // Must find at least the known lazy-loaders
   test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
-    // getPOMSReferenceHtml removed (POMS excluded from SolidBase)
   });
 
   [...serverFunctions].forEach(fn => {
@@ -617,7 +616,7 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 // and injected into the SPA. If its <script> block has syntax errors, the entire
 // POMS tab fails silently.
 
-describe.skip('G11: poms_reference.html integrity (POMS removed from SolidBase)', () => {
+describe.skip('G11: poms_reference.html integrity (SolidBase: POMS excluded)', () => {
   const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
 
   test('poms_reference.html exists', () => {
@@ -748,7 +747,37 @@ describe('G13: Module load order is safe', () => {
 });
 
 
-// G14: WorkloadService crash-safe patterns — SKIPPED (25_WorkloadService.gs excluded from SolidBase)
+const _hasWorkloadService = fs.existsSync(path.join(SRC_DIR, '25_WorkloadService.gs'));
+const _describeWS = _hasWorkloadService ? describe : describe.skip;
+
+_describeWS('G14: WorkloadService crash-safe patterns', () => {
+  const wsCode = _hasWorkloadService ? fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8') : '';
+
+  test('_refreshReportingData does NOT clearContents before writing', () => {
+    // Extract the _refreshReportingData function body
+    const funcStart = wsCode.indexOf('function _refreshReportingData()');
+    expect(funcStart).toBeGreaterThan(-1);
+    const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
+    const funcBody = wsCode.substring(funcStart, funcEnd);
+
+    // The old antipattern: report.clearContents() before setValues
+    // New pattern: setValues first, then clearContent only for stale rows
+    expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
+  });
+
+  test('rate limit uses atomic check-and-record pattern', () => {
+    // _checkAndRecordRateLimit should exist (replaces separate check + record)
+    expect(wsCode).toContain('function _checkAndRecordRateLimit');
+    // Old separate _recordRateLimitAttempt should NOT exist
+    expect(wsCode).not.toContain('function _recordRateLimitAttempt');
+    // No separate _recordSubmission call
+    expect(wsCode).not.toContain('function _recordSubmission');
+  });
+
+  test('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
+    expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
+  });
+});
 
 // ============================================================================
 // G15: IDLE LOGOUT MODULE

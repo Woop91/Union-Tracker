@@ -173,6 +173,19 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('🔧 Repair Dynamic Formulas', 'repairDynamicFormulas'))
 
+    .addSubMenu(ui.createMenu('📑 Tab Modals')
+      .addItem('⚙️ Config', 'showTabModalConfig')
+      .addItem('👥 Member Directory', 'showTabModalMemberDirectory')
+      .addItem('⚖️ Grievance Log', 'showTabModalGrievanceLog')
+      .addItem('✅ Case Checklist', 'showTabModalCaseChecklist')
+      .addItem('💡 Feedback', 'showTabModalFeedback')
+      .addItem('🤝 Volunteer Hours', 'showTabModalVolunteerHours')
+      .addItem('📅 Meeting Attendance', 'showTabModalMeetingAttendance')
+      .addItem('📝 Meeting Check-In', 'showTabModalMeetingCheckIn')
+      .addItem('📚 Resources', 'showTabModalResources')
+      .addSeparator()
+      .addItem('🔄 Reset "Don\'t Show Again"', 'resetTabModalDismissals'))
+
     .addSubMenu(ui.createMenu('🎨 Themes')
       .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
       .addItem('🏛️ Apply Union Brand Theme (All Tabs)', 'applyUnionThemeToAllTabs')
@@ -4071,4 +4084,229 @@ function modalCreateWeeklyQuestion(question, options, active) {
     Logger.log('modalCreateWeeklyQuestion error: ' + e.message);
     return { success: false, error: e.message };
   }
+}
+
+// ============================================================================
+// TAB-SPECIFIC MODALS (v4.48.0)
+// Auto-open contextual modals when navigating to key sheet tabs.
+// Each modal provides quick actions, tips, and links relevant to that tab.
+// Controlled by Config: ENABLE_TAB_MODALS (default: 'yes').
+// Users can dismiss per-tab via "Don't show again" checkbox.
+// ============================================================================
+
+/**
+ * Returns true if tab modals are enabled in Config.
+ * Defaults to true (enabled) when the config value is missing or blank.
+ * @returns {boolean}
+ */
+function isTabModalsEnabled_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return true;
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (!configSheet) return true;
+    var val = configSheet.getRange(3, CONFIG_COLS.ENABLE_TAB_MODALS).getValue();
+    return String(val).trim().toLowerCase() !== 'no';
+  } catch (_e) { return true; }
+}
+
+/**
+ * Returns true if the user has dismissed the tab modal for the given sheet.
+ * @param {string} sheetKey - Key like 'CONFIG', 'MEMBER_DIR', etc.
+ * @returns {boolean}
+ */
+function isTabModalDismissed_(sheetKey) {
+  try {
+    var val = PropertiesService.getUserProperties().getProperty('tabModal_dismiss_' + sheetKey);
+    return val === 'true';
+  } catch (_e) { return false; }
+}
+
+/**
+ * Marks a tab modal as dismissed for the current user.
+ * Called from the modal's "Don't show again" checkbox.
+ * @param {string} sheetKey - Key like 'CONFIG', 'MEMBER_DIR', etc.
+ */
+function dismissTabModal(sheetKey) {
+  try {
+    PropertiesService.getUserProperties().setProperty('tabModal_dismiss_' + sheetKey, 'true');
+  } catch (_e) { /* silent */ }
+}
+
+/**
+ * Resets all tab modal dismissals for the current user.
+ * Accessible via Admin > Settings or Tools menu.
+ */
+function resetTabModalDismissals() {
+  try {
+    var props = PropertiesService.getUserProperties();
+    var all = props.getProperties();
+    for (var key in all) {
+      if (key.indexOf('tabModal_dismiss_') === 0) {
+        props.deleteProperty(key);
+      }
+    }
+    SpreadsheetApp.getUi().alert('Tab modal preferences have been reset. Modals will show again on tab navigation.');
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error resetting tab modals: ' + e.message);
+  }
+}
+
+/**
+ * Returns shared HTML wrapper for all tab modals.
+ * Includes dismiss checkbox, close button, and shared styles.
+ * @param {string} sheetKey - Key for dismiss tracking
+ * @param {string} title - Modal title
+ * @param {string} bodyHtml - Inner HTML content
+ * @returns {string} Complete HTML string
+ * @private
+ */
+function getTabModalHtml_(sheetKey, title, bodyHtml) {
+  return '<!DOCTYPE html><html><head>' + getModalHead_() + getModalStyles_() +
+    '<style>' +
+    '.tab-modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #E5E7EB; }' +
+    '.tab-modal-header h2 { flex: 1; margin: 0; }' +
+    '.quick-action { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: white; border: 1px solid #E5E7EB; border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }' +
+    '.quick-action:hover { background: #F0F9FF; border-color: #2C5282; transform: translateX(2px); }' +
+    '.quick-action .qa-icon { font-size: 20px; width: 28px; text-align: center; }' +
+    '.quick-action .qa-text { flex: 1; }' +
+    '.quick-action .qa-text strong { display: block; font-size: 13px; color: #1F2937; }' +
+    '.quick-action .qa-text small { color: #6B7280; font-size: 11px; }' +
+    '.tip-box { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 12px; color: #92400E; }' +
+    '.dismiss-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid #E5E7EB; }' +
+    '.dismiss-row label { font-size: 12px; color: #6B7280; cursor: pointer; display: flex; align-items: center; gap: 6px; }' +
+    '.dismiss-row input[type=checkbox] { width: auto; }' +
+    '.section-label { font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 6px; }' +
+    '</style></head><body>' +
+    '<div class="tab-modal-header"><h2>' + title + '</h2></div>' +
+    bodyHtml +
+    '<div class="dismiss-row">' +
+    '<label><input type="checkbox" id="dismissChk" onchange="handleDismiss()"> Don\'t show this again for this tab</label>' +
+    '<button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+    '<script>' +
+    'function handleDismiss() { if (document.getElementById("dismissChk").checked) { google.script.run.dismissTabModal("' + sheetKey + '"); } }' +
+    'function runAction(fn) { google.script.host.close(); google.script.run[fn](); }' +
+    '</script></body></html>';
+}
+
+/**
+ * Helper to show a tab modal dialog.
+ * @param {string} html - Full HTML string
+ * @param {string} title - Dialog title
+ * @private
+ */
+function showTabModal_(html, title) {
+  var output = HtmlService.createHtmlOutput(html)
+    .setWidth(DIALOG_SIZES.MEDIUM.width)
+    .setHeight(420);
+  SpreadsheetApp.getUi().showModalDialog(output, title);
+}
+
+// ── Config Tab Modal ──
+
+function showTabModalConfig() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showSettingsDialog\')"><div class="qa-icon">⚙️</div><div class="qa-text"><strong>Open Settings</strong><small>Calendar, email, drive integration toggles</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showRepairDialog\')"><div class="qa-icon">🔧</div><div class="qa-text"><strong>Repair Dashboard</strong><small>Fix missing sheets, formulas, and validations</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'restoreConfigAndDropdowns\')"><div class="qa-icon">🔄</div><div class="qa-text"><strong>Restore Dropdowns</strong><small>Re-seed default dropdown values in Config columns</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'applyConfigStyling\')"><div class="qa-icon">🎨</div><div class="qa-text"><strong>Apply Config Styling</strong><small>Re-apply colors, fonts, and section headers</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> Rows 1–2 are headers (do not edit). Data starts at Row 3. Each column is a dropdown source or setting. Use the section headers in Row 1 to find what you need.</div>';
+  showTabModal_(getTabModalHtml_('CONFIG', '⚙️ Config Tab', body), '⚙️ Config');
+}
+
+// ── Member Directory Tab Modal ──
+
+function showTabModalMemberDirectory() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showNewMemberDialog\')"><div class="qa-icon">➕</div><div class="qa-text"><strong>Add New Member</strong><small>Create a new member record</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showSearchDialog\')"><div class="qa-icon">🔍</div><div class="qa-text"><strong>Find Member</strong><small>Search by name, email, or member ID</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showImportMembersDialog\')"><div class="qa-icon">📥</div><div class="qa-text"><strong>Import Members</strong><small>Bulk import from CSV or another sheet</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'generateMissingMemberIDs\')"><div class="qa-icon">🆔</div><div class="qa-text"><strong>Generate Missing IDs</strong><small>Auto-assign IDs to members without one</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'syncAllData\')"><div class="qa-icon">🔄</div><div class="qa-text"><strong>Sync All Data</strong><small>Sync grievances, attendance, and engagement</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> Select a member row and use Union Hub > Members for actions like promote/demote steward, export, or duplicate checks.</div>';
+  showTabModal_(getTabModalHtml_('MEMBER_DIR', '👥 Member Directory', body), '👥 Member Directory');
+}
+
+// ── Grievance Log Tab Modal ──
+
+function showTabModalGrievanceLog() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showNewGrievanceDialog\')"><div class="qa-icon">📝</div><div class="qa-text"><strong>New Case / Grievance</strong><small>File a new grievance or case</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showEditGrievanceDialog\')"><div class="qa-icon">✏️</div><div class="qa-text"><strong>Edit Selected Grievance</strong><small>Modify the currently selected case</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showChecklistDialog\')"><div class="qa-icon">✅</div><div class="qa-text"><strong>View Case Checklist</strong><small>Track progress steps for the selected case</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'createPDFForSelectedGrievance\')"><div class="qa-icon">📄</div><div class="qa-text"><strong>Create Signature PDF</strong><small>Generate a PDF for the selected grievance</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'applyTrafficLightIndicators\')"><div class="qa-icon">🚦</div><div class="qa-text"><strong>Apply Traffic Lights</strong><small>Color-code rows by deadline urgency</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> Select a grievance row first, then use quick actions. Traffic lights turn rows green/yellow/red based on deadline proximity.</div>';
+  showTabModal_(getTabModalHtml_('GRIEVANCE_LOG', '⚖️ Grievance Log', body), '⚖️ Grievance Log');
+}
+
+// ── Case Checklist Tab Modal ──
+
+function showTabModalCaseChecklist() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showCaseProgressModal\')"><div class="qa-icon">📊</div><div class="qa-text"><strong>Case Progress Overview</strong><small>View completion stats across all cases</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showChecklistDialog\')"><div class="qa-icon">✅</div><div class="qa-text"><strong>View Checklist for Selected</strong><small>Open checklist for the selected case</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'unlockChecklistSheet\')"><div class="qa-icon">🔓</div><div class="qa-text"><strong>Unlock Sheet</strong><small>Remove protection if locked</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> Each row tracks a grievance case\'s checklist. Checkboxes auto-calculate completion percentage in the progress column.</div>';
+  showTabModal_(getTabModalHtml_('CASE_CHECKLIST', '✅ Case Checklist', body), '✅ Case Checklist');
+}
+
+// ── Feedback & Development Tab Modal ──
+
+function showTabModalFeedback() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showSubmitFeedbackModal\')"><div class="qa-icon">💡</div><div class="qa-text"><strong>Submit New Feedback</strong><small>Report a bug, idea, or feature request</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> This sheet tracks member and steward feedback, feature requests, and bug reports. New entries appear at the bottom. Use the Category and Priority columns to filter.</div>';
+  showTabModal_(getTabModalHtml_('FEEDBACK', '💡 Feedback & Development', body), '💡 Feedback & Development');
+}
+
+// ── Volunteer Hours Tab Modal ──
+
+function showTabModalVolunteerHours() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showLogVolunteerHoursModal\')"><div class="qa-icon">🤝</div><div class="qa-text"><strong>Log Volunteer Hours</strong><small>Record hours for a member</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'syncVolunteerHoursToMemberDirectory\')"><div class="qa-icon">🔄</div><div class="qa-text"><strong>Sync to Member Directory</strong><small>Update total hours in member records</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> Hours logged here automatically roll up to each member\'s total in the Member Directory when synced.</div>';
+  showTabModal_(getTabModalHtml_('VOLUNTEER_HOURS', '🤝 Volunteer Hours', body), '🤝 Volunteer Hours');
+}
+
+// ── Meeting Attendance Tab Modal ──
+
+function showTabModalMeetingAttendance() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showTakeAttendanceModal\')"><div class="qa-icon">📋</div><div class="qa-text"><strong>Take Attendance</strong><small>Record who attended a meeting</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'syncMeetingAttendanceToMemberDirectory\')"><div class="qa-icon">🔄</div><div class="qa-text"><strong>Sync to Member Directory</strong><small>Update attendance counts in member records</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showAddEventModal\')"><div class="qa-icon">📅</div><div class="qa-text"><strong>Add New Event</strong><small>Schedule a new union event</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> Members can also check in via the web app or QR code. Use Tools > Calendar & Meetings for QR and meeting setup.</div>';
+  showTabModal_(getTabModalHtml_('MEETING_ATTENDANCE', '📅 Meeting Attendance', body), '📅 Meeting Attendance');
+}
+
+// ── Meeting Check-In Log Tab Modal ──
+
+function showTabModalMeetingCheckIn() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'showSetupMeetingDialog\')"><div class="qa-icon">📝</div><div class="qa-text"><strong>Setup New Meeting</strong><small>Create a new meeting session for check-ins</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showMeetingCheckInDialog\')"><div class="qa-icon">✅</div><div class="qa-text"><strong>Open Meeting Check-In</strong><small>Start checking in members</small></div></div>' +
+    '<div class="quick-action" onclick="runAction(\'showMeetingQRCodeDialog\')"><div class="qa-icon">📱</div><div class="qa-text"><strong>QR Code Check-In</strong><small>Generate QR code for mobile check-in</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> This log records all check-ins (manual, web app, and QR). Each row is a single check-in event with timestamp and method.</div>';
+  showTabModal_(getTabModalHtml_('MEETING_CHECKIN_LOG', '📝 Meeting Check-In Log', body), '📝 Meeting Check-In Log');
+}
+
+// ── Resources Tab Modal ──
+
+function showTabModalResources() {
+  var body =
+    '<div class="section-label">Quick Actions</div>' +
+    '<div class="quick-action" onclick="runAction(\'openGoogleDrive\')"><div class="qa-icon">📁</div><div class="qa-text"><strong>Open Google Drive</strong><small>Browse shared resource files</small></div></div>' +
+    '<div class="tip-box">💡 <strong>Tip:</strong> Resources are organized by category. Members can browse and download them from the web app Resources tab. Manage categories in the Resource Config sheet.</div>';
+  showTabModal_(getTabModalHtml_('RESOURCES', '📚 Resources', body), '📚 Resources');
 }

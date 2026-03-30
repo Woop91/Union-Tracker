@@ -1893,8 +1893,7 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEETS.GRIEVANCE_LOG
-  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!sheet) {
     return errorResponse('Grievance Log/Tracker not found');

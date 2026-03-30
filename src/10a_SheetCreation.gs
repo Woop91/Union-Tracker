@@ -94,7 +94,8 @@ function createConfigSheet(ss) {
     '── ADVANCED SETTINGS ──', '', '',                            // cols 72-74 (3)
     '── FEATURE TOGGLES ──', '',                                  // cols 75-76 (2)
     '── RETENTION ──', '',                                        // cols 77-78 (2)
-    '── ORG BRANDING ──'                                          // col 79 (1)
+    '── ORG BRANDING ──',                                          // col 80 (1)
+    '── TAB MODALS ──'                                            // col 81 (1)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -196,8 +197,8 @@ function createConfigSheet(ss) {
 
   // Mobile Dashboard & branding defaults
   seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['DDS'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['DDS'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['SB'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['SB'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);
@@ -234,35 +235,79 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL, ['yes'], isExistingSheet);
   // Apply yes/no dropdown validation so admins get a picker instead of a free-text cell
   if (CONFIG_COLS.BROADCAST_SCOPE_ALL) {
+    var broadcastCell = sheet.getRange(3, CONFIG_COLS.BROADCAST_SCOPE_ALL);
+    try {
+      var broadcastVal = String(broadcastCell.getValue()).toLowerCase().trim();
+      if (broadcastVal !== 'yes' && broadcastVal !== 'no' && broadcastVal !== '') {
+        broadcastCell.setValue('yes');
+        SpreadsheetApp.flush();
+      }
+    } catch (_) { /* non-coercible value — skip normalization */ }
     var broadcastScopeRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true)
       .setHelpText('yes = stewards can broadcast to all members. no = stewards can only broadcast to their assigned members.')
       .build();
-    sheet.getRange(3, CONFIG_COLS.BROADCAST_SCOPE_ALL).setDataValidation(broadcastScopeRule);
+    broadcastCell.setDataValidation(broadcastScopeRule);
   }
 
   // Correlation Engine — enables statistical correlation analysis on the Insights page.
   // Default: 'yes'. Set to 'no' to disable (reduces compute on large datasets).
   seedConfigDefault_(sheet, CONFIG_COLS.ENABLE_CORRELATION, ['yes'], isExistingSheet);
   if (CONFIG_COLS.ENABLE_CORRELATION) {
+    var correlationCell = sheet.getRange(3, CONFIG_COLS.ENABLE_CORRELATION);
+    try {
+      var correlationVal = String(correlationCell.getValue()).toLowerCase().trim();
+      if (correlationVal !== 'yes' && correlationVal !== 'no' && correlationVal !== '') {
+        correlationCell.setValue('yes');
+        SpreadsheetApp.flush();
+      }
+    } catch (_) { /* non-coercible value — skip normalization */ }
     var correlationRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true)
       .setHelpText('yes = enable correlation analysis on Insights page. no = disable (reduces compute).')
       .build();
-    sheet.getRange(3, CONFIG_COLS.ENABLE_CORRELATION).setDataValidation(correlationRule);
+    correlationCell.setDataValidation(correlationRule);
   }
 
   // Grievance toggle (v4.34.4) — 'yes' (default) shows all grievance features; 'no' hides them.
   seedConfigDefault_(sheet, CONFIG_COLS.SHOW_GRIEVANCES, ['yes'], isExistingSheet);
   if (CONFIG_COLS.SHOW_GRIEVANCES) {
+    var grievanceCell = sheet.getRange(3, CONFIG_COLS.SHOW_GRIEVANCES);
+    try {
+      var grievanceVal = String(grievanceCell.getValue()).toLowerCase().trim();
+      if (grievanceVal !== 'yes' && grievanceVal !== 'no' && grievanceVal !== '') {
+        grievanceCell.setValue('yes');
+        SpreadsheetApp.flush();
+      }
+    } catch (_) { /* non-coercible value — skip normalization */ }
     var grievanceToggleRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(false)
+      .setAllowInvalid(true)
       .setHelpText('yes = show grievance tracking features. no = hide all grievance UI and endpoints.')
       .build();
-    sheet.getRange(3, CONFIG_COLS.SHOW_GRIEVANCES).setDataValidation(grievanceToggleRule);
+    grievanceCell.setDataValidation(grievanceToggleRule);
+  }
+
+  // Tab Modals (v4.48.0) — auto-open contextual modals when navigating to key sheet tabs.
+  // Default: 'yes'. Set to 'no' to disable all tab modals system-wide.
+  seedConfigDefault_(sheet, CONFIG_COLS.ENABLE_TAB_MODALS, ['yes'], isExistingSheet);
+  if (CONFIG_COLS.ENABLE_TAB_MODALS) {
+    var tabModalsCell = sheet.getRange(3, CONFIG_COLS.ENABLE_TAB_MODALS);
+    try {
+      var tabModalsVal = String(tabModalsCell.getValue()).toLowerCase().trim();
+      if (tabModalsVal !== 'yes' && tabModalsVal !== 'no' && tabModalsVal !== '') {
+        tabModalsCell.setValue('yes');
+        SpreadsheetApp.flush();
+      }
+    } catch (_) { /* non-coercible value — skip normalization */ }
+    var tabModalsRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['yes', 'no'], true)
+      .setAllowInvalid(true)
+      .setHelpText('yes = show contextual modals when navigating to sheet tabs. no = disable tab modals.')
+      .build();
+    tabModalsCell.setDataValidation(tabModalsRule);
   }
 
   // Retention thresholds (v4.33.1) — days before auto-archival via dailyTrigger()

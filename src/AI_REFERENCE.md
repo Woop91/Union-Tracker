@@ -1,4 +1,4 @@
-# AI REFERENCE DOCUMENT — SolidBase
+# AI REFERENCE DOCUMENT — DDS-Dashboard
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
 # Last updated: 2026-03-16
@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | Upstream sync flow, Workload Tracker exclusion registry |
+| 3 | **SYNC-LOG.md** | DDS↔Union-Tracker sync flow, Workload Tracker exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -29,14 +29,15 @@ Read these files **in this order** when onboarding to this codebase:
 ## 🏗️ PROJECT OVERVIEW
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
-**Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
-**Upstream:** Synced from DDS-Dashboard. See SYNC-LOG.md for exclusion rules.
+**Repo:** `Woop91/DDS-Dashboard` (private). Default branch: `Main` (capital M).
+**Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users).
-**Architecture:** 39 source `.gs` files + 15 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
-**Current build:** 38 `.gs` + 15 `.html` files in `dist/` (individual file mode, NOT consolidated).
+**Target users:** Union stewards (power users) and members (casual users) at MassAbility DDS (SEIU 509).
+**Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
+**Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**Apps Script ID:** [REDACTED]
+**DDS Apps Script ID:** `[REDACTED-DDS-SCRIPT-ID]`
+**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -202,7 +203,7 @@ Features: Material Design UI, Weingarten Rights, live steward search, PII scrubb
 | 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
 | 2026-02-23 | GitHub token `ghp_FTE8...` expired | Token rotated | User generated new token | ✅ |
 | 2026-02-23 | Token `ghp_q3Zd...` lacked `repo` scope | Wrong scope selected | User generated third token with correct scope | ✅ |
-| 2026-02-25 | Memory had upstream default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
+| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
 | 2026-02-25 | Expired token `ghp_FTE8...` still in memory | Token rotated but memory stale | Updated memory to `ghp_7MY0...` | ✅ |
 
 ---
@@ -245,7 +246,7 @@ Records what each AI agent changed, when, and in which files.
 | 2026-02-25 | Claude (claude.ai) | Merged staging→Main: v4.13.0 SPA overhaul + notification bell/EventBus + individual-file build. Synced all 3 branches. | All `src/`, `dist/`, `build.js`, `CLAUDE.md` |
 | 2026-02-28 | Claude Code (Opus 4.6) | v4.18.1-security: Full security assessment + 7 remediations — auth default ON, magic link rate limiting, token cleanup trigger, timing attack fix, PIN token migration to PropertiesService, innerHTML→textContent, escapeForFormula | `00_Security.gs`, `19_WebDashAuth.gs`, `13_MemberSelfService.gs`, `14_MeetingCheckIn.gs`, `21_WebDashDataService.gs`, `CODE_REVIEW.md`, `CHANGELOG.md`, `FEATURES.md` |
 | 2026-03-22 | Claude (claude.ai) | DESIGN ITERATION (not yet released): Member Hub feature — 3 new GAS files created. `member_hub_styles.html` (auth manifesto + hub CSS), `auth_manifesto.html` (phrase bg + quote cycler JS), `member_hub_view.html` (renderMemberHub tab function). Standalone prototype: `member-hub.html`. See integration instructions at top of each file. Union-agnostic — identical copy goes to SolidBase. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html` |
-| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All GAS files updated and pushed to upstream Main + SolidBase staging. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
+| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All GAS files updated and pushed to DDS Main + SolidBase staging. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
 | 2026-03-23 | Claude (claude.ai) | COMMITTED v1.1.1: Login card opacity dropped to 0.06, blur removed entirely — phrases fully visible through card. Added measureAndHidePhrases() to auth_manifesto.html — suppresses any phrase wider than viewport on mobile so no clipped text appears. CSS overflow:hidden fallback added to phrase elements. Resize listener recalculates on orientation change. | `member_hub_styles.html`, `auth_manifesto.html` |
 
 ---
@@ -305,73 +306,6 @@ See `PHASE2_PLAN.md` for details.
 
 All historical entries (v4.18.1–v4.25.9 bug fixes, feature implementations, migration notes)
 have been archived to `docs/AI_REFERENCE_ARCHIVE.md`. Refer there for past development context.
-
----
-
-## CHANGE LOG — Dues Statuses Config-driven (v4.49.1) — 2026-03-29
-
-### What changed
-**Rule fix: Nothing is hardcoded. `Dues Status` dropdown is now Config-driven.**
-
-#### `01_Core.gs` — `CONFIG_HEADER_MAP_`
-- Added `{ key: 'DUES_STATUSES', header: 'Dues Statuses', type: 'list' }` after `BEST_TIMES`
-- `CONFIG_COLS.DUES_STATUSES` now auto-derived like all other Config columns
-
-#### `07_DevTools.gs` — `seedConfigData()`
-- Added seed block for `CONFIG_COLS.DUES_STATUSES` with defaults:
-  `['Current', 'Past Due', 'Inactive', 'Fee Payer', 'Exempt']`
-- Seed runs on first setup only — safe to re-run (skips if column already has values)
-
-#### `21_WebDashDataService.gs` — `dataGetAddMemberOptions()`
-- Removed hardcoded `duesStatuses` array
-- Now reads `_configList(CONFIG_COLS.DUES_STATUSES)` dynamically from Config tab
-- **RULE: If the Config tab has no Dues Statuses values, run seedConfigData() or
-  add values manually to the `Dues Statuses` column in the Config sheet.**
-
-### CORRECTED from v4.49.0 notes
-- Previous note said: "Dues Status is NOT in CONFIG_HEADER_MAP_ — hardcoded 5-value list"
-- That was wrong. It is NOW in CONFIG_HEADER_MAP_ and fully Config-driven.
-
----
-
-## CHANGE LOG — Add Member from Webapp (v4.49.0) — 2026-03-29
-
-### What was added
-**Feature: Stewards can add new members AND non-member contacts directly from the webapp.**
-
-#### `02_DataManagers.gs` — `addMember()` field expansion
-- Was missing: `supervisor`, `manager`, `employeeId`, `hireDate`, `duesStatus`, `IS_STEWARD` default
-- All fields now written via `MEMBER_COLS` constants — never hardcoded column index
-- `IS_STEWARD` defaults to `'No'` — promote separately via existing steward workflow
-- `HIRE_DATE` only written if a value is provided (avoids spurious date errors)
-
-#### `21_WebDashDataService.gs` — 2 new server wrappers
-- **`dataGetAddMemberOptions(sessionToken)`** — steward-auth-gated. Reads Job Titles, Locations,
-  Units, Supervisors, Managers from Config tab dynamically via `_configList()` pattern.
-  Returns `duesStatuses` from Config tab via `_configList(CONFIG_COLS.DUES_STATUSES)`.
-- **`dataAddMemberFromWebapp(sessionToken, memberData)`** — steward-auth-gated. Validates
-  firstName+lastName required. Calls `addMember()` in 02_DataManagers.gs via `withScriptLock_`.
-  Logs audit event with steward's server-resolved email (not client-supplied).
-
-#### `steward_view.html` — 2 UI additions
-- **`showAddMemberModal(onSuccess)`** — overlay modal. Fields: First/Last Name (required),
-  Email, Phone, Job Title (dropdown), Work Location (dropdown), Unit (dropdown), Dues Status
-  (dropdown), Supervisor (dropdown), Manager (dropdown), Employee ID, Hire Date.
-  Dropdowns fetched from Config on modal open — always current, never stale.
-  On success: shows toast with new Member ID, calls `onSuccess()` to reload Members tab.
-- **`+ Add Member` button** — added to Member Finder panel header (right side), visible in
-  both bulk and paginated member list views.
-
-### Non-member contacts (existing — no change)
-- Already fully built at bottom of Contact tab (`renderNonMemberContactsSection`)
-- `showNMCModal()` handles add/edit
-- Sheet tab: `Non-Member Contacts` — recreatable via Sheet Setup if missing
-
-### RULES — do not violate
-- `dataAddMemberFromWebapp` must remain steward-auth-gated — never expose to member role
-- Dropdown options always fetched from Config tab at runtime — never hardcode lists in UI
-- `addMember()` uses `MEMBER_COLS` constants only — never column index literals
-- `Dues Status` is now fully Config-driven via CONFIG_HEADER_MAP_
 
 ---
 
@@ -564,11 +498,11 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 ## [2026-03-24] agency_org_chart.html — Added (New File)
 
 ### What was done
-- Prepped standalone the agency Agency Org Chart HTML file for GAS SPA integration
+- Prepped standalone MassAbility Agency Org Chart HTML file for GAS SPA integration
 - Converted from full standalone HTML document to a GAS include partial
 
 ### Source
-- Input: `the agency___Agency_Org_Chart.html` (936 lines, standalone)
+- Input: `MassAbility___Agency_Org_Chart.html` (936 lines, standalone)
 - Output: `src/agency_org_chart.html` + `dist/agency_org_chart.html` (1056 lines, GAS partial)
 
 ### Transformations applied
@@ -583,19 +517,19 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 ### Integration
 - Include in GAS SPA via: `<?= include('agency_org_chart') ?>`
 - No routing hook added yet — needs to be wired into SPA navigation manually
-- CSS variables are SELF-CONTAINED (separate from upstream theme variables) — no conflicts
+- CSS variables are SELF-CONTAINED (separate from DDS theme variables) — no conflicts
 
 ### File features
 - 6 tabs: Org Chart, Budget Summary, Budget Tracking, Historical Budget, Historical Spending, Agency Info
 - Interactive salary history modal (10 staff/leadership records, 2017-2026)
-- Collapsible internal org panel (expanded by default)
+- Collapsible DDS internal org panel (expanded by default)
 - EOHHS sibling agencies toggle
 - Support Divisions group toggle (5 offices)
 - 5 collapsible sub-lists (Community Living, Voc Rehab, General Counsel, Financial, Learning/Dev, HR, Excellence & Innovation)
-- Position descriptions for VDE I/II/III/IV (job grades and salary ranges)
+- Position descriptions for VDE I/II/III/IV (DDS job grades and salary ranges)
 - Full budget tables: FY2023-FY2026 GAA, historical spending, budget tracking
 - Agency quick facts, EOHHS contacts
 
 ### ⚠️ Pending
 - NOT yet wired into index.html SPA navigation — needs manual step
-- Internal org chart data is point-in-time (2025/2026 actual) — not dynamic from sheet
+- DDS internal org chart data is point-in-time (2025/2026 actual) — not dynamic from sheet
