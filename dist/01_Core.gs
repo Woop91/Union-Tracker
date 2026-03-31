@@ -463,18 +463,18 @@ function getLocalNumberFromConfig_() {
  * @const {Object}
  */
 var VERSION_INFO = (function() {
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.48.0';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.50.0';
   var parts = ver.split('.');
   return {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
-    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 47,
+    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 50,
     PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-28',
-    CODENAME: 'Phone PIN',
-    codename: 'Phone PIN'
+    BUILD_DATE: '2026-03-31',
+    CODENAME: 'Non-Member Fields',
+    codename: 'Non-Member Fields'
   };
 })();
 
@@ -485,6 +485,7 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.50.0', date: '2026-03-31', codename: 'Non-Member Fields', changes: 'Added Union Name, Shirt Size, and Steward (Yes/No) columns to Non-Member Contacts tab. New fields in NMC_HEADER_MAP_, sheet creation validations (Shirt Size dropdown, Steward Yes/No dropdown), full CRUD support in DataService, steward_view.html modal and contact cards, and fallback modal in 03_UIComponents.gs.' },
   { version: '4.48.0', date: '2026-03-30', codename: 'Tab Modals', changes: 'Auto-opening contextual modals for 9 key sheet tabs: Config, Member Directory, Grievance Log, Case Checklist, Feedback & Development, Volunteer Hours, Meeting Attendance, Meeting Check-In Log, Resources. Each modal shows tab-specific quick actions and tips. Triggered on tab switch via onSelectionChange sheet-change detection. Config toggle ENABLE_TAB_MODALS (default: yes) for system-wide control. Per-user "Don\'t show again" dismissal via UserProperties. New Tools > Tab Modals submenu for manual access. TAB_MODAL_REGISTRY in 01_Core.gs maps sheets to modal functions.' },
   { version: '4.45.0', date: '2026-03-28', codename: 'Phone PIN', changes: 'Phone-number-derived PINs: generateMemberPIN() now uses first 6 digits of member phone number when available, falling back to random. Email notifications hint at phone-based PIN without exposing it. PIN sessions blocked from poll submissions (wqSubmitPoolQuestion). Theme cleanup: removed 5 novelty themes (Comic, Brutalist, Retro OS, Liquid Pour, Blob Lava). Removed Lao Tzu duplicate quote from Knowledge Engine.' },
   { version: '4.44.0', date: '2026-03-28', codename: 'Idle Prefetch', changes: 'Performance optimization suite. (1) Dynamic tab prefetch: _recordTabFrequency() tracks per-role tab visit counts in localStorage (dds_tabFreq); _getTopTabs() determines user top 3; _PREFETCH_REGISTRY warms DataCache via requestIdleCallback. (2) Request deduplication: _dedupMap in _throttledServerCall coalesces identical in-flight server calls — if dataGetAllMembers is pending and another caller requests it, piggybacks on existing call. (3) Cases list converted to LazyList with IntersectionObserver auto-scroll (replaces manual Show More button). (4) Visibility-based refresh: visibilitychange listener silently re-fetches batch data when user returns after 30+ min away. (5) Extended caching: DataCache default 2min→15min, stable 5min→30min, new STATS_TTL 60min, SWR 30min→2hrs. Notifications tab now cacheable.' },
@@ -708,7 +709,8 @@ var SHEETS = {
   RSVP_LOG:           '_RSVP_Log',                // hidden — meeting RSVP tracking
   // Trend Alerts & Engagement (v4.36.0)
   TREND_ALERTS:       '_Trend_Alerts',            // hidden — auto-detected trend alerts
-  ENGAGEMENT_SCORES:  '_Engagement_Scores'        // hidden — per-member engagement scores
+  ENGAGEMENT_SCORES:  '_Engagement_Scores',       // hidden — per-member engagement scores
+  SHIRT_SIZE_LOG:     '👕 Shirt Size Log'          // visible — member shirt sizes with name, location, unit, steward
 };
 
 /**
@@ -1164,6 +1166,7 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'CITY',               header: 'City' },
   { key: 'STATE',              header: 'State' },
   { key: 'ZIP_CODE',           header: 'Zip Code' },
+  { key: 'SHIRT_SIZE',         header: 'Shirt Size' },
   { key: 'DUES_STATUS',             header: 'Dues Status' },
   { key: 'MEMBER_ADMIN_FOLDER_URL',  header: 'Member Admin Folder URL' },   // Drive master folder URL — auto-set on first contact or grievance; steward-visible only
   { key: 'ROLE',                     header: 'Role' }                        // Member/Steward/Both — used by auth to support dual-role users
@@ -1190,6 +1193,9 @@ var NMC_HEADER_MAP_ = [
   { key: 'JOB_TITLE',     header: 'Job Title' },
   { key: 'WORK_LOCATION', header: 'Work Location' },
   { key: 'UNIT',          header: 'Unit' },
+  { key: 'UNION_NAME',    header: 'Union Name' },
+  { key: 'SHIRT_SIZE',    header: 'Shirt Size' },
+  { key: 'IS_STEWARD',    header: 'Steward' },
   { key: 'EMAIL',         header: 'Email' },
   { key: 'PHONE',         header: 'Phone' },
   { key: 'CATEGORY',      header: 'Category' },

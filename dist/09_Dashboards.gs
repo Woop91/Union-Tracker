@@ -3807,7 +3807,7 @@ function formatWorkloadReportingTab_(ss) {
 function formatNonMemberContactsTab_(ss) {
   var sheet = getSheetSafe_(ss, SHEETS.NON_MEMBER_CONTACTS);
   if (!sheet) return;
-  var numCols = Math.max(sheet.getLastColumn(), 9);
+  var numCols = Math.max(sheet.getLastColumn(), 13);
 
   // Distinct amber-tinted header to differentiate from Member Directory
   sheet.getRange(1, 1, 1, numCols)
@@ -3820,7 +3820,7 @@ function formatNonMemberContactsTab_(ss) {
   sheet.setRowHeight(1, 40);
   sheet.setFrozenRows(1);
 
-  applyColumnWidths_(sheet, { 1: 120, 2: 120, 3: 160, 4: 140, 5: 80, 6: 100, 7: 120, 8: 200, 9: 140 });
+  applyColumnWidths_(sheet, { 1: 120, 2: 120, 3: 160, 4: 140, 5: 80, 6: 100, 7: 140, 8: 80, 9: 70, 10: 120, 11: 200, 12: 140, 13: 200 });
   applyRowBanding_(sheet, 2, numCols);
 
   Logger.log('Formatted: Non-Member Contacts');

@@ -888,7 +888,6 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
   // If you add a new dues-gated tab, add its render function name here.
   const duesGatedTabs = [
     { fn: 'renderMemberResources', label: 'Resources' },
-    { fn: 'renderSurveyFormPage', label: 'Quarterly Survey' },
     { fn: 'renderUnionStatsPage', label: 'Union Stats' },
     { fn: 'renderPollsPage', label: 'Polls' },
   ];
@@ -900,6 +899,7 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
     'renderStewardContact',
     'renderUpdateProfile',
     'renderMemberNotifications',
+    'renderSurveyFormPage',       // Survey open to all members since v4.50.0
   ];
 
   duesGatedTabs.forEach(({ fn, label }) => {

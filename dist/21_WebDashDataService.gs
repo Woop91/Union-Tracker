@@ -71,6 +71,7 @@ var DataService = (function () {
     memberEmployeeId:    ['employee id', 'employee number', 'emp id', 'emp no'],
     memberHireDate:      ['hire date', 'date hired', 'start date'],
     memberOpenRate:      ['open rate %', 'open rate', 'email open rate'],
+    memberShirtSize:     ['shirt size', 'tshirt size', 't-shirt size'],
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -427,6 +428,7 @@ var DataService = (function () {
       employeeId: user.employeeId || '',
       hireDate: user.hireDate || '',
       openRate: user.openRate || '',
+      shirtSize: user.shirtSize || '',
     };
   }
 
@@ -459,6 +461,7 @@ var DataService = (function () {
       workLocation: HEADERS.memberWorkLocation,
       officeDays:   HEADERS.memberOfficeDays,
       sharePhone:   HEADERS.memberSharePhone,   // steward opt-in: phone visible to members
+      shirtSize:    HEADERS.memberShirtSize,    // member shirt size (self-service)
     };
 
     for (var i = 1; i < data.length; i++) {
@@ -481,10 +484,69 @@ var DataService = (function () {
       if (typeof logAuditEvent === 'function') {
         logAuditEvent('PROFILE_UPDATE', { email: email, fields: Object.keys(updates).join(',') });
       }
+
+      // Sync shirt size to the dedicated log sheet when updated
+      if (updates.shirtSize !== undefined) {
+        try {
+          _syncShirtSizeLog(email, updates.shirtSize);
+        } catch (logErr) {
+          Logger.log('Shirt size log sync error: ' + logErr.message);
+        }
+      }
+
       return { success: true, message: 'Profile updated.' };
     }
 
     return { success: false, message: 'Member not found.' };
+  }
+
+  /**
+   * Syncs a member's shirt size to the Shirt Size Log sheet.
+   * Creates the sheet with headers if it doesn't exist.
+   * Upserts: updates existing row for the email, or appends a new one.
+   * @param {string} email
+   * @param {string} shirtSize
+   * @private
+   */
+  function _syncShirtSizeLog(email, shirtSize) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
+    var sheetName = SHEETS.SHIRT_SIZE_LOG;
+    var logSheet = ss.getSheetByName(sheetName);
+    var LOG_HEADERS = ['Name', 'Email', 'Shirt Size', 'Work Location', 'Unit', 'Assigned Steward', 'Updated'];
+
+    if (!logSheet) {
+      logSheet = ss.insertSheet(sheetName);
+      logSheet.getRange(1, 1, 1, LOG_HEADERS.length).setValues([LOG_HEADERS]);
+      logSheet.getRange(1, 1, 1, LOG_HEADERS.length).setFontWeight('bold');
+      logSheet.setFrozenRows(1);
+    }
+
+    // Look up member details from directory
+    var user = findUserByEmail(email);
+    var memberName = user ? user.name : email;
+    var workLocation = user ? (user.workLocation || '') : '';
+    var unit = user ? (user.unit || '') : '';
+    var steward = user ? (user.assignedSteward || '') : '';
+
+    // Resolve steward name from email if possible
+    if (steward && steward.indexOf('@') !== -1) {
+      var stewardUser = findUserByEmail(steward);
+      if (stewardUser && stewardUser.name) steward = stewardUser.name;
+    }
+
+    var newRow = [memberName, email, shirtSize || '', workLocation, unit, steward, new Date()];
+
+    // Upsert: find existing row by email (col 2)
+    var data = logSheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).trim().toLowerCase() === email) {
+        logSheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
+        return;
+      }
+    }
+    // Append new row
+    logSheet.appendRow(newRow);
   }
 
   // ═══════════════════════════════════════
@@ -1886,6 +1948,7 @@ var DataService = (function () {
         return String(raw || '').trim();
       })(),
       openRate: String(_getVal(row, colMap, HEADERS.memberOpenRate, '')).trim(),
+      shirtSize: String(_getVal(row, colMap, HEADERS.memberShirtSize, '')).trim(),
     };
   }
 

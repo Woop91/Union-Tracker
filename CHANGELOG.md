@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.50.0] - 2026-03-31
+
+### Added
+- **Union Name column** on Non-Member Contacts tab — free-text field for union affiliation.
+- **Shirt Size column** on Non-Member Contacts tab — dropdown with XS, S, M, L, XL, 2XL, 3XL, 4XL.
+- **Steward (Yes/No) column** on Non-Member Contacts tab — dropdown indicating steward status.
+- All three fields added to: `NMC_HEADER_MAP_` / `NMC_COLS` (01_Core.gs), sheet creation validations (10a_SheetCreation.gs), tab formatting with updated column widths (09_Dashboards.gs), DataService CRUD (21_WebDashDataService.gs), steward view modal and contact cards (steward_view.html), and fallback modal (03_UIComponents.gs).
+- **Shirt Size in member profile** — Self-service shirt size dropdown in Update Profile page with dedicated Shirt Size Log sheet for tracking.
+- **Non-Member dues status** — `Non-Member` recognized as non-paying dues status with corresponding feature restrictions.
+
+### Changed
+- **Survey open to all members** — Removed the dues-paying gate from the Quarterly Survey. All authenticated users can now take the survey regardless of dues status.
+- **Swipe gestures inverted** — Right-edge swipe now opens "More" menu; left-edge swipe opens Member Hub.
+- Updated dues-restricted banner text to remove Survey from the locked features list.
+
 ## [4.44.0] - 2026-03-28
 
 ### Added

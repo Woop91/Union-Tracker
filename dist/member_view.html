@@ -482,14 +482,14 @@ function renderMemberHome(appContainer) {
   }, 'Some features require membership dues'));
   duesBannerText.appendChild(el('div', {
   style: { fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }
-  }, 'Events, Resources, Polls, Survey, Org Charts, and Union Stats are only available to dues-paying members. Contact your steward if you believe this is an error.'));
+  }, 'Events, Resources, Polls, Org Charts, and Union Stats are only available to dues-paying members. Contact your steward if you believe this is an error.'));
   duesBanner.appendChild(duesBannerText);
   container.appendChild(duesBanner);
  }
 
  
  DataCache.cachedCall('surveyStatus_' + CURRENT_USER.email, 'dataGetSurveyStatus', [SESSION_TOKEN], function(status) {
-  if (status && !status.hasCompleted && _isDuesPaying()) {
+  if (status && !status.hasCompleted) {
   var banner = el('div', { className: 'survey-banner fade-in' });
   var bannerLeft = el('div');
   bannerLeft.appendChild(el('span', { className: 'survey-banner-text' }, 'Quarterly survey is open!'));
@@ -2060,6 +2060,20 @@ function renderUpdateProfile(appContainer) {
   form.appendChild(group);
   });
 
+  
+  var shirtGroup = el('div', { className: 'form-group' });
+  shirtGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'profile-shirtsize' }, 'Shirt Size'));
+  var shirtSizes = ['', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+  var shirtSelect = el('select', { id: 'profile-shirtsize', className: 'form-input ' + _TI });
+  shirtSizes.forEach(function(sz) {
+  var opt = el('option', { value: sz }, sz || '— Select —');
+  if (sz === (profile.shirtSize || '')) opt.selected = true;
+  shirtSelect.appendChild(opt);
+  });
+  inputs.shirtSize = shirtSelect;
+  shirtGroup.appendChild(shirtSelect);
+  form.appendChild(shirtGroup);
+
   var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', minHeight: '20px' } });
   form.appendChild(statusMsg);
 
@@ -2102,7 +2116,7 @@ function renderUpdateProfile(appContainer) {
 function renderPINSetup(appContainer) {
  if (_renderPINRestricted(appContainer, 'PIN Setup')) return;
  renderPageLayout(appContainer, 'member', 'pinsetup', function(container) {
- // ── Blue-themed "DDS Dashboard" header ────────────────────────────────
+ // ── Blue-themed "SolidBase" header ────────────────────────────────
  var header = el('div', {
   style: {
   background: 'linear-gradient(135deg, #1565C0, #1E88E5)',
@@ -2115,7 +2129,7 @@ function renderPINSetup(appContainer) {
  });
  header.appendChild(el('div', {
   style: { fontSize: '24px', fontWeight: '700', fontFamily: 'var(--fontDisplay)', marginBottom: '4px' }
- }, 'DDS Dashboard'));
+ }, 'SolidBase'));
  header.appendChild(el('div', {
   style: { fontSize: '12px', opacity: '0.85' }
  }, 'Set up your login PIN'));
@@ -2359,7 +2373,7 @@ function renderMemberMore(appContainer) {
   { group: 'Community' },
   { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('member', 'qaforum'); } },
   { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
-  { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', locked: true, action: function() { _handleTabNav('member', 'surveyform'); } },
+  { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', action: function() { _handleTabNav('member', 'surveyform'); } },
   { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { _handleTabNav('member', 'survey'); } },
   { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { _handleTabNav('member', 'feedback'); } },
   { group: 'Comms' },
@@ -2442,7 +2456,7 @@ function renderMemberMore(appContainer) {
 }
 
 function renderSurveyFormPage(appContainer) {
- if (!_isDuesPaying()) { _renderDuesGate(appContainer, 'Quarterly Survey', function() { renderMemberHome(appContainer); }); return; }
+ 
  renderPageLayout(appContainer, 'member', 'survey-form', function(container) {
  _memberHeader(container, 'Quarterly Survey');
  var content = el('div', { className: 'content' });
@@ -3166,8 +3180,8 @@ function renderSurveyResultsPage(appContainer) {
   { id: 'meeting', label: '\uD83D\uDCCB Meeting' },
   ];
 
-  // ── Take Survey CTA — show when survey is open and member hasn't completed ──
-  if (_isDuesPaying()) {
+  
+  if (true) {
   DataCache.cachedCall('surveyStatus_' + CURRENT_USER.email, 'dataGetSurveyStatus', [SESSION_TOKEN], function(status) {
    if (status && !status.hasCompleted) {
    var banner = el('div', { className: 'card card-glass fade-in', style: {

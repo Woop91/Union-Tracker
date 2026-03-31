@@ -1886,6 +1886,20 @@ function ensureNonMemberContactsSheet_(ss) {
     .build();
   sheet.getRange(2, NMC_COLS.CATEGORY, 500, 1).setDataValidation(catRule);
 
+  // Shirt Size validation dropdown
+  var shirtRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NMC_COLS.SHIRT_SIZE, 500, 1).setDataValidation(shirtRule);
+
+  // Steward Yes/No validation dropdown
+  var stewardRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Yes', 'No'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NMC_COLS.IS_STEWARD, 500, 1).setDataValidation(stewardRule);
+
   Logger.log('Created Non-Member Contacts sheet: ' + SHEETS.NON_MEMBER_CONTACTS);
   return sheet;
 }

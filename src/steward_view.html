@@ -6381,8 +6381,19 @@ function _renderNMCList(container, contacts) {
     if (c.jobTitle) meta.push(c.jobTitle);
     if (c.workLocation) meta.push(c.workLocation);
     if (c.unit) meta.push(c.unit);
+    if (c.unionName) meta.push(c.unionName);
     info.appendChild(el('div', { className: 'text-xs-muted' }, meta.join(' \u00B7 ')));
     topRow.appendChild(info);
+    if (c.isSteward === 'Yes') {
+      topRow.appendChild(el('span', {
+        style: { fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: '#2c3e50', color: '#fff', whiteSpace: 'nowrap', marginRight: '4px' }
+      }, 'Steward'));
+    }
+    if (c.shirtSize) {
+      topRow.appendChild(el('span', {
+        style: { fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', whiteSpace: 'nowrap', marginRight: '4px' }
+      }, c.shirtSize));
+    }
     if (c.category) {
       var badgeColor = catColors[c.category] || catColors.Other;
       topRow.appendChild(el('span', {
@@ -6393,6 +6404,9 @@ function _renderNMCList(container, contacts) {
 
     // Expandable details
     var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
+    if (c.unionName) details.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', marginBottom: '4px' } }, 'Union: ' + c.unionName));
+    if (c.shirtSize) details.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', marginBottom: '4px' } }, 'Shirt Size: ' + c.shirtSize));
+    if (c.isSteward) details.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', marginBottom: '4px' } }, 'Steward: ' + c.isSteward));
     if (c.email) details.appendChild(el('a', { href: 'mailto:' + c.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, '\u2709\uFE0F ' + c.email));
     if (c.phone) details.appendChild(el('a', { href: 'tel:' + c.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '4px' } }, '\uD83D\uDCDE ' + c.phone));
     if (c.notes) details.appendChild(el('div', { className: 'text-xs-muted', style: { marginTop: '4px', fontStyle: 'italic' } }, c.notes));
@@ -6464,6 +6478,7 @@ function showNMCModal(existing) {
     { id: 'nmc-title',    label: 'Job Title',        val: (existing && existing.jobTitle) || '' },
     { id: 'nmc-location', label: 'Work Location',    val: (existing && existing.workLocation) || '' },
     { id: 'nmc-unit',     label: 'Unit / Dept',      val: (existing && existing.unit) || '' },
+    { id: 'nmc-union',    label: 'Union Name',         val: (existing && existing.unionName) || '' },
     { id: 'nmc-email',    label: 'Email',             val: (existing && existing.email) || '', type: 'email' },
     { id: 'nmc-phone',    label: 'Phone',             val: (existing && existing.phone) || '', type: 'tel' }
   ];
@@ -6481,6 +6496,36 @@ function showNMCModal(existing) {
     group.appendChild(inp);
     modal.appendChild(group);
   });
+
+  // Shirt Size dropdown
+  var shirtGroup = el('div', { style: { marginBottom: '10px' } });
+  shirtGroup.appendChild(el('label', { style: { display: 'block', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' } }, 'Shirt Size'));
+  var shirtSel = el('select', {
+    style: { width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '14px', fontFamily: 'var(--fontBody)' }
+  });
+  var shirtOpt0 = el('option', { value: '' }, '— Select —');
+  shirtSel.appendChild(shirtOpt0);
+  ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'].forEach(function(sz) {
+    var opt = el('option', { value: sz }, sz);
+    if (existing && existing.shirtSize === sz) opt.selected = true;
+    shirtSel.appendChild(opt);
+  });
+  shirtGroup.appendChild(shirtSel);
+  modal.appendChild(shirtGroup);
+
+  // Steward Yes/No dropdown
+  var stewardGroup = el('div', { style: { marginBottom: '10px' } });
+  stewardGroup.appendChild(el('label', { style: { display: 'block', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' } }, 'Steward'));
+  var stewardSel = el('select', {
+    style: { width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '14px', fontFamily: 'var(--fontBody)' }
+  });
+  ['No', 'Yes'].forEach(function(val) {
+    var opt = el('option', { value: val }, val);
+    if (existing && existing.isSteward === val) opt.selected = true;
+    stewardSel.appendChild(opt);
+  });
+  stewardGroup.appendChild(stewardSel);
+  modal.appendChild(stewardGroup);
 
   // Category dropdown
   var catGroup = el('div', { style: { marginBottom: '10px' } });
@@ -6522,6 +6567,9 @@ function showNMCModal(existing) {
         jobTitle:     inputs['nmc-title'].value.trim(),
         workLocation: inputs['nmc-location'].value.trim(),
         unit:         inputs['nmc-unit'].value.trim(),
+        unionName:    inputs['nmc-union'].value.trim(),
+        shirtSize:    shirtSel.value,
+        isSteward:    stewardSel.value,
         email:        inputs['nmc-email'].value.trim(),
         phone:        inputs['nmc-phone'].value.trim(),
         category:     catSel.value,

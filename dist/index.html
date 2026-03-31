@@ -3712,6 +3712,8 @@
  
  
  
+ // RIGHT-EDGE SWIPE → "MORE" MENU (swipes inverted v4.43.2)
+ // Detects left-swipe from the right screen edge and opens the "More"
  
  
  var _swipePanel = (function() {
@@ -3796,16 +3798,11 @@
   }
 
   function open() {
-  if (_isOpen || LayoutState.mode !== 'mobile') return;
-  _ensureDOM();
-  _renderContent();
-  _isOpen = true;
-  _panelWidth = _panel.offsetWidth;
-  requestAnimationFrame(function() {
-   _panel.classList.add('open');
-   _scrim.classList.add('open');
-   if (_hint) _hint.classList.add('hidden');
-  });
+  if (LayoutState.mode !== 'mobile') return;
+  var role = AppState.activeRole;
+  if (!role) return;
+  var moreTab = (role === 'steward') ? '_steward_more' : '_member_more';
+  _handleTabNav(role, moreTab);
   }
 
   function close() {
@@ -3909,17 +3906,13 @@
    _scrim.classList.add('open');
    }
   } else {
-   
+   // Open "More" menu if swiped left past threshold
    if (Math.abs(deltaX) > _threshold) {
-   _isOpen = true;
-   _renderContent();
-   _panel.classList.add('open');
-   _scrim.classList.add('open');
-   if (_hint) _hint.classList.add('hidden');
-   } else {
-   
-   _panel.classList.remove('open');
-   _scrim.classList.remove('open');
+   var role = AppState.activeRole;
+   if (role) {
+    var moreTab = (role === 'steward') ? '_steward_more' : '_member_more';
+    _handleTabNav(role, moreTab);
+   }
    }
   }
   }
@@ -3945,8 +3938,8 @@
  }
 
  
- // LEFT-EDGE SWIPE → "MORE" MENU (v4.40.0, reworked v4.41.0)
- // Detects right-swipe from the left screen edge and opens the "More"
+ 
+ 
  
  // (pushState/popstate) approach didn't fire inside the GAS iframe.
  
@@ -3998,8 +3991,7 @@
 
   var role = AppState.activeRole;
   if (!role) return;
-  var moreTab = (role === 'steward') ? '_steward_more' : '_member_more';
-  _handleTabNav(role, moreTab);
+  _handleTabNav(role, 'memberhub');
 
   _cooldown = true;
   setTimeout(function() { _cooldown = false; }, 600);

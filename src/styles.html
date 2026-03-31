@@ -3742,8 +3742,8 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 
 /* ═══════════════════════════════════════
-   SWIPE PANEL (mobile nav drawer from right)
-   Revealed by edge-swipe from right side.
+   SWIPE PANEL (right-edge "More" menu trigger)
+   Revealed by edge-swipe from right side → navigates to More tab.
    Hidden on tablet+ where sidebar is visible.
    ═══════════════════════════════════════ */
 .swipe-panel-scrim {
@@ -3815,7 +3815,7 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 .swipe-panel-divider { height: 1px; background: var(--border); margin: 6px 14px; }
 
-/* Swipe edge hint — subtle visual cue on right edge */
+/* Swipe edge hint — subtle visual cue on right edge (More menu) */
 .swipe-edge-hint {
   position: fixed; top: 50%; right: 0;
   transform: translateY(-50%);
@@ -3829,7 +3829,7 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 .swipe-edge-hint.hidden { opacity: 0; }
 
-/* Back-swipe edge hint — left edge cue for "More" menu */
+/* Back-swipe edge hint — left edge cue for Member Hub */
 .back-swipe-hint {
   position: fixed; top: 50%; left: 0;
   transform: translateY(-50%);

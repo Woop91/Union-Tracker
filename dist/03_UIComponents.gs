@@ -3324,8 +3324,9 @@ function getAddContactHtml_() {
     '<div class="row"><div class="form-group"><label>Job Title</label><input id="jobTitle" placeholder="Supervisor, Manager..."></div>' +
     '<div class="form-group"><label>Work Location</label><input id="workLocation"></div></div>' +
     '<div class="row"><div class="form-group"><label>Unit</label><input id="unit"></div>' +
-    '<div class="form-group"><label>Cubicle/Office</label><input id="cubicle"></div></div>' +
-    '<div class="form-group"><label>Office Days</label><input id="officeDays" placeholder="Mon, Tue, Wed..."></div>' +
+    '<div class="form-group"><label>Union Name</label><input id="unionName"></div></div>' +
+    '<div class="row"><div class="form-group"><label>Shirt Size</label><select id="shirtSize"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>2XL</option><option>3XL</option><option>4XL</option></select></div>' +
+    '<div class="form-group"><label>Steward</label><select id="isSteward"><option value="No">No</option><option value="Yes">Yes</option></select></div></div>' +
     '<div class="row"><div class="form-group"><label>Email</label><input type="email" id="email"></div>' +
     '<div class="form-group"><label>Phone</label><input id="phone" placeholder="555-123-4567"></div></div>' +
     '<div class="actions"><button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
@@ -3338,7 +3339,8 @@ function getAddContactHtml_() {
     '  document.getElementById("submitBtn").disabled = true;' +
     '  var data = { firstName: fn, lastName: ln, jobTitle: document.getElementById("jobTitle").value,' +
     '    workLocation: document.getElementById("workLocation").value, unit: document.getElementById("unit").value,' +
-    '    cubicle: document.getElementById("cubicle").value, officeDays: document.getElementById("officeDays").value,' +
+    '    unionName: document.getElementById("unionName").value, shirtSize: document.getElementById("shirtSize").value,' +
+    '    isSteward: document.getElementById("isSteward").value,' +
     '    email: document.getElementById("email").value, phone: document.getElementById("phone").value };' +
     '  google.script.run.withSuccessHandler(function(r) {' +
     '    if (r && r.success) { showMsg("Contact added!", "success"); setTimeout(function() { google.script.host.close(); }, 1500); }' +
@@ -3366,17 +3368,18 @@ function modalAddContact(data) {
       }
     }
 
-    sheet.appendRow([
-      escapeForFormula(data.firstName),
-      escapeForFormula(data.lastName),
-      escapeForFormula(data.jobTitle || ''),
-      escapeForFormula(data.workLocation || ''),
-      escapeForFormula(data.unit || ''),
-      escapeForFormula(data.cubicle || ''),
-      escapeForFormula(data.officeDays || ''),
-      escapeForFormula(data.email || ''),
-      escapeForFormula(data.phone || '')
-    ]);
+    var row = [];
+    row[NMC_COLS.FIRST_NAME - 1]    = escapeForFormula(data.firstName);
+    row[NMC_COLS.LAST_NAME - 1]     = escapeForFormula(data.lastName);
+    row[NMC_COLS.JOB_TITLE - 1]     = escapeForFormula(data.jobTitle || '');
+    row[NMC_COLS.WORK_LOCATION - 1] = escapeForFormula(data.workLocation || '');
+    row[NMC_COLS.UNIT - 1]          = escapeForFormula(data.unit || '');
+    row[NMC_COLS.UNION_NAME - 1]    = escapeForFormula(data.unionName || '');
+    row[NMC_COLS.SHIRT_SIZE - 1]    = escapeForFormula(data.shirtSize || '');
+    row[NMC_COLS.IS_STEWARD - 1]    = escapeForFormula(data.isSteward || 'No');
+    row[NMC_COLS.EMAIL - 1]         = escapeForFormula(data.email || '');
+    row[NMC_COLS.PHONE - 1]         = escapeForFormula(data.phone || '');
+    sheet.appendRow(row);
 
     return { success: true };
   } catch (e) {
