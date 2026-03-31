@@ -1,4 +1,4 @@
-# AI REFERENCE DOCUMENT — DDS-Dashboard
+# AI REFERENCE DOCUMENT — SolidBase
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
 # Last updated: 2026-03-16
@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | DDS↔Union-Tracker sync flow, Workload Tracker exclusion registry |
+| 3 | **SYNC-LOG.md** | SolidBase sync flow, feature exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -29,15 +29,13 @@ Read these files **in this order** when onboarding to this codebase:
 ## 🏗️ PROJECT OVERVIEW
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
-**Repo:** `Woop91/DDS-Dashboard` (private). Default branch: `Main` (capital M).
-**Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
+**Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users) at MassAbility DDS (SEIU 509).
+**Target users:** Union stewards (power users) and members (casual users).
 **Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
 **Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED-DDS-SCRIPT-ID]`
-**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**SolidBase Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -203,7 +201,7 @@ Features: Material Design UI, Weingarten Rights, live steward search, PII scrubb
 | 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
 | 2026-02-23 | GitHub token `ghp_FTE8...` expired | Token rotated | User generated new token | ✅ |
 | 2026-02-23 | Token `ghp_q3Zd...` lacked `repo` scope | Wrong scope selected | User generated third token with correct scope | ✅ |
-| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
+| 2026-02-25 | Memory had default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
 | 2026-02-25 | Expired token `ghp_FTE8...` still in memory | Token rotated but memory stale | Updated memory to `ghp_7MY0...` | ✅ |
 
 ---
@@ -495,41 +493,6 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 
 
 ---
-## [2026-03-24] agency_org_chart.html — Added (New File)
+## [2026-03-24] agency_org_chart.html — Excluded from SolidBase
 
-### What was done
-- Prepped standalone MassAbility Agency Org Chart HTML file for GAS SPA integration
-- Converted from full standalone HTML document to a GAS include partial
-
-### Source
-- Input: `MassAbility___Agency_Org_Chart.html` (936 lines, standalone)
-- Output: `src/agency_org_chart.html` + `dist/agency_org_chart.html` (1056 lines, GAS partial)
-
-### Transformations applied
-1. **Stripped** outer HTML shell (`<!DOCTYPE>`, `<html>`, `<head>`, `<body>` tags)
-2. **CSS scoped** — all selectors prefixed with `.agency-oc`, variables moved from `:root` to `.agency-oc` block
-3. **JS namespaced** — all 11 functions prefixed `agencyOC_`: `showTab`, `toggleEOHHS`, `toggleSupportDivs`, `ddsSetOpen`, `togSub`, `toggleSec`, `togJD`, `openSal`, `closeSal`, `fmt`, `pf`
-4. **SAL data** — namespaced as `window.agencyOC_SAL`
-5. **All onclick handlers** updated to use `agencyOC_` prefix
-6. **Google Fonts** (Source Serif 4 + DM Sans) loaded dynamically with existence check
-7. **Wrapper div** added: `<div class="agency-oc" id="agency-oc-embed">`
-
-### Integration
-- Include in GAS SPA via: `<?= include('agency_org_chart') ?>`
-- No routing hook added yet — needs to be wired into SPA navigation manually
-- CSS variables are SELF-CONTAINED (separate from DDS theme variables) — no conflicts
-
-### File features
-- 6 tabs: Org Chart, Budget Summary, Budget Tracking, Historical Budget, Historical Spending, Agency Info
-- Interactive salary history modal (10 staff/leadership records, 2017-2026)
-- Collapsible DDS internal org panel (expanded by default)
-- EOHHS sibling agencies toggle
-- Support Divisions group toggle (5 offices)
-- 5 collapsible sub-lists (Community Living, Voc Rehab, General Counsel, Financial, Learning/Dev, HR, Excellence & Innovation)
-- Position descriptions for VDE I/II/III/IV (DDS job grades and salary ranges)
-- Full budget tables: FY2023-FY2026 GAA, historical spending, budget tracking
-- Agency quick facts, EOHHS contacts
-
-### ⚠️ Pending
-- NOT yet wired into index.html SPA navigation — needs manual step
-- DDS internal org chart data is point-in-time (2025/2026 actual) — not dynamic from sheet
+This file is excluded from SolidBase (org-specific feature). See DDS-Dashboard for details.
