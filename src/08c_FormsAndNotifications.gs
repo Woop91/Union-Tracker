@@ -1662,7 +1662,7 @@ function submitSurveyResponse(callerEmail, responses) {
       if (vaultSheet) {
         var memberId = '';
         try {
-          var memberSheet = ss.getSheetByName(SHEETS.MEMBERS);
+          var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
           if (memberSheet && memberSheet.getLastRow() > 1) {
             var memberEmails = memberSheet.getRange(
               2, MEMBER_COLS.EMAIL, memberSheet.getLastRow() - 1, 1

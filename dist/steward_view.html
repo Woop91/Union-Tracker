@@ -9375,7 +9375,7 @@ function _loadLeaderMentees(leaderList) {
  leaderList.innerHTML = '';
  if (!leaders || leaders.length === 0) {
   leaderList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } },
-  'No Member Leaders found. Use the DDS menu > Setup Member Leader Role to enable this feature.'));
+  'No Member Leaders found. Use the Admin menu > Setup Member Leader Role to enable this feature.'));
   return;
  }
  var myEmail = (CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email.toLowerCase() : '';
