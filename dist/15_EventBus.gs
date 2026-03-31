@@ -335,10 +335,16 @@ function registerEventBusSubscribers() {
     }
   }, { priority: 100, id: 'attendance_sync_handler' });
 
-  // --- Config edit handler ---
+  // --- Config edit handlers ---
   EventBus.on('sheet:edit:CONFIG', function(e) {
     if (typeof handleConfigStewardEdit_ === 'function') handleConfigStewardEdit_(e);
   }, { priority: 100, id: 'config_steward_handler' });
+
+  EventBus.on('sheet:edit:CONFIG', function(e) {
+    if (typeof syncConfigToSheetValidation_ === 'function') {
+      try { syncConfigToSheetValidation_(e); } catch (_err) { Logger.log('syncConfigToSheetValidation_: ' + (_err.message || _err)); }
+    }
+  }, { priority: 80, id: 'config_validation_sync' });
 
   // --- Cross-cutting: Audit logging (high-value sheets) ---
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
