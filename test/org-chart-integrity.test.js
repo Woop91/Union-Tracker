@@ -66,7 +66,10 @@ describe('OC1: Org chart is not clipped by parent max-width', () => {
 // <script> tags were not reliably accessible from onclick="" handlers in some
 // browser/GAS contexts. Assigning to window.* guarantees global scope.
 
-describe('OC2: Org chart interactive functions are explicitly global', () => {
+// SolidBase: org_chart.html is a generic placeholder — interactive functions
+// (pillToggle, repToggle, maToggle, etc.) are org-specific and not present.
+// Only sbToggleMode is tested (via OC6).
+describe.skip('OC2: Org chart interactive functions are explicitly global', () => {
   const requiredGlobalFunctions = [
     'pillToggle',
     'repToggle',
@@ -129,7 +132,8 @@ describe('OC3: renderOrgChart script re-execution is reliable', () => {
 // the user navigated away and back, initDesktop() wouldn't run, leaving
 // MassAbility sub-sections in an incorrect state.
 
-describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
+// SolidBase: placeholder org chart has no _initDesktopRan (no desktop init logic)
+describe.skip('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   test('org_chart.html declares _initDesktopRan on window (resets on re-execution)', () => {
     expect(orgChartCode).toMatch(/window\._initDesktopRan\s*=\s*false/);
   });
@@ -219,7 +223,8 @@ describe('OC6: Light/dark mode toggle is functional', () => {
 // Bug: pillToggle('some-id', this) was called but the element with that ID
 // didn't exist, so clicking the pill did nothing.
 
-describe('OC7: Pill button toggle targets exist in the HTML', () => {
+// SolidBase: placeholder org chart has no pill/rep/ma toggle buttons
+describe.skip('OC7: Pill button toggle targets exist in the HTML', () => {
   test('every pillToggle target ID has a matching element', () => {
     const pillRegex = /pillToggle\('([^']+)'/g;
     const targetIds = new Set();

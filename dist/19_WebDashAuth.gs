@@ -715,7 +715,7 @@ function authCleanupExpiredTokens() {
  */
 function testAuthEmailSend(testEmail) {
   var to = testEmail || Session.getEffectiveUser().getEmail();
-  var subject = '[DDS-Dashboard] Magic Link Email Test';
+  var subject = '[SolidBase] Magic Link Email Test';
   var htmlBody = '<p>This is a test of the magic link email system.</p>'
     + '<p>If you received this, email sending is working correctly.</p>'
     + '<p>Sent at: ' + new Date().toISOString() + '</p>';
@@ -723,7 +723,7 @@ function testAuthEmailSend(testEmail) {
   var results = { to: to, gmail: null, mailapp: null };
 
   try {
-    GmailApp.sendEmail(to, subject + ' (GmailApp)', '', { htmlBody: htmlBody, name: 'DDS-Dashboard Test' });
+    GmailApp.sendEmail(to, subject + ' (GmailApp)', '', { htmlBody: htmlBody, name: 'SolidBase Test' });
     results.gmail = 'SUCCESS';
     Logger.log('testAuthEmailSend: GmailApp → SUCCESS');
   } catch (e) {

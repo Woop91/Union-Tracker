@@ -974,11 +974,24 @@ function syncDropdownToConfig_(e, sheetName) {
   }
 
   // Add each value that doesn't already exist in Config
+  var addedNew = false;
   for (var v = 0; v < valuesToSync.length; v++) {
     var val = valuesToSync[v].trim();
     if (val && !existingSet[val]) {
       addToConfigDropdown_(configCol, val);
       existingSet[val] = true;
+      addedNew = true;
+    }
+  }
+
+  // Refresh data validation on the source column so the new Config value
+  // appears in the dropdown immediately — requireValueInList embeds values,
+  // not a live reference, so stale rules won't show newly-added options.
+  if (addedNew && configCol && configSheet) {
+    try {
+      setDropdownValidation(e.range.getSheet(), col, configSheet, configCol);
+    } catch (_refreshErr) {
+      Logger.log('syncDropdownToConfig_ validation refresh: ' + _refreshErr.message);
     }
   }
 }
