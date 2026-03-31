@@ -2064,8 +2064,52 @@ function syncColumnMaps() {
     { name: 'RESOURCE_CONFIG_COLS', sheet: SHEETS.RESOURCE_CONFIG, map: RESOURCE_CONFIG_HEADER_MAP_, target: RESOURCE_CONFIG_COLS }
   ];
 
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
   for (var m = 0; m < maps.length; m++) {
     var entry = maps[m];
+    var sheet = ss ? ss.getSheetByName(entry.sheet) : null;
+
+    // Backfill missing columns — older deployments may lack columns added in
+    // later versions. Detect unresolved headers and append them so all sheets
+    // converge to the expected column count automatically on next onOpen.
+    if (sheet && sheet.getLastColumn() > 0) {
+      try {
+        var hRow = (entry.opts && entry.opts.headerRow) || 1;
+        var sheetLastCol = sheet.getLastColumn();
+        var sheetHeaders = sheet.getRange(hRow, 1, 1, sheetLastCol).getValues()[0];
+        var headerSet = {};
+        for (var sh = 0; sh < sheetHeaders.length; sh++) {
+          var hText = String(sheetHeaders[sh]).trim();
+          if (hText) headerSet[hText] = true;
+        }
+
+        var missingCols = [];
+        for (var hm = 0; hm < entry.map.length; hm++) {
+          if (!headerSet[entry.map[hm].header]) missingCols.push(entry.map[hm]);
+        }
+
+        if (missingCols.length > 0) {
+          var appendAt = sheetLastCol + 1;
+          ensureMinimumColumns(sheet, sheetLastCol + missingCols.length);
+          for (var mc = 0; mc < missingCols.length; mc++) {
+            sheet.getRange(hRow, appendAt + mc).setValue(missingCols[mc].header)
+              .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+              .setFontColor('#ffffff')
+              .setFontWeight('bold')
+              .setHorizontalAlignment('center');
+          }
+          result.warnings.push(entry.name + ': backfilled ' + missingCols.length + ' missing columns (' +
+            missingCols.map(function(c) { return c.key; }).join(', ') + ')');
+          result.synced.push(entry.name + '_BACKFILL');
+          Logger.log('syncColumnMaps: Added ' + missingCols.length + ' missing columns to ' + entry.sheet + ': ' +
+            missingCols.map(function(c) { return c.header; }).join(', '));
+        }
+      } catch (_bfErr) {
+        Logger.log('syncColumnMaps backfill ' + entry.sheet + ': ' + _bfErr.message);
+      }
+    }
+
     var resolved = resolveColumnsFromSheet_(entry.sheet, entry.map, entry.opts);
     if (!resolved) continue;
 
@@ -2088,60 +2132,6 @@ function syncColumnMaps() {
     }
 
     if (moved) result.synced.push(entry.name);
-  }
-
-  // Backfill missing Config columns — older deployments may not have columns
-  // added in later versions. Detect unresolved headers and append them so all
-  // Config sheets converge to the same column count automatically.
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss ? ss.getSheetByName(SHEETS.CONFIG) : null;
-    if (configSheet) {
-      var headerRow = 2;
-      var lastCol = configSheet.getLastColumn();
-      var actualHeaders = lastCol > 0
-        ? configSheet.getRange(headerRow, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); })
-        : [];
-      var actualSet = {};
-      for (var ah = 0; ah < actualHeaders.length; ah++) {
-        if (actualHeaders[ah]) actualSet[actualHeaders[ah]] = true;
-      }
-
-      var missing = [];
-      for (var cm = 0; cm < CONFIG_HEADER_MAP_.length; cm++) {
-        if (!actualSet[CONFIG_HEADER_MAP_[cm].header]) {
-          missing.push(CONFIG_HEADER_MAP_[cm]);
-        }
-      }
-
-      if (missing.length > 0) {
-        // Expand sheet and write missing headers
-        var startCol = lastCol + 1;
-        ensureMinimumColumns(configSheet, lastCol + missing.length);
-        for (var mi = 0; mi < missing.length; mi++) {
-          configSheet.getRange(headerRow, startCol + mi).setValue(missing[mi].header)
-            .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
-            .setFontColor('#ffffff')
-            .setFontWeight('bold')
-            .setHorizontalAlignment('center');
-        }
-        result.warnings.push('CONFIG: backfilled ' + missing.length + ' missing columns (' +
-          missing.map(function(m) { return m.key; }).join(', ') + ')');
-        result.synced.push('CONFIG_BACKFILL');
-        Logger.log('syncColumnMaps: Added ' + missing.length + ' missing Config columns: ' +
-          missing.map(function(m) { return m.header; }).join(', '));
-
-        // Re-resolve CONFIG_COLS now that new columns exist
-        var freshConfig = resolveColumnsFromSheet_(SHEETS.CONFIG, CONFIG_HEADER_MAP_, { headerRow: 2 });
-        if (freshConfig) {
-          for (var fc in freshConfig) {
-            if (freshConfig.hasOwnProperty(fc)) CONFIG_COLS[fc] = freshConfig[fc];
-          }
-        }
-      }
-    }
-  } catch (_backfillErr) {
-    Logger.log('syncColumnMaps Config backfill: ' + _backfillErr.message);
   }
 
   // Rebuild derived column configs so dropdown dialogs and bidirectional
