@@ -989,7 +989,11 @@ function syncDropdownToConfig_(e, sheetName) {
   // not a live reference, so stale rules won't show newly-added options.
   if (addedNew && configCol && configSheet) {
     try {
-      setDropdownValidation(e.range.getSheet(), col, configSheet, configCol);
+      if (isMultiSelect && typeof setMultiSelectValidation === 'function') {
+        setMultiSelectValidation(e.range.getSheet(), col, configSheet, configCol);
+      } else {
+        setDropdownValidation(e.range.getSheet(), col, configSheet, configCol);
+      }
     } catch (_refreshErr) {
       Logger.log('syncDropdownToConfig_ validation refresh: ' + _refreshErr.message);
     }

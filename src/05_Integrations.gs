@@ -5137,6 +5137,31 @@ function initiateGrievance(stewardEmail, data, idemKey) {
 
     grievanceSheet.appendRow(rowData);
 
+    // Programmatic writes don't trigger onEdit, so bidirectional sync
+    // (syncDropdownToConfig_) never fires. Explicitly sync dropdown values
+    // to Config so they appear in future grievance form dropdowns.
+    try {
+      var _grDDFields = [
+        { val: data.issueCategory,       col: CONFIG_COLS.ISSUE_CATEGORY },
+        { val: data.step,                col: CONFIG_COLS.GRIEVANCE_STEP },
+        { val: memberData.workLocation,  col: CONFIG_COLS.OFFICE_LOCATIONS }
+      ];
+      // Articles may be comma-separated (multi-select) — sync each individually
+      if (data.articles) {
+        var _artParts = String(data.articles).split(',');
+        for (var _ap = 0; _ap < _artParts.length; _ap++) {
+          var _artVal = _artParts[_ap].trim();
+          if (_artVal && CONFIG_COLS.ARTICLES) addToConfigDropdown_(CONFIG_COLS.ARTICLES, _artVal);
+        }
+      }
+      for (var _gd = 0; _gd < _grDDFields.length; _gd++) {
+        var _gv = String(_grDDFields[_gd].val || '').trim();
+        if (_gv && _grDDFields[_gd].col) addToConfigDropdown_(_grDDFields[_gd].col, _gv);
+      }
+    } catch (_grSyncErr) {
+      Logger.log('initiateGrievance config sync: ' + _grSyncErr.message);
+    }
+
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_CREATED, {
       grievanceId: grievanceId,
       memberId: memberData.memberId,
