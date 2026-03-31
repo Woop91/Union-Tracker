@@ -115,9 +115,26 @@ body.auth-active {
   font-family: 'Space Grotesk', var(--fontDisplay, sans-serif);
   font-size: 2.5rem; font-weight: 700;
   letter-spacing: 0.4em; text-align: center;
-  color: #1f4a43; margin-bottom: 4px;
+  margin-bottom: 4px;
+  background: linear-gradient(90deg, #1f4a43, #2a7c6f, #3db8a4, #6ec6d8, #a78bfa, #e879a8, #f0a050, #3db8a4, #1f4a43);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: prism-shift 6s ease-in-out infinite;
 }
-[data-theme-mode="dark"] .auth-brand { color: #4fd8c1; }
+[data-theme-mode="dark"] .auth-brand {
+  background: linear-gradient(90deg, #4fd8c1, #6ee7d0, #a78bfa, #c084fc, #f472b6, #fb923c, #facc15, #6ee7d0, #4fd8c1);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: prism-shift 6s ease-in-out infinite;
+}
+@keyframes prism-shift {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
 
 .auth-container .auth-title {
   font-family: 'Space Grotesk', var(--fontDisplay, sans-serif);

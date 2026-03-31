@@ -697,7 +697,7 @@ function test_failsafe_moduleExists() {
 function test_failsafe_publicAPIComplete() {
   var expected = [
     'initFailsafeSheet', 'getDigestConfig', 'updateDigestConfig',
-    'processScheduledDigests', 'triggerBulkExport',
+    'processScheduledDigests', 'restoreFromDriveBackup',
     'backupCriticalSheets', 'setupFailsafeTriggers', 'removeFailsafeTriggers'
   ];
   for (var i = 0; i < expected.length; i++) {

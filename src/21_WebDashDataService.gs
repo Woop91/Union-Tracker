@@ -2227,6 +2227,7 @@ var DataService = (function () {
    * @returns {Object[]} Array of contact records
    */
   function getMemberContactHistory(stewardEmail, memberEmail) {
+    if (!stewardEmail || !memberEmail) return [];
     var sheet = _ensureContactLog();
     if (sheet.getLastRow() <= 1) return [];
     var data = sheet.getDataRange().getValues();
@@ -2254,6 +2255,7 @@ var DataService = (function () {
    * @returns {Object[]} Array of contact records
    */
   function getStewardContactLog(stewardEmail) {
+    if (!stewardEmail) return [];
     var sheet = _ensureContactLog();
     if (sheet.getLastRow() <= 1) return [];
     var data = sheet.getDataRange().getValues();
@@ -4882,6 +4884,7 @@ function _resolveCallerEmail(sessionToken) {
  * @private
  */
 function _requireStewardAuth(sessionToken) {
+  if (sessionToken === null || sessionToken === undefined) return null;
   var auth = checkWebAppAuthorization('steward', sessionToken);
   if (!auth.isAuthorized) return null;
   return (auth.email || '').toLowerCase().trim();
@@ -5229,6 +5232,25 @@ function dataAddMemberFromWebapp(sessionToken, memberData) {
         name: memberData.firstName + ' ' + memberData.lastName,
         addedBy: s.email
       });
+      // Programmatic writes don't trigger onEdit, so bidirectional sync
+      // (syncDropdownToConfig_) never fires. Explicitly sync dropdown values
+      // to Config so they appear in future Add Member dropdowns.
+      try {
+        var _ddFields = [
+          { val: memberData.jobTitle,     col: CONFIG_COLS.JOB_TITLES },
+          { val: memberData.workLocation, col: CONFIG_COLS.OFFICE_LOCATIONS },
+          { val: memberData.unit,         col: CONFIG_COLS.UNITS },
+          { val: memberData.supervisor,   col: CONFIG_COLS.SUPERVISORS },
+          { val: memberData.manager,      col: CONFIG_COLS.MANAGERS },
+          { val: memberData.duesStatus,   col: CONFIG_COLS.DUES_STATUSES }
+        ];
+        for (var _d = 0; _d < _ddFields.length; _d++) {
+          var _v = String(_ddFields[_d].val || '').trim();
+          if (_v && _ddFields[_d].col) addToConfigDropdown_(_ddFields[_d].col, _v);
+        }
+      } catch (_syncErr) {
+        Logger.log('dataAddMemberFromWebapp config sync: ' + _syncErr.message);
+      }
       return { success: true, memberId: memberId, message: 'Member added successfully.' };
     } catch (err) {
       Logger.log('dataAddMemberFromWebapp error: ' + err.message);
