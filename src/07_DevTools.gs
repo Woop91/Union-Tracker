@@ -397,7 +397,7 @@ function seedConfigData() {
 
   // Dues Statuses — valid values for Member Directory "Dues Status" column
   if (seedIfEmpty(CONFIG_COLS.DUES_STATUSES, [
-    'Current', 'Past Due', 'Inactive', 'Fee Payer', 'Exempt'
+    'Current', 'Past Due', 'Inactive'
   ])) seededAny = true;
 
   // ═══════════════════════════════════════════════════════════════════════════

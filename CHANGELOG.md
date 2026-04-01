@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.50.1] - 2026-03-31
+
+### Fixed
+- **Column cache TTL** — Increased `persistColumnMaps_()` cache from 2 hours to 6 hours (GAS maximum) to reduce cold-cache column mismatches after the v4.50.0 Config reorder.
+- **Eager column restore** — Added global-scope `loadCachedColumnMaps_()` call in 01_Core.gs so all execution contexts (doGet, data* web functions, onEdit) start with correct column positions.
+- **doGet cold-cache fallback** — If column cache is empty on first access after deploy, doGet now calls `syncColumnMaps()` before rendering to prevent wrong-column reads.
+- **Dues Status dropdown** — Added `DUES_STATUS → DUES_STATUSES` mapping to `DROPDOWN_MAP` so Dues Status column respects Config-driven values.
+- **Simplified seed data** — Removed unused 'Fee Payer' and 'Exempt' from default Dues Statuses seed.
+- **Version bump** — COMMAND_CONFIG.VERSION corrected from 4.49.0 → 4.50.1.
+
 ## [4.50.0] - 2026-03-31
 
 ### Added

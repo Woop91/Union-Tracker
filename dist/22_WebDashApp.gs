@@ -98,6 +98,16 @@ function doGet(e) {
 function doGetWebDashboard(e) {
   e = e || { parameter: {} };
 
+  // Ensure column positions match the actual sheet layout.
+  // The global-scope loadCachedColumnMaps_() (01_Core.gs) handles most cases,
+  // but if the cache is cold (first access after deploy / 2-hour expiry),
+  // fall back to a full sync so ConfigReader reads the correct columns.
+  try {
+    if (!CacheService.getScriptCache().get('RESOLVED_COL_MAPS')) {
+      syncColumnMaps();
+    }
+  } catch (_syncErr) { Logger.log('doGet column sync: ' + (_syncErr.message || _syncErr)); }
+
   // Load config once at top — reused in both success and error paths (Fix 2.1)
   var config;
   try {

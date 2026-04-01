@@ -282,7 +282,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.49.0",
+  VERSION: "4.50.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -2218,7 +2218,7 @@ function persistColumnMaps_() {
       FEEDBACK_COLS: FEEDBACK_COLS,
       CHECKLIST_COLS: CHECKLIST_COLS
     };
-    CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 7200); // 2 hours
+    CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 21600); // 6 hours (max)
   } catch (_e) {
     // CacheService unavailable — degrade silently; defaults are still valid
     // for sheets created by this code.
@@ -2798,7 +2798,8 @@ function buildDropdownMap_() {
       // handleMemberEdit() and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS.
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
-      { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
+      { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS },
+      { col: MEMBER_COLS.DUES_STATUS,        configCol: CONFIG_COLS.DUES_STATUSES }
     ],
     // ISSUE_CATEGORY and ARTICLES are multi-select columns (comma-separated values).
     // They live in MULTI_SELECT_COLS.GRIEVANCE_LOG, NOT here.
@@ -2816,6 +2817,14 @@ function buildDropdownMap_() {
  * Single-select dropdown map.  Initialized at load; refreshed by syncColumnMaps().
  */
 var DROPDOWN_MAP = buildDropdownMap_();
+
+// ── Eagerly restore cached column positions ──
+// Every GAS execution starts with array-order defaults from buildColsFromMap_.
+// After CONFIG_HEADER_MAP_ was reordered (v4.50.0), these defaults no longer
+// match the actual sheet layout.  syncColumnMaps() resolves positions at runtime
+// but only runs in onOpen().  This call restores cached positions so that ALL
+// execution contexts (doGet, data* web functions, onEdit) use correct columns.
+try { loadCachedColumnMaps_(); } catch (_initCache) { /* CacheService unavailable — defaults used */ }
 
 // ============================================================================
 // ID GENERATION
