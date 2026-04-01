@@ -191,12 +191,12 @@ describe('CONFIG_COLS', () => {
   });
 
   test('has chief steward email column', () => {
-    expect(CONFIG_COLS.CHIEF_STEWARD_EMAIL).toBe(46);
+    expect(CONFIG_COLS.CHIEF_STEWARD_EMAIL).toBe(16);
   });
 
   test('has escalation config columns', () => {
-    expect(CONFIG_COLS.ESCALATION_STATUSES).toBe(49);
-    expect(CONFIG_COLS.ESCALATION_STEPS).toBe(50);
+    expect(CONFIG_COLS.ESCALATION_STATUSES).toBe(35);
+    expect(CONFIG_COLS.ESCALATION_STEPS).toBe(36);
   });
 
   test('has form URL columns', () => {

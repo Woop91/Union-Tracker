@@ -1321,103 +1321,116 @@ var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_, {
 // Column types: list = multi-row dropdown options, text = free text, number = numeric,
 // url = URL, id = Google API ID (15+ chars), email = email address, days = positive integer,
 // boolean = yes/no toggle, label = short UI text (≤50 chars), csv = comma-separated values
+//
+// Columns are grouped by logical section. syncColumnMaps() resolves columns by header
+// name at runtime, so reordering here is safe for existing deployments.
 var CONFIG_HEADER_MAP_ = [
+  // ── ORGANIZATION (A–J) ── identity, contract info
+  { key: 'ORG_NAME',              header: 'Organization Name',                 type: 'text' },
+  { key: 'ORG_ABBREV',            header: 'Organization Abbreviation',         type: 'label' },
+  { key: 'LOCAL_NUMBER',          header: 'Local Number',                      type: 'text' },
+  { key: 'UNION_PARENT',          header: 'Union Parent',                      type: 'text' },
+  { key: 'STATE_REGION',          header: 'State/Region',                      type: 'text' },
+  { key: 'ORG_WEBSITE',           header: 'Organization Website',              type: 'url' },
+  { key: 'CONTRACT_NAME',         header: 'Contract Name',                     type: 'text' },
+  { key: 'CONTRACT_GRIEVANCE',    header: 'Contract Article (Grievance)',      type: 'text' },
+  { key: 'CONTRACT_DISCIPLINE',   header: 'Contract Article (Discipline)',     type: 'text' },
+  { key: 'CONTRACT_WORKLOAD',     header: 'Contract Article (Workload)',       type: 'text' },
+
+  // ── CONTACT INFO (K–P) ── addresses, phones, emails
+  { key: 'MAIN_ADDRESS',          header: 'Main Office Address',               type: 'text' },
+  { key: 'MAIN_PHONE',            header: 'Main Phone',                        type: 'text' },
+  { key: 'MAIN_FAX',              header: 'Main Fax',                          type: 'text' },
+  { key: 'MAIN_CONTACT_NAME',     header: 'Main Contact Name',                type: 'text' },
+  { key: 'MAIN_CONTACT_EMAIL',    header: 'Main Contact Email',               type: 'email' },
+  { key: 'CHIEF_STEWARD_EMAIL',   header: 'Chief Steward Email',              type: 'email' },
+
+  // ── EMPLOYMENT (Q–W) ── workplace structure, job info
   { key: 'JOB_TITLES',            header: 'Job Titles',                        type: 'list' },
   { key: 'OFFICE_LOCATIONS',      header: 'Office Locations',                  type: 'list' },
-  { key: 'UNITS',                 header: 'Units',                             type: 'list' },
+  { key: 'OFFICE_ADDRESSES',      header: 'Office Addresses',                  type: 'text' },
   { key: 'OFFICE_DAYS',           header: 'Office Days',                       type: 'list' },
+  { key: 'UNITS',                 header: 'Units',                             type: 'list' },
+  { key: 'UNIT_CODES',            header: 'Unit Codes',                        type: 'list' },
+  { key: 'DUES_STATUSES',         header: 'Dues Statuses',                     type: 'list' },
+
+  // ── PEOPLE (X–AC) ���─ supervisors, stewards, contact prefs
   { key: 'SUPERVISORS',           header: 'Supervisors',                       type: 'list' },
   { key: 'MANAGERS',              header: 'Managers',                          type: 'list' },
   { key: 'STEWARDS',              header: 'Stewards',                          type: 'list' },
   { key: 'STEWARD_COMMITTEES',    header: 'Steward Committees',                type: 'list' },
+  { key: 'COMM_METHODS',          header: 'Communication Methods',             type: 'list' },
+  { key: 'BEST_TIMES',            header: 'Best Times to Contact',             type: 'list' },
+
+  // ── GRIEVANCE SETTINGS (AD–AJ) ── statuses, steps, categories, escalation
   { key: 'GRIEVANCE_STATUS',      header: 'Grievance Status',                  type: 'list' },
   { key: 'GRIEVANCE_STEP',        header: 'Grievance Step',                    type: 'list' },
   { key: 'ISSUE_CATEGORY',        header: 'Issue Category',                    type: 'list' },
   { key: 'ARTICLES',              header: 'Articles Violated',                 type: 'list' },
-  { key: 'COMM_METHODS',          header: 'Communication Methods',             type: 'list' },
   { key: 'GRIEVANCE_COORDINATORS', header: 'Grievance Coordinators',           type: 'list' },
-  { key: 'GRIEVANCE_FORM_URL',    header: 'Grievance Form URL',               type: 'url' },
-  { key: 'CONTACT_FORM_URL',      header: 'Contact Form URL',                 type: 'url' },
-  { key: 'ADMIN_EMAILS',          header: 'Admin Emails',                      type: 'list' },
-  { key: 'ALERT_DAYS',            header: 'Alert Days Before Deadline',        type: 'csv' },
-  { key: 'NOTIFICATION_RECIPIENTS', header: 'Notification Recipients',         type: 'list' },
-  { key: 'ORG_NAME',              header: 'Organization Name',                 type: 'text' },
-  { key: 'LOCAL_NUMBER',          header: 'Local Number',                      type: 'text' },
-  { key: 'MAIN_ADDRESS',          header: 'Main Office Address',               type: 'text' },
-  { key: 'MAIN_PHONE',            header: 'Main Phone',                        type: 'text' },
-  { key: 'DRIVE_FOLDER_ID',       header: 'Google Drive Folder ID',            type: 'id' },
-  { key: 'CALENDAR_ID',           header: 'Google Calendar ID',                type: 'id' },
+  { key: 'ESCALATION_STATUSES',   header: 'Escalation Statuses',              type: 'list' },
+  { key: 'ESCALATION_STEPS',      header: 'Escalation Steps',                 type: 'list' },
+
+  // ── DEADLINES (AK–AR) ── grievance timeline, alerts
   { key: 'FILING_DEADLINE_DAYS',  header: 'Filing Deadline Days',              type: 'days' },
   { key: 'STEP1_RESPONSE_DAYS',   header: 'Step I Response Days',              type: 'days' },
   { key: 'STEP2_APPEAL_DAYS',     header: 'Step II Appeal Days',               type: 'days' },
   { key: 'STEP2_RESPONSE_DAYS',   header: 'Step II Response Days',             type: 'days' },
-  { key: 'STEP3_APPEAL_DAYS',    header: 'Step III Appeal Days',               type: 'days' },
-  { key: 'STEP3_RESPONSE_DAYS',  header: 'Step III Response Days',             type: 'days' },
+  { key: 'STEP3_APPEAL_DAYS',     header: 'Step III Appeal Days',              type: 'days' },
+  { key: 'STEP3_RESPONSE_DAYS',   header: 'Step III Response Days',            type: 'days' },
   { key: 'ARBITRATION_DEMAND_DAYS', header: 'Arbitration Demand Days',         type: 'days' },
-  { key: 'BEST_TIMES',            header: 'Best Times to Contact',             type: 'list' },
-  { key: 'DUES_STATUSES',         header: 'Dues Statuses',                     type: 'list' },  // Editable list of valid dues status values (e.g. Current, Past Due, Inactive, Fee Payer, Exempt)
-  { key: 'CONTRACT_GRIEVANCE',    header: 'Contract Article (Grievance)',      type: 'text' },
-  { key: 'CONTRACT_DISCIPLINE',   header: 'Contract Article (Discipline)',     type: 'text' },
-  { key: 'CONTRACT_WORKLOAD',     header: 'Contract Article (Workload)',       type: 'text' },
-  { key: 'CONTRACT_NAME',         header: 'Contract Name',                     type: 'text' },
-  { key: 'UNION_PARENT',          header: 'Union Parent',                      type: 'text' },
-  { key: 'STATE_REGION',          header: 'State/Region',                      type: 'text' },
-  { key: 'ORG_WEBSITE',           header: 'Organization Website',              type: 'url' },
-  { key: 'OFFICE_ADDRESSES',      header: 'Office Addresses',                  type: 'text' },
-  { key: 'MAIN_FAX',              header: 'Main Fax',                          type: 'text' },
-  { key: 'MAIN_CONTACT_NAME',     header: 'Main Contact Name',                type: 'text' },
-  { key: 'MAIN_CONTACT_EMAIL',    header: 'Main Contact Email',               type: 'email' },
-  // SATISFACTION_FORM_URL removed v4.22.7 — deprecated since v4.21.0 (Google Form integration replaced by native webapp survey)
-  { key: 'CHIEF_STEWARD_EMAIL',   header: 'Chief Steward Email',              type: 'email' },
-  { key: 'UNIT_CODES',            header: 'Unit Codes',                        type: 'list' },
+  { key: 'ALERT_DAYS',            header: 'Alert Days Before Deadline',        type: 'csv' },
+
+  // ── NOTIFICATIONS (AS–AU) ── admin & system email lists
+  { key: 'ADMIN_EMAILS',          header: 'Admin Emails',                      type: 'list' },
+  { key: 'NOTIFICATION_RECIPIENTS', header: 'Notification Recipients',         type: 'list' },
+  { key: 'TEST_NOTIFY_EMAIL',     header: 'Test Runner Notify Email',          type: 'email' },
+
+  // ── LINKS (AV–BB) ── external URLs, custom sidebar links
+  { key: 'GRIEVANCE_FORM_URL',    header: 'Grievance Form URL',               type: 'url' },
+  { key: 'CONTACT_FORM_URL',      header: 'Contact Form URL',                 type: 'url' },
+  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL', type: 'url' },
+  { key: 'CUSTOM_LINK_1_NAME',    header: 'Custom Link 1 Name',               type: 'label' },
+  { key: 'CUSTOM_LINK_1_URL',     header: 'Custom Link 1 URL',                type: 'url' },
+  { key: 'CUSTOM_LINK_2_NAME',    header: 'Custom Link 2 Name',               type: 'label' },
+  { key: 'CUSTOM_LINK_2_URL',     header: 'Custom Link 2 URL',                type: 'url' },
+
+  // ── DRIVE & CALENDAR (BC–BM) ── Google Drive folder IDs, Calendar ID
+  { key: 'DRIVE_FOLDER_ID',       header: 'Google Drive Folder ID',            type: 'id' },
+  { key: 'CALENDAR_ID',           header: 'Google Calendar ID',                type: 'id' },
   { key: 'ARCHIVE_FOLDER_ID',     header: 'Archive Folder ID',                type: 'id' },
-  { key: 'ESCALATION_STATUSES',   header: 'Escalation Statuses',              type: 'list' },
-  { key: 'ESCALATION_STEPS',      header: 'Escalation Steps',                 type: 'list' },
   { key: 'TEMPLATE_ID',           header: 'Template ID',                       type: 'id' },
   { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID',                    type: 'id' },
-  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL', type: 'url' },
-  { key: 'ACCENT_HUE',            header: 'Accent Hue',                       type: 'number' },
-  { key: 'LOGO_INITIALS',         header: 'Logo Initials',                    type: 'label' },
-  { key: 'MAGIC_LINK_EXPIRY_DAYS', header: 'Magic Link Expiry Days',          type: 'days' },
-  { key: 'COOKIE_DURATION_DAYS',  header: 'Cookie Duration Days',             type: 'days' },
-  { key: 'STEWARD_LABEL',         header: 'Steward Label',                    type: 'label' },
-  { key: 'MEMBER_LABEL',          header: 'Member Label',                     type: 'label' },
-  { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name',               type: 'label' },
-  { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL',                type: 'url' },
-  { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name',               type: 'label' },
-  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL',                type: 'url' },
-  { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)',           type: 'list' },
-  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)',                type: 'list' },
-  // Drive folder structure (v4.20.17) — set by CREATE_DASHBOARD, read-only at runtime
   { key: 'DASHBOARD_ROOT_FOLDER_ID',   header: 'Dashboard Root Folder ID',    type: 'id' },
   { key: 'GRIEVANCES_FOLDER_ID',       header: 'Grievances Folder ID',        type: 'id' },
   { key: 'RESOURCES_FOLDER_ID',        header: 'Resources Folder ID',         type: 'id' },
   { key: 'MINUTES_FOLDER_ID',          header: 'Minutes Folder ID',           type: 'id' },
   { key: 'EVENT_CHECKIN_FOLDER_ID',    header: 'Event Check-In Folder ID',    type: 'id' },
-  // Survey engine (v4.21.0) — Q64 priority options, editable in sheet
+  { key: 'PAST_SURVEYS_FOLDER_ID',     header: 'Past Surveys Folder ID',      type: 'id' },
+
+  // ── SURVEY (BN–BP) ── priority options, response logs
   { key: 'SURVEY_PRIORITY_OPTIONS',  header: 'Survey Priority Options',       type: 'list' },
-  // Drive folder for archived past survey periods
-  { key: 'PAST_SURVEYS_FOLDER_ID',   header: 'Past Surveys Folder ID',       type: 'id' },
-  // Insights page cache — how long (in minutes) to serve cached data before re-fetching
-  { key: 'INSIGHTS_CACHE_TTL_MIN',   header: 'Insights Cache TTL (Minutes)', type: 'number' },
-  // Broadcast: allow any steward to send to ALL members (not just their assigned ones)
-  // Set to 'yes' to enable the All Members scope option in the Broadcast tab
-  { key: 'BROADCAST_SCOPE_ALL',      header: 'Broadcast: Allow All Members Scope', type: 'boolean' },
-  // Test runner (v4.25.2) — email address for failure notifications from scheduled test runs
-  { key: 'TEST_NOTIFY_EMAIL',        header: 'Test Runner Notify Email',      type: 'email' },
-  // Correlation Engine (v4.30.0) — set to 'yes' to enable the correlation/insights engine
-  { key: 'ENABLE_CORRELATION',       header: 'Enable Correlation Engine',     type: 'boolean' },
-  // Grievance Toggle (v4.34.4) — set to 'no' to hide all grievance UI/endpoints
-  { key: 'SHOW_GRIEVANCES',          header: 'Show Grievances',               type: 'boolean' },
-  // Retention thresholds (v4.33.1) — days before auto-archival; defaults applied if blank
-  // GRIEVANCE_ARCHIVE_DAYS: closed grievances older than this are moved to _Archive_Grievances
-  { key: 'GRIEVANCE_ARCHIVE_DAYS',   header: 'Grievance Archive Days',        type: 'days' },
-  // AUDIT_ARCHIVE_DAYS: audit log entries older than this are exported to Drive CSV + pruned
-  { key: 'AUDIT_ARCHIVE_DAYS',       header: 'Audit Log Archive Days',        type: 'days' },
-  // Organization abbreviation — shown in sidebar header, email subjects (v4.41.0)
-  { key: 'ORG_ABBREV',               header: 'Organization Abbreviation',     type: 'label' },
-  // Tab Modals (v4.48.0) — auto-open contextual modals when navigating to key sheet tabs
-  { key: 'ENABLE_TAB_MODALS',        header: 'Enable Tab Modals',             type: 'boolean' }
+  { key: 'SURVEY_LOG_IDS',        header: 'Survey Log (Member IDs)',           type: 'list' },
+  { key: 'SURVEY_LOG_DATES',      header: 'Survey Log (Dates)',                type: 'list' },
+
+  // ── BRANDING & UX (BQ–BV) ── visual theme, role labels, session config
+  { key: 'ACCENT_HUE',            header: 'Accent Hue',                       type: 'number' },
+  { key: 'LOGO_INITIALS',         header: 'Logo Initials',                    type: 'label' },
+  { key: 'STEWARD_LABEL',         header: 'Steward Label',                    type: 'label' },
+  { key: 'MEMBER_LABEL',          header: 'Member Label',                     type: 'label' },
+  { key: 'MAGIC_LINK_EXPIRY_DAYS', header: 'Magic Link Expiry Days',          type: 'days' },
+  { key: 'COOKIE_DURATION_DAYS',  header: 'Cookie Duration Days',             type: 'days' },
+
+  // ── FEATURE TOGGLES (BW–CA) ── on/off switches, cache TTL
+  { key: 'SHOW_GRIEVANCES',       header: 'Show Grievances',                   type: 'boolean' },
+  { key: 'BROADCAST_SCOPE_ALL',   header: 'Broadcast: Allow All Members Scope', type: 'boolean' },
+  { key: 'ENABLE_CORRELATION',    header: 'Enable Correlation Engine',         type: 'boolean' },
+  { key: 'ENABLE_TAB_MODALS',     header: 'Enable Tab Modals',                type: 'boolean' },
+  { key: 'INSIGHTS_CACHE_TTL_MIN', header: 'Insights Cache TTL (Minutes)',    type: 'number' },
+
+  // ── RETENTION (CB–CC) ── auto-archival thresholds
+  { key: 'GRIEVANCE_ARCHIVE_DAYS', header: 'Grievance Archive Days',           type: 'days' },
+  { key: 'AUDIT_ARCHIVE_DAYS',    header: 'Audit Log Archive Days',            type: 'days' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);

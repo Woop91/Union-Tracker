@@ -4739,6 +4739,9 @@ var DataService = (function () {
         jobTitle:     String(row[NMC_COLS.JOB_TITLE - 1] || ''),
         workLocation: String(row[NMC_COLS.WORK_LOCATION - 1] || ''),
         unit:         String(row[NMC_COLS.UNIT - 1] || ''),
+        unionName:    String(row[NMC_COLS.UNION_NAME - 1] || ''),
+        shirtSize:    String(row[NMC_COLS.SHIRT_SIZE - 1] || ''),
+        isSteward:    String(row[NMC_COLS.IS_STEWARD - 1] || ''),
         email:        String(row[NMC_COLS.EMAIL - 1] || ''),
         phone:        String(row[NMC_COLS.PHONE - 1] || ''),
         category:     String(row[NMC_COLS.CATEGORY - 1] || ''),
@@ -4769,6 +4772,9 @@ var DataService = (function () {
     row[NMC_COLS.JOB_TITLE - 1]     = escapeForFormula(contactData.jobTitle || '');
     row[NMC_COLS.WORK_LOCATION - 1] = escapeForFormula(contactData.workLocation || '');
     row[NMC_COLS.UNIT - 1]          = escapeForFormula(contactData.unit || '');
+    row[NMC_COLS.UNION_NAME - 1]    = escapeForFormula(contactData.unionName || '');
+    row[NMC_COLS.SHIRT_SIZE - 1]    = escapeForFormula(contactData.shirtSize || '');
+    row[NMC_COLS.IS_STEWARD - 1]    = escapeForFormula(contactData.isSteward || 'No');
     row[NMC_COLS.EMAIL - 1]         = escapeForFormula(contactData.email || '');
     row[NMC_COLS.PHONE - 1]         = escapeForFormula(contactData.phone || '');
     row[NMC_COLS.CATEGORY - 1]      = escapeForFormula(contactData.category || 'Other');
@@ -4795,6 +4801,9 @@ var DataService = (function () {
     if (updateData.jobTitle !== undefined)     sheet.getRange(rowIdx, NMC_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
     if (updateData.workLocation !== undefined) sheet.getRange(rowIdx, NMC_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
     if (updateData.unit !== undefined)         sheet.getRange(rowIdx, NMC_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+    if (updateData.unionName !== undefined)    sheet.getRange(rowIdx, NMC_COLS.UNION_NAME).setValue(escapeForFormula(updateData.unionName));
+    if (updateData.shirtSize !== undefined)    sheet.getRange(rowIdx, NMC_COLS.SHIRT_SIZE).setValue(escapeForFormula(updateData.shirtSize));
+    if (updateData.isSteward !== undefined)    sheet.getRange(rowIdx, NMC_COLS.IS_STEWARD).setValue(escapeForFormula(updateData.isSteward));
     if (updateData.email !== undefined)        sheet.getRange(rowIdx, NMC_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
     if (updateData.phone !== undefined)        sheet.getRange(rowIdx, NMC_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
     if (updateData.category !== undefined)     sheet.getRange(rowIdx, NMC_COLS.CATEGORY).setValue(escapeForFormula(updateData.category));

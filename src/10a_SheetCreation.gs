@@ -70,32 +70,21 @@ function createConfigSheet(ss) {
     var _migrated = _migrateOrphanedColumns(sheet);
   }
 
-  // Row 1: Section Headers (grouped categories) — must match CONFIG_HEADER_MAP_ length (79 cols)
+  // Row 1: Section Headers (grouped categories) — must match CONFIG_HEADER_MAP_ length (81 cols)
   var sectionHeaders = [
-    '── EMPLOYMENT INFO ──', '', '', '',                          // cols 1-4 (4)
-    '── SUPERVISION ──', '',                                      // cols 5-6 (2)
-    '── STEWARD INFO ──', '',                                     // cols 7-8 (2)
-    '── GRIEVANCE SETTINGS ──', '', '', '',                       // cols 9-12 (4)
-    '── LINKS & COORDINATORS ──', '', '', '',                     // cols 13-16 (4)
-    '── NOTIFICATIONS ──', '', '',                                // cols 17-19 (3)
-    '── ORGANIZATION ──', '', '', '',                             // cols 20-23 (4)
-    '── INTEGRATION ──', '',                                      // cols 24-25 (2)
-    '── DEADLINES ──', '', '', '', '', '', '',                    // cols 26-32 (7)
-    '── MULTI-SELECT OPTIONS ──', '',                               // cols 33-34 (2)
-    '── CONTRACT & LEGAL ──', '', '', '',                         // cols 35-38 (4)
-    '── ORG IDENTITY ──', '', '',                                 // cols 38-40 (3)
-    '── EXTENDED CONTACT ──', '', '', '', '',                     // cols 41-45 (5)
-    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '',     // cols 46-52 (7)
-    '── MOBILE DASHBOARD ──', '', '', '', '', '',                 // cols 53-58 (6)
-    '── CUSTOM LINKS ──', '', '', '',                             // cols 59-62 (4)
-    '── SURVEY LOG ──', '',                                       // cols 63-64 (2)
-    '── DRIVE FOLDERS ──', '', '', '', '',                        // cols 65-69 (5)
-    '── SURVEY ENGINE ──', '',                                    // cols 70-71 (2)
-    '── ADVANCED SETTINGS ──', '', '',                            // cols 72-74 (3)
-    '── FEATURE TOGGLES ──', '',                                  // cols 75-76 (2)
-    '── RETENTION ──', '',                                        // cols 77-78 (2)
-    '── ORG BRANDING ──',                                          // col 80 (1)
-    '── TAB MODALS ──'                                            // col 81 (1)
+    '── ORGANIZATION ──', '', '', '', '', '', '', '', '', '',     // cols 1-10 (10)
+    '── CONTACT INFO ──', '', '', '', '', '',                     // cols 11-16 (6)
+    '── EMPLOYMENT ──', '', '', '', '', '', '',                   // cols 17-23 (7)
+    '── PEOPLE ──', '', '', '', '', '',                           // cols 24-29 (6)
+    '── GRIEVANCE SETTINGS ──', '', '', '', '', '', '',           // cols 30-36 (7)
+    '��─ DEADLINES ��─', '', '', '', '', '', '', '',                // cols 37-44 (8)
+    '── NOTIFICATIONS ──', '', '',                                // cols 45-47 (3)
+    '── LINKS ──', '', '', '', '', '', '',                        // cols 48-54 (7)
+    '── DRIVE & CALENDAR ��─', '', '', '', '', '', '', '', '', '', '', // cols 55-65 (11)
+    '── SURVEY ──', '', '',                                       // cols 66-68 (3)
+    '── BRANDING & UX ──', '', '', '', '', '',                    // cols 69-74 (6)
+    '── FEATURE TOGGLES ──', '', '', '', '',                      // cols 75-79 (5)
+    '── RETENTION ──', ''                                         // cols 80-81 (2)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -127,39 +116,47 @@ function createConfigSheet(ss) {
   // This ensures re-running CREATE_DASHBOARD fills in newly-added columns without
   // overwriting user-customized values.
 
-  // Office Days (D)
+  // ── Organization (A–J)
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['SB'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.UNION_PARENT, ['Your Parent Union'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STATE_REGION, ['Your State'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_WEBSITE, ['https://www.example.org/'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_NAME, ['Current CBA'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_GRIEVANCE, ['Article XX'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_DISCIPLINE, ['Article YY'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_WORKLOAD, ['Article ZZ'], isExistingSheet);
+
+  // ── Contact Info (K–P)
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_ADDRESS, ['123 Main Street, Suite 100, City, ST 00000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['(000) 000-0000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['(000) 000-0000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Your Contact Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['your-email@your-org.org'], isExistingSheet);
+
+  // ── Employment (Q–W)
   seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
 
-  // Steward Committees (H)
+  // ── People (X–AC)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
                     'Political Action Committee', 'Membership Committee', 'Executive Board'];
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_COMMITTEES, committees, isExistingSheet);
-
-  // Grievance Status (J)
-  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS, isExistingSheet);
-
-  // Grievance Step (K)
-  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP, isExistingSheet);
-
-  // Issue Category (L)
-  seedConfigDefault_(sheet, CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY, isExistingSheet);
-
-  // Articles (M)
-  seedConfigDefault_(sheet, CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES, isExistingSheet);
-
-  // Communication Methods (N)
   seedConfigDefault_(sheet, CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS, isExistingSheet);
+  var bestTimes = ['Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'];
+  seedConfigDefault_(sheet, CONFIG_COLS.BEST_TIMES, bestTimes, isExistingSheet);
 
-  // Alert Days (S) - default notification intervals
-  seedConfigDefault_(sheet, CONFIG_COLS.ALERT_DAYS, ['3, 7, 14'], isExistingSheet);
+  // ── Grievance Settings (AD–AJ)
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS, isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP, isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY, isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES, isExistingSheet);
+  var escalationStatuses = COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
+  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STATUSES, escalationStatuses, isExistingSheet);
+  var escalationSteps = COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
+  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STEPS, escalationSteps, isExistingSheet);
 
-  // Organization defaults (placeholders — update in Config sheet)
-  seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_ADDRESS, ['123 Main Street, Suite 100, City, ST 00000'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['(000) 000-0000'], isExistingSheet);
-
-  // Deadline defaults (in days) — values from DEADLINE_DEFAULTS (01_Core.gs)
+  // ── Deadlines (AK–AR) — values from DEADLINE_DEFAULTS (01_Core.gs)
   seedConfigDefault_(sheet, CONFIG_COLS.FILING_DEADLINE_DAYS, [DEADLINE_DEFAULTS.FILING_DAYS], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEP1_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_1_RESPONSE], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEP2_APPEAL_DAYS, [DEADLINE_DEFAULTS.STEP_2_APPEAL], isExistingSheet);
@@ -167,51 +164,15 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.STEP3_APPEAL_DAYS, [DEADLINE_DEFAULTS.STEP_3_APPEAL], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEP3_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_3_RESPONSE], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.ARBITRATION_DEMAND_DAYS, [DEADLINE_DEFAULTS.ARBITRATION_DEMAND], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ALERT_DAYS, ['3, 7, 14'], isExistingSheet);
 
-  // Best Times to Contact (AE)
-  var bestTimes = ['Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'];
-  seedConfigDefault_(sheet, CONFIG_COLS.BEST_TIMES, bestTimes, isExistingSheet);
-
-  // Contract articles
-  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_GRIEVANCE, ['Article XX'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_DISCIPLINE, ['Article YY'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_WORKLOAD, ['Article ZZ'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_NAME, ['Current CBA'], isExistingSheet);
-
-  // Org identity
-  seedConfigDefault_(sheet, CONFIG_COLS.UNION_PARENT, ['Your Parent Union'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.STATE_REGION, ['Your State'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.ORG_WEBSITE, ['https://www.example.org/'], isExistingSheet);
-
-  // Extended contact
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['(000) 000-0000'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Your Contact Name'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['your-email@your-org.org'], isExistingSheet);
-
-  // Escalation triggers (comma-separated values read at runtime)
-  var escalationStatuses = COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
-  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STATUSES, escalationStatuses, isExistingSheet);
-
-  var escalationSteps = COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
-  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STEPS, escalationSteps, isExistingSheet);
-
-  // Mobile Dashboard & branding defaults
-  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['SB'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['SB'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MEMBER_LABEL, ['Member'], isExistingSheet);
-
-  // Custom links (placeholders)
+  // ── Links (AV–BB)
   seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_1_NAME, ['Resources'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_1_URL, ['https://www.example.org/resources'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_NAME, ['Help'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_URL, ['https://www.example.org/help'], isExistingSheet);
 
-  // Survey engine — Q64 checkbox options (v4.21.0)
-  // Editable directly in Config tab. getSurveyQuestions() reads this column dynamically.
+  // ── Survey (BN–BP)
   seedConfigDefault_(sheet, CONFIG_COLS.SURVEY_PRIORITY_OPTIONS, [
     'Contract Enforcement',
     'Workload & Staffing',
@@ -226,94 +187,33 @@ function createConfigSheet(ss) {
     'Other'
   ], isExistingSheet);
 
-  // Insights page cache TTL — how many minutes before the Insights tab re-fetches data.
-  // Default 5 min. Admins can raise this for large datasets or lower it for real-time needs.
+  // ── Branding & UX (BQ–BV)
+  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['SB'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MEMBER_LABEL, ['Member'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, [5], isExistingSheet);
 
-  // Broadcast: Allow All Members Scope — controls whether stewards can send to all members
-  // (not just their own assigned members). Default: 'yes'. Set to 'no' to restrict.
-  seedConfigDefault_(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL, ['yes'], isExistingSheet);
-  // Apply yes/no dropdown validation so admins get a picker instead of a free-text cell
-  if (CONFIG_COLS.BROADCAST_SCOPE_ALL) {
-    var broadcastCell = sheet.getRange(3, CONFIG_COLS.BROADCAST_SCOPE_ALL);
-    try {
-      var broadcastVal = String(broadcastCell.getValue()).toLowerCase().trim();
-      if (broadcastVal !== 'yes' && broadcastVal !== 'no' && broadcastVal !== '') {
-        broadcastCell.setValue('yes');
-        SpreadsheetApp.flush();
-      }
-    } catch (_) { /* non-coercible value — skip normalization */ }
-    var broadcastScopeRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(true)
-      .setHelpText('yes = stewards can broadcast to all members. no = stewards can only broadcast to their assigned members.')
-      .build();
-    broadcastCell.setDataValidation(broadcastScopeRule);
-  }
-
-  // Correlation Engine — enables statistical correlation analysis on the Insights page.
-  // Default: 'yes'. Set to 'no' to disable (reduces compute on large datasets).
-  seedConfigDefault_(sheet, CONFIG_COLS.ENABLE_CORRELATION, ['yes'], isExistingSheet);
-  if (CONFIG_COLS.ENABLE_CORRELATION) {
-    var correlationCell = sheet.getRange(3, CONFIG_COLS.ENABLE_CORRELATION);
-    try {
-      var correlationVal = String(correlationCell.getValue()).toLowerCase().trim();
-      if (correlationVal !== 'yes' && correlationVal !== 'no' && correlationVal !== '') {
-        correlationCell.setValue('yes');
-        SpreadsheetApp.flush();
-      }
-    } catch (_) { /* non-coercible value — skip normalization */ }
-    var correlationRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(true)
-      .setHelpText('yes = enable correlation analysis on Insights page. no = disable (reduces compute).')
-      .build();
-    correlationCell.setDataValidation(correlationRule);
-  }
-
-  // Grievance toggle (v4.34.4) — 'yes' (default) shows all grievance features; 'no' hides them.
+  // ── Feature Toggles (BW–CA) — yes/no dropdown validation
   seedConfigDefault_(sheet, CONFIG_COLS.SHOW_GRIEVANCES, ['yes'], isExistingSheet);
-  if (CONFIG_COLS.SHOW_GRIEVANCES) {
-    var grievanceCell = sheet.getRange(3, CONFIG_COLS.SHOW_GRIEVANCES);
-    try {
-      var grievanceVal = String(grievanceCell.getValue()).toLowerCase().trim();
-      if (grievanceVal !== 'yes' && grievanceVal !== 'no' && grievanceVal !== '') {
-        grievanceCell.setValue('yes');
-        SpreadsheetApp.flush();
-      }
-    } catch (_) { /* non-coercible value — skip normalization */ }
-    var grievanceToggleRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(true)
-      .setHelpText('yes = show grievance tracking features. no = hide all grievance UI and endpoints.')
-      .build();
-    grievanceCell.setDataValidation(grievanceToggleRule);
-  }
+  _applyYesNoValidation(sheet, CONFIG_COLS.SHOW_GRIEVANCES,
+    'yes = show grievance tracking features. no = hide all grievance UI and endpoints.');
 
-  // Tab Modals (v4.48.0) — auto-open contextual modals when navigating to key sheet tabs.
-  // Default: 'yes'. Set to 'no' to disable all tab modals system-wide.
+  seedConfigDefault_(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL, ['yes'], isExistingSheet);
+  _applyYesNoValidation(sheet, CONFIG_COLS.BROADCAST_SCOPE_ALL,
+    'yes = stewards can broadcast to all members. no = stewards can only broadcast to their assigned members.');
+
+  seedConfigDefault_(sheet, CONFIG_COLS.ENABLE_CORRELATION, ['yes'], isExistingSheet);
+  _applyYesNoValidation(sheet, CONFIG_COLS.ENABLE_CORRELATION,
+    'yes = enable correlation analysis on Insights page. no = disable (reduces compute).');
+
   seedConfigDefault_(sheet, CONFIG_COLS.ENABLE_TAB_MODALS, ['yes'], isExistingSheet);
-  if (CONFIG_COLS.ENABLE_TAB_MODALS) {
-    var tabModalsCell = sheet.getRange(3, CONFIG_COLS.ENABLE_TAB_MODALS);
-    try {
-      var tabModalsVal = String(tabModalsCell.getValue()).toLowerCase().trim();
-      if (tabModalsVal !== 'yes' && tabModalsVal !== 'no' && tabModalsVal !== '') {
-        tabModalsCell.setValue('yes');
-        SpreadsheetApp.flush();
-      }
-    } catch (_) { /* non-coercible value — skip normalization */ }
-    var tabModalsRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(true)
-      .setHelpText('yes = show contextual modals when navigating to sheet tabs. no = disable tab modals.')
-      .build();
-    tabModalsCell.setDataValidation(tabModalsRule);
-  }
+  _applyYesNoValidation(sheet, CONFIG_COLS.ENABLE_TAB_MODALS,
+    'yes = show contextual modals when navigating to sheet tabs. no = disable tab modals.');
 
-  // Retention thresholds (v4.33.1) — days before auto-archival via dailyTrigger()
-  // Grievance Archive Days: closed grievances older than this are moved to _Archive_Grievances.
-  // Audit Log Archive Days: audit entries older than this are exported to Drive CSV and pruned.
-  // Both default to 90 days. Set to a higher value (e.g. 180, 365) to retain longer.
+  // ── Retention (CB–CC)
   seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_ARCHIVE_DAYS, [90], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.AUDIT_ARCHIVE_DAYS, [90], isExistingSheet);
 
@@ -350,7 +250,7 @@ function createConfigSheet(ss) {
  *
  * Works in two scenarios:
  *  A) Old headers still present — orphan detected by header text mismatch.
- *  B) Headers already overwritten — first 79 cols match, extras past col 79 are deleted.
+ *  B) Headers already overwritten — first 81 cols match, extras past col 81 are deleted.
  *
  * @param {Sheet} sheet - The Config sheet
  * @returns {number} Number of orphaned columns deleted
@@ -454,6 +354,37 @@ function seedConfigDefault_(sheet, col, values, isExisting) {
   }
   sheet.getRange(3, col, values.length, 1)
     .setValues(values.map(function(v) { return [v]; }));
+}
+
+/**
+ * Safely applies a yes/no data-validation dropdown to a Config toggle cell.
+ * Normalizes the cell value first, then applies the validation rule.
+ * Entire operation is wrapped in try/catch — if GAS throws (known quirk where
+ * setDataValidation echoes helpText as the error), we log and continue.
+ * The dropdown is cosmetic; config reads work fine without it.
+ * @param {Sheet} sheet - The Config sheet
+ * @param {number} col - 1-indexed column number
+ * @param {string} helpText - Hover help text for the dropdown
+ * @private
+ */
+function _applyYesNoValidation(sheet, col, helpText) {
+  if (!col) return;
+  try {
+    var cell = sheet.getRange(3, col);
+    var raw = cell.getValue();
+    var val = (raw === '' || raw == null) ? '' : String(raw).toLowerCase().trim();
+    if (val !== 'yes' && val !== 'no' && val !== '') {
+      cell.setValue('yes');
+    }
+    var rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['yes', 'no'], true)
+      .setAllowInvalid(true)
+      .setHelpText(helpText)
+      .build();
+    cell.setDataValidation(rule);
+  } catch (e) {
+    Logger.log('_applyYesNoValidation col ' + col + ' skipped: ' + e.message);
+  }
 }
 
 /**
@@ -670,59 +601,39 @@ function applyConfigSheetStyling(sheet) {
  * @private
  */
 function applySectionColors_(sheet, lastCol) {
-  // Section color definitions (23 sections, columns A-CA = 79 cols)
+  // Section color definitions (13 sections, columns A-CC = 81 cols)
   var SECTION_COLORS = {
-    EMPLOYMENT:      { bg: '#3b82f6', text: SHEET_COLORS.TEXT_WHITE },     // Blue
-    SUPERVISION:     { bg: '#8b5cf6', text: SHEET_COLORS.TEXT_WHITE },     // Violet
-    STEWARD:         { bg: '#06b6d4', text: SHEET_COLORS.TEXT_WHITE },     // Cyan
-    GRIEVANCE:       { bg: '#ef4444', text: SHEET_COLORS.TEXT_WHITE },     // Red
-    LINKS:           { bg: '#f97316', text: SHEET_COLORS.TEXT_WHITE },     // Orange
-    NOTIFICATIONS:   { bg: '#eab308', text: SHEET_COLORS.HEADER_SLATE },  // Yellow
     ORGANIZATION:    { bg: '#22c55e', text: SHEET_COLORS.TEXT_WHITE },     // Green
-    INTEGRATION:     { bg: '#14b8a6', text: SHEET_COLORS.TEXT_WHITE },     // Teal
+    CONTACT:         { bg: '#0ea5e9', text: SHEET_COLORS.TEXT_WHITE },     // Sky
+    EMPLOYMENT:      { bg: '#3b82f6', text: SHEET_COLORS.TEXT_WHITE },     // Blue
+    PEOPLE:          { bg: '#8b5cf6', text: SHEET_COLORS.TEXT_WHITE },     // Violet
+    GRIEVANCE:       { bg: '#ef4444', text: SHEET_COLORS.TEXT_WHITE },     // Red
     DEADLINES:       { bg: '#ec4899', text: SHEET_COLORS.TEXT_WHITE },     // Pink
-    MULTISELECT:     { bg: '#a855f7', text: SHEET_COLORS.TEXT_WHITE },     // Purple
-    CONTRACT:        { bg: '#6366f1', text: SHEET_COLORS.TEXT_WHITE },     // Indigo
-    IDENTITY:        { bg: '#0ea5e9', text: SHEET_COLORS.TEXT_WHITE },     // Sky
-    EXTENDED:        { bg: '#84cc16', text: SHEET_COLORS.HEADER_SLATE },   // Lime
-    COMMAND:         { bg: '#f43f5e', text: SHEET_COLORS.TEXT_WHITE },     // Rose
-    MOBILE:          { bg: '#10b981', text: SHEET_COLORS.TEXT_WHITE },     // Emerald
-    CUSTOM_LINKS:    { bg: '#f59e0b', text: SHEET_COLORS.HEADER_SLATE },  // Amber
-    SURVEY_LOG:      { bg: '#64748b', text: SHEET_COLORS.TEXT_WHITE },     // Slate
-    DRIVE_FOLDERS:   { bg: '#0d9488', text: SHEET_COLORS.TEXT_WHITE },     // Teal-dark
-    SURVEY_ENGINE:   { bg: '#7c3aed', text: SHEET_COLORS.TEXT_WHITE },     // Violet-dark
-    ADVANCED:        { bg: '#475569', text: SHEET_COLORS.TEXT_WHITE },     // Slate-dark
+    NOTIFICATIONS:   { bg: '#eab308', text: SHEET_COLORS.HEADER_SLATE },  // Yellow
+    LINKS:           { bg: '#f97316', text: SHEET_COLORS.TEXT_WHITE },     // Orange
+    DRIVE_CALENDAR:  { bg: '#0d9488', text: SHEET_COLORS.TEXT_WHITE },     // Teal
+    SURVEY:          { bg: '#7c3aed', text: SHEET_COLORS.TEXT_WHITE },     // Violet-dark
+    BRANDING:        { bg: '#10b981', text: SHEET_COLORS.TEXT_WHITE },     // Emerald
     FEATURE_TOGGLES: { bg: '#ea580c', text: SHEET_COLORS.TEXT_WHITE },     // Orange-dark
-    RETENTION:       { bg: '#dc2626', text: SHEET_COLORS.TEXT_WHITE },     // Red-dark
-    ORG_BRANDING:    { bg: '#4f46e5', text: SHEET_COLORS.TEXT_WHITE }      // Indigo-dark
+    RETENTION:       { bg: '#dc2626', text: SHEET_COLORS.TEXT_WHITE }      // Red-dark
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
-  // Total: 79 columns (A-CA) — must match CONFIG_HEADER_MAP_ order
+  // Total: 81 columns (A-CC) — must match CONFIG_HEADER_MAP_ order
   var sections = [
-    { start: 1,  end: 4,  color: SECTION_COLORS.EMPLOYMENT },       // cols 1-4
-    { start: 5,  end: 6,  color: SECTION_COLORS.SUPERVISION },      // cols 5-6
-    { start: 7,  end: 8,  color: SECTION_COLORS.STEWARD },          // cols 7-8
-    { start: 9,  end: 12, color: SECTION_COLORS.GRIEVANCE },        // cols 9-12
-    { start: 13, end: 16, color: SECTION_COLORS.LINKS },            // cols 13-16
-    { start: 17, end: 19, color: SECTION_COLORS.NOTIFICATIONS },    // cols 17-19
-    { start: 20, end: 23, color: SECTION_COLORS.ORGANIZATION },     // cols 20-23
-    { start: 24, end: 25, color: SECTION_COLORS.INTEGRATION },      // cols 24-25
-    { start: 26, end: 32, color: SECTION_COLORS.DEADLINES },        // cols 26-32
-    { start: 33, end: 33, color: SECTION_COLORS.MULTISELECT },      // col 33
-    { start: 34, end: 37, color: SECTION_COLORS.CONTRACT },         // cols 34-37
-    { start: 38, end: 40, color: SECTION_COLORS.IDENTITY },         // cols 38-40
-    { start: 41, end: 45, color: SECTION_COLORS.EXTENDED },         // cols 41-45
-    { start: 46, end: 52, color: SECTION_COLORS.COMMAND },          // cols 46-52
-    { start: 53, end: 58, color: SECTION_COLORS.MOBILE },           // cols 53-58
-    { start: 59, end: 62, color: SECTION_COLORS.CUSTOM_LINKS },     // cols 59-62
-    { start: 63, end: 64, color: SECTION_COLORS.SURVEY_LOG },       // cols 63-64
-    { start: 65, end: 69, color: SECTION_COLORS.DRIVE_FOLDERS },    // cols 65-69
-    { start: 70, end: 71, color: SECTION_COLORS.SURVEY_ENGINE },    // cols 70-71
-    { start: 72, end: 74, color: SECTION_COLORS.ADVANCED },         // cols 72-74
-    { start: 75, end: 76, color: SECTION_COLORS.FEATURE_TOGGLES },  // cols 75-76
-    { start: 77, end: 78, color: SECTION_COLORS.RETENTION },        // cols 77-78
-    { start: 79, end: 79, color: SECTION_COLORS.ORG_BRANDING }      // col 79
+    { start: 1,  end: 10, color: SECTION_COLORS.ORGANIZATION },     // A–J   Organization
+    { start: 11, end: 16, color: SECTION_COLORS.CONTACT },          // K–P   Contact Info
+    { start: 17, end: 23, color: SECTION_COLORS.EMPLOYMENT },       // Q–W   Employment
+    { start: 24, end: 29, color: SECTION_COLORS.PEOPLE },           // X–AC  People
+    { start: 30, end: 36, color: SECTION_COLORS.GRIEVANCE },        // AD–AJ Grievance Settings
+    { start: 37, end: 44, color: SECTION_COLORS.DEADLINES },        // AK–AR Deadlines
+    { start: 45, end: 47, color: SECTION_COLORS.NOTIFICATIONS },    // AS–AU Notifications
+    { start: 48, end: 54, color: SECTION_COLORS.LINKS },            // AV–BB Links
+    { start: 55, end: 65, color: SECTION_COLORS.DRIVE_CALENDAR },   // BC–BM Drive & Calendar
+    { start: 66, end: 68, color: SECTION_COLORS.SURVEY },           // BN–BP Survey
+    { start: 69, end: 74, color: SECTION_COLORS.BRANDING },         // BQ–BV Branding & UX
+    { start: 75, end: 79, color: SECTION_COLORS.FEATURE_TOGGLES },  // BW–CA Feature Toggles
+    { start: 80, end: 81, color: SECTION_COLORS.RETENTION }         // CB–CC Retention
   ];
 
   sections.forEach(function(section) {
@@ -847,16 +758,17 @@ function createConfigGuideSheet(ss) {
   sheet.getRange(row, 5, 1, 2).merge().setValue('Example Values').setFontWeight('bold').setBackground('#E5E7EB');
 
   var columnData = [
-    ['A', 'Job Titles', 'Member Directory', 'Case Worker, Supervisor, Manager...'],
-    ['B', 'Office Locations', 'Member Dir & Grievance Log', 'Boston Office, Springfield Office...'],
-    ['C', 'Units', 'Member Dir & Grievance Log', 'Unit 1, Unit 2, Unit 3...'],
-    ['F', 'Supervisors', 'Member Directory', 'Names of supervisors'],
-    ['G', 'Managers', 'Member Directory', 'Names of managers'],
-    ['H', 'Stewards', 'Member Dir & Grievance Log', 'Names of union stewards'],
-    ['J', 'Grievance Status', 'Grievance Log', 'Open, Pending Info, Settled, Won...'],
-    ['K', 'Grievance Step', 'Grievance Log', 'Informal, Step I, Step II, Step III...'],
-    ['L', 'Issue Category', 'Grievance Log', 'Discipline, Workload, Pay, Benefits...'],
-    ['M', 'Articles Violated', 'Grievance Log', 'Article 12, Article 23A...']
+    ['A', 'Organization Name', 'Dashboard-wide', 'Your Union Name'],
+    ['Q', 'Job Titles', 'Member Directory', 'Case Worker, Supervisor, Manager...'],
+    ['R', 'Office Locations', 'Member Dir & Grievance Log', 'Boston Office, Springfield Office...'],
+    ['U', 'Units', 'Member Dir & Grievance Log', 'Unit 1, Unit 2, Unit 3...'],
+    ['X', 'Supervisors', 'Member Directory', 'Names of supervisors'],
+    ['Y', 'Managers', 'Member Directory', 'Names of managers'],
+    ['Z', 'Stewards', 'Member Dir & Grievance Log', 'Names of union stewards'],
+    ['AD', 'Grievance Status', 'Grievance Log', 'Open, Pending Info, Settled, Won...'],
+    ['AE', 'Grievance Step', 'Grievance Log', 'Informal, Step I, Step II, Step III...'],
+    ['AF', 'Issue Category', 'Grievance Log', 'Discipline, Workload, Pay, Benefits...'],
+    ['AG', 'Articles Violated', 'Grievance Log', 'Article 12, Article 23A...']
   ];
 
   for (var j = 0; j < columnData.length; j++) {
