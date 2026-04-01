@@ -56,6 +56,7 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
@@ -197,13 +198,17 @@ describe('A1: Build order integrity', () => {
     '17_CorrelationEngine.gs', '19_WebDashAuth.gs',
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
-    '26_QAForum.gs', '27_TimelineService.gs',
+    '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_TrendAlertService.gs', '30_EngagementService.gs', '30_TestRunner.gs',
     '31_WebAppTests.gs', '32_AdminSettings.gs', '33_NewFeatureServices.gs', 'DevMenu.gs'
   ];
 
-  test('all source files in BUILD_ORDER exist on disk', () => {
-    BUILD_ORDER.forEach(filename => {
+  test('all source files in BUILD_ORDER exist on disk (excluding SolidBase omissions)', () => {
+    // SolidBase excludes some org-specific files (e.g., 25_WorkloadService.gs).
+    // Filter to only files expected to exist.
+    const SOLIDBASE_OMISSIONS = ['25_WorkloadService.gs'];
+    const expectedFiles = BUILD_ORDER.filter(f => !SOLIDBASE_OMISSIONS.includes(f));
+    expectedFiles.forEach(filename => {
       const filePath = path.resolve(__dirname, '..', 'src', filename);
       expect(fs.existsSync(filePath)).toBe(true);
     });
@@ -439,7 +444,8 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-  ];
+    '25_WorkloadService.gs',
+  ].filter(f => fs.existsSync(path.resolve(__dirname, '..', 'src', f))); // SolidBase: skip missing files
 
   webAppFiles.forEach(file => {
     test(`${file}: every getActiveSpreadsheet() call has a null guard`, () => {
@@ -764,8 +770,7 @@ describe('A11b: Client-callable HTML endpoints have error handling', () => {
   // HTML-serving endpoints — serve static content, auth enforced by doGet().
   // No per-function auth check: Session.getActiveUser().getEmail() returns empty
   // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
-  // SolidBase: getPOMSReferenceHtml is a stub (POMS excluded) — no try/catch needed
-  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml'];
+  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml', 'getPOMSReferenceHtml'];
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() has try/catch error handling`, () => {
@@ -979,13 +984,14 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
+    '25_WorkloadService.gs',
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
     '08c_FormsAndNotifications.gs',
     '10c_FormsAndSync.gs',
     '12_Features.gs',
-  ];
+  ].filter(f => fs.existsSync(path.resolve(__dirname, '..', 'src', f))); // SolidBase: skip missing files
   const srcDir = path.resolve(__dirname, '..', 'src');
 
   lockFiles.forEach(file => {
@@ -1039,7 +1045,8 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-  ];
+    '25_WorkloadService.gs',
+  ].filter(f => fs.existsSync(path.resolve(__dirname, '..', 'src', f))); // SolidBase: skip missing files
   const srcDir = path.resolve(__dirname, '..', 'src');
 
   // Extract named function bodies from a source string.

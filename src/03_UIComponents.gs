@@ -507,6 +507,11 @@ function navigateToRecord(id, type) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) return;
 
+  if (sheet.getLastRow() <= 1) {
+    SpreadsheetApp.getUi().alert('No records found in ' + sheetName + '.');
+    return;
+  }
+
   var data = sheet.getRange(2, idCol, sheet.getLastRow() - 1, 1).getValues();
   for (var i = 0; i < data.length; i++) {
     if (data[i][0] === id) {
@@ -2068,6 +2073,12 @@ function sendMemberDashboardLink() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var url = ss.getUrl();
 
+  // Rate limit: check daily email quota before prompting
+  if (MailApp.getRemainingDailyQuota() < 1) {
+    ui.alert('Email quota exceeded for today. Try again tomorrow.');
+    return;
+  }
+
   var response = ui.prompt('Send Report', 'Enter Member Email:', ui.ButtonSet.OK_CANCEL);
 
   if (response.getSelectedButton() === ui.Button.OK) {
@@ -2075,6 +2086,14 @@ function sendMemberDashboardLink() {
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       ui.alert('Please enter a valid email address.');
+      return;
+    }
+
+    // Per-recipient cooldown: prevent spam to the same address
+    var cache = CacheService.getScriptCache();
+    var cacheKey = 'dashlink_' + email.toLowerCase();
+    if (cache.get(cacheKey)) {
+      ui.alert('A dashboard link was recently sent to this address. Please wait before sending again.');
       return;
     }
 
@@ -2094,7 +2113,8 @@ function sendMemberDashboardLink() {
       COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
-      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
+      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your SolidBase Access", body);
+      cache.put(cacheKey, '1', 300); // 5-minute cooldown per recipient
       ui.alert('Dashboard access link sent to ' + email);
     } catch (e) {
       ui.alert('Error sending email: ' + e.message);
@@ -3033,7 +3053,7 @@ function modalSubmitFeedback(category, priority, title, description) {
     var id = 'FB-' + Utilities.formatDate(timestamp, 'America/New_York', 'yyyyMMdd-HHmmss');
 
     sheet.appendRow([
-      escapeForFormula(timestamp),
+      timestamp,
       escapeForFormula(user),
       escapeForFormula(category),
       escapeForFormula(priority),
@@ -3771,11 +3791,11 @@ function getWelcomeWizardHtml_() {
     '<script>' +
     'var step = 0, totalSteps = 4;' +
     'var steps = [' +
-    '  { title: "Welcome to Your Union Dashboard!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
+    '  { title: "Welcome to SolidBase!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
     '  { title: "Step 1: Organization Setup", desc: "Open the <strong>Config</strong> tab and fill in:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Organization Name</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Local Number</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Time Zone</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Contact Email</div>" },' +
     '  { title: "Step 2: Add Your First Members", desc: "Open <strong>Member Directory</strong> and add at least one member:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Add yourself as the first steward</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Import or manually add members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Assign steward roles</div>" },' +
     '  { title: "Step 3: Explore Key Features", desc: "Try these essential features:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Open Union Hub menu — explore Search & Members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Create a test grievance case</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Check the Getting Started tab for more guidance</div>" },' +
-    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using your Union Dashboard!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
+    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using SolidBase!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
     '];' +
     'totalSteps = steps.length;' +
     'function render() {' +

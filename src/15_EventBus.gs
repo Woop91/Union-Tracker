@@ -95,7 +95,7 @@ var EventBus = (function() {
      * @returns {string} Subscription ID
      */
     onAny: function(callback) {
-      var subId = 'wildcard_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      var subId = 'wildcard_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
       wildcardListeners_.push({ id: subId, callback: callback });
       return subId;
     },

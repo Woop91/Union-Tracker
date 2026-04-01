@@ -58,6 +58,7 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs', // SolidBase: may not exist (org-specific); loadSource skips if missing
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',

@@ -297,7 +297,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * SEIU Local Dashboard including:
+ * SolidBase Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -311,7 +311,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author SEIU Local
+ * @author SolidBase
  * @version 4.43.1
  */
 
@@ -737,12 +737,19 @@ function executeSendRandomSurveyEmails(opts) {
   // Send emails
   var sent = 0;
   var errors = [];
-  var formUrl = SATISFACTION_FORM_CONFIG.FORM_URL;
+  // Survey is now native webapp — direct members to the member portal URL
+  var surveyUrl = '';
+  if (configSheet && configSheet.getLastRow() >= 3) {
+    try {
+      surveyUrl = configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '';
+    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  }
+  if (!surveyUrl) surveyUrl = SATISFACTION_FORM_CONFIG.FORM_URL; // legacy fallback
   var newLogEntries = [];
 
   selected.forEach(function(member) {
     try {
-      var personalizedUrl = formUrl + '?memberId=' + encodeURIComponent(member.memberId);
+      var personalizedUrl = surveyUrl + (surveyUrl.indexOf('?') === -1 ? '?' : '&') + 'memberId=' + encodeURIComponent(member.memberId);
       var body = 'Dear ' + member.firstName + ',\n\n' +
         'We value your feedback! Please take a few minutes to complete our Member Satisfaction Survey.\n\n' +
         'Your responses help us improve union services and representation.\n\n' +

@@ -305,7 +305,7 @@ var TimelineService = (function () {
       if (data[i][0] === eventId) {
         if (updates.title) sheet.getRange(i + 1, 2).setValue(_sanitize(updates.title.substring(0, 200)));
         if (updates.eventDate) sheet.getRange(i + 1, 3).setValue(new Date(updates.eventDate));
-        if (updates.description !== undefined) sheet.getRange(i + 1, 4).setValue(_sanitize(updates.description.substring(0, 2000)));
+        if (updates.description !== undefined) sheet.getRange(i + 1, 4).setValue(_sanitize((updates.description || '').substring(0, 2000)));
         if (updates.category) {
           var cat = updates.category.toLowerCase().trim();
           if (validCats.indexOf(cat) !== -1) sheet.getRange(i + 1, 5).setValue(cat);

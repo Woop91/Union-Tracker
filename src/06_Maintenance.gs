@@ -1777,7 +1777,7 @@ function logAuditEvent(eventType, details) {
     }
 
   } catch (error) {
-    Logger.log('Error logging audit event:', error);
+    Logger.log('Error logging audit event: ' + error);
     // Don't throw - audit logging shouldn't break main functionality
   }
 }
@@ -2148,8 +2148,8 @@ function navigateToAuditLog() {
   if (!auditSheet) {
     // Create audit log if it doesn't exist
     auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-    auditSheet.getRange('A1:E1').setValues([['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']]);
-    auditSheet.getRange('A1:E1')
+    auditSheet.getRange('A1:K1').setValues([['Timestamp', 'User Email', 'Sheet', 'Row', 'Column', 'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type', 'Integrity Hash']]);
+    auditSheet.getRange('A1:K1')
       .setFontWeight('bold')
       .setBackground(COLORS.CARD_DARK_BG)
       .setFontColor(COLORS.CARD_DARK_TEXT);
@@ -3008,7 +3008,7 @@ function onEditWithAuditLogging(e) {
       validateMemberIdOnEdit(e);
     }
   } catch (err) {
-    Logger.log('onEditWithAuditLogging error:', err.message);
+    Logger.log('onEditWithAuditLogging error: ' + err.message);
   }
 }
 

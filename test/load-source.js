@@ -25,6 +25,11 @@ const path = require('path');
  */
 function loadSource(filename) {
   const filePath = path.resolve(__dirname, '..', 'src', filename);
+  if (!fs.existsSync(filePath)) {
+    // SolidBase excludes some DDS-specific files (e.g., 25_WorkloadService.gs).
+    // Skip silently so test suites that share the same load list can run.
+    return;
+  }
   let code = fs.readFileSync(filePath, 'utf8');
 
   // --- Phase 1: Hoist function declarations ---

@@ -283,7 +283,19 @@
   };
   }
 
-  var palette = generatePalette(CONFIG.accentHue || 250);
+  
+  // (server-side UserProperties can't work per-user in Execute-as-Me webapps)
+  var _userAccentHue = (function() {
+  try {
+   var saved = localStorage.getItem('dds_accentHue');
+   if (saved !== null) {
+   var parsed = parseInt(saved, 10);
+   if (!isNaN(parsed) && parsed >= 0 && parsed <= 360) return parsed;
+   }
+  } catch (_) {}
+  return null;
+  })();
+  var palette = generatePalette(_userAccentHue !== null ? _userAccentHue : (CONFIG.accentHue || 250));
 
   
   var roleThemes = {
@@ -501,7 +513,7 @@
   cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
   tasks: '#f59e0b', home: '#ff3366',
   more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-  resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+  resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
   polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
   events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
   testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -599,10 +611,15 @@
   _manageCrtOverlay(isCyber);
 
   
-  var embedRoot = document.querySelector('.sb-embed');
+  var embedRoot = document.querySelector('.madds-embed');
   if (embedRoot) {
    if (!AppState.isDark) embedRoot.classList.add('light');
    else embedRoot.classList.remove('light');
+  }
+  var agencyRoot = document.querySelector('.agency-oc');
+  if (agencyRoot) {
+   if (AppState.isDark) agencyRoot.classList.add('dark');
+   else agencyRoot.classList.remove('dark');
   }
   }
 
@@ -646,6 +663,7 @@
 
   function updatePalette(hue) {
   palette = generatePalette(hue);
+  safeLSSet('dds_accentHue', String(hue));
   apply();
   }
 
@@ -716,7 +734,7 @@
  
  function _genIdemKey() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+  return Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 11);
  }
 
  
@@ -1774,14 +1792,14 @@
   '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
   '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/></svg>';
   for (var i = 0; i < _SC_POSITIONS.length; i++) {
-  var el = document.createElement('div');
-  el.className = 'scatter-cat';
-  el.setAttribute('aria-hidden', 'true');
-  el.style.left = _SC_POSITIONS[i].left;
-  el.style.top = _SC_POSITIONS[i].top;
-  el.innerHTML = svg;
-  document.body.appendChild(el);
-  _scatterCatEls.push(el);
+  var catEl = document.createElement('div');
+  catEl.className = 'scatter-cat';
+  catEl.setAttribute('aria-hidden', 'true');
+  catEl.style.left = _SC_POSITIONS[i].left;
+  catEl.style.top = _SC_POSITIONS[i].top;
+  catEl.innerHTML = svg;
+  document.body.appendChild(catEl);
+  _scatterCatEls.push(catEl);
   }
   return _scatterCatEls;
  }
@@ -1813,13 +1831,13 @@
 
  function _scatterCatsSettle() {
   for (var i = 0; i < _scatterCatEls.length; i++) {
-  var el = _scatterCatEls[i];
-  el.classList.remove('sc-chasing');
-  el.classList.add('sc-settling');
+  var catEl = _scatterCatEls[i];
+  catEl.classList.remove('sc-chasing');
+  catEl.classList.add('sc-settling');
   
   var dur = 8 + Math.random() * 7;
-  el.style.transition = 'transform ' + dur.toFixed(1) + 's ease-in-out, opacity 2s ease';
-  el.style.transform = '';
+  catEl.style.transition = 'transform ' + dur.toFixed(1) + 's ease-in-out, opacity 2s ease';
+  catEl.style.transform = '';
   }
   var cleanTimer = setTimeout(function() {
   for (var j = 0; j < _scatterCatEls.length; j++) {
@@ -2750,10 +2768,13 @@
   { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
   { group: 'Manage' },
   { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+  // { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },  
   { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
   { group: 'Reference' },
+  // { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },  
   { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
   { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
+  { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -3057,7 +3078,7 @@
     }
    });
    
-   var embedRoot = wrap.querySelector('.sb-embed');
+   var embedRoot = wrap.querySelector('.madds-embed');
    if (embedRoot) {
     if (!AppState.isDark) embedRoot.classList.add('light');
     else embedRoot.classList.remove('light');
@@ -3085,6 +3106,52 @@
    .getOrgChartHtml();
   });
  }
+
+ 
+ function renderAgencyOrgChart(appContainer, role) {
+  var mySwitch = _navSwitchId;
+  var myGen = _renderGeneration;
+  renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
+  showLoading(container);
+  google.script.run
+   .withSuccessHandler(function(html) {
+   if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return;
+   container.innerHTML = '';
+   container.classList.add('orgchart-content');
+   var wrap = el('div');
+   wrap.innerHTML = html;
+   container.appendChild(wrap);
+   
+   wrap.querySelectorAll('script').forEach(function(old) {
+    try {
+    var s = document.createElement('script');
+    s.textContent = old.textContent;
+    old.parentNode.removeChild(old);
+    document.head.appendChild(s);
+    } catch (scriptErr) {
+    console.error('Agency org chart script re-execution failed:', scriptErr);
+    }
+   });
+   
+   var agencyRoot = wrap.querySelector('.agency-oc');
+   if (agencyRoot) {
+    if (AppState.isDark) agencyRoot.classList.add('dark');
+    else agencyRoot.classList.remove('dark');
+   }
+   
+   if (typeof window.agencyOC_init === 'function') {
+    try { window.agencyOC_init(); } catch (_e) {  }
+   }
+   })
+   .withFailureHandler(function(err) {
+   container.innerHTML = '';
+   container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load agency org chart.'));
+   })
+   .getAgencyOrgChartHtml();
+  });
+ }
+
+ 
 
  
  
@@ -3262,6 +3329,23 @@
   _navProgressDone();
   return;
   }
+  if (tabId === 'maddsorgchart') {
+  if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
+   if (typeof _renderDuesGate === 'function') {
+   _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
+   }
+   _navProgressDone();
+   return;
+  }
+  _hideAllVisiblePanes();
+  _splitRenderTarget = 'primary';
+  renderAgencyOrgChart(app, role);
+  _activePane = _layoutCache.content;
+  _navProgressDone();
+  return;
+  }
+  
+
   
   if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 

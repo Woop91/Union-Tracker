@@ -35,8 +35,9 @@ const WRAPPER_FILES = [
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
+  '25_WorkloadService.gs',
   '08e_SurveyEngine.gs',
-];
+].filter(f => fs.existsSync(path.join(SRC_DIR, f))); // SolidBase: skip missing files
 
 // HTML view files that call google.script.run (client-side)
 const CLIENT_VIEW_FILES = [
@@ -391,12 +392,13 @@ describe('G6: dist/ files are in sync with src/', () => {
 
   test('dist/ does not contain dev-only files (must be built with --prod)', () => {
     // Test runner included in prod — tab gated by IS_DEV_MODE, endpoints by steward auth
-    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
+    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs'];
     const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
     expect(found).toEqual([]);
   });
 
   test('every src .gs file has identical copy in dist', () => {
+    // SolidBase PROD_EXCLUDE is larger than DDS (also excludes TestRunner/WebAppTests)
     const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
@@ -474,9 +476,9 @@ describe('G7: All .gs files have valid JavaScript syntax', () => {
 // ============================================================================
 // G8: build.js file arrays match actual src/ contents
 // ============================================================================
-// Reason: poms_reference.html was added to src/ and dist/ but NOT to the
-// HTML_FILES array in build.js. A fresh --prod build would delete it from dist/,
-// breaking the POMS Reference tab at runtime.
+// Reason: Files can be added to src/ but forgotten in build.js arrays.
+// A fresh --prod build would delete unregistered files from dist/,
+// breaking features at runtime.
 
 describe('G8: build.js file arrays match src/ contents', () => {
   const buildCode = fs.readFileSync(path.resolve(__dirname, '..', 'build.js'), 'utf8');
@@ -529,8 +531,11 @@ describe('G8: build.js file arrays match src/ contents', () => {
 describe('G9: Nav tabs and handlers are in sync', () => {
   const indexCode = fs.readFileSync(path.join(SRC_DIR, 'index.html'), 'utf8');
 
+  // Strip single-line comments so commented-out tab entries aren't matched
+  const indexCodeNoComments = indexCode.replace(/\/\/.*$/gm, '');
+
   // Extract all tab ids from _getSidebarTabs
-  const tabIdMatches = indexCode.match(/\{\s*id:\s*'([^']+)'/g) || [];
+  const tabIdMatches = indexCodeNoComments.match(/\{\s*id:\s*'([^']+)'/g) || [];
   const navTabIds = [...new Set(
     tabIdMatches.map(m => m.match(/id:\s*'([^']+)'/)[1])
       .filter(id => !id.startsWith('_')) // skip _member_more, _steward_more
@@ -550,7 +555,8 @@ describe('G9: Nav tabs and handlers are in sync', () => {
   });
 
   // Member-only tabs (removed from steward nav)
-  const memberOnlyTabs = ['orgchart'];
+  // SolidBase: filter to tabs that still exist (poms may be excluded)
+  const memberOnlyTabs = ['poms', 'orgchart', 'maddsorgchart'].filter(id => navTabIds.includes(id));
   memberOnlyTabs.forEach(tabId => {
     test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
       const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
@@ -597,8 +603,12 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   });
 
   // Must find at least the known lazy-loaders
-  test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
+  test('detects lazy-loaded server functions (getOrgChartHtml, getPOMSReferenceHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
+    // SolidBase: POMS is excluded; getPOMSReferenceHtml may not be present
+    if (fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'))) {
+      expect(serverFunctions.has('getPOMSReferenceHtml')).toBe(true);
+    }
   });
 
   [...serverFunctions].forEach(fn => {
@@ -616,7 +626,11 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 // and injected into the SPA. If its <script> block has syntax errors, the entire
 // POMS tab fails silently.
 
-describe.skip('G11: poms_reference.html integrity (SolidBase: POMS excluded)', () => {
+// SolidBase: poms_reference.html is excluded (DDS-only feature)
+const _pomsExists = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
+const g11Describe = _pomsExists ? describe : describe.skip;
+
+g11Describe('G11: poms_reference.html integrity', () => {
   const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
 
   test('poms_reference.html exists', () => {
@@ -673,15 +687,15 @@ describe.skip('G11: poms_reference.html integrity (SolidBase: POMS excluded)', (
 // ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
-// files that get synced to the public Union-Tracker repo.
+// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in SolidBase
+// source files.
 
 describe('G12: No sensitive ID leaks', () => {
   const DDS_SCRIPT_ID_PREFIX = '18hHHX';
   const srcFiles = fs.readdirSync(SRC_DIR);
 
-  // AI_REFERENCE.md legitimately contains Script IDs in the private DDS repo;
-  // in public Union-Tracker the ID is redacted so this guard still protects there.
+  // AI_REFERENCE.md has the Script ID redacted in SolidBase.
+  // Exclude kept as safety net in case of accidental sync from DDS.
   const G12_EXCLUDES = ['AI_REFERENCE.md'];
 
   srcFiles.filter(f => !G12_EXCLUDES.includes(f)).forEach(file => {
@@ -747,11 +761,12 @@ describe('G13: Module load order is safe', () => {
 });
 
 
-const _hasWorkloadService = fs.existsSync(path.join(SRC_DIR, '25_WorkloadService.gs'));
-const _describeWS = _hasWorkloadService ? describe : describe.skip;
+// SolidBase: WorkloadService is excluded (org-specific feature)
+const _wsExists = fs.existsSync(path.join(SRC_DIR, '25_WorkloadService.gs'));
+const _describeWS = _wsExists ? describe : describe.skip;
 
 _describeWS('G14: WorkloadService crash-safe patterns', () => {
-  const wsCode = _hasWorkloadService ? fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8') : '';
+  const wsCode = _wsExists ? fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8') : '';
 
   test('_refreshReportingData does NOT clearContents before writing', () => {
     // Extract the _refreshReportingData function body

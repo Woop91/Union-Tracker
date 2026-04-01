@@ -1911,7 +1911,7 @@ var DataService = (function () {
         // Fallback: derive from Dues Status column ('Current' → paying; 'Past Due'/'Inactive' → not paying)
         var duesStatus = String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim().toLowerCase();
         if (duesStatus === '') return null; // column absent — unknown
-        var NON_PAYING = ['past due', 'inactive', 'delinquent', 'lapsed', 'non-paying', 'no'];
+        var NON_PAYING = ['past due', 'inactive', 'delinquent', 'lapsed', 'non-paying', 'no', 'non-member'];
         for (var ni = 0; ni < NON_PAYING.length; ni++) {
           if (duesStatus === NON_PAYING[ni]) return false;
         }
@@ -5302,7 +5302,7 @@ function dataAddMemberFromWebapp(sessionToken, memberData) {
       logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
         memberId: memberId,
         name: memberData.firstName + ' ' + memberData.lastName,
-        addedBy: s.email
+        addedBy: s
       });
       // Programmatic writes don't trigger onEdit, so bidirectional sync
       // (syncDropdownToConfig_) never fires. Explicitly sync dropdown values

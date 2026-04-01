@@ -416,7 +416,7 @@ function adminSaveListValues(configColKey, values) {
   if (fieldDef.readOnly) return { success: false, error: configColKey + ' is read-only' };
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var isOwner = ss.getOwner().getEmail().toLowerCase() === email.toLowerCase();
+  var owner = ss.getOwner(); var isOwner = owner ? owner.getEmail().toLowerCase() === email.toLowerCase() : false;
   if (fieldDef.sensitive && !isOwner) {
     return { success: false, error: 'Only the spreadsheet owner can edit ' + fieldDef.label };
   }

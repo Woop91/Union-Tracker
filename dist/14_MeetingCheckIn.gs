@@ -1252,9 +1252,9 @@ function getMeetingQRCode(meetingId) {
 
   var checkInUrl = webAppUrl + '?page=qr-checkin&meeting=' + encodeURIComponent(meetingId);
 
-  // Google Charts QR code API (free, no key needed, max 300x300)
-  var qrImageUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=' +
-    encodeURIComponent(checkInUrl) + '&choe=UTF-8';
+  // QR code image API (free, no key needed)
+  var qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' +
+    encodeURIComponent(checkInUrl);
 
   return {
     success: true,
@@ -1464,7 +1464,7 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
   attendees.forEach(function(row, idx) {
     var memberId   = String(row[MEETING_CHECKIN_COLS.MEMBER_ID   - 1] || '');
     var memberName = String(row[MEETING_CHECKIN_COLS.MEMBER_NAME - 1] || '');
-    var checkInTime = row[MEETING_CHECKIN_COLS.CHECK_IN_TIME - 1];
+    var checkInTime = row[MEETING_CHECKIN_COLS.CHECKIN_TIME - 1];
     var timeStr = checkInTime instanceof Date
       ? Utilities.formatDate(checkInTime, Session.getScriptTimeZone(), 'h:mm a')
       : String(checkInTime || '');

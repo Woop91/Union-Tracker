@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | SolidBase sync flow, feature exclusion registry |
+| 3 | **SYNC-LOG.md** | SolidBase sync flow, Workload Tracker exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -32,10 +32,10 @@ Read these files **in this order** when onboarding to this codebase:
 **Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users).
-**Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
-**Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
+**Architecture:** 38 source `.gs` files + 15 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
+**Current build:** 38 `.gs` + 15 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**SolidBase Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**SolidBase Apps Script ID:** `REDACTED_SCRIPT_ID`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -75,7 +75,7 @@ src/*.gs (42 files) + src/*.html (7 files)
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
-| `19_-25_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, workload service |
+| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets |
 | `26_` | Q&A Forum | Steward-member Q&A with steward-only answers, resolve/reopen |
 | `27_` | Timeline Service | Activity feed with inline edit, pagination, calendar links |
 | `28_` | Failsafe Service | Security & reliability guardrails |
@@ -244,7 +244,7 @@ Records what each AI agent changed, when, and in which files.
 | 2026-02-25 | Claude (claude.ai) | Merged staging→Main: v4.13.0 SPA overhaul + notification bell/EventBus + individual-file build. Synced all 3 branches. | All `src/`, `dist/`, `build.js`, `CLAUDE.md` |
 | 2026-02-28 | Claude Code (Opus 4.6) | v4.18.1-security: Full security assessment + 7 remediations — auth default ON, magic link rate limiting, token cleanup trigger, timing attack fix, PIN token migration to PropertiesService, innerHTML→textContent, escapeForFormula | `00_Security.gs`, `19_WebDashAuth.gs`, `13_MemberSelfService.gs`, `14_MeetingCheckIn.gs`, `21_WebDashDataService.gs`, `CODE_REVIEW.md`, `CHANGELOG.md`, `FEATURES.md` |
 | 2026-03-22 | Claude (claude.ai) | DESIGN ITERATION (not yet released): Member Hub feature — 3 new GAS files created. `member_hub_styles.html` (auth manifesto + hub CSS), `auth_manifesto.html` (phrase bg + quote cycler JS), `member_hub_view.html` (renderMemberHub tab function). Standalone prototype: `member-hub.html`. See integration instructions at top of each file. Union-agnostic — identical copy goes to SolidBase. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html` |
-| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All GAS files updated and pushed to Main + SolidBase staging. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
+| 2026-03-22 | Claude (claude.ai) | COMMITTED v1.1.0: Member Hub feature — final design approved. WTR section repositioned after Daily Habits (escalation flow: understand → protect yourself → take it further collectively). Mobile-responsive CSS throughout. Login card opacity 0.18 / blur 3px. Quote cycler on login (8s interval, full pool shuffle). 3 inline quotes in hub. All GAS files updated and pushed to Main. | `member_hub_styles.html`, `auth_manifesto.html`, `member_hub_view.html`, `AI_REFERENCE.md` |
 | 2026-03-23 | Claude (claude.ai) | COMMITTED v1.1.1: Login card opacity dropped to 0.06, blur removed entirely — phrases fully visible through card. Added measureAndHidePhrases() to auth_manifesto.html — suppresses any phrase wider than viewport on mobile so no clipped text appears. CSS overflow:hidden fallback added to phrase elements. Resize listener recalculates on orientation change. | `member_hub_styles.html`, `auth_manifesto.html` |
 
 ---
@@ -493,6 +493,6 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 
 
 ---
-## [2026-03-24] agency_org_chart.html — Excluded from SolidBase
+## [2026-03-24] agency_org_chart.html — DDS-only feature (excluded from SolidBase)
 
-This file is excluded from SolidBase (org-specific feature). See source repository for details.
+This file is not included in SolidBase. See DDS-Dashboard for the full org chart feature.

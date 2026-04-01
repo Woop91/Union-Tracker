@@ -2120,7 +2120,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds org-specific content including
+ * by createResourcesSheet(). Adds union-specific content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -2251,7 +2251,7 @@ function seedNotificationsData() {
       'Contract Negotiations Update',
       'The bargaining committee met with management on ' + fmt(threeDaysAgo) + '. Key topics discussed: wage increases, telecommuting policy, and caseload limits. A full update will be shared at the next general membership meeting. Your support matters — please attend.',
       'Normal',
-      'bargaining@example.org',
+      'bargaining@seiu509.org',
       'Bargaining Committee',
       fmt(threeDaysAgo),
       fmt(inOneMonth),
@@ -2266,7 +2266,7 @@ function seedNotificationsData() {
       'Workload Survey Due This Friday',
       'Please submit your weekly workload tracker by end of day Friday. Your data helps the union build the case for adequate staffing. Submissions are anonymous and take less than 2 minutes.',
       'Urgent',
-      'workload@example.org',
+      'workload@seiu509.org',
       'Workload Committee',
       today,
       fmt(inOneWeek),
@@ -2281,7 +2281,7 @@ function seedNotificationsData() {
       'New Know Your Rights Resources Available',
       'We have added new educational resources to the Learn tab including FMLA rights, ADA accommodations, anti-retaliation protections, and caseload standards. Check them out and know your rights!',
       'Normal',
-      'education@example.org',
+      'education@seiu509.org',
       'Education Committee',
       today,
       fmt(inOneMonth),
@@ -2296,7 +2296,7 @@ function seedNotificationsData() {
       'Steward Office Hours This Week',
       'Your stewards will be available for drop-in office hours this week: Tuesday 12-1pm and Thursday 3-4pm in the break room. No appointment needed. Bring your questions about the contract, grievances, or any workplace concerns.',
       'Normal',
-      'stewards@example.org',
+      'stewards@seiu509.org',
       'Steward Team',
       today,
       fmt(inTwoWeeks),
@@ -2367,7 +2367,7 @@ function seedWorkloadData() {
     var timestamp = new Date(now.getTime() - daysAgo * 86400000);
     var email = emails[Math.floor(Math.random() * emails.length)];
 
-    // Realistic caseload numbers for DDS social workers
+    // Realistic caseload numbers for social workers
     var priorityCases = Math.floor(Math.random() * 8) + 1;
     var pendingCases = Math.floor(Math.random() * 15) + 5;
     var unreadDocs = Math.floor(Math.random() * 20);

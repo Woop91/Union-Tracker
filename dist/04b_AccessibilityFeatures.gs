@@ -501,7 +501,7 @@ function getImportDialogHtml_() {
     '    var result = []; var cell = ""; var inQuotes = false;' +
     '    for (var i = 0; i < line.length; i++) {' +
     '      var c = line[i];' +
-    '      if (c === "\\"") { inQuotes = !inQuotes; }' +
+    '      if (c === "\\"") { if (inQuotes && i + 1 < line.length && line[i + 1] === "\\"") { cell += "\\""; i++; } else { inQuotes = !inQuotes; } }' +
     '      else if (c === "," && !inQuotes) { result.push(cell.trim()); cell = ""; }' +
     '      else { cell += c; }' +
     '    }' +
@@ -615,7 +615,12 @@ function parseCSVLine_(line) {
   for (var i = 0; i < line.length; i++) {
     var c = line.charAt(i);
     if (c === '"') {
-      inQuotes = !inQuotes;
+      if (inQuotes && i + 1 < line.length && line.charAt(i + 1) === '"') {
+        cell += '"';
+        i++; // skip the second quote
+      } else {
+        inQuotes = !inQuotes;
+      }
     } else if (c === ',' && !inQuotes) {
       result.push(cell.trim());
       cell = '';
@@ -677,7 +682,7 @@ function showBreakReminder() {
 function showComfortViewControlPanel() {
   var settings = getComfortViewSettings();
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom:3px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.toggleZebraStripes();setTimeout(function(){location.reload()},1000)">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.toggleGridlinesComfortView();setTimeout(function(){location.reload()},1000)">' + (settings.gridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom:3px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.toggleZebraStripes();setTimeout(function(){location.reload()},1000)">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.toggleGridlinesComfortView();setTimeout(function(){location.reload()},1000)">' + (settings.hideGridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, '♿ Comfort View Panel');
 }

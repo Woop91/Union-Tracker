@@ -1,5 +1,5 @@
 /**
- * Build Script for Dashboard
+ * Build Script for SolidBase
  * Copies individual source files into dist/ for multi-file CLASP deployment.
  * GAS V8 loads files in alphabetical filename order — numbered filenames
  * (00_, 01_, …) guarantee correct load order AND give the GAS editor a
@@ -16,6 +16,8 @@
  *   Excludes development/test files that should not be deployed:
  *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
  *   - DevMenu.gs (dev-only quick deploy menu, guarded by typeof in onOpen)
+ *   - 30_TestRunner.gs (test runner UI, gated by IS_DEV_MODE)
+ *   - 31_WebAppTests.gs (web app integration tests)
  */
 
 const fs = require('fs');
@@ -53,7 +55,7 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules (load after all DDS modules)
+  // Web-dashboard SPA modules (load after all core modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -182,7 +184,7 @@ function minifyHtml(content) {
   // Minify <script> blocks: remove // comments (careful with URLs), collapse whitespace
   content = content.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/gi, function(_, open, js, close) {
     // Remove single-line comments (but not URLs like https:// and regex \/\/)
-    js = js.replace(/([^:\\])\/\/(?![\/*])(?![^\n]*['"`]).*$/gm, '$1');
+    js = js.replace(/([^:\\]|^)\/\/(?![\/*])(?![^\n]*['"`]).*$/gm, '$1');
     // Remove multi-line comments
     js = js.replace(/\/\*[\s\S]*?\*\//g, '');
     // Collapse multiple blank lines into one
@@ -205,7 +207,7 @@ function minifyHtml(content) {
 
 function build(fileList) {
   const startTime = Date.now();
-  console.log('Building dashboard (multi-file mode)...\n');
+  console.log('Building SolidBase (multi-file mode)...\n');
 
   // Ensure dist directory exists
   if (!fs.existsSync(DIST_DIR)) {
@@ -301,7 +303,7 @@ const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds.
-// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
+// SolidBase excludes test runner and web app tests from prod in addition to DevTools.
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {
@@ -321,7 +323,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 41 .gs + 17 .html + 1 appsscript.json = 59 files
+  // Current prod capacity: 38 .gs + 15 .html + 1 appsscript.json = 54 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
   const gsFileCount = isProd

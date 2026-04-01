@@ -803,7 +803,11 @@ function getSatisfactionResponseData() {
 
   // Sort by date (most recent first) - use Date parsing for correct chronological order
   responses.sort(function(a, b) {
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
+    var da = new Date(a.date).getTime();
+    var db = new Date(b.date).getTime();
+    if (isNaN(db)) return -1;
+    if (isNaN(da)) return 1;
+    return db - da;
   });
 
   return responses;
@@ -1537,6 +1541,9 @@ function syncGrievanceFormulasToLog() {
   var orphanedGrievances = [];    // Grievances with non-existent Member IDs
   var missingMemberIds = [];      // Grievances with no Member ID
 
+  // Read configurable deadline rules once (outside the loop)
+  var rules = getDeadlineRules();
+
   for (var j = 1; j < grievanceData.length; j++) {
     var row = grievanceData[j];
     memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
@@ -1569,7 +1576,8 @@ function syncGrievanceFormulasToLog() {
     var status = row[GRIEVANCE_COLS.STATUS - 1];
     var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
 
-    // Calculate deadline dates
+    // Calculate deadline dates using configurable rules and business-day math
+    // (matches recalculateDownstreamDeadlines_ approach)
     var filingDeadline = '';
     var step1Due = '';
     var step2AppealDue = '';
@@ -1577,19 +1585,19 @@ function syncGrievanceFormulasToLog() {
     var step3AppealDue = '';
 
     if (incidentDate instanceof Date) {
-      filingDeadline = new Date(incidentDate.getTime() + 21 * 24 * 60 * 60 * 1000);
+      filingDeadline = addBusinessDays(incidentDate, rules.FILING_DAYS);
     }
     if (dateFiled instanceof Date) {
-      step1Due = new Date(dateFiled.getTime() + 30 * 24 * 60 * 60 * 1000);
+      step1Due = addBusinessDays(dateFiled, rules.STEP_1.DAYS_FOR_RESPONSE);
     }
     if (step1Rcvd instanceof Date) {
-      step2AppealDue = new Date(step1Rcvd.getTime() + 10 * 24 * 60 * 60 * 1000);
+      step2AppealDue = addBusinessDays(step1Rcvd, rules.STEP_2.DAYS_TO_APPEAL);
     }
     if (step2AppealFiled instanceof Date) {
-      step2Due = new Date(step2AppealFiled.getTime() + 30 * 24 * 60 * 60 * 1000);
+      step2Due = addBusinessDays(step2AppealFiled, rules.STEP_2.DAYS_FOR_RESPONSE);
     }
     if (step2Rcvd instanceof Date) {
-      step3AppealDue = new Date(step2Rcvd.getTime() + 30 * 24 * 60 * 60 * 1000);
+      step3AppealDue = addBusinessDays(step2Rcvd, rules.STEP_3.DAYS_TO_APPEAL);
     }
 
     // Deadlines (H, J, L, N, P)
@@ -1631,7 +1639,7 @@ function syncGrievanceFormulasToLog() {
     var daysToDeadline = '';
     if (nextActionDue instanceof Date) {
       var days = Math.floor((nextActionDue - today) / (1000 * 60 * 60 * 24));
-      daysToDeadline = days < 0 ? 'Overdue' : days;
+      daysToDeadline = days;
     }
 
     // Metrics (S, T, U)

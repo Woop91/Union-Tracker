@@ -54,4 +54,4 @@ npx clasp push --force
 
 echo ""
 echo "Rollback complete. Deployed dist/ from commit $SHA."
-echo "Run 'git checkout -- dist/' to restore your local dist/ to HEAD."
+echo "To undo this rollback, run: git revert HEAD"

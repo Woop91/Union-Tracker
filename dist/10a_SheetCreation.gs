@@ -1765,13 +1765,7 @@ function ensureGrievanceArchiveSheet_(ss) {
     archive.setFrozenRows(1);
   }
   // Very hidden — only accessible via script
-  archive.hideSheet();
-  try { archive.showSheet(); archive.hideSheet(); } catch (_e) { /* already hidden */ }
-  // Use VERY_HIDDEN protection level
-  try { ss.setSheetVisibility(archive, SpreadsheetApp.SheetVisibility.VERY_HIDDEN); } catch (_e2) {
-    // setSheetVisibility may not exist in older GAS runtimes, fall back to hideSheet
-    Logger.log('ensureGrievanceArchiveSheet_: VERY_HIDDEN not available, sheet is regular-hidden');
-  }
+  setSheetVeryHidden_(archive);
   Logger.log('Created grievance archive sheet: ' + SHEETS.GRIEVANCE_ARCHIVE);
   return archive;
 }

@@ -89,22 +89,16 @@ var MEMBER_PIN_COLS = {
 // ============================================================================
 
 /**
- * Generate a 6-digit PIN from a phone number or randomly.
- * If a phone number is provided with at least 6 digits, the first 6 digits are used.
- * Otherwise falls back to a random 6-digit PIN.
- * @param {string} [phoneNumber] - Optional phone number to derive PIN from
+ * Generate a random 6-digit PIN.
+ * Leading zeros are valid (e.g. '012345').
  * @returns {string} 6-digit PIN
  */
-function generateMemberPIN(phoneNumber) {
-  if (phoneNumber) {
-    var digits = String(phoneNumber).replace(/\D/g, '');
-    if (digits.length >= 6) {
-      return digits.substring(0, 6);
-    }
+function generateMemberPIN() {
+  var pin = '';
+  for (var j = 0; j < 6; j++) {
+    pin += Math.floor(Math.random() * 10).toString();
   }
-  // Fallback: random 6-digit PIN (100000-999999)
-  var pin = Math.floor(100000 + Math.random() * 900000);
-  return String(pin);
+  return pin;
 }
 
 /**
@@ -203,15 +197,12 @@ function assignMemberPIN(memberId, options) {
   var memberRow = -1;
   var memberEmail = null;
   var memberName = null;
-  var memberPhone = null;
-
   for (var i = 1; i < data.length; i++) {
     var rowId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
     if (rowId === memberId) {
       memberRow = i + 1;
       memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
       memberName = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
-      memberPhone = String(data[i][MEMBER_COLS.PHONE - 1] || '');
       break;
     }
   }
@@ -226,8 +217,8 @@ function assignMemberPIN(memberId, options) {
     return errorResponse('Member already has a PIN assigned. Use PIN reset instead.', 'assignMemberPIN');
   }
 
-  // Generate PIN: use first 6 digits of phone number if available, else random
-  var newPin = generateMemberPIN(memberPhone);
+  // Generate random 6-digit PIN
+  var newPin = generateMemberPIN();
   var hashedPin = hashPIN(newPin, memberId);
   sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
 
@@ -247,9 +238,7 @@ function assignMemberPIN(memberId, options) {
         subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Your Self-Service Portal PIN',
         body: 'Hello ' + memberName + ',\n\n' +
           'A PIN has been set up for you to access the Member Self-Service Portal.\n\n' +
-          (memberPhone && String(memberPhone).replace(/\D/g, '').length >= 6
-            ? 'Your PIN is the first 6 digits of your phone number on file.\n\n'
-            : 'Your PIN is: ' + newPin + '\n\n') +
+          'Your PIN is: ' + newPin + '\n\n' +
           'Please change your PIN after your first login for security.\n\n' +
           'If you did not expect this, please contact your union steward.\n\n' +
           'Best regards,\n' + (typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Union') : 'Your Union')
@@ -738,7 +727,7 @@ function generateMemberPINForSteward(memberId) {
   var userEmail = Session.getActiveUser().getEmail();
   var userRole = getUserRole_(userEmail);
 
-  if (userRole !== 'admin' && userRole !== 'steward') {
+  if (userRole !== 'admin' && userRole !== 'steward' && userRole !== 'both') {
     return errorResponse('Only stewards can generate member PINs');
   }
 
@@ -761,14 +750,12 @@ function generateMemberPINForSteward(memberId) {
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
   var memberName = '';
-  var memberPhone = '';
 
   for (var i = 1; i < data.length; i++) {
     var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
       memberName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '');
-      memberPhone = String(data[i][MEMBER_COLS.PHONE - 1] || '');
       break;
     }
   }
@@ -777,8 +764,8 @@ function generateMemberPINForSteward(memberId) {
     return errorResponse('Member not found: ' + memberId);
   }
 
-  // Generate new PIN: use first 6 digits of phone if available, else random
-  var newPIN = generateMemberPIN(memberPhone);
+  // Generate random 6-digit PIN
+  var newPIN = generateMemberPIN();
   var hashedPIN = hashPIN(newPIN, memberId);
 
   // Store hashed PIN
@@ -849,7 +836,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -944,7 +931,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -1013,7 +1000,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
@@ -1030,22 +1017,16 @@ function showBulkGeneratePINDialog() {
       continue;
     }
 
-    var memberPhone = String(data[i][MEMBER_COLS.PHONE - 1] || '');
-    var phoneHas6 = memberPhone.replace(/\D/g, '').length >= 6;
-
     var result = generateMemberPINForSteward(memberId);
     if (result.success) {
       // Try to email the PIN to the member
       if (memberEmail && String(memberEmail).includes('@')) {
         try {
-          var pinLine = phoneHas6
-            ? 'Your PIN is the first 6 digits of your phone number on file.\n\n'
-            : 'Your new self-service portal PIN is: ' + result.pin + '\n\n';
           MailApp.sendEmail({
             to: String(memberEmail),
             subject: orgName + ' - Your Self-Service Portal PIN',
             body: 'Hello ' + memberName + ',\n\n' +
-                  pinLine +
+                  'Your new self-service portal PIN is: ' + result.pin + '\n\n' +
                   'Use this PIN along with your Member ID (' + memberId + ') to access the member portal.\n\n' +
                   'If you did not request this PIN, please contact your steward.\n\n' +
                   '- ' + orgName
@@ -1564,9 +1545,9 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
 function devAuthLoginByPIN(pin) {
   // ── Input validation ──────────────────────────────────────────────────────
   pin = String(pin || '').trim();
-  if (!pin || !/^\d{4,6}$/.test(pin)) {
+  if (!pin || !/^\d{6}$/.test(pin)) {
     Utilities.sleep(100 + Math.floor(Math.random() * 200));
-    return { success: false, message: 'PIN must be 4–6 digits.' };
+    return { success: false, message: 'PIN must be exactly 6 digits.' };
   }
 
   var startTime = Date.now();

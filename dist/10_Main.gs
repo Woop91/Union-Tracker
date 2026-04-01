@@ -61,7 +61,7 @@ function onOpen() {
     createDashboardMenu();
     if (typeof buildDevMenu === 'function') buildDevMenu();
   } catch (error) {
-    Logger.log('Error in onOpen:', error);
+    Logger.log('Error in onOpen: ' + error);
   }
 }
 
@@ -129,7 +129,7 @@ function onOpenDeferred_() {
     // invocation in an isolated context, so onEdit() re-registers on every call.
     // Registering here wastes ~200ms on spreadsheet open for no benefit.
 
-    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
+    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F SolidBase', 3);
   } catch (deferredErr) {
     Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
     if (typeof logAuditEvent === 'function') {
@@ -212,7 +212,7 @@ function onEdit(e) {
     }
 
   } catch (error) {
-    Logger.log('Error in onEdit:', error);
+    Logger.log('Error in onEdit: ' + error);
   }
 }
 
@@ -1138,7 +1138,7 @@ function dailyTrigger() {
         meetingStatusResult = updateMeetingStatuses();
       }
     } catch (e) {
-      Logger.log('Meeting status update error:', e);
+      Logger.log('Meeting status update error: ' + e);
     }
 
     // Process meeting doc notifications (agenda 3 days before, notes 1 day before, publish 1 day after)
@@ -1148,7 +1148,7 @@ function dailyTrigger() {
         meetingDocResult = processMeetingDocNotifications();
       }
     } catch (e) {
-      Logger.log('Meeting doc notification error:', e);
+      Logger.log('Meeting doc notification error: ' + e);
     }
 
     // Cleanup expired meeting check-in records (>90 days old)
@@ -1156,7 +1156,7 @@ function dailyTrigger() {
     try {
       meetingRowsCleaned = cleanupExpiredMeetings();
     } catch (e) {
-      Logger.log('Meeting cleanup error:', e);
+      Logger.log('Meeting cleanup error: ' + e);
     }
 
     // v4.36.0 — Run trend alert detection
@@ -1248,7 +1248,7 @@ function dailyTrigger() {
     });
 
   } catch (error) {
-    Logger.log('Error in dailyTrigger:', error);
+    Logger.log('Error in dailyTrigger: ' + error);
   }
 }
 
@@ -1635,7 +1635,7 @@ function showHelpDialog() {
               </div>
             </div>
 
-            <a href="' + escapeHtml(getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '#') + '" target="_blank" class="repo-link">
+            <a href="${escapeHtml(getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '#')}" target="_blank" class="repo-link">
               <span class="material-icons" style="font-size: 16px;">open_in_new</span>
               Organization Website
             </a>
@@ -1823,7 +1823,7 @@ function updateGrievance(grievanceId, updates) {
     return { success: true, message: 'Grievance updated successfully' };
 
   } catch (error) {
-    Logger.log('Error updating grievance:', error);
+    Logger.log('Error updating grievance: ' + error);
     return errorResponse(error.message);
   }
 }
@@ -2091,7 +2091,7 @@ function addNewMember(memberData) {
     };
 
   } catch (error) {
-    Logger.log('Error adding member:', error);
+    Logger.log('Error adding member: ' + error);
     return errorResponse(error.message);
   }
 }

@@ -1423,7 +1423,7 @@ function importMembersBatch(batchData, mapping) {
             break;
           }
         }
-        if (!memberId) memberId = namePrefix + String(Date.now()).slice(-3);
+        if (!memberId) memberId = namePrefix + String(Date.now()).slice(-6);
 
         // Build new row
         var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
@@ -1617,7 +1617,7 @@ function startNewGrievance(grievanceData) {
       };
     });
   } catch (error) {
-    Logger.log('Error creating grievance:', error);
+    Logger.log('Error creating grievance: ' + error);
     return errorResponse(error.message, 'createGrievance');
   }
 }
@@ -1918,7 +1918,7 @@ function advanceGrievanceStep(grievanceId, options) {
     };
     });
   } catch (error) {
-    Logger.log('Error advancing grievance:', error);
+    Logger.log('Error advancing grievance: ' + error);
     return errorResponse(error.message, 'advanceGrievanceStep');
   }
 }
@@ -2085,7 +2085,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
       };
     });
   } catch (error) {
-    Logger.log('Error in bulk status update:', error);
+    Logger.log('Error in bulk status update: ' + error);
     return errorResponse(error.message, 'bulkUpdateGrievanceStatus');
   }
 }
@@ -2385,7 +2385,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
       };
     });
   } catch (error) {
-    Logger.log('Error resolving grievance:', error);
+    Logger.log('Error resolving grievance: ' + error);
     return errorResponse(error.message);
   }
 }
@@ -2889,7 +2889,7 @@ function bulkFlagGrievances(rowNumbers) {
         sheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, alertCol.length, 1).setValues(alertCol);
       }
 
-      logAuditEvent('BULK_FLAG_GRIEVANCES', 'Flagged ' + count + ' grievances for message alert. Rows: ' + rowNumbers.join(', '));
+      logAuditEvent('BULK_FLAG_GRIEVANCES', { action: 'Flagged ' + count + ' grievances for message alert. Rows: ' + rowNumbers.join(', ') });
 
       return successResponse({ count: count }, 'Flagged ' + count + ' grievance(s) for message alert');
     } catch (e) {
@@ -2952,7 +2952,7 @@ function bulkEmailGrievanceMembers(rowNumbers, subject, body) {
         }
       }
 
-      logAuditEvent('BULK_EMAIL_GRIEVANCE_MEMBERS', 'Sent ' + sent + ', failed ' + failed + ', skipped ' + skipped + ' of ' + rowNumbers.length + ' selected rows');
+      logAuditEvent('BULK_EMAIL_GRIEVANCE_MEMBERS', { action: 'Sent ' + sent + ', failed ' + failed + ', skipped ' + skipped + ' of ' + rowNumbers.length + ' selected rows' });
 
       return successResponse(
         { sent: sent, failed: failed, skipped: skipped },
@@ -3019,7 +3019,7 @@ function bulkExportGrievancesToCsv(rowNumbers) {
       attachments: [blob]
     });
 
-    logAuditEvent('BULK_EXPORT_GRIEVANCES_CSV', 'Exported ' + rowNumbers.length + ' grievances as CSV to ' + userEmail);
+    logAuditEvent('BULK_EXPORT_GRIEVANCES_CSV', { action: 'Exported ' + rowNumbers.length + ' grievances as CSV to ' + userEmail });
 
     return successResponse(null, 'CSV with ' + rowNumbers.length + ' record(s) sent to ' + userEmail);
   } catch (e) {

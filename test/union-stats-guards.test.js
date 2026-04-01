@@ -192,8 +192,14 @@ describe('G18: Stats renderers use all backend data fields', () => {
     expect(body).toMatch(/resourceDownloads/);
   });
 
-  // SolidBase: workload excluded
-  test.skip('workload stats renderer references all summary fields (SolidBase: workload excluded)', () => {});
+  test('workload stats renderer references all summary fields', () => {
+    const body = extractFunctionBody(memberCode, '_renderWorkloadStatsContent');
+    expect(body.length).toBeGreaterThan(0);
+
+    const requiredFields = ['avgCaseload', 'highCaseloadPct', 'submissionRate', 'trendDirection'];
+    const missing = requiredFields.filter(field => !body.includes(field));
+    expect(missing).toEqual([]);
+  });
 });
 
 
@@ -230,6 +236,7 @@ describe('G19: Stats pages have client-side caching', () => {
       '_renderHotSpots',
       '_renderMembershipStats',
       '_renderEngagementStats',
+      '_renderWorkloadSummaryStats',
     ];
     const missing = [];
     for (const fn of renderers) {
@@ -264,6 +271,7 @@ describe('G20: Stats sub-tab renderers separate fetch from content render', () =
     { fetch: '_renderHotSpots', render: '_renderHotSpotsContent' },
     { fetch: '_renderMembershipStats', render: '_renderMembershipStatsContent' },
     { fetch: '_renderEngagementStats', render: '_renderEngagementStatsContent' },
+    { fetch: '_renderWorkloadSummaryStats', render: '_renderWorkloadStatsContent' },
   ];
 
   subTabs.forEach(({ fetch: fetchFn, render: renderFn }) => {

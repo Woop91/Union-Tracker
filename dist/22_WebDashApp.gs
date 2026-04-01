@@ -100,18 +100,22 @@ function doGetWebDashboard(e) {
 
   // Ensure column positions match the actual sheet layout.
   // The global-scope loadCachedColumnMaps_() (01_Core.gs) handles most cases,
-  // but if the cache is cold (first access after deploy / 2-hour expiry),
+  // but if the cache is cold (first access after deploy / 6-hour expiry),
   // fall back to a full sync so ConfigReader reads the correct columns.
+  var _coldSync = false;
   try {
     if (!CacheService.getScriptCache().get('RESOLVED_COL_MAPS')) {
       syncColumnMaps();
+      _coldSync = true;
     }
   } catch (_syncErr) { Logger.log('doGet column sync: ' + (_syncErr.message || _syncErr)); }
 
   // Load config once at top — reused in both success and error paths (Fix 2.1)
+  // After a cold column sync, force-refresh so ConfigReader doesn't serve
+  // stale values that were cached with wrong column positions.
   var config;
   try {
-    config = ConfigReader.getConfig();
+    config = _coldSync ? ConfigReader.refreshConfig() : ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
     config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
@@ -358,20 +362,14 @@ function _serveError(config, type, detail) {
  * Strips internal-only fields from config before sending to client.
  */
 function _sanitizeConfig(config) {
-  // Override accentHue with user's saved color theme preference if set
-  var userHue = config.accentHue;
-  try {
-    var savedHue = PropertiesService.getUserProperties().getProperty('visual_accentHue');
-    if (savedHue) {
-      var parsed = JSON.parse(savedHue);
-      if (typeof parsed === 'number' && parsed >= 0 && parsed <= 360) userHue = parsed;
-    }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  // accentHue comes from the config sheet (org default).
+  // Per-user overrides are handled client-side via localStorage because
+  // UserProperties returns the script OWNER's props in Execute-as-Me webapps.
   return {
     orgName: String(config.orgName || ''),
     orgAbbrev: String(config.orgAbbrev || ''),
     logoInitials: String(config.logoInitials || ''),
-    accentHue: userHue,
+    accentHue: config.accentHue,
     stewardLabel: String(config.stewardLabel || 'Steward'),
     memberLabel: String(config.memberLabel || 'Member'),
     magicLinkExpiryDays: config.magicLinkExpiryDays,
@@ -799,7 +797,7 @@ function getMemberViewHtml() {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .sb-embed), or error message
+ * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
  */
 function getOrgChartHtml() {
   try {
@@ -822,19 +820,48 @@ function getOrgChartHtml() {
 }
 
 /**
- * Client-callable stub: Agency Org Chart is not available in SolidBase.
- * @returns {string} Stub message
+ * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
+ * Loaded on-demand when the user navigates to the Agency Org Chart tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
  */
 function getAgencyOrgChartHtml() {
-  return '<div class="empty-state">Agency org chart is not available in SolidBase.</div>';
+  try {
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_agency_org_chart_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('agency_org_chart').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    Logger.log('getAgencyOrgChartHtml error: ' + e.message);
+    return '<div class="empty-state">Agency org chart could not be loaded.</div>';
+  }
 }
 
 /**
- * Client-callable stub: POMS Reference is not available in SolidBase.
- * @returns {string} Stub message
+ * Client-callable: Returns the POMS Reference HTML for lazy-loading.
+ * Loaded on-demand when the user navigates to the POMS Reference tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
  */
 function getPOMSReferenceHtml() {
-  return '<div class="empty-state">POMS Reference is not available in SolidBase.</div>';
+  try {
+    // No auth check — user already authenticated via doGet().
+    // Session.getActiveUser().getEmail() returns empty for magic-link users.
+    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_poms_ref_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    Logger.log('getPOMSReferenceHtml error: ' + e.message);
+    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
+  }
 }
 
 /**

@@ -1882,7 +1882,7 @@ function computeAuditRowHash_(previousHash, timestamp, eventType, user, details,
  */
 function verifyAuditLogIntegrity() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG || SHEETS.AUDIT_LOG);
+  var sheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
   if (!sheet || sheet.getLastRow() < 2) {
     return { valid: true, totalRows: 0, invalidRows: [] };
   }

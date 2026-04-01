@@ -353,7 +353,7 @@ var Auth = (function () {
       Logger.log('WARNING: ScriptProperties usage at ' + Math.round(totalSize / 1024) + 'KB / 500KB');
       // M9: Escalate via recordSecurityEvent so admins get notified
       if (typeof recordSecurityEvent === 'function') {
-        recordSecurityEvent('QUOTA_WARNING', 'ScriptProperties at ' + Math.round(totalSize / 1024) + 'KB / 500KB', { totalSize: totalSize }, 'HIGH');
+        recordSecurityEvent('QUOTA_WARNING', 'HIGH', 'ScriptProperties at ' + Math.round(totalSize / 1024) + 'KB / 500KB', { totalSize: totalSize });
       }
     }
 

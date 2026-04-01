@@ -1054,11 +1054,9 @@ var TwoFactorService = (function () {
    * @returns {string} 6-digit code
    */
   function _generateCode() {
-    // Use UUID-derived digits for better entropy than Math.random()
-    var uuid = Utilities.getUuid().replace(/[^0-9]/g, '');
     var code = '';
     for (var i = 0; i < CODE_LENGTH; i++) {
-      code += uuid.charAt(i % uuid.length);
+      code += Math.floor(Math.random() * 10).toString();
     }
     return code;
   }
@@ -1131,7 +1129,7 @@ var TwoFactorService = (function () {
     // Send code via email
     var orgName = '';
     try {
-      if (typeof getConfigValue_ === 'function') orgName = getConfigValue_('ORG_NAME') || '';
+      if (typeof getConfigValue_ === 'function') orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || '';
     } catch (_) { /* ignore */ }
 
     var subject = (orgName ? orgName + ' — ' : '') + 'Verification Code: ' + code;
@@ -1470,7 +1468,7 @@ var SMSService = (function () {
   function sendStatusUpdate(recipientEmail, grievanceId, newStatus) {
     var orgName = '';
     try {
-      if (typeof getConfigValue_ === 'function') orgName = getConfigValue_('ORG_ABBREV') || getConfigValue_('ORG_NAME') || '';
+      if (typeof getConfigValue_ === 'function') orgName = getConfigValue_(CONFIG_COLS.ORG_ABBREV) || getConfigValue_(CONFIG_COLS.ORG_NAME) || '';
     } catch (_) { /* ignore */ }
     var text = (orgName ? orgName + ': ' : '') + 'Your grievance ' + grievanceId + ' status has been updated to: ' + newStatus + '. Log in for details.';
     return sendSMS(recipientEmail, text);
@@ -1646,7 +1644,7 @@ var RSVPService = (function () {
     // Org info for email
     var orgName = '';
     try {
-      if (typeof getConfigValue_ === 'function') orgName = getConfigValue_('ORG_NAME') || '';
+      if (typeof getConfigValue_ === 'function') orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || '';
     } catch (_) { /* ignore */ }
 
     for (var i = 1; i < members.length; i++) {

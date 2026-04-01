@@ -1,54 +1,13 @@
-<style> .sb-embed *,.sb-embed *::before,.sb-embed *::after{box-sizing:border-box;margin:0;padding:0}.sb-embed{--bg:#0c0e14;--surf:#13161e;--surf2:#191d27;--bdr:rgba(255,255,255,0.07);--txt:#e4e8f0;--mute:#7a8399;--dim:#49526a;--blue:#4f8ef7;--purple:#a17cf7;--teal:#3ecfb2;--gold:#f0c040;--ff-disp:'DM Serif Display',Georgia,serif;--ff-body:'DM Sans',system-ui,sans-serif}.sb-embed{background:var(--bg);color:var(--txt);font-family:var(--ff-body);font-size:16px;line-height:1.5;min-height:auto;max-width:100%;overflow-x:hidden}.sb-embed.light{--bg:#ffffff;--surf:#ffffff;--surf2:#f8f8f8;--bdr:transparent;--txt:#111111;--mute:#444444;--dim:#999999;--blue:#6d28d9;--purple:#e11d48;--teal:#0284c7;--gold:#d94800}.sb-embed.light{background:#ffffff !important}.sb-embed.light header h1{-webkit-text-fill-color:unset;background:none;color:#111}.sb-embed.light header h1 span{color:#6d28d9;-webkit-text-fill-color:unset}.sb-embed.light header p{color:#666}.sb-embed.light footer{color:#bbb}#sb-mode-toggle{position:fixed;top:12px;right:12px;z-index:50;background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:var(--ff-body)}.page{max-width:1200px;margin:0 auto;padding:40px 20px 60px;box-sizing:border-box}header{text-align:center;margin-bottom:32px}header h1{font-family:var(--ff-disp);font-size:clamp(28px,5vw,42px);font-weight:400;font-style:italic;letter-spacing:0.01em;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}header p{font-size:14px;color:var(--mute);margin-top:6px;letter-spacing:0.04em}footer{text-align:center;font-size:11px;color:var(--dim);margin-top:40px;padding-top:16px;border-top:1px solid var(--bdr)}.placeholder-card{background:var(--surf);border:1px solid var(--bdr);border-radius:16px;padding:48px 32px;text-align:center;margin:24px 0}.placeholder-card .icon{font-size:48px;margin-bottom:16px}.placeholder-card h2{font-family:var(--ff-disp);font-size:22px;font-weight:400;color:var(--txt);margin-bottom:12px}.placeholder-card p{font-size:14px;color:var(--mute);line-height:1.7;max-width:500px;margin:0 auto}.placeholder-card .hint{display:inline-block;margin-top:20px;padding:8px 20px;background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;font-size:12px;color:var(--dim);letter-spacing:0.03em}.sb-embed.light .placeholder-card{background:#fff;border:none;box-shadow:0 10px 40px rgba(109,40,217,0.10),0 2px 6px rgba(0,0,0,0.04)}</style>
-<div class="sb-embed">
-<button id="sb-mode-toggle" onclick="sbToggleMode()">&#9728; Light</button>
-<div class="page">
+<style> .madds-embed *,.madds-embed *::before,.madds-embed *::after{box-sizing:border-box;margin:0;padding:0}.madds-embed{--bg:#0c0e14;--surf:#13161e;--surf2:#191d27;--bdr:rgba(255,255,255,0.07);--txt:#e4e8f0;--mute:#7a8399;--dim:#49526a;--blue:#4f8ef7;--teal:#3ecfb2;--gold:#f0c040;--ff-disp:'DM Serif Display',Georgia,serif;--ff-body:'DM Sans',system-ui,sans-serif}.madds-embed{background:var(--bg);color:var(--txt);font-family:var(--ff-body);font-size:16px;line-height:1.5;min-height:auto;max-width:100%;padding:32px 18px;text-align:center}.madds-embed.light{--bg:#f5f6f8;--surf:#fff;--surf2:#f0f1f3;--bdr:rgba(0,0,0,0.08);--txt:#1a1a2e;--mute:#6b7280;--dim:#9ca3af}.madds-embed h2{font-family:var(--ff-disp);font-size:1.6rem;color:var(--gold);margin-bottom:16px}.madds-embed p{color:var(--mute);font-size:0.9rem;max-width:480px;margin:0 auto 12px}</style>
 
-<header>
-  <h1>Organization <span>Chart</span></h1>
-  <p>Leadership &amp; Staff Directory</p>
-</header>
-
-<div class="placeholder-card">
-  <div class="icon">&#127963;</div>
-  <h2>Your Organization Chart</h2>
-  <p>
-    This page displays your organization's leadership structure and staff directory.
-    Customize this file with your union's officers, directors, coordinators, and chapter leadership.
-  </p>
-  <p style="margin-top: 12px;">
-    The chart supports dark/light mode, expandable sections, editable contact info (steward-only),
-    and localStorage persistence for local edits.
-  </p>
-  <div class="hint">Edit <code>org_chart.html</code> to add your organization's structure</div>
-</div>
-
-<footer>Organization Chart &mdash; SolidBase</footer>
-
+<div class="madds-embed">
+  <h2>Union Organization Chart</h2>
+  <p>This is a generic placeholder for the union org chart. Configure your organization's structure in the Config sheet to populate this view.</p>
+  <p style="font-size:0.75rem;color:var(--dim);">SolidBase — Organization Chart</p>
 </div>
 
 <script>
 
-var _root = document.querySelector('.sb-embed');
-window.sbToggleMode = function sbToggleMode() {
- if (!_root) return;
- _root.classList.toggle('light');
- var btn = document.getElementById('sb-mode-toggle');
- if (btn) btn.innerHTML = _root.classList.contains('light') ? '&#9790; Dark' : '&#9728; Light';
- try { localStorage.setItem('solidbase_org_mode', _root.classList.contains('light') ? 'light' : 'dark'); } catch (_) {}
-};
-
-(function() {
- try {
- if (localStorage.getItem('solidbase_org_mode') === 'light' && _root) {
-  _root.classList.add('light');
-  var btn = document.getElementById('sb-mode-toggle');
-  if (btn) btn.innerHTML = '&#9790; Dark';
- }
- } catch (_) {}
-})();
-</script>
-</div>
-<script>
 (function() {
  if (!document.querySelector('link[href*="DM+Serif"]')) {
  var lnk = document.createElement('link');

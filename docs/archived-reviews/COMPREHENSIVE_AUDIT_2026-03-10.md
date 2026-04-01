@@ -1,4 +1,4 @@
-# 🔍 DDS-Dashboard — Comprehensive Code Audit Report
+# 🔍 SolidBase — Comprehensive Code Audit Report
 # Date: 2026-03-10 | Version Audited: v4.25.7 | Auditor: Claude Opus 4.6
 
 ---
@@ -56,7 +56,7 @@ All 1,380 top-level functions have unique names across the entire GS codebase. Z
 - Server-side `escapeHtml()`, `sanitizeObjectForHtml()`, `escapeForFormula()` all present
 
 ### 1.7 Script ID Security — ✅ CLEAN
-DDS Apps Script ID (`18hHHX-...`) does not appear anywhere in the source files. Safe for Union-Tracker sync.
+Source Apps Script ID does not appear anywhere in the source files. Clean for deployment.
 
 ### 1.8 Config-Driven Architecture — ✅ MOSTLY DYNAMIC
 Column identification by header name via `resolveColumnsFromSheet_()`. Sheet names from Config tab. Dropdowns from Config tab. Org name from Config tab (fixed in v4.20.13).

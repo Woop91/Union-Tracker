@@ -362,8 +362,8 @@ function renderSidebarKnowledge(sidebarEl) {
     _sidebarKnowledgeTimer = setTimeout(showNext, 24000 + Math.floor(Math.random() * 8000));
   }
 
-  showNext();
   if (_sidebarKnowledgeTimer) clearTimeout(_sidebarKnowledgeTimer);
+  showNext();
 }
 
 function stopSidebarKnowledge() {

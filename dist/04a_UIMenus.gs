@@ -284,7 +284,7 @@ function getVisualControlPanelHtml() {
 
         function selectTheme(theme) {
           document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
-          event.target.classList.add('active');
+          var btn = event.target.closest ? event.target.closest('.theme-btn') : event.target; if (btn) btn.classList.add('active');
           google.script.run
             .withSuccessHandler(showStatus)
             .withFailureHandler(function(e){showStatus("Error: "+e.message)})
@@ -553,6 +553,12 @@ function getMultiSelectHtml(items, callback) {
         }
 
         function filterItems(query) {
+          // Sync current checkbox state back to items before re-rendering
+          document.querySelectorAll('.item-checkbox').forEach(function(cb) {
+            var id = cb.getAttribute('data-id');
+            var item = items.find(function(it) { return it.id === id; });
+            if (item) item.selected = cb.checked;
+          });
           const q = query.toLowerCase();
           filteredItems = items.filter(item => item.label.toLowerCase().includes(q));
           renderItems();
