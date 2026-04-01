@@ -93,6 +93,57 @@ function createConfigSheet(ss) {
   // Ensure sheet has enough columns for all headers (handles sheets created before new columns were added)
   ensureMinimumColumns(sheet, columnHeaders.length);
 
+  // ── Data migration: remap row 3+ data when headers are reordered ──
+  // If the existing sheet has headers in a different order than CONFIG_HEADER_MAP_,
+  // we must move the data to match the new header positions before overwriting headers.
+  // Without this, header reorder causes data misalignment (e.g. org name reads "yes"
+  // because the boolean toggle data stayed in the old column).
+  if (isExistingSheet) {
+    var lastCol = sheet.getLastColumn();
+    if (lastCol > 0) {
+      var oldHeaders = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+      var lastDataRow = sheet.getLastRow();
+
+      // Build old header text → 0-indexed column map
+      var oldHeaderToCol = {};
+      for (var oh = 0; oh < oldHeaders.length; oh++) {
+        var hText = String(oldHeaders[oh]).trim();
+        if (hText) oldHeaderToCol[hText] = oh;
+      }
+
+      // Check if any headers moved position
+      var needsMigration = false;
+      for (var nh = 0; nh < columnHeaders.length; nh++) {
+        var oldIdx = oldHeaderToCol[columnHeaders[nh]];
+        if (oldIdx !== undefined && oldIdx !== nh) {
+          needsMigration = true;
+          break;
+        }
+      }
+
+      if (needsMigration && lastDataRow >= 3) {
+        Logger.log('createConfigSheet: headers reordered — migrating row 3+ data to match new layout');
+        var dataRows = sheet.getRange(3, 1, lastDataRow - 2, lastCol).getValues();
+
+        // Remap each data row: new column order pulls from old column positions
+        var remapped = [];
+        for (var dr = 0; dr < dataRows.length; dr++) {
+          var newRow = [];
+          for (var nc = 0; nc < columnHeaders.length; nc++) {
+            var srcIdx = oldHeaderToCol[columnHeaders[nc]];
+            newRow.push(srcIdx !== undefined && srcIdx < dataRows[dr].length ? dataRows[dr][srcIdx] : '');
+          }
+          remapped.push(newRow);
+        }
+
+        // Clear old data first to avoid stale values in columns beyond new width
+        sheet.getRange(3, 1, lastDataRow - 2, lastCol).clearContent();
+        sheet.getRange(3, 1, remapped.length, columnHeaders.length).setValues(remapped);
+        Logger.log('createConfigSheet: migrated ' + remapped.length + ' data row(s) across ' + columnHeaders.length + ' columns');
+      }
+    }
+  }
+
   // Always apply headers (Row 1 & 2) — safe to overwrite since these are structure, not data.
   // This ensures existing sheets pick up newly-added columns beyond AZ.
 
@@ -263,28 +314,39 @@ function _migrateOrphanedColumns(sheet) {
 
   var row2 = sheet.getRange(2, 1, 1, maxCol).getValues()[0];
 
-  // Walk both pointers: ci through actual columns, ei through expected headers.
-  // Matched pair → advance both. Mismatch → mark actual column as orphan.
+  // Build a set of all expected header names for safe lookup.
+  // Only delete columns whose header text does NOT appear anywhere in
+  // CONFIG_HEADER_MAP_. The old two-pointer algorithm assumed sequential
+  // order and would incorrectly mark reordered columns as orphans.
+  var expectedSet = {};
+  for (var e = 0; e < expected.length; e++) {
+    expectedSet[expected[e]] = true;
+  }
+
   var toDelete = [];
-  var ei = 0;
   for (var ci = 0; ci < row2.length; ci++) {
-    if (ei >= expected.length) {
-      // All expected headers matched — remaining columns are extras
-      toDelete.push(ci + 1);
-      continue;
-    }
     var actual = String(row2[ci]).trim();
-    if (actual === expected[ei]) {
-      ei++; // match
-    } else {
-      toDelete.push(ci + 1); // orphan
+    if (actual === '') continue; // skip blank headers
+    if (!expectedSet[actual]) {
+      toDelete.push(ci + 1); // truly orphaned — not in expected set
+    }
+  }
+
+  // Also mark trailing blank columns beyond the expected count
+  if (row2.length > expected.length) {
+    for (var ti = expected.length; ti < row2.length; ti++) {
+      var trailing = String(row2[ti]).trim();
+      if (trailing === '' && toDelete.indexOf(ti + 1) === -1) {
+        toDelete.push(ti + 1);
+      }
     }
   }
 
   if (toDelete.length === 0) return 0;
 
   // Delete right-to-left to preserve column indices
-  for (var d = toDelete.length - 1; d >= 0; d--) {
+  toDelete.sort(function(a, b) { return b - a; });
+  for (var d = 0; d < toDelete.length; d++) {
     sheet.deleteColumn(toDelete[d]);
   }
   Logger.log('_migrateOrphanedColumns: deleted ' + toDelete.length +
@@ -373,8 +435,12 @@ function _applyYesNoValidation(sheet, col, helpText) {
     var cell = sheet.getRange(3, col);
     var raw = cell.getValue();
     var val = (raw === '' || raw == null) ? '' : String(raw).toLowerCase().trim();
-    if (val !== 'yes' && val !== 'no' && val !== '') {
+    if (val === '') {
       cell.setValue('yes');
+    } else if (val !== 'yes' && val !== 'no') {
+      // Non-boolean value in a toggle column — likely misaligned data.
+      // Log a warning instead of silently overwriting, which destroys data.
+      Logger.log('_applyYesNoValidation col ' + col + ': unexpected value "' + raw + '" — skipping (may indicate column misalignment)');
     }
     var rule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['yes', 'no'], true)

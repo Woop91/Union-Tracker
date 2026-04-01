@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.50.4] - 2026-04-01
+
+### Fixed
+- **`_migrateOrphanedColumns` rewrite** — Replaced unsafe sequential two-pointer algorithm with name-based header lookup. Old algorithm would incorrectly delete valid columns when `CONFIG_HEADER_MAP_` order changed, causing data loss.
+- **Global cold-cache column sync** — Global-scope column map initialization now calls `syncColumnMaps()` when cache is expired, protecting all execution contexts (menu handlers, `google.script.run` data functions, triggers) from using wrong array-order defaults.
+
+## [4.50.3] - 2026-04-01
+
+### Fixed
+- **Config data migration on column reorder** — `createConfigSheet()` now detects when existing sheet headers differ in order from `CONFIG_HEADER_MAP_` and remaps row 3+ data to match before overwriting headers. Prevents org name showing "yes"/"no" after the v4.50.0 column reorder.
+- **Hardened `_applyYesNoValidation`** — No longer silently overwrites non-boolean values with "yes". Logs a warning instead, protecting against data destruction when columns are misaligned.
+
 ## [4.50.1] - 2026-03-31
 
 ### Fixed

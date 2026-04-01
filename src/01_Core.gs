@@ -282,7 +282,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.50.2",
+  VERSION: "4.50.4",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -472,9 +472,9 @@ var VERSION_INFO = (function() {
     PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-03-31',
-    CODENAME: 'Non-Member Fields',
-    codename: 'Non-Member Fields'
+    BUILD_DATE: '2026-04-01',
+    CODENAME: 'Config Data Migration',
+    codename: 'Config Data Migration'
   };
 })();
 
@@ -485,6 +485,8 @@ var VERSION_INFO = (function() {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.50.4', date: '2026-04-01', codename: 'Config Column Safety', changes: 'Fixed _migrateOrphanedColumns to use name-based lookup instead of sequential two-pointer walk — old algorithm would incorrectly delete valid columns when CONFIG_HEADER_MAP_ was reordered. Global-scope column map init now falls back to syncColumnMaps() on cold cache instead of silently using wrong array-order defaults, protecting all execution contexts (menu handlers, data functions, triggers).' },
+  { version: '4.50.3', date: '2026-04-01', codename: 'Config Data Migration', changes: 'Fixed Config sheet data misalignment after column reorder (v4.50.0). createConfigSheet() now detects when existing headers are in a different order than CONFIG_HEADER_MAP_ and migrates row 3+ data to match new positions before overwriting headers. Prevents org name reading "yes"/"no" from boolean toggle columns. Also hardened _applyYesNoValidation to not overwrite non-boolean values — logs warning instead of silently converting misaligned data to "yes".' },
   { version: '4.50.2', date: '2026-03-31', codename: 'Config Cache Fix', changes: 'Fixed stale ConfigReader cache after cold column-map sync. When RESOLVED_COL_MAPS cache expires and syncColumnMaps() re-resolves column positions, ConfigReader now force-refreshes instead of serving cached values built with wrong (array-order) positions. syncColumnMaps() also invalidates ORG_CONFIG_v2 cache key when columns change. Fixes org name showing as "yes" and steward label showing URL after cache expiry.' },
   { version: '4.50.0', date: '2026-03-31', codename: 'Non-Member Fields', changes: 'Added Union Name, Shirt Size, and Steward (Yes/No) columns to Non-Member Contacts tab. New fields in NMC_HEADER_MAP_, sheet creation validations (Shirt Size dropdown, Steward Yes/No dropdown), full CRUD support in DataService, steward_view.html modal and contact cards, and fallback modal in 03_UIComponents.gs.' },
   { version: '4.48.0', date: '2026-03-30', codename: 'Tab Modals', changes: 'Auto-opening contextual modals for 9 key sheet tabs: Config, Member Directory, Grievance Log, Case Checklist, Feedback & Development, Volunteer Hours, Meeting Attendance, Meeting Check-In Log, Resources. Each modal shows tab-specific quick actions and tips. Triggered on tab switch via onSelectionChange sheet-change detection. Config toggle ENABLE_TAB_MODALS (default: yes) for system-wide control. Per-user "Don\'t show again" dismissal via UserProperties. New Tools > Tab Modals submenu for manual access. TAB_MODAL_REGISTRY in 01_Core.gs maps sheets to modal functions.' },
@@ -2828,7 +2830,15 @@ var DROPDOWN_MAP = buildDropdownMap_();
 // match the actual sheet layout.  syncColumnMaps() resolves positions at runtime
 // but only runs in onOpen().  This call restores cached positions so that ALL
 // execution contexts (doGet, data* web functions, onEdit) use correct columns.
-try { loadCachedColumnMaps_(); } catch (_initCache) { /* CacheService unavailable — defaults used */ }
+try {
+  if (!loadCachedColumnMaps_()) {
+    // Cache is cold — column defaults may be wrong after CONFIG_HEADER_MAP_ reorder.
+    // Run a full sync to resolve positions from actual sheet headers.
+    // This covers ALL execution contexts (doGet, data* web functions, menu handlers,
+    // onEdit) not just doGetWebDashboard and onOpen.
+    syncColumnMaps();
+  }
+} catch (_initCache) { /* CacheService or sheet unavailable — defaults used */ }
 
 // ============================================================================
 // ID GENERATION
