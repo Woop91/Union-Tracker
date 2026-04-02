@@ -2879,7 +2879,7 @@ function renderStewardResources(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
   { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
   ];
-  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: (CONFIG.orgName || 'Union') + ' Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+  if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Union Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
   quickLinks.forEach(function(r) {
   if (!r.url) return;
@@ -5197,9 +5197,8 @@ function _renderWorkloadInsights(container, wl, showDetail) {
 
  var totalSubmissions = d.totalSubmissions || 0;
  var memberCount = d.members || 0;
- grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting', function() {
- if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
- }));
+ 
+ grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting'));
 
  
  var avgs = d.averages || {};
@@ -5216,10 +5215,6 @@ function _renderWorkloadInsights(container, wl, showDetail) {
   }
   items.sort(function(a, b) { return b.count - a.count; });
   _renderInsightDetailList(panel, items, 'var(--info)');
-  var navBtn = el('button', { className: 'btn btn-primary', style: { marginTop: '12px', fontSize: '12px' }, onClick: function() {
-  if (typeof _handleTabNav === 'function') _handleTabNav('steward', 'workload');
-  }}, 'View Workload Tracker \u2192');
-  panel.appendChild(navBtn);
  });
  }));
 
@@ -9520,7 +9515,7 @@ function _loadLeaderMentees(leaderList) {
  leaderList.innerHTML = '';
  if (!leaders || leaders.length === 0) {
   leaderList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } },
-  'No Member Leaders found. Use the Dashboard menu > Setup Member Leader Role to enable this feature.'));
+  'No Member Leaders found. Use the menu > Setup Member Leader Role to enable this feature.'));
   return;
  }
  var myEmail = (CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email.toLowerCase() : '';

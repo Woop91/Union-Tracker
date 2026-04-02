@@ -10,7 +10,7 @@
  *     (3) Route to correct view (auth_view for login, steward_view for
  *         stewards, member_view for members)
  *     (4) Config + user data injection into HTML template
- *   Deep-link support: ?page=workload opens specific SPA tab after auth.
+ *   Deep-link support: ?page=X opens specific SPA tab after auth.
  *   Token-authenticated pages: ?page=esign (e-sig), ?page=rsvp (meeting RSVP).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -118,7 +118,7 @@ function doGetWebDashboard(e) {
     config = _coldSync ? ConfigReader.refreshConfig() : ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
-    config = { orgName: 'SB', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -821,47 +821,20 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
+ * Stub — agency_org_chart.html is excluded from SolidBase builds.
+ * @returns {string} Placeholder message
  */
 function getAgencyOrgChartHtml() {
-  try {
-    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
-    var cacheKey = 'HTML_agency_org_chart_' + ver;
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get(cacheKey);
-    if (cached) return cached;
-    var html = HtmlService.createHtmlOutputFromFile('agency_org_chart').getContent();
-    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
-    return html;
-  } catch (e) {
-    Logger.log('getAgencyOrgChartHtml error: ' + e.message);
-    return '<div class="empty-state">Agency org chart could not be loaded.</div>';
-  }
+  return '<div class="empty-state">Agency org chart is not available in this deployment.</div>';
 }
 
 /**
  * Client-callable: Returns the POMS Reference HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the POMS Reference tab.
- * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
+ * Stub — poms_reference.html is excluded from SolidBase builds.
+ * @returns {string} Placeholder message
  */
 function getPOMSReferenceHtml() {
-  try {
-    // No auth check — user already authenticated via doGet().
-    // Session.getActiveUser().getEmail() returns empty for magic-link users.
-    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
-    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
-    var cacheKey = 'HTML_poms_ref_' + ver;
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get(cacheKey);
-    if (cached) return cached;
-    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
-    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
-    return html;
-  } catch (e) {
-    Logger.log('getPOMSReferenceHtml error: ' + e.message);
-    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
-  }
+  return '<div class="empty-state">POMS Reference is not available in this deployment.</div>';
 }
 
 /**

@@ -135,7 +135,7 @@ var Auth = (function () {
     } catch (cfgErr) {
       Logger.log('Auth.sendMagicLink: ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
       config = {
-        orgName: 'SB',
+        orgName: 'SolidBase',
         logoInitials: '',
         accentHue: 250,
         magicLinkExpiryMs: 7 * 24 * 60 * 60 * 1000,

@@ -2120,7 +2120,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds sample educational content including
+ * by createResourcesSheet(). Adds organization-specific content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -2367,7 +2367,7 @@ function seedWorkloadData() {
     var timestamp = new Date(now.getTime() - daysAgo * 86400000);
     var email = emails[Math.floor(Math.random() * emails.length)];
 
-    // Realistic caseload numbers for sample data
+    // Realistic caseload numbers for social workers
     var priorityCases = Math.floor(Math.random() * 8) + 1;
     var pendingCases = Math.floor(Math.random() * 15) + 5;
     var unreadDocs = Math.floor(Math.random() * 20);

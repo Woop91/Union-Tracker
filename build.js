@@ -1,5 +1,5 @@
 /**
- * Build Script for Dashboard
+ * Build Script for SolidBase
  * Copies individual source files into dist/ for multi-file CLASP deployment.
  * GAS V8 loads files in alphabetical filename order — numbered filenames
  * (00_, 01_, …) guarantee correct load order AND give the GAS editor a
@@ -16,6 +16,8 @@
  *   Excludes development/test files that should not be deployed:
  *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
  *   - DevMenu.gs (dev-only quick deploy menu, guarded by typeof in onOpen)
+ *   - 30_TestRunner.gs (test runner, gated by IS_DEV_MODE)
+ *   - 31_WebAppTests.gs (web app test suite)
  */
 
 const fs = require('fs');
@@ -301,7 +303,7 @@ const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds.
-// SolidBase excludes test runner and web app tests from prod in addition to DevTools.
+// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {
@@ -316,12 +318,12 @@ if (validateOnly) {
     : BUILD_ORDER;
 
   if (isProd) {
-    console.log('Production build: Excluding DevTools...\n');
+    console.log('Production build: Excluding DevTools, TestRunner, WebAppTests...\n');
   }
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 41 .gs + 17 .html + 1 appsscript.json = 59 files
+  // Current prod capacity: 38 .gs + 15 .html + 1 appsscript.json = 54 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
   const gsFileCount = isProd

@@ -27,11 +27,6 @@ const orgChartCode = read('org_chart.html');
 const indexCode = read('index.html');
 const stylesCode = read('styles.html');
 
-// SolidBase: org_chart.html is a generic placeholder without interactive functions.
-// Detect this by checking for a key interactive function (pillToggle).
-const _hasFullOrgChart = orgChartCode.includes('window.pillToggle');
-const _describeInteractive = _hasFullOrgChart ? describe : describe.skip;
-
 
 // ============================================================================
 // OC1: ORG CHART WIDTH — NOT CLIPPED BY page-layout-content MAX-WIDTH
@@ -39,7 +34,7 @@ const _describeInteractive = _hasFullOrgChart ? describe : describe.skip;
 // Bug: .page-layout-content had max-width:800px on desktop, but the org chart
 // needs up to 1200px. Content was visually clipped on the right side.
 
-_describeInteractive('OC1: Org chart is not clipped by parent max-width', () => {
+describe('OC1: Org chart is not clipped by parent max-width', () => {
   test('styles.html has a max-width override for org chart content', () => {
     // There must be a CSS rule that removes max-width for the org chart container.
     // Accept either :has(.madds-embed) or .orgchart-content class-based override.
@@ -71,7 +66,7 @@ _describeInteractive('OC1: Org chart is not clipped by parent max-width', () => 
 // <script> tags were not reliably accessible from onclick="" handlers in some
 // browser/GAS contexts. Assigning to window.* guarantees global scope.
 
-_describeInteractive('OC2: Org chart interactive functions are explicitly global', () => {
+describe('OC2: Org chart interactive functions are explicitly global', () => {
   const requiredGlobalFunctions = [
     'pillToggle',
     'repToggle',
@@ -132,9 +127,9 @@ describe('OC3: renderOrgChart script re-execution is reliable', () => {
 // ============================================================================
 // Bug: _initDesktopRan was set to true on first visit and never reset. When
 // the user navigated away and back, initDesktop() wouldn't run, leaving
-// MassAbility sub-sections in an incorrect state.
+// Agency sub-sections in an incorrect state.
 
-_describeInteractive('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
+describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   test('org_chart.html declares _initDesktopRan on window (resets on re-execution)', () => {
     expect(orgChartCode).toMatch(/window\._initDesktopRan\s*=\s*false/);
   });
@@ -157,7 +152,7 @@ _describeInteractive('OC4: _initDesktopRan is reset for SPA re-navigation', () =
 // Bug: onclick handlers referenced functions that didn't exist or weren't
 // global, causing silent failures when buttons were clicked.
 
-_describeInteractive('OC5: onclick handlers reference declared functions', () => {
+describe('OC5: onclick handlers reference declared functions', () => {
   test('every onclick function call in org_chart.html has a matching window.* declaration', () => {
     // Extract all function names from onclick attributes
     const onclickRegex = /onclick="(\w+)\s*\(/g;
@@ -198,7 +193,7 @@ _describeInteractive('OC5: onclick handlers reference declared functions', () =>
 // Bug: The light/dark mode toggle button existed but maddstoggleMode() wasn't
 // globally accessible, so clicking the button did nothing.
 
-_describeInteractive('OC6: Light/dark mode toggle is functional', () => {
+describe('OC6: Light/dark mode toggle is functional', () => {
   test('madds-mode-toggle button exists with onclick', () => {
     expect(orgChartCode).toMatch(/id="madds-mode-toggle"/);
     expect(orgChartCode).toMatch(/onclick="maddstoggleMode\(\)"/);
@@ -224,7 +219,7 @@ _describeInteractive('OC6: Light/dark mode toggle is functional', () => {
 // Bug: pillToggle('some-id', this) was called but the element with that ID
 // didn't exist, so clicking the pill did nothing.
 
-_describeInteractive('OC7: Pill button toggle targets exist in the HTML', () => {
+describe('OC7: Pill button toggle targets exist in the HTML', () => {
   test('every pillToggle target ID has a matching element', () => {
     const pillRegex = /pillToggle\('([^']+)'/g;
     const targetIds = new Set();
@@ -307,7 +302,7 @@ _describeInteractive('OC7: Pill button toggle targets exist in the HTML', () => 
 // Bug: Org chart styles leaked into the SPA or SPA styles leaked into the
 // org chart because CSS wasn't properly scoped under .madds-embed.
 
-_describeInteractive('OC8: Org chart CSS is scoped under .madds-embed', () => {
+describe('OC8: Org chart CSS is scoped under .madds-embed', () => {
   test('all style rules (except keyframes) are scoped to .madds-embed', () => {
     // Extract the <style> block
     const styleEnd = orgChartCode.indexOf('</style>');
@@ -367,7 +362,7 @@ _describeInteractive('OC8: Org chart CSS is scoped under .madds-embed', () => {
 // Bug: overflow-x:hidden on a width-constrained parent caused content to be
 // invisible instead of scrollable.
 
-_describeInteractive('OC9: Org chart overflow is handled correctly', () => {
+describe('OC9: Org chart overflow is handled correctly', () => {
   test('.madds-embed has overflow-x handling', () => {
     // .madds-embed should handle overflow (hidden is OK since content is self-contained)
     expect(orgChartCode).toMatch(/\.madds-embed\s*\{[^}]*overflow-x:\s*(hidden|auto)/);

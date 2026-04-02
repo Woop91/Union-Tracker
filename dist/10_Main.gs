@@ -129,7 +129,7 @@ function onOpenDeferred_() {
     // invocation in an isolated context, so onEdit() re-registers on every call.
     // Registering here wastes ~200ms on spreadsheet open for no benefit.
 
-    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
+    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F SolidBase', 3);
   } catch (deferredErr) {
     Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
     if (typeof logAuditEvent === 'function') {
@@ -258,9 +258,14 @@ function onSelectionChange(e) {
 
 /**
  * Called when the user switches to a different sheet tab.
- * Looks up TAB_MODAL_REGISTRY and shows the contextual modal if:
- *   1. Tab modals are enabled in Config (ENABLE_TAB_MODALS ≠ 'no')
- *   2. The user hasn't dismissed the modal for this tab
+ * Shows a toast hint about available quick actions for this tab.
+ *
+ * DESIGN NOTE (v4.50.6): GAS simple triggers (including onSelectionChange)
+ * CANNOT call showModalDialog() — the call fails silently. The prior approach
+ * (v4.48.0) tried to open modals directly from onSelectionChange, which never
+ * worked. Fix: show a toast hint and let the user open the modal via menu
+ * (🔧 Tools > 📑 Tab Quick Actions) or (🔧 Tools > 📑 Tab Modals > ...).
+ *
  * @param {string} sheetName - Name of the newly-activated sheet
  * @private
  */
@@ -279,26 +284,59 @@ function onTabSwitch_(sheetName) {
         }
         if (sheetKey && typeof isTabModalDismissed_ === 'function' && isTabModalDismissed_(sheetKey)) return;
 
-        // Call the modal show function
-        // GAS V8: all .gs functions share global namespace, use lookup map
-        var fnMap = {
-          showTabModalConfig: typeof showTabModalConfig === 'function' ? showTabModalConfig : null,
-          showTabModalMemberDirectory: typeof showTabModalMemberDirectory === 'function' ? showTabModalMemberDirectory : null,
-          showTabModalGrievanceLog: typeof showTabModalGrievanceLog === 'function' ? showTabModalGrievanceLog : null,
-          showTabModalCaseChecklist: typeof showTabModalCaseChecklist === 'function' ? showTabModalCaseChecklist : null,
-          showTabModalFeedback: typeof showTabModalFeedback === 'function' ? showTabModalFeedback : null,
-          showTabModalVolunteerHours: typeof showTabModalVolunteerHours === 'function' ? showTabModalVolunteerHours : null,
-          showTabModalMeetingAttendance: typeof showTabModalMeetingAttendance === 'function' ? showTabModalMeetingAttendance : null,
-          showTabModalMeetingCheckIn: typeof showTabModalMeetingCheckIn === 'function' ? showTabModalMeetingCheckIn : null,
-          showTabModalResources: typeof showTabModalResources === 'function' ? showTabModalResources : null
-        };
-        if (fnMap[entry.fn]) {
-          fnMap[entry.fn]();
-        }
+        // Show a toast hint — toasts work from simple triggers, modals don't.
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          'Quick actions available for ' + entry.title + '. Use 🔧 Tools > 📑 Tab Quick Actions to open.',
+          '📑 ' + entry.title, 4);
         return;
       }
     }
   } catch (_e) { Logger.log('onTabSwitch_ error: ' + (_e.message || _e)); }
+}
+
+/**
+ * Shows the tab modal for the currently active sheet.
+ * Auto-detects which sheet the user is on and opens the corresponding
+ * contextual modal with quick actions, tips, and links.
+ * Accessible via menu: 🔧 Tools > 📑 Tab Quick Actions
+ */
+function showCurrentTabModal() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
+    var sheetName = ss.getActiveSheet().getName();
+
+    if (typeof TAB_MODAL_REGISTRY === 'undefined') {
+      SpreadsheetApp.getUi().alert('Tab modal registry not available.');
+      return;
+    }
+
+    var fnMap = {
+      showTabModalConfig: typeof showTabModalConfig === 'function' ? showTabModalConfig : null,
+      showTabModalMemberDirectory: typeof showTabModalMemberDirectory === 'function' ? showTabModalMemberDirectory : null,
+      showTabModalGrievanceLog: typeof showTabModalGrievanceLog === 'function' ? showTabModalGrievanceLog : null,
+      showTabModalCaseChecklist: typeof showTabModalCaseChecklist === 'function' ? showTabModalCaseChecklist : null,
+      showTabModalFeedback: typeof showTabModalFeedback === 'function' ? showTabModalFeedback : null,
+      showTabModalVolunteerHours: typeof showTabModalVolunteerHours === 'function' ? showTabModalVolunteerHours : null,
+      showTabModalMeetingAttendance: typeof showTabModalMeetingAttendance === 'function' ? showTabModalMeetingAttendance : null,
+      showTabModalMeetingCheckIn: typeof showTabModalMeetingCheckIn === 'function' ? showTabModalMeetingCheckIn : null,
+      showTabModalResources: typeof showTabModalResources === 'function' ? showTabModalResources : null
+    };
+
+    for (var i = 0; i < TAB_MODAL_REGISTRY.length; i++) {
+      var entry = TAB_MODAL_REGISTRY[i];
+      if (entry.sheet === sheetName && fnMap[entry.fn]) {
+        fnMap[entry.fn]();
+        return;
+      }
+    }
+
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'No quick actions modal available for the "' + sheetName + '" tab.',
+      'Tab Quick Actions', 3);
+  } catch (e) {
+    Logger.log('showCurrentTabModal error: ' + e.message);
+  }
 }
 
 /**

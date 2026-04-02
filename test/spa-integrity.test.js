@@ -15,15 +15,6 @@ const path = require('path');
 
 const SRC_DIR = path.resolve(__dirname, '..', 'src');
 
-// SolidBase: detect excluded org-specific features
-const _hasPOMS = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
-const _hasWorkloadService = fs.existsSync(path.join(SRC_DIR, '25_WorkloadService.gs'));
-// Tab IDs whose route handlers are excluded in SolidBase
-const _excludedTabIds = [
-  ...(_hasPOMS ? [] : ['poms']),
-  ...(_hasWorkloadService ? [] : ['workload']),
-];
-
 // Helper: read file content
 function read(file) {
   return fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
@@ -833,8 +824,7 @@ describe('G19: More menu items have route handlers', () => {
 
   test('all steward More menu tab IDs have route handlers', () => {
     const stewardMenuTabs = extractMenuTabIds(stewardCode);
-    // SolidBase: exclude tab IDs whose features were removed (workload, poms)
-    const unhandled = stewardMenuTabs.filter(id => !handledIds.has(id) && !_excludedTabIds.includes(id));
+    const unhandled = stewardMenuTabs.filter(id => !handledIds.has(id));
     if (unhandled.length > 0) {
       // eslint-disable-next-line no-console
       console.warn('Steward More menu tabs with no route handler:', unhandled);
@@ -844,8 +834,7 @@ describe('G19: More menu items have route handlers', () => {
 
   test('all member More menu tab IDs have route handlers', () => {
     const memberMenuTabs = extractMenuTabIds(memberCode);
-    // SolidBase: exclude tab IDs whose features were removed (workload, poms)
-    const unhandled = memberMenuTabs.filter(id => !handledIds.has(id) && !_excludedTabIds.includes(id));
+    const unhandled = memberMenuTabs.filter(id => !handledIds.has(id));
     if (unhandled.length > 0) {
       // eslint-disable-next-line no-console
       console.warn('Member More menu tabs with no route handler:', unhandled);
@@ -862,10 +851,8 @@ describe('G19: More menu items have route handlers', () => {
 // instead of "Program Operations Manual System". This guard prevents the wrong
 // acronym expansion from reappearing.
 
-// SolidBase: POMS feature is excluded; skip when poms_reference.html is absent
-const _describePOMS = _hasPOMS ? describe : describe.skip;
-
-_describePOMS('G20: POMS description accuracy', () => {
+// SOLIDBASE: skipped — POMS feature excluded from SolidBase
+describe.skip('G20: POMS description accuracy', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
 
@@ -1052,9 +1039,8 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  // SolidBase: renderPOMSReference was removed (POMS excluded)
-  const _testPOMS = _hasPOMS ? test : test.skip;
-  _testPOMS('renderPOMSReference async callback checks _navSwitchId', () => {
+  // SOLIDBASE: skipped — POMS feature excluded from SolidBase
+  test.skip('renderPOMSReference async callback checks _navSwitchId', () => {
     const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
     expect(fnBody).toMatch(/_navSwitchId/);
   });
@@ -1132,9 +1118,8 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  // SolidBase: POMS tab excluded; skip when poms_reference.html is absent
-  const _testPOMSG24 = _hasPOMS ? test : test.skip;
-  _testPOMSG24('poms early-return uses _hideAllVisiblePanes', () => {
+  // SOLIDBASE: skipped — POMS feature excluded from SolidBase
+  test.skip('poms early-return uses _hideAllVisiblePanes', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');
     const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
     expect(pomsBlock).not.toBeNull();
