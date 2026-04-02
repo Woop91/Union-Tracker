@@ -2,7 +2,7 @@
 /**
  * Member View — "Glass Depth"
  * v4.12.0 — Full member dashboard with responsive layout,
- * steward contact, profile editor, resources, survey, weekly questions.
+ * steward contact, profile editor, resources, survey, workload, weekly questions.
  */
 
 // ═══════════════════════════════════════
@@ -1928,7 +1928,7 @@ function renderMemberResources(appContainer) {
       { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
       { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
     ];
-    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Organization Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: (CONFIG.orgName || 'Union') + ' Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     quickLinks.forEach(function(r) {
       if (!r.url) return;
@@ -2238,7 +2238,7 @@ function renderPINSetup(appContainer) {
     });
     header.appendChild(el('div', {
       style: { fontSize: '24px', fontWeight: '700', fontFamily: 'var(--fontDisplay)', marginBottom: '4px' }
-    }, 'SolidBase'));
+    }, CONFIG.orgName || 'SolidBase'));
     header.appendChild(el('div', {
       style: { fontSize: '12px', opacity: '0.85' }
     }, 'Set up your login PIN'));
@@ -2487,7 +2487,6 @@ function renderMemberMore(appContainer) {
       { group: 'Reference' },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
       { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the union organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
-      { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'Agency structure & budget', locked: true, action: function() { _handleTabNav('member', 'maddsorgchart'); } },
       { group: 'Community' },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('member', 'qaforum'); } },
       { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
@@ -3891,8 +3890,8 @@ function renderWorkloadTracker(appContainer) {
 
 var WT_SUB_CATS = {
   priority:   ['QDD','CAL','TERI','Aged Case','Congressional','Dire Need','Homeless',
-               'Presumptive Disability','COBRA','Aged Case','SOAR Involvement',
-               'MC/WW','100% P&T','Public Inquiry','High Priority','Medium Priority'],
+               'Presumptive Disability','COBRA','DDS Aged','SOAR Involvement',
+               'MC/WW','100% P&T','Public Inquiry','DDS Important (High)','DDS Important (Medium)'],
   pending:    ['New Cases','Immediate Action','No Activity 15+ Days',
                'No Activity 30+ Days','Internal QA Returns','Federal QA Returns','Approval Returns'],
   unread:     ['All Unread Documents','MER','CE Reports','Trailer Mail'],

@@ -197,12 +197,15 @@ function assignMemberPIN(memberId, options) {
   var memberRow = -1;
   var memberEmail = null;
   var memberName = null;
+  var memberPhone = null;
+
   for (var i = 1; i < data.length; i++) {
     var rowId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
     if (rowId === memberId) {
       memberRow = i + 1;
       memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
       memberName = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
+      memberPhone = String(data[i][MEMBER_COLS.PHONE - 1] || '');
       break;
     }
   }
@@ -750,12 +753,14 @@ function generateMemberPINForSteward(memberId) {
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
   var memberName = '';
+  var memberPhone = '';
 
   for (var i = 1; i < data.length; i++) {
     var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
       memberName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '');
+      memberPhone = String(data[i][MEMBER_COLS.PHONE - 1] || '');
       break;
     }
   }
@@ -836,7 +841,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -931,7 +936,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -1000,7 +1005,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {

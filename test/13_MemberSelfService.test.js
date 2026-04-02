@@ -57,10 +57,11 @@ describe('generateMemberPIN', () => {
     expect(pin).toMatch(/^\d{6}$/);
   });
 
-  test('generates values in 6-digit range (100000-999999)', () => {
-    const pin = Number(generateMemberPIN());
-    expect(pin).toBeGreaterThanOrEqual(100000);
-    expect(pin).toBeLessThanOrEqual(999999);
+  test('generates exactly 6 digit characters', () => {
+    for (let i = 0; i < 20; i++) {
+      const pin = generateMemberPIN();
+      expect(pin).toMatch(/^\d{6}$/);
+    }
   });
 });
 

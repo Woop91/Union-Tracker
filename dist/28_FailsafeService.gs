@@ -235,7 +235,7 @@ var FailsafeService = (function () {
             if (!stillDue) { continue; } // Another execution already sent
             MailApp.sendEmail({
               to: email,
-              subject: 'Your SolidBase Digest',
+              subject: 'Your Union Dashboard Digest',
               htmlBody: body,
               noReply: true
             });
@@ -325,8 +325,8 @@ var FailsafeService = (function () {
     if (sections.length === 0) return null;
 
     var html = '<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">';
-    html += '<h2 style="color: #1a73e8;">SolidBase Digest</h2>';
-    html += '<p style="color: #666;">Here is your latest data summary from SolidBase.</p><hr>';
+    html += '<h2 style="color: #1a73e8;">Union Dashboard Digest</h2>';
+    html += '<p style="color: #666;">Here is your latest data summary from the Union Dashboard.</p><hr>';
     html += sections.join('<hr>');
     html += '<hr><p style="font-size: 12px; color: #999;">This is an automated digest. Manage your preferences in the Dashboard under Profile &gt; Email Digest Settings.</p>';
     html += '</body></html>';

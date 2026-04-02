@@ -162,6 +162,39 @@ function createConfigSheet(ss) {
     .setFontWeight('bold')
     .setHorizontalAlignment('center');
 
+  // Re-sync CONFIG_COLS from the freshly-written headers.  Without this,
+  // seedConfigDefault_ and _applyYesNoValidation use stale positions resolved
+  // from the PRE-migration layout (e.g. SHOW_GRIEVANCES → old col 70 instead
+  // of new col 75), causing yes/no dropdowns to land on Branding columns.
+  syncColumnMaps();
+
+  // Repair stale yes/no validations and misaligned data left on non-toggle
+  // columns by prior runs that used stale CONFIG_COLS (pre-v4.50.5 bug).
+  // The old bug applied yes/no dropdowns to Branding columns (Logo Initials,
+  // Steward Label, etc.) instead of Feature Toggle columns, letting users
+  // accidentally set branding values to "yes"/"no".
+  if (isExistingSheet) {
+    var brandingRepairCols = [
+      CONFIG_COLS.LOGO_INITIALS, CONFIG_COLS.STEWARD_LABEL,
+      CONFIG_COLS.MEMBER_LABEL, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS,
+      CONFIG_COLS.COOKIE_DURATION_DAYS
+    ];
+    for (var bc = 0; bc < brandingRepairCols.length; bc++) {
+      if (!brandingRepairCols[bc]) continue;
+      try {
+        var repairCell = sheet.getRange(3, brandingRepairCols[bc]);
+        repairCell.clearDataValidations();
+        // Clear yes/no values from non-boolean columns — these are toggle values
+        // that landed here due to the stale CONFIG_COLS bug.
+        var repairVal = String(repairCell.getValue() || '').toLowerCase().trim();
+        if (repairVal === 'yes' || repairVal === 'no') {
+          repairCell.clearContent();
+          Logger.log('createConfigSheet: cleared misaligned toggle value "' + repairVal + '" from branding col ' + brandingRepairCols[bc]);
+        }
+      } catch (_v) {}
+    }
+  }
+
   // Add default dropdown values (Row 3+)
   // For existing sheets, seedConfigDefault_ only writes to columns that are currently empty.
   // This ensures re-running CREATE_DASHBOARD fills in newly-added columns without
@@ -245,9 +278,9 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.MEMBER_LABEL, ['Member'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, [5], isExistingSheet);
 
   // ── Feature Toggles (BW–CA) — yes/no dropdown validation
+  seedConfigDefault_(sheet, CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, [5], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.SHOW_GRIEVANCES, ['yes'], isExistingSheet);
   _applyYesNoValidation(sheet, CONFIG_COLS.SHOW_GRIEVANCES,
     'yes = show grievance tracking features. no = hide all grievance UI and endpoints.');

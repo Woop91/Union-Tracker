@@ -118,7 +118,7 @@ function doGetWebDashboard(e) {
     config = _coldSync ? ConfigReader.refreshConfig() : ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
-    config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'SB', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -821,7 +821,7 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the Agency Org Chart tab.
+ * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
  * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
  */
 function getAgencyOrgChartHtml() {

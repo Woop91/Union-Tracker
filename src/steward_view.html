@@ -3020,7 +3020,7 @@ function renderStewardResources(appContainer) {
         { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
         { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
       ];
-      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Organization Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: (CONFIG.orgName || 'Union') + ' Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
       quickLinks.forEach(function(r) {
         if (!r.url) return;
@@ -9936,7 +9936,7 @@ function _loadLeaderMentees(leaderList) {
     leaderList.innerHTML = '';
     if (!leaders || leaders.length === 0) {
       leaderList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } },
-        'No Member Leaders found. Use the SolidBase menu > Setup Member Leader Role to enable this feature.'));
+        'No Member Leaders found. Use the Dashboard menu > Setup Member Leader Role to enable this feature.'));
       return;
     }
     var myEmail = (CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email.toLowerCase() : '';
