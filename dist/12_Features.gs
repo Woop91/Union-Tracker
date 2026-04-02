@@ -193,43 +193,63 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   var sheet = getOrCreateChecklistSheet();
   var itemsCreated = [];
 
-  // Prepare rows to add
-  var rows = [];
-  for (var i = 0; i < templateItems.length; i++) {
-    var item = templateItems[i];
-    var checklistId = generateChecklistId_(i);
-
-    var row = [];
-    row[CHECKLIST_COLS.CHECKLIST_ID - 1] = checklistId;
-    row[CHECKLIST_COLS.CASE_ID - 1] = caseId;
-    row[CHECKLIST_COLS.ACTION_TYPE - 1] = actionType;
-    row[CHECKLIST_COLS.ITEM_TEXT - 1] = item.text;
-    row[CHECKLIST_COLS.CATEGORY - 1] = item.category;
-    row[CHECKLIST_COLS.REQUIRED - 1] = item.required ? 'Yes' : 'No';
-    row[CHECKLIST_COLS.COMPLETED - 1] = false;
-    row[CHECKLIST_COLS.COMPLETED_BY - 1] = '';
-    row[CHECKLIST_COLS.COMPLETED_DATE - 1] = '';
-    row[CHECKLIST_COLS.DUE_DATE - 1] = '';
-    row[CHECKLIST_COLS.NOTES - 1] = '';
-    row[CHECKLIST_COLS.SORT_ORDER - 1] = i + 1;
-
-    rows.push(row);
-    itemsCreated.push({
-      id: checklistId,
-      text: item.text,
-      category: item.category,
-      required: item.required
-    });
-  }
-
-  // Add all rows at once for efficiency
-  if (rows.length > 0) {
+  // Acquire lock ONCE for the entire batch instead of per-item via generateChecklistId_
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    // Determine max existing ID once
     var lastRow = sheet.getLastRow();
-    var startRow = lastRow + 1;
-    sheet.getRange(startRow, 1, rows.length, CHECKLIST_HEADER_MAP_.length).setValues(rows);
+    var maxNum = 0;
+    if (lastRow >= 2) {
+      var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
+      for (var k = 0; k < ids.length; k++) {
+        var existId = ids[k][0];
+        if (existId && typeof existId === 'string' && existId.indexOf('CL-') === 0) {
+          var numPart = parseInt(existId.substring(3), 10);
+          if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+        }
+      }
+    }
 
-    // Add checkboxes to the new rows
-    sheet.getRange(startRow, CHECKLIST_COLS.COMPLETED, rows.length, 1).insertCheckboxes();
+    // Prepare rows to add — derive sequential IDs from maxNum
+    var rows = [];
+    for (var i = 0; i < templateItems.length; i++) {
+      var item = templateItems[i];
+      var checklistId = 'CL-' + String(maxNum + 1 + i).padStart(5, '0');
+
+      var row = [];
+      row[CHECKLIST_COLS.CHECKLIST_ID - 1] = checklistId;
+      row[CHECKLIST_COLS.CASE_ID - 1] = caseId;
+      row[CHECKLIST_COLS.ACTION_TYPE - 1] = actionType;
+      row[CHECKLIST_COLS.ITEM_TEXT - 1] = item.text;
+      row[CHECKLIST_COLS.CATEGORY - 1] = item.category;
+      row[CHECKLIST_COLS.REQUIRED - 1] = item.required ? 'Yes' : 'No';
+      row[CHECKLIST_COLS.COMPLETED - 1] = false;
+      row[CHECKLIST_COLS.COMPLETED_BY - 1] = '';
+      row[CHECKLIST_COLS.COMPLETED_DATE - 1] = '';
+      row[CHECKLIST_COLS.DUE_DATE - 1] = '';
+      row[CHECKLIST_COLS.NOTES - 1] = '';
+      row[CHECKLIST_COLS.SORT_ORDER - 1] = i + 1;
+
+      rows.push(row);
+      itemsCreated.push({
+        id: checklistId,
+        text: item.text,
+        category: item.category,
+        required: item.required
+      });
+    }
+
+    // Add all rows at once for efficiency
+    if (rows.length > 0) {
+      var startRow = lastRow + 1;
+      sheet.getRange(startRow, 1, rows.length, CHECKLIST_HEADER_MAP_.length).setValues(rows);
+
+      // Add checkboxes to the new rows
+      sheet.getRange(startRow, CHECKLIST_COLS.COMPLETED, rows.length, 1).insertCheckboxes();
+    }
+  } finally {
+    lock.releaseLock();
   }
 
   // Update the checklist progress on the grievance

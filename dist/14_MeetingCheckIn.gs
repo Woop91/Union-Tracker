@@ -646,7 +646,10 @@ function cleanupExpiredMeetings() {
     }
   }
 
-  // Delete bottom-up to preserve row indices
+  // Delete bottom-up to preserve row indices.  The array is already in
+  // descending row order (built from the bottom of the sheet upward), so
+  // each deleteRow() call doesn't shift the indices of rows still to be
+  // deleted.  Non-contiguous rows can't safely use deleteRows(start, count).
   for (var j = 0; j < rowsToDelete.length; j++) {
     sheet.deleteRow(rowsToDelete[j]);
   }

@@ -135,6 +135,14 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('📁 Open Google Drive', 'openGoogleDrive'))
 
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData')
+      .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
+      .addSeparator()
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))
+
     .addSubMenu(ui.createMenu('📋 Surveys & Polls')
       .addItem('📂 Open New Survey Period', 'menuOpenNewSurveyPeriod')
       .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
@@ -419,12 +427,6 @@ function showConfirmation(message, title) {
   return result === ui.Button.YES;
 }
 
-/**
- * Shows an alert dialog
- * @param {string} message - The message to display
- * @param {string} title - The dialog title
- * @returns {void}
- */
 /**
  * Opens Google Calendar in a new browser tab
  */
@@ -869,7 +871,8 @@ function toggleDarkMode() {
 function getComfortViewSettings() {
   var props = PropertiesService.getUserProperties();
   var settings = props.getProperty('comfortViewSettings');
-  return settings ? JSON.parse(settings) : getDefaultComfortViewSettings_();
+  if (!settings) return getDefaultComfortViewSettings_();
+  try { return JSON.parse(settings); } catch (_) { return getDefaultComfortViewSettings_(); }
 }
 
 /**
@@ -1001,11 +1004,18 @@ function toggleZebraStripes() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
 
-  // Check if zebra stripes are applied (row 2 has different color than row 3)
-  var row2Color = sheet.getRange(2, 1).getBackground();
-  var row3Color = sheet.getRange(3, 1).getBackground();
+  var isStriped;
+  if (sheet.getLastRow() < 3) {
+    // Default to applying stripes for sheets with < 3 rows
+    isStriped = false;
+  } else {
+    // Check if zebra stripes are applied (row 2 has different color than row 3)
+    var row2Color = sheet.getRange(2, 1).getBackground();
+    var row3Color = sheet.getRange(3, 1).getBackground();
+    isStriped = (row2Color !== row3Color);
+  }
 
-  if (row2Color !== row3Color) {
+  if (isStriped) {
     removeZebraStripes(sheet);
   } else {
     applyZebraStripes(sheet);
@@ -1054,7 +1064,8 @@ function getCurrentTheme() {
   if (!stored) return 'default';
   try {
     return JSON.parse(stored);
-  } catch(_e) {
+  } catch (_e) {
+    // Backward compatibility: old theme values were plain strings, not JSON
     return stored;
   }
 }
@@ -1173,27 +1184,30 @@ function refreshAllVisuals() {
  */
 function showMobileDashboard() {
   var stats = getMobileDashboardStats();
+  var accent = SHEET_COLORS.DIALOG_ACCENT;
+  var accentDark = SHEET_COLORS.DIALOG_ACCENT_DARK;
+  var touchSize = MOBILE_CONFIG.TOUCH_TARGET_SIZE;
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;padding:0;margin:0;background:#f5f5f5}' +
-    '.header{background:linear-gradient(135deg,' + SHEET_COLORS.DIALOG_ACCENT + ',' + SHEET_COLORS.DIALOG_ACCENT_DARK + ');color:white;padding:clamp(14px,4vw,20px);padding-top:calc(clamp(14px,4vw,20px) + env(safe-area-inset-top,0px))}' +
-    '.header h1{margin:0;font-size:clamp(20px,5vw,24px)}.header .subtitle{font-size:clamp(12px,3vw,14px);opacity:0.9}' +
-    '.container{padding:clamp(10px,3vw,15px);padding-bottom:80px}' +
-    '.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(8px,2vw,12px);margin-bottom:20px}' +
-    '.stat-card{background:white;padding:clamp(14px,3.5vw,20px);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center}' +
-    '.stat-value{font-size:clamp(24px,7vw,32px);font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + '}' +
-    '.stat-label{font-size:clamp(10px,2.8vw,13px);color:#666;text-transform:uppercase;margin-top:4px}' +
-    '.section-title{font-size:clamp(14px,3.8vw,16px);font-weight:600;color:#333;margin:20px 0 12px;padding-left:5px}' +
-    '.action-btn{background:white;border:none;padding:clamp(12px,3.5vw,16px);margin-bottom:10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);width:100%;text-align:left;display:flex;align-items:center;gap:clamp(10px,3vw,15px);font-size:clamp(13px,3.5vw,15px);cursor:pointer;min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + '}' +
-    '.action-btn:active{transform:scale(0.98)}' +
-    '.action-icon{font-size:clamp(20px,5vw,24px);width:clamp(36px,9vw,40px);height:clamp(36px,9vw,40px);display:flex;align-items:center;justify-content:center;background:#e8f0fe;border-radius:10px;flex-shrink:0}' +
-    '.action-label{font-weight:500}.action-desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}' +
-    '.fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));right:20px;width:56px;height:56px;background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:100}' +
-    '@media(max-width:360px){.stats{grid-template-columns:1fr 1fr;gap:6px}.stat-card{padding:10px}.container{padding:8px;padding-bottom:80px}}' +
-    '</style></head><body>' +
-    '<div class="header"><h1>📱 Dashboard</h1><div class="subtitle">Mobile View</div></div>' +
-    '<div class="container"><div class="stats"><div class="stat-card"><div class="stat-value">' + stats.totalGrievances + '</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">' + stats.activeGrievances + '</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">' + stats.pendingGrievances + '</div><div class="stat-label">Pending</div></div><div class="stat-card"><div class="stat-value">' + stats.overdueGrievances + '</div><div class="stat-label">Overdue</div></div></div><div class="section-title">⚡ Quick Actions</div><button class="action-btn" onclick="google.script.run.showMobileGrievanceList()"><div class="action-icon">📋</div><div><div class="action-label">View Grievances</div><div class="action-desc">Browse all grievances</div></div></button><button class="action-btn" onclick="google.script.run.showMobileUnifiedSearch()"><div class="action-icon">🔍</div><div><div class="action-label">Search</div><div class="action-desc">Find grievances or members</div></div></button><button class="action-btn" onclick="google.script.run.showMyAssignedGrievances()"><div class="action-icon">👤</div><div><div class="action-label">My Cases</div><div class="action-desc">View assigned grievances</div></div></button></div><button class="fab" onclick="location.reload()">🔄</button></body></html>'
+    `<!DOCTYPE html><html><head><base target="_top">${getMobileOptimizedHead()}<style>*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;padding:0;margin:0;background:#f5f5f5}` +
+    `.header{background:linear-gradient(135deg,${accent},${accentDark});color:white;padding:clamp(14px,4vw,20px);padding-top:calc(clamp(14px,4vw,20px) + env(safe-area-inset-top,0px))}` +
+    `.header h1{margin:0;font-size:clamp(20px,5vw,24px)}.header .subtitle{font-size:clamp(12px,3vw,14px);opacity:0.9}` +
+    `.container{padding:clamp(10px,3vw,15px);padding-bottom:80px}` +
+    `.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(8px,2vw,12px);margin-bottom:20px}` +
+    `.stat-card{background:white;padding:clamp(14px,3.5vw,20px);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center}` +
+    `.stat-value{font-size:clamp(24px,7vw,32px);font-weight:bold;color:${accent}}` +
+    `.stat-label{font-size:clamp(10px,2.8vw,13px);color:#666;text-transform:uppercase;margin-top:4px}` +
+    `.section-title{font-size:clamp(14px,3.8vw,16px);font-weight:600;color:#333;margin:20px 0 12px;padding-left:5px}` +
+    `.action-btn{background:white;border:none;padding:clamp(12px,3.5vw,16px);margin-bottom:10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);width:100%;text-align:left;display:flex;align-items:center;gap:clamp(10px,3vw,15px);font-size:clamp(13px,3.5vw,15px);cursor:pointer;min-height:${touchSize}}` +
+    `.action-btn:active{transform:scale(0.98)}` +
+    `.action-icon{font-size:clamp(20px,5vw,24px);width:clamp(36px,9vw,40px);height:clamp(36px,9vw,40px);display:flex;align-items:center;justify-content:center;background:#e8f0fe;border-radius:10px;flex-shrink:0}` +
+    `.action-label{font-weight:500}.action-desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}` +
+    `.fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));right:20px;width:56px;height:56px;background:${accent};color:white;border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:100}` +
+    `@media(max-width:360px){.stats{grid-template-columns:1fr 1fr;gap:6px}.stat-card{padding:10px}.container{padding:8px;padding-bottom:80px}}` +
+    `</style></head><body>` +
+    `<div class="header"><h1>\u{1F4F1} Dashboard</h1><div class="subtitle">Mobile View</div></div>` +
+    `<div class="container"><div class="stats"><div class="stat-card"><div class="stat-value">${stats.totalGrievances}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.activeGrievances}</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">${stats.pendingGrievances}</div><div class="stat-label">Pending</div></div><div class="stat-card"><div class="stat-value">${stats.overdueGrievances}</div><div class="stat-label">Overdue</div></div></div><div class="section-title">\u26A1 Quick Actions</div><button class="action-btn" onclick="google.script.run.showMobileGrievanceList()"><div class="action-icon">\u{1F4CB}</div><div><div class="action-label">View Grievances</div><div class="action-desc">Browse all grievances</div></div></button><button class="action-btn" onclick="google.script.run.showMobileUnifiedSearch()"><div class="action-icon">\u{1F50D}</div><div><div class="action-label">Search</div><div class="action-desc">Find grievances or members</div></div></button><button class="action-btn" onclick="google.script.run.showMyAssignedGrievances()"><div class="action-icon">\u{1F464}</div><div><div class="action-label">My Cases</div><div class="action-desc">View assigned grievances</div></div></button></div><button class="fab" onclick="location.reload()">\u{1F504}</button></body></html>`
   ).setWidth(400).setHeight(700);
-  SpreadsheetApp.getUi().showModalDialog(html, '📱 Mobile Dashboard');
+  SpreadsheetApp.getUi().showModalDialog(html, '\u{1F4F1} Mobile Dashboard');
 }
 
 /**
@@ -1201,6 +1215,10 @@ function showMobileDashboard() {
  * @returns {Object} Statistics object with totalGrievances, activeGrievances, pendingGrievances, overdueGrievances
  */
 function getMobileDashboardStats() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('mobile_dash_stats');
+  if (cached) return JSON.parse(cached);
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet || sheet.getLastRow() <= 1) return { totalGrievances: 0, activeGrievances: 0, pendingGrievances: 0, overdueGrievances: 0 };
@@ -1214,6 +1232,7 @@ function getMobileDashboardStats() {
     if (status === GRIEVANCE_STATUS.PENDING) stats.pendingGrievances++;
     if ((daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0)) && status === GRIEVANCE_STATUS.OPEN) stats.overdueGrievances++;
   });
+  try { cache.put('mobile_dash_stats', JSON.stringify(stats), 30); } catch (_) {}
   return stats;
 }
 
@@ -1265,38 +1284,40 @@ function getRecentGrievancesForMobile(limit) {
  * @returns {void}
  */
 function showMobileGrievanceList() {
+  var accent = SHEET_COLORS.DIALOG_ACCENT;
+  var touchSize = MOBILE_CONFIG.TOUCH_TARGET_SIZE;
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' +
-    getMobileOptimizedHead() +
-    '<style>' +
-    '*{box-sizing:border-box}' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}' +
-    '.header{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;padding:15px;position:sticky;top:0;z-index:100}' +
-    '.header h2{margin:0;font-size:clamp(18px,4vw,24px)}' +
-    '.search{width:100%;padding:clamp(10px,2.5vw,14px);border:none;border-radius:8px;font-size:clamp(14px,3vw,16px);margin-top:10px}' +
-    '.filters{display:flex;overflow-x:auto;padding:10px;background:white;gap:8px;-webkit-overflow-scrolling:touch}' +
-    '.filter{padding:clamp(6px,1.5vw,10px) clamp(12px,3vw,18px);border-radius:20px;background:#f0f0f0;white-space:nowrap;cursor:pointer;font-size:clamp(12px,2.5vw,14px);border:none;min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + ';display:flex;align-items:center}' +
-    '.filter.active{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white}' +
-    '.list{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}' +
-    '.card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}' +
-    '.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}' +
-    '.card-id{font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + ';font-size:clamp(14px,3vw,16px)}' +
-    '.card-status{padding:4px 10px;border-radius:12px;font-size:clamp(10px,2vw,12px);font-weight:bold;background:#e8f0fe}' +
-    '.card-row{font-size:clamp(12px,2.5vw,14px);margin:5px 0;color:#666}' +
-    '.pagination{display:flex;justify-content:center;align-items:center;gap:12px;padding:16px;background:white;border-top:1px solid #e0e0e0;position:sticky;bottom:0}' +
-    '.pg-btn{padding:10px 20px;border-radius:8px;border:1px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';color:' + SHEET_COLORS.DIALOG_ACCENT + ';background:white;font-size:14px;cursor:pointer;min-height:44px}' +
-    '.pg-btn:disabled{opacity:.4;cursor:default}' +
-    '.pg-info{font-size:13px;color:#666}' +
-    '@media (min-width:768px){.list{grid-template-columns:repeat(2,1fr)}}' +
-    '@media (min-width:1024px){.list{grid-template-columns:repeat(3,1fr)}}' +
-    '</style></head><body>' +
-    '<div class="header"><h2>📋 Grievances</h2><input type="text" class="search" placeholder="Search..." oninput="filter(this.value)"></div>' +
-    '<div class="filters"><button class="filter active" onclick="filterStatus(\'all\',this)">All</button><button class="filter" onclick="filterStatus(\'Open\',this)">Open</button><button class="filter" onclick="filterStatus(\'Pending Info\',this)">Pending</button><button class="filter" onclick="filterStatus(\'Resolved\',this)">Resolved</button></div>' +
-    '<div class="list" id="list"><div style="text-align:center;padding:40px;color:#666;grid-column:1/-1">Loading...</div></div>' +
-    '<div class="pagination" id="pager" style="display:none"><button class="pg-btn" id="prevBtn" onclick="changePage(-1)">Prev</button><span class="pg-info" id="pgInfo"></span><button class="pg-btn" id="nextBtn" onclick="changePage(1)">Next</button></div>' +
-    '<script>' + getClientSideEscapeHtml() + 'var all=[],filtered=[],PAGE_SIZE=20,curPage=0;google.script.run.withSuccessHandler(function(data){all=data;filtered=data;curPage=0;renderPage()}).getRecentGrievancesForMobile(500);function renderPage(){var c=document.getElementById("list");var pg=document.getElementById("pager");if(!filtered||filtered.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";pg.style.display="none";return}var totalPages=Math.ceil(filtered.length/PAGE_SIZE);if(curPage>=totalPages)curPage=totalPages-1;if(curPage<0)curPage=0;var start=curPage*PAGE_SIZE;var page=filtered.slice(start,start+PAGE_SIZE);c.innerHTML=page.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+escapeHtml(g.id)+"</div><div class=\'card-status\'>"+escapeHtml(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class=\'card-row\'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("");if(filtered.length>PAGE_SIZE){pg.style.display="flex";document.getElementById("prevBtn").disabled=curPage===0;document.getElementById("nextBtn").disabled=curPage>=totalPages-1;document.getElementById("pgInfo").textContent="Page "+(curPage+1)+" of "+totalPages+" ("+filtered.length+" results)"}else{pg.style.display="none"}}function changePage(dir){curPage+=dir;renderPage();document.getElementById("list").scrollIntoView({behavior:"smooth"})}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");filtered=s==="all"?all:all.filter(function(g){return g.status===s});curPage=0;renderPage()}function filter(q){q=q.toLowerCase();filtered=all.filter(function(g){return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0});curPage=0;renderPage()}</script></body></html>'
+    `<!DOCTYPE html><html><head><base target="_top">` +
+    `${getMobileOptimizedHead()}` +
+    `<style>` +
+    `*{box-sizing:border-box}` +
+    `body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}` +
+    `.header{background:${accent};color:white;padding:15px;position:sticky;top:0;z-index:100}` +
+    `.header h2{margin:0;font-size:clamp(18px,4vw,24px)}` +
+    `.search{width:100%;padding:clamp(10px,2.5vw,14px);border:none;border-radius:8px;font-size:clamp(14px,3vw,16px);margin-top:10px}` +
+    `.filters{display:flex;overflow-x:auto;padding:10px;background:white;gap:8px;-webkit-overflow-scrolling:touch}` +
+    `.filter{padding:clamp(6px,1.5vw,10px) clamp(12px,3vw,18px);border-radius:20px;background:#f0f0f0;white-space:nowrap;cursor:pointer;font-size:clamp(12px,2.5vw,14px);border:none;min-height:${touchSize};display:flex;align-items:center}` +
+    `.filter.active{background:${accent};color:white}` +
+    `.list{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}` +
+    `.card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}` +
+    `.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}` +
+    `.card-id{font-weight:bold;color:${accent};font-size:clamp(14px,3vw,16px)}` +
+    `.card-status{padding:4px 10px;border-radius:12px;font-size:clamp(10px,2vw,12px);font-weight:bold;background:#e8f0fe}` +
+    `.card-row{font-size:clamp(12px,2.5vw,14px);margin:5px 0;color:#666}` +
+    `.pagination{display:flex;justify-content:center;align-items:center;gap:12px;padding:16px;background:white;border-top:1px solid #e0e0e0;position:sticky;bottom:0}` +
+    `.pg-btn{padding:10px 20px;border-radius:8px;border:1px solid ${accent};color:${accent};background:white;font-size:14px;cursor:pointer;min-height:44px}` +
+    `.pg-btn:disabled{opacity:.4;cursor:default}` +
+    `.pg-info{font-size:13px;color:#666}` +
+    `@media (min-width:768px){.list{grid-template-columns:repeat(2,1fr)}}` +
+    `@media (min-width:1024px){.list{grid-template-columns:repeat(3,1fr)}}` +
+    `</style></head><body>` +
+    `<div class="header"><h2>\u{1F4CB} Grievances</h2><input type="text" class="search" placeholder="Search..." oninput="filter(this.value)"></div>` +
+    `<div class="filters"><button class="filter active" onclick="filterStatus('all',this)">All</button><button class="filter" onclick="filterStatus('Open',this)">Open</button><button class="filter" onclick="filterStatus('Pending Info',this)">Pending</button><button class="filter" onclick="filterStatus('Resolved',this)">Resolved</button></div>` +
+    `<div class="list" id="list"><div style="text-align:center;padding:40px;color:#666;grid-column:1/-1">Loading...</div></div>` +
+    `<div class="pagination" id="pager" style="display:none"><button class="pg-btn" id="prevBtn" onclick="changePage(-1)">Prev</button><span class="pg-info" id="pgInfo"></span><button class="pg-btn" id="nextBtn" onclick="changePage(1)">Next</button></div>` +
+    `<script>${getClientSideEscapeHtml()}var all=[],filtered=[],PAGE_SIZE=20,curPage=0;google.script.run.withSuccessHandler(function(data){all=data;filtered=data;curPage=0;renderPage()}).getRecentGrievancesForMobile(500);function renderPage(){var c=document.getElementById("list");var pg=document.getElementById("pager");if(!filtered||filtered.length===0){c.innerHTML="<div style='text-align:center;padding:40px;color:#999;grid-column:1/-1'>No grievances</div>";pg.style.display="none";return}var totalPages=Math.ceil(filtered.length/PAGE_SIZE);if(curPage>=totalPages)curPage=totalPages-1;if(curPage<0)curPage=0;var start=curPage*PAGE_SIZE;var page=filtered.slice(start,start+PAGE_SIZE);c.innerHTML=page.map(function(g){return"<div class='card'><div class='card-header'><div class='card-id'>#"+escapeHtml(g.id)+"</div><div class='card-status'>"+escapeHtml(g.status||"Filed")+"</div></div><div class='card-row'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class='card-row'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class='card-row'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("");if(filtered.length>PAGE_SIZE){pg.style.display="flex";document.getElementById("prevBtn").disabled=curPage===0;document.getElementById("nextBtn").disabled=curPage>=totalPages-1;document.getElementById("pgInfo").textContent="Page "+(curPage+1)+" of "+totalPages+" ("+filtered.length+" results)"}else{pg.style.display="none"}}function changePage(dir){curPage+=dir;renderPage();document.getElementById("list").scrollIntoView({behavior:"smooth"})}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");filtered=s==="all"?all:all.filter(function(g){return g.status===s});curPage=0;renderPage()}function filter(q){q=q.toLowerCase();filtered=all.filter(function(g){return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0});curPage=0;renderPage()}</script></body></html>`
   ).setWidth(800).setHeight(700);
-  SpreadsheetApp.getUi().showModalDialog(html, '📋 Grievance List');
+  SpreadsheetApp.getUi().showModalDialog(html, '\u{1F4CB} Grievance List');
 }
 
 // ============================================================================
@@ -1312,34 +1333,37 @@ function showMobileGrievanceList() {
  * @returns {void}
  */
 function showMobileUnifiedSearch() {
+  var accent = SHEET_COLORS.DIALOG_ACCENT;
+  var accentDark = SHEET_COLORS.DIALOG_ACCENT_DARK;
+  var touchSize = MOBILE_CONFIG.TOUCH_TARGET_SIZE;
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' +
-    getMobileOptimizedHead() +
-    '<style>' +
-    '*{box-sizing:border-box}' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}' +
-    '.header{background:linear-gradient(135deg,' + SHEET_COLORS.DIALOG_ACCENT + ',' + SHEET_COLORS.DIALOG_ACCENT_DARK + ');color:white;padding:15px}' +
-    '.header h2{margin:0 0 12px 0;font-size:clamp(18px,4vw,22px)}' +
-    '.search-container{position:relative}' +
-    '.search-input{width:100%;padding:clamp(12px,3vw,16px) clamp(12px,3vw,16px) clamp(12px,3vw,16px) 45px;border:none;border-radius:10px;font-size:clamp(14px,3vw,16px);background:white}' +
-    '.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px}' +
-    '.tabs{display:flex;background:white;border-bottom:1px solid #e0e0e0}' +
-    '.tab{flex:1;padding:clamp(10px,2.5vw,14px);text-align:center;font-size:clamp(12px,2.5vw,14px);font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + '}' +
-    '.tab.active{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom-color:' + SHEET_COLORS.DIALOG_ACCENT + '}' +
-    '.results{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}' +
-    '.result-card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}' +
-    '.result-title{font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + ';margin-bottom:5px;font-size:clamp(14px,3vw,16px)}' +
-    '.result-detail{font-size:clamp(11px,2.5vw,13px);color:#666;margin:3px 0}' +
-    '.empty-state{text-align:center;padding:60px;color:#999;grid-column:1/-1}' +
-    '@media (min-width:768px){.results{grid-template-columns:repeat(2,1fr)}}' +
-    '@media (min-width:1024px){.results{grid-template-columns:repeat(3,1fr)}}' +
-    '</style></head><body>' +
-    '<div class="header"><h2>🔍 Search</h2><div class="search-container"><span class="search-icon">🔍</span><input type="text" class="search-input" id="q" placeholder="Search members or grievances..." oninput="search(this.value)"></div></div>' +
-    '<div class="tabs"><button class="tab active" onclick="setTab(\'all\',this)">All</button><button class="tab" onclick="setTab(\'members\',this)">Members</button><button class="tab" onclick="setTab(\'grievances\',this)">Grievances</button></div>' +
-    '<div class="results" id="results"><div class="empty-state">Type to search...</div></div>' +
-    '<script>' + getClientSideEscapeHtml() + 'var tab="all";function setTab(t,btn){tab=t;document.querySelectorAll(".tab").forEach(function(tb){tb.classList.remove("active")});btn.classList.add("active");search(document.getElementById("q").value)}function search(q){if(!q||q.length<2){document.getElementById("results").innerHTML="<div class=\'empty-state\'>Type to search...</div>";return}google.script.run.withSuccessHandler(function(data){render(data)}).getMobileSearchData(q,tab)}function render(data){var c=document.getElementById("results");if(!data||data.length===0){c.innerHTML="<div class=\'empty-state\'>No results</div>";return}c.innerHTML=data.map(function(r){return"<div class=\'result-card\'><div class=\'result-title\'>"+(r.type==="member"?"👤 ":"📋 ")+escapeHtml(r.title)+"</div><div class=\'result-detail\'>"+escapeHtml(r.subtitle)+"</div>"+(r.detail?"<div class=\'result-detail\'>"+escapeHtml(r.detail)+"</div>":"")+"</div>"}).join("")}</script></body></html>'
+    `<!DOCTYPE html><html><head><base target="_top">` +
+    `${getMobileOptimizedHead()}` +
+    `<style>` +
+    `*{box-sizing:border-box}` +
+    `body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}` +
+    `.header{background:linear-gradient(135deg,${accent},${accentDark});color:white;padding:15px}` +
+    `.header h2{margin:0 0 12px 0;font-size:clamp(18px,4vw,22px)}` +
+    `.search-container{position:relative}` +
+    `.search-input{width:100%;padding:clamp(12px,3vw,16px) clamp(12px,3vw,16px) clamp(12px,3vw,16px) 45px;border:none;border-radius:10px;font-size:clamp(14px,3vw,16px);background:white}` +
+    `.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px}` +
+    `.tabs{display:flex;background:white;border-bottom:1px solid #e0e0e0}` +
+    `.tab{flex:1;padding:clamp(10px,2.5vw,14px);text-align:center;font-size:clamp(12px,2.5vw,14px);font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;min-height:${touchSize}}` +
+    `.tab.active{color:${accent};border-bottom-color:${accent}}` +
+    `.results{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}` +
+    `.result-card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}` +
+    `.result-title{font-weight:bold;color:${accent};margin-bottom:5px;font-size:clamp(14px,3vw,16px)}` +
+    `.result-detail{font-size:clamp(11px,2.5vw,13px);color:#666;margin:3px 0}` +
+    `.empty-state{text-align:center;padding:60px;color:#999;grid-column:1/-1}` +
+    `@media (min-width:768px){.results{grid-template-columns:repeat(2,1fr)}}` +
+    `@media (min-width:1024px){.results{grid-template-columns:repeat(3,1fr)}}` +
+    `</style></head><body>` +
+    `<div class="header"><h2>\u{1F50D} Search</h2><div class="search-container"><span class="search-icon">\u{1F50D}</span><input type="text" class="search-input" id="q" placeholder="Search members or grievances..." oninput="search(this.value)"></div></div>` +
+    `<div class="tabs"><button class="tab active" onclick="setTab('all',this)">All</button><button class="tab" onclick="setTab('members',this)">Members</button><button class="tab" onclick="setTab('grievances',this)">Grievances</button></div>` +
+    `<div class="results" id="results"><div class="empty-state">Type to search...</div></div>` +
+    `<script>${getClientSideEscapeHtml()}var tab="all";function setTab(t,btn){tab=t;document.querySelectorAll(".tab").forEach(function(tb){tb.classList.remove("active")});btn.classList.add("active");search(document.getElementById("q").value)}function search(q){if(!q||q.length<2){document.getElementById("results").innerHTML="<div class='empty-state'>Type to search...</div>";return}google.script.run.withSuccessHandler(function(data){render(data)}).getMobileSearchData(q,tab)}function render(data){var c=document.getElementById("results");if(!data||data.length===0){c.innerHTML="<div class='empty-state'>No results</div>";return}c.innerHTML=data.map(function(r){return"<div class='result-card'><div class='result-title'>"+(r.type==="member"?"\u{1F464} ":"\u{1F4CB} ")+escapeHtml(r.title)+"</div><div class='result-detail'>"+escapeHtml(r.subtitle)+"</div>"+(r.detail?"<div class='result-detail'>"+escapeHtml(r.detail)+"</div>":"")+"</div>"}).join("")}</script></body></html>`
   ).setWidth(800).setHeight(700);
-  SpreadsheetApp.getUi().showModalDialog(html, '🔍 Search');
+  SpreadsheetApp.getUi().showModalDialog(html, '\u{1F50D} Search');
 }
 
 /**
@@ -1943,7 +1967,7 @@ function emailGrievanceStatusToMember(grievanceId) {
     'Issue Category: ' + (grievance.issueCategory || 'Not specified') + '\n' +
     'Current Status: ' + grievance.status + '\n' +
     'Current Step: ' + grievance.step + '\n' +
-    'Date Filed: ' + (grievance.dateFiled ? new Date(grievance.dateFiled).toLocaleDateString() : 'N/A') + '\n';
+    'Date Filed: ' + (grievance.dateFiled ? Utilities.formatDate(new Date(grievance.dateFiled), Session.getScriptTimeZone(), 'MM/dd/yyyy') : 'N/A') + '\n';
 
   if (grievance.daysToDeadline !== null && grievance.daysToDeadline !== '') {
     if (grievance.daysToDeadline === 'Overdue' || (typeof grievance.daysToDeadline === 'number' && grievance.daysToDeadline < 0)) {
@@ -2028,7 +2052,7 @@ function showMemberGrievanceHistory(memberId) {
   });
   if (mine.length === 0) { SpreadsheetApp.getUi().alert('No grievances for this member.'); return; }
   var list = mine.map(function(g) {
-    return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === GRIEVANCE_STATUS.OPEN ? '#f44336' : '#4caf50') + '"><strong>' + escapeHtml(g.id) + '</strong><br><span style="color:#666">Status: ' + escapeHtml(g.status) + ' | Step: ' + escapeHtml(g.step) + '</span><br><span style="color:#888;font-size:12px">' + escapeHtml(g.issue) + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
+    return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === GRIEVANCE_STATUS.OPEN ? '#f44336' : '#4caf50') + '"><strong>' + escapeHtml(g.id) + '</strong><br><span style="color:#666">Status: ' + escapeHtml(g.status) + ' | Step: ' + escapeHtml(g.step) + '</span><br><span style="color:#888;font-size:12px">' + escapeHtml(g.issue) + ' | Filed: ' + (g.filed ? Utilities.formatDate(new Date(g.filed), Session.getScriptTimeZone(), 'MM/dd/yyyy') : 'N/A') + '</span></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + escapeHtml(memberId) + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === GRIEVANCE_STATUS.OPEN; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== GRIEVANCE_STATUS.OPEN; }).length + '</div>' + list + '</body></html>'
@@ -2106,7 +2130,7 @@ function sendMemberDashboardLink() {
       COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
-      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your SolidBase Access", body);
+      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
       cache.put(cacheKey, '1', 300); // 5-minute cooldown per recipient
       ui.alert('Dashboard access link sent to ' + email);
     } catch (e) {
@@ -3650,11 +3674,12 @@ function modalSaveCaseChecklist(updates) {
 
     for (var i = 0; i < updates.length; i++) {
       var u = updates[i];
-      sheet.getRange(u.row, 7).setValue(u.completed);  // Completed column
+      var rowValues = [u.completed];
       if (u.completed) {
-        sheet.getRange(u.row, 8).setValue(escapeForFormula(user));  // Completed By
-        sheet.getRange(u.row, 9).setValue(now);                     // Completed Date
+        rowValues.push(escapeForFormula(user));  // Completed By
+        rowValues.push(now);                     // Completed Date
       }
+      sheet.getRange(u.row, 7, 1, rowValues.length).setValues([rowValues]);
     }
 
     return { success: true };
@@ -3696,6 +3721,7 @@ function getSurveyResponseViewerHtml_() {
     '<div class="nav-btns"><button class="btn btn-secondary" onclick="prev()">← Previous</button>' +
     '<button class="btn btn-secondary" onclick="next()">Next →</button></div></div>' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'var responses = [], headers = [], idx = 0;' +
     'google.script.run.withSuccessHandler(function(data) {' +
     '  document.getElementById("loading").style.display = "none";' +
@@ -3707,15 +3733,15 @@ function getSurveyResponseViewerHtml_() {
     'function renderResponse() {' +
     '  var r = responses[idx]; document.getElementById("counter").textContent = "Response " + (idx+1) + " of " + responses.length;' +
     '  var html = "<div class=\\"demo-info\\">";' +
-    '  for (var i = 0; i < Math.min(5, r.length); i++) { html += "<div class=\\"demo-item\\"><strong>" + headers[i] + ":</strong> " + (r[i] || "—") + "</div>"; }' +
+    '  for (var i = 0; i < Math.min(5, r.length); i++) { html += "<div class=\\"demo-item\\"><strong>" + escapeHtml(headers[i]) + ":</strong> " + escapeHtml(r[i] || "—") + "</div>"; }' +
     '  html += "</div>";' +
     '  for (var j = 5; j < r.length; j++) {' +
     '    var val = parseFloat(r[j]); var label = headers[j] || "Q" + (j+1);' +
     '    if (!isNaN(val) && val >= 1 && val <= 10) {' +
     '      var pct = val * 10; var color = val >= 7 ? "#6EE7B7" : (val >= 4 ? "#FDE68A" : "#FCA5A5");' +
-    '      html += "<div class=\\"q-row\\"><span class=\\"q-label\\">" + label + "</span><div class=\\"bar-bg\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"></div></div><span class=\\"q-value\\">"+val+"</span></div>";' +
+    '      html += "<div class=\\"q-row\\"><span class=\\"q-label\\">" + escapeHtml(label) + "</span><div class=\\"bar-bg\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"></div></div><span class=\\"q-value\\">"+val+"</span></div>";' +
     '    } else if (r[j]) {' +
-    '      html += "<div style=\\"margin-bottom:8px\\"><strong style=\\"font-size:13px\\">" + label + ":</strong> <span style=\\"font-size:13px\\">" + r[j] + "</span></div>";' +
+    '      html += "<div style=\\"margin-bottom:8px\\"><strong style=\\"font-size:13px\\">" + escapeHtml(label) + ":</strong> <span style=\\"font-size:13px\\">" + escapeHtml(r[j]) + "</span></div>";' +
     '    }' +
     '  }' +
     '  document.getElementById("responseCard").innerHTML = html;' +
@@ -3784,11 +3810,11 @@ function getWelcomeWizardHtml_() {
     '<script>' +
     'var step = 0, totalSteps = 4;' +
     'var steps = [' +
-    '  { title: "Welcome to Your SolidBase!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
+    '  { title: "Welcome to Your Union Dashboard!", desc: "This wizard will guide you through the essential setup steps. You can always come back to this wizard from the Admin menu.<br><br><strong>What you will configure:</strong><br>1. Organization details<br>2. Steward setup<br>3. Key features<br>4. Final checks" },' +
     '  { title: "Step 1: Organization Setup", desc: "Open the <strong>Config</strong> tab and fill in:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Organization Name</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Local Number</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Time Zone</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Contact Email</div>" },' +
     '  { title: "Step 2: Add Your First Members", desc: "Open <strong>Member Directory</strong> and add at least one member:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Add yourself as the first steward</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Import or manually add members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Assign steward roles</div>" },' +
     '  { title: "Step 3: Explore Key Features", desc: "Try these essential features:<br><br><div class=\\"check-item\\"><input type=\\"checkbox\\"> Open Union Hub menu — explore Search & Members</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Create a test grievance case</div><div class=\\"check-item\\"><input type=\\"checkbox\\"> Check the Getting Started tab for more guidance</div>" },' +
-    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using SolidBase!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
+    '  { title: "Setup Complete! 🎉", desc: "You are ready to start using your Union Dashboard!<br><br><strong>Quick links:</strong><br>• 📊 Union Hub — Daily operations<br>• 🔧 Tools — Calendar, drive, notifications<br>• 🛠️ Admin — System management<br>• ❓ FAQ — Common questions<br><br>You can re-run this wizard anytime from Admin menu." }' +
     '];' +
     'totalSteps = steps.length;' +
     'function render() {' +
@@ -3831,6 +3857,7 @@ function getSearchableHelpHtml_() {
     '<div class="tab" onclick="switchTab(\'tips\')">Quick Tips</div></div>' +
     '<div class="results-container" id="results"><div class="msg msg-info">Loading help content...</div></div>' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'var allItems = [], activeTab = "all";' +
     'google.script.run.withSuccessHandler(function(data) {' +
     '  allItems = data || [];' +
@@ -3851,7 +3878,7 @@ function getSearchableHelpHtml_() {
     '  for (var i = 0; i < Math.min(filtered.length, 50); i++) {' +
     '    var it = filtered[i];' +
     '    var badge = it.source === "faq" ? "❓ FAQ" : (it.source === "features" ? "📋 Feature" : "💡 Tip");' +
-    '    html += "<div class=\\"result\\"><span class=\\"result-source\\">" + badge + "</span><div class=\\"result-title\\">" + it.title + "</div><div class=\\"result-text\\">" + (it.text.length > 150 ? it.text.substring(0, 147) + "..." : it.text) + "</div></div>";' +
+    '    html += "<div class=\\"result\\"><span class=\\"result-source\\">" + badge + "</span><div class=\\"result-title\\">" + escapeHtml(it.title) + "</div><div class=\\"result-text\\">" + escapeHtml(it.text.length > 150 ? it.text.substring(0, 147) + "..." : it.text) + "</div></div>";' +
     '  }' +
     '  document.getElementById("results").innerHTML = html;' +
     '}' +
@@ -4006,14 +4033,17 @@ function modalSaveQuestion(data) {
     if (!sheet) return { success: false, error: 'Survey Questions sheet not found' };
 
     // Write back edited fields (skip ID/col 1 and sectionKey/col 3 — auto-generated)
+    // Batch: col 2 (section), then cols 4-10 (sectionTitle through branchParent)
     sheet.getRange(data.row, 2).setValue(escapeForFormula(data.section));
-    sheet.getRange(data.row, 4).setValue(escapeForFormula(data.sectionTitle));
-    sheet.getRange(data.row, 5).setValue(escapeForFormula(data.questionText));
-    sheet.getRange(data.row, 6).setValue(escapeForFormula(data.type));
-    sheet.getRange(data.row, 7).setValue(escapeForFormula(data.required));
-    sheet.getRange(data.row, 8).setValue(escapeForFormula(data.active));
-    sheet.getRange(data.row, 9).setValue(escapeForFormula(data.options));
-    sheet.getRange(data.row, 10).setValue(escapeForFormula(data.branchParent));
+    sheet.getRange(data.row, 4, 1, 7).setValues([[
+      escapeForFormula(data.sectionTitle),
+      escapeForFormula(data.questionText),
+      escapeForFormula(data.type),
+      escapeForFormula(data.required),
+      escapeForFormula(data.active),
+      escapeForFormula(data.options),
+      escapeForFormula(data.branchParent)
+    ]]);
 
     return { success: true };
   } catch (e) {

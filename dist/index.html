@@ -513,7 +513,7 @@
   cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
   tasks: '#f59e0b', home: '#ff3366',
   more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-  resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
+  resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
   polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
   events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
   testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -611,15 +611,10 @@
   _manageCrtOverlay(isCyber);
 
   
-  var embedRoot = document.querySelector('.madds-embed');
+  var embedRoot = document.querySelector('.oc-embed');
   if (embedRoot) {
    if (!AppState.isDark) embedRoot.classList.add('light');
    else embedRoot.classList.remove('light');
-  }
-  var agencyRoot = document.querySelector('.agency-oc');
-  if (agencyRoot) {
-   if (AppState.isDark) agencyRoot.classList.add('dark');
-   else agencyRoot.classList.remove('dark');
   }
   }
 
@@ -2772,7 +2767,6 @@
   { group: 'Reference' },
   { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
   { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
-  { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -3076,7 +3070,7 @@
     }
    });
    
-   var embedRoot = wrap.querySelector('.madds-embed');
+   var embedRoot = wrap.querySelector('.oc-embed');
    if (embedRoot) {
     if (!AppState.isDark) embedRoot.classList.add('light');
     else embedRoot.classList.remove('light');
@@ -3107,45 +3101,17 @@
 
  
  function renderAgencyOrgChart(appContainer, role) {
-  var mySwitch = _navSwitchId;
-  var myGen = _renderGeneration;
   renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
-  showLoading(container);
-  google.script.run
-   .withSuccessHandler(function(html) {
-   if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return;
-   container.innerHTML = '';
-   container.classList.add('orgchart-content');
-   var wrap = el('div');
-   wrap.innerHTML = html;
-   container.appendChild(wrap);
-   
-   wrap.querySelectorAll('script').forEach(function(old) {
-    try {
-    var s = document.createElement('script');
-    s.textContent = old.textContent;
-    old.parentNode.removeChild(old);
-    document.head.appendChild(s);
-    } catch (scriptErr) {
-    console.error('Agency org chart script re-execution failed:', scriptErr);
-    }
-   });
-   
-   var agencyRoot = wrap.querySelector('.agency-oc');
-   if (agencyRoot) {
-    if (AppState.isDark) agencyRoot.classList.add('dark');
-    else agencyRoot.classList.remove('dark');
-   }
-   
-   if (typeof window.agencyOC_init === 'function') {
-    try { window.agencyOC_init(); } catch (_e) {  }
-   }
-   })
-   .withFailureHandler(function(err) {
-   container.innerHTML = '';
-   container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load agency org chart.'));
-   })
-   .getAgencyOrgChartHtml();
+  container.innerHTML = '';
+  container.appendChild(el('div', { className: 'empty-state' }, 'Agency org chart is not available in this edition.'));
+  });
+ }
+
+ 
+ function renderPOMSReference(appContainer, role) {
+  renderPageLayout(appContainer, role, 'poms', function(container) {
+  container.innerHTML = '';
+  container.appendChild(el('div', { className: 'empty-state' }, 'POMS Reference is not available in this edition.'));
   });
  }
 
@@ -3325,21 +3291,7 @@
   _navProgressDone();
   return;
   }
-  if (tabId === 'maddsorgchart') {
-  if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
-   if (typeof _renderDuesGate === 'function') {
-   _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
-   }
-   _navProgressDone();
-   return;
-  }
-  _hideAllVisiblePanes();
-  _splitRenderTarget = 'primary';
-  renderAgencyOrgChart(app, role);
-  _activePane = _layoutCache.content;
-  _navProgressDone();
-  return;
-  }
+
   
   if (switchId !== _navSwitchId) { _navProgressDone(); return; }
 

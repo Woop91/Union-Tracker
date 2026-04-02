@@ -1,3 +1,4 @@
+// Tests cross-cutting code quality: sanitizeFolderName_, padRight, etc.
 /**
  * Tests for 10_Code (split into 10a-10d modules)
  *
@@ -80,28 +81,30 @@ describe('SATISFACTION_FORM_CONFIG', () => {
 // ============================================================================
 
 describe('sanitizeFolderName_', () => {
+  // sanitizeFolderName_ now delegates to sanitizeFolderName (05_Integrations.gs)
+  // which replaces spaces with underscores for consistent folder names
   test('removes slashes', () => {
-    expect(sanitizeFolderName_('John / Smith')).toBe('John Smith');
+    expect(sanitizeFolderName_('John / Smith')).toBe('John_Smith');
   });
 
   test('removes backslashes', () => {
-    expect(sanitizeFolderName_('John \\ Smith')).toBe('John Smith');
+    expect(sanitizeFolderName_('John \\ Smith')).toBe('John_Smith');
   });
 
   test('removes colons, asterisks, question marks, quotes, angle brackets, pipes', () => {
     expect(sanitizeFolderName_('a:b*c?"d<e>f|g')).toBe('abcdefg');
   });
 
-  test('collapses multiple spaces into one', () => {
-    expect(sanitizeFolderName_('John    Smith')).toBe('John Smith');
+  test('collapses multiple spaces into single underscore', () => {
+    expect(sanitizeFolderName_('John    Smith')).toBe('John_Smith');
   });
 
   test('trims leading and trailing whitespace', () => {
-    expect(sanitizeFolderName_('  John Smith  ')).toBe('John Smith');
+    expect(sanitizeFolderName_('  John Smith  ')).toBe('John_Smith');
   });
 
-  test('combined: "  John / Smith  " becomes "John Smith"', () => {
-    expect(sanitizeFolderName_('  John / Smith  ')).toBe('John Smith');
+  test('combined: "  John / Smith  " becomes "John_Smith"', () => {
+    expect(sanitizeFolderName_('  John / Smith  ')).toBe('John_Smith');
   });
 
   test('returns empty string for null', () => {
@@ -122,8 +125,8 @@ describe('sanitizeFolderName_', () => {
     expect(result.length).toBe(50);
   });
 
-  test('handles already-clean names', () => {
-    expect(sanitizeFolderName_('Clean Name')).toBe('Clean Name');
+  test('handles already-clean names (spaces become underscores)', () => {
+    expect(sanitizeFolderName_('Clean Name')).toBe('Clean_Name');
   });
 
   test('converts non-string to string via toString', () => {

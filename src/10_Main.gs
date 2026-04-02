@@ -68,19 +68,16 @@ function onOpen() {
 
 /**
  * Deferred onOpen tasks — runs heavy init after the UI is responsive.
- * Called by a 1-second timed trigger created in onOpen().
+ * Installed as a persistent installable onOpen trigger via setupOpenDeferredTrigger().
+ * Has full authorization (can show modals, access ScriptApp, etc.).
  * @private
  */
 function onOpenDeferred_() {
-  try {
-    // Delete this one-shot trigger so it doesn't accumulate
-    var triggers = ScriptApp.getProjectTriggers();
-    for (var t = 0; t < triggers.length; t++) {
-      if (triggers[t].getHandlerFunction() === 'onOpenDeferred_') {
-        ScriptApp.deleteTrigger(triggers[t]);
-      }
-    }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  // FIX v4.50.7: Removed self-deletion code that was left over from the old
+  // one-shot timed trigger approach. This function is now installed as a
+  // PERSISTENT installable onOpen trigger via setupOpenDeferredTrigger().
+  // Deleting the trigger here meant it only fired on the first open after
+  // install — all subsequent opens skipped deferred init entirely.
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
@@ -130,6 +127,29 @@ function onOpenDeferred_() {
     // Registering here wastes ~200ms on spreadsheet open for no benefit.
 
     ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F SolidBase', 3);
+
+    // FIX v4.50.7: Auto-show tab modal for the active sheet on spreadsheet open.
+    // This works because onOpenDeferred_ is an INSTALLABLE trigger with full
+    // authorization — unlike onSelectionChange (simple trigger) which cannot call
+    // showModalDialog(). Respects ENABLE_TAB_MODALS config and per-user dismissals.
+    try {
+      if (typeof showCurrentTabModal === 'function' &&
+          (typeof isTabModalsEnabled_ !== 'function' || isTabModalsEnabled_())) {
+        var activeSheet = ss.getActiveSheet().getName();
+        // Check per-user dismissal before showing
+        var sheetKey = '';
+        if (typeof SHEETS !== 'undefined') {
+          for (var sk in SHEETS) {
+            if (SHEETS[sk] === activeSheet) { sheetKey = sk; break; }
+          }
+        }
+        if (!sheetKey || typeof isTabModalDismissed_ !== 'function' || !isTabModalDismissed_(sheetKey)) {
+          showCurrentTabModal();
+        }
+      }
+    } catch (modalErr) {
+      Logger.log('Auto-open tab modal skipped: ' + modalErr.message);
+    }
   } catch (deferredErr) {
     Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
     if (typeof logAuditEvent === 'function') {
@@ -245,7 +265,13 @@ function onSelectionChange(e) {
     }
 
     // ── Multi-select auto-open ──
-    var autoOpen = props.getProperty('multiSelectAutoOpen');
+    // Cache the preference to avoid reading PropertiesService on every selection change
+    var userCache = CacheService.getUserCache();
+    var autoOpen = userCache ? userCache.get('autoOpenPref') : null;
+    if (autoOpen === null) {
+      autoOpen = props.getProperty('multiSelectAutoOpen');
+      if (userCache) try { userCache.put('autoOpenPref', autoOpen || '', 300); } catch(_) {}
+    }
     // Default is ON — only skip if user has explicitly disabled it ('false').
     // Absence of the property (fresh install) means enabled.
     if (autoOpen === 'false') return;
@@ -352,11 +378,18 @@ function handleSecurityAudit_(e) {
     var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
 
     if (!auditSheet) {
-      // Create audit log sheet if it doesn't exist
-      auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
-      auditSheet.setFrozenRows(1);
-      setSheetVeryHidden_(auditSheet);
+      // Delegate to canonical schema setup in 08d_AuditAndFormulas.gs
+      if (typeof setupAuditLogSheet === 'function') {
+        setupAuditLogSheet();
+        auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+      }
+      if (!auditSheet) {
+        // Fallback: create with correct headers
+        auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
+        auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
+        auditSheet.setFrozenRows(1);
+        setSheetVeryHidden_(auditSheet);
+      }
     }
 
     var userEmail = '';
@@ -373,7 +406,14 @@ function handleSecurityAudit_(e) {
     // SABOTAGE PROTECTION: Detect mass deletions (>15 cells cleared)
     // Exclude multi-cell paste operations (e.value is undefined for pastes AND deletions,
     // but pastes set range values while deletions clear them)
-    var rangeIsEmpty = range.isBlank();
+    // Skip isBlank check for very large edits — too expensive for simple trigger context
+    var rangeIsEmpty = false;
+    if (numCells <= 500) {
+      rangeIsEmpty = range.isBlank();
+    } else if (!e.value) {
+      // For large ranges, sample the first cell as a heuristic
+      try { rangeIsEmpty = range.getCell(1, 1).isBlank(); } catch(_) { rangeIsEmpty = false; }
+    }
     if (numCells > 15 && !e.value && rangeIsEmpty) {
       alertMessage = 'MASS_DELETION_ALERT';
 
@@ -418,13 +458,40 @@ function handleSecurityAudit_(e) {
       alert: alertMessage || ''
     });
 
-    auditSheet.appendRow([
+    var auditRow = [
       new Date(),
       alertMessage || 'CELL_EDIT',
       userEmail,
       details,
       ''
-    ]);
+    ];
+
+    // Batch audit writes via CacheService to reduce appendRow calls
+    var cache = CacheService.getScriptCache();
+    var queueKey = 'AUDIT_EVENT_QUEUE';
+    var batchLock = LockService.getScriptLock();
+    if (batchLock.tryLock(2000)) {
+      try {
+        var existing = cache.get(queueKey);
+        var queue = existing ? JSON.parse(existing) : [];
+        // Serialize Date for JSON storage
+        auditRow[0] = auditRow[0].toISOString();
+        queue.push(auditRow);
+        if (queue.length >= 10) {
+          // Flush batch — restore Date objects
+          for (var qi = 0; qi < queue.length; qi++) {
+            queue[qi][0] = new Date(queue[qi][0]);
+          }
+          auditSheet.getRange(auditSheet.getLastRow() + 1, 1, queue.length, queue[0].length).setValues(queue);
+          cache.remove(queueKey);
+        } else {
+          cache.put(queueKey, JSON.stringify(queue), 120);
+        }
+      } finally { batchLock.releaseLock(); }
+    } else {
+      // Fallback: direct append if lock unavailable
+      auditSheet.appendRow(auditRow);
+    }
 
   } catch (auditError) {
     // Silently fail - don't break user's edit for audit logging
@@ -555,11 +622,60 @@ function sendEscalationAlert_(memberName, caseID, status) {
                'Immediate review is required.\n' +
                COMMAND_CONFIG.EMAIL.FOOTER;
 
-    MailApp.sendEmail(chiefStewardEmail, subject, body);
-    SpreadsheetApp.getActiveSpreadsheet().toast('Escalation alert sent to Chief Steward', 'Alert Sent', 3);
+    // L-41: MailApp is unavailable in simple trigger context (onEdit).
+    // Try direct send first; if it fails, queue for daily trigger flush.
+    try {
+      safeSendEmail_({ to: chiefStewardEmail, subject: subject, body: body });
+      SpreadsheetApp.getActiveSpreadsheet().toast('Escalation alert sent to Chief Steward', 'Alert Sent', 3);
+    } catch (_sendErr) {
+      _queueEscalationEmail(chiefStewardEmail, subject, body);
+      Logger.log('Escalation email queued for daily flush (simple trigger context)');
+    }
   } catch (emailError) {
     Logger.log('Escalation email error: ' + emailError.message);
   }
+}
+
+/**
+ * Queues an escalation email for later flush by a daily time-driven trigger.
+ * Used when MailApp is unavailable (e.g., simple trigger context).
+ * @param {string} to - Recipient email
+ * @param {string} subject - Email subject
+ * @param {string} body - Email body
+ * @private
+ */
+function _queueEscalationEmail(to, subject, body) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var queue = JSON.parse(props.getProperty('ESCALATION_EMAIL_QUEUE') || '[]');
+    queue.push({ to: to, subject: subject, body: body, queued: new Date().toISOString() });
+    props.setProperty('ESCALATION_EMAIL_QUEUE', JSON.stringify(queue));
+  } catch(_) {}
+}
+
+/**
+ * Flushes queued escalation emails. Call from a daily time-driven trigger.
+ * @returns {number} Number of emails sent
+ */
+function flushEscalationEmailQueue() {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty('ESCALATION_EMAIL_QUEUE');
+  if (!raw) return 0;
+  var queue = [];
+  try { queue = JSON.parse(raw); } catch(_) { return 0; }
+  if (!queue.length) return 0;
+
+  var sent = 0;
+  for (var i = 0; i < queue.length; i++) {
+    try {
+      safeSendEmail_({ to: queue[i].to, subject: queue[i].subject, body: queue[i].body });
+      sent++;
+    } catch(e) {
+      Logger.log('flushEscalationEmailQueue error: ' + e.message);
+    }
+  }
+  props.deleteProperty('ESCALATION_EMAIL_QUEUE');
+  return sent;
 }
 
 /**
@@ -652,6 +768,9 @@ function handleGrievanceEdit(e) {
 
   const sheet = e.range.getSheet();
 
+  // Batch-read the entire row once to avoid multiple getValue() calls
+  var rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+
   // Only update Next Action Due when status or step date changes, not on every edit
   var statusAndDateCols = [
     GRIEVANCE_COLS.STATUS, GRIEVANCE_COLS.CURRENT_STEP,
@@ -662,20 +781,20 @@ function handleGrievanceEdit(e) {
   if (statusAndDateCols.indexOf(col) !== -1) {
     // Compute the actual next deadline based on current step, matching the logic
     // in recalculateDownstreamDeadlines_. Only set to a real deadline date, not now().
-    var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
-    var status = sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue();
+    var currentStep = rowData[GRIEVANCE_COLS.CURRENT_STEP - 1];
+    var status = rowData[GRIEVANCE_COLS.STATUS - 1];
     var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
 
     if (closedStatuses.indexOf(status) === -1 && currentStep) {
       var nextActionDate = '';
       if (currentStep === 'Informal') {
-        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.FILING_DEADLINE).getValue();
+        nextActionDate = rowData[GRIEVANCE_COLS.FILING_DEADLINE - 1];
       } else if (currentStep === 'Step I') {
-        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP1_DUE).getValue();
+        nextActionDate = rowData[GRIEVANCE_COLS.STEP1_DUE - 1];
       } else if (currentStep === 'Step II') {
-        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP2_DUE).getValue();
+        nextActionDate = rowData[GRIEVANCE_COLS.STEP2_DUE - 1];
       } else if (currentStep === 'Step III') {
-        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP3_APPEAL_DUE).getValue();
+        nextActionDate = rowData[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1];
       }
 
       if (nextActionDate instanceof Date) {
@@ -696,7 +815,7 @@ function handleGrievanceEdit(e) {
   if (col === GRIEVANCE_COLS.STATUS) {
     try {
       const settings = typeof getSettings === 'function' ? getSettings() : {};
-      const grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+      const grievanceId = rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
       // Auto-sync to calendar if enabled
       if (settings.autoSyncCalendar && grievanceId && typeof syncSingleGrievanceToCalendar === 'function') {

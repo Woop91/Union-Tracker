@@ -7,7 +7,7 @@
  *   OC3: Script re-execution must use reliable global-scope injection
  *   OC4: _initDesktopRan flag must be reset before script re-execution
  *   OC5: All onclick handlers in org_chart.html must reference declared functions
- *   OC6: Light/dark mode toggle must exist and reference maddstoggleMode
+ *   OC6: Light/dark mode toggle must exist and reference ocToggleMode
  *   OC7: Org chart pill buttons must have matching toggle targets (id exists)
  *   OC8: renderOrgChart must mark container for CSS override
  *
@@ -37,9 +37,9 @@ const stylesCode = read('styles.html');
 describe('OC1: Org chart is not clipped by parent max-width', () => {
   test('styles.html has a max-width override for org chart content', () => {
     // There must be a CSS rule that removes max-width for the org chart container.
-    // Accept either :has(.madds-embed) or .orgchart-content class-based override.
+    // Accept either :has(.oc-embed) / :has(.madds-embed) or .orgchart-content class-based override.
     const hasOverride =
-      stylesCode.includes('.madds-embed') && stylesCode.includes('max-width: none') ||
+      (stylesCode.includes('.oc-embed') || stylesCode.includes('.madds-embed')) && stylesCode.includes('max-width: none') ||
       stylesCode.includes('orgchart-content') && stylesCode.includes('max-width: none');
     expect(hasOverride).toBe(true);
   });
@@ -73,7 +73,7 @@ describe('OC2: Org chart interactive functions are explicitly global', () => {
     'maToggle',
     'togglePSGroup',
     'toggleOtherGroup',
-    'maddstoggleMode',
+    'ocToggleMode',
     'initDesktop',
   ];
 
@@ -127,7 +127,7 @@ describe('OC3: renderOrgChart script re-execution is reliable', () => {
 // ============================================================================
 // Bug: _initDesktopRan was set to true on first visit and never reset. When
 // the user navigated away and back, initDesktop() wouldn't run, leaving
-// Agency sub-sections in an incorrect state.
+// org chart sub-sections in an incorrect state.
 
 describe('OC4: _initDesktopRan is reset for SPA re-navigation', () => {
   test('org_chart.html declares _initDesktopRan on window (resets on re-execution)', () => {
@@ -190,25 +190,25 @@ describe('OC5: onclick handlers reference declared functions', () => {
 // ============================================================================
 // OC6: LIGHT/DARK MODE TOGGLE EXISTS AND IS WIRED
 // ============================================================================
-// Bug: The light/dark mode toggle button existed but maddstoggleMode() wasn't
+// Bug: The light/dark mode toggle button existed but ocToggleMode() wasn't
 // globally accessible, so clicking the button did nothing.
 
 describe('OC6: Light/dark mode toggle is functional', () => {
-  test('madds-mode-toggle button exists with onclick', () => {
-    expect(orgChartCode).toMatch(/id="madds-mode-toggle"/);
-    expect(orgChartCode).toMatch(/onclick="maddstoggleMode\(\)"/);
+  test('oc-mode-toggle button exists with onclick', () => {
+    expect(orgChartCode).toMatch(/id="oc-mode-toggle"/);
+    expect(orgChartCode).toMatch(/onclick="ocToggleMode\(\)"/);
   });
 
-  test('maddstoggleMode toggles .light class on .madds-embed', () => {
-    expect(orgChartCode).toMatch(/\.madds-embed/);
+  test('ocToggleMode toggles .light class on .oc-embed', () => {
+    expect(orgChartCode).toMatch(/\.oc-embed/);
     expect(orgChartCode).toMatch(/classList\.toggle\s*\(\s*['"]light['"]\s*\)/);
   });
 
   test('light mode CSS variables are defined', () => {
-    expect(orgChartCode).toMatch(/\.madds-embed\.light\s*\{/);
+    expect(orgChartCode).toMatch(/\.oc-embed\.light\s*\{/);
     // Must override key variables
-    expect(orgChartCode).toMatch(/\.madds-embed\.light[\s\S]*?--bg:/);
-    expect(orgChartCode).toMatch(/\.madds-embed\.light[\s\S]*?--txt:/);
+    expect(orgChartCode).toMatch(/\.oc-embed\.light[\s\S]*?--bg:/);
+    expect(orgChartCode).toMatch(/\.oc-embed\.light[\s\S]*?--txt:/);
   });
 });
 
@@ -297,20 +297,20 @@ describe('OC7: Pill button toggle targets exist in the HTML', () => {
 
 
 // ============================================================================
-// OC8: MADDS-EMBED WRAPPER SCOPING
+// OC8: OC-EMBED WRAPPER SCOPING
 // ============================================================================
 // Bug: Org chart styles leaked into the SPA or SPA styles leaked into the
-// org chart because CSS wasn't properly scoped under .madds-embed.
+// org chart because CSS wasn't properly scoped under .oc-embed.
 
-describe('OC8: Org chart CSS is scoped under .madds-embed', () => {
-  test('all style rules (except keyframes) are scoped to .madds-embed', () => {
+describe('OC8: Org chart CSS is scoped under .oc-embed', () => {
+  test('all style rules (except keyframes) are scoped to .oc-embed', () => {
     // Extract the <style> block
     const styleEnd = orgChartCode.indexOf('</style>');
     if (styleEnd === -1) return; // no style block
     const styleBlock = orgChartCode.substring(0, styleEnd);
 
     // Find unscoped rules: lines that start a CSS rule block but don't
-    // reference .madds-embed or start with @, #madds-, or are comments
+    // reference .oc-embed or start with @, #oc-, or are comments
     const lines = styleBlock.split('\n');
     const unscopedRules = [];
 
@@ -326,15 +326,15 @@ describe('OC8: Org chart CSS is scoped under .madds-embed', () => {
       if (line.includes('{')) {
         const selector = line.split('{')[0].trim();
         if (!selector) continue;
-        // Must be scoped to .madds-embed OR be #madds-mode-toggle OR be a keyframe name
-        if (selector.includes('.madds-embed') ||
-            selector.includes('#madds-') ||
+        // Must be scoped to .oc-embed OR be #oc-mode-toggle OR be a keyframe name
+        if (selector.includes('.oc-embed') ||
+            selector.includes('#oc-') ||
             selector.startsWith('@') ||
             selector.startsWith('from') ||
             selector.startsWith('to') ||
             /^\d+%/.test(selector)) continue;
 
-        // Allow .page, .tier, etc. inside the .madds-embed <style> block
+        // Allow .page, .tier, etc. inside the .oc-embed <style> block
         // since they're scoped by the wrapper div
         // Only flag selectors that could conflict: html, body, *, etc.
         if (['html', 'body', 'html *', 'body *'].some(s => selector === s)) {
@@ -350,8 +350,8 @@ describe('OC8: Org chart CSS is scoped under .madds-embed', () => {
     expect(unscopedRules).toEqual([]);
   });
 
-  test('org chart HTML is wrapped in .madds-embed div', () => {
-    expect(orgChartCode).toMatch(/<div class="madds-embed">/);
+  test('org chart HTML is wrapped in .oc-embed div', () => {
+    expect(orgChartCode).toMatch(/<div class="oc-embed">/);
   });
 });
 
@@ -363,9 +363,9 @@ describe('OC8: Org chart CSS is scoped under .madds-embed', () => {
 // invisible instead of scrollable.
 
 describe('OC9: Org chart overflow is handled correctly', () => {
-  test('.madds-embed has overflow-x handling', () => {
-    // .madds-embed should handle overflow (hidden is OK since content is self-contained)
-    expect(orgChartCode).toMatch(/\.madds-embed\s*\{[^}]*overflow-x:\s*(hidden|auto)/);
+  test('.oc-embed has overflow-x handling', () => {
+    // .oc-embed should handle overflow (hidden is OK since content is self-contained)
+    expect(orgChartCode).toMatch(/\.oc-embed\s*\{[^}]*overflow-x:\s*(hidden|auto)/);
   });
 
   test('.page uses box-sizing: border-box', () => {

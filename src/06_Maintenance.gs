@@ -228,6 +228,11 @@ function REPAIR_DASHBOARD() {
 
   ss.toast('Starting repair...', '🔧 Repair', 5);
 
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    ui.alert('Another repair is in progress. Please wait and try again.');
+    return;
+  }
   try {
     // Recreate hidden sheets
     ss.toast('Recreating hidden sheets...', '🔧 Progress', 3);
@@ -270,6 +275,8 @@ function REPAIR_DASHBOARD() {
       error: error.message,
       runBy: Session.getActiveUser().getEmail()
     });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -295,53 +302,25 @@ function REPAIR_DASHBOARD() {
  *
  * @returns {Object} Summary with counts of updated, created, and repaired items
  */
-function UPDATE_ALL_SHEETS() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = null;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) { /* headless */ }
+/**
+ * Step 1: Sync column maps.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary - Accumulates updated/created/repaired/errors arrays
+ * @private
+ */
+function _updateStep_syncColumns(ss, summary) {
+  syncColumnMaps();
+  summary.updated.push('Column maps synced');
+  ss.toast('Column maps synced', '🔄 Step 1/8', 2);
+}
 
-  if (ui) {
-    var response = ui.alert(
-      '🔄 Update All Sheets',
-      'This will update every tab in the spreadsheet:\n\n' +
-      '• Update headers on Config, Member Directory, Grievance Log\n' +
-      '• Ensure all feature sheets exist (QA, Timeline, Workload, etc.)\n' +
-      '• Refresh hidden calculation sheets & formulas\n' +
-      '• Reapply data validations (dropdowns)\n' +
-      '• Re-enforce hidden sheet protection\n' +
-      '• Reorder sheets to standard layout\n' +
-      '• Sync all calculation data\n\n' +
-      'Your data will NOT be deleted.\n\n' +
-      'Continue?',
-      ui.ButtonSet.YES_NO
-    );
-    if (response !== ui.Button.YES) {
-      ui.alert('Update cancelled.');
-      return { cancelled: true };
-    }
-  }
-
-  var summary = {
-    updated: [],
-    created: [],
-    repaired: [],
-    errors: [],
-    startTime: new Date()
-  };
-
-  ss.toast('Starting full sheet update...', '🔄 Update', 5);
-
-  // ── STEP 1: Sync column maps ─────────────────────────────────────────────
-  try {
-    syncColumnMaps();
-    summary.updated.push('Column maps synced');
-    ss.toast('Column maps synced', '🔄 Step 1/8', 2);
-  } catch (e) {
-    summary.errors.push('syncColumnMaps: ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS syncColumnMaps error: ' + e.message);
-  }
-
-  // ── STEP 2: Update core data sheet headers ────────────────────────────────
+/**
+ * Step 2: Update core data sheet headers (Config, Member Dir, Grievance Log, etc.).
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_headers(ss, summary) {
   var step2 = 'Config';
   try {
     step2 = 'Config';
@@ -367,11 +346,17 @@ function UPDATE_ALL_SHEETS() {
 
     ss.toast('Core data sheets updated', '🔄 Step 2/8', 2);
   } catch (e) {
-    summary.errors.push('Step 2 (' + step2 + '): ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS step 2 error (' + step2 + '): ' + e.message);
+    throw new Error('Step 2 (' + step2 + '): ' + e.message);
   }
+}
 
-  // ── STEP 3: Ensure all feature sheets exist ───────────────────────────────
+/**
+ * Step 3: Ensure all feature sheets exist.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_featureSheets(ss, summary) {
   ss.toast('Ensuring feature sheets...', '🔄 Step 3/8', 3);
   var featureSteps = [
     { name: 'Survey Questions', fn: function() { createSurveyQuestionsSheet(ss); } },
@@ -414,84 +399,143 @@ function UPDATE_ALL_SHEETS() {
     }
   }
   ss.toast('Feature sheets ready', '🔄 Step 3/8', 2);
+}
 
-  // ── STEP 4: Refresh hidden calculation sheets ─────────────────────────────
+/**
+ * Step 4: Refresh hidden calculation sheets.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_hiddenSheets(ss, summary) {
   ss.toast('Refreshing hidden sheets...', '🔄 Step 4/8', 3);
-  try {
-    setupHiddenSheets(ss);
-    summary.repaired.push('Hidden calculation sheets (16)');
-    ss.toast('Hidden sheets refreshed', '🔄 Step 4/8', 2);
-  } catch (e) {
-    summary.errors.push('setupHiddenSheets: ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS setupHiddenSheets error: ' + e.message);
-  }
+  setupHiddenSheets(ss);
+  summary.repaired.push('Hidden calculation sheets (16)');
+  ss.toast('Hidden sheets refreshed', '🔄 Step 4/8', 2);
 
   // Also refresh the self-contained hidden sheets (08d)
-  try {
-    if (typeof setupAllHiddenSheets === 'function') {
-      setupAllHiddenSheets();
-      summary.repaired.push('Self-contained calc sheets (7)');
-    }
-  } catch (e) {
-    summary.errors.push('setupAllHiddenSheets: ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS setupAllHiddenSheets error: ' + e.message);
+  if (typeof setupAllHiddenSheets === 'function') {
+    setupAllHiddenSheets();
+    summary.repaired.push('Self-contained calc sheets (7)');
   }
+}
 
-  // ── STEP 5: Reapply data validations ──────────────────────────────────────
+/**
+ * Step 5: Reapply data validations (dropdowns).
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_validation(ss, summary) {
   ss.toast('Reapplying validations...', '🔄 Step 5/8', 3);
-  try {
-    setupDataValidations();
-    summary.updated.push('Data validations (dropdowns)');
-  } catch (e) {
-    summary.errors.push('setupDataValidations: ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS setupDataValidations error: ' + e.message);
-  }
+  setupDataValidations();
+  summary.updated.push('Data validations (dropdowns)');
+}
 
-  // ── STEP 6: Re-enforce hidden sheet protection ────────────────────────────
+/**
+ * Step 6: Re-enforce hidden sheet protection.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_protection(ss, summary) {
   ss.toast('Enforcing hidden sheet protection...', '🔄 Step 6/8', 3);
-  try {
-    var allSheets = ss.getSheets();
-    var hiddenCount = 0;
-    for (var h = 0; h < allSheets.length; h++) {
-      var sName = allSheets[h].getName();
-      if (sName.charAt(0) === '_') {
-        setSheetVeryHidden_(allSheets[h]);
-        hiddenCount++;
-      }
+  var allSheets = ss.getSheets();
+  var hiddenCount = 0;
+  for (var h = 0; h < allSheets.length; h++) {
+    var sName = allSheets[h].getName();
+    if (sName.charAt(0) === '_') {
+      setSheetVeryHidden_(allSheets[h]);
+      hiddenCount++;
     }
-    summary.repaired.push(hiddenCount + ' hidden sheets re-protected');
-  } catch (e) {
-    summary.errors.push('Hidden sheet enforcement: ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS hidden enforcement error: ' + e.message);
   }
+  summary.repaired.push(hiddenCount + ' hidden sheets re-protected');
+}
 
-  // ── STEP 7: Reorder sheets ────────────────────────────────────────────────
+/**
+ * Step 7: Reorder sheets to standard layout.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_reorder(ss, summary) {
   ss.toast('Reordering sheets...', '🔄 Step 7/8', 2);
-  try {
-    reorderSheetsToStandard(ss);
-    summary.updated.push('Sheet order');
-  } catch (e) {
-    summary.errors.push('reorderSheetsToStandard: ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS reorder error: ' + e.message);
-  }
+  reorderSheetsToStandard(ss);
+  summary.updated.push('Sheet order');
+}
 
-  // ── STEP 8: Sync all data ─────────────────────────────────────────────────
+/**
+ * Step 8: Sync all calculation data + repair checkboxes.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_dataSync(ss, summary) {
   ss.toast('Syncing calculation data...', '🔄 Step 8/8', 3);
-  try {
-    syncAllData();
-    summary.updated.push('Calculation data synced');
-  } catch (e) {
-    summary.errors.push('syncAllData: ' + e.message);
-    Logger.log('UPDATE_ALL_SHEETS syncAllData error: ' + e.message);
-  }
+  syncAllData();
+  summary.updated.push('Calculation data synced');
 
   // Also repair checkboxes
-  try {
-    if (typeof repairGrievanceCheckboxes === 'function') repairGrievanceCheckboxes();
-    if (typeof repairMemberCheckboxes === 'function') repairMemberCheckboxes();
-    summary.repaired.push('Checkboxes');
-  } catch (e) {
-    Logger.log('UPDATE_ALL_SHEETS checkbox repair: ' + e.message);
+  if (typeof repairGrievanceCheckboxes === 'function') repairGrievanceCheckboxes();
+  if (typeof repairMemberCheckboxes === 'function') repairMemberCheckboxes();
+  summary.repaired.push('Checkboxes');
+}
+
+function UPDATE_ALL_SHEETS() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = null;
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { /* headless */ }
+
+  if (ui) {
+    var response = ui.alert(
+      '🔄 Update All Sheets',
+      'This will update every tab in the spreadsheet:\n\n' +
+      '• Update headers on Config, Member Directory, Grievance Log\n' +
+      '• Ensure all feature sheets exist (QA, Timeline, Workload, etc.)\n' +
+      '• Refresh hidden calculation sheets & formulas\n' +
+      '• Reapply data validations (dropdowns)\n' +
+      '• Re-enforce hidden sheet protection\n' +
+      '• Reorder sheets to standard layout\n' +
+      '• Sync all calculation data\n\n' +
+      'Your data will NOT be deleted.\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+    if (response !== ui.Button.YES) {
+      ui.alert('Update cancelled.');
+      return { cancelled: true };
+    }
+  }
+
+  var summary = {
+    updated: [],
+    created: [],
+    repaired: [],
+    errors: [],
+    startTime: new Date()
+  };
+
+  ss.toast('Starting full sheet update...', '🔄 Update', 5);
+
+  // Run each step with try/catch for partial failure reporting
+  var steps = [
+    { name: 'Column Sync',     fn: _updateStep_syncColumns },
+    { name: 'Headers',          fn: _updateStep_headers },
+    { name: 'Feature Sheets',   fn: _updateStep_featureSheets },
+    { name: 'Hidden Sheets',    fn: _updateStep_hiddenSheets },
+    { name: 'Validation',       fn: _updateStep_validation },
+    { name: 'Protection',       fn: _updateStep_protection },
+    { name: 'Reorder',          fn: _updateStep_reorder },
+    { name: 'Data Sync',        fn: _updateStep_dataSync }
+  ];
+
+  for (var i = 0; i < steps.length; i++) {
+    try {
+      steps[i].fn(ss, summary);
+    } catch (e) {
+      summary.errors.push(steps[i].name + ': ' + e.message);
+      Logger.log('UPDATE_ALL_SHEETS ' + steps[i].name + ' error: ' + e.message);
+    }
   }
 
   // ── DONE ──────────────────────────────────────────────────────────────────
@@ -586,6 +630,7 @@ function removeDeprecatedTabs() {
     }
 
     if (shouldRemove) {
+      if (ss.getSheets().length <= 1) break;
       try {
         ss.deleteSheet(sheet);
         removed.push(name);
@@ -984,13 +1029,11 @@ function setCachedData(key, data, ttl) {
     }
 
     // PropertiesService limit is ~9KB per property
-    if (str.length < 9000) {
+    var wrappedStr = JSON.stringify({ data: data, timestamp: Date.now() });
+    if (wrappedStr.length < 9000) {
       try {
         var propsCache = PropertiesService.getScriptProperties();
-        propsCache.setProperty(key, JSON.stringify({
-          data: data,
-          timestamp: Date.now()
-        }));
+        propsCache.setProperty(key, wrappedStr);
       } catch (_propsErr) {
         Logger.log('Properties cache write failed for ' + key);
       }

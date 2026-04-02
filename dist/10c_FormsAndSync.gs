@@ -22,7 +22,7 @@
  * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
  */
 var GRIEVANCE_FORM_CONFIG = {
-  // Form URL — set in Config sheet column O, read via getFormUrlFromConfig('grievance')
+  /** @type {string} Empty by default -- populated at runtime from Config sheet via getFormUrlFromConfig() */
   FORM_URL: '',
 
   // Default form field entry IDs — overridden by Script Properties at runtime
@@ -99,12 +99,13 @@ function getCurrentStewardInfo_(ss) {
  * @private
  */
 function sanitizeFolderName_(name) {
+  // Delegate to canonical sanitizeFolderName in 05_Integrations.gs for consistency
+  if (typeof sanitizeFolderName === 'function') return sanitizeFolderName(name);
   if (!name) return '';
-  // Remove characters invalid for Google Drive folder names
   return name.toString().trim()
     .replace(/[\/\\:*?"<>|]/g, '')
-    .replace(/\s+/g, ' ')
-    .substring(0, 50); // Limit length
+    .replace(/\s+/g, '_')
+    .substring(0, 50);
 }
 
 /**
@@ -289,16 +290,29 @@ function syncAllDashboardData() {
       return;
     }
 
-    // Sync hidden calculation sheets first
-    if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
-    if (typeof syncDashboardCalcValues === 'function') syncDashboardCalcValues();
-    if (typeof syncStewardPerformanceValues === 'function') syncStewardPerformanceValues();
+    // Sync hidden calculation sheets first — track per-step errors
+    var syncErrors = [];
+    var syncSteps = [
+      { name: 'syncGrievanceCalcSheet', fn: typeof syncGrievanceCalcSheet === 'function' ? syncGrievanceCalcSheet : null },
+      { name: 'syncDashboardCalcValues', fn: typeof syncDashboardCalcValues === 'function' ? syncDashboardCalcValues : null },
+      { name: 'syncStewardPerformanceValues', fn: typeof syncStewardPerformanceValues === 'function' ? syncStewardPerformanceValues : null },
+      { name: 'syncDashboardValues', fn: typeof syncDashboardValues === 'function' ? syncDashboardValues : null },
+      { name: 'syncSatisfactionValues', fn: typeof syncSatisfactionValues === 'function' ? syncSatisfactionValues : null }
+    ];
+    for (var si = 0; si < syncSteps.length; si++) {
+      if (syncSteps[si].fn) {
+        try { syncSteps[si].fn(); } catch (stepErr) {
+          syncErrors.push(syncSteps[si].name + ': ' + stepErr.message);
+          Logger.log('syncAllDashboardData step error: ' + syncSteps[si].name + ' - ' + stepErr.message);
+        }
+      }
+    }
 
-    // Sync visible dashboard values
-    if (typeof syncDashboardValues === 'function') syncDashboardValues();
-    if (typeof syncSatisfactionValues === 'function') syncSatisfactionValues();
-
-    ss.toast('All dashboard data synced successfully!', '✅ Complete', 5);
+    if (syncErrors.length > 0) {
+      ss.toast('Sync completed with errors: ' + syncErrors.join('; '), '⚠️ Warning', 10);
+    } else {
+      ss.toast('All dashboard data synced successfully!', '✅ Complete', 5);
+    }
   } catch (e) {
     SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing: ' + e.message, '❌ Error', 5);
     Logger.log('syncAllDashboardData error: ' + e.toString());
@@ -350,6 +364,7 @@ function showGrievanceFiles() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
   var ui = SpreadsheetApp.getUi();
+  var response, html;
 
   if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
     ui.alert('📁 View Files', 'Please go to the Grievance Log sheet and select a grievance row first.', ui.ButtonSet.OK);
@@ -367,7 +382,7 @@ function showGrievanceFiles() {
   var grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
 
   if (!folderId) {
-    var response = ui.alert('📁 No Folder',
+    response = ui.alert('📁 No Folder',
       'No folder exists for ' + grievanceId + '.\n\nWould you like to create one?',
       ui.ButtonSet.YES_NO);
     if (response === ui.Button.YES) {
@@ -392,7 +407,7 @@ function showGrievanceFiles() {
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var safeUrl = String(folderUrl).replace(/[<>"']/g, '');
-        var html = HtmlService.createHtmlOutput(
+        html = HtmlService.createHtmlOutput(
           '<script>window.open(' + JSON.stringify(safeUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');

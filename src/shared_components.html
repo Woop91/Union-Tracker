@@ -207,8 +207,9 @@ function createAutocomplete(options) {
   });
 
   // Dismiss on outside click
+  var DROPDOWN_BLUR_DELAY_MS = 200; // Delay allows click to register before blur hides dropdown
   input.addEventListener('blur', function() {
-    setTimeout(function() { dropdown.style.display = 'none'; }, 200);
+    setTimeout(function() { dropdown.style.display = 'none'; }, DROPDOWN_BLUR_DELAY_MS);
   });
 
   return {
@@ -536,6 +537,13 @@ function show2FAModal(onVerified, options) {
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+
+  // Allow Escape key to dismiss the modal
+  overlay.setAttribute('tabindex', '-1');
+  overlay.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') overlay.remove();
+  });
+  overlay.focus();
 
   // Send the initial code
   serverCall().withSuccessHandler(function(res) {

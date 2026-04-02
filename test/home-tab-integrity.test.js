@@ -207,7 +207,7 @@ describe('H5: Quick Links in renderMemberHome have click navigation', () => {
 // or _requireStewardAuth. This is already in CLAUDE.md but adding a test.
 
 describe('H6: Home tab server functions have auth checks', () => {
-  const dataServiceCode = read('21_WebDashDataService.gs');
+  const dataServiceCode = read('21_WebDashDataService.gs') + '\n' + read('21d_WebDashDataWrappers.gs');
 
   const homeFunctions = [
     'dataGetSurveyStatus',

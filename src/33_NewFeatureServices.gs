@@ -335,7 +335,7 @@ var CommunicationLogService = (function () {
     var now = new Date();
     var safeSubject = typeof escapeForFormula === 'function' ? escapeForFormula(subject || '') : (subject || '');
     var safeNotes = typeof escapeForFormula === 'function' ? escapeForFormula(notes || '') : (notes || '');
-    sheet.appendRow([id, memberEmail, stewardEmail, type || 'other', safeSubject, safeNotes, now]);
+    sheet.appendRow([id, escapeForFormula(memberEmail), escapeForFormula(stewardEmail), type || 'other', safeSubject, safeNotes, now]);
     return { success: true, id: id };
   }
 

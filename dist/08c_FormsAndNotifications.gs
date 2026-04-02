@@ -297,7 +297,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * SolidBase including:
+ * SEIU Local Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -311,7 +311,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author SolidBase
+ * @author SEIU Local
  * @version 4.43.1
  */
 
@@ -432,7 +432,13 @@ function checkDeadlinesAndNotify_() {
 
   body += '\n\nView your dashboard: ' + ss.getUrl();
 
-  safeSendEmail_({ to: email, subject: subject, body: body });
+  // Support comma-separated emails and optional CC to admin
+  var emailOpts = { to: email, subject: subject, body: body };
+  var ccEmail = props.getProperty('notification_cc_email') || '';
+  if (ccEmail && ccEmail.indexOf('@') !== -1) {
+    emailOpts.cc = ccEmail;
+  }
+  safeSendEmail_(emailOpts);
 }
 
 /**
@@ -551,6 +557,7 @@ function sendStewardDeadlineAlerts() {
   }
 
   // Get steward emails from Member Directory (stewards are members with IS_STEWARD = Yes)
+  // Keys are normalized (trimmed, lowercased) for robust matching against grievance data
   var stewardEmails = {};
   for (var s = 1; s < memberData.length; s++) {
     var isSteward = memberData[s][MEMBER_COLS.IS_STEWARD - 1];
@@ -560,7 +567,7 @@ function sendStewardDeadlineAlerts() {
       var sFullName = (sFirstName + ' ' + sLastName).trim();
       var sEmail = memberData[s][MEMBER_COLS.EMAIL - 1] || '';
       if (sFullName && sEmail && sEmail.indexOf('@') !== -1) {
-        stewardEmails[sFullName] = sEmail;
+        stewardEmails[sFullName.toLowerCase()] = sEmail;
       }
     }
   }
@@ -576,7 +583,9 @@ function sendStewardDeadlineAlerts() {
     // Sort by days remaining (most urgent first)
     grievances.sort(function(a, b) { return a.daysRemaining - b.daysRemaining; });
 
-    var email = stewardEmails[stewardName] || adminEmail;
+    // Normalize steward name for robust matching (trim + lowercase)
+    var normalizedName = String(stewardName || '').trim().toLowerCase();
+    var email = stewardEmails[normalizedName] || adminEmail;
 
     // Build email body
     var overdue = grievances.filter(function(g) { return g.daysRemaining < 0; });
@@ -683,6 +692,10 @@ function executeSendRandomSurveyEmails(opts) {
 
   // Get survey email log from Config (uses dedicated columns, not PDF_FOLDER_ID)
   var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
+  if (!surveyLogCol || surveyLogCol < 1) {
+    Logger.log('SURVEY_LOG_IDS column not mapped — skipping survey log read');
+    return 'Survey log column not configured. Cannot track sent emails.';
+  }
   var surveyLog = {};
   try {
     if (configSheet && configSheet.getLastRow() > 1) {
@@ -775,14 +788,19 @@ function executeSendRandomSurveyEmails(opts) {
 
   // Update survey email log - find actual last row in log column to avoid overwriting
   if (newLogEntries.length > 0 && configSheet) {
-    var nextRow = 2;
-    if (configSheet.getLastRow() > 1) {
-      var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 1).getValues();
-      for (var lr = logValues.length - 1; lr >= 0; lr--) {
-        if (logValues[lr][0]) { nextRow = lr + 3; break; }
-      }
+    var logLock = LockService.getScriptLock();
+    if (logLock.tryLock(10000)) {
+      try {
+        var nextRow = 2;
+        if (configSheet.getLastRow() > 1) {
+          var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 1).getValues();
+          for (var lr = logValues.length - 1; lr >= 0; lr--) {
+            if (logValues[lr][0]) { nextRow = lr + 3; break; }
+          }
+        }
+        configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
+      } finally { logLock.releaseLock(); }
     }
-    configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
   }
 
   var result = 'Sent ' + sent + ' survey emails';

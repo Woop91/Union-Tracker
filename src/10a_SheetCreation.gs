@@ -93,12 +93,26 @@ function createConfigSheet(ss) {
   // Ensure sheet has enough columns for all headers (handles sheets created before new columns were added)
   ensureMinimumColumns(sheet, columnHeaders.length);
 
+  // Quick-exit for migration: if existing headers already match expected order, skip the
+  // expensive data-remap block below (still apply headers, validations, and defaults).
+  var _skipMigration = false;
+  if (isExistingSheet) {
+    var existingLastCol = sheet.getLastColumn();
+    if (existingLastCol >= columnHeaders.length) {
+      var existingHeaders = sheet.getRange(2, 1, 1, existingLastCol).getValues()[0];
+      _skipMigration = columnHeaders.every(function(h, i) { return existingHeaders[i] === h; });
+      if (_skipMigration) {
+        Logger.log('createConfigSheet: headers already match — skipping migration');
+      }
+    }
+  }
+
   // ── Data migration: remap row 3+ data when headers are reordered ──
   // If the existing sheet has headers in a different order than CONFIG_HEADER_MAP_,
   // we must move the data to match the new header positions before overwriting headers.
   // Without this, header reorder causes data misalignment (e.g. org name reads "yes"
   // because the boolean toggle data stayed in the old column).
-  if (isExistingSheet) {
+  if (isExistingSheet && !_skipMigration) {
     var lastCol = sheet.getLastColumn();
     if (lastCol > 0) {
       var oldHeaders = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
@@ -377,10 +391,22 @@ function _migrateOrphanedColumns(sheet) {
 
   if (toDelete.length === 0) return 0;
 
-  // Delete right-to-left to preserve column indices
+  // Group contiguous columns for batch deletion (right-to-left)
   toDelete.sort(function(a, b) { return b - a; });
-  for (var d = 0; d < toDelete.length; d++) {
-    sheet.deleteColumn(toDelete[d]);
+  var i = 0;
+  while (i < toDelete.length) {
+    var start = toDelete[i];
+    var count = 1;
+    // Check for contiguous columns (sorted descending, so contiguous = consecutive decreasing by 1)
+    while (i + count < toDelete.length && toDelete[i + count] === start - count) {
+      count++;
+    }
+    if (count > 1) {
+      sheet.deleteColumns(start - count + 1, count); // deleteColumns(startCol, numCols)
+    } else {
+      sheet.deleteColumn(start);
+    }
+    i += count;
   }
   Logger.log('_migrateOrphanedColumns: deleted ' + toDelete.length +
     ' orphaned column(s) — sheet now has ' + sheet.getMaxColumns() + ' columns');
@@ -441,7 +467,8 @@ function seedConfigDefault_(sheet, col, values, isExisting) {
     if (lastRow >= 3) {
       var existing = sheet.getRange(3, col, lastRow - 2, 1).getValues();
       for (var i = 0; i < existing.length; i++) {
-        if (existing[i][0] !== '' && existing[i][0] !== null) {
+        // Truthiness check covers '', null, undefined, and 0 (no valid config default is 0)
+        if (existing[i][0]) {
           return; // Column already has data, don't overwrite
         }
       }

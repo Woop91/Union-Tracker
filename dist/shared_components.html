@@ -157,8 +157,9 @@ function createAutocomplete(options) {
  });
 
  
+ var DROPDOWN_BLUR_DELAY_MS = 200; 
  input.addEventListener('blur', function() {
- setTimeout(function() { dropdown.style.display = 'none'; }, 200);
+ setTimeout(function() { dropdown.style.display = 'none'; }, DROPDOWN_BLUR_DELAY_MS);
  });
 
  return {
@@ -448,6 +449,13 @@ function show2FAModal(onVerified, options) {
 
  overlay.appendChild(modal);
  document.body.appendChild(overlay);
+
+ 
+ overlay.setAttribute('tabindex', '-1');
+ overlay.addEventListener('keydown', function(e) {
+ if (e.key === 'Escape') overlay.remove();
+ });
+ overlay.focus();
 
  
  serverCall().withSuccessHandler(function(res) {

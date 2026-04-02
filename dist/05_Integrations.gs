@@ -164,7 +164,7 @@ function _getOrCreateNamedFolder_(name, propKey, props, configSheet, parentFolde
   var newFolder = parentFolder ? parentFolder.createFolder(name) : DriveApp.createFolder(name);
   props.setProperty(propKey, newFolder.getId());
 
-  newFolder.setDescription('SolidBase — auto-managed. Do not move or rename.');
+  newFolder.setDescription('Union Dashboard — auto-managed. Do not move or rename.');
   return newFolder;
 }
 
@@ -177,6 +177,9 @@ function _writeConfigFolderId_(configSheet, colIndex, folderId, folderUrl) {
   if (!configSheet || !colIndex || colIndex === 0) return;
   try {
     configSheet.getRange(3, colIndex).setValue(folderId || '');
+    if (folderUrl) {
+      configSheet.getRange(3, colIndex + 1).setValue(folderUrl);
+    }
   } catch (e) {
     Logger.log('_writeConfigFolderId_: could not write col ' + colIndex + ': ' + e.message);
   }
@@ -197,7 +200,7 @@ function setupDashboardCalendar() {
 
   // Derive calendar name from org name
   var orgName = getSystemName_();
-  var calendarName = (orgName && orgName !== 'SolidBase') ? orgName + ' Events' : 'Union Events';
+  var calendarName = (orgName && orgName !== 'Union Dashboard') ? orgName + ' Events' : 'Union Events';
 
   // Try stored ID
   var storedId = props.getProperty('UNION_CALENDAR_ID');
@@ -289,7 +292,7 @@ function getOrCreateRootFolder() {
     rootFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
   } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
 
-  grievancesFolder.setDescription('Individual case folders — Auto-managed by SolidBase');
+  grievancesFolder.setDescription('Individual case folders — Auto-managed by Union Dashboard');
 
   logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
     folderId:  grievancesFolder.getId(),
@@ -391,23 +394,31 @@ function getOrCreateMemberAdminFolder(memberEmail) {
     }
 
     // ── 3. Find or create per-member master folder ───────────────────────────
-    var masterFolder = null;
-    var isNewMaster   = false;
-    var existingIter  = membersRoot.getFoldersByName(memberFolderName);
-    if (existingIter.hasNext()) {
-      masterFolder = existingIter.next();
-    } else {
-      masterFolder = membersRoot.createFolder(memberFolderName);
-      isNewMaster  = true;
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) {
+      throw new Error('Could not acquire lock for folder creation');
     }
+    try {
+      var masterFolder = null;
+      var isNewMaster   = false;
+      var existingIter  = membersRoot.getFoldersByName(memberFolderName);
+      if (existingIter.hasNext()) {
+        masterFolder = existingIter.next();
+      } else {
+        masterFolder = membersRoot.createFolder(memberFolderName);
+        isNewMaster  = true;
+      }
 
-    // ── 4. Find or create Grievances/ subfolder ──────────────────────────────
-    var grievancesFolder = null;
-    var gIter = masterFolder.getFoldersByName('Grievances');
-    if (gIter.hasNext()) {
-      grievancesFolder = gIter.next();
-    } else {
-      grievancesFolder = masterFolder.createFolder('Grievances');
+      // ── 4. Find or create Grievances/ subfolder ──────────────────────────────
+      var grievancesFolder = null;
+      var gIter = masterFolder.getFoldersByName('Grievances');
+      if (gIter.hasNext()) {
+        grievancesFolder = gIter.next();
+      } else {
+        grievancesFolder = masterFolder.createFolder('Grievances');
+      }
+    } finally {
+      lock.releaseLock();
     }
 
     // ── 5. Write master folder URL to Member Directory (non-fatal) ───────────
@@ -491,7 +502,22 @@ function setupDriveFolderForGrievance(grievanceId) {
       if (membersRootId) {
         try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
       }
-      if (!membersRoot) membersRoot = getOrCreateRootFolder(); // ultimate fallback to dashboard root
+      if (!membersRoot) {
+        // Resolve Members/ folder explicitly — do NOT fall back to Grievances/ root.
+        // Same resolution logic as getOrCreateMemberAdminFolder: dashboard root → create Members/.
+        var dashRootId = props.getProperty('DASHBOARD_ROOT_FOLDER_ID') || '';
+        if (dashRootId) {
+          try {
+            var dashRoot = DriveApp.getFolderById(dashRootId);
+            var mIter = dashRoot.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+            membersRoot = mIter.hasNext() ? mIter.next() : dashRoot.createFolder(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+          } catch (_e) { Logger.log('setupDriveFolderForGrievance fallback: ' + _e.message); }
+        }
+        if (!membersRoot) {
+          var fallbackIter = DriveApp.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+          membersRoot = fallbackIter.hasNext() ? fallbackIter.next() : DriveApp.createFolder(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+        }
+      }
       var memberFolderName = (lastName && firstName)
         ? (sanitizeFolderName(lastName) + ', ' + sanitizeFolderName(firstName))
         : (sanitizeFolderName(firstName || lastName || 'Unknown'));
@@ -564,15 +590,37 @@ function setupDriveFolderForGrievance(grievanceId) {
  * @returns {Object} Cleanup results
  */
 function cleanupEmptyDriveFolders() {
+  // Since v4.20+ case folders live under Members/<LastName>/Grievances/<CaseId>/,
+  // not under the legacy Grievances/ root. Scan the Members/ folder instead.
   var rootFolder;
   try {
-    rootFolder = getOrCreateRootFolder();
+    var props = PropertiesService.getScriptProperties();
+    var membersId = props.getProperty('MEMBERS_FOLDER_ID') || '';
+    if (membersId) {
+      try { rootFolder = DriveApp.getFolderById(membersId); } catch (_e) { rootFolder = null; }
+    }
+    if (!rootFolder) {
+      // Resolve Members/ via dashboard root (same approach as getOrCreateMemberAdminFolder)
+      var dashRootId = props.getProperty('DASHBOARD_ROOT_FOLDER_ID') || '';
+      if (dashRootId) {
+        try {
+          var dashRoot = DriveApp.getFolderById(dashRootId);
+          var mIter = dashRoot.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
+          if (mIter.hasNext()) rootFolder = mIter.next();
+        } catch (_e) { /* fall through */ }
+      }
+    }
+    if (!rootFolder) {
+      // Ultimate fallback: legacy Grievances/ root for pre-v4.20 installs
+      rootFolder = getOrCreateRootFolder();
+    }
   } catch (_e) {
     return { success: false, reason: 'Could not access root folder' };
   }
 
   var removed = 0;
   var skipped = 0;
+  // Walk member folders → Grievances/ subfolders → case folders
   var subFolders = rootFolder.getFolders();
 
   // Build a set of resolved grievance IDs for quick lookup
@@ -595,45 +643,60 @@ function cleanupEmptyDriveFolders() {
     Logger.log('cleanupEmptyDriveFolders: sheet read error: ' + sheetErr.message);
   }
 
+  // Structure: Members/<LastName, FirstName>/Grievances/<CaseId - Date>/
+  // Walk each member folder, then into its Grievances/ subfolder, then check case folders.
   while (subFolders.hasNext()) {
-    var folder = subFolders.next();
+    var memberFolder = subFolders.next();
     try {
-      // Only remove if folder tree is empty (no files in any sub-level)
-      if (_isFolderTreeEmpty(folder)) {
-        // Check if folder name contains a resolved grievance ID
-        var folderName = folder.getName();
-        // M-49: Extract grievance ID from folder name using known naming patterns,
-        // then do O(1) direct lookup instead of O(n) scan through all resolved IDs.
-        // Simple template: "{grievanceId} - {date}" => ID is everything before " - "
-        var isResolved = false;
-        var dashIdx = folderName.indexOf(' - ');
-        if (dashIdx > 0) {
-          var candidateId = folderName.substring(0, dashIdx).trim();
-          if (resolvedIds[candidateId]) {
-            isResolved = true;
-          }
-        }
-        // Fallback for non-standard naming: linear scan (rare path)
-        if (!isResolved) {
-          var resolvedKeys = Object.keys(resolvedIds);
-          for (var rk = 0; rk < resolvedKeys.length; rk++) {
-            if (folderName.indexOf(resolvedKeys[rk]) >= 0) {
-              isResolved = true;
-              break;
+      var grievancesIter = memberFolder.getFoldersByName('Grievances');
+      if (!grievancesIter.hasNext()) { skipped++; continue; }
+      var grievancesFolder = grievancesIter.next();
+      var caseFolders = grievancesFolder.getFolders();
+
+      while (caseFolders.hasNext()) {
+        var folder = caseFolders.next();
+        try {
+          // Only remove if folder tree is empty (no files in any sub-level)
+          if (_isFolderTreeEmpty(folder)) {
+            // Check if folder name contains a resolved grievance ID
+            var folderName = folder.getName();
+            // M-49: Extract grievance ID from folder name using known naming patterns,
+            // then do O(1) direct lookup instead of O(n) scan through all resolved IDs.
+            // Simple template: "{grievanceId} - {date}" => ID is everything before " - "
+            var isResolved = false;
+            var dashIdx = folderName.indexOf(' - ');
+            if (dashIdx > 0) {
+              var candidateId = folderName.substring(0, dashIdx).trim();
+              if (resolvedIds[candidateId]) {
+                isResolved = true;
+              }
             }
+            // Fallback for non-standard naming: linear scan (rare path)
+            if (!isResolved) {
+              var resolvedKeys = Object.keys(resolvedIds);
+              for (var rk = 0; rk < resolvedKeys.length; rk++) {
+                if (folderName.indexOf(resolvedKeys[rk]) >= 0) {
+                  isResolved = true;
+                  break;
+                }
+              }
+            }
+            if (isResolved) {
+              folder.setTrashed(true);
+              removed++;
+            } else {
+              skipped++;
+            }
+          } else {
+            skipped++;
           }
-        }
-        if (isResolved) {
-          folder.setTrashed(true);
-          removed++;
-        } else {
+        } catch (folderErr) {
+          Logger.log('cleanupEmptyDriveFolders: error on case folder: ' + folderErr.message);
           skipped++;
         }
-      } else {
-        skipped++;
       }
-    } catch (folderErr) {
-      Logger.log('cleanupEmptyDriveFolders: error on folder: ' + folderErr.message);
+    } catch (memberErr) {
+      Logger.log('cleanupEmptyDriveFolders: error on member folder: ' + memberErr.message);
       skipped++;
     }
   }
@@ -655,11 +718,13 @@ function cleanupEmptyDriveFolders() {
  * @returns {boolean} true if folder and all sub-folders contain no files
  * @private
  */
-function _isFolderTreeEmpty(folder) {
+function _isFolderTreeEmpty(folder, depth) {
+  depth = depth || 0;
+  if (depth > 10) return false;
   if (folder.getFiles().hasNext()) return false;
   var subs = folder.getFolders();
   while (subs.hasNext()) {
-    if (!_isFolderTreeEmpty(subs.next())) return false;
+    if (!_isFolderTreeEmpty(subs.next(), depth + 1)) return false;
   }
   return true;
 }
@@ -680,7 +745,7 @@ function batchCreateGrievanceFolders(grievanceIds) {
 
   for (let i = 0; i < grievanceIds.length; i++) {
     // Check time limit
-    if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - 30000) {
+    if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - BATCH_LIMITS.EXECUTION_BUFFER_MS) {
       results.errors.push('Time limit reached, some folders not created');
       break;
     }
@@ -890,7 +955,7 @@ function getOrCreateMeetingsCalendar() {
     return calendars[0];
   }
   var newCalendar = CalendarApp.createCalendar(calendarName, {
-    summary: 'Union meeting events - Auto-managed by SolidBase',
+    summary: 'Union meeting events - Auto-managed by Union Dashboard',
     color: CalendarApp.Color.GREEN
   });
   return newCalendar;
@@ -926,7 +991,7 @@ function createMeetingCalendarEvent(meetingData) {
         description: 'Meeting ID: ' + (meetingData.meetingId || 'TBD') + '\n' +
                      'Type: ' + (meetingData.type || 'In-Person') + '\n' +
                      'Check-in opens on the day of the event.\n\n' +
-                     'Auto-generated by SolidBase'
+                     'Auto-generated by Union Dashboard'
       });
     } catch (calErr) {
       // F31: Quota-aware error handling for calendar creation
@@ -1040,13 +1105,13 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
       body += '<p><em>No members checked in to this meeting.</em></p>';
     }
 
-    body += '<br><p style="font-size:12px;color:#666">Auto-generated by SolidBase</p>';
+    body += '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
     var emailResult = safeSendEmail_({
       to: recipientEmails,
       subject: 'Meeting Attendance: ' + meetingName + ' (' + dateStr + ')',
       htmlBody: body,
-      name: 'SolidBase'
+      name: 'Union Dashboard'
     });
     if (!emailResult.success) return errorResponse(emailResult.error);
 
@@ -1073,7 +1138,7 @@ function getOrCreateMeetingNotesFolder() {
     return folders.next();
   }
   var newFolder = rootFolder.createFolder(folderName);
-  newFolder.setDescription('Meeting Notes - Auto-managed by SolidBase');
+  newFolder.setDescription('Meeting Notes - Auto-managed by Union Dashboard');
   return newFolder;
 }
 
@@ -1089,7 +1154,7 @@ function getOrCreateMeetingAgendaFolder() {
     return folders.next();
   }
   var newFolder = rootFolder.createFolder(folderName);
-  newFolder.setDescription('Meeting Agenda - Auto-managed by SolidBase (Steward access only)');
+  newFolder.setDescription('Meeting Agenda - Auto-managed by Union Dashboard (Steward access only)');
   return newFolder;
 }
 
@@ -1158,6 +1223,8 @@ function createMeetingDocs(meetingData) {
     }
   } catch (error) {
     Logger.log('Error creating meeting docs: ' + error.message);
+    result.success = false;
+    result.error = error.message;
   }
   return result;
 }
@@ -1217,13 +1284,13 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
       '<p>Click the link below to access the ' + escapeHtml(typeLabel.toLowerCase()) + ':</p>' +
       (safeDocUrl ? '<p><a href="' + escapeHtml(safeDocUrl) + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
       'Open ' + escapeHtml(typeLabel) + '</a></p>' : '<p><em>Document link unavailable.</em></p>') +
-      '<br><p style="font-size:12px;color:#666">Auto-generated by SolidBase</p>';
+      '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
     safeSendEmail_({
       to: recipientEmails,
       subject: typeLabel + ': ' + meetingName + ' (' + meetingDate + ')',
       htmlBody: body,
-      name: 'SolidBase'
+      name: 'Union Dashboard'
     });
   } catch (error) {
     Logger.log('Error emailing meeting doc link: ' + error.message);
@@ -1295,7 +1362,7 @@ function processMeetingDocNotifications() {
       var notesUrl = String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || '');
       var agendaUrl = String(data[i][MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] || '');
       var agendaStewards = String(data[i][MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] || '');
-      var dateStr = meetingDate.toLocaleDateString();
+      var dateStr = Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'MM/dd/yyyy');
 
       // 3 days before: send agenda link to SELECTED stewards only
       if (diffDays === 3 && agendaUrl && agendaStewards) {
@@ -1398,7 +1465,7 @@ function getOrCreateDeadlinesCalendar() {
 
   // Create new calendar
   const newCalendar = CalendarApp.createCalendar(calendarName, {
-    summary: 'Grievance deadline tracking - Auto-managed by SolidBase',
+    summary: 'Grievance deadline tracking - Auto-managed by Union Dashboard',
     color: CalendarApp.Color.RED
   });
 
@@ -1420,7 +1487,7 @@ function syncDeadlinesToCalendar() {
 
     for (const grievance of openGrievances) {
       // Check time limit
-      if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - 30000) {
+      if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - BATCH_LIMITS.EXECUTION_BUFFER_MS) {
         break;
       }
 
@@ -1512,7 +1579,7 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
                     'Member: ' + memberName + '\n' +
                     'Step: ' + currentStep + '\n' +
                     'Action Required: Response deadline\n\n' +
-                    'Auto-generated by SolidBase';
+                    'Auto-generated by Union Dashboard';
 
   if (storedEventId) {
     try {
@@ -1613,13 +1680,13 @@ function sendDeadlineReminders(daysAhead) {
 
     body += `</table>`;
     body += `<p style="margin-top: 20px; color: #666; font-size: 12px;">
-               This is an automated reminder from the SolidBase.
+               This is an automated reminder from the Union Dashboard.
              </p>`;
 
     // Send email
     safeSendEmail_({
       to: userEmail,
-      subject: `[SolidBase] ${deadlines.length} Upcoming Grievance Deadline${deadlines.length > 1 ? 's' : ''}`,
+      subject: `[Union Dashboard] ${deadlines.length} Upcoming Grievance Deadline${deadlines.length > 1 ? 's' : ''}`,
       htmlBody: body
     });
 
@@ -1967,6 +2034,7 @@ function sendGrievancePdfEmail_(data, pdf) {
  * @param {Object} e - Form submission event object
  */
 function onGrievanceFormSubmit(e) {
+  if (!e || !e.namedValues) return;
   try {
     var responses = e.namedValues;
     var data = {
@@ -4395,7 +4463,7 @@ function generateGrievancePDF_(formData) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || getSystemName_(),
+      'agency':     formData.agency     || '',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4529,7 +4597,7 @@ function generateDraftGrievancePDF_(formData, grievanceId, documentHash) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || getSystemName_(),
+      'agency':     formData.agency     || '',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4614,7 +4682,7 @@ function generateSignedGrievancePDF_(formData, grievanceId, documentHash, sigBas
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || getSystemName_(),
+      'agency':     formData.agency     || '',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4934,7 +5002,7 @@ function submitGrievanceSignature(sigToken, sigBase64) {
       grievant:   memberName,
       jobtitle:   '', // from member dir if available
       startdate:  hireDateStr,
-      agency:     getSystemName_(),
+      agency:     '',
       region:     regionVal,
       workloc:    workLoc,
       articles:   grievanceObj.articles,
@@ -5196,7 +5264,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
       grievant:   memberData.firstName + ' ' + memberData.lastName,
       jobtitle:   formOverrides.jobtitle || memberData.jobTitle,
       startdate:  formOverrides.startdate || hireDateStr,
-      agency:     formOverrides.agency || getSystemName_(),
+      agency:     formOverrides.agency || '',
       region:     formOverrides.region || regionVal,
       workloc:    formOverrides.workloc || memberData.workLocation,
       managers:   formOverrides.managers || memberData.manager || memberData.supervisor,

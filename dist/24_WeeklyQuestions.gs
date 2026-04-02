@@ -262,30 +262,38 @@ var WeeklyQuestions = (function () {
     var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
     if (!rSheet) return { success: false, message: 'System not initialized.' };
 
-    // Dedup check
-    if (rSheet.getLastRow() > 1) {
-      var existing = rSheet.getDataRange().getValues();
-      for (var i = 1; i < existing.length; i++) {
-        if (String(existing[i][R_COLS.QUESTION_ID]) === questionId &&
-            existing[i][R_COLS.EMAIL_HASH] === emailHash) {
-          return { success: false, message: 'Already voted.' };
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) {
+      return { success: false, message: 'Server busy, please try again.' };
+    }
+    try {
+      // Dedup check
+      if (rSheet.getLastRow() > 1) {
+        var existing = rSheet.getDataRange().getValues();
+        for (var i = 1; i < existing.length; i++) {
+          if (String(existing[i][R_COLS.QUESTION_ID]) === questionId &&
+              existing[i][R_COLS.EMAIL_HASH] === emailHash) {
+            return { success: false, message: 'Already voted.' };
+          }
         }
       }
-    }
 
-    rSheet.appendRow([_id(), questionId, emailHash, String(response), new Date()]);
+      rSheet.appendRow([_id(), questionId, emailHash, String(response), new Date()]);
 
-    // Return updated aggregate stats
-    var all = rSheet.getDataRange().getValues();
-    var counts = {};
-    var total = 0;
-    for (var r = 1; r < all.length; r++) {
-      if (String(all[r][R_COLS.QUESTION_ID]) !== questionId) continue;
-      total++;
-      var resp = String(all[r][R_COLS.RESPONSE]);
-      counts[resp] = (counts[resp] || 0) + 1;
+      // Return updated aggregate stats
+      var all = rSheet.getDataRange().getValues();
+      var counts = {};
+      var total = 0;
+      for (var r = 1; r < all.length; r++) {
+        if (String(all[r][R_COLS.QUESTION_ID]) !== questionId) continue;
+        total++;
+        var resp = String(all[r][R_COLS.RESPONSE]);
+        counts[resp] = (counts[resp] || 0) + 1;
+      }
+      return { success: true, stats: { total: total, counts: counts } };
+    } finally {
+      lock.releaseLock();
     }
-    return { success: true, stats: { total: total, counts: counts } };
   }
 
   // ── Public: Steward — Create Poll ────────────────────────────────────────

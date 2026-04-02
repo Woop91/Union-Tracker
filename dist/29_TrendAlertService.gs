@@ -37,7 +37,7 @@
 
 var TrendAlertService = (function () {
 
-  var HEADERS = ['ID', 'Type', 'Severity', 'Title', 'Message', 'Data', 'Created', 'Status', 'Acknowledged By', 'Acknowledged At'];
+  var HEADERS = ['ID', 'Type', 'Severity', 'Title', 'Message', 'Data', 'Created', 'Status', 'Acknowledged By', 'Acknowledged At', 'Resolved By', 'Resolved At'];
 
   function initSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -347,43 +347,55 @@ var TrendAlertService = (function () {
    * @returns {number} Count of new alerts generated
    */
   function runDetection() {
-    var sheet = initSheet();
-    var existingAlerts = [];
-    if (sheet.getLastRow() >= 2) {
-      existingAlerts = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
-    }
-
+    // Collect candidate alerts outside the lock (read-only, safe for concurrency)
     var newAlerts = [];
     newAlerts = newAlerts.concat(_detectGrievanceSpike());
     newAlerts = newAlerts.concat(_detectSatisfactionDrop());
     newAlerts = newAlerts.concat(_detectWinRateDecline());
     newAlerts = newAlerts.concat(_detectDeadlineMissSpike());
+    if (newAlerts.length === 0) return 0;
 
-    var written = 0;
-    for (var i = 0; i < newAlerts.length; i++) {
-      var alert = newAlerts[i];
-      var key = _dedupKey(alert.type, alert.data);
-      if (_alertExists(existingAlerts, key)) continue;
-
-      sheet.appendRow([
-        Utilities.getUuid().substring(0, 8),
-        escapeForFormula(alert.type),
-        escapeForFormula(alert.severity),
-        escapeForFormula(alert.title),
-        escapeForFormula(alert.message),
-        escapeForFormula(alert.data || ''),
-        new Date(),
-        'Active',
-        '',
-        ''
-      ]);
-      written++;
+    // Acquire lock to make read-deduplicate-write atomic and prevent duplicate alerts
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) {
+      Logger.log('TrendAlertService.runDetection: could not acquire lock — skipping this run');
+      return 0;
     }
+    try {
+      var sheet = initSheet();
+      var existingAlerts = [];
+      if (sheet.getLastRow() >= 2) {
+        existingAlerts = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
+      }
 
-    if (written > 0 && typeof logAuditEvent === 'function') {
-      logAuditEvent('TREND_ALERTS_GENERATED', { newAlerts: written });
+      var written = 0;
+      for (var i = 0; i < newAlerts.length; i++) {
+        var alert = newAlerts[i];
+        var key = _dedupKey(alert.type, alert.data);
+        if (_alertExists(existingAlerts, key)) continue;
+
+        sheet.appendRow([
+          Utilities.getUuid().replace(/-/g, '').substring(0, 16),
+          escapeForFormula(alert.type),
+          escapeForFormula(alert.severity),
+          escapeForFormula(alert.title),
+          escapeForFormula(alert.message),
+          escapeForFormula(alert.data || ''),
+          new Date(),
+          'Active',
+          '',
+          ''
+        ]);
+        written++;
+      }
+
+      if (written > 0 && typeof logAuditEvent === 'function') {
+        logAuditEvent('TREND_ALERTS_GENERATED', { newAlerts: written });
+      }
+      return written;
+    } finally {
+      lock.releaseLock();
     }
-    return written;
   }
 
   /**
@@ -445,9 +457,10 @@ var TrendAlertService = (function () {
   /**
    * Resolves an alert (marks it as handled).
    * @param {string} alertId - Alert ID
+   * @param {string} [resolvedBy] - Email of the steward who resolved the alert (audit trail)
    * @returns {Object} { success }
    */
-  function resolveAlert(alertId) {
+  function resolveAlert(alertId, resolvedBy) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return { success: false };
     var sheet = ss.getSheetByName(SHEETS.TREND_ALERTS);
@@ -456,8 +469,13 @@ var TrendAlertService = (function () {
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][0]) === alertId) {
         sheet.getRange(i + 1, 8).setValue('Resolved');
+        // Write resolver info for audit trail (columns 11-12: Resolved By, Resolved At)
+        if (resolvedBy) {
+          sheet.getRange(i + 1, 11).setValue(escapeForFormula(resolvedBy));
+          sheet.getRange(i + 1, 12).setValue(new Date());
+        }
         if (typeof logAuditEvent === 'function') {
-          logAuditEvent('TREND_ALERT_RESOLVED', { alertId: alertId });
+          logAuditEvent('TREND_ALERT_RESOLVED', { alertId: alertId, by: resolvedBy ? (typeof maskEmail === 'function' ? maskEmail(resolvedBy) : resolvedBy) : 'unknown' });
         }
         return { success: true };
       }
@@ -496,7 +514,7 @@ function dataAcknowledgeTrendAlert(sessionToken, alertId) {
 function dataResolveTrendAlert(sessionToken, alertId) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, message: 'Steward access required.' };
-  return TrendAlertService.resolveAlert(alertId);
+  return TrendAlertService.resolveAlert(alertId, s);
 }
 
 /** Daily trigger handler — runs all trend detection algorithms. No auth needed. */

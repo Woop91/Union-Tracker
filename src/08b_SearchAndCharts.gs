@@ -208,10 +208,20 @@ function viewActiveGrievances() {
 function searchDashboard(query, searchType, filters) {
   var results = [];
   var queryLower = query.toLowerCase();
+  var cache = CacheService.getScriptCache();
 
   // Search members
   if (searchType === 'all' || searchType === 'members') {
-    var members = getMemberList();
+    var members;
+    var memberCacheKey = 'search_memberList';
+    var cachedMembers = cache.get(memberCacheKey);
+    if (cachedMembers) {
+      try { members = JSON.parse(cachedMembers); } catch (_) { members = null; }
+    }
+    if (!members) {
+      members = getMemberList();
+      try { cache.put(memberCacheKey, JSON.stringify(members), 15); } catch (_) {}
+    }
     members.forEach(function(m) {
       if (m.name.toLowerCase().indexOf(queryLower) !== -1 ||
           m.id.toLowerCase().indexOf(queryLower) !== -1 ||
@@ -228,7 +238,16 @@ function searchDashboard(query, searchType, filters) {
 
   // Search grievances
   if (searchType === 'all' || searchType === 'grievances') {
-    var grievances = getOpenGrievances();
+    var grievances;
+    var grievanceCacheKey = 'search_grievanceList';
+    var cachedGrievances = cache.get(grievanceCacheKey);
+    if (cachedGrievances) {
+      try { grievances = JSON.parse(cachedGrievances); } catch (_) { grievances = null; }
+    }
+    if (!grievances) {
+      grievances = getOpenGrievances();
+      try { cache.put(grievanceCacheKey, JSON.stringify(grievances), 15); } catch (_) {}
+    }
     grievances.forEach(function(g) {
       var grievanceId = g['Grievance ID'] || '';
       var memberName = g['Member Name'] || '';
@@ -288,8 +307,8 @@ function advancedSearch(filters) {
         var row = data[i];
         var matches = true;
 
-        // Apply department filter
-        if (filters.department && row[MEMBER_COLS.JOB_TITLE - 1] !== filters.department) {
+        // Apply department filter (matches against Unit column, not Job Title)
+        if (filters.department && row[MEMBER_COLS.UNIT - 1] !== filters.department) {
           matches = false;
         }
 
@@ -381,7 +400,7 @@ function getDepartmentList() {
 
     if (!memberSheet || memberSheet.getLastRow() <= 1) return [];
 
-    var data = memberSheet.getRange(2, MEMBER_COLS.JOB_TITLE,
+    var data = memberSheet.getRange(2, MEMBER_COLS.UNIT,
       memberSheet.getLastRow() - 1, 1).getValues();
 
     var depts = {};
@@ -414,7 +433,7 @@ function getMemberList() {
       members.push({
         id: data[i][MEMBER_COLS.MEMBER_ID - 1],
         name: data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1],
-        department: data[i][MEMBER_COLS.JOB_TITLE - 1]
+        department: data[i][MEMBER_COLS.UNIT - 1]
       });
     }
   }
@@ -853,17 +872,15 @@ function createStewardLeaderboardChart_(sheet) {
 }
 
 /**
- * Pads a string to a specified length
+ * Pads a string to a specified length.
+ * Legacy polyfill — V8 runtime supports String.prototype.padEnd() natively,
+ * but retained for backward compatibility with callers.
  * @param {string} str - String to pad
  * @param {number} len - Target length
  * @returns {string} Padded string
  */
 function padRight(str, len) {
-  str = String(str);
-  while (str.length < len) {
-    str += ' ';
-  }
-  return str.substring(0, len);
+  return String(str).padEnd(len).substring(0, len);
 }
 
 /**
@@ -886,6 +903,6 @@ function padRight(str, len) {
  *
  * Note: onGrievanceFormSubmit() is defined in 05_Integrations.gs
  *
- * @author SolidBase Development Team
+ * @author SEIU Local Development Team
  * @version 4.43.1
  */

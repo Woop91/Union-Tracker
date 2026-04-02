@@ -527,6 +527,23 @@ function getSatisfactionDashboardHtml() {
 }
 
 // ============================================================================
+// SATISFACTION COLUMN CACHE
+// ============================================================================
+
+/**
+ * Module-level cache for buildSatisfactionColsShim_ result.
+ * Avoids rebuilding the column map on every function call within a single execution.
+ * @private
+ */
+var _satisfactionColsCache_ = null;
+function _getCachedSatisfactionCols() {
+  if (!_satisfactionColsCache_) {
+    _satisfactionColsCache_ = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  }
+  return _satisfactionColsCache_;
+}
+
+// ============================================================================
 // SATISFACTION DATA RETRIEVAL - OVERVIEW AND STATS
 // ============================================================================
 
@@ -534,7 +551,7 @@ function getSatisfactionDashboardHtml() {
  * Get overview data for satisfaction dashboard
  */
 function getSatisfactionOverviewData() {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (!sheet) return {
@@ -732,7 +749,7 @@ function getSatisfactionOverviewData() {
  * Get individual response data for satisfaction dashboard
  */
 function getSatisfactionResponseData() {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (!sheet) return [];
@@ -817,7 +834,7 @@ function getSatisfactionResponseData() {
  * Get section-level data for satisfaction dashboard
  */
 function getSatisfactionSectionData() {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -847,6 +864,10 @@ function getSatisfactionSectionData() {
   ];
 
   sectionDefs.forEach(function(section) {
+    if (!section.startCol || section.startCol < 1) {
+      result.sections.push({ name: section.name, avg: 0, responseCount: 0, questions: section.numCols });
+      return; // skip this iteration (forEach callback)
+    }
     var data = sheet.getRange(2, section.startCol, numRows, section.numCols).getValues();
     var sum = 0, count = 0;
 
@@ -877,7 +898,7 @@ function getSatisfactionSectionData() {
  * Get analytics data for satisfaction dashboard insights
  */
 function getSatisfactionAnalyticsData() {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -1077,40 +1098,40 @@ function syncSatisfactionValues() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) { Logger.log('syncSatisfactionValues: lock contention — skipped'); return; }
   try {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
+    var SATISFACTION_COLS = _getCachedSatisfactionCols();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
-  if (!sheet) {
-    Logger.log('Member Satisfaction sheet not found');
-    return;
-  }
+    if (!sheet) {
+      Logger.log('Member Satisfaction sheet not found');
+      return;
+    }
 
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    // No data to process, just write empty dashboard
-    writeSatisfactionDashboard_(sheet, [], []);
-    return;
-  }
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      // No data to process, just write empty dashboard
+      writeSatisfactionDashboard_(sheet, [], []);
+      return;
+    }
 
-  // Get all response data (up to last scale question column)
-  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS; // last Likert-scale question
-  var responseData = sheet.getRange(2, 1, lastRow - 1, lastResponseCol).getValues();
+    // Get all response data (up to last scale question column)
+    var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS; // last Likert-scale question
+    var responseData = sheet.getRange(2, 1, lastRow - 1, lastResponseCol).getValues();
 
-  // Calculate section averages for each row
-  var sectionAverages = computeSectionAverages_(responseData);
+    // Calculate section averages for each row
+    var sectionAverages = computeSectionAverages_(responseData);
 
-  // Write section averages to summary area (v4.23.0: skipped — dynamic schema has no summary cols)
-  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
-  var summaryCols = Math.max(1, (SATISFACTION_COLS.AVG_SCHEDULING || 0) - (SATISFACTION_COLS.AVG_OVERALL_SAT || 0) + 1);
-  if (sectionAverages.length > 0 && summaryStart > 0) {
-    sheet.getRange(2, summaryStart, sectionAverages.length, summaryCols).setValues(sectionAverages);
-  }
+    // Write section averages to summary area (v4.23.0: skipped — dynamic schema has no summary cols)
+    var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+    var summaryCols = Math.max(1, (SATISFACTION_COLS.AVG_SCHEDULING || 0) - (SATISFACTION_COLS.AVG_OVERALL_SAT || 0) + 1);
+    if (sectionAverages.length > 0 && summaryStart > 0) {
+      sheet.getRange(2, summaryStart, sectionAverages.length, summaryCols).setValues(sectionAverages);
+    }
 
-  // Calculate and write dashboard metrics
-  writeSatisfactionDashboard_(sheet, responseData, sectionAverages);
+    // Calculate and write dashboard metrics
+    writeSatisfactionDashboard_(sheet, responseData, sectionAverages);
 
-  Logger.log('Member Satisfaction values synced for ' + responseData.length + ' responses');
+    Logger.log('Member Satisfaction values synced for ' + responseData.length + ' responses');
   } finally { lock.releaseLock(); }
 }
 
@@ -1121,7 +1142,7 @@ function syncSatisfactionValues() {
  * @private
  */
 function computeSectionAverages_(responseData) {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var results = [];
 
   for (var r = 0; r < responseData.length; r++) {
@@ -1201,7 +1222,7 @@ function computeAverage_(row, startIdx, endIdx) {
  * @private
  */
 function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var dashStart = 84; // Column CF
   var demoStart = 87; // Column CH
   var chartStart = 90; // Column CK
@@ -1320,7 +1341,7 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
  * @param {number} row - Row number of the new response
  */
 function computeSatisfactionRowAverages(row) {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -1352,19 +1373,6 @@ function computeSatisfactionRowAverages(row) {
   if (summaryStart > 0) {
     sheet.getRange(row, summaryStart, 1, summaryCols).setValues([averages]);
   }
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Helper function to get last row with data
- * @param {Sheet} sheet - The sheet to check
- * @return {number} The last row number with data
- */
-function getSheetLastRow(sheet) {
-  return sheet.getLastRow();
 }
 
 /**
@@ -1494,18 +1502,13 @@ function syncGrievanceToMemberDirectory() {
  * This is the self-healing function - it copies calculated values to the Grievance Log
  * Member data (Name, Email, Unit, Location, Steward) is looked up directly from Member Directory
  */
-function syncGrievanceFormulasToLog() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!grievanceSheet || !memberSheet) {
-    try { SpreadsheetApp.getActiveSpreadsheet().toast('Required sheets not found for formula sync.', 'Sync Error', 5); } catch (_) {}
-    return;
-  }
-
-  // Get Member Directory data and create lookup by Member ID
-  var memberData = memberSheet.getDataRange().getValues();
+/**
+ * Build a lookup map from Member Directory data, keyed by Member ID.
+ * @param {Array<Array>} memberData - Raw member data with headers at index 0
+ * @returns {Object} Map of memberId -> { firstName, lastName, email, unit, location, steward }
+ * @private
+ */
+function _buildMemberLookupMap_(memberData) {
   var memberLookup = {};
   for (var i = 1; i < memberData.length; i++) {
     var memberId = memberData[i][MEMBER_COLS.MEMBER_ID - 1];
@@ -1520,6 +1523,123 @@ function syncGrievanceFormulasToLog() {
       };
     }
   }
+  return memberLookup;
+}
+
+/**
+ * Calculate deadline dates and time-based metrics for a single grievance row.
+ * Pure function — no SpreadsheetApp calls.
+ * @param {Array} rowData - Single grievance row array
+ * @param {Object} rules - Deadline rules from getDeadlineRules()
+ * @param {Array<string>} closedStatuses - Statuses that should not have Next Action Due
+ * @param {Date} today - Current date (normalized to midnight)
+ * @returns {Object} { deadlines: [5 values], metrics: [3 values] }
+ * @private
+ */
+function _calculateRowDeadlines_(rowData, rules, closedStatuses, today) {
+  var incidentDate = rowData[GRIEVANCE_COLS.INCIDENT_DATE - 1];
+  var dateFiled = rowData[GRIEVANCE_COLS.DATE_FILED - 1];
+  var step1Rcvd = rowData[GRIEVANCE_COLS.STEP1_RCVD - 1];
+  var step2AppealFiled = rowData[GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1];
+  var step2Rcvd = rowData[GRIEVANCE_COLS.STEP2_RCVD - 1];
+  var dateClosed = rowData[GRIEVANCE_COLS.DATE_CLOSED - 1];
+  var status = rowData[GRIEVANCE_COLS.STATUS - 1];
+  var currentStep = rowData[GRIEVANCE_COLS.CURRENT_STEP - 1];
+
+  // Calculate deadline dates using configurable rules and business-day math
+  // (matches recalculateDownstreamDeadlines_ approach)
+  var filingDeadline = '';
+  var step1Due = '';
+  var step2AppealDue = '';
+  var step2Due = '';
+  var step3AppealDue = '';
+
+  if (incidentDate instanceof Date) {
+    filingDeadline = addBusinessDays(incidentDate, rules.FILING_DAYS);
+  }
+  if (dateFiled instanceof Date) {
+    step1Due = addBusinessDays(dateFiled, rules.STEP_1.DAYS_FOR_RESPONSE);
+  }
+  if (step1Rcvd instanceof Date) {
+    step2AppealDue = addBusinessDays(step1Rcvd, rules.STEP_2.DAYS_TO_APPEAL);
+  }
+  if (step2AppealFiled instanceof Date) {
+    step2Due = addBusinessDays(step2AppealFiled, rules.STEP_2.DAYS_FOR_RESPONSE);
+  }
+  if (step2Rcvd instanceof Date) {
+    step3AppealDue = addBusinessDays(step2Rcvd, rules.STEP_3.DAYS_TO_APPEAL);
+  }
+
+  // Calculate Days Open directly
+  var daysOpen = '';
+  if (dateFiled instanceof Date) {
+    if (dateClosed instanceof Date) {
+      daysOpen = Math.floor((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+    } else {
+      daysOpen = Math.floor((today - dateFiled) / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  // Calculate Next Action Due based on current step and status
+  var nextActionDue = '';
+  var isClosed = closedStatuses.indexOf(status) !== -1;
+
+  if (!isClosed && currentStep) {
+    if (currentStep === 'Informal' && filingDeadline) {
+      nextActionDue = filingDeadline;
+    } else if (currentStep === 'Step I' && step1Due) {
+      nextActionDue = step1Due;
+    } else if (currentStep === 'Step II' && step2Due) {
+      nextActionDue = step2Due;
+    } else if (currentStep === 'Step III' && step3AppealDue) {
+      nextActionDue = step3AppealDue;
+    }
+  }
+
+  // Calculate Days to Deadline directly
+  var daysToDeadline = '';
+  if (nextActionDue instanceof Date) {
+    daysToDeadline = Math.floor((nextActionDue - today) / (1000 * 60 * 60 * 24));
+  }
+
+  return {
+    deadlines: [filingDeadline, step1Due, step2AppealDue, step2Due, step3AppealDue],
+    metrics: [daysOpen, nextActionDue, daysToDeadline]
+  };
+}
+
+/**
+ * Track data quality issues for a single grievance row.
+ * Appends to the provided quality counter arrays (mutates in place).
+ * @param {string} memberId - The member ID from the grievance row
+ * @param {string} grievanceId - The grievance ID (or fallback label)
+ * @param {Object} memberLookup - Member lookup map
+ * @param {Object} qualityCounters - { orphanedGrievances: [], missingMemberIds: [] }
+ * @private
+ */
+function _trackDataQuality_(memberId, grievanceId, memberLookup, qualityCounters) {
+  if (!memberId) {
+    qualityCounters.missingMemberIds.push(grievanceId);
+    Logger.log('WARNING: Grievance ' + grievanceId + ' has no Member ID');
+  } else if (!memberLookup[memberId]) {
+    qualityCounters.orphanedGrievances.push(grievanceId + ' (Member ID: ' + memberId + ')');
+    Logger.log('WARNING: Grievance ' + grievanceId + ' references non-existent Member ID: ' + memberId);
+  }
+}
+
+function syncGrievanceFormulasToLog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!grievanceSheet || !memberSheet) {
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Required sheets not found for formula sync.', 'Sync Error', 5); } catch (_) {}
+    return;
+  }
+
+  // Build member lookup from directory
+  var memberData = memberSheet.getDataRange().getValues();
+  var memberLookup = _buildMemberLookupMap_(memberData);
 
   // Get grievance data
   var grievanceData = grievanceSheet.getDataRange().getValues();
@@ -1533,30 +1653,23 @@ function syncGrievanceFormulasToLog() {
 
   // Prepare updates
   var nameUpdates = [];           // Columns C-D
-  var deadlineUpdates = [];       // Columns H, J, L, N, P (Filing Deadline, Step I Due, Step II Appeal Due, Step II Due, Step III Appeal Due)
-  var metricsUpdates = [];        // Columns S, T, U (Days Open, Next Action Due, Days to Deadline)
-  var contactUpdates = [];        // Columns X, Y, Z, AA (Email, Unit, Location, Steward)
+  var deadlineUpdates = [];       // Columns H, J, L, N, P
+  var metricsUpdates = [];        // Columns S, T, U
+  var contactUpdates = [];        // Columns X, Y, Z, AA
 
   // Track data quality issues
-  var orphanedGrievances = [];    // Grievances with non-existent Member IDs
-  var missingMemberIds = [];      // Grievances with no Member ID
+  var qualityCounters = { orphanedGrievances: [], missingMemberIds: [] };
 
   // Read configurable deadline rules once (outside the loop)
   var rules = getDeadlineRules();
 
   for (var j = 1; j < grievanceData.length; j++) {
     var row = grievanceData[j];
-    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || ('Row ' + (j + 1));
 
     // Track data quality issues
-    if (!memberId) {
-      missingMemberIds.push(grievanceId);
-      Logger.log('WARNING: Grievance ' + grievanceId + ' has no Member ID');
-    } else if (!memberLookup[memberId]) {
-      orphanedGrievances.push(grievanceId + ' (Member ID: ' + memberId + ')');
-      Logger.log('WARNING: Grievance ' + grievanceId + ' references non-existent Member ID: ' + memberId);
-    }
+    _trackDataQuality_(memberId, grievanceId, memberLookup, qualityCounters);
 
     var memberInfo = memberLookup[memberId] || {};
 
@@ -1566,88 +1679,14 @@ function syncGrievanceFormulasToLog() {
       memberInfo.lastName || ''
     ]);
 
-    // Get date values from grievance row for deadline calculations
-    var incidentDate = row[GRIEVANCE_COLS.INCIDENT_DATE - 1];
-    var dateFiled = row[GRIEVANCE_COLS.DATE_FILED - 1];
-    var step1Rcvd = row[GRIEVANCE_COLS.STEP1_RCVD - 1];
-    var step2AppealFiled = row[GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1];
-    var step2Rcvd = row[GRIEVANCE_COLS.STEP2_RCVD - 1];
-    var dateClosed = row[GRIEVANCE_COLS.DATE_CLOSED - 1];
-    var status = row[GRIEVANCE_COLS.STATUS - 1];
-    var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
-
-    // Calculate deadline dates using configurable rules and business-day math
-    // (matches recalculateDownstreamDeadlines_ approach)
-    var filingDeadline = '';
-    var step1Due = '';
-    var step2AppealDue = '';
-    var step2Due = '';
-    var step3AppealDue = '';
-
-    if (incidentDate instanceof Date) {
-      filingDeadline = addBusinessDays(incidentDate, rules.FILING_DAYS);
-    }
-    if (dateFiled instanceof Date) {
-      step1Due = addBusinessDays(dateFiled, rules.STEP_1.DAYS_FOR_RESPONSE);
-    }
-    if (step1Rcvd instanceof Date) {
-      step2AppealDue = addBusinessDays(step1Rcvd, rules.STEP_2.DAYS_TO_APPEAL);
-    }
-    if (step2AppealFiled instanceof Date) {
-      step2Due = addBusinessDays(step2AppealFiled, rules.STEP_2.DAYS_FOR_RESPONSE);
-    }
-    if (step2Rcvd instanceof Date) {
-      step3AppealDue = addBusinessDays(step2Rcvd, rules.STEP_3.DAYS_TO_APPEAL);
-    }
+    // Calculate deadlines and metrics for this row
+    var rowCalc = _calculateRowDeadlines_(row, rules, closedStatuses, today);
 
     // Deadlines (H, J, L, N, P)
-    deadlineUpdates.push([
-      filingDeadline,
-      step1Due,
-      step2AppealDue,
-      step2Due,
-      step3AppealDue
-    ]);
-
-    // Calculate Days Open directly
-    var daysOpen = '';
-    if (dateFiled instanceof Date) {
-      if (dateClosed instanceof Date) {
-        daysOpen = Math.floor((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
-      } else {
-        daysOpen = Math.floor((today - dateFiled) / (1000 * 60 * 60 * 24));
-      }
-    }
-
-    // Calculate Next Action Due based on current step and status
-    var nextActionDue = '';
-    var isClosed = closedStatuses.indexOf(status) !== -1;
-
-    if (!isClosed && currentStep) {
-      if (currentStep === 'Informal' && filingDeadline) {
-        nextActionDue = filingDeadline;
-      } else if (currentStep === 'Step I' && step1Due) {
-        nextActionDue = step1Due;
-      } else if (currentStep === 'Step II' && step2Due) {
-        nextActionDue = step2Due;
-      } else if (currentStep === 'Step III' && step3AppealDue) {
-        nextActionDue = step3AppealDue;
-      }
-    }
-
-    // Calculate Days to Deadline directly
-    var daysToDeadline = '';
-    if (nextActionDue instanceof Date) {
-      var days = Math.floor((nextActionDue - today) / (1000 * 60 * 60 * 24));
-      daysToDeadline = days;
-    }
+    deadlineUpdates.push(rowCalc.deadlines);
 
     // Metrics (S, T, U)
-    metricsUpdates.push([
-      daysOpen,
-      nextActionDue,
-      daysToDeadline
-    ]);
+    metricsUpdates.push(rowCalc.metrics);
 
     // Contact info (X, Y, Z, AA)
     contactUpdates.push([
@@ -1728,13 +1767,13 @@ function syncGrievanceFormulasToLog() {
 
   // Show warnings to user if data quality issues found
   var warnings = [];
-  if (missingMemberIds.length > 0) {
-    warnings.push(missingMemberIds.length + ' grievance(s) have no Member ID');
-    Logger.log('Missing Member IDs: ' + missingMemberIds.join(', '));
+  if (qualityCounters.missingMemberIds.length > 0) {
+    warnings.push(qualityCounters.missingMemberIds.length + ' grievance(s) have no Member ID');
+    Logger.log('Missing Member IDs: ' + qualityCounters.missingMemberIds.join(', '));
   }
-  if (orphanedGrievances.length > 0) {
-    warnings.push(orphanedGrievances.length + ' grievance(s) reference non-existent members');
-    Logger.log('Orphaned grievances: ' + orphanedGrievances.join(', '));
+  if (qualityCounters.orphanedGrievances.length > 0) {
+    warnings.push(qualityCounters.orphanedGrievances.length + ' grievance(s) reference non-existent members');
+    Logger.log('Orphaned grievances: ' + qualityCounters.orphanedGrievances.join(', '));
   }
 
   if (warnings.length > 0) {
@@ -1789,9 +1828,23 @@ function syncMemberToGrievanceLog() {
 
   for (var j = 1; j < grievanceData.length; j++) {
     memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
-    var data = lookup[memberId] || {firstName: '', lastName: '', email: '', unit: '', location: '', steward: ''};
-    nameUpdates.push([data.firstName, data.lastName]);
-    infoUpdates.push([data.email, data.unit, data.location, data.steward]);
+    var data = lookup[memberId];
+    // Existing values (0-indexed from grievanceData row)
+    var curFirst = grievanceData[j][GRIEVANCE_COLS.FIRST_NAME - 1];
+    var curLast = grievanceData[j][GRIEVANCE_COLS.LAST_NAME - 1];
+    var curEmail = grievanceData[j][GRIEVANCE_COLS.MEMBER_EMAIL - 1];
+    var curUnit = grievanceData[j][GRIEVANCE_COLS.MEMBER_EMAIL];
+    var curLoc = grievanceData[j][GRIEVANCE_COLS.MEMBER_EMAIL + 1];
+    var curSteward = grievanceData[j][GRIEVANCE_COLS.MEMBER_EMAIL + 2];
+    if (!data) {
+      // No lookup match — preserve existing grievance row values
+      nameUpdates.push([curFirst, curLast]);
+      infoUpdates.push([curEmail, curUnit, curLoc, curSteward]);
+    } else {
+      // Only overwrite with non-empty source values
+      nameUpdates.push([data.firstName || curFirst, data.lastName || curLast]);
+      infoUpdates.push([data.email || curEmail, data.unit || curUnit, data.location || curLoc, data.steward || curSteward]);
+    }
   }
 
   if (nameUpdates.length > 0) {
@@ -1914,8 +1967,11 @@ function onEditAutoSync(e) {
       sortGrievanceLogByStatus();
       // Update Dashboard with new computed values
       syncDashboardValues();
-      // Auto-create folders for any grievances missing them
-      autoCreateMissingGrievanceFolders_();
+      // Auto-create folders for any grievances missing them (throttled to once per 15 min)
+      if (!cache.get('folder_sync_throttle')) {
+        autoCreateMissingGrievanceFolders_();
+        cache.put('folder_sync_throttle', '1', 900); // 15 min throttle
+      }
     } else if (sheetName === SHEETS.MEMBER_DIR) {
       // Member Directory changed - sync to Grievance Log and Config
       syncNewValueToConfig(e);  // Bidirectional: add new values to Config
@@ -1955,8 +2011,13 @@ function syncAllData() {
   repairGrievanceCheckboxes();
   repairMemberCheckboxes();
 
-  // Run data quality check
-  var issues = checkDataQuality();
+  // Run data quality check (wrapped in try/catch so sync completes even if check fails)
+  var issues = [];
+  try {
+    if (typeof checkDataQuality === 'function') issues = checkDataQuality();
+  } catch (_dq) {
+    Logger.log('Data quality check failed: ' + _dq.message);
+  }
 
   if (issues.length > 0) {
     var issueMsg = issues.slice(0, 5).join('\n');
@@ -2138,94 +2199,31 @@ function syncDashboardValues() {
 }
 
 /**
- * Compute all Dashboard metrics from raw data
+ * Compute member-related metrics (total members, stewards, open rates, vol hours, contacts).
+ * @param {Array<Array>} memberData - Raw member data with headers at index 0
+ * @param {Date} today - Current date
+ * @param {Date} thisMonthStart - First day of current month
+ * @returns {Object} Member metrics
  * @private
  */
-function computeDashboardMetrics_(memberData, grievanceData, configData) {
-  var metrics = {
-    // Quick Stats
+function _computeMemberMetrics_(memberData, today, thisMonthStart) {
+  var result = {
     totalMembers: 0,
     activeStewards: 0,
-    activeGrievances: 0,
-    winRate: '-',
-    overdueCases: 0,
-    dueThisWeek: 0,
-
-    // Member Metrics
     avgOpenRate: '-',
     ytdVolHours: 0,
-
-    // Grievance Metrics
-    open: 0,
-    pendingInfo: 0,
-    settled: 0,
-    won: 0,
-    denied: 0,
-    withdrawn: 0,
-
-    // Timeline Metrics
-    avgDaysOpen: 0,
-    filedThisMonth: 0,
-    closedThisMonth: 0,
-    avgResolutionDays: 0,
-
-    // Category Analysis (top 5)
-    categories: [],
-
-    // Location Breakdown (top 5)
-    locations: [],
-
-    // Month-over-Month Trends
-    trends: {
-      filed: { thisMonth: 0, lastMonth: 0 },
-      closed: { thisMonth: 0, lastMonth: 0 },
-      won: { thisMonth: 0, lastMonth: 0 }
-    },
-
-    // 6-Month Historical Data for Sparklines
-    sixMonthHistory: {
-      grievances: [], // [month-5, month-4, month-3, month-2, month-1, current]
-      members: [],
-      casesFiled: []
-    },
-
-    // Steward Summary
-    stewardSummary: {
-      total: 0,
-      activeWithCases: 0,
-      avgCasesPerSteward: '-',
-      totalVolHours: 0,
-      contactsThisMonth: 0
-    },
-
-    // Top 30 Busiest Stewards
-    busiestStewards: [],
-
-    // Top 10 Performers (from hidden sheet)
-    topPerformers: [],
-
-    // Bottom 10 (needing support)
-    needingSupport: []
+    contactsThisMonth: 0
   };
-
-  var today = new Date();
-  var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  var lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  var lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-
-  // ══════════════════════════════════════════════════════════════════════
-  // MEMBER METRICS
-  // ══════════════════════════════════════════════════════════════════════
   var openRates = [];
 
   for (var m = 1; m < memberData.length; m++) {
     var row = memberData[m];
     if (!row[MEMBER_COLS.MEMBER_ID - 1]) continue;
 
-    metrics.totalMembers++;
+    result.totalMembers++;
 
     if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) {
-      metrics.activeStewards++;
+      result.activeStewards++;
     }
 
     var openRate = row[MEMBER_COLS.OPEN_RATE - 1];
@@ -2235,28 +2233,53 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
 
     var volHours = row[MEMBER_COLS.VOLUNTEER_HOURS - 1];
     if (typeof volHours === 'number') {
-      metrics.ytdVolHours += volHours;
+      result.ytdVolHours += volHours;
     }
 
     var contactDate = row[MEMBER_COLS.RECENT_CONTACT_DATE - 1];
     if (contactDate instanceof Date && contactDate >= thisMonthStart && contactDate <= today) {
-      metrics.stewardSummary.contactsThisMonth++;
+      result.contactsThisMonth++;
     }
   }
 
   if (openRates.length > 0) {
     var avgRate = openRates.reduce(function(a, b) { return a + b; }, 0) / openRates.length;
-    metrics.avgOpenRate = Math.round(avgRate * 10) / 10 + '%';
+    result.avgOpenRate = Math.round(avgRate * 10) / 10 + '%';
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // GRIEVANCE METRICS
-  // ══════════════════════════════════════════════════════════════════════
+  return result;
+}
+
+/**
+ * Compute grievance status counts, trends, averages, and build intermediate
+ * category/location/steward lookup objects for downstream helpers.
+ * @param {Array<Array>} grievanceData - Raw grievance data with headers at index 0
+ * @param {Date} today - Current date
+ * @param {Date} thisMonthStart - First day of current month
+ * @param {Date} lastMonthStart - First day of last month
+ * @param {Date} lastMonthEnd - Last day of last month
+ * @returns {Object} Grievance metrics + intermediate lookup objects
+ * @private
+ */
+function _computeGrievanceMetrics_(grievanceData, today, thisMonthStart, lastMonthStart, lastMonthEnd) {
+  var result = {
+    open: 0, pendingInfo: 0, settled: 0, won: 0, denied: 0, withdrawn: 0,
+    activeGrievances: 0, overdueCases: 0, dueThisWeek: 0,
+    avgDaysOpen: 0, filedThisMonth: 0, closedThisMonth: 0, avgResolutionDays: 0,
+    winRate: '-',
+    trends: {
+      filed: { thisMonth: 0, lastMonth: 0 },
+      closed: { thisMonth: 0, lastMonth: 0 },
+      won: { thisMonth: 0, lastMonth: 0 }
+    },
+    // Intermediate objects for downstream helpers
+    categoryStats: {},
+    locationStats: {},
+    stewardGrievances: {}
+  };
+
   var daysOpenValues = [];
   var closedDaysValues = [];
-  var categoryStats = {};
-  var locationStats = {};
-  var stewardGrievances = {};
 
   for (var g = 1; g < grievanceData.length; g++) {
     var gRow = grievanceData[g];
@@ -2272,25 +2295,25 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var daysToDeadline = gRow[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
 
     // Status counts
-    if (status === GRIEVANCE_STATUS.OPEN) metrics.open++;
-    else if (status === GRIEVANCE_STATUS.PENDING) metrics.pendingInfo++;
-    else if (status === GRIEVANCE_STATUS.SETTLED) metrics.settled++;
-    else if (status === GRIEVANCE_STATUS.WON) metrics.won++;
-    else if (status === GRIEVANCE_STATUS.DENIED) metrics.denied++;
-    else if (status === GRIEVANCE_STATUS.WITHDRAWN) metrics.withdrawn++;
+    if (status === GRIEVANCE_STATUS.OPEN) result.open++;
+    else if (status === GRIEVANCE_STATUS.PENDING) result.pendingInfo++;
+    else if (status === GRIEVANCE_STATUS.SETTLED) result.settled++;
+    else if (status === GRIEVANCE_STATUS.WON) result.won++;
+    else if (status === GRIEVANCE_STATUS.DENIED) result.denied++;
+    else if (status === GRIEVANCE_STATUS.WITHDRAWN) result.withdrawn++;
 
     // Active grievances
     if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) {
-      metrics.activeGrievances++;
+      result.activeGrievances++;
     }
 
     // Overdue and due this week
     // Note: daysToDeadline can be a number OR the string "Overdue"
     if (daysToDeadline === 'Overdue') {
-      metrics.overdueCases++;
+      result.overdueCases++;
     } else if (typeof daysToDeadline === 'number') {
-      if (daysToDeadline < 0) metrics.overdueCases++;
-      else if (daysToDeadline <= 7) metrics.dueThisWeek++;
+      if (daysToDeadline < 0) result.overdueCases++;
+      else if (daysToDeadline <= 7) result.dueThisWeek++;
     }
 
     // Days open average
@@ -2305,90 +2328,99 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
 
     // Filed this month
     if (dateFiled instanceof Date && dateFiled >= thisMonthStart && dateFiled <= today) {
-      metrics.filedThisMonth++;
-      metrics.trends.filed.thisMonth++;
+      result.filedThisMonth++;
+      result.trends.filed.thisMonth++;
     }
     if (dateFiled instanceof Date && dateFiled >= lastMonthStart && dateFiled <= lastMonthEnd) {
-      metrics.trends.filed.lastMonth++;
+      result.trends.filed.lastMonth++;
     }
 
     // Closed this month
     if (dateClosed instanceof Date && dateClosed >= thisMonthStart && dateClosed <= today) {
-      metrics.closedThisMonth++;
-      metrics.trends.closed.thisMonth++;
+      result.closedThisMonth++;
+      result.trends.closed.thisMonth++;
       if (status === GRIEVANCE_STATUS.WON) {
-        metrics.trends.won.thisMonth++;
+        result.trends.won.thisMonth++;
       }
     }
     if (dateClosed instanceof Date && dateClosed >= lastMonthStart && dateClosed <= lastMonthEnd) {
-      metrics.trends.closed.lastMonth++;
+      result.trends.closed.lastMonth++;
       if (status === GRIEVANCE_STATUS.WON) {
-        metrics.trends.won.lastMonth++;
+        result.trends.won.lastMonth++;
       }
     }
 
     // Category stats
     if (category) {
-      if (!categoryStats[category]) {
-        categoryStats[category] = { total: 0, open: 0, resolved: 0, won: 0, denied: 0, settled: 0, withdrawn: 0, daysOpen: [] };
+      if (!result.categoryStats[category]) {
+        result.categoryStats[category] = { total: 0, open: 0, resolved: 0, won: 0, denied: 0, settled: 0, withdrawn: 0, daysOpen: [] };
       }
-      categoryStats[category].total++;
-      if (status === GRIEVANCE_STATUS.OPEN) categoryStats[category].open++;
-      if (status !== GRIEVANCE_STATUS.OPEN && status !== GRIEVANCE_STATUS.PENDING) categoryStats[category].resolved++;
-      if (status === GRIEVANCE_STATUS.WON) categoryStats[category].won++;
-      if (status === GRIEVANCE_STATUS.DENIED) categoryStats[category].denied++;
-      if (status === GRIEVANCE_STATUS.SETTLED) categoryStats[category].settled++;
-      if (status === GRIEVANCE_STATUS.WITHDRAWN) categoryStats[category].withdrawn++;
-      if (typeof daysOpen === 'number') categoryStats[category].daysOpen.push(daysOpen);
+      result.categoryStats[category].total++;
+      if (status === GRIEVANCE_STATUS.OPEN) result.categoryStats[category].open++;
+      if (status !== GRIEVANCE_STATUS.OPEN && status !== GRIEVANCE_STATUS.PENDING) result.categoryStats[category].resolved++;
+      if (status === GRIEVANCE_STATUS.WON) result.categoryStats[category].won++;
+      if (status === GRIEVANCE_STATUS.DENIED) result.categoryStats[category].denied++;
+      if (status === GRIEVANCE_STATUS.SETTLED) result.categoryStats[category].settled++;
+      if (status === GRIEVANCE_STATUS.WITHDRAWN) result.categoryStats[category].withdrawn++;
+      if (typeof daysOpen === 'number') result.categoryStats[category].daysOpen.push(daysOpen);
     }
 
     // Location stats
     if (location) {
-      if (!locationStats[location]) {
-        locationStats[location] = { members: 0, grievances: 0, open: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 };
+      if (!result.locationStats[location]) {
+        result.locationStats[location] = { members: 0, grievances: 0, open: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 };
       }
-      locationStats[location].grievances++;
-      if (status === GRIEVANCE_STATUS.OPEN) locationStats[location].open++;
-      if (status === GRIEVANCE_STATUS.WON) locationStats[location].won++;
-      if (status === GRIEVANCE_STATUS.DENIED) locationStats[location].denied++;
-      if (status === GRIEVANCE_STATUS.SETTLED) locationStats[location].settled++;
-      if (status === GRIEVANCE_STATUS.WITHDRAWN) locationStats[location].withdrawn++;
+      result.locationStats[location].grievances++;
+      if (status === GRIEVANCE_STATUS.OPEN) result.locationStats[location].open++;
+      if (status === GRIEVANCE_STATUS.WON) result.locationStats[location].won++;
+      if (status === GRIEVANCE_STATUS.DENIED) result.locationStats[location].denied++;
+      if (status === GRIEVANCE_STATUS.SETTLED) result.locationStats[location].settled++;
+      if (status === GRIEVANCE_STATUS.WITHDRAWN) result.locationStats[location].withdrawn++;
     }
 
     // Steward stats
     if (steward) {
-      if (!stewardGrievances[steward]) {
-        stewardGrievances[steward] = { active: 0, open: 0, pendingInfo: 0, total: 0 };
+      if (!result.stewardGrievances[steward]) {
+        result.stewardGrievances[steward] = { active: 0, open: 0, pendingInfo: 0, total: 0 };
       }
-      stewardGrievances[steward].total++;
+      result.stewardGrievances[steward].total++;
       if (status === GRIEVANCE_STATUS.OPEN) {
-        stewardGrievances[steward].active++;
-        stewardGrievances[steward].open++;
+        result.stewardGrievances[steward].active++;
+        result.stewardGrievances[steward].open++;
       } else if (status === GRIEVANCE_STATUS.PENDING) {
-        stewardGrievances[steward].active++;
-        stewardGrievances[steward].pendingInfo++;
+        result.stewardGrievances[steward].active++;
+        result.stewardGrievances[steward].pendingInfo++;
       }
     }
   }
 
   // Calculate averages
   if (daysOpenValues.length > 0) {
-    metrics.avgDaysOpen = Math.round(daysOpenValues.reduce(function(a, b) { return a + b; }, 0) / daysOpenValues.length * 10) / 10;
+    result.avgDaysOpen = Math.round(daysOpenValues.reduce(function(a, b) { return a + b; }, 0) / daysOpenValues.length * 10) / 10;
   }
   if (closedDaysValues.length > 0) {
-    metrics.avgResolutionDays = Math.round(closedDaysValues.reduce(function(a, b) { return a + b; }, 0) / closedDaysValues.length * 10) / 10;
+    result.avgResolutionDays = Math.round(closedDaysValues.reduce(function(a, b) { return a + b; }, 0) / closedDaysValues.length * 10) / 10;
   }
 
   // Win rate
-  var totalOutcomes = metrics.won + metrics.denied + metrics.settled + metrics.withdrawn;
+  var totalOutcomes = result.won + result.denied + result.settled + result.withdrawn;
   if (totalOutcomes > 0) {
-    metrics.winRate = Math.round(metrics.won / totalOutcomes * 100) + '%';
+    result.winRate = Math.round(result.won / totalOutcomes * 100) + '%';
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // 6-MONTH HISTORICAL DATA FOR SPARKLINES
-  // ══════════════════════════════════════════════════════════════════════
-  // Calculate filing counts for each of the last 6 months
+  return result;
+}
+
+/**
+ * Compute 6-month filing/closing history for sparklines.
+ * @param {Array<Array>} grievanceData - Raw grievance data with headers at index 0
+ * @param {Date} today - Current date
+ * @param {number} activeGrievances - Current count of active grievances
+ * @param {number} totalMembers - Current total member count
+ * @returns {Object} sixMonthHistory with casesFiled, grievances, members arrays
+ * @private
+ */
+function _computeMonthlyHistory_(grievanceData, today, activeGrievances, totalMembers) {
   var monthlyFiledCounts = [0, 0, 0, 0, 0, 0]; // [5 months ago, 4, 3, 2, 1, current]
   var monthlyClosedCounts = [0, 0, 0, 0, 0, 0];
 
@@ -2422,26 +2454,26 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     }
   }
 
-  // Store 6-month history for sparklines
-  metrics.sixMonthHistory.casesFiled = monthlyFiledCounts;
-  metrics.sixMonthHistory.grievances = monthlyFiledCounts.map(function(val, idx) {
-    // Running total of active grievances (approximation)
-    return metrics.activeGrievances + monthlyFiledCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0) -
-           monthlyClosedCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0);
-  });
-  // Member count history not tracked — show current count consistently (no fabricated trends)
-  metrics.sixMonthHistory.members = [
-    metrics.totalMembers,
-    metrics.totalMembers,
-    metrics.totalMembers,
-    metrics.totalMembers,
-    metrics.totalMembers,
-    metrics.totalMembers
-  ];
+  return {
+    casesFiled: monthlyFiledCounts,
+    grievances: monthlyFiledCounts.map(function(val, idx) {
+      // Running total of active grievances (approximation)
+      return activeGrievances + monthlyFiledCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0) -
+             monthlyClosedCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0);
+    }),
+    // Member count history not tracked — show current count consistently (no fabricated trends)
+    members: [totalMembers, totalMembers, totalMembers, totalMembers, totalMembers, totalMembers]
+  };
+}
 
-  // ══════════════════════════════════════════════════════════════════════
-  // CATEGORY ANALYSIS (Top 5)
-  // ══════════════════════════════════════════════════════════════════════
+/**
+ * Compute top-5 category analysis from pre-built category stats.
+ * @param {Object} categoryStats - Category stats built by _computeGrievanceMetrics_
+ * @returns {Array<Object>} Array of category analysis objects
+ * @private
+ */
+function _computeCategoryAnalysis_(categoryStats) {
+  var categories = [];
   var defaultCategories = ['Contract Violation', 'Discipline', 'Workload', 'Safety', 'Discrimination'];
   for (var c = 0; c < defaultCategories.length; c++) {
     var cat = defaultCategories[c];
@@ -2451,7 +2483,7 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var avgDays = catData.daysOpen.length > 0 ?
       Math.round(catData.daysOpen.reduce(function(a, b) { return a + b; }, 0) / catData.daysOpen.length * 10) / 10 : '-';
 
-    metrics.categories.push({
+    categories.push({
       name: cat,
       total: catData.total,
       open: catData.open,
@@ -2460,10 +2492,20 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
       avgDays: avgDays
     });
   }
+  return categories;
+}
 
-  // ══════════════════════════════════════════════════════════════════════
-  // LOCATION BREAKDOWN (Top 5 from Config)
-  // ══════════════════════════════════════════════════════════════════════
+/**
+ * Compute top-5 location breakdown from member data, config data, and pre-built location stats.
+ * @param {Array<Array>} memberData - Raw member data with headers at index 0
+ * @param {Array<Array>} configData - Raw config data
+ * @param {Object} locationStats - Location stats built by _computeGrievanceMetrics_
+ * @returns {Array<Object>} Array of location breakdown objects
+ * @private
+ */
+function _computeLocationBreakdown_(memberData, configData, locationStats) {
+  var locations = [];
+
   // Count members per location
   var memberLocations = {};
   for (var ml = 1; ml < memberData.length; ml++) {
@@ -2493,7 +2535,7 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var locResolved = locData.won + locData.denied + locData.settled + locData.withdrawn;
     var locWinRate = locResolved > 0 ? Math.round(locData.won / locResolved * 100) + '%' : '-';
 
-    metrics.locations.push({
+    locations.push({
       name: locName,
       members: locData.members,
       grievances: locData.grievances,
@@ -2503,25 +2545,43 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     });
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // STEWARD SUMMARY
-  // ══════════════════════════════════════════════════════════════════════
-  metrics.stewardSummary.total = metrics.activeStewards;
-  metrics.stewardSummary.totalVolHours = metrics.ytdVolHours;
+  return locations;
+}
+
+/**
+ * Compute steward summary, busiest stewards list, and top/bottom performers.
+ * @param {Object} stewardGrievances - Steward stats built by _computeGrievanceMetrics_
+ * @param {number} activeStewards - Count of active stewards
+ * @param {number} ytdVolHours - Year-to-date volunteer hours
+ * @param {number} contactsThisMonth - Contacts this month count
+ * @param {number} grievanceCount - Total grievance row count (excluding header)
+ * @returns {Object} stewardSummary, busiestStewards, topPerformers, needingSupport
+ * @private
+ */
+function _computeStewardSummary_(stewardGrievances, activeStewards, ytdVolHours, contactsThisMonth, grievanceCount) {
+  var result = {
+    stewardSummary: {
+      total: activeStewards,
+      activeWithCases: 0,
+      avgCasesPerSteward: '-',
+      totalVolHours: ytdVolHours,
+      contactsThisMonth: contactsThisMonth
+    },
+    busiestStewards: [],
+    topPerformers: [],
+    needingSupport: []
+  };
 
   var stewardsWithActiveCases = Object.keys(stewardGrievances).filter(function(s) {
     return stewardGrievances[s].active > 0;
   }).length;
-  metrics.stewardSummary.activeWithCases = stewardsWithActiveCases;
+  result.stewardSummary.activeWithCases = stewardsWithActiveCases;
 
-  if (metrics.activeStewards > 0) {
-    var totalGrievances = grievanceData.length - 1;
-    metrics.stewardSummary.avgCasesPerSteward = Math.round(totalGrievances / metrics.activeStewards * 10) / 10;
+  if (activeStewards > 0) {
+    result.stewardSummary.avgCasesPerSteward = Math.round(grievanceCount / activeStewards * 10) / 10;
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // TOP 30 BUSIEST STEWARDS
-  // ══════════════════════════════════════════════════════════════════════
+  // Top 30 busiest stewards
   var stewardArray = Object.keys(stewardGrievances).map(function(name) {
     return {
       name: name,
@@ -2531,13 +2591,10 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
       total: stewardGrievances[name].total
     };
   });
-
   stewardArray.sort(function(a, b) { return b.active - a.active; });
-  metrics.busiestStewards = stewardArray.slice(0, 30);
+  result.busiestStewards = stewardArray.slice(0, 30);
 
-  // ══════════════════════════════════════════════════════════════════════
-  // TOP/BOTTOM PERFORMERS (from hidden sheet)
-  // ══════════════════════════════════════════════════════════════════════
+  // Top/bottom performers (from hidden sheet)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
   if (perfSheet && perfSheet.getLastRow() > 1) {
@@ -2557,14 +2614,121 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
 
     // Sort by score descending for top performers
     performers.sort(function(a, b) { return b.score - a.score; });
-    metrics.topPerformers = performers.slice(0, 10);
+    result.topPerformers = performers.slice(0, 10);
 
     // Sort by score ascending for needing support
     performers.sort(function(a, b) { return a.score - b.score; });
-    metrics.needingSupport = performers.slice(0, 10);
+    result.needingSupport = performers.slice(0, 10);
   }
 
-  return metrics;
+  return result;
+}
+
+/**
+ * Compute all Dashboard metrics from raw data.
+ * Delegates to focused helpers for each metric section.
+ * @param {Array<Array>} memberData - Raw member data with headers at index 0
+ * @param {Array<Array>} grievanceData - Raw grievance data with headers at index 0
+ * @param {Array<Array>} configData - Raw config data
+ * @returns {Object} Combined metrics object
+ * @private
+ */
+function computeDashboardMetrics_(memberData, grievanceData, configData) {
+  var today = new Date();
+  var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  var lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  var lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // MEMBER METRICS
+  // ══════════════════════════════════════════════════════════════════════
+  var memberMetrics = _computeMemberMetrics_(memberData, today, thisMonthStart);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // GRIEVANCE METRICS (also builds category/location/steward lookups)
+  // ══════════════════════════════════════════════════════════════════════
+  var grievanceMetrics = _computeGrievanceMetrics_(grievanceData, today, thisMonthStart, lastMonthStart, lastMonthEnd);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 6-MONTH HISTORICAL DATA FOR SPARKLINES
+  // ══════════════════════════════════════════════════════════════════════
+  var sixMonthHistory = _computeMonthlyHistory_(grievanceData, today, grievanceMetrics.activeGrievances, memberMetrics.totalMembers);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // CATEGORY ANALYSIS (Top 5)
+  // ══════════════════════════════════════════════════════════════════════
+  var categories = _computeCategoryAnalysis_(grievanceMetrics.categoryStats);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // LOCATION BREAKDOWN (Top 5 from Config)
+  // ══════════════════════════════════════════════════════════════════════
+  var locations = _computeLocationBreakdown_(memberData, configData, grievanceMetrics.locationStats);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // STEWARD SUMMARY + BUSIEST STEWARDS + PERFORMERS
+  // ══════════════════════════════════════════════════════════════════════
+  var stewardResult = _computeStewardSummary_(
+    grievanceMetrics.stewardGrievances,
+    memberMetrics.activeStewards,
+    memberMetrics.ytdVolHours,
+    memberMetrics.contactsThisMonth,
+    grievanceData.length - 1
+  );
+
+  // ══════════════════════════════════════════════════════════════════════
+  // ASSEMBLE FINAL METRICS
+  // ══════════════════════════════════════════════════════════════════════
+  return {
+    // Quick Stats
+    totalMembers: memberMetrics.totalMembers,
+    activeStewards: memberMetrics.activeStewards,
+    activeGrievances: grievanceMetrics.activeGrievances,
+    winRate: grievanceMetrics.winRate,
+    overdueCases: grievanceMetrics.overdueCases,
+    dueThisWeek: grievanceMetrics.dueThisWeek,
+
+    // Member Metrics
+    avgOpenRate: memberMetrics.avgOpenRate,
+    ytdVolHours: memberMetrics.ytdVolHours,
+
+    // Grievance Metrics
+    open: grievanceMetrics.open,
+    pendingInfo: grievanceMetrics.pendingInfo,
+    settled: grievanceMetrics.settled,
+    won: grievanceMetrics.won,
+    denied: grievanceMetrics.denied,
+    withdrawn: grievanceMetrics.withdrawn,
+
+    // Timeline Metrics
+    avgDaysOpen: grievanceMetrics.avgDaysOpen,
+    filedThisMonth: grievanceMetrics.filedThisMonth,
+    closedThisMonth: grievanceMetrics.closedThisMonth,
+    avgResolutionDays: grievanceMetrics.avgResolutionDays,
+
+    // Category Analysis (top 5)
+    categories: categories,
+
+    // Location Breakdown (top 5)
+    locations: locations,
+
+    // Month-over-Month Trends
+    trends: grievanceMetrics.trends,
+
+    // 6-Month Historical Data for Sparklines
+    sixMonthHistory: sixMonthHistory,
+
+    // Steward Summary
+    stewardSummary: stewardResult.stewardSummary,
+
+    // Top 30 Busiest Stewards
+    busiestStewards: stewardResult.busiestStewards,
+
+    // Top 10 Performers (from hidden sheet)
+    topPerformers: stewardResult.topPerformers,
+
+    // Bottom 10 (needing support)
+    needingSupport: stewardResult.needingSupport
+  };
 }
 
 /**
@@ -2798,10 +2962,25 @@ function writeDashboardValues_(sheet, metrics) {
  * @private
  */
 function applyDashboardGradients_(sheet) {
-  // Define gradient color scale (Green -> Yellow -> Red)
-  var _greenColor = SHEET_COLORS.BG_PALE_GREEN;  // Low values (good for some metrics)
-  var _yellowColor = SHEET_COLORS.BG_LIGHT_YELLOW; // Mid values
-  var _redColor = '#FCA5A5';    // High values (bad for some metrics)
+  var L = DASHBOARD_LAYOUT;
+
+  // Derive gradient ranges from DASHBOARD_LAYOUT constants instead of hardcoding A1 notation
+  var GRADIENT_RANGES = {
+    ACTIVE_CASES:     { startRow: L.BUSIEST_START_ROW,        endRow: L.BUSIEST_END_ROW,          col: 3 },  // C59:C88
+    PERF_SCORE:       { startRow: L.TOP_PERFORMERS_START_ROW, endRow: L.TOP_PERFORMERS_END_ROW,   col: 3 },  // C93:C102
+    PERF_WIN_RATE:    { startRow: L.TOP_PERFORMERS_START_ROW, endRow: L.TOP_PERFORMERS_END_ROW,   col: 4 },  // D93:D102
+    PERF_OVERDUE:     { startRow: L.TOP_PERFORMERS_START_ROW, endRow: L.TOP_PERFORMERS_END_ROW,   col: 6 },  // F93:F102
+    NEED_SCORE:       { startRow: L.NEEDING_SUPPORT_START_ROW, endRow: L.NEEDING_SUPPORT_END_ROW, col: 3 },  // C107:C116
+    NEED_OVERDUE:     { startRow: L.NEEDING_SUPPORT_START_ROW, endRow: L.NEEDING_SUPPORT_END_ROW, col: 6 },  // F107:F116
+    CAT_WIN_RATE:     { startRow: L.CATEGORY_START_ROW,       endRow: L.CATEGORY_END_ROW,         col: 5 },  // E26:E30
+    LOC_WIN_RATE:     { startRow: L.LOCATION_START_ROW,       endRow: L.LOCATION_END_ROW,         col: 5 }   // E35:E39
+  };
+
+  /** Helper: convert {startRow, endRow, col} to a Sheet Range */
+  function _gr(key) {
+    var g = GRADIENT_RANGES[key];
+    return sheet.getRange(g.startRow, g.col, g.endRow - g.startRow + 1, 1);
+  }
 
   // Reverse scale (Red -> Yellow -> Green) for positive metrics
   var redToGreen = {
@@ -2818,7 +2997,7 @@ function applyDashboardGradients_(sheet) {
   };
 
   // ── Active Cases Column (Top 30 Busiest) - Higher = more work (red)
-  var activeCasesRange = sheet.getRange('C59:C88');
+  var activeCasesRange = _gr('ACTIVE_CASES');
   var activeCasesRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(greenToRed.minColor)
     .setGradientMidpointWithValue(greenToRed.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
@@ -2827,7 +3006,7 @@ function applyDashboardGradients_(sheet) {
     .build();
 
   // ── Score Column (Top 10 Performers) - Higher = better (green)
-  var scoreRange = sheet.getRange('C93:C102');
+  var scoreRange = _gr('PERF_SCORE');
   var scoreRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(redToGreen.minColor)
     .setGradientMidpointWithValue(redToGreen.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
@@ -2836,7 +3015,7 @@ function applyDashboardGradients_(sheet) {
     .build();
 
   // ── Win Rate Column (Top 10 Performers) - Higher = better (green)
-  var winRateRange = sheet.getRange('D93:D102');
+  var winRateRange = _gr('PERF_WIN_RATE');
   var winRateRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(redToGreen.minColor)
     .setGradientMidpointWithValue(redToGreen.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
@@ -2845,7 +3024,7 @@ function applyDashboardGradients_(sheet) {
     .build();
 
   // ── Overdue Column (Performers) - Lower = better (green at low)
-  var overdueRange = sheet.getRange('F93:F102');
+  var overdueRange = _gr('PERF_OVERDUE');
   var overdueRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(greenToRed.minColor)
     .setGradientMidpointWithValue(greenToRed.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
@@ -2854,7 +3033,7 @@ function applyDashboardGradients_(sheet) {
     .build();
 
   // ── Score Column (Needing Support) - Lower scores (red)
-  var needScoreRange = sheet.getRange('C107:C116');
+  var needScoreRange = _gr('NEED_SCORE');
   var needScoreRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(redToGreen.minColor)
     .setGradientMidpointWithValue(redToGreen.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
@@ -2863,7 +3042,7 @@ function applyDashboardGradients_(sheet) {
     .build();
 
   // ── Overdue Column (Needing Support) - Highlight high overdue
-  var needOverdueRange = sheet.getRange('F107:F116');
+  var needOverdueRange = _gr('NEED_OVERDUE');
   var needOverdueRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(greenToRed.minColor)
     .setGradientMidpointWithValue(greenToRed.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
@@ -2872,7 +3051,7 @@ function applyDashboardGradients_(sheet) {
     .build();
 
   // ── Category Win Rate (Issue Breakdown) - Higher = better (green)
-  var catWinRateRange = sheet.getRange('E26:E30');
+  var catWinRateRange = _gr('CAT_WIN_RATE');
   var catWinRateRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(redToGreen.minColor)
     .setGradientMidpointWithValue(redToGreen.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
@@ -2881,13 +3060,18 @@ function applyDashboardGradients_(sheet) {
     .build();
 
   // ── Location Win Rate - Higher = better (green)
-  var locWinRateRange = sheet.getRange('E35:E39');
+  var locWinRateRange = _gr('LOC_WIN_RATE');
   var locWinRateRule = SpreadsheetApp.newConditionalFormatRule()
     .setGradientMinpoint(redToGreen.minColor)
     .setGradientMidpointWithValue(redToGreen.midColor, SpreadsheetApp.InterpolationType.PERCENTILE, '50')
     .setGradientMaxpoint(redToGreen.maxColor)
     .setRanges([locWinRateRange])
     .build();
+
+  // Collect A1 notation of all gradient ranges for dedup filter
+  var gradientA1 = [activeCasesRange, scoreRange, winRateRange, overdueRange,
+    needScoreRange, needOverdueRange, catWinRateRange, locWinRateRange]
+    .map(function(r) { return r.getA1Notation(); });
 
   // Apply all rules
   var rules = sheet.getConditionalFormatRules();
@@ -2898,7 +3082,7 @@ function applyDashboardGradients_(sheet) {
     if (ranges.length === 0) return true;
     var rangeStr = ranges[0].getA1Notation();
     // Keep rules that aren't our gradient ranges
-    return ['C59:C88', 'C93:C102', 'D93:D102', 'F93:F102', 'C107:C116', 'F107:F116', 'E26:E30', 'E35:E39'].indexOf(rangeStr) === -1;
+    return gradientA1.indexOf(rangeStr) === -1;
   });
 
   // Add our gradient rules
@@ -3001,7 +3185,7 @@ function syncFeedbackValues() {
  * @returns {Object} Pending submissions data (email, date, row number - NO survey answers)
  */
 function getFlaggedSubmissionsData() {
-  var SATISFACTION_COLS = buildSatisfactionColsShim_(getSatisfactionColMap_());
+  var SATISFACTION_COLS = _getCachedSatisfactionCols();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
 

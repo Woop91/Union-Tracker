@@ -300,24 +300,30 @@ var TimelineService = (function () {
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Event not found.' };
     var validCats = getCategories();
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] === eventId) {
-        if (updates.title) sheet.getRange(i + 1, 2).setValue(_sanitize(updates.title.substring(0, 200)));
-        if (updates.eventDate) sheet.getRange(i + 1, 3).setValue(new Date(updates.eventDate));
-        if (updates.description !== undefined) sheet.getRange(i + 1, 4).setValue(_sanitize((updates.description || '').substring(0, 2000)));
-        if (updates.category) {
-          var cat = updates.category.toLowerCase().trim();
-          if (validCats.indexOf(cat) !== -1) sheet.getRange(i + 1, 5).setValue(cat);
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) return { success: false, message: 'Server busy.' };
+    try {
+      var data = sheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] === eventId) {
+          if (updates.title) sheet.getRange(i + 1, 2).setValue(_sanitize(updates.title.substring(0, 200)));
+          if (updates.eventDate) sheet.getRange(i + 1, 3).setValue(new Date(updates.eventDate));
+          if (updates.description !== undefined) sheet.getRange(i + 1, 4).setValue(_sanitize((updates.description || '').substring(0, 2000)));
+          if (updates.category) {
+            var cat = updates.category.toLowerCase().trim();
+            if (validCats.indexOf(cat) !== -1) sheet.getRange(i + 1, 5).setValue(cat);
+          }
+          if (updates.meetingMinutesId !== undefined) sheet.getRange(i + 1, 9).setValue(String(updates.meetingMinutesId || ''));
+          sheet.getRange(i + 1, 12).setValue(new Date());
+          _cacheInvalidate();
+          logAuditEvent('TIMELINE_EVENT_UPDATED', 'Event ' + eventId + ' updated by ' + stewardEmail);
+          return { success: true };
         }
-        if (updates.meetingMinutesId !== undefined) sheet.getRange(i + 1, 9).setValue(String(updates.meetingMinutesId || ''));
-        sheet.getRange(i + 1, 12).setValue(new Date());
-        _cacheInvalidate();
-        logAuditEvent('TIMELINE_EVENT_UPDATED', 'Event ' + eventId + ' updated by ' + stewardEmail);
-        return { success: true };
       }
+      return { success: false, message: 'Event not found.' };
+    } finally {
+      lock.releaseLock();
     }
-    return { success: false, message: 'Event not found.' };
   }
 
   /**
@@ -332,16 +338,22 @@ var TimelineService = (function () {
     if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Event not found.' };
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] === eventId) {
-        sheet.deleteRow(i + 1);
-        _cacheInvalidate();
-        logAuditEvent('TIMELINE_EVENT_DELETED', 'Event ' + eventId + ' deleted by ' + stewardEmail);
-        return { success: true };
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) return { success: false, message: 'Server busy.' };
+    try {
+      var data = sheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] === eventId) {
+          sheet.deleteRow(i + 1);
+          _cacheInvalidate();
+          logAuditEvent('TIMELINE_EVENT_DELETED', 'Event ' + eventId + ' deleted by ' + stewardEmail);
+          return { success: true };
+        }
       }
+      return { success: false, message: 'Event not found.' };
+    } finally {
+      lock.releaseLock();
     }
-    return { success: false, message: 'Event not found.' };
   }
 
   /**
@@ -381,8 +393,8 @@ var TimelineService = (function () {
             var id = 'TL_' + Date.now().toString(36) + '_' + imported;
             var now = new Date();
             sheet.appendRow([
-              id, calEvent.getTitle().substring(0, 200), calEvent.getStartTime(),
-              (calEvent.getDescription() || '').substring(0, 2000), 'meeting',
+              id, _sanitize(calEvent.getTitle().substring(0, 200)), calEvent.getStartTime(),
+              _sanitize((calEvent.getDescription() || '').substring(0, 2000)), 'meeting',
               calId, '', '', '', stewardEmail.toLowerCase().trim(), now, now
             ]);
             existingCalIds[calId] = true;

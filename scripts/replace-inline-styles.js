@@ -26,7 +26,6 @@ const REPLACEMENTS = [
   // ── Typography + spacing combos ──
   { style: "fontSize: '11px', color: 'var(--muted)', marginTop: '4px'", cls: 'text-xs-muted-mt-4' },
   { style: "fontSize: '11px', color: 'var(--muted)', marginBottom: '4px'", cls: 'text-xs-muted-mb-4' },
-  { style: "fontSize: '11px', color: 'var(--muted)', marginTop: '2px'", cls: 'text-xs-muted', extraStyle: "marginTop: '2px'" },
   { style: "fontSize: '12px', color: 'var(--muted)', marginBottom: '12px'", cls: 'text-sm-muted-mb-12' },
 
   // ── Layout ──
@@ -37,7 +36,6 @@ const REPLACEMENTS = [
   // ── Empty states ──
   { style: "textAlign: 'center', padding: '30px 0', color: 'var(--danger)'", cls: 'empty-state-danger' },
   { style: "textAlign: 'center', padding: '30px 0', color: 'var(--muted)'", cls: 'empty-state' },
-  { style: "color: 'var(--muted)', padding: '20px 0', textAlign: 'center'", cls: 'empty-state', extraStyle: "padding: '20px 0'" },
   { style: "textAlign: 'center', padding: '40px 0'", cls: 'empty-state-lg' },
 
   // ── Spacing ──
@@ -89,9 +87,9 @@ const REPLACEMENTS = [
 const activeReplacements = REPLACEMENTS.filter(r => r.cls);
 
 const FILES = [
-  'src/member_view.html',
-  'src/steward_view.html',
-  'src/shared_components.html',
+  path.resolve(__dirname, '..', 'src', 'member_view.html'),
+  path.resolve(__dirname, '..', 'src', 'steward_view.html'),
+  path.resolve(__dirname, '..', 'src', 'shared_components.html'),
 ];
 
 let totalReplacements = 0;

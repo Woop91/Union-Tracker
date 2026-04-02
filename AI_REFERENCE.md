@@ -30,14 +30,14 @@ Read these files **in this order** when onboarding to this codebase:
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
 **Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
-**Source:** Synced from `Woop91/DDS-Dashboard` with org-specific content removed.
+**Upstream:** Synced from `Woop91/DDS-Dashboard` (private). See SYNC-LOG.md for exclusion rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
-**Target users:** Union stewards (power users) and members (casual users) at any organization.
-**Architecture:** 45 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`. Production build excludes DevTools + DevMenu (43 .gs + 8 .html).
-**Current build:** 43 `.gs` + 8 `.html` files in `dist/` production (individual file mode, NOT consolidated).
+**Target users:** Union stewards (power users) and members (casual users) at any union local.
+**Architecture:** 43 source `.gs` files + 15 `.html` files in `src/` → copied individually to `dist/` via `node build.js`. Production build excludes DevTools, DevMenu, TestRunner, WebAppTests (39 .gs + 15 .html).
+**Current build:** 39 `.gs` + 15 `.html` files in `dist/` production (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED-DDS-SCRIPT-ID]`
-**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**DDS Apps Script ID:** `[REDACTED]`
+**SB Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**

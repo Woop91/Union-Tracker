@@ -106,11 +106,11 @@ function isDashboardMemberAuthRequired() {
  */
 function enableDashboardMemberAuth() {
   var ui = SpreadsheetApp.getUi();
-  var confirm = ui.alert('Enable Dashboard Authentication',
+  var response = ui.alert('Enable Dashboard Authentication',
     'This will require ALL members to log in with a PIN to access dashboards.\n\n' +
     'Make sure all members have PINs generated first. Continue?',
     ui.ButtonSet.YES_NO);
-  if (confirm !== ui.Button.YES) return;
+  if (response !== ui.Button.YES) return;
 
   var props = PropertiesService.getScriptProperties();
   props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'true');
@@ -335,14 +335,22 @@ function checkWebAppAuthorization(requiredRole, sessionToken) {
 function getUserRole_(email) {
   if (!email) return 'anonymous';
 
+  // Check cache first to avoid reading entire Member Directory on every call
+  var cacheKey = 'user_role_' + email.toLowerCase();
+  var cached = CacheService.getScriptCache().get(cacheKey);
+  if (cached) return cached;
+
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return 'anonymous'; // Web app context — spreadsheet binding unavailable
 
     // Check if user is the spreadsheet owner (admin)
+    var role;
     var owner = ss.getOwner();
     if (owner && owner.getEmail().toLowerCase() === email.toLowerCase()) {
-      return 'admin';
+      role = 'admin';
+      try { CacheService.getScriptCache().put(cacheKey, role, ACCESS_CONTROL.AUTH_CACHE_DURATION || 300); } catch(_) {}
+      return role;
     }
 
     // Check if user is in the stewards list
@@ -357,11 +365,15 @@ function getUserRole_(email) {
             var roleCol = MEMBER_COLS.ROLE ? data[i][MEMBER_COLS.ROLE - 1] : '';
             var roleRaw = String(roleCol || '').trim().toLowerCase();
             var isBoth = roleRaw === 'both' || roleRaw === 'steward/member';
-            if (isBoth) return 'both';
-            if (isTruthyValue(isSteward)) {
-              return 'steward';
+            if (isBoth) {
+              role = 'both';
+            } else if (isTruthyValue(isSteward)) {
+              role = 'steward';
+            } else {
+              role = 'member';
             }
-            return 'member';
+            try { CacheService.getScriptCache().put(cacheKey, role, ACCESS_CONTROL.AUTH_CACHE_DURATION || 300); } catch(_) {}
+            return role;
           }
         }
       }
@@ -653,7 +665,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     // Mask PII in details before including in email
     var safeDetails = maskObjectPII_(details, true);
 
-    var systemName = 'SolidBase';
+    var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }
@@ -700,26 +712,37 @@ function sendSecurityAlertEmail_(eventType, description, details) {
  */
 function queueSecurityDigestEvent_(eventType, description, details) {
   try {
-    var props = PropertiesService.getScriptProperties();
-    var existing = props.getProperty('SECURITY_DIGEST_QUEUE') || '[]';
-    var queue = JSON.parse(existing);
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(5000)) return;
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var existing = props.getProperty('SECURITY_DIGEST_QUEUE') || '[]';
+      var queue = JSON.parse(existing);
 
-    // Mask PII before storing
-    var safeDetails = maskObjectPII_(details, true);
+      // Mask PII before storing
+      var safeDetails = maskObjectPII_(details, true);
 
-    queue.push({
-      time: new Date().toISOString(),
-      event: eventType,
-      description: description,
-      details: safeDetails
-    });
+      queue.push({
+        time: new Date().toISOString(),
+        event: eventType,
+        description: description,
+        details: safeDetails
+      });
 
-    // Cap at 100 events to prevent property size overflow
-    if (queue.length > 100) {
-      queue = queue.slice(-100);
-    }
+      // Cap at 30 events to prevent property size overflow (9KB limit)
+      if (queue.length > 30) {
+        queue = queue.slice(-30);
+      }
 
-    props.setProperty('SECURITY_DIGEST_QUEUE', JSON.stringify(queue));
+      // Size guard: ensure serialized queue stays under 9KB property limit
+      var jsonStr = JSON.stringify(queue);
+      if (jsonStr.length > 8500) {
+        queue = queue.slice(-15);
+        jsonStr = JSON.stringify(queue);
+      }
+
+      props.setProperty('SECURITY_DIGEST_QUEUE', jsonStr);
+    } finally { lock.releaseLock(); }
   } catch (e) {
     Logger.log('Failed to queue security digest event: ' + e.message);
   }
@@ -737,11 +760,6 @@ function sendDailySecurityDigest() {
     var queue = JSON.parse(existing);
 
     if (queue.length === 0) return; // Nothing to report
-
-    // TOCTOU fix: Clear the queue immediately after reading to prevent duplicate
-    // sends if another trigger fires concurrently. If the email send fails below,
-    // events are lost — but this is preferable to sending duplicate digest emails.
-    props.setProperty('SECURITY_DIGEST_QUEUE', '[]');
 
     // Also run integrity checks
     var auditIntegrity = null;
@@ -777,7 +795,7 @@ function sendDailySecurityDigest() {
 
     if (recipients.length === 0) return;
 
-    var systemName = 'SolidBase';
+    var systemName = 'Union Dashboard';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }
@@ -846,9 +864,13 @@ function sendDailySecurityDigest() {
       body: body
     });
 
+    // Clear the queue only after successful email send
+    props.setProperty('SECURITY_DIGEST_QUEUE', '[]');
+
     Logger.log('Security digest sent with ' + queue.length + ' events');
 
   } catch (e) {
+    // Events remain in the queue so the next digest run can retry
     Logger.log('Failed to send security digest: ' + e.message);
   }
 }

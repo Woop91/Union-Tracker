@@ -121,7 +121,7 @@ module.exports = [
 
       // These are disabled to allow existing code to pass
       // Enable gradually as code is cleaned up
-      'no-undef': 'off',
+      'no-undef': 'warn',
       'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', vars: 'local' }],
       'no-redeclare': ['error', { builtinGlobals: false }],
       'no-empty': 'off',
@@ -141,8 +141,8 @@ module.exports = [
       'no-useless-escape': 'off',
       'no-inner-declarations': 'off',
       'no-case-declarations': 'off',
-      'no-prototype-builtins': 'off',
-      'getter-return': 'off',
+      'no-prototype-builtins': 'warn',
+      'getter-return': 'error',
       'no-constant-condition': 'off',
       'no-control-regex': 'off',
       'no-debugger': 'error',
@@ -160,8 +160,8 @@ module.exports = [
       'no-setter-return': 'off',
       'no-sparse-arrays': 'off',
       'no-unexpected-multiline': 'off',
-      'no-unsafe-negation': 'off',
-      'no-unsafe-optional-chaining': 'off',
+      'no-unsafe-negation': 'error',
+      'no-unsafe-optional-chaining': 'error',
       'require-yield': 'off'
     }
   },

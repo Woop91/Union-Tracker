@@ -95,7 +95,11 @@ var QAForum = (function () {
     if (!sheet || sheet.getLastRow() <= 1) return null;
     var data = sheet.getDataRange().getValues();
     try {
-      cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
+      var jsonStr = JSON.stringify(data);
+      if (jsonStr.length < 90000) { // CacheService 100KB limit per key — leave margin
+        cache.put(cacheKey, jsonStr, maxAgeSec);
+      }
+      // If too large, skip caching — data will be read fresh each time
     } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
     return data;
   }

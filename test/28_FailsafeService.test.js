@@ -359,7 +359,7 @@ describe('FailsafeService.backupCriticalSheets', () => {
     installSS([memberSheet]);
 
     FailsafeService.backupCriticalSheets();
-    expect(DriveApp.createFolder).toHaveBeenCalledWith('SolidBase_Backups');
+    expect(DriveApp.createFolder).toHaveBeenCalledWith('SolidBase_Dashboard_Backups');
   });
 
   test('backs up sheets to CSV files', () => {
@@ -426,7 +426,7 @@ describe('FailsafeService.backupCriticalSheets', () => {
 
     var result = FailsafeService.backupCriticalSheets();
     expect(result).toHaveProperty('backedUp');
-    expect(result).toHaveProperty('folderName', 'SolidBase_Backups');
+    expect(result).toHaveProperty('folderName', 'SolidBase_Dashboard_Backups');
     expect(result.success).toBe(true);
   });
 });

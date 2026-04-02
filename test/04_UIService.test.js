@@ -1,3 +1,4 @@
+// Tests functions from: 03_UIComponents.gs, 04a_UIMenus.gs
 /**
  * Tests for 04_UIService (split into 04a-04e modules)
  *

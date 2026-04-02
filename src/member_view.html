@@ -2,7 +2,7 @@
 /**
  * Member View — "Glass Depth"
  * v4.12.0 — Full member dashboard with responsive layout,
- * steward contact, profile editor, resources, survey, workload, weekly questions.
+ * steward contact, profile editor, resources, survey, weekly questions.
  */
 
 // ═══════════════════════════════════════
@@ -2487,7 +2487,6 @@ function renderMemberMore(appContainer) {
       { group: 'Reference' },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
       { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
-      { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'Agency structure & budget', locked: true, action: function() { _handleTabNav('member', 'maddsorgchart'); } },
       { group: 'Community' },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('member', 'qaforum'); } },
       { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
@@ -4862,7 +4861,7 @@ function renderUnionStatsPage(appContainer) {
     if (!AppState.unionStatsCache) AppState.unionStatsCache = {};
     var cache = AppState.unionStatsCache;
 
-    var statTabs = ['grievances', 'hot spots', 'membership', 'engagement', 'resources', 'usage', 'workload'];
+    var statTabs = ['grievances', 'hot spots', 'membership', 'engagement', 'resources', 'usage'];
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
       statTabs.forEach(function(tab) {
@@ -4889,7 +4888,6 @@ function renderUnionStatsPage(appContainer) {
       else if (activeSubTab === 'engagement') _renderEngagementStats(subContent, _getCached, _setCache);
       else if (activeSubTab === 'resources') _renderResourceStats(subContent, _getCached, _setCache);
       else if (activeSubTab === 'usage') _renderUsageStats(subContent, _getCached, _setCache);
-      else if (activeSubTab === 'workload') _renderWorkloadSummaryStats(subContent, _getCached, _setCache);
       else _renderMembershipStats(subContent, _getCached, _setCache);
     }
 

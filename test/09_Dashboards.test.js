@@ -131,30 +131,9 @@ describe('computeAverage_', () => {
 // getSheetLastRow
 // ============================================================================
 
-describe('getSheetLastRow', () => {
-  test('returns last row from sheet', () => {
-    const mockSheet = createMockSheet('Test');
-    mockSheet.getLastRow.mockReturnValue(3);
-
-    const result = getSheetLastRow(mockSheet);
-    expect(result).toBe(3);
-  });
-
-  test('returns 1 when only header exists', () => {
-    const mockSheet = createMockSheet('Test');
-    mockSheet.getLastRow.mockReturnValue(1);
-
-    const result = getSheetLastRow(mockSheet);
-    expect(result).toBe(1);
-  });
-
-  test('returns 0 for empty sheet', () => {
-    const mockSheet = createMockSheet('Test');
-    mockSheet.getLastRow.mockReturnValue(0);
-
-    const result = getSheetLastRow(mockSheet);
-    expect(result).toBe(0);
-  });
+// getSheetLastRow wrapper was removed (trivial pass-through to sheet.getLastRow())
+describe('getSheetLastRow (removed)', () => {
+  test.skip('wrapper removed — use sheet.getLastRow() directly', () => {});
 });
 
 // ============================================================================

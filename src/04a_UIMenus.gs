@@ -246,16 +246,16 @@ function getVisualControlPanelHtml() {
         <div class="section">
           <div class="section-title">Theme Selection</div>
           <div class="theme-grid">
-            <div class="theme-btn theme-default active" onclick="selectTheme('default')">
+            <div class="theme-btn theme-default active" onclick="selectTheme('default', event)">
               🎨 Default
             </div>
-            <div class="theme-btn theme-dark" onclick="selectTheme('dark')">
+            <div class="theme-btn theme-dark" onclick="selectTheme('dark', event)">
               🌙 Dark
             </div>
-            <div class="theme-btn theme-light" onclick="selectTheme('light')">
+            <div class="theme-btn theme-light" onclick="selectTheme('light', event)">
               ☀️ Light
             </div>
-            <div class="theme-btn theme-contrast" onclick="selectTheme('contrast')">
+            <div class="theme-btn theme-contrast" onclick="selectTheme('contrast', event)">
               👁️ High Contrast
             </div>
           </div>
@@ -282,12 +282,12 @@ function getVisualControlPanelHtml() {
             .saveVisualSetting(setting, isChecked);
         }
 
-        function selectTheme(theme) {
+        function selectTheme(theme, e) {
           document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
-          var btn = event.target.closest ? event.target.closest('.theme-btn') : event.target; if (btn) btn.classList.add('active');
+          var btn = e.target.closest ? e.target.closest('.theme-btn') : e.target; if (btn) btn.classList.add('active');
           google.script.run
             .withSuccessHandler(showStatus)
-            .withFailureHandler(function(e){showStatus("Error: "+e.message)})
+            .withFailureHandler(function(err){showStatus("Error: "+err.message)})
             .applyDashboardTheme(theme);
         }
 
@@ -304,6 +304,13 @@ function getVisualControlPanelHtml() {
           bar.textContent = '✅ ' + (msg || 'Settings applied');
           bar.style.background = 'rgba(16,185,129,0.2)';
         }
+
+        // Load saved toggle states on panel open
+        google.script.run.withSuccessHandler(function(settings) {
+          if (!settings) return;
+          if (typeof settings.focusMode !== 'undefined') document.getElementById('focusMode').checked = !!settings.focusMode;
+          if (typeof settings.zebraStripes !== 'undefined') document.getElementById('zebraStripes').checked = !!settings.zebraStripes;
+        }).getComfortViewSettings();
       </script>
     </body>
     </html>
@@ -577,6 +584,8 @@ function getMultiSelectHtml(items, callback) {
         function submitSelection() {
           const selected = Array.from(document.querySelectorAll('.item-checkbox:checked'))
                                .map(cb => cb.dataset.id);
+          // Dynamic dispatch: callbackFn is validated against an allowlist server-side
+          // (see openCellMultiSelectEditor validation) before being called via bracket notation
           google.script.run
             .withSuccessHandler(function() { google.script.host.close(); })
             .withFailureHandler(function(e) { alert('Error: ' + e.message); })

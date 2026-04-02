@@ -305,7 +305,7 @@ describe('G20: Stats sub-tab renderers separate fetch from content render', () =
 // variant must exist. This test verifies known pairs are complete.
 
 describe('G21: Member-safe endpoint pairs exist', () => {
-  const dataServiceCode = read('21_WebDashDataService.gs');
+  const dataServiceCode = read('21_WebDashDataService.gs') + '\n' + read('21d_WebDashDataWrappers.gs');
 
   // Known pairs: steward-only → member-safe
   const requiredPairs = [
@@ -351,7 +351,7 @@ describe('G22: Resource click tracking is wired end-to-end', () => {
   });
 
   test('backend engagement stats returns live resourceDownloads', () => {
-    const dsCode = read('21_WebDashDataService.gs');
+    const dsCode = read('21_WebDashDataService.gs') + '\n' + read('21d_WebDashDataWrappers.gs');
     const body = extractFunctionBody(dsCode, 'dataGetEngagementStats');
     // Backend should read resourceDownloads from DataService.getResourceClickTotal()
     expect(body).toMatch(/resourceDownloads.*getResourceClickTotal/);
@@ -366,7 +366,7 @@ describe('G22: Resource click tracking is wired end-to-end', () => {
 // This test ensures the function reads each sheet at most once.
 
 describe('G23: dataGetEngagementStats has no redundant sheet reads', () => {
-  const dsCode = read('21_WebDashDataService.gs');
+  const dsCode = read('21_WebDashDataService.gs') + '\n' + read('21d_WebDashDataWrappers.gs');
 
   test('Member Directory is read at most once', () => {
     const body = extractFunctionBody(dsCode, 'dataGetEngagementStats');

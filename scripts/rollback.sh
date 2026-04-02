@@ -3,7 +3,29 @@
 # Usage: ./scripts/rollback.sh <git-sha>
 set -euo pipefail
 
-SHA="${1:?Usage: rollback.sh <git-sha>}"
+SKIP_TESTS=false
+AUTO_YES=false
+for arg in "$@"; do
+  case "$arg" in
+    --skip-tests) SKIP_TESTS=true ;;
+    --yes|-y) AUTO_YES=true ;;
+  esac
+done
+
+# First positional arg is the SHA (skip flags)
+SHA=""
+for arg in "$@"; do
+  case "$arg" in
+    --*) ;; # skip flags
+    *) SHA="$arg"; break ;;
+  esac
+done
+
+if [ -z "$SHA" ]; then
+  echo "Usage: rollback.sh <git-sha> [--skip-tests] [--yes|-y]"
+  exit 1
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 echo "=== DDS Dashboard Rollback ==="
@@ -33,11 +55,20 @@ echo "Rolling back to:"
 git log --oneline -1 "$SHA"
 echo ""
 
-read -rp "Continue with rollback? [y/N] " confirm
-if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-  echo "Rollback cancelled."
-  exit 0
+if [ "$AUTO_YES" = true ]; then
+  # Skip confirmation (--yes / -y flag)
+  true
+else
+  read -rp "Continue with rollback? [y/N] " confirm
+  if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "Rollback cancelled."
+    exit 0
+  fi
 fi
+
+# Print undo command before performing the rollback
+echo "To undo this rollback: ./scripts/rollback.sh $(git rev-parse HEAD)"
+echo ""
 
 # Checkout dist/ from the target commit
 git checkout "$SHA" -- dist/
@@ -47,6 +78,16 @@ echo "Restored dist/ from $SHA"
 git add dist/
 git commit -m "Rollback dist/ to $SHA"
 echo "Committed rollback to git history."
+
+# Run deploy guards unless --skip-tests
+if [ "$SKIP_TESTS" = false ]; then
+  echo "Running deploy guards..."
+  npx jest test/deploy-guards.test.js --no-coverage --bail
+  if [ $? -ne 0 ]; then
+    echo "Deploy guards failed on rolled-back code. Use --skip-tests to force."
+    exit 1
+  fi
+fi
 
 # Push to GAS
 echo "Pushing to Google Apps Script..."

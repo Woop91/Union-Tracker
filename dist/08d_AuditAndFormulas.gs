@@ -143,9 +143,13 @@ function onEditAudit(e) {
   // Throttle: max 1 audit event per second per user (prevents rapid-fire edits flooding the log)
   // Uses ScriptCache (not UserCache) because onEdit runs as a simple trigger where
   // getUserCache() is not permitted. Key includes effective user for per-user isolation.
+  // Note: e.user.getEmail() returns the script owner (not the editor) in simple trigger
+  // context, so we fall back to range info for a more unique key when email is unavailable.
   try {
     var cache = CacheService.getScriptCache();
-    var throttleUser = (e.user && e.user.email) ? e.user.email : Session.getEffectiveUser().getEmail();
+    var throttleUser = '';
+    try { throttleUser = (e.user && e.user.getEmail()) || ''; } catch(_) {}
+    if (!throttleUser) throttleUser = 'edit_' + (e.range ? e.range.getA1Notation() : 'unknown');
     var throttleKey = 'audit_throttle_' + throttleUser;
     if (cache.get(throttleKey)) return; // Already logged within 1 second
     cache.put(throttleKey, '1', 1); // 1-second TTL
@@ -514,6 +518,11 @@ function setupGrievanceFormulasSheet() {
   );
 
   // =========== CALCULATED COLUMNS ===========
+  // LEGACY: These hardcoded deadline day counts (21, 30, 10) are part of the
+  // deprecated spreadsheet-formula approach. The runtime JS in
+  // syncGrievanceFormulasToLog() (via getDeadlineRules()) now computes these
+  // dynamically from configurable rules. These formulas remain only for
+  // backward compatibility with orgs that still reference the formula sheet.
 
   // Column M: Filing Deadline = Incident Date + 21 days
   sheet.getRange('M2').setFormula(
@@ -746,7 +755,9 @@ function setupDashboardCalcSheet() {
   var gDateClosedCol = getColumnLetter(GRIEVANCE_COLS.DATE_CLOSED);
 
   // Metrics with formulas (15 key metrics)
-  // Note: Using COUNTIF with "M*" and "G*" patterns to only count valid IDs (ignores blank rows)
+  // NOTE: ID format dependency — Member IDs start with "M", Grievance IDs start with "G"
+  // These patterns are enforced by generateNameBasedId() in 01_Core.gs
+  // If the ID format changes, these COUNTIF formulas must be updated
   var metrics = [
     ['Total Members', '=COUNTIF(\'' + SHEETS.MEMBER_DIR + '\'!' + mIdCol + ':' + mIdCol + ',"M*")', 'Total union members in directory'],
     ['Active Stewards', '=COUNTIF(\'' + SHEETS.MEMBER_DIR + '\'!' + mStewardCol + ':' + mStewardCol + ',"Yes")', 'Members marked as stewards'],
@@ -864,9 +875,10 @@ function setupAllHiddenSheets() {
   var created = 0;
   var repaired = 0;
 
-  // @deprecated v4.30.0 — 6 calc sheets are replaced by JS-computed values in DataService.
-  // Still created for backward compatibility unless existing sheets are already present.
+  // Legacy calc sheets — deprecated v4.30.0, replaced by JS-computed values in DataService.
+  // Kept for backward compatibility with sheets that still reference these formulas.
   // The checklist calc sheet is NOT deprecated (still actively used).
+  // TODO: Remove once all orgs confirm no formula references remain
   try { setupGrievanceCalcSheet(); created++; } catch (_e) { Logger.log('setupGrievanceCalcSheet: ' + (_e.message || _e)); repaired++; }
   try { setupGrievanceFormulasSheet(); created++; } catch (_e) { Logger.log('setupGrievanceFormulasSheet: ' + (_e.message || _e)); repaired++; }
   try { setupMemberLookupSheet(); created++; } catch (_e) { Logger.log('setupMemberLookupSheet: ' + (_e.message || _e)); repaired++; }

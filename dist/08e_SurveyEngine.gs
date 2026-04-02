@@ -447,6 +447,8 @@ function archiveSurveyPeriod_(periodId) {
  * @param {string} periodId
  */
 function incrementPeriodResponseCount_(periodId) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HIDDEN_SHEETS.SURVEY_PERIODS);
     if (!sheet || sheet.getLastRow() < 2) return;
@@ -461,6 +463,8 @@ function incrementPeriodResponseCount_(periodId) {
     }
   } catch(e) {
     Logger.log('incrementPeriodResponseCount_ error: ' + e.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -541,7 +545,32 @@ function getPendingSurveyMembers() {
     var pendingMembers = [];
     var completedCount = 0;
 
+    // First pass: identify pending vs completed (no enrichment yet)
+    var pendingRows = [];
+    for (var i = 0; i < data.length; i++) {
+      var status = String(data[i][C.CURRENT_STATUS - 1] || '').trim().toLowerCase();
+      if (status === 'completed') {
+        completedCount++;
+      } else {
+        pendingRows.push(data[i]);
+      }
+    }
+
+    // Early exit: if no pending members, skip the expensive member directory read
+    if (pendingRows.length === 0) {
+      return {
+        periodId:    period.periodId,
+        periodName:  period.name,
+        total:       completedCount,
+        pending:     0,
+        completed:   completedCount,
+        rate:        completedCount > 0 ? 100 : 0,
+        members:     []
+      };
+    }
+
     // Build email → member record map for enrichment (cubicle, officeDays, hireDate)
+    // Only loaded when there are pending members to enrich
     var memberMap = {};
     try {
       var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -574,32 +603,29 @@ function getPendingSurveyMembers() {
       Logger.log('getPendingSurveyMembers enrichment error: ' + enrichErr.message);
     }
 
-    for (var i = 0; i < data.length; i++) {
-      var status = String(data[i][C.CURRENT_STATUS - 1] || '').trim().toLowerCase();
-      var email = String(data[i][C.EMAIL - 1] || '').trim().toLowerCase();
+    // Second pass: build enriched pending member objects
+    for (var pi = 0; pi < pendingRows.length; pi++) {
+      var pRow = pendingRows[pi];
+      var email = String(pRow[C.EMAIL - 1] || '').trim().toLowerCase();
       var enriched = memberMap[email] || {};
-      var totalMissed = parseInt(data[i][C.TOTAL_MISSED - 1], 10) || 0;
-      var totalCompleted = parseInt(data[i][C.TOTAL_COMPLETED - 1], 10) || 0;
+      var totalMissed = parseInt(pRow[C.TOTAL_MISSED - 1], 10) || 0;
+      var totalCompleted = parseInt(pRow[C.TOTAL_COMPLETED - 1], 10) || 0;
       var totalSurveys = totalMissed + totalCompleted;
       var participationRate = totalSurveys > 0 ? Math.round((totalCompleted / totalSurveys) * 100) : null;
 
-      if (status === 'completed') {
-        completedCount++;
-      } else {
-        pendingMembers.push({
-          memberId:        String(data[i][C.MEMBER_ID        - 1] || ''),
-          name:            String(data[i][C.MEMBER_NAME      - 1] || ''),
-          email:           String(data[i][C.EMAIL            - 1] || ''),
-          workLocation:    String(data[i][C.WORK_LOCATION    - 1] || ''),
-          assignedSteward: String(data[i][C.ASSIGNED_STEWARD - 1] || ''),
-          cubicle:         enriched.cubicle || '',
-          officeDays:      enriched.officeDays || '',
-          hireDate:        enriched.hireDate || '',
-          participationRate: participationRate,
-          totalCompleted:  totalCompleted,
-          totalMissed:     totalMissed,
-        });
-      }
+      pendingMembers.push({
+        memberId:        String(pRow[C.MEMBER_ID        - 1] || ''),
+        name:            String(pRow[C.MEMBER_NAME      - 1] || ''),
+        email:           String(pRow[C.EMAIL            - 1] || ''),
+        workLocation:    String(pRow[C.WORK_LOCATION    - 1] || ''),
+        assignedSteward: String(pRow[C.ASSIGNED_STEWARD - 1] || ''),
+        cubicle:         enriched.cubicle || '',
+        officeDays:      enriched.officeDays || '',
+        hireDate:        enriched.hireDate || '',
+        participationRate: participationRate,
+        totalCompleted:  totalCompleted,
+        totalMissed:     totalMissed,
+      });
     }
 
     var total = pendingMembers.length + completedCount;
@@ -740,7 +766,7 @@ function pushSurveyOpenNotification_(periodName) {
         message:   'The ' + periodName + ' is now open. Your feedback is anonymous and helps shape your union. Complete it in the Member Portal.',
         priority:  'Normal',
         sentBy:    'system',
-        sentByName:'SolidBase',
+        sentByName:'Union Dashboard',
         // No expiry — stays until member dismisses or period closes
         expiresDate: '',
         recipient: 'All'

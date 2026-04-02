@@ -624,7 +624,7 @@ describe('validateConfigValue_', () => {
   test('label type accepts short text', () => {
     expect(validateConfigValue_('STEWARD_LABEL', 'Steward').valid).toBe(true);
     expect(validateConfigValue_('MEMBER_LABEL', 'Member').valid).toBe(true);
-    expect(validateConfigValue_('LOGO_INITIALS', 'DDS').valid).toBe(true);
+    expect(validateConfigValue_('LOGO_INITIALS', 'SB').valid).toBe(true);
   });
 
   test('label type rejects text over 50 chars', () => {

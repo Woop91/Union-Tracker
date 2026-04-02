@@ -129,10 +129,10 @@ describe('Config seed defaults match column types', () => {
     STEWARD_LABEL: 'Steward',
     MEMBER_LABEL: 'Member',
     ACCENT_HUE: '30',
-    LOGO_INITIALS: 'DDS',
+    LOGO_INITIALS: 'SB',
     MAGIC_LINK_EXPIRY_DAYS: '7',
     COOKIE_DURATION_DAYS: '30',
-    ORG_ABBREV: 'DDS',
+    ORG_ABBREV: 'SB',
     SHOW_GRIEVANCES: 'yes',
     ENABLE_CORRELATION: 'no',
     GRIEVANCE_ARCHIVE_DAYS: '90',
@@ -154,7 +154,7 @@ describe('Config seed defaults match column types', () => {
     { key: 'DRIVE_FOLDER_ID', value: 'Steward', desc: 'label in ID column' },
     { key: 'FILING_DEADLINE_DAYS', value: 'In Arbitration', desc: 'status text in days column' },
     { key: 'MAIN_CONTACT_EMAIL', value: '(000) 000-0000', desc: 'phone in email column' },
-    { key: 'SHOW_GRIEVANCES', value: 'DDS', desc: 'abbreviation in boolean column' },
+    { key: 'SHOW_GRIEVANCES', value: 'SB', desc: 'abbreviation in boolean column' },
     { key: 'PDF_FOLDER_ID', value: 'Step II', desc: 'step name in ID column' }
   ];
 
@@ -191,14 +191,18 @@ describe('_migrateOrphanedColumns', () => {
     const headers = getHeadersFromMap_(CONFIG_HEADER_MAP_);
     headers.push('Old Orphan 1', 'Old Orphan 2'); // 81 columns
     let deletedCols = [];
+    let batchDeleted = [];
     const mockSheet = {
       getMaxColumns: () => headers.length,
       getRange: () => ({ getValues: () => [headers] }),
-      deleteColumn: (c) => { deletedCols.push(c); }
+      deleteColumn: (c) => { deletedCols.push(c); },
+      deleteColumns: (start, count) => { batchDeleted.push({ start, count }); }
     };
     const result = _migrateOrphanedColumns(mockSheet);
     expect(result).toBe(2);
-    expect(deletedCols.length).toBe(2);
+    // May use batch deleteColumns for contiguous ranges or individual deleteColumn
+    const totalDeleted = deletedCols.length + batchDeleted.reduce((sum, b) => sum + b.count, 0);
+    expect(totalDeleted).toBe(2);
   });
 
   test('detects orphaned column in the middle when old headers present', () => {

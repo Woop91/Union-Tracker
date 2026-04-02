@@ -5197,7 +5197,6 @@ function _renderWorkloadInsights(container, wl, showDetail) {
 
  var totalSubmissions = d.totalSubmissions || 0;
  var memberCount = d.members || 0;
- 
  grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting'));
 
  
@@ -5215,6 +5214,7 @@ function _renderWorkloadInsights(container, wl, showDetail) {
   }
   items.sort(function(a, b) { return b.count - a.count; });
   _renderInsightDetailList(panel, items, 'var(--info)');
+  
  });
  }));
 
@@ -7832,7 +7832,7 @@ function renderTestRunnerPage(appContainer) {
  var ctrlCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--card)', border: '2px solid var(--accent)', boxShadow: '0 2px 12px rgba(0,0,0,0.4)' } });
 
  
- var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'loginlink', 'contacts', 'emailtypes', 'webapp', 'configrd', 'portal', 'weeklyq', 'workload', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
+ var _allSuiteIds = ['config', 'colmap', 'auth', 'grievance', 'security', 'system', 'dataservice', 'authsweep', 'configlive', 'survey', 'emailsend', 'loginlink', 'contacts', 'emailtypes', 'webapp', 'configrd', 'portal', 'weeklyq', 'qaforum', 'timeline', 'failsafe', 'endpoints'];
  var runAllBtn = el('button', {
   className: 'btn btn-primary',
   style: { padding: '8px 20px', fontWeight: '600', cursor: 'pointer' },
@@ -7909,7 +7909,6 @@ function renderTestRunnerPage(appContainer) {
   { value: 'configrd', label: 'ConfigReader' },
   { value: 'portal', label: 'Portal Sheets' },
   { value: 'weeklyq', label: 'Weekly Questions' },
-  { value: 'workload', label: 'Workload Service' },
   { value: 'qaforum', label: 'QA Forum' },
   { value: 'timeline', label: 'Timeline Service' },
   { value: 'failsafe', label: 'Failsafe Service' },
@@ -9515,7 +9514,7 @@ function _loadLeaderMentees(leaderList) {
  leaderList.innerHTML = '';
  if (!leaders || leaders.length === 0) {
   leaderList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } },
-  'No Member Leaders found. Use the menu > Setup Member Leader Role to enable this feature.'));
+  'No Member Leaders found. Use the Setup menu to enable the Member Leader Role feature.'));
   return;
  }
  var myEmail = (CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email.toLowerCase() : '';

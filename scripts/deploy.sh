@@ -14,9 +14,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 DRY_RUN=false
-if [[ "${1:-}" == "--dry" ]]; then
+if [ "${1:-}" == "--dry" ]; then
   DRY_RUN=true
   echo -e "${YELLOW}DRY RUN — will validate but not push${NC}"
+elif [ -n "${1:-}" ]; then
+  echo "⚠️  Unrecognized argument: $1 (did you mean --dry?)"
+  exit 1
 fi
 
 echo ""
@@ -47,7 +50,7 @@ echo ""
 
 # Step 5: HTML size budget check
 echo "[5/6] Checking HTML size budget..."
-MAX_KB=820
+MAX_KB=810  # GAS limit ~820KB; 10KB safety margin
 INDEX_SIZE=$(wc -c < dist/index.html)
 STYLES_SIZE=$(wc -c < dist/styles.html)
 STEWARD_SIZE=$(wc -c < dist/steward_view.html)

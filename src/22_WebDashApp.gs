@@ -10,7 +10,7 @@
  *     (3) Route to correct view (auth_view for login, steward_view for
  *         stewards, member_view for members)
  *     (4) Config + user data injection into HTML template
- *   Deep-link support: ?page=X opens specific SPA tab after auth.
+ *   Deep-link support: ?page=workload opens specific SPA tab after auth.
  *   Token-authenticated pages: ?page=esign (e-sig), ?page=rsvp (meeting RSVP).
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
@@ -45,6 +45,10 @@ function doGet(e) {
   e = e || { parameter: {} };
 
   // v4.33.0 — E-Signature page (token-authenticated, no login required)
+  // Security: esign.html serves a static shell. No sensitive data is embedded in the HTML.
+  // The client calls google.script.run.dataGetGrievanceForSigning(sigToken) which validates
+  // the signature token server-side in getGrievanceForSigning() before returning grievance
+  // data. Invalid/expired/already-used tokens receive { success: false } — no data leaked.
   if (e.parameter && e.parameter.page === 'esign') {
     try {
       return HtmlService.createHtmlOutputFromFile('esign')
@@ -56,6 +60,9 @@ function doGet(e) {
   }
 
   // v4.36.0 — RSVP page (token-authenticated, no login required)
+  // Security: RSVP token is validated server-side by RSVPService.processRSVP() inside
+  // _serveRSVPPage() BEFORE the response HTML is generated. Invalid tokens get an error
+  // page. The rendered HTML contains only the meeting name and accept/decline status — no PII.
   if (e.parameter && e.parameter.page === 'rsvp') {
     try {
       return _serveRSVPPage(e);
@@ -66,6 +73,9 @@ function doGet(e) {
   }
 
   // v4.43.0 — QR Code meeting check-in (mobile, no login required)
+  // Security: The served HTML is a generic check-in form with no embedded data. Members
+  // authenticate per check-in via phone + PIN. The meeting ID in the URL is a non-sensitive
+  // identifier used to look up the meeting server-side during the PIN-authenticated check-in call.
   if (e.parameter && e.parameter.page === 'qr-checkin') {
     try {
       return _serveQRCheckInPage(e);
@@ -118,7 +128,7 @@ function doGetWebDashboard(e) {
     config = _coldSync ? ConfigReader.refreshConfig() : ConfigReader.getConfig();
   } catch (cfgErr) {
     Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
-    config = { orgName: 'SolidBase', orgAbbrev: 'SB', logoInitials: 'SB', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'DDS', orgAbbrev: 'DDS', logoInitials: 'DDS', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -150,11 +160,14 @@ function doGetWebDashboard(e) {
     var userRecord = DataService.findUserByEmail(user.email);
 
     if (!userRecord) {
-      // Check if the visitor is the script owner — grant bootstrap access
-      // so the app is usable before the Member Directory is populated.
+      // Bootstrap admin: grant the script owner admin access even when they're not
+      // in the Member Directory. Prevents lockout when the owner is not in the member
+      // directory (e.g. initial setup, or if the directory is cleared accidentally).
+      // Can be disabled via config.allowBootstrapAdmin = false once directory is stable.
+      var allowBootstrapAdmin = config.allowBootstrapAdmin !== false; // default true
       try {
         var ownerEmail = Session.getActiveUser().getEmail().toLowerCase();
-        if (user.email && user.email.toLowerCase() === ownerEmail) {
+        if (allowBootstrapAdmin && user.email && user.email.toLowerCase() === ownerEmail) {
           userRecord = {
             email: user.email,
             name: 'Admin',
@@ -359,6 +372,15 @@ function _serveError(config, type, detail) {
 }
 
 /**
+ * Build a Drive folder URL from a folder ID, or empty string if falsy.
+ * @param {string} folderId
+ * @returns {string}
+ */
+function _buildDriveUrl(folderId) {
+  return folderId ? 'https://drive.google.com/drive/folders/' + folderId : '';
+}
+
+/**
  * Strips internal-only fields from config before sending to client.
  */
 function _sanitizeConfig(config) {
@@ -377,12 +399,12 @@ function _sanitizeConfig(config) {
     calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
     // H8: Pre-build URLs server-side instead of exposing raw resource IDs
     calendarCreateUrl: config.calendarId ? 'https://calendar.google.com/calendar/render?action=TEMPLATE&src=' + encodeURIComponent(config.calendarId) : '',
-    driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
+    driveFolderUrl: _buildDriveUrl(config.driveFolderId),
     // surveyFormUrl removed v4.22.7 — survey is native webapp (renderSurveyFormPage in member_view.html)
     orgWebsite: config.orgWebsite || '',
     broadcastScopeAll: (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes'),
     // H8: v4.31.0 — replaced raw folder IDs with pre-built URLs and boolean flags
-    minutesFolderUrl: config.minutesFolderId ? 'https://drive.google.com/drive/folders/' + config.minutesFolderId : '',
+    minutesFolderUrl: _buildDriveUrl(config.minutesFolderId),
     hasMinutesFolder: !!config.minutesFolderId,
     hasGrievancesFolder: !!config.grievancesFolderId,
     // v4.20.18: insights cache TTL exposed so client can show staleness info
@@ -797,7 +819,7 @@ function getMemberViewHtml() {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
+ * @returns {string} Raw HTML content (CSS-scoped under .oc-embed), or error message
  */
 function getOrgChartHtml() {
   try {
@@ -821,20 +843,47 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Stub — agency_org_chart.html is excluded from SolidBase builds.
- * @returns {string} Placeholder message
+ * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
  */
 function getAgencyOrgChartHtml() {
-  return '<div class="empty-state">Agency org chart is not available in this deployment.</div>';
+  try {
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_agency_org_chart_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('agency_org_chart').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    Logger.log('getAgencyOrgChartHtml error: ' + e.message);
+    return '<div class="empty-state">Agency org chart could not be loaded.</div>';
+  }
 }
 
 /**
  * Client-callable: Returns the POMS Reference HTML for lazy-loading.
- * Stub — poms_reference.html is excluded from SolidBase builds.
- * @returns {string} Placeholder message
+ * Loaded on-demand when the user navigates to the POMS Reference tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
  */
 function getPOMSReferenceHtml() {
-  return '<div class="empty-state">POMS Reference is not available in this deployment.</div>';
+  try {
+    // No auth check — user already authenticated via doGet().
+    // Session.getActiveUser().getEmail() returns empty for magic-link users.
+    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_poms_ref_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    Logger.log('getPOMSReferenceHtml error: ' + e.message);
+    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
+  }
 }
 
 /**

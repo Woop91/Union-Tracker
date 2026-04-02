@@ -63,6 +63,9 @@ var EventBus = (function() {
         listeners_[eventName] = [];
       }
 
+      // Collision probability: ~1 in 60M per subscription pair (5 random chars from base-36
+      // = 36^5 = ~60M combinations, plus millisecond timestamp). Acceptable for current
+      // scale (~20 active subscribers per session).
       var subId = options.id || ('sub_' + eventName + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
       listeners_[eventName].push({

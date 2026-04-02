@@ -243,7 +243,7 @@ describe('G10: isDualRole is only true for dual-role users', () => {
 // could add new sheets and forget to register them.
 
 describe('G11: _ensureAllSheetsInternal covers all feature sheets', () => {
-  const dataServiceCode = read('21_WebDashDataService.gs');
+  const dataServiceCode = read('21_WebDashDataService.gs') + '\n' + read('21d_WebDashDataWrappers.gs');
   const coreCode = read('01_Core.gs');
 
   // Extract hidden/feature sheet names from SHEETS constant
@@ -851,8 +851,10 @@ describe('G19: More menu items have route handlers', () => {
 // instead of "Program Operations Manual System". This guard prevents the wrong
 // acronym expansion from reappearing.
 
-// SOLIDBASE: skipped — POMS feature excluded from SolidBase
-describe.skip('G20: POMS description accuracy', () => {
+// G20: POMS description accuracy
+// These guards prevent the wrong POMS acronym expansion from reappearing.
+// SolidBase: POMS descriptions were removed during scrub; negative guards still apply.
+describe('G20: POMS description accuracy', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
 
@@ -864,13 +866,9 @@ describe.skip('G20: POMS description accuracy', () => {
     expect(memberCode).not.toContain('Postal Operations Manual');
   });
 
-  test('steward view has correct POMS description', () => {
-    expect(stewardCode).toContain('Program Operations Manual System');
-  });
-
-  test('member view has correct POMS description', () => {
-    expect(memberCode).toContain('Program Operations Manual System');
-  });
+  // SolidBase: POMS description text removed during DDS scrub
+  test.skip('steward view has correct POMS description — SolidBase-excluded', () => {});
+  test.skip('member view has correct POMS description — SolidBase-excluded', () => {});
 });
 
 
@@ -1039,8 +1037,8 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  // SOLIDBASE: skipped — POMS feature excluded from SolidBase
-  test.skip('renderPOMSReference async callback checks _navSwitchId', () => {
+  // SolidBase: renderPOMSReference is a stub (no async server call), so no _navSwitchId needed
+  test.skip('renderPOMSReference async callback checks _navSwitchId — SolidBase stub', () => {
     const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
     expect(fnBody).toMatch(/_navSwitchId/);
   });
@@ -1118,13 +1116,8 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  // SOLIDBASE: skipped — POMS feature excluded from SolidBase
-  test.skip('poms early-return uses _hideAllVisiblePanes', () => {
-    const fnBody = extractFnBody(indexCode, '_handleTabNav');
-    const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
-    expect(pomsBlock).not.toBeNull();
-    expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
-  });
+  // SolidBase: poms tab is not routed in _handleTabNav (DDS-specific feature)
+  test.skip('poms early-return uses _hideAllVisiblePanes — SolidBase-excluded', () => {});
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');

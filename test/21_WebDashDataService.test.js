@@ -9,7 +9,7 @@ require('./gas-mock');
 const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
 const { loadSources } = require('./load-source');
 
-loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '21_WebDashDataService.gs']);
+loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '21_WebDashDataService.gs', '21d_WebDashDataWrappers.gs']);
 
 let mockMemberSheet;
 let mockGrievanceSheet;

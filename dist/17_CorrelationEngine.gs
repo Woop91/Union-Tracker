@@ -198,7 +198,13 @@ function classifyCorrelation_(r, n) {
  */
 function getCorrelationInsights(isPII, cachedData) {
   if (!_isCorrelationEnabled()) return _CORRELATION_DISABLED_INSIGHTS;
-  var data = cachedData || JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  var data;
+  try {
+    data = cachedData || JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  } catch (_e) {
+    Logger.log('getCorrelationInsights: failed to load dashboard data — ' + (_e.message || _e));
+    return JSON.stringify([]); // Return empty insights on data fetch failure
+  }
   var insights = [];
 
   // 1. Location Satisfaction vs Grievance Rate
@@ -838,7 +844,13 @@ function buildDataPoints_(labels, x, y) {
 function getCorrelationAlerts(isPII) {
   if (!_isCorrelationEnabled()) return _CORRELATION_DISABLED_ALERTS;
   // Fetch data once and reuse for insights to avoid redundant dashboard fetches
-  var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  var dashboardData;
+  try {
+    dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  } catch (_e) {
+    Logger.log('getCorrelationAlerts: failed to load dashboard data — ' + (_e.message || _e));
+    return JSON.stringify([]); // Return empty alerts on data fetch failure
+  }
   var insightsJson = getCorrelationInsights(isPII, dashboardData);
   var insights = JSON.parse(insightsJson);
   var alerts = [];
@@ -882,7 +894,13 @@ function getCorrelationAlerts(isPII) {
 function getCorrelationSummary(isPII) {
   if (!_isCorrelationEnabled()) return _CORRELATION_DISABLED_SUMMARY;
   // Fetch data once and reuse for insights to avoid redundant dashboard fetches
-  var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  var dashboardData;
+  try {
+    dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  } catch (_e) {
+    Logger.log('getCorrelationSummary: failed to load dashboard data — ' + (_e.message || _e));
+    return JSON.stringify({ total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, highlights: [] });
+  }
   var insights = JSON.parse(getCorrelationInsights(isPII, dashboardData));
 
   var summary = {

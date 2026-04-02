@@ -1,3 +1,4 @@
+// Tests functions from: 08a_SheetSetup.gs, 10c_FormsAndSync.gs
 /**
  * Tests for 08_SheetUtils (split into 08a-08d modules)
  *
@@ -155,13 +156,15 @@ describe('getConfigValues', () => {
 // ============================================================================
 
 describe('getOrCreateSheet', () => {
-  test('returns existing sheet and clears it', () => {
+  test('returns existing sheet without clearing when it has data', () => {
     const existingSheet = createMockSheet('TestSheet');
+    existingSheet.getLastRow.mockReturnValue(1); // has header row
     const ss = createMockSpreadsheet([existingSheet]);
 
     const result = getOrCreateSheet(ss, 'TestSheet');
     expect(result).toBe(existingSheet);
-    expect(existingSheet.clear).toHaveBeenCalled();
+    // Sheet with lastRow >= 1 should NOT be cleared (preserves headers/data)
+    expect(existingSheet.clear).not.toHaveBeenCalled();
   });
 
   test('creates new sheet when not found', () => {

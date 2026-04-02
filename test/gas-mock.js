@@ -13,11 +13,17 @@ global.Logger = {
 // --- Utilities ---
 global.Utilities = {
   getUuid: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
-  formatDate: jest.fn((date, tz, fmt) => {
-    if (fmt === 'yyyy-MM-dd') {
-      return date.toISOString().slice(0, 10);
-    }
-    return date.toISOString();
+  formatDate: jest.fn(function(date, tz, format) {
+    if (!date) return '';
+    var d = new Date(date);
+    // Basic format support for the most common patterns used in tests
+    var yyyy = d.getFullYear();
+    var MM = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    if (format === 'yyyy-MM-dd') return yyyy + '-' + MM + '-' + dd;
+    if (format === 'MM/dd/yyyy') return MM + '/' + dd + '/' + yyyy;
+    if (format === 'M/d/yyyy') return (d.getMonth()+1) + '/' + d.getDate() + '/' + yyyy;
+    return d.toISOString().slice(0, 10);
   }),
   computeDigest: jest.fn((algo, data, charset) => {
     // Mock hash with full avalanche: every input byte affects all output bytes
@@ -65,50 +71,51 @@ global.Session = {
 // --- PropertiesService ---
 let _scriptProperties = {};
 let _userProperties = {};
+var _scriptPropertiesMock = {
+  getProperty: jest.fn(function(key) { return _scriptProperties[key] || null; }),
+  setProperty: jest.fn(function(key, value) { _scriptProperties[key] = value; }),
+  deleteProperty: jest.fn(function(key) { delete _scriptProperties[key]; }),
+  getProperties: jest.fn(function() { return Object.assign({}, _scriptProperties); }),
+  setProperties: jest.fn(function(obj) { Object.assign(_scriptProperties, obj); }),
+  deleteAllProperties: jest.fn(function() { for (var k in _scriptProperties) delete _scriptProperties[k]; })
+};
+var _userPropertiesMock = {
+  getProperty: jest.fn(function(key) { return _userProperties[key] || null; }),
+  setProperty: jest.fn(function(key, value) { _userProperties[key] = value; }),
+  deleteProperty: jest.fn(function(key) { delete _userProperties[key]; }),
+  getProperties: jest.fn(function() { return Object.assign({}, _userProperties); }),
+  setProperties: jest.fn(function(obj) { Object.assign(_userProperties, obj); }),
+  deleteAllProperties: jest.fn(function() { for (var k in _userProperties) delete _userProperties[k]; })
+};
 global.PropertiesService = {
-  getScriptProperties: jest.fn(() => ({
-    getProperty: jest.fn(key => _scriptProperties[key] || null),
-    setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; }),
-    deleteAllProperties: jest.fn(() => { for (var k in _scriptProperties) delete _scriptProperties[k]; }),
-    getProperties: jest.fn(() => Object.assign({}, _scriptProperties)),
-  })),
-  getUserProperties: jest.fn(() => ({
-    getProperty: jest.fn(key => _userProperties[key] || null),
-    setProperty: jest.fn((key, val) => { _userProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _userProperties[key]; }),
-    deleteAllProperties: jest.fn(() => { for (var k in _userProperties) delete _userProperties[k]; }),
-    getProperties: jest.fn(() => Object.assign({}, _userProperties)),
-  })),
-  getDocumentProperties: jest.fn(() => ({
-    getProperty: jest.fn(key => _scriptProperties[key] || null),
-    setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; }),
-    deleteAllProperties: jest.fn(() => { for (var k in _scriptProperties) delete _scriptProperties[k]; }),
-    getProperties: jest.fn(() => Object.assign({}, _scriptProperties)),
-  }))
+  getScriptProperties: jest.fn(function() { return _scriptPropertiesMock; }),
+  getUserProperties: jest.fn(function() { return _userPropertiesMock; }),
+  getDocumentProperties: jest.fn(function() { return _scriptPropertiesMock; })
 };
 
 // --- CacheService ---
 // TEST-03: TTL enforcement — expired entries return null, matching real GAS behavior
 let _cache = {};
 let _cacheTTLs = {};
+var _scriptCacheMock = {
+  get: jest.fn(function(key) {
+    if (_cacheTTLs[key] && Date.now() > _cacheTTLs[key]) {
+      delete _cache[key];
+      delete _cacheTTLs[key];
+      return null;
+    }
+    return _cache[key] || null;
+  }),
+  put: jest.fn(function(key, val, ttl) {
+    _cache[key] = val;
+    if (ttl) _cacheTTLs[key] = Date.now() + (ttl * 1000);
+  }),
+  remove: jest.fn(function(key) { delete _cache[key]; delete _cacheTTLs[key]; })
+};
 global.CacheService = {
-  getScriptCache: jest.fn(() => ({
-    get: jest.fn(key => {
-      if (_cacheTTLs[key] && Date.now() > _cacheTTLs[key]) {
-        delete _cache[key];
-        delete _cacheTTLs[key];
-        return null;
-      }
-      return _cache[key] || null;
-    }),
-    put: jest.fn((key, val, ttl) => {
-      _cache[key] = val;
-      if (ttl) _cacheTTLs[key] = Date.now() + (ttl * 1000);
-    }),
-    remove: jest.fn(key => { delete _cache[key]; delete _cacheTTLs[key]; })
-  }))
+  getScriptCache: jest.fn(function() { return _scriptCacheMock; }),
+  getUserCache: jest.fn(function() { return _scriptCacheMock; }),
+  getDocumentCache: jest.fn(function() { return _scriptCacheMock; })
 };
 
 // Reset stores between tests to prevent singleton leaks
@@ -117,6 +124,11 @@ afterEach(() => {
   for (const key of Object.keys(_userProperties)) delete _userProperties[key];
   for (const key of Object.keys(_cache)) delete _cache[key];
   for (const key of Object.keys(_cacheTTLs)) delete _cacheTTLs[key];
+  _lockShouldFail = false;
+  // Clear mock call history on stable singleton mocks
+  Object.values(_scriptPropertiesMock).forEach(fn => { if (fn.mockClear) fn.mockClear(); });
+  Object.values(_userPropertiesMock).forEach(fn => { if (fn.mockClear) fn.mockClear(); });
+  Object.values(_scriptCacheMock).forEach(fn => { if (fn.mockClear) fn.mockClear(); });
 });
 
 // --- Mock Sheet / Range / Spreadsheet ---
@@ -194,7 +206,13 @@ function createMockSheet(name, data) {
     setTabColor: jest.fn(),
     clear: jest.fn(),
     protect: jest.fn(() => createMockProtection()),
-    getProtections: jest.fn(() => [])
+    getProtections: jest.fn(() => []),
+    setName: jest.fn(),
+    copyTo: jest.fn(),
+    getParent: jest.fn(function() { return createMockSpreadsheet([]); }),
+    getIndex: jest.fn(function() { return 1; }),
+    insertRowsAfter: jest.fn(),
+    getFilter: jest.fn(function() { return null; })
   };
 }
 
@@ -223,6 +241,7 @@ function createMockSpreadsheet(sheets) {
       sheetMap[name] = s;
       return s;
     }),
+    getActiveSheet: jest.fn(() => (sheets && sheets[0]) || createMockSheet('Sheet1')),
     setActiveSheet: jest.fn(),
     moveActiveSheet: jest.fn(),
     getOwner: jest.fn(() => ({ getEmail: jest.fn(() => 'owner@example.com') })),

@@ -89,14 +89,16 @@ var MEMBER_PIN_COLS = {
 // ============================================================================
 
 /**
- * Generate a random 6-digit PIN.
+ * Generate a random 6-digit PIN using Utilities.getUuid() for
+ * cryptographic-quality randomness (avoids Math.random() weakness).
  * Leading zeros are valid (e.g. '012345').
  * @returns {string} 6-digit PIN
  */
 function generateMemberPIN() {
+  var uuid = Utilities.getUuid().replace(/-/g, '');
   var pin = '';
   for (var j = 0; j < 6; j++) {
-    pin += Math.floor(Math.random() * 10).toString();
+    pin += (parseInt(uuid.charAt(j), 16) % 10).toString();
   }
   return pin;
 }
@@ -114,6 +116,12 @@ function getPINSalt_() {
     // Generate a new salt if none exists
     salt = Utilities.getUuid() + '-' + Date.now();
     props.setProperty(PIN_CONFIG.SALT_PROPERTY, salt);
+
+    // Verify persistence — if this fails, all PIN hashes will silently mismatch
+    var persisted = props.getProperty(PIN_CONFIG.SALT_PROPERTY);
+    if (persisted !== salt) {
+      throw new Error('CRITICAL: PIN salt failed to persist to ScriptProperties. PIN authentication will not work until this is resolved.');
+    }
   }
 
   return salt;
@@ -234,6 +242,7 @@ function assignMemberPIN(memberId, options) {
   }
 
   // Optionally email the PIN to the member
+  var emailSent = false;
   if (options.sendEmail && memberEmail) {
     try {
       MailApp.sendEmail({
@@ -246,18 +255,18 @@ function assignMemberPIN(memberId, options) {
           'If you did not expect this, please contact your union steward.\n\n' +
           'Best regards,\n' + (typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Union') : 'Your Union')
       });
+      emailSent = true;
     } catch (emailError) {
       Logger.log('Could not send PIN email to member: ' + emailError.message);
     }
   }
 
-  return {
-    success: true,
-    memberId: memberId,
-    pin: newPin,
-    emailSent: !!(options.sendEmail && memberEmail),
-    message: 'PIN assigned successfully' + (options.sendEmail && memberEmail ? ' and emailed to member' : '')
-  };
+  var result = { success: true, memberId: memberId, emailSent: emailSent, message: 'PIN assigned successfully' + (emailSent ? ' and emailed to member' : '') };
+  if (!emailSent) {
+    result.pin = newPin; // Only return PIN when email delivery failed
+    result.pinDeliveryNote = 'Email delivery failed. Provide PIN directly to member.';
+  }
+  return result;
 }
 
 // ============================================================================
@@ -661,7 +670,14 @@ function authenticateMember(memberId, pin) {
 }
 
 /**
- * Create a session token for an authenticated member
+ * Create a session token for an authenticated member.
+ *
+ * PIN portal sessions are intentionally stored in CacheService (volatile, ~6h max)
+ * rather than PropertiesService (persistent, 500KB quota). This is acceptable because:
+ * 1. PIN sessions are short-lived (configurable, default 60 minutes)
+ * 2. Cache eviction = user re-enters PIN, which is low-friction
+ * 3. Avoids contributing to PropertiesService quota pressure from long-lived web sessions
+ *
  * @param {string} memberId - The member ID
  * @returns {string} Session token
  */
@@ -841,7 +857,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -936,7 +952,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -1005,7 +1021,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
@@ -1312,6 +1328,7 @@ function getMemberGrievances(sessionToken) {
 function getMemberGrievanceHistory(sessionTokenOrEmail) {
   // Determine if input is a session token or email
   var memberId;
+  var ss; // hoisted — assigned in both branches and used after the if/else
   if (sessionTokenOrEmail && sessionTokenOrEmail.indexOf('@') !== -1) {
     // Email-based lookup (SPA context) — verify caller authorization
     var email = String(sessionTokenOrEmail).trim().toLowerCase();
@@ -1330,7 +1347,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
       }
     }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return { success: true, history: [] };
     var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!memberSheet) return { success: true, history: [] };

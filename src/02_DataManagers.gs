@@ -1049,16 +1049,12 @@ function showImportMembersDialog() {
 }
 
 /**
- * Generates HTML for the import members dialog
- * @returns {string} HTML content
+ * Returns the CSS styles for the Import Members dialog.
+ * @returns {string} CSS rules (without wrapping style tags)
  * @private
  */
-function getImportMembersHtml_() {
-  return '<!DOCTYPE html>' +
-    '<html><head>' +
-    getMobileOptimizedHead() +
-    '<style>' +
-    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+function _getImportMembersCss_() {
+  return '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 20px; color: #F8FAFC; }' +
     'h3 { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }' +
     '.step { margin-bottom: 20px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #334155; }' +
@@ -1088,44 +1084,16 @@ function getImportMembersHtml_() {
     '.progress-container { width: 100%; background: #0F172A; border-radius: 8px; border: 1px solid #334155; overflow: hidden; height: 32px; }' +
     '.progress-bar { height: 100%; background: linear-gradient(90deg, #7C3AED, #A78BFA); border-radius: 8px; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: white; min-width: 0; }' +
     '.progress-text { text-align: center; font-size: 12px; color: #94A3B8; margin-top: 8px; }' +
-    '.progress-stats { display: flex; justify-content: space-between; font-size: 11px; color: #64748B; margin-top: 4px; }' +
-    '</style>' +
-    '</head><body>' +
-    '<h3>📥 Import Members from CSV</h3>' +
-    '' +
-    '<div class="step">' +
-    '  <div class="step-title">Step 1: Paste CSV Data</div>' +
-    '  <textarea id="csvData" placeholder="Paste your CSV data here...&#10;&#10;Example:&#10;First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Analyst,Main Station&#10;Jane,Smith,jane@example.com,555-5678,Manager,Field Ops"></textarea>' +
-    '  <div class="help">Paste data from Excel, Google Sheets, or a CSV file. First row should be headers.</div>' +
-    '</div>' +
-    '' +
-    '<div class="step" id="mappingStep" style="display:none;">' +
-    '  <div class="step-title">Step 2: Map Columns</div>' +
-    '  <div class="mapping-grid" id="mappingGrid"></div>' +
-    '  <div class="preview" id="preview"></div>' +
-    '</div>' +
-    '' +
-    '<div class="btn-row">' +
-    '  <button class="btn-secondary" id="parseBtn" onclick="parseCSV()">Parse CSV</button>' +
-    '  <button class="btn-primary" id="importBtn" onclick="importMembers()" disabled>Import Members</button>' +
-    '  <button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
-    '</div>' +
-    '' +
-    '<div id="statusArea"></div>' +
-    '' +
-    '<div id="progressSection" class="progress-section" style="display:none;">' +
-    '  <div class="progress-container">' +
-    '    <div class="progress-bar" id="progressBar" style="width:0%">0%</div>' +
-    '  </div>' +
-    '  <div class="progress-text" id="progressText">Preparing import...</div>' +
-    '  <div class="progress-stats">' +
-    '    <span id="progressImported">Imported: 0</span>' +
-    '    <span id="progressSkipped">Skipped: 0</span>' +
-    '  </div>' +
-    '</div>' +
-    '' +
-    '<script>' +
-    getClientSideEscapeHtml() +
+    '.progress-stats { display: flex; justify-content: space-between; font-size: 11px; color: #64748B; margin-top: 4px; }';
+}
+
+/**
+ * Returns the client-side JavaScript for the Import Members dialog.
+ * @returns {string} JavaScript code (without wrapping script tags)
+ * @private
+ */
+function _getImportMembersScript_() {
+  return getClientSideEscapeHtml() +
     'var parsedData = [];' +
     'var csvHeaders = [];' +
     'var BATCH_SIZE = 25;' +
@@ -1336,8 +1304,55 @@ function getImportMembersHtml_() {
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
     '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
-    '}' +
-    '</script>' +
+    '}';
+}
+
+/**
+ * Generates HTML for the import members dialog.
+ * Assembles CSS from _getImportMembersCss_(), HTML structure, and JS from _getImportMembersScript_().
+ * @returns {string} HTML content
+ * @private
+ */
+function getImportMembersHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    getMobileOptimizedHead() +
+    '<style>' + _getImportMembersCss_() + '</style>' +
+    '</head><body>' +
+    '<h3>📥 Import Members from CSV</h3>' +
+    '' +
+    '<div class="step">' +
+    '  <div class="step-title">Step 1: Paste CSV Data</div>' +
+    '  <textarea id="csvData" placeholder="Paste your CSV data here...&#10;&#10;Example:&#10;First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Analyst,Main Station&#10;Jane,Smith,jane@example.com,555-5678,Manager,Field Ops"></textarea>' +
+    '  <div class="help">Paste data from Excel, Google Sheets, or a CSV file. First row should be headers.</div>' +
+    '</div>' +
+    '' +
+    '<div class="step" id="mappingStep" style="display:none;">' +
+    '  <div class="step-title">Step 2: Map Columns</div>' +
+    '  <div class="mapping-grid" id="mappingGrid"></div>' +
+    '  <div class="preview" id="preview"></div>' +
+    '</div>' +
+    '' +
+    '<div class="btn-row">' +
+    '  <button class="btn-secondary" id="parseBtn" onclick="parseCSV()">Parse CSV</button>' +
+    '  <button class="btn-primary" id="importBtn" onclick="importMembers()" disabled>Import Members</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
+    '</div>' +
+    '' +
+    '<div id="statusArea"></div>' +
+    '' +
+    '<div id="progressSection" class="progress-section" style="display:none;">' +
+    '  <div class="progress-container">' +
+    '    <div class="progress-bar" id="progressBar" style="width:0%">0%</div>' +
+    '  </div>' +
+    '  <div class="progress-text" id="progressText">Preparing import...</div>' +
+    '  <div class="progress-stats">' +
+    '    <span id="progressImported">Imported: 0</span>' +
+    '    <span id="progressSkipped">Skipped: 0</span>' +
+    '  </div>' +
+    '</div>' +
+    '' +
+    '<script>' + _getImportMembersScript_() + '</script>' +
     '</body></html>';
 }
 /**

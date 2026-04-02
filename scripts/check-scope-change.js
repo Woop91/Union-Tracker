@@ -18,11 +18,9 @@
 
 'use strict';
 const { execSync } = require('child_process');
-const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const MANIFEST = path.join(ROOT, 'appsscript.json');
 
 function getScopes(json) {
   try {
@@ -32,20 +30,24 @@ function getScopes(json) {
   }
 }
 
-// Read current manifest
-if (!fs.existsSync(MANIFEST)) {
-  console.log('[scope-check] appsscript.json not found — skipping');
+// Read current manifest from HEAD (committed version)
+let currentScopes = [];
+try {
+  const current = execSync('git show HEAD:appsscript.json', { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
+  currentScopes = getScopes(current);
+} catch (_) {
+  // Not a git repo or no commits yet — skip
+  console.log('[scope-check] No HEAD commit found — skipping scope comparison');
   process.exit(0);
 }
-const currentScopes = getScopes(fs.readFileSync(MANIFEST, 'utf8'));
 
 // Try to read the previous version from git
 let previousScopes = [];
 try {
-  const prev = execSync('git show HEAD:appsscript.json', { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
+  const prev = execSync('git show HEAD~1:appsscript.json', { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
   previousScopes = getScopes(prev);
 } catch (_) {
-  // No previous commit (initial commit) or not a git repo — skip
+  // First commit — no previous version to compare
   console.log('[scope-check] No previous commit to diff against — skipping scope comparison');
   process.exit(0);
 }

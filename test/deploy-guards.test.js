@@ -32,10 +32,11 @@ const VIEW_FILES = [
 // .gs files that contain google.script.run wrapper functions
 const WRAPPER_FILES = [
   '21_WebDashDataService.gs',
+  '21d_WebDashDataWrappers.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
-  // SOLIDBASE: 25_WorkloadService.gs excluded — feature not in SolidBase
+  // '25_WorkloadService.gs', — excluded from SolidBase
   '08e_SurveyEngine.gs',
 ];
 
@@ -391,15 +392,14 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 describe('G6: dist/ files are in sync with src/', () => {
 
   test('dist/ does not contain dev-only files (must be built with --prod)', () => {
-    // SOLIDBASE: TestRunner + WebAppTests also excluded from SolidBase prod builds
-    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
+    // Test runner included in prod — tab gated by IS_DEV_MODE, endpoints by steward auth
+    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs'];
     const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
     expect(found).toEqual([]);
   });
 
   test('every src .gs file has identical copy in dist', () => {
-    // SOLIDBASE: 30_TestRunner.gs, 31_WebAppTests.gs also excluded from SolidBase prod
-    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build
+    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build (SolidBase)
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
 
@@ -552,8 +552,8 @@ describe('G9: Nav tabs and handlers are in sync', () => {
   });
 
   // Member-only tabs (removed from steward nav)
-  // SOLIDBASE: 'poms' excluded — feature not in SolidBase
-  const memberOnlyTabs = ['orgchart', 'maddsorgchart'];
+  // SolidBase only has 'orgchart' — poms and maddsorgchart are DDS-specific
+  const memberOnlyTabs = ['orgchart'];
   memberOnlyTabs.forEach(tabId => {
     test(`member-only tab '${tabId}' appears in member nav but not steward nav`, () => {
       const count = tabIdMatches.filter(m => m.includes(`'${tabId}'`)).length;
@@ -600,7 +600,7 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
   });
 
   // Must find at least the known lazy-loaders
-  // SOLIDBASE: getPOMSReferenceHtml excluded — POMS feature not in SolidBase
+  // SolidBase: getPOMSReferenceHtml is not lazy-loaded (POMS stub doesn't call server)
   test('detects lazy-loaded server functions (getOrgChartHtml)', () => {
     expect(serverFunctions.has('getOrgChartHtml')).toBe(true);
   });
@@ -616,62 +616,10 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 // ============================================================================
 // G11: poms_reference.html is self-contained and parseable
 // ============================================================================
-// Reason: poms_reference.html is loaded via HtmlService.createHtmlOutputFromFile
-// and injected into the SPA. If its <script> block has syntax errors, the entire
-// POMS tab fails silently.
+// SKIPPED: poms_reference.html does not exist in SolidBase (DDS-specific feature).
 
-// SOLIDBASE: skipped — poms_reference.html excluded from SolidBase
-describe.skip('G11: poms_reference.html integrity', () => {
-  const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
-
-  test('poms_reference.html exists', () => {
-    expect(fs.existsSync(pomsPath)).toBe(true);
-  });
-
-  test('POMS_DATA is available (lazy-loaded from server or inline)', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    // POMS_DATA may be inline (const POMS_DATA = [...]) or lazy-loaded (var POMS_DATA = [])
-    const match = code.match(/POMS_DATA\s*=\s*\[/);
-    expect(match).not.toBeNull();
-    // If lazy-loaded, data lives in 21_WebDashDataService.gs
-    const clientEntries = (code.match(/\{id:/g) || []).length;
-    if (clientEntries < 78) {
-      const svcPath = path.join(SRC_DIR, '21_WebDashDataService.gs');
-      const svcCode = fs.readFileSync(svcPath, 'utf8');
-      const serverEntries = (svcCode.match(/\{id:"/g) || []).length;
-      expect(serverEntries).toBeGreaterThanOrEqual(78);
-    }
-  });
-
-  test('contains FLOWS object with flowcharts', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    const match = code.match(/FLOWS\s*=\s*\{/);
-    expect(match).not.toBeNull();
-    // Count flowcharts (title: entries)
-    const charts = (code.match(/title:"/g) || []).length;
-    expect(charts).toBeGreaterThanOrEqual(17);
-  });
-
-  test('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
-      expect(code).toContain(`P.tab==='${tab}'`);
-    });
-  });
-
-  test('<script> block parses without syntax errors', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
-    expect(scriptMatch).not.toBeNull();
-    expect(() => {
-      new vm.Script(scriptMatch[1], { filename: 'poms_reference.html' });
-    }).not.toThrow();
-  });
-
-  test('no DDS Apps Script ID present', () => {
-    const code = fs.readFileSync(pomsPath, 'utf8');
-    expect(code).not.toContain('18hHHX');
-  });
+describe.skip('G11: poms_reference.html integrity — SolidBase-excluded', () => {
+  test('poms_reference.html exists', () => {});
 });
 
 
@@ -752,34 +700,11 @@ describe('G13: Module load order is safe', () => {
 });
 
 
-// SOLIDBASE: skipped — 25_WorkloadService.gs excluded from SolidBase
-describe.skip('G14: WorkloadService crash-safe patterns', () => {
-  const wsCode = ''; // file does not exist in SolidBase
+// G14: WorkloadService crash-safe patterns
+// SKIPPED: 25_WorkloadService.gs does not exist in SolidBase (DDS-specific feature).
 
-  test('_refreshReportingData does NOT clearContents before writing', () => {
-    // Extract the _refreshReportingData function body
-    const funcStart = wsCode.indexOf('function _refreshReportingData()');
-    expect(funcStart).toBeGreaterThan(-1);
-    const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
-    const funcBody = wsCode.substring(funcStart, funcEnd);
-
-    // The old antipattern: report.clearContents() before setValues
-    // New pattern: setValues first, then clearContent only for stale rows
-    expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
-  });
-
-  test('rate limit uses atomic check-and-record pattern', () => {
-    // _checkAndRecordRateLimit should exist (replaces separate check + record)
-    expect(wsCode).toContain('function _checkAndRecordRateLimit');
-    // Old separate _recordRateLimitAttempt should NOT exist
-    expect(wsCode).not.toContain('function _recordRateLimitAttempt');
-    // No separate _recordSubmission call
-    expect(wsCode).not.toContain('function _recordSubmission');
-  });
-
-  test('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
-    expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
-  });
+describe.skip('G14: WorkloadService crash-safe patterns — SolidBase-excluded', () => {
+  test('_refreshReportingData does NOT clearContents before writing', () => {});
 });
 
 // ============================================================================

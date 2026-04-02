@@ -51,9 +51,11 @@ var ConfigReader = (function () {
     // S3: Return in-execution memo if available (same GAS execution)
     if (!forceRefresh && _memo) return _memo;
 
+    // Declared at function scope — used in both the cache-read and cache-write paths
+    var cache = CacheService.getScriptCache();
+
     // Try cache first
     if (!forceRefresh) {
-      var cache = CacheService.getScriptCache();
       var cached = cache.get(CACHE_KEY);
       if (cached) {
         try {
@@ -119,9 +121,8 @@ var ConfigReader = (function () {
     // S3: Store in-execution memo
     _memo = config;
 
-    // Cache it
+    // Cache it (reuses `cache` declared at function top)
     try {
-      cache = CacheService.getScriptCache();
       cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
     } catch (e) {
       // Cache write failed — non-fatal, will just re-read next time

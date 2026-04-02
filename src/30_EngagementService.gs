@@ -276,13 +276,14 @@ var EngagementService = (function () {
       totalScore += result.composite;
     }
 
-    // Write all scores (clear and rewrite)
+    // Write new data first, then clear any remaining old rows
     if (results.length > 0) {
-      // Clear old data (keep header)
-      if (scoreSheet.getLastRow() >= 2) {
-        scoreSheet.getRange(2, 1, scoreSheet.getLastRow() - 1, HEADERS.length).clearContent();
-      }
       scoreSheet.getRange(2, 1, results.length, HEADERS.length).setValues(results);
+    }
+    // Clear remaining old rows beyond new data
+    var lastRow = scoreSheet.getLastRow();
+    if (lastRow > results.length + 1) {
+      scoreSheet.getRange(results.length + 2, 1, lastRow - results.length - 1, HEADERS.length).clearContent();
     }
 
     if (typeof logAuditEvent === 'function') {

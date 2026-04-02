@@ -97,7 +97,9 @@ function CREATE_DASHBOARD() {
   ss.toast('Starting dashboard creation...', '🏗️ Setup', 5);
 
   try {
-    // ── DRIVE FOLDER STRUCTURE ───────────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════
+    // STEP 1: Drive & Calendar Setup
+    // ═══════════════════════════════════════════════════
     // Creates DashboardTest/ with Grievances/, Resources/, Minutes/, Event Check-In/
     // Folder IDs are written to Config sheet + Script Properties automatically.
     if (typeof setupDashboardDriveFolders === 'function') {
@@ -114,8 +116,7 @@ function CREATE_DASHBOARD() {
       }
     }
 
-    // ── EVENTS CALENDAR ─────────────────────────────────────────────────────────────────
-    // Creates the org events calendar, writes Calendar ID to Config row 3.
+    // Events Calendar — creates the org events calendar, writes Calendar ID to Config row 3.
     if (typeof setupDashboardCalendar === 'function') {
       try {
         var calResult = setupDashboardCalendar();
@@ -130,6 +131,9 @@ function CREATE_DASHBOARD() {
       }
     }
 
+    // ═══════════════════════════════════════════════════
+    // STEP 2: Core Sheets (Config, Member Dir, Grievance Log)
+    // ═══════════════════════════════════════════════════
     var currentStep_ = '';
     try {
     currentStep_ = 'createConfigSheet';
@@ -152,10 +156,16 @@ function CREATE_DASHBOARD() {
     getOrCreateChecklistSheet();
     ss.toast('Created Case Checklist sheet', '🏗️ Progress', 2);
 
+    // ═══════════════════════════════════════════════════
+    // STEP 3: Hidden Calculation Sheets
+    // ═══════════════════════════════════════════════════
     currentStep_ = 'setupHiddenSheets';
     ss.toast('Setting up hidden sheets...', '🏗️ Progress', 3);
     setupHiddenSheets(ss);
 
+    // ═══════════════════════════════════════════════════
+    // STEP 4: Feature Sheets (Survey, Satisfaction, etc.)
+    // ═══════════════════════════════════════════════════
     currentStep_ = 'createSurveyQuestionsSheet';
     createSurveyQuestionsSheet(ss);
     ss.toast('Created Survey Questions', '🏗️ Progress', 2);
@@ -204,6 +214,9 @@ function CREATE_DASHBOARD() {
     saveFormUrlsToConfig_silent(ss);
     ss.toast('Saved form URLs to Config', '🏗️ Progress', 2);
 
+    // ═══════════════════════════════════════════════════
+    // STEP 5: Data Validations (dropdowns)
+    // ═══════════════════════════════════════════════════
     currentStep_ = 'setupDataValidations';
     ss.toast('Setting up validations...', '🏗️ Progress', 3);
     setupDataValidations();
@@ -211,8 +224,9 @@ function CREATE_DASHBOARD() {
       throw new Error('[' + currentStep_ + '] ' + stepErr.message);
     }
 
-    // Initialize Resources sheet and Resource Config sheet (v4.22.x)
-    // Both auto-create on first access but wired here so they're ready on setup.
+    // ═══════════════════════════════════════════════════
+    // STEP 6: Optional Feature Sheets (Resources, Workload, etc.)
+    // ═══════════════════════════════════════════════════
     if (typeof createResourcesSheet === 'function') {
       try {
         createResourcesSheet(ss);
@@ -231,6 +245,9 @@ function CREATE_DASHBOARD() {
       }
     }
 
+    // ═══════════════════════════════════════════════════
+    // STEP 7: Sheet Reorder & Triggers
+    // ═══════════════════════════════════════════════════
     reorderSheetsToStandard(ss);
     ss.toast('Sheets reordered', '🏗️ Progress', 2);
 
@@ -464,15 +481,15 @@ function getOrCreateSheet(ss, name) {
     }
   }
   if (sheet) {
-    // CRITICAL: Never clear sheets that contain user data.
-    // Only clear if the sheet is empty (no data rows beyond header).
+    // CRITICAL: Never clear sheets that contain user data or headers.
+    // Only clear if the sheet is truly empty (lastRow === 0).
     var lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      // Sheet has data - preserve it. Only update headers if needed.
-      Logger.log('Sheet "' + name + '" has ' + (lastRow - 1) + ' data rows - preserving existing data');
+    if (lastRow >= 1) {
+      // Sheet has headers or data - preserve it.
+      Logger.log('Sheet "' + name + '" has ' + lastRow + ' row(s) - preserving existing content');
       return sheet;
     }
-    // Sheet is empty or has only headers - safe to clear and rebuild
+    // Sheet is completely empty - safe to clear and rebuild
     sheet.clear();
   } else {
     sheet = ss.insertSheet(name);
@@ -486,6 +503,8 @@ function getOrCreateSheet(ss, name) {
  * @returns {void}
  */
 function reorderSheetsToStandard(ss) {
+  var originalSheet = ss.getActiveSheet();
+
   // 4 groups: Core Data (purple) → Reference (green) → Engagement (blue) → Config & Admin (orange)
   var desiredOrder = [
     // 🟣 Core Data — daily workflow
@@ -524,11 +543,15 @@ function reorderSheetsToStandard(ss) {
     }
   }
 
-  var firstSheet = ss.getSheetByName(SHEETS.MEMBER_DIR) ||
-                   ss.getSheetByName(SHEETS.GETTING_STARTED) ||
-                   ss.getSheets()[0];
-  if (firstSheet) {
-    ss.setActiveSheet(firstSheet);
+  // Restore the sheet the user had open before reordering
+  try { ss.setActiveSheet(originalSheet); } catch(_) {
+    // Original sheet may have been deleted — fall back to first sheet
+    var firstSheet = ss.getSheetByName(SHEETS.MEMBER_DIR) ||
+                     ss.getSheetByName(SHEETS.GETTING_STARTED) ||
+                     ss.getSheets()[0];
+    if (firstSheet) {
+      ss.setActiveSheet(firstSheet);
+    }
   }
 
   Logger.log('Sheets reordered to standard layout');
@@ -548,6 +571,12 @@ function reorderSheetsToStandard(ss) {
  * @returns {void}
  */
 function setupHiddenSheets(ss) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) {
+    Logger.log('setupHiddenSheets: could not acquire lock — skipping to avoid concurrent rebuild');
+    return;
+  }
+  try {
   var hiddenSheets = [
     { name: HIDDEN_SHEETS.CALC_MEMBERS, setup: setupCalcMembersSheet },
     { name: HIDDEN_SHEETS.CALC_GRIEVANCES, setup: setupCalcGrievancesSheet },
@@ -604,6 +633,7 @@ function setupHiddenSheets(ss) {
       setSheetVeryHidden_(wlArchive);
     }
   }
+  } finally { lock.releaseLock(); }
 }
 
 // ============================================================================

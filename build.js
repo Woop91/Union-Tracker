@@ -1,5 +1,5 @@
 /**
- * Build Script for SolidBase
+ * Build Script for Dashboard
  * Copies individual source files into dist/ for multi-file CLASP deployment.
  * GAS V8 loads files in alphabetical filename order — numbered filenames
  * (00_, 01_, …) guarantee correct load order AND give the GAS editor a
@@ -16,8 +16,8 @@
  *   Excludes development/test files that should not be deployed:
  *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
  *   - DevMenu.gs (dev-only quick deploy menu, guarded by typeof in onOpen)
- *   - 30_TestRunner.gs (test runner, gated by IS_DEV_MODE)
- *   - 31_WebAppTests.gs (web app test suite)
+ *   - 30_TestRunner.gs (test runner — excluded from SolidBase prod)
+ *   - 31_WebAppTests.gs (web app tests — excluded from SolidBase prod)
  */
 
 const fs = require('fs');
@@ -27,7 +27,11 @@ const vm = require('vm');
 const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 
-// .gs files in load order — alphabetical filename = correct GAS load order
+// Build order: matches GAS V8 load order for most files (alphabetical by name).
+// Intentional deviations:
+//   - 00_Security.gs before 00_DataAccess.gs (security must be available first)
+//   - 10a/10b/10c before 10_Main.gs (sheet creation before main entry point)
+// Since GAS V8 hoists function declarations, order only matters for var/const initializers.
 const BUILD_ORDER = [
   '00_Security.gs',
   '00_DataAccess.gs',
@@ -55,10 +59,11 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules (load after all core modules)
+  // Web-dashboard SPA modules (load after all SolidBase modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
+  '21d_WebDashDataWrappers.gs',
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
@@ -105,9 +110,14 @@ function validate(gsFiles, htmlFiles) {
   let errors = 0;
 
   // 1. Check .gs files
+  var missingCount = 0;
   for (const file of gsFiles) {
     const filePath = path.join(SRC_DIR, file);
-    if (!fs.existsSync(filePath)) continue;
+    if (!fs.existsSync(filePath)) {
+      console.warn('  ⚠️  Missing source file: ' + file);
+      missingCount++;
+      continue;
+    }
     const code = fs.readFileSync(filePath, 'utf8');
     try {
       new vm.Script(code, { filename: file });
@@ -116,6 +126,10 @@ function validate(gsFiles, htmlFiles) {
       console.error(`  ❌ SYNTAX ERROR in ${file} (line ${line}): ${e.message}`);
       errors++;
     }
+  }
+  if (missingCount > 0) {
+    console.error('  ✗ ' + missingCount + ' source file(s) missing from BUILD_ORDER');
+    process.exit(1);
   }
 
   // 2. Check <script> blocks in HTML files
@@ -128,7 +142,7 @@ function validate(gsFiles, htmlFiles) {
     let blockIndex = 0;
     while ((match = scriptRegex.exec(content)) !== null) {
       const js = match[1];
-      if (js.trim().length < 10 || js.includes('<?')) continue; // skip empty/template blocks
+      if (js.trim().length < 3 || js.includes('<?')) continue; // Skip trivial/GAS scriptlet blocks
       try {
         new vm.Script(js, { filename: `${file}:script[${blockIndex}]` });
       } catch (e) {
@@ -183,6 +197,10 @@ function minifyHtml(content) {
 
   // Minify <script> blocks: remove // comments (careful with URLs), collapse whitespace
   content = content.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/gi, function(_, open, js, close) {
+    // NOTE: This regex-based comment removal has known limitations:
+    // - Skips lines containing quote characters (may leave some comments intact)
+    // - Cannot reliably distinguish comments inside string literals
+    // - Safe for this codebase where IIFE bodies are indented, but not general-purpose
     // Remove single-line comments (but not URLs like https:// and regex \/\/)
     js = js.replace(/([^:\\]|^)\/\/(?![\/*])(?![^\n]*['"`]).*$/gm, '$1');
     // Remove multi-line comments
@@ -205,7 +223,7 @@ function minifyHtml(content) {
   return content;
 }
 
-function build(fileList) {
+function build(fileList, shouldMinify) {
   const startTime = Date.now();
   console.log('Building dashboard (multi-file mode)...\n');
 
@@ -248,6 +266,7 @@ function build(fileList) {
     }
 
     let htmlContent = fs.readFileSync(src, 'utf8');
+    htmlContent = htmlContent.replace(/\r\n/g, '\n'); // Normalize CRLF for cross-platform parity
     const originalSize = htmlContent.length;
     if (shouldMinify) {
       htmlContent = minifyHtml(htmlContent);
@@ -280,14 +299,12 @@ function build(fileList) {
 function clean() {
   console.log('Cleaning dist directory...');
   if (fs.existsSync(DIST_DIR)) {
-    // Remove only .gs and .html files; keep appsscript.json
     const files = fs.readdirSync(DIST_DIR);
     let removed = 0;
-    for (const f of files) {
-      if (f.endsWith('.gs') || f.endsWith('.html')) {
-        fs.unlinkSync(path.join(DIST_DIR, f));
-        removed++;
-      }
+    for (const file of files) {
+      if (file === 'appsscript.json') continue;
+      fs.unlinkSync(path.join(DIST_DIR, file));
+      removed++;
     }
     console.log(`Removed ${removed} files from dist/\n`);
   } else {
@@ -302,8 +319,8 @@ const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
-// Files to exclude in production builds.
-// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
+// Files to exclude in SolidBase production builds.
+// SolidBase excludes test runner + test suite in addition to dev tools.
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {
@@ -318,17 +335,15 @@ if (validateOnly) {
     : BUILD_ORDER;
 
   if (isProd) {
-    console.log('Production build: Excluding DevTools, TestRunner, WebAppTests...\n');
+    console.log('Production build: Excluding DevTools...\n');
   }
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 38 .gs + 15 .html + 1 appsscript.json = 54 files
+  // Current SolidBase prod capacity: 39 .gs + 15 .html + 1 appsscript.json = 55 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
-  const gsFileCount = isProd
-    ? fileList.filter(f => !PROD_EXCLUDE.includes(f)).length
-    : fileList.length;
+  const gsFileCount = fileList.length;
   const totalDeployFiles = gsFileCount + HTML_FILES.length + 1; // +1 for appsscript.json
   if (totalDeployFiles > GAS_FILE_LIMIT) {
     console.error(`\n❌ ERROR: Prod file count (${totalDeployFiles}) exceeds limit of ${GAS_FILE_LIMIT}.`);
@@ -340,8 +355,20 @@ if (validateOnly) {
     console.warn(`   .gs files: ${gsFileCount}, .html files: ${HTML_FILES.length}, manifest: 1\n`);
   }
 
+  // Check for shared numeric prefixes (informational — some sharing is intentional)
+  var prefixes = {};
+  fileList.forEach(function(f) {
+    var prefix = f.match(/^(\d+[a-z]?_)/);
+    if (prefix) {
+      if (prefixes[prefix[1]]) {
+        console.log('  Note: Shared prefix ' + prefix[1] + ': ' + prefixes[prefix[1]] + ', ' + f);
+      }
+      prefixes[prefix[1]] = f;
+    }
+  });
+
   // Auto-clean before build to prevent orphaned files from persisting
   validate(fileList, HTML_FILES);
   clean();
-  build(fileList);
+  build(fileList, shouldMinify);
 }

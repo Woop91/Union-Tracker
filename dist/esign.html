@@ -26,12 +26,8 @@ var LAST_POINT = null;
 
 (function() {
  var params = {};
- var hash = window.location.hash.substring(1);
- if (!hash) {
- var search = window.location.search.substring(1);
- hash = search;
- }
- hash.split('&').forEach(function(pair) {
+ var paramString = window.location.hash ? window.location.hash.substring(1) : window.location.search.substring(1);
+ paramString.split('&').forEach(function(pair) {
  var parts = pair.split('=');
  if (parts.length === 2) params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
  });
@@ -102,7 +98,7 @@ function renderSigningPage() {
  
  var header = document.createElement('div');
  header.style.cssText = 'text-align:center;margin-bottom:14px;';
- header.innerHTML = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Union Local</div>' +
+ header.innerHTML = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Union E-Signature</div>' +
  '<div style="font-size:18px;font-weight:700;margin-top:4px;">Grievance Signature</div>';
  app.appendChild(header);
 
@@ -279,7 +275,21 @@ function initCanvas(wrap) {
  CTX.lineJoin = 'round';
  CTX.lineWidth = 2.5;
  CTX.strokeStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#e5e7eb' : '#1a1a2e';
- if (imgData) { try { CTX.putImageData(imgData, 0, 0); } catch (_e) {  HAS_DRAWN = false; if (canvasWrap) canvasWrap.classList.remove('active'); } }
+ if (imgData) {
+  try { CTX.putImageData(imgData, 0, 0); } catch (_e) {
+  
+  var wasDrawn = HAS_DRAWN;
+  HAS_DRAWN = false;
+  if (canvasWrap) canvasWrap.classList.remove('active');
+  if (wasDrawn) {
+   var msg = document.getElementById('statusMsg');
+   if (msg) {
+   msg.textContent = 'Signature cleared due to screen resize. Please sign again.';
+   msg.style.color = 'var(--warning)';
+   }
+  }
+  }
+ }
  }
  window.addEventListener('resize', _resizeCanvas);
  window.addEventListener('orientationchange', function() { setTimeout(_resizeCanvas, 200); });

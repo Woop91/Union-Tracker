@@ -21,6 +21,7 @@ loadSources([
   '01_Core.gs',
   '02_DataManagers.gs',
   '21_WebDashDataService.gs',
+  '21d_WebDashDataWrappers.gs',
   '07_DevTools.gs',
 ]);
 

@@ -177,25 +177,6 @@ function getCommonStyles() {
   `;
 }
 
-/**
- * Shows a toast notification
- * @param {string} message - Message to display
- * @param {string} title - Optional title
- */
-
-/**
- * Shows a confirmation dialog
- * @param {string} message - Confirmation message
- * @param {string} title - Dialog title
- * @return {boolean} True if user confirmed
- */
-
-/**
- * Shows an alert dialog
- * @param {string} message - Alert message
- * @param {string} title - Dialog title
- */
-
 // navigateToSheet() - REMOVED DUPLICATE - see line 565 for main definition
 
 /**
@@ -255,27 +236,27 @@ function startPomodoroTimer() {
 
   // For immediate feedback, show a modal with timer info
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
-    'body{font-family:Arial,sans-serif;padding:30px;text-align:center;background:linear-gradient(135deg,#ff6b6b,#ee5a24)}' +
-    '.timer{font-size:72px;color:white;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}' +
-    '.label{color:white;font-size:18px;margin-top:10px;opacity:0.9}' +
-    '.tip{background:rgba(255,255,255,0.2);padding:15px;border-radius:8px;margin-top:20px;color:white}' +
-    'button{background:white;color:#ee5a24;border:none;padding:12px 24px;border-radius:25px;font-size:16px;cursor:pointer;margin-top:20px}' +
-    '</style></head><body>' +
-    '<div class="timer" id="time">25:00</div>' +
-    '<div class="label">🍅 Focus Time Remaining</div>' +
-    '<div class="tip">💡 Tip: Close this window and focus on your task.<br>A toast notification will remind you when time is up.</div>' +
-    '<button onclick="google.script.host.close()">Start Focusing</button>' +
-    '<script>' +
-    'var seconds = 25 * 60;' +
-    'var timer = setInterval(function(){' +
-    '  seconds--;' +
-    '  if(seconds <= 0){clearInterval(timer);document.getElementById("time").innerHTML="Done!";return;}' +
-    '  var m = Math.floor(seconds/60);' +
-    '  var s = seconds % 60;' +
-    '  document.getElementById("time").innerHTML = m + ":" + (s < 10 ? "0" : "") + s;' +
-    '},1000);' +
-    '</script></body></html>'
+    `<!DOCTYPE html><html><head><base target="_top">${getMobileOptimizedHead()}<style>
+body{font-family:Arial,sans-serif;padding:30px;text-align:center;background:linear-gradient(135deg,#ff6b6b,#ee5a24)}
+.timer{font-size:72px;color:white;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}
+.label{color:white;font-size:18px;margin-top:10px;opacity:0.9}
+.tip{background:rgba(255,255,255,0.2);padding:15px;border-radius:8px;margin-top:20px;color:white}
+button{background:white;color:#ee5a24;border:none;padding:12px 24px;border-radius:25px;font-size:16px;cursor:pointer;margin-top:20px}
+</style></head><body>
+<div class="timer" id="time">25:00</div>
+<div class="label">🍅 Focus Time Remaining</div>
+<div class="tip">💡 Tip: Close this window and focus on your task.<br>A toast notification will remind you when time is up.</div>
+<button onclick="google.script.host.close()">Start Focusing</button>
+<script>
+var seconds = 25 * 60;
+var timer = setInterval(function(){
+  seconds--;
+  if(seconds <= 0){clearInterval(timer);document.getElementById("time").innerHTML="Done!";return;}
+  var m = Math.floor(seconds/60);
+  var s = seconds % 60;
+  document.getElementById("time").innerHTML = m + ":" + (s < 10 ? "0" : "") + s;
+},1000);
+</script></body></html>`
   ).setWidth(350).setHeight(350);
 
   ui.showModelessDialog(html, '🍅 Pomodoro Timer');
@@ -304,7 +285,8 @@ function getQuickCaptureNotes() {
 function saveQuickCaptureNotes(notes) {
   try {
     var userProps = PropertiesService.getUserProperties();
-    userProps.setProperty('quickCaptureNotes', notes || '');
+    var sanitized = typeof escapeForFormula === 'function' ? escapeForFormula(notes || '') : (notes || '');
+    userProps.setProperty('quickCaptureNotes', sanitized);
     userProps.setProperty('quickCaptureLastSaved', new Date().toISOString());
     return { success: true, message: 'Notes saved' };
   } catch (e) {
@@ -418,7 +400,7 @@ function showQuickCaptureNotepad() {
     '    saveNotes();' +
     '  }' +
     '});' +
-    '</script>'
+    '</script></body></html>'
   )
   .setWidth(500)
   .setHeight(450);
@@ -430,107 +412,107 @@ function showQuickCaptureNotepad() {
  * @private
  */
 function getImportDialogHtml_() {
-  return '<!DOCTYPE html>' +
-    '<html><head><base target="_top">' + getMobileOptimizedHead() +
-    '<style>' +
-    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
-    'body { font-family: "Roboto", Arial, sans-serif; padding: 20px; background: #f5f5f5; }' +
-    '.container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }' +
-    'h2 { color: ' + SHEET_COLORS.DIALOG_ACCENT + '; margin-bottom: 15px; font-size: 18px; }' +
-    '.section { margin-bottom: 20px; }' +
-    '.section-title { font-weight: bold; color: #333; margin-bottom: 8px; font-size: 14px; }' +
-    'textarea { width: 100%; height: 200px; border: 2px solid #e0e0e0; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; resize: vertical; }' +
-    'textarea:focus { border-color: ' + SHEET_COLORS.DIALOG_ACCENT + '; outline: none; }' +
-    '.format-hint { background: #e8f0fe; padding: 12px; border-radius: 6px; font-size: 12px; color: #1967d2; margin-bottom: 15px; }' +
-    '.format-hint code { background: #fff; padding: 2px 6px; border-radius: 3px; }' +
-    '.preview { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; max-height: 150px; overflow-y: auto; font-size: 12px; display: none; }' +
-    '.preview-row { padding: 4px 0; border-bottom: 1px solid #eee; }' +
-    '.preview-row:last-child { border-bottom: none; }' +
-    '.btn-row { display: flex; gap: 10px; margin-top: 15px; }' +
-    'button { padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; }' +
-    '.btn-primary { background: ' + SHEET_COLORS.DIALOG_ACCENT + '; color: white; }' +
-    '.btn-primary:hover { background: ' + SHEET_COLORS.DIALOG_ACCENT_DARK + '; }' +
-    '.btn-secondary { background: #f1f3f4; color: #5f6368; }' +
-    '.btn-secondary:hover { background: #e8eaed; }' +
-    '.status { padding: 10px; border-radius: 6px; margin-top: 10px; display: none; }' +
-    '.status.success { background: #e6f4ea; color: #137333; }' +
-    '.status.error { background: #fce8e6; color: #c5221f; }' +
-    '.count { font-weight: bold; color: ' + SHEET_COLORS.DIALOG_ACCENT + '; }' +
-    '</style></head><body>' +
-    '<div class="container">' +
-    '<h2>📥 Import Members from CSV</h2>' +
-    '<div class="format-hint">' +
-    '<strong>Required columns:</strong> First Name, Last Name<br>' +
-    '<strong>Optional:</strong> Email, Phone, Job Title, Unit, Work Location, Supervisor, Is Steward, Dues Paying<br>' +
-    '<strong>Format:</strong> Paste CSV with headers in first row. Use comma separator.' +
-    '</div>' +
-    '<div class="section">' +
-    '<div class="section-title">Paste CSV Data:</div>' +
-    '<textarea id="csvData" placeholder="First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Clerk,Admin&#10;Jane,Smith,jane@example.com,555-5678,Manager,Operations"></textarea>' +
-    '</div>' +
-    '<div class="section">' +
-    '<div class="section-title">Preview (<span id="rowCount" class="count">0</span> rows):</div>' +
-    '<div id="preview" class="preview"></div>' +
-    '</div>' +
-    '<div id="status" class="status"></div>' +
-    '<div class="btn-row">' +
-    '<button class="btn-secondary" onclick="previewData()">👁️ Preview</button>' +
-    '<button class="btn-primary" onclick="importData()">📥 Import</button>' +
-    '<button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
-    '</div></div>' +
-    '<script>' +
-    getClientSideEscapeHtml() +
-    'function previewData() {' +
-    '  var csv = document.getElementById("csvData").value.trim();' +
-    '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
-    '  var rows = parseCSV(csv);' +
-    '  if (rows.length < 2) { showStatus("Need at least a header row and one data row", "error"); return; }' +
-    '  document.getElementById("rowCount").textContent = rows.length - 1;' +
-    '  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].map(function(c){return escapeHtml(c)}).join(" | ") + "</strong></div>";' +
-    '  for (var i = 1; i < Math.min(rows.length, 6); i++) {' +
-    '    previewHtml += "<div class=\\"preview-row\\">" + rows[i].map(function(c){return escapeHtml(c)}).join(" | ") + "</div>";' +
-    '  }' +
-    '  if (rows.length > 6) previewHtml += "<div class=\\"preview-row\\">... and " + (rows.length - 6) + " more rows</div>";' +
-    '  document.getElementById("preview").innerHTML = previewHtml;' +
-    '  document.getElementById("preview").style.display = "block";' +
-    '  showStatus("Preview ready. Click Import to add " + (rows.length - 1) + " members.", "success");' +
-    '}' +
-    'function parseCSV(csv) {' +
-    '  var lines = csv.split(/\\r?\\n/);' +
-    '  return lines.filter(function(line) { return line.trim(); }).map(function(line) {' +
-    '    var result = []; var cell = ""; var inQuotes = false;' +
-    '    for (var i = 0; i < line.length; i++) {' +
-    '      var c = line[i];' +
-    '      if (c === "\\"") { if (inQuotes && i + 1 < line.length && line[i + 1] === "\\"") { cell += "\\""; i++; } else { inQuotes = !inQuotes; } }' +
-    '      else if (c === "," && !inQuotes) { result.push(cell.trim()); cell = ""; }' +
-    '      else { cell += c; }' +
-    '    }' +
-    '    result.push(cell.trim());' +
-    '    return result;' +
-    '  });' +
-    '}' +
-    'function importData() {' +
-    '  var csv = document.getElementById("csvData").value.trim();' +
-    '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
-    '  showStatus("Importing...", "success");' +
-    '  google.script.run.withSuccessHandler(function(result) {' +
-    '    if (result.success) {' +
-    '      showStatus("✅ Successfully imported " + result.count + " members!", "success");' +
-    '      setTimeout(function() { google.script.host.close(); }, 2000);' +
-    '    } else {' +
-    '      showStatus("❌ " + escapeHtml(result.error), "error");' +
-    '    }' +
-    '  }).withFailureHandler(function(err) {' +
-    '    showStatus("❌ Error: " + escapeHtml(err.message), "error");' +
-    '  }).processMemberImport(csv);' +
-    '}' +
-    'function showStatus(msg, type) {' +
-    '  var el = document.getElementById("status");' +
-    '  el.textContent = msg;' +
-    '  el.className = "status " + type;' +
-    '  el.style.display = "block";' +
-    '}' +
-    '</script></body></html>';
+  return `<!DOCTYPE html>
+<html><head><base target="_top">${getMobileOptimizedHead()}
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Roboto", Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+.container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+h2 { color: ${SHEET_COLORS.DIALOG_ACCENT}; margin-bottom: 15px; font-size: 18px; }
+.section { margin-bottom: 20px; }
+.section-title { font-weight: bold; color: #333; margin-bottom: 8px; font-size: 14px; }
+textarea { width: 100%; height: 200px; border: 2px solid #e0e0e0; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; resize: vertical; }
+textarea:focus { border-color: ${SHEET_COLORS.DIALOG_ACCENT}; outline: none; }
+.format-hint { background: #e8f0fe; padding: 12px; border-radius: 6px; font-size: 12px; color: #1967d2; margin-bottom: 15px; }
+.format-hint code { background: #fff; padding: 2px 6px; border-radius: 3px; }
+.preview { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; max-height: 150px; overflow-y: auto; font-size: 12px; display: none; }
+.preview-row { padding: 4px 0; border-bottom: 1px solid #eee; }
+.preview-row:last-child { border-bottom: none; }
+.btn-row { display: flex; gap: 10px; margin-top: 15px; }
+button { padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; }
+.btn-primary { background: ${SHEET_COLORS.DIALOG_ACCENT}; color: white; }
+.btn-primary:hover { background: ${SHEET_COLORS.DIALOG_ACCENT_DARK}; }
+.btn-secondary { background: #f1f3f4; color: #5f6368; }
+.btn-secondary:hover { background: #e8eaed; }
+.status { padding: 10px; border-radius: 6px; margin-top: 10px; display: none; }
+.status.success { background: #e6f4ea; color: #137333; }
+.status.error { background: #fce8e6; color: #c5221f; }
+.count { font-weight: bold; color: ${SHEET_COLORS.DIALOG_ACCENT}; }
+</style></head><body>
+<div class="container">
+<h2>📥 Import Members from CSV</h2>
+<div class="format-hint">
+<strong>Required columns:</strong> First Name, Last Name<br>
+<strong>Optional:</strong> Email, Phone, Job Title, Unit, Work Location, Supervisor, Is Steward, Dues Paying<br>
+<strong>Format:</strong> Paste CSV with headers in first row. Use comma separator.
+</div>
+<div class="section">
+<div class="section-title">Paste CSV Data:</div>
+<textarea id="csvData" placeholder="First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Clerk,Admin&#10;Jane,Smith,jane@example.com,555-5678,Manager,Operations"></textarea>
+</div>
+<div class="section">
+<div class="section-title">Preview (<span id="rowCount" class="count">0</span> rows):</div>
+<div id="preview" class="preview"></div>
+</div>
+<div id="status" class="status"></div>
+<div class="btn-row">
+<button class="btn-secondary" onclick="previewData()">👁️ Preview</button>
+<button class="btn-primary" onclick="importData()">📥 Import</button>
+<button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+</div></div>
+<script>
+ ${getClientSideEscapeHtml()}
+ function previewData() {
+  var csv = document.getElementById("csvData").value.trim();
+  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }
+  var rows = parseCSV(csv);
+  if (rows.length < 2) { showStatus("Need at least a header row and one data row", "error"); return; }
+  document.getElementById("rowCount").textContent = rows.length - 1;
+  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].map(function(c){return escapeHtml(c)}).join(" | ") + "</strong></div>";
+  for (var i = 1; i < Math.min(rows.length, 6); i++) {
+    previewHtml += "<div class=\\"preview-row\\">" + rows[i].map(function(c){return escapeHtml(c)}).join(" | ") + "</div>";
+  }
+  if (rows.length > 6) previewHtml += "<div class=\\"preview-row\\">... and " + (rows.length - 6) + " more rows</div>";
+  document.getElementById("preview").innerHTML = previewHtml;
+  document.getElementById("preview").style.display = "block";
+  showStatus("Preview ready. Click Import to add " + (rows.length - 1) + " members.", "success");
+ }
+ function parseCSV(csv) {
+  var lines = csv.split(/\\r?\\n/);
+  return lines.filter(function(line) { return line.trim(); }).map(function(line) {
+    var result = []; var cell = ""; var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === "\\"") { if (inQuotes && i + 1 < line.length && line[i + 1] === "\\"") { cell += "\\""; i++; } else { inQuotes = !inQuotes; } }
+      else if (c === "," && !inQuotes) { result.push(cell.trim()); cell = ""; }
+      else { cell += c; }
+    }
+    result.push(cell.trim());
+    return result;
+  });
+ }
+ function importData() {
+  var csv = document.getElementById("csvData").value.trim();
+  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }
+  showStatus("Importing...", "success");
+  google.script.run.withSuccessHandler(function(result) {
+    if (result.success) {
+      showStatus("✅ Successfully imported " + result.count + " members!", "success");
+      setTimeout(function() { google.script.host.close(); }, 2000);
+    } else {
+      showStatus("❌ " + escapeHtml(result.error), "error");
+    }
+  }).withFailureHandler(function(err) {
+    showStatus("❌ Error: " + escapeHtml(err.message), "error");
+  }).processMemberImport(csv);
+ }
+ function showStatus(msg, type) {
+  var el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "status " + type;
+  el.style.display = "block";
+ }
+</script></body></html>`;
 }
 
 /**
@@ -563,12 +545,14 @@ function processMemberImport(csvData) {
 
     // Process data rows
     var importedCount = 0;
+    var allRows = [];
+    var numCols = sheet.getLastColumn();
+    var _eff = typeof escapeForFormula === 'function' ? escapeForFormula : function(v) { return v; };
     for (var i = 1; i < lines.length; i++) {
       var values = parseCSVLine_(lines[i]);
       if (!values || values.length === 0) continue;
 
       // Build row data — escapeForFormula on all string inputs to prevent formula injection
-      var _eff = typeof escapeForFormula === 'function' ? escapeForFormula : function(v) { return v; };
       var rowData = [];
       rowData[MEMBER_COLS.FIRST_NAME - 1] = _eff(values[columnMap.firstName] || '');
       rowData[MEMBER_COLS.LAST_NAME - 1] = _eff(values[columnMap.lastName] || '');
@@ -582,13 +566,17 @@ function processMemberImport(csvData) {
       rowData[MEMBER_COLS.DUES_PAYING - 1] = columnMap.duesPaying !== undefined ? (values[columnMap.duesPaying] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'Yes';
 
       // Fill empty cells
-      while (rowData.length < sheet.getLastColumn()) {
+      while (rowData.length < numCols) {
         rowData.push('');
       }
 
-      // Append row
-      sheet.appendRow(rowData);
+      allRows.push(rowData);
       importedCount++;
+    }
+
+    // Batch append all rows at once
+    if (allRows.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, allRows.length, allRows[0].length).setValues(allRows);
     }
 
     // Generate Member IDs for imported rows
@@ -605,6 +593,9 @@ function processMemberImport(csvData) {
 
 /**
  * Parses a single CSV line handling quoted values
+ * KNOWN LIMITATION: This CSV parser does not handle newlines within quoted fields.
+ * Quoted fields containing \n will be split across lines, producing corrupt data.
+ * For files with newlines in fields, use a pre-processor or convert to XLSX format.
  * @private
  */
 function parseCSVLine_(line) {
@@ -682,7 +673,7 @@ function showBreakReminder() {
 function showComfortViewControlPanel() {
   var settings = getComfortViewSettings();
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom:3px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.toggleZebraStripes();setTimeout(function(){location.reload()},1000)">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.toggleGridlinesComfortView();setTimeout(function(){location.reload()},1000)">' + (settings.hideGridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom:3px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(){location.reload()}).toggleZebraStripes()">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(){location.reload()}).toggleGridlinesComfortView()">' + (settings.hideGridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, '♿ Comfort View Panel');
 }
@@ -742,164 +733,117 @@ function showSmartDashboard() {
 function getSmartDashboardHtml() {
   var stats = getMobileDashboardStats();
 
-  return '<!DOCTYPE html>' +
-    '<html><head>' +
-    '<base target="_top">' +
-    getMobileOptimizedHead() +
-    '<style>' +
-    // CSS Reset and base styles
-    '*{box-sizing:border-box;margin:0;padding:0}' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh}' +
-
-    // Responsive container
-    '.container{padding:15px;max-width:1200px;margin:0 auto}' +
-
-    // Header - responsive
-    '.header{background:linear-gradient(135deg,' + SHEET_COLORS.DIALOG_ACCENT + ',' + SHEET_COLORS.DIALOG_ACCENT_DARK + ');color:white;padding:20px;text-align:center}' +
-    '.header h1{font-size:clamp(18px,5vw,28px);margin-bottom:5px}' +
-    '.header .subtitle{font-size:clamp(12px,3vw,14px);opacity:0.9}' +
-    '.device-badge{display:inline-block;padding:4px 12px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:11px;margin-top:8px}' +
-
-    // Stats grid - responsive
-    '.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}' +
-    '.stat-card{background:white;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center;transition:transform 0.2s}' +
-    '.stat-card:hover{transform:translateY(-2px)}' +
-    '.stat-value{font-size:clamp(24px,6vw,36px);font-weight:bold;color:' + SHEET_COLORS.DIALOG_ACCENT + '}' +
-    '.stat-label{font-size:clamp(11px,2.5vw,13px);color:#666;text-transform:uppercase;margin-top:5px}' +
-
-    // Section titles
-    '.section-title{font-size:clamp(14px,3.5vw,18px);font-weight:600;color:#333;margin:20px 0 12px;padding-left:5px}' +
-
-    // Action buttons - responsive grid
-    '.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}' +
-    '.action-btn{background:white;border:none;padding:16px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);' +
-    'width:100%;text-align:left;display:flex;align-items:center;gap:15px;font-size:15px;cursor:pointer;' +
-    'min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + ';transition:all 0.2s}' +
-    '.action-btn:hover{background:#e8f0fe;transform:translateX(4px)}' +
-    '.action-btn:active{transform:scale(0.98)}' +
-    '.action-icon{font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#e8f0fe;border-radius:10px;flex-shrink:0}' +
-    '.action-label{font-weight:500}' +
-    '.action-desc{font-size:12px;color:#666;margin-top:2px}' +
-
-    // FAB (Floating Action Button)
-    '.fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;' +
-    'border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:1000}' +
-    '.fab:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}' +
-
-    // Desktop-only elements
-    '.desktop-only{display:none}' +
-
-    // Mobile-specific adjustments
-    '@media (max-width:' + MOBILE_CONFIG.MOBILE_BREAKPOINT + 'px){' +
-    '  .stats{grid-template-columns:repeat(2,1fr)}' +
-    '  .actions{grid-template-columns:1fr}' +
-    '  .container{padding:10px}' +
-    '  .header{padding:15px}' +
-    '}' +
-
-    // Tablet adjustments
-    '@media (min-width:' + MOBILE_CONFIG.MOBILE_BREAKPOINT + 'px) and (max-width:' + MOBILE_CONFIG.TABLET_BREAKPOINT + 'px){' +
-    '  .stats{grid-template-columns:repeat(2,1fr)}' +
-    '  .actions{grid-template-columns:repeat(2,1fr)}' +
-    '}' +
-
-    // Desktop view
-    '@media (min-width:' + MOBILE_CONFIG.TABLET_BREAKPOINT + 'px){' +
-    '  .stats{grid-template-columns:repeat(4,1fr)}' +
-    '  .actions{grid-template-columns:repeat(2,1fr)}' +
-    '  .desktop-only{display:block}' +
-    '}' +
-
-    '</style>' +
-    '</head><body>' +
-
-    // Header with dynamic device badge
-    '<div class="header">' +
-    '<h1>📋 Dashboard Pend</h1>' +
-    '<div class="subtitle">Pending Actions & Quick Overview</div>' +
-    '<div class="device-badge" id="deviceBadge">Detecting device...</div>' +
-    '</div>' +
-
-    '<div class="container">' +
-
-    // Stats section
-    '<div class="stats">' +
-    '<div class="stat-card"><div class="stat-value">' + stats.totalGrievances + '</div><div class="stat-label">Total</div></div>' +
-    '<div class="stat-card"><div class="stat-value">' + stats.activeGrievances + '</div><div class="stat-label">Active</div></div>' +
-    '<div class="stat-card"><div class="stat-value">' + stats.pendingGrievances + '</div><div class="stat-label">Pending</div></div>' +
-    '<div class="stat-card"><div class="stat-value">' + stats.overdueGrievances + '</div><div class="stat-label">Overdue</div></div>' +
-    '</div>' +
-
-    // Quick Actions
-    '<div class="section-title">⚡ Quick Actions</div>' +
-    '<div class="actions">' +
-
-    '<button class="action-btn" onclick="google.script.run.showMobileGrievanceList()">' +
-    '<div class="action-icon">📋</div>' +
-    '<div><div class="action-label">View Grievances</div><div class="action-desc">Browse and filter all grievances</div></div>' +
-    '</button>' +
-
-    '<button class="action-btn" onclick="google.script.run.showMobileUnifiedSearch()">' +
-    '<div class="action-icon">🔍</div>' +
-    '<div><div class="action-label">Search</div><div class="action-desc">Find grievances or members</div></div>' +
-    '</button>' +
-
-    '<button class="action-btn" onclick="google.script.run.showMyAssignedGrievances()">' +
-    '<div class="action-icon">👤</div>' +
-    '<div><div class="action-label">My Cases</div><div class="action-desc">View your assigned grievances</div></div>' +
-    '</button>' +
-
-    '<button class="action-btn" onclick="google.script.run.showQuickActionsMenu()">' +
-    '<div class="action-icon">⚡</div>' +
-    '<div><div class="action-label">Row Actions</div><div class="action-desc">Quick actions for selected row</div></div>' +
-    '</button>' +
-
-    '</div>' +
-
-    // Desktop-only additional info
-    '<div class="desktop-only">' +
-    '<div class="section-title">ℹ️ Dashboard Info</div>' +
-    '<p style="color:#666;font-size:14px;padding:15px;background:white;border-radius:8px;">' +
-    'This responsive dashboard automatically adjusts to your screen size. ' +
-    'On mobile devices, you\'ll see a touch-optimized interface with larger buttons. ' +
-    'Use the menu items above to manage grievances and member information.' +
-    '</p>' +
-    '</div>' +
-
-    '</div>' +
-
-    // FAB for refresh
-    '<button class="fab" onclick="location.reload()" title="Refresh">🔄</button>' +
-
-    // Device detection script
-    '<script>' +
-    'function detectDevice(){' +
-    '  var w=window.innerWidth;' +
-    '  var badge=document.getElementById("deviceBadge");' +
-    '  var isTouchDevice="ontouchstart" in window||navigator.maxTouchPoints>0;' +
-    '  var userAgent=navigator.userAgent.toLowerCase();' +
-    '  var isMobileUA=/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);' +
-    '  ' +
-    '  if(w<' + MOBILE_CONFIG.MOBILE_BREAKPOINT + '||isMobileUA){' +
-    '    badge.textContent="📱 Mobile View";' +
-    '    badge.style.background="rgba(76,175,80,0.3)";' +
-    '  }else if(w<' + MOBILE_CONFIG.TABLET_BREAKPOINT + '){' +
-    '    badge.textContent="📱 Tablet View";' +
-    '    badge.style.background="rgba(255,152,0,0.3)";' +
-    '  }else{' +
-    '    badge.textContent="🖥️ Desktop View";' +
-    '    badge.style.background="rgba(33,150,243,0.3)";' +
-    '  }' +
-    '  ' +
-    '  if(isTouchDevice){' +
-    '    document.body.classList.add("touch-device");' +
-    '  }' +
-    '}' +
-    'detectDevice();' +
-    'window.addEventListener("resize",detectDevice);' +
-    '</script>' +
-
-    '</body></html>';
+  return `<!DOCTYPE html>
+<html><head>
+<base target="_top">
+${getMobileOptimizedHead()}
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh}
+.container{padding:15px;max-width:1200px;margin:0 auto}
+.header{background:linear-gradient(135deg,${SHEET_COLORS.DIALOG_ACCENT},${SHEET_COLORS.DIALOG_ACCENT_DARK});color:white;padding:20px;text-align:center}
+.header h1{font-size:clamp(18px,5vw,28px);margin-bottom:5px}
+.header .subtitle{font-size:clamp(12px,3vw,14px);opacity:0.9}
+.device-badge{display:inline-block;padding:4px 12px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:11px;margin-top:8px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:white;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center;transition:transform 0.2s}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-value{font-size:clamp(24px,6vw,36px);font-weight:bold;color:${SHEET_COLORS.DIALOG_ACCENT}}
+.stat-label{font-size:clamp(11px,2.5vw,13px);color:#666;text-transform:uppercase;margin-top:5px}
+.section-title{font-size:clamp(14px,3.5vw,18px);font-weight:600;color:#333;margin:20px 0 12px;padding-left:5px}
+.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.action-btn{background:white;border:none;padding:16px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);width:100%;text-align:left;display:flex;align-items:center;gap:15px;font-size:15px;cursor:pointer;min-height:${MOBILE_CONFIG.TOUCH_TARGET_SIZE};transition:all 0.2s}
+.action-btn:hover{background:#e8f0fe;transform:translateX(4px)}
+.action-btn:active{transform:scale(0.98)}
+.action-icon{font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#e8f0fe;border-radius:10px;flex-shrink:0}
+.action-label{font-weight:500}
+.action-desc{font-size:12px;color:#666;margin-top:2px}
+.fab{position:fixed;bottom:20px;right:20px;width:56px;height:56px;background:${SHEET_COLORS.DIALOG_ACCENT};color:white;border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:1000}
+.fab:hover{background:${SHEET_COLORS.DIALOG_ACCENT_DARK}}
+.desktop-only{display:none}
+@media (max-width:${MOBILE_CONFIG.MOBILE_BREAKPOINT}px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .actions{grid-template-columns:1fr}
+  .container{padding:10px}
+  .header{padding:15px}
+}
+@media (min-width:${MOBILE_CONFIG.MOBILE_BREAKPOINT}px) and (max-width:${MOBILE_CONFIG.TABLET_BREAKPOINT}px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .actions{grid-template-columns:repeat(2,1fr)}
+}
+@media (min-width:${MOBILE_CONFIG.TABLET_BREAKPOINT}px){
+  .stats{grid-template-columns:repeat(4,1fr)}
+  .actions{grid-template-columns:repeat(2,1fr)}
+  .desktop-only{display:block}
+}
+</style>
+</head><body>
+<div class="header">
+<h1>📋 Dashboard Pend</h1>
+<div class="subtitle">Pending Actions & Quick Overview</div>
+<div class="device-badge" id="deviceBadge">Detecting device...</div>
+</div>
+<div class="container">
+<div class="stats">
+<div class="stat-card"><div class="stat-value">${stats.totalGrievances}</div><div class="stat-label">Total</div></div>
+<div class="stat-card"><div class="stat-value">${stats.activeGrievances}</div><div class="stat-label">Active</div></div>
+<div class="stat-card"><div class="stat-value">${stats.pendingGrievances}</div><div class="stat-label">Pending</div></div>
+<div class="stat-card"><div class="stat-value">${stats.overdueGrievances}</div><div class="stat-label">Overdue</div></div>
+</div>
+<div class="section-title">⚡ Quick Actions</div>
+<div class="actions">
+<button class="action-btn" onclick="google.script.run.showMobileGrievanceList()">
+<div class="action-icon">📋</div>
+<div><div class="action-label">View Grievances</div><div class="action-desc">Browse and filter all grievances</div></div>
+</button>
+<button class="action-btn" onclick="google.script.run.showMobileUnifiedSearch()">
+<div class="action-icon">🔍</div>
+<div><div class="action-label">Search</div><div class="action-desc">Find grievances or members</div></div>
+</button>
+<button class="action-btn" onclick="google.script.run.showMyAssignedGrievances()">
+<div class="action-icon">👤</div>
+<div><div class="action-label">My Cases</div><div class="action-desc">View your assigned grievances</div></div>
+</button>
+<button class="action-btn" onclick="google.script.run.showQuickActionsMenu()">
+<div class="action-icon">⚡</div>
+<div><div class="action-label">Row Actions</div><div class="action-desc">Quick actions for selected row</div></div>
+</button>
+</div>
+<div class="desktop-only">
+<div class="section-title">ℹ️ Dashboard Info</div>
+<p style="color:#666;font-size:14px;padding:15px;background:white;border-radius:8px;">
+This responsive dashboard automatically adjusts to your screen size.
+On mobile devices, you'll see a touch-optimized interface with larger buttons.
+Use the menu items above to manage grievances and member information.
+</p>
+</div>
+</div>
+<button class="fab" onclick="location.reload()" title="Refresh">🔄</button>
+<script>
+ function detectDevice(){
+  var w=window.innerWidth;
+  var badge=document.getElementById("deviceBadge");
+  var isTouchDevice="ontouchstart" in window||navigator.maxTouchPoints>0;
+  var userAgent=navigator.userAgent.toLowerCase();
+  var isMobileUA=/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+  if(w<${MOBILE_CONFIG.MOBILE_BREAKPOINT}||isMobileUA){
+    badge.textContent="📱 Mobile View";
+    badge.style.background="rgba(76,175,80,0.3)";
+  }else if(w<${MOBILE_CONFIG.TABLET_BREAKPOINT}){
+    badge.textContent="📱 Tablet View";
+    badge.style.background="rgba(255,152,0,0.3)";
+  }else{
+    badge.textContent="🖥️ Desktop View";
+    badge.style.background="rgba(33,150,243,0.3)";
+  }
+  if(isTouchDevice){
+    document.body.classList.add("touch-device");
+  }
+ }
+ detectDevice();
+ window.addEventListener("resize",detectDevice);
+</script>
+</body></html>`;
 }
 
 /**

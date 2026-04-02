@@ -53,10 +53,11 @@ loadSources([
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
+  '21d_WebDashDataWrappers.gs',
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
-  // SOLIDBASE: 25_WorkloadService.gs excluded — feature not in SolidBase
+  // '25_WorkloadService.gs', — excluded from SolidBase
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
@@ -196,9 +197,8 @@ describe('A1: Build order integrity', () => {
     '11_CommandHub.gs', '12_Features.gs', '13_MemberSelfService.gs',
     '14_MeetingCheckIn.gs', '15_EventBus.gs',
     '17_CorrelationEngine.gs', '19_WebDashAuth.gs',
-    '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
+    '20_WebDashConfigReader.gs', '21_WebDashDataService.gs', '21d_WebDashDataWrappers.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
-    // SOLIDBASE: 25_WorkloadService.gs excluded — feature not in SolidBase
     '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_TrendAlertService.gs', '30_EngagementService.gs', '30_TestRunner.gs',
     '31_WebAppTests.gs', '32_AdminSettings.gs', '33_NewFeatureServices.gs', 'DevMenu.gs'
@@ -441,7 +441,7 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-    // SOLIDBASE: 25_WorkloadService.gs excluded — feature not in SolidBase
+    // '25_WorkloadService.gs', — excluded from SolidBase
   ];
 
   webAppFiles.forEach(file => {
@@ -611,6 +611,8 @@ describe('A9: UI tab routes have matching render functions', () => {
 describe('A10: Web app data writes use escapeForFormula where needed', () => {
   const dataServiceSrc = fs.readFileSync(
     path.resolve(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8'
+  ) + '\n' + fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21d_WebDashDataWrappers.gs'), 'utf8'
   );
 
   test('setValue() calls with user-supplied string fields use escapeForFormula', () => {
@@ -677,6 +679,8 @@ describe('A10: Web app data writes use escapeForFormula where needed', () => {
 describe('A11: Server-exposed functions have auth checks', () => {
   const dataServiceSrc = fs.readFileSync(
     path.resolve(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8'
+  ) + '\n' + fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21d_WebDashDataWrappers.gs'), 'utf8'
   );
   const qaSrc = fs.readFileSync(
     path.resolve(__dirname, '..', 'src', '26_QAForum.gs'), 'utf8'
@@ -702,7 +706,6 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetWorkloadSummaryStats',
     'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
     'dataGetGrievanceForSigning', 'dataSubmitGrievanceSignature', // sigToken auth, not session
-    'dataGetPomsReference', // SOLIDBASE: stub — returns [] without auth
   ];
 
   // Functions that are init/admin only (not called from client google.script.run)
@@ -768,8 +771,7 @@ describe('A11b: Client-callable HTML endpoints have error handling', () => {
   // HTML-serving endpoints — serve static content, auth enforced by doGet().
   // No per-function auth check: Session.getActiveUser().getEmail() returns empty
   // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
-  // SOLIDBASE: getPOMSReferenceHtml excluded — stub only, no try/catch needed
-  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml'];
+  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml', 'getPOMSReferenceHtml'];
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() has try/catch error handling`, () => {
@@ -983,7 +985,7 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
-    // SOLIDBASE: 25_WorkloadService.gs excluded — feature not in SolidBase
+    // '25_WorkloadService.gs', — excluded from SolidBase
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
@@ -1044,7 +1046,7 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-    // SOLIDBASE: 25_WorkloadService.gs excluded — feature not in SolidBase
+    // '25_WorkloadService.gs', — excluded from SolidBase
   ];
   const srcDir = path.resolve(__dirname, '..', 'src');
 
@@ -1094,6 +1096,8 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
 describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () => {
   const src = fs.readFileSync(
     path.resolve(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8'
+  ) + '\n' + fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21d_WebDashDataWrappers.gs'), 'utf8'
   );
   const lines = src.split('\n');
 

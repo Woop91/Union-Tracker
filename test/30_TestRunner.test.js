@@ -158,6 +158,8 @@ describe('this[...] usage in GAS test files', () => {
 describe('Endpoint existence tests cover all data* wrappers', () => {
   const dataSrc = fs.readFileSync(
     path.resolve(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8'
+  ) + '\n' + fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21d_WebDashDataWrappers.gs'), 'utf8'
   );
 
   test('all global data* functions are tested in endpoint existence checks', () => {

@@ -135,7 +135,7 @@ var Auth = (function () {
     } catch (cfgErr) {
       Logger.log('Auth.sendMagicLink: ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
       config = {
-        orgName: 'SolidBase',
+        orgName: 'SB',
         logoInitials: '',
         accentHue: 250,
         magicLinkExpiryMs: 7 * 24 * 60 * 60 * 1000,
@@ -169,60 +169,7 @@ var Auth = (function () {
     step = 'send';
     Logger.log('Auth.sendMagicLink STEP 4: attempting email send to ' + email);
 
-    // PRIMARY: GmailApp (uses gmail.send scope — authorized in web app deployment)
-    // FALLBACK: MailApp (uses script.send_mail scope — requires separate re-auth)
-    // Reason: gmail.send was in appsscript.json long before script.send_mail was added
-    // (v4.24.9). If the deployment wasn't re-authorized after v4.24.9, MailApp throws.
-    // GmailApp uses the pre-existing gmail.send scope and avoids that auth gap.
-    var sendError = null;
-
-    try {
-      GmailApp.sendEmail(email, subject, '', {
-        htmlBody: htmlBody,
-        name: config.orgName + ' Dashboard',
-        noReply: false,
-      });
-      Logger.log('Auth.sendMagicLink STEP 5: GmailApp send succeeded');
-      return { success: true, message: 'Sign-in link sent to ' + email };
-    } catch (gmailErr) {
-      Logger.log('Auth.sendMagicLink GmailApp FAILED: ' + gmailErr.message + ' — trying MailApp fallback');
-      sendError = gmailErr;
-    }
-
-    // Fallback: MailApp (works if script.send_mail scope is authorized in deployment)
-    try {
-      // Quota guard — MailApp has a daily limit
-      var remaining = 0;
-      try { remaining = MailApp.getRemainingDailyQuota(); } catch (_q) { remaining = 1; }
-      if (remaining <= 0) {
-        Logger.log('Auth.sendMagicLink: MailApp quota exhausted');
-        return { success: false, message: 'Email quota reached for today. Please use Google Sign-In or try again tomorrow.' };
-      }
-
-      MailApp.sendEmail({
-        to: email,
-        subject: subject,
-        htmlBody: htmlBody,
-        noReply: true,
-      });
-      Logger.log('Auth.sendMagicLink STEP 5: MailApp fallback send succeeded');
-      return { success: true, message: 'Sign-in link sent to ' + email };
-    } catch (mailErr) {
-      Logger.log('Auth.sendMagicLink BOTH senders FAILED. GmailApp: ' + sendError.message + ' | MailApp: ' + mailErr.message);
-
-      var msg = 'Failed to send sign-in link. ';
-      var combinedMsg = (sendError.message || '') + ' ' + (mailErr.message || '');
-      if (combinedMsg.indexOf('quota') >= 0) {
-        msg += 'Email quota exhausted. Please use Google Sign-In.';
-      } else if (combinedMsg.indexOf('authorization') >= 0 || combinedMsg.indexOf('Permission') >= 0 || combinedMsg.indexOf('auth') >= 0) {
-        msg += 'Email authorization error — the web app may need to be re-deployed. Please use Google Sign-In.';
-      } else if (combinedMsg.indexOf('invalid') >= 0) {
-        msg += 'The email address may be invalid. Please check and try again.';
-      } else {
-        msg += 'Please try again or use Google Sign-In.';
-      }
-      return { success: false, message: msg };
-    }
+    return _sendMagicLinkEmail(email, subject, htmlBody, config.orgName);
     } catch (outerErr) {
       Logger.log('Auth.sendMagicLink OUTER ERROR at step [' + step + ']: ' + outerErr.message + '\n' + (outerErr.stack || ''));
 
@@ -250,7 +197,7 @@ var Auth = (function () {
    * Called after successful auth if remember=1.
    * @param {string} email
    * @param {string} [authMethod] - Original auth method ('sso', 'magic', 'pin'). Stored in session for access-level decisions.
-   * @returns {string} Session token
+   * @returns {string|{error: string, message: string}} Session token string on success, or error object on failure (e.g. PropertiesService write failure)
    */
   function createSessionToken(email, authMethod) {
     // Auto-evict expired tokens if approaching quota
@@ -314,7 +261,14 @@ var Auth = (function () {
   function invalidateSession(token) {
     if (!token) return;
     var props = PropertiesService.getScriptProperties();
-    props.deleteProperty(SESSION_PREFIX + token);
+    var key = SESSION_PREFIX + token;
+    props.deleteProperty(key);
+
+    // Verify deletion — a surviving session token is a security risk
+    if (props.getProperty(key) !== null) {
+      Logger.log('SECURITY WARNING: session token ' + key.substring(0, 12) + '... was not deleted — forcing overwrite');
+      try { props.setProperty(key, '{"invalidated":true}'); } catch (_) {}
+    }
   }
 
   /**
@@ -363,6 +317,75 @@ var Auth = (function () {
   // ═══════════════════════════════════════
   // PRIVATE METHODS
   // ═══════════════════════════════════════
+
+  /**
+   * Sends a magic link email using GmailApp (primary) with MailApp fallback.
+   * Extracted from sendMagicLink for clarity.
+   *
+   * PRIMARY: GmailApp (uses gmail.send scope — authorized in web app deployment)
+   * FALLBACK: MailApp (uses script.send_mail scope — requires separate re-auth)
+   * Reason: gmail.send was in appsscript.json long before script.send_mail was added
+   * (v4.24.9). If the deployment wasn't re-authorized after v4.24.9, MailApp throws.
+   * GmailApp uses the pre-existing gmail.send scope and avoids that auth gap.
+   *
+   * @param {string} email - Recipient email address
+   * @param {string} subject - Email subject line
+   * @param {string} htmlBody - HTML email body
+   * @param {string} orgName - Organization name for sender display
+   * @returns {Object} { success: boolean, message: string }
+   * @private
+   */
+  function _sendMagicLinkEmail(email, subject, htmlBody, orgName) {
+    var sendError = null;
+
+    try {
+      GmailApp.sendEmail(email, subject, '', {
+        htmlBody: htmlBody,
+        name: (orgName || 'Dashboard') + ' Dashboard',
+        noReply: false,
+      });
+      Logger.log('Auth._sendMagicLinkEmail: GmailApp send succeeded');
+      return { success: true, message: 'Sign-in link sent to ' + email };
+    } catch (gmailErr) {
+      Logger.log('Auth._sendMagicLinkEmail GmailApp FAILED: ' + gmailErr.message + ' — trying MailApp fallback');
+      sendError = gmailErr;
+    }
+
+    // Fallback: MailApp (works if script.send_mail scope is authorized in deployment)
+    try {
+      // Quota guard — MailApp has a daily limit
+      var remaining = 0;
+      try { remaining = MailApp.getRemainingDailyQuota(); } catch (_q) { remaining = 1; }
+      if (remaining <= 0) {
+        Logger.log('Auth._sendMagicLinkEmail: MailApp quota exhausted');
+        return { success: false, message: 'Email quota reached for today. Please use Google Sign-In or try again tomorrow.' };
+      }
+
+      MailApp.sendEmail({
+        to: email,
+        subject: subject,
+        htmlBody: htmlBody,
+        noReply: true,
+      });
+      Logger.log('Auth._sendMagicLinkEmail: MailApp fallback send succeeded');
+      return { success: true, message: 'Sign-in link sent to ' + email };
+    } catch (mailErr) {
+      Logger.log('Auth._sendMagicLinkEmail BOTH senders FAILED. GmailApp: ' + sendError.message + ' | MailApp: ' + mailErr.message);
+
+      var msg = 'Failed to send sign-in link. ';
+      var combinedMsg = (sendError.message || '') + ' ' + (mailErr.message || '');
+      if (combinedMsg.indexOf('quota') >= 0) {
+        msg += 'Email quota exhausted. Please use Google Sign-In.';
+      } else if (combinedMsg.indexOf('authorization') >= 0 || combinedMsg.indexOf('Permission') >= 0 || combinedMsg.indexOf('auth') >= 0) {
+        msg += 'Email authorization error — the web app may need to be re-deployed. Please use Google Sign-In.';
+      } else if (combinedMsg.indexOf('invalid') >= 0) {
+        msg += 'The email address may be invalid. Please check and try again.';
+      } else {
+        msg += 'Please try again or use Google Sign-In.';
+      }
+      return { success: false, message: msg };
+    }
+  }
 
   function _generateMagicToken(email, config) {
     config = config || ConfigReader.getConfig();
