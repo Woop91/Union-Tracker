@@ -208,12 +208,12 @@ function assignMemberPIN(memberId, options) {
   var memberPhone = null;
 
   for (var i = 1; i < data.length; i++) {
-    var rowId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowId === memberId) {
       memberRow = i + 1;
-      memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
-      memberName = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
-      memberPhone = String(data[i][MEMBER_COLS.PHONE - 1] || '');
+      memberEmail = col_(data[i], MEMBER_COLS.EMAIL);
+      memberName = ((col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || '')).trim();
+      memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
       break;
     }
   }
@@ -257,7 +257,7 @@ function assignMemberPIN(memberId, options) {
       });
       emailSent = true;
     } catch (emailError) {
-      Logger.log('Could not send PIN email to member: ' + emailError.message);
+      log_('Could not send PIN email to member', emailError.message);
     }
   }
 
@@ -310,11 +310,11 @@ function requestPINReset(memberId) {
   var memberName = null;
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
-      memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
-      memberName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '');
+      memberEmail = col_(data[i], MEMBER_COLS.EMAIL);
+      memberName = (col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || '');
       break;
     }
   }
@@ -374,7 +374,7 @@ function requestPINReset(memberId) {
     }
 
   } catch (e) {
-    Logger.log('Failed to send PIN reset email: ' + e.message);
+    log_('Failed to send PIN reset email', e.message);
     if (typeof secureLog === 'function') {
       secureLog('PINResetError', 'Failed to send reset email', { memberId: memberId, error: e.message });
     }
@@ -451,7 +451,7 @@ function completePINReset(memberId, token, newPin) {
   var memberRow = null;
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
       break;
@@ -609,10 +609,10 @@ function authenticateMember(memberId, pin) {
   var storedHash = '';
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1; // 1-indexed row
-      storedHash = String(data[i][MEMBER_PIN_COLS.PIN_HASH - 1] || '');
+      storedHash = String(col_(data[i], MEMBER_PIN_COLS.PIN_HASH) || '');
       break;
     }
   }
@@ -772,11 +772,11 @@ function generateMemberPINForSteward(memberId) {
   var memberPhone = '';
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
-      memberName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '');
-      memberPhone = String(data[i][MEMBER_COLS.PHONE - 1] || '');
+      memberName = (col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || '');
+      memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
       break;
     }
   }
@@ -1025,10 +1025,10 @@ function showBulkGeneratePINDialog() {
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
-    var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
-    var memberName = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
-                     (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
-    var memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
+    var memberId = col_(data[i], MEMBER_COLS.MEMBER_ID);
+    var memberName = ((col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' +
+                     (col_(data[i], MEMBER_COLS.LAST_NAME) || '')).trim();
+    var memberEmail = col_(data[i], MEMBER_COLS.EMAIL);
     var existingPin = data[i][PIN_CONFIG.PIN_COLUMN - 1];
 
     if (!memberId) continue;
@@ -1102,8 +1102,7 @@ function showBulkGeneratePINDialog() {
   }
 
   htmlContent += '</body></html>';
-  var htmlOutput = HtmlService.createHtmlOutput(htmlContent).setWidth(500).setHeight(400);
-  ui.showModalDialog(htmlOutput, 'Bulk PIN Generation Results');
+  showDialog_(htmlContent, 'Bulk PIN Generation Results', 500, 400);
 }
 
 // ============================================================================
@@ -1132,24 +1131,24 @@ function getMemberProfileBySession(sessionToken) {
   var data = sheet.getDataRange().getValues();
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       return {
         success: true,
         profile: {
-          memberId: data[i][MEMBER_COLS.MEMBER_ID - 1] || '',
-          firstName: data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
-          lastName: data[i][MEMBER_COLS.LAST_NAME - 1] || '',
-          jobTitle: data[i][MEMBER_COLS.JOB_TITLE - 1] || '',
-          workLocation: data[i][MEMBER_COLS.WORK_LOCATION - 1] || '',
-          unit: data[i][MEMBER_COLS.UNIT - 1] || '',
-          email: data[i][MEMBER_COLS.EMAIL - 1] || '',
-          phone: data[i][MEMBER_COLS.PHONE - 1] || '',
-          preferredComm: data[i][MEMBER_COLS.PREFERRED_COMM - 1] || '',
-          bestTime: data[i][MEMBER_COLS.BEST_TIME - 1] || '',
-          state: data[i][MEMBER_COLS.STATE - 1] || '',
-          assignedSteward: data[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',
-          hasOpenGrievance: data[i][MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] || 'No'
+          memberId: col_(data[i], MEMBER_COLS.MEMBER_ID) || '',
+          firstName: col_(data[i], MEMBER_COLS.FIRST_NAME) || '',
+          lastName: col_(data[i], MEMBER_COLS.LAST_NAME) || '',
+          jobTitle: col_(data[i], MEMBER_COLS.JOB_TITLE) || '',
+          workLocation: col_(data[i], MEMBER_COLS.WORK_LOCATION) || '',
+          unit: col_(data[i], MEMBER_COLS.UNIT) || '',
+          email: col_(data[i], MEMBER_COLS.EMAIL) || '',
+          phone: col_(data[i], MEMBER_COLS.PHONE) || '',
+          preferredComm: col_(data[i], MEMBER_COLS.PREFERRED_COMM) || '',
+          bestTime: col_(data[i], MEMBER_COLS.BEST_TIME) || '',
+          state: col_(data[i], MEMBER_COLS.STATE) || '',
+          assignedSteward: col_(data[i], MEMBER_COLS.ASSIGNED_STEWARD) || '',
+          hasOpenGrievance: col_(data[i], MEMBER_COLS.HAS_OPEN_GRIEVANCE) || 'No'
         }
       };
     }
@@ -1193,7 +1192,7 @@ function updateMemberContact(sessionToken, updates) {
   var memberRow = -1;
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
       break;
@@ -1291,18 +1290,18 @@ function getMemberGrievances(sessionToken) {
   var grievances = [];
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][GRIEVANCE_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], GRIEVANCE_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       grievances.push({
-        grievanceId: data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '',
-        status: data[i][GRIEVANCE_COLS.STATUS - 1] || '',
-        currentStep: data[i][GRIEVANCE_COLS.CURRENT_STEP - 1] || '',
-        issueCategory: data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
-        incidentDate: formatDateMSS_(data[i][GRIEVANCE_COLS.INCIDENT_DATE - 1]),
-        filedDate: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_FILED - 1]),
-        steward: data[i][GRIEVANCE_COLS.STEWARD - 1] || '',
-        nextDeadline: formatDateMSS_(data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1]),
-        resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || ''
+        grievanceId: col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) || '',
+        status: col_(data[i], GRIEVANCE_COLS.STATUS) || '',
+        currentStep: col_(data[i], GRIEVANCE_COLS.CURRENT_STEP) || '',
+        issueCategory: col_(data[i], GRIEVANCE_COLS.ISSUE_CATEGORY) || '',
+        incidentDate: formatDateMSS_(col_(data[i], GRIEVANCE_COLS.INCIDENT_DATE)),
+        filedDate: formatDateMSS_(col_(data[i], GRIEVANCE_COLS.DATE_FILED)),
+        steward: col_(data[i], GRIEVANCE_COLS.STEWARD) || '',
+        nextDeadline: formatDateMSS_(col_(data[i], GRIEVANCE_COLS.NEXT_ACTION_DUE)),
+        resolution: col_(data[i], GRIEVANCE_COLS.RESOLUTION) || ''
       });
     }
   }
@@ -1333,7 +1332,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
     // Email-based lookup (SPA context) — verify caller authorization
     var email = String(sessionTokenOrEmail).trim().toLowerCase();
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { log_('_e', (_e.message || _e)); }
 
     // Verify caller authorization — if we can't identify the caller in
     // Execute-as-Me context, deny access (prevents unauthenticated lookups)
@@ -1380,19 +1379,19 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
   var history = [];
 
   for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(data[i][GRIEVANCE_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    var rowMemberId = String(col_(data[i], GRIEVANCE_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId !== memberId) continue;
 
-    var status = String(data[i][GRIEVANCE_COLS.STATUS - 1] || '').trim().toLowerCase();
+    var status = String(col_(data[i], GRIEVANCE_COLS.STATUS) || '').trim().toLowerCase();
     if (closedStatuses.indexOf(status) === -1) continue;
 
     history.push({
-      grievanceId: data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '',
-      issueCategory: data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
+      grievanceId: col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) || '',
+      issueCategory: col_(data[i], GRIEVANCE_COLS.ISSUE_CATEGORY) || '',
       status: status.charAt(0).toUpperCase() + status.slice(1),
-      outcome: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '',
-      dateFiled: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_FILED - 1]),
-      dateClosed: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_CLOSED - 1])
+      outcome: col_(data[i], GRIEVANCE_COLS.RESOLUTION) || '',
+      dateFiled: formatDateMSS_(col_(data[i], GRIEVANCE_COLS.DATE_FILED)),
+      dateClosed: formatDateMSS_(col_(data[i], GRIEVANCE_COLS.DATE_CLOSED))
     });
   }
 
@@ -1412,7 +1411,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
 function dataGetMemberGrievanceHistoryPortal(sessionToken) {
   var e = (typeof _resolveCallerEmail === 'function') ? _resolveCallerEmail(sessionToken) : '';
   if (!e) {
-    try { e = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+    try { e = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_err) { log_('_err', (_err.message || _err)); }
   }
   return e ? getMemberGrievanceHistory(e) : { success: false, history: [], error: 'Not authenticated.' };
 }
@@ -1509,8 +1508,8 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
     var memberId = null;
     var memberRow = -1;
     for (var mi = 1; mi < mData.length; mi++) {
-      if (String(mData[mi][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim() === e.toLowerCase().trim()) {
-        memberId = String(mData[mi][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+      if (String(col_(mData[mi], MEMBER_COLS.EMAIL) || '').toLowerCase().trim() === e.toLowerCase().trim()) {
+        memberId = String(col_(mData[mi], MEMBER_COLS.MEMBER_ID) || '').trim();
         memberRow = mi + 1;
         break;
       }

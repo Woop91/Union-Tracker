@@ -96,7 +96,7 @@ var WeeklyQuestions = (function () {
     try {
       var val = PropertiesService.getScriptProperties().getProperty('POLL_FREQUENCY');
       if (val === 'biweekly' || val === 'monthly') return val;
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
     return 'weekly';
   }
 
@@ -316,7 +316,7 @@ var WeeklyQuestions = (function () {
 
     // Role check — belt-and-suspenders (wrapper already calls _requireStewardAuth)
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_e) { log_('_e', (_e.message || _e)); }
     if (!callerEmail) return { success: false, message: 'Unable to verify identity.' };
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
@@ -408,7 +408,7 @@ var WeeklyQuestions = (function () {
   function selectRandomPoolQuestion() {
     var poolSheet = _getSheet(SHEETS.QUESTION_POOL);
     if (!poolSheet || poolSheet.getLastRow() <= 1) {
-      Logger.log('selectRandomPoolQuestion: pool is empty.');
+      log_('selectRandomPoolQuestion', 'pool is empty.');
       return { success: false, message: 'No pool questions.' };
     }
 
@@ -716,7 +716,7 @@ function wqGetPollData(sessionToken) {
     result.frequency = freq;
     return result;
   } catch (err) {
-    Logger.log('wqGetPollData error: ' + err.message + '\n' + (err.stack || ''));
+    log_('wqGetPollData error', err.message + '\n' + (err.stack || ''));
     return { frequency: freq, questions: [] };
   }
 }
@@ -769,7 +769,7 @@ function autoSelectCommunityPoll() {
       var jan4 = new Date(today.getFullYear(), 0, 4);
       var weekNum = Math.ceil(((today - jan4) / 86400000 + jan4.getDay() + 1) / 7);
       if (weekNum % 2 !== 0) {
-        Logger.log('autoSelectCommunityPoll: biweekly — odd week ' + weekNum + ', skipping draw.');
+        log_('autoSelectCommunityPoll', 'biweekly — odd week ' + weekNum + ', skipping draw.');
         return;
       }
     }
@@ -777,7 +777,7 @@ function autoSelectCommunityPoll() {
     // Monthly: only draw on the 1st of the month
     if (freq === 'monthly') {
       if (today.getDate() !== 1) {
-        Logger.log('autoSelectCommunityPoll: monthly — not the 1st, skipping draw.');
+        log_('autoSelectCommunityPoll', 'monthly — not the 1st, skipping draw.');
         return;
       }
     }
@@ -813,7 +813,7 @@ function autoSelectCommunityPoll() {
           var src    = String(rows[i][qc.SOURCE]);
           var active = String(rows[i][qc.ACTIVE]).toLowerCase();
           if (String(wk) === thisPeriod && src === 'community' && (active === 'true' || active === 'yes' || active === '1')) {
-            Logger.log('autoSelectCommunityPoll: community poll already active for period ' + thisPeriod + ' — skipping draw.');
+            log_('autoSelectCommunityPoll', 'community poll already active for period ' + thisPeriod + ' — skipping draw.');
             return;
           }
         }
@@ -821,9 +821,9 @@ function autoSelectCommunityPoll() {
     }
 
     var result = WeeklyQuestions.selectRandomPoolQuestion();
-    Logger.log('autoSelectCommunityPoll: ' + JSON.stringify(result));
+    log_('autoSelectCommunityPoll', JSON.stringify(result));
   } catch (e) {
-    Logger.log('autoSelectCommunityPoll error: ' + e.message);
+    log_('autoSelectCommunityPoll error', e.message);
   }
 }
 
@@ -843,9 +843,9 @@ function setupCommunityPollTrigger() {
     .onWeekDay(ScriptApp.WeekDay.MONDAY)
     .atHour(7)
     .create();
-  Logger.log('setupCommunityPollTrigger: Community poll draw trigger installed (Mondays at 7 AM).');
+  log_('setupCommunityPollTrigger', 'Community poll draw trigger installed (Mondays at 7 AM).');
   try {
     SpreadsheetApp.getActiveSpreadsheet()
       .toast('Community poll draw trigger installed — fires every Monday at 7 AM.', 'Polls', 5);
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
 }

@@ -156,7 +156,7 @@ var EventBus = (function() {
           result.handled++;
         } catch (err) {
           result.errors.push('Wildcard[' + sub.id + ']: ' + err.message);
-          Logger.log('EventBus wildcard error: ' + err.message);
+          log_('EventBus wildcard error', err.message);
         }
       });
 
@@ -170,7 +170,7 @@ var EventBus = (function() {
           result.handled++;
         } catch (err) {
           result.errors.push(eventName + '[' + subs[i].id + ']: ' + err.message);
-          Logger.log('EventBus error in ' + eventName + ': ' + err.message);
+          log_('emit', 'EventBus error in ' + eventName + ': ' + err.message);
         }
         if (subs[i].once) {
           toRemove.push(subs[i].id);
@@ -188,7 +188,7 @@ var EventBus = (function() {
             result.handled++;
           } catch (err) {
             result.errors.push(parentEvent + '[' + parentSubs[j].id + ']: ' + err.message);
-            Logger.log('EventBus error in ' + parentEvent + ' (parent of ' + eventName + '): ' + err.message);
+            log_('emit', 'EventBus error in ' + parentEvent + ' (parent of ' + eventName + '): ' + err.message);
           }
           if (parentSubs[j].once) {
             toRemove.push(parentSubs[j].id);
@@ -297,12 +297,12 @@ function registerEventBusSubscribers() {
   }, { priority: 80, id: 'grievance_stagegate_handler' });
 
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
-    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { log_('_err', (_err.message || _err)); }
   }, { priority: 70, id: 'grievance_config_sync' });
 
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function() {
     if (typeof sortGrievanceLogByStatus === 'function') {
-      try { sortGrievanceLogByStatus(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+      try { sortGrievanceLogByStatus(); } catch (_err) { log_('_err', (_err.message || _err)); }
     }
   }, { priority: 60, id: 'grievance_sort_handler' });
 
@@ -316,7 +316,7 @@ function registerEventBusSubscribers() {
   }, { priority: 90, id: 'member_style_handler' });
 
   EventBus.on('sheet:edit:MEMBER_DIR', function(e) {
-    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { log_('_err', (_err.message || _err)); }
   }, { priority: 70, id: 'member_config_sync' });
 
   // --- Checklist edit handler ---
@@ -327,14 +327,14 @@ function registerEventBusSubscribers() {
   // --- Volunteer Hours sync ---
   EventBus.on('sheet:edit:VOLUNTEER_HOURS', function() {
     if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
-      try { syncVolunteerHoursToMemberDirectory(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+      try { syncVolunteerHoursToMemberDirectory(); } catch (_err) { log_('_err', (_err.message || _err)); }
     }
   }, { priority: 100, id: 'volunteer_sync_handler' });
 
   // --- Meeting Attendance sync ---
   EventBus.on('sheet:edit:MEETING_ATTENDANCE', function() {
     if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
-      try { syncMeetingAttendanceToMemberDirectory(); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+      try { syncMeetingAttendanceToMemberDirectory(); } catch (_err) { log_('_err', (_err.message || _err)); }
     }
   }, { priority: 100, id: 'attendance_sync_handler' });
 
@@ -345,26 +345,26 @@ function registerEventBusSubscribers() {
 
   EventBus.on('sheet:edit:CONFIG', function(e) {
     if (typeof warnInvalidConfigValue_ === 'function') {
-      try { warnInvalidConfigValue_(e); } catch (_err) { Logger.log('warnInvalidConfigValue_: ' + (_err.message || _err)); }
+      try { warnInvalidConfigValue_(e); } catch (_err) { log_('warnInvalidConfigValue_', (_err.message || _err)); }
     }
   }, { priority: 90, id: 'config_type_validator' });
 
   EventBus.on('sheet:edit:CONFIG', function(e) {
     if (typeof syncConfigToSheetValidation_ === 'function') {
-      try { syncConfigToSheetValidation_(e); } catch (_err) { Logger.log('syncConfigToSheetValidation_: ' + (_err.message || _err)); }
+      try { syncConfigToSheetValidation_(e); } catch (_err) { log_('syncConfigToSheetValidation_', (_err.message || _err)); }
     }
   }, { priority: 80, id: 'config_validation_sync' });
 
   // --- Cross-cutting: Audit logging (high-value sheets) ---
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
     if (typeof onEditAudit === 'function') {
-      try { onEditAudit(e); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+      try { onEditAudit(e); } catch (_err) { log_('_err', (_err.message || _err)); }
     }
   }, { priority: 10, id: 'grievance_audit' });
 
   EventBus.on('sheet:edit:MEMBER_DIR', function(e) {
     if (typeof onEditAudit === 'function') {
-      try { onEditAudit(e); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+      try { onEditAudit(e); } catch (_err) { log_('_err', (_err.message || _err)); }
     }
   }, { priority: 10, id: 'member_audit' });
 
@@ -378,10 +378,10 @@ function registerEventBusSubscribers() {
         var terminalStatuses = ['won', 'denied', 'settled', 'withdrawn', 'closed'];
         if (terminalStatuses.indexOf(newVal.toLowerCase()) !== -1) {
           var row = e.range.getRow();
-          Logger.log('Grievance terminal status: row ' + row + ' → ' + newVal + ' (archive candidate)');
+          log_('Grievance terminal status', 'row ' + row + ' → ' + newVal + ' (archive candidate)');
         }
       }
-    } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+    } catch (_err) { log_('_err', (_err.message || _err)); }
   }, { priority: 50, id: 'grievance_terminal_status_logger' });
 
   // --- Auto-sync (debounced via onEditAutoSync) ---
@@ -389,13 +389,13 @@ function registerEventBusSubscribers() {
   // (handleGrievanceEdit at priority 100 already computed deadline values for this row)
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
     if (typeof onEditAutoSync === 'function') {
-      try { e._grievanceEditHandled = true; onEditAutoSync(e); } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+      try { e._grievanceEditHandled = true; onEditAutoSync(e); } catch (_err) { log_('_err', (_err.message || _err)); }
     }
   }, { priority: 20, id: 'grievance_auto_sync' });
 
   // --- Data change notifications (for dashboard refresh) ---
   EventBus.on('data:changed', function(data) {
-    Logger.log('Data changed: ' + (data && data.source ? data.source : 'unknown'));
+    log_('Data changed', (data && data.source ? data.source : 'unknown'));
   }, { priority: 0, id: 'data_change_logger' });
 
   // --- Auto-notification: Grievance deadline approaching ---
@@ -411,7 +411,7 @@ function registerEventBusSubscribers() {
         });
       }
     } catch (err) {
-      Logger.log('EventBus notification error (deadline): ' + err);
+      log_('EventBus notification error (deadline)', err);
     }
   }, { priority: 30, id: 'notif_deadline_approaching' });
 
@@ -428,11 +428,11 @@ function registerEventBusSubscribers() {
         });
       }
     } catch (err) {
-      Logger.log('EventBus notification error (status): ' + err);
+      log_('EventBus notification error (status)', err);
     }
   }, { priority: 30, id: 'notif_status_changed' });
 
-  Logger.log('EventBus: ' + EventBus.listenerCount() + ' subscribers registered');
+  log_('EventBus', EventBus.listenerCount() + ' subscribers registered');
 }
 
 // ============================================================================

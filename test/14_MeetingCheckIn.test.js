@@ -14,6 +14,7 @@ loadSources([
   '00_Security.gs',
   '00_DataAccess.gs',
   '01_Core.gs',
+  '03_UIComponents.gs',
   '13_MemberSelfService.gs',
   '14_MeetingCheckIn.gs'
 ]);

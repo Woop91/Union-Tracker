@@ -407,7 +407,7 @@ var TimelineService = (function () {
       logAuditEvent('TIMELINE_CALENDAR_IMPORTED', imported + ' events imported by ' + stewardEmail);
       return { success: true, imported: imported };
     } catch (err) {
-      Logger.log('Calendar import error: ' + err.message);
+      log_('Calendar import error', err.message);
       return { success: false, message: 'Calendar import failed: ' + err.message };
     }
   }

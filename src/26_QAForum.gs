@@ -88,7 +88,7 @@ var QAForum = (function () {
       var cacheKey = 'qa_sheet_' + sheetName;
       var cached = cache.get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
     var sheet = ss.getSheetByName(sheetName);
@@ -100,7 +100,7 @@ var QAForum = (function () {
         cache.put(cacheKey, jsonStr, maxAgeSec);
       }
       // If too large, skip caching — data will be read fresh each time
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
     return data;
   }
 
@@ -272,7 +272,7 @@ var QAForum = (function () {
         );
         notificationSent = true;
       } catch (notifErr) {
-        Logger.log('QA submitQuestion: steward notification failed: ' + notifErr.message);
+        log_('QA submitQuestion', 'steward notification failed: ' + notifErr.message);
       }
 
       return { success: true, questionId: id, notificationSent: notificationSent };
@@ -357,7 +357,7 @@ var QAForum = (function () {
           (result._stewardName || 'A steward') + ' answered your question: "' + preview + '"'
         );
       } catch (notifErr) {
-        Logger.log('QA submitAnswer: author notification failed: ' + notifErr.message);
+        log_('QA submitAnswer', 'author notification failed: ' + notifErr.message);
       }
       // Strip internal fields from response
       delete result._authorEmail;
@@ -620,7 +620,7 @@ var QAForum = (function () {
         'Normal', 'system', 'Q&A Forum', today, '', '', 'Active', 'Dismissible'
       ]);
     } catch (e) {
-      Logger.log('QAForum._createNotificationInternal_ error: ' + e.message);
+      log_('QAForum._createNotificationInternal_ error', e.message);
     }
   }
 
@@ -633,7 +633,7 @@ var QAForum = (function () {
     try {
       var cache = CacheService.getScriptCache();
       cache.remove('qa_sheet_' + sheetName);
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
 
   /**
@@ -736,7 +736,7 @@ function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStew
 /** @param {string} sessionToken @returns {Object} Flagged questions and answers (steward-only). */
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
 /** @param {string} sessionToken @param {string} questionId @returns {Object} Resolve result (owner or steward). */
-function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_) { Logger.log('_: ' + (_.message || _)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
+function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_) { log_('_', (_.message || _)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
 /** @param {string} sessionToken @param {number} [page] @param {number} [pageSize] @param {string} [sort] @returns {Object} Org-wide paginated question list. */
 function qaGetOrgWideQuestions(sessionToken, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getOrgWideQuestions(e, page, pageSize, sort); }
 /** @returns {void} Initializes Q&A forum sheets (no auth required — setup only). */

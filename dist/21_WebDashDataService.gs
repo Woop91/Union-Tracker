@@ -24,6 +24,9 @@ var DataService = (function () {
   var MEMBER_SHEET = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ? SHEETS.MEMBER_DIR : 'Member Directory';
   var GRIEVANCE_SHEET = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ? SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
+  // PERF: Compute lowercased closed statuses once at module init (avoids 4× redundant .map() calls)
+  var _closedStatusesLower = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
+
   // PERF: Spreadsheet singleton — avoids redundant getActiveSpreadsheet() IPC calls.
   // Cached per execution (GAS module-scope resets between requests).
   var _cachedSS = null;
@@ -195,7 +198,7 @@ var DataService = (function () {
 
     var stewardCol = _findColumn(colMap, HEADERS.grievanceSteward);
     if (stewardCol === -1) {
-      Logger.log('DataService: Steward column not found in Grievance Log');
+      log_('DataService', 'Steward column not found in Grievance Log');
       return [];
     }
 
@@ -280,7 +283,7 @@ var DataService = (function () {
     var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
     if (memberCol === -1) return [];
 
-    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
+    var closedStatuses = _closedStatusesLower;
     var grievances = [];
     for (var i = 1; i < data.length; i++) {
       var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
@@ -319,7 +322,7 @@ var DataService = (function () {
     var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
     if (memberCol === -1) return { success: true, history: [] };
 
-    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
+    var closedStatuses = _closedStatusesLower;
     var history = [];
 
     for (var i = 1; i < data.length; i++) {
@@ -492,7 +495,7 @@ var DataService = (function () {
         try {
           _syncShirtSizeLog(email, updates.shirtSize);
         } catch (logErr) {
-          Logger.log('Shirt size log sync error: ' + logErr.message);
+          log_('Shirt size log sync error', logErr.message);
         }
       }
 
@@ -914,7 +917,7 @@ var DataService = (function () {
       // Delegate to the global Drive folder setup function in 05_Integrations.gs
       return setupDriveFolderForGrievance(grievanceId);
     } catch (e) {
-      Logger.log('DataService.createGrievanceDriveFolder error: ' + e.message);
+      log_('DataService.createGrievanceDriveFolder error', e.message);
       return { success: false, message: 'Error creating Drive folder.' };
     }
   }
@@ -956,7 +959,7 @@ var DataService = (function () {
         };
       }
     } catch (e) {
-      Logger.log('DataService.getMemberSurveyStatus error: ' + e.message);
+      log_('DataService.getMemberSurveyStatus error', e.message);
     }
     return { hasCompleted: false, lastCompleted: null };
   }
@@ -997,7 +1000,7 @@ var DataService = (function () {
 
       return { success: true };
     } catch (e) {
-      Logger.log('logResourceClick error: ' + e.message);
+      log_('logResourceClick error', e.message);
       return { success: false };
     }
   }
@@ -1040,12 +1043,12 @@ var DataService = (function () {
       if (resSheet && resSheet.getLastRow() >= 2) {
         var resData = resSheet.getRange(2, 1, resSheet.getLastRow() - 1, resSheet.getLastColumn()).getValues();
         for (var ri = 0; ri < resData.length; ri++) {
-          var rId = String(resData[ri][RESOURCES_COLS.RESOURCE_ID - 1]).trim();
-          var visible = String(resData[ri][RESOURCES_COLS.VISIBLE - 1]).trim().toLowerCase();
+          var rId = String(col_(resData[ri], RESOURCES_COLS.RESOURCE_ID)).trim();
+          var visible = String(col_(resData[ri], RESOURCES_COLS.VISIBLE)).trim().toLowerCase();
           if (rId && visible === 'yes') {
             resourceMap[rId] = {
-              title: String(resData[ri][RESOURCES_COLS.TITLE - 1]).trim(),
-              category: String(resData[ri][RESOURCES_COLS.CATEGORY - 1]).trim()
+              title: String(col_(resData[ri], RESOURCES_COLS.TITLE)).trim(),
+              category: String(col_(resData[ri], RESOURCES_COLS.CATEGORY)).trim()
             };
           }
         }
@@ -1121,7 +1124,7 @@ var DataService = (function () {
         byCategoryCount: byCategoryCount
       };
     } catch (e) {
-      Logger.log('getResourceStats error: ' + e.message);
+      log_('getResourceStats error', e.message);
       return null;
     }
   }
@@ -1214,7 +1217,7 @@ var DataService = (function () {
 
       return { success: true };
     } catch (e) {
-      Logger.log('logTabVisit error: ' + e.message);
+      log_('logTabVisit error', e.message);
       return { success: false };
     }
   }
@@ -1416,7 +1419,7 @@ var DataService = (function () {
         hourlyPattern: hourlyPattern
       };
     } catch (e) {
-      Logger.log('getUsageStats error: ' + e.message);
+      log_('getUsageStats error', e.message);
       return null;
     }
   }
@@ -1436,7 +1439,7 @@ var DataService = (function () {
       try {
         var existing = DriveApp.getFolderById(storedId);
         return 'https://drive.google.com/drive/folders/' + existing.getId();
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
 
     try {
@@ -1466,7 +1469,7 @@ var DataService = (function () {
 
       return 'https://drive.google.com/drive/folders/' + newFolder.getId();
     } catch (e) {
-      Logger.log('getOrCreateSheetFolder_ error: ' + e.message);
+      log_('getOrCreateSheetFolder_ error', e.message);
       return '';
     }
   }
@@ -1632,7 +1635,7 @@ var DataService = (function () {
         }
       }
     } catch (e) {
-      Logger.log('getStewardSurveyTracking: survey pre-load error: ' + e.message);
+      log_('getStewardSurveyTracking', 'survey pre-load error: ' + e.message);
     }
 
     // Find steward's own location + cubicle for proximity scoring
@@ -1746,7 +1749,7 @@ var DataService = (function () {
       } catch (e) {
         failedCount++;
         failures.push({ email: filtered[i].email, error: e.message });
-        Logger.log('Broadcast send error for ' + filtered[i].email + ': ' + e.message);
+        log_('sendBroadcastMessage', 'Broadcast send error for ' + filtered[i].email + ': ' + e.message);
       }
     }
 
@@ -1830,7 +1833,7 @@ var DataService = (function () {
 
       return { available: true, count: responseCount, threshold: 30, sections: sections };
     } catch (e) {
-      Logger.log('DataService.getSurveyResults error: ' + e.message);
+      log_('DataService.getSurveyResults error', e.message);
       return { available: false, count: 0, threshold: 30, sections: [], error: e.message };
     }
   }
@@ -1874,12 +1877,12 @@ var DataService = (function () {
   function _getSheet(name) {
     var ss = _getSS();
     if (!ss) {
-      Logger.log('DataService: getActiveSpreadsheet() returned null for sheet "' + name + '"');
+      log_('DataService', 'getActiveSpreadsheet() returned null for sheet "' + name + '"');
       return null;
     }
     var sheet = ss.getSheetByName(name);
     if (!sheet) {
-      Logger.log('DataService: Sheet "' + name + '" not found.');
+      log_('DataService', 'Sheet "' + name + '" not found.');
     }
     return sheet;
   }
@@ -2199,7 +2202,7 @@ var DataService = (function () {
    */
   function _getMemberAdminFolder_(memberEmail) {
     if (typeof getOrCreateMemberAdminFolder !== 'function') {
-      Logger.log('_getMemberAdminFolder_: getOrCreateMemberAdminFolder not available');
+      log_('_getMemberAdminFolder_', 'getOrCreateMemberAdminFolder not available');
       return null;
     }
     return getOrCreateMemberAdminFolder(memberEmail);
@@ -2250,7 +2253,7 @@ var DataService = (function () {
       sheet.setColumnWidth(5, 100); // Duration
       return ss;
     } catch (e) {
-      Logger.log('getOrCreateMemberContactSheet_ error: ' + e.message);
+      log_('getOrCreateMemberContactSheet_ error', e.message);
       return null;
     }
   }
@@ -2331,7 +2334,7 @@ var DataService = (function () {
         }
       }
     } catch (wbErr) {
-      Logger.log('logMemberContact writeback error: ' + wbErr.message);
+      log_('logMemberContact writeback error', wbErr.message);
     }
 
     // ── 4. Append to per-member Drive contact log sheet ───────────────────
@@ -2349,7 +2352,7 @@ var DataService = (function () {
         }
       }
     } catch (driveErr) {
-      Logger.log('logMemberContact Drive sheet error: ' + driveErr.message);
+      log_('logMemberContact Drive sheet error', driveErr.message);
       // Non-fatal — _Contact_Log and Member Directory snapshot already updated
     }
 
@@ -2880,7 +2883,7 @@ var DataService = (function () {
         monthlyResolved[rKey] = (monthlyResolved[rKey] || 0) + 1;
       }
       } catch (rowErr) {
-        Logger.log('getGrievanceStats: skipped row ' + i + ' — ' + rowErr.message);
+        log_('getGrievanceStats', 'skipped row ' + i + ' — ' + rowErr.message);
       }
     }
     // Merge month keys from both maps, sort, take last 12
@@ -3211,9 +3214,9 @@ var DataService = (function () {
       if (result.length > 0) cache.put(cacheKey, JSON.stringify(result), 900);
       return result;
     } catch (e) {
-      Logger.log('getUpcomingEvents error: ' + e.message);
+      log_('getUpcomingEvents error', e.message);
       // Last resort: try timeline fallback
-      try { var fb = _getTimelineEvents(limit); if (fb.length > 0) return fb; } catch (_e2) { Logger.log('_e2: ' + (_e2.message || _e2)); }
+      try { var fb = _getTimelineEvents(limit); if (fb.length > 0) return fb; } catch (_e2) { log_('_e2', (_e2.message || _e2)); }
       return [];
     }
   }
@@ -3258,7 +3261,7 @@ var DataService = (function () {
   function _checkExecTime(label) {
     var elapsed = Date.now() - _execStart;
     if (elapsed > 25000) {
-      Logger.log('SLOW_EXEC: ' + label + ' at ' + elapsed + 'ms');
+      log_('SLOW_EXEC', label + ' at ' + elapsed + 'ms');
       throw new Error('Request is taking too long. Please try again.');
     }
   }
@@ -3335,7 +3338,7 @@ var DataService = (function () {
         var parsed = JSON.parse(cached);
         // Log cache age for observability
         if (parsed._cachedAt) {
-          Logger.log('Sheet cache hit: ' + sheetName + ' (age: ' + (Date.now() - parsed._cachedAt) + 'ms)');
+          log_('Sheet cache hit', sheetName + ' (age: ' + (Date.now() - parsed._cachedAt) + 'ms)');
         }
         // Restore Date objects from serialized __d markers
         parsed.data = parsed.data.map(function(row) {
@@ -3347,7 +3350,7 @@ var DataService = (function () {
         _sheetDataCache[sheetName] = parsed;
         return parsed;
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     var sheet = _getSheet(sheetName);
     if (!sheet) return null;
@@ -3361,11 +3364,11 @@ var DataService = (function () {
     _sheetHealthLog[sheetName] = rowCount;
     if (typeof SCALE_THRESHOLDS !== 'undefined') {
       if (rowCount >= SCALE_THRESHOLDS.CRITICAL_ROWS) {
-        Logger.log('SCALE_CRITICAL: ' + sheetName + ' has ' + rowCount + ' rows — manual intervention recommended');
+        log_('SCALE_CRITICAL', sheetName + ' has ' + rowCount + ' rows — manual intervention recommended');
       } else if (rowCount >= SCALE_THRESHOLDS.THROTTLE_ROWS) {
-        Logger.log('SCALE_THROTTLE: ' + sheetName + ' has ' + rowCount + ' rows — paginated mode active');
+        log_('SCALE_THROTTLE', sheetName + ' has ' + rowCount + ' rows — paginated mode active');
       } else if (rowCount >= SCALE_THRESHOLDS.WARN_ROWS) {
-        Logger.log('SCALE_WARN: ' + sheetName + ' has ' + rowCount + ' rows');
+        log_('SCALE_WARN', sheetName + ' has ' + rowCount + ' rows');
       }
     }
 
@@ -3392,7 +3395,7 @@ var DataService = (function () {
       });
       var json = JSON.stringify({ data: serializable, _cachedAt: Date.now() });
       _putChunkedCache(writeCache, cacheKey, json, smartTTL);
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     return result;
   }
@@ -3415,7 +3418,7 @@ var DataService = (function () {
         var num = parseInt(n, 10);
         for (var i = 0; i < num; i++) cache.remove(cacheKey + '_' + i);
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
 
   // ═══════════════════════════════════════
@@ -3446,7 +3449,7 @@ var DataService = (function () {
       var cacheKey = 'SD_' + archiveName.replace(/\s/g, '_');
       var serialized = JSON.stringify({ data: data, _cachedAt: Date.now() });
       _putChunkedCache(cache, cacheKey, serialized, 600);
-    } catch (_e) { Logger.log('_getCachedArchiveData cache write: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_getCachedArchiveData cache write', (_e.message || _e)); }
 
     return result;
   }
@@ -3470,12 +3473,12 @@ var DataService = (function () {
     var activeHeaders = active.data[0];
     var archiveHeaders = archive.data[0];
     if (activeHeaders.length !== archiveHeaders.length) {
-      Logger.log('_getAllGrievanceData: column count mismatch (active=' + activeHeaders.length + ', archive=' + archiveHeaders.length + ') — using active only');
+      log_('_getAllGrievanceData', 'column count mismatch (active=' + activeHeaders.length + ', archive=' + archiveHeaders.length + ') — using active only');
       return active;
     }
     for (var h = 0; h < activeHeaders.length; h++) {
       if (String(activeHeaders[h]).trim() !== String(archiveHeaders[h]).trim()) {
-        Logger.log('_getAllGrievanceData: header mismatch at col ' + (h + 1) + ' ("' + activeHeaders[h] + '" vs "' + archiveHeaders[h] + '") — using active only');
+        log_('_getAllGrievanceData', 'header mismatch at col ' + (h + 1) + ' ("' + activeHeaders[h] + '" vs "' + archiveHeaders[h] + '") — using active only');
         return active;
       }
     }
@@ -3514,8 +3517,8 @@ var DataService = (function () {
    */
   function _getMemberBatchData(email) {
     // Pre-warm cache for sheets we'll read multiple times
-    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
-    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { log_('_', (_.message || _)); }
+    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { log_('_', (_.message || _)); }
 
     _checkExecTime('_getMemberBatchData:start');
     var grievances = [];
@@ -3538,13 +3541,13 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, 'member');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     var memberTaskCount = 0;
     try {
       var openTasks = getMemberTasks(email, 'not-completed');
       memberTaskCount = openTasks.length;
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     return {
       grievances: grievances,
@@ -3565,9 +3568,9 @@ var DataService = (function () {
    */
   function _getStewardBatchData(email) {
     // Pre-warm cache for sheets we'll read multiple times
-    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
-    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { Logger.log('_: ' + (_.message || _)); }
-    try { _getCachedSheetData(SHEETS.STEWARD_TASKS); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { log_('_', (_.message || _)); }
+    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { log_('_', (_.message || _)); }
+    try { _getCachedSheetData(SHEETS.STEWARD_TASKS); } catch (_) { log_('_', (_.message || _)); }
 
     _checkExecTime('_getStewardBatchData:start');
     // Read cases once and compute KPIs from same data (avoids double sheet read)
@@ -3587,7 +3590,7 @@ var DataService = (function () {
     try {
       memberCount = getStewardMembers(email).length;
       if (memberCount === 0) memberCount = getAllMembers().length;
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     _checkExecTime('_getStewardBatchData:members');
     // Task counts — open tasks only; derive overdue from dueDays < 0.
@@ -3600,7 +3603,7 @@ var DataService = (function () {
       for (var t = 0; t < openTasks.length; t++) {
         if (openTasks[t].dueDays !== null && openTasks[t].dueDays < 0) overdueTaskCount++;
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     var notifCount = 0;
     try {
@@ -3608,7 +3611,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, 'steward');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     var qaUnansweredCount = 0;
     try {
@@ -3616,7 +3619,7 @@ var DataService = (function () {
         // Use lightweight count — avoids building 999 full question objects
         qaUnansweredCount = QAForum.getUnansweredCount();
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     return {
       cases: cases,
@@ -3665,7 +3668,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, role || 'steward');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
 
     var taskCount = 0;
     var overdueTaskCount = 0;
@@ -3676,7 +3679,7 @@ var DataService = (function () {
         for (var t = 0; t < openTasks.length; t++) {
           if (openTasks[t].dueDays !== null && openTasks[t].dueDays < 0) overdueTaskCount++;
         }
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
 
     var qaUnansweredCount = 0;
@@ -3685,7 +3688,7 @@ var DataService = (function () {
         if (typeof QAForum !== 'undefined') {
           qaUnansweredCount = QAForum.getUnansweredCount();
         }
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
 
     return {
@@ -3713,19 +3716,19 @@ var DataService = (function () {
     var data = sheet.getDataRange().getValues();
     var items = [];
     for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(data[i][FEEDBACK_COLS.SUBMITTED_BY - 1]).trim().toLowerCase();
+      var rowEmail = String(col_(data[i], FEEDBACK_COLS.SUBMITTED_BY)).trim().toLowerCase();
       if (rowEmail !== email) continue;
 
-      var ts = data[i][FEEDBACK_COLS.TIMESTAMP - 1];
+      var ts = col_(data[i], FEEDBACK_COLS.TIMESTAMP);
       items.push({
         date: ts instanceof Date ? _formatDate(ts) : String(ts || ''),
-        category: String(data[i][FEEDBACK_COLS.CATEGORY - 1] || ''),
-        type: String(data[i][FEEDBACK_COLS.TYPE - 1] || ''),
-        priority: String(data[i][FEEDBACK_COLS.PRIORITY - 1] || ''),
-        title: String(data[i][FEEDBACK_COLS.TITLE - 1] || ''),
-        description: String(data[i][FEEDBACK_COLS.DESCRIPTION - 1] || ''),
-        status: String(data[i][FEEDBACK_COLS.STATUS - 1] || 'New'),
-        resolution: String(data[i][FEEDBACK_COLS.RESOLUTION - 1] || ''),
+        category: String(col_(data[i], FEEDBACK_COLS.CATEGORY) || ''),
+        type: String(col_(data[i], FEEDBACK_COLS.TYPE) || ''),
+        priority: String(col_(data[i], FEEDBACK_COLS.PRIORITY) || ''),
+        title: String(col_(data[i], FEEDBACK_COLS.TITLE) || ''),
+        description: String(col_(data[i], FEEDBACK_COLS.DESCRIPTION) || ''),
+        status: String(col_(data[i], FEEDBACK_COLS.STATUS) || 'New'),
+        resolution: String(col_(data[i], FEEDBACK_COLS.RESOLUTION) || ''),
       });
     }
     items.reverse(); // newest first
@@ -3777,7 +3780,7 @@ var DataService = (function () {
     minutes.forEach(function(m) { delete m.meetingDateTs; });
     return minutes.slice(0, limit);
     } catch (e) {
-      Logger.log('getMeetingMinutes error: ' + e.message + '\n' + (e.stack || ''));
+      log_('getMeetingMinutes error', e.message + '\n' + (e.stack || ''));
       return [];
     }
   }
@@ -3851,12 +3854,12 @@ var DataService = (function () {
           minutesFolder.addFile(docFile);
           DriveApp.getRootFolder().removeFile(docFile);
         } catch (moveErr) {
-          Logger.log('addMeetingMinutes: could not move doc to Minutes folder: ' + moveErr.message);
+          log_('addMeetingMinutes', 'could not move doc to Minutes folder: ' + moveErr.message);
         }
       }
       driveDocUrl = docFile.getUrl();
     } catch (driveErr) {
-      Logger.log('addMeetingMinutes: Drive doc creation failed (non-fatal): ' + driveErr.message);
+      log_('addMeetingMinutes', 'Drive doc creation failed (non-fatal): ' + driveErr.message);
     }
 
     // ── Write to sheet (8 columns: add DriveDocUrl at end) ──────────────────
@@ -3875,7 +3878,7 @@ var DataService = (function () {
     try {
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       if (!headers[7]) sheet.getRange(1, 8).setValue('DriveDocUrl');
-    } catch (_he) { Logger.log('_he: ' + (_he.message || _he)); }
+    } catch (_he) { log_('_he', (_he.message || _he)); }
 
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title, driveDocUrl: driveDocUrl });
@@ -3906,24 +3909,24 @@ var DataService = (function () {
 
       var data = sheet.getDataRange().getValues();
       for (var i = 1; i < data.length; i++) {
-        var rowEmail = String(data[i][STEWARD_PERF_COLS.STEWARD - 1]).trim().toLowerCase();
+        var rowEmail = String(col_(data[i], STEWARD_PERF_COLS.STEWARD)).trim().toLowerCase();
         if (rowEmail !== email) continue;
         return {
           steward: rowEmail,
-          totalCases: Number(data[i][STEWARD_PERF_COLS.TOTAL_CASES - 1]) || 0,
-          active: Number(data[i][STEWARD_PERF_COLS.ACTIVE - 1]) || 0,
-          closed: Number(data[i][STEWARD_PERF_COLS.CLOSED - 1]) || 0,
-          won: Number(data[i][STEWARD_PERF_COLS.WON - 1]) || 0,
-          winRate: Number(data[i][STEWARD_PERF_COLS.WIN_RATE - 1]) || 0,
-          avgDays: Number(data[i][STEWARD_PERF_COLS.AVG_DAYS - 1]) || 0,
-          overdue: Number(data[i][STEWARD_PERF_COLS.OVERDUE - 1]) || 0,
-          dueThisWeek: Number(data[i][STEWARD_PERF_COLS.DUE_THIS_WEEK - 1]) || 0,
-          performanceScore: Number(data[i][STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]) || 0,
+          totalCases: Number(col_(data[i], STEWARD_PERF_COLS.TOTAL_CASES)) || 0,
+          active: Number(col_(data[i], STEWARD_PERF_COLS.ACTIVE)) || 0,
+          closed: Number(col_(data[i], STEWARD_PERF_COLS.CLOSED)) || 0,
+          won: Number(col_(data[i], STEWARD_PERF_COLS.WON)) || 0,
+          winRate: Number(col_(data[i], STEWARD_PERF_COLS.WIN_RATE)) || 0,
+          avgDays: Number(col_(data[i], STEWARD_PERF_COLS.AVG_DAYS)) || 0,
+          overdue: Number(col_(data[i], STEWARD_PERF_COLS.OVERDUE)) || 0,
+          dueThisWeek: Number(col_(data[i], STEWARD_PERF_COLS.DUE_THIS_WEEK)) || 0,
+          performanceScore: Number(col_(data[i], STEWARD_PERF_COLS.PERFORMANCE_SCORE)) || 0,
         };
       }
       return {};
     } catch (_e) {
-      Logger.log('getStewardPerformance error: ' + _e.message);
+      log_('getStewardPerformance error', _e.message);
       return {};
     }
   }
@@ -3942,24 +3945,24 @@ var DataService = (function () {
       var data = sheet.getDataRange().getValues();
       var results = [];
       for (var i = 1; i < data.length; i++) {
-        var steward = String(data[i][STEWARD_PERF_COLS.STEWARD - 1]).trim();
+        var steward = String(col_(data[i], STEWARD_PERF_COLS.STEWARD)).trim();
         if (!steward) continue;
         results.push({
           steward: steward.toLowerCase(),
-          totalCases: Number(data[i][STEWARD_PERF_COLS.TOTAL_CASES - 1]) || 0,
-          active: Number(data[i][STEWARD_PERF_COLS.ACTIVE - 1]) || 0,
-          closed: Number(data[i][STEWARD_PERF_COLS.CLOSED - 1]) || 0,
-          won: Number(data[i][STEWARD_PERF_COLS.WON - 1]) || 0,
-          winRate: Number(data[i][STEWARD_PERF_COLS.WIN_RATE - 1]) || 0,
-          avgDays: Number(data[i][STEWARD_PERF_COLS.AVG_DAYS - 1]) || 0,
-          overdue: Number(data[i][STEWARD_PERF_COLS.OVERDUE - 1]) || 0,
-          dueThisWeek: Number(data[i][STEWARD_PERF_COLS.DUE_THIS_WEEK - 1]) || 0,
-          performanceScore: Number(data[i][STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]) || 0,
+          totalCases: Number(col_(data[i], STEWARD_PERF_COLS.TOTAL_CASES)) || 0,
+          active: Number(col_(data[i], STEWARD_PERF_COLS.ACTIVE)) || 0,
+          closed: Number(col_(data[i], STEWARD_PERF_COLS.CLOSED)) || 0,
+          won: Number(col_(data[i], STEWARD_PERF_COLS.WON)) || 0,
+          winRate: Number(col_(data[i], STEWARD_PERF_COLS.WIN_RATE)) || 0,
+          avgDays: Number(col_(data[i], STEWARD_PERF_COLS.AVG_DAYS)) || 0,
+          overdue: Number(col_(data[i], STEWARD_PERF_COLS.OVERDUE)) || 0,
+          dueThisWeek: Number(col_(data[i], STEWARD_PERF_COLS.DUE_THIS_WEEK)) || 0,
+          performanceScore: Number(col_(data[i], STEWARD_PERF_COLS.PERFORMANCE_SCORE)) || 0,
         });
       }
       return results;
     } catch (_e) {
-      Logger.log('getAllStewardPerformance error: ' + _e.message);
+      log_('getAllStewardPerformance error', _e.message);
       return [];
     }
   }
@@ -3986,28 +3989,28 @@ var DataService = (function () {
       var data = sheet.getDataRange().getValues();
       var items = [];
       for (var i = 1; i < data.length; i++) {
-        if (String(data[i][CHECKLIST_COLS.CASE_ID - 1]).trim() !== caseId) continue;
-        var dueDate = data[i][CHECKLIST_COLS.DUE_DATE - 1];
-        var completedDate = data[i][CHECKLIST_COLS.COMPLETED_DATE - 1];
+        if (String(col_(data[i], CHECKLIST_COLS.CASE_ID)).trim() !== caseId) continue;
+        var dueDate = col_(data[i], CHECKLIST_COLS.DUE_DATE);
+        var completedDate = col_(data[i], CHECKLIST_COLS.COMPLETED_DATE);
         items.push({
-          id: String(data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] || ''),
+          id: String(col_(data[i], CHECKLIST_COLS.CHECKLIST_ID) || ''),
           caseId: caseId,
-          actionType: String(data[i][CHECKLIST_COLS.ACTION_TYPE - 1] || ''),
-          itemText: String(data[i][CHECKLIST_COLS.ITEM_TEXT - 1] || ''),
-          category: String(data[i][CHECKLIST_COLS.CATEGORY - 1] || ''),
-          required: String(data[i][CHECKLIST_COLS.REQUIRED - 1]).toLowerCase() === 'true',
-          completed: String(data[i][CHECKLIST_COLS.COMPLETED - 1]).toLowerCase() === 'true',
-          completedBy: String(data[i][CHECKLIST_COLS.COMPLETED_BY - 1] || ''),
+          actionType: String(col_(data[i], CHECKLIST_COLS.ACTION_TYPE) || ''),
+          itemText: String(col_(data[i], CHECKLIST_COLS.ITEM_TEXT) || ''),
+          category: String(col_(data[i], CHECKLIST_COLS.CATEGORY) || ''),
+          required: String(col_(data[i], CHECKLIST_COLS.REQUIRED)).toLowerCase() === 'true',
+          completed: String(col_(data[i], CHECKLIST_COLS.COMPLETED)).toLowerCase() === 'true',
+          completedBy: String(col_(data[i], CHECKLIST_COLS.COMPLETED_BY) || ''),
           completedDate: completedDate instanceof Date ? _formatDate(completedDate) : '',
           dueDate: dueDate instanceof Date ? _formatDate(dueDate) : String(dueDate || ''),
-          notes: String(data[i][CHECKLIST_COLS.NOTES - 1] || ''),
-          sortOrder: Number(data[i][CHECKLIST_COLS.SORT_ORDER - 1]) || 0,
+          notes: String(col_(data[i], CHECKLIST_COLS.NOTES) || ''),
+          sortOrder: Number(col_(data[i], CHECKLIST_COLS.SORT_ORDER)) || 0,
         });
       }
       items.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
       return items;
     } catch (_e) {
-      Logger.log('getCaseChecklist error: ' + _e.message);
+      log_('getCaseChecklist error', _e.message);
       return [];
     }
   }
@@ -4039,7 +4042,7 @@ var DataService = (function () {
         percent: total > 0 ? Math.round((completed / total) * 100) : 0,
       };
     } catch (_e) {
-      Logger.log('getCaseChecklistProgress error: ' + _e.message);
+      log_('getCaseChecklistProgress error', _e.message);
       return { total: 0, completed: 0, required: 0, requiredCompleted: 0, percent: 0 };
     }
   }
@@ -4062,7 +4065,7 @@ var DataService = (function () {
 
       var data = sheet.getDataRange().getValues();
       for (var i = 1; i < data.length; i++) {
-        if (String(data[i][CHECKLIST_COLS.CHECKLIST_ID - 1]).trim() !== String(checklistId).trim()) continue;
+        if (String(col_(data[i], CHECKLIST_COLS.CHECKLIST_ID)).trim() !== String(checklistId).trim()) continue;
         var rowNum = i + 1;
         sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED).setValue(completed ? 'true' : 'false');
         sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED_BY).setValue(completed ? String(email || '').toLowerCase().trim() : '');
@@ -4075,7 +4078,7 @@ var DataService = (function () {
       }
       return { success: false, message: 'Checklist item not found.' };
     } catch (_e) {
-      Logger.log('toggleChecklistItem error: ' + _e.message);
+      log_('toggleChecklistItem error', _e.message);
       return { success: false, message: 'Failed to update checklist.' };
     }
   }
@@ -4102,22 +4105,22 @@ var DataService = (function () {
       var data = sheet.getDataRange().getValues();
       var meetings = [];
       for (var i = 1; i < data.length; i++) {
-        var rowEmail = String(data[i][MEETING_CHECKIN_COLS.EMAIL - 1]).trim().toLowerCase();
+        var rowEmail = String(col_(data[i], MEETING_CHECKIN_COLS.EMAIL)).trim().toLowerCase();
         if (rowEmail !== email) continue;
-        var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
-        var checkinTime = data[i][MEETING_CHECKIN_COLS.CHECKIN_TIME - 1];
+        var meetingDate = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DATE);
+        var checkinTime = col_(data[i], MEETING_CHECKIN_COLS.CHECKIN_TIME);
         meetings.push({
-          meetingId: String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || ''),
-          meetingName: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
+          meetingId: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || ''),
+          meetingName: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_NAME) || ''),
           meetingDate: meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || ''),
-          meetingType: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
+          meetingType: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_TYPE) || ''),
           checkinTime: checkinTime instanceof Date ? _formatDate(checkinTime) : String(checkinTime || ''),
         });
       }
       meetings.reverse(); // newest first
       return meetings;
     } catch (_e) {
-      Logger.log('getMemberMeetings error: ' + _e.message);
+      log_('getMemberMeetings error', _e.message);
       return [];
     }
   }
@@ -4139,8 +4142,8 @@ var DataService = (function () {
       var meetingIds = {};
       var attendees = {};
       for (var i = 1; i < data.length; i++) {
-        var mid = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1]).trim();
-        var aemail = String(data[i][MEETING_CHECKIN_COLS.EMAIL - 1]).trim().toLowerCase();
+        var mid = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID)).trim();
+        var aemail = String(col_(data[i], MEETING_CHECKIN_COLS.EMAIL)).trim().toLowerCase();
         if (mid) meetingIds[mid] = true;
         if (aemail) attendees[aemail] = true;
       }
@@ -4154,7 +4157,7 @@ var DataService = (function () {
         avgAttendance: totalMeetings > 0 ? Math.round(totalCheckins / totalMeetings) : 0,
       };
     } catch (_e) {
-      Logger.log('getMeetingStats error: ' + _e.message);
+      log_('getMeetingStats error', _e.message);
       return { totalMeetings: 0, totalCheckins: 0, uniqueAttendees: 0, avgAttendance: 0 };
     }
   }
@@ -4204,7 +4207,7 @@ var DataService = (function () {
         categories:    categories
       };
     } catch (_e) {
-      Logger.log('getSatisfactionTrends error: ' + _e.message);
+      log_('getSatisfactionTrends error', _e.message);
       return { overall: 0, responseCount: 0, categories: [] };
     }
   }
@@ -4252,7 +4255,7 @@ var DataService = (function () {
       }
       return { success: true, message: 'Feedback submitted.' };
     } catch (_e) {
-      Logger.log('submitFeedback error: ' + _e.message);
+      log_('submitFeedback error', _e.message);
       return { success: false, message: 'Failed to submit feedback.' };
     }
   }
@@ -4477,7 +4480,7 @@ var DataService = (function () {
     if (!cached) return null;
     var data = cached.data;
     var colMap = cached.colMap;
-    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
+    var closedStatuses = _closedStatusesLower;
 
     var now = new Date();
     var fourteenDaysAgo = now.getTime() - 14 * 86400000;
@@ -4554,7 +4557,7 @@ var DataService = (function () {
     if (!cached) return { success: false, message: 'Could not read grievances.' };
     var data = cached.data;
     var colMap = cached.colMap;
-    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
+    var closedStatuses = _closedStatusesLower;
     var matchedRec = null;
 
     for (var i = 0; i < data.length; i++) {
@@ -4790,7 +4793,7 @@ var DataService = (function () {
         MailApp.sendEmail({ to: unitMembers[j].email, subject: subj, body: message.trim(), replyTo: senderEmail });
         sentCount++;
       } catch (_e) {
-        Logger.log('Unit broadcast send failed for ' + unitMembers[j].email + ': ' + (_e.message || _e));
+        log_('sendUnitBroadcast', 'Unit broadcast send failed for ' + unitMembers[j].email + ': ' + (_e.message || _e));
         failedCount++;
       }
     }
@@ -4806,19 +4809,19 @@ var DataService = (function () {
     var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, NMC_HEADER_MAP_.length).getValues();
     return data.map(function(row) {
       return {
-        contactId:    String(row[NMC_COLS.CONTACT_ID - 1] || ''),
-        firstName:    String(row[NMC_COLS.FIRST_NAME - 1] || ''),
-        lastName:     String(row[NMC_COLS.LAST_NAME - 1] || ''),
-        jobTitle:     String(row[NMC_COLS.JOB_TITLE - 1] || ''),
-        workLocation: String(row[NMC_COLS.WORK_LOCATION - 1] || ''),
-        unit:         String(row[NMC_COLS.UNIT - 1] || ''),
-        unionName:    String(row[NMC_COLS.UNION_NAME - 1] || ''),
-        shirtSize:    String(row[NMC_COLS.SHIRT_SIZE - 1] || ''),
-        isSteward:    String(row[NMC_COLS.IS_STEWARD - 1] || ''),
-        email:        String(row[NMC_COLS.EMAIL - 1] || ''),
-        phone:        String(row[NMC_COLS.PHONE - 1] || ''),
-        category:     String(row[NMC_COLS.CATEGORY - 1] || ''),
-        notes:        String(row[NMC_COLS.NOTES - 1] || '')
+        contactId:    String(col_(row, NMC_COLS.CONTACT_ID) || ''),
+        firstName:    String(col_(row, NMC_COLS.FIRST_NAME) || ''),
+        lastName:     String(col_(row, NMC_COLS.LAST_NAME) || ''),
+        jobTitle:     String(col_(row, NMC_COLS.JOB_TITLE) || ''),
+        workLocation: String(col_(row, NMC_COLS.WORK_LOCATION) || ''),
+        unit:         String(col_(row, NMC_COLS.UNIT) || ''),
+        unionName:    String(col_(row, NMC_COLS.UNION_NAME) || ''),
+        shirtSize:    String(col_(row, NMC_COLS.SHIRT_SIZE) || ''),
+        isSteward:    String(col_(row, NMC_COLS.IS_STEWARD) || ''),
+        email:        String(col_(row, NMC_COLS.EMAIL) || ''),
+        phone:        String(col_(row, NMC_COLS.PHONE) || ''),
+        category:     String(col_(row, NMC_COLS.CATEGORY) || ''),
+        notes:        String(col_(row, NMC_COLS.NOTES) || '')
       };
     }).filter(function(c) { return c.firstName || c.lastName; });
   }
@@ -4839,19 +4842,19 @@ var DataService = (function () {
     }
     var contactId = 'NMC-' + String(nextNum).padStart(3, '0');
     var row = [];
-    row[NMC_COLS.CONTACT_ID - 1]    = contactId;
-    row[NMC_COLS.FIRST_NAME - 1]    = escapeForFormula(contactData.firstName || '');
-    row[NMC_COLS.LAST_NAME - 1]     = escapeForFormula(contactData.lastName || '');
-    row[NMC_COLS.JOB_TITLE - 1]     = escapeForFormula(contactData.jobTitle || '');
-    row[NMC_COLS.WORK_LOCATION - 1] = escapeForFormula(contactData.workLocation || '');
-    row[NMC_COLS.UNIT - 1]          = escapeForFormula(contactData.unit || '');
-    row[NMC_COLS.UNION_NAME - 1]    = escapeForFormula(contactData.unionName || '');
-    row[NMC_COLS.SHIRT_SIZE - 1]    = escapeForFormula(contactData.shirtSize || '');
-    row[NMC_COLS.IS_STEWARD - 1]    = escapeForFormula(contactData.isSteward || 'No');
-    row[NMC_COLS.EMAIL - 1]         = escapeForFormula(contactData.email || '');
-    row[NMC_COLS.PHONE - 1]         = escapeForFormula(contactData.phone || '');
-    row[NMC_COLS.CATEGORY - 1]      = escapeForFormula(contactData.category || 'Other');
-    row[NMC_COLS.NOTES - 1]         = escapeForFormula(contactData.notes || '');
+    setCol_(row, NMC_COLS.CONTACT_ID, contactId);
+    setCol_(row, NMC_COLS.FIRST_NAME, escapeForFormula(contactData.firstName || ''));
+    setCol_(row, NMC_COLS.LAST_NAME, escapeForFormula(contactData.lastName || ''));
+    setCol_(row, NMC_COLS.JOB_TITLE, escapeForFormula(contactData.jobTitle || ''));
+    setCol_(row, NMC_COLS.WORK_LOCATION, escapeForFormula(contactData.workLocation || ''));
+    setCol_(row, NMC_COLS.UNIT, escapeForFormula(contactData.unit || ''));
+    setCol_(row, NMC_COLS.UNION_NAME, escapeForFormula(contactData.unionName || ''));
+    setCol_(row, NMC_COLS.SHIRT_SIZE, escapeForFormula(contactData.shirtSize || ''));
+    setCol_(row, NMC_COLS.IS_STEWARD, escapeForFormula(contactData.isSteward || 'No'));
+    setCol_(row, NMC_COLS.EMAIL, escapeForFormula(contactData.email || ''));
+    setCol_(row, NMC_COLS.PHONE, escapeForFormula(contactData.phone || ''));
+    setCol_(row, NMC_COLS.CATEGORY, escapeForFormula(contactData.category || 'Other'));
+    setCol_(row, NMC_COLS.NOTES, escapeForFormula(contactData.notes || ''));
     sheet.appendRow(row);
     return { success: true, contactId: contactId };
   }

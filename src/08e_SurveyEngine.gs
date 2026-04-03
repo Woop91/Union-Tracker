@@ -140,7 +140,7 @@ function initSurveyEngine() {
   } catch(e) { log.push('❌ Tracking populate: ' + e.message); }
 
   var summary = log.join('\n');
-  Logger.log('initSurveyEngine:\n' + summary);
+  log_('initSurveyEngine', 'initSurveyEngine:\n' + summary);
   ui.alert('Survey Engine Initialized', summary, ui.ButtonSet.OK);
 }
 //
@@ -199,7 +199,7 @@ function setupSurveyPeriodsSheet() {
   // Hide the sheet at API level
   try { setSheetVeryHidden_(sheet); } catch(_e) { sheet.hideSheet(); }
 
-  Logger.log('setupSurveyPeriodsSheet: _Survey_Periods created.');
+  log_('setupSurveyPeriodsSheet', '_Survey_Periods created.');
 }
 
 // ── Period lifecycle ─────────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ function getSurveyPeriod() {
     }
     return null; // No active period
   } catch(e) {
-    Logger.log('getSurveyPeriod error: ' + e.message);
+    log_('getSurveyPeriod error', e.message);
     return null;
   }
 }
@@ -301,11 +301,11 @@ function openNewSurveyPeriod(callerEmail) {
       // Push survey-open notification to all active members
       pushSurveyOpenNotification_(periodName);
 
-      Logger.log('openNewSurveyPeriod: Opened ' + periodId);
+      log_('openNewSurveyPeriod', 'Opened ' + periodId);
       return { success: true, periodId: periodId, message: periodName + ' is now open.' };
 
     } catch(e) {
-      Logger.log('openNewSurveyPeriod error: ' + e.message);
+      log_('openNewSurveyPeriod error', e.message);
       return { success: false, periodId: null, message: 'Error opening period: ' + e.message };
     }
   }, 30);
@@ -375,11 +375,11 @@ function archiveSurveyPeriod_(periodId) {
           var configSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.CONFIG);
           if (configSh && CONFIG_COLS.PAST_SURVEYS_FOLDER_ID) {
             configSh.getRange(3, CONFIG_COLS.PAST_SURVEYS_FOLDER_ID).setValue(parentFolder.getId());
-            Logger.log('archiveSurveyPeriod_: Pinned Past Surveys Folder ID to Config: ' + parentFolder.getId());
+            log_('archiveSurveyPeriod_', 'Pinned Past Surveys Folder ID to Config: ' + parentFolder.getId());
           }
         }
       } catch(pe) {
-        Logger.log('archiveSurveyPeriod_: Could not pin folder ID to Config: ' + pe.message);
+        log_('archiveSurveyPeriod_', 'Could not pin folder ID to Config: ' + pe.message);
       }
 
       // ── Export question snapshot (JSON) ──────────────────────────────
@@ -396,7 +396,7 @@ function archiveSurveyPeriod_(periodId) {
         if (existingQ.hasNext()) existingQ.next().setTrashed(true);
         periodFolder.createFile('questions.json', questionsJson, 'application/json');
       } catch(qe) {
-        Logger.log('archiveSurveyPeriod_: question export error: ' + qe.message);
+        log_('archiveSurveyPeriod_', 'question export error: ' + qe.message);
       }
 
       // ── Export responses CSV ──────────────────────────────────────────
@@ -422,11 +422,11 @@ function archiveSurveyPeriod_(periodId) {
           periodFolder.createFile('responses.csv', csvLines.join('\n'), 'text/csv');
         }
       } catch(re) {
-        Logger.log('archiveSurveyPeriod_: response export error: ' + re.message);
+        log_('archiveSurveyPeriod_', 'response export error: ' + re.message);
       }
 
     } catch(de) {
-      Logger.log('archiveSurveyPeriod_: Drive error: ' + de.message);
+      log_('archiveSurveyPeriod_', 'Drive error: ' + de.message);
     }
 
     // ── Mark period as Closed in _Survey_Periods ──────────────────────
@@ -435,10 +435,10 @@ function archiveSurveyPeriod_(periodId) {
     rowData[C.ARCHIVE_URL - 1] = pastFolderUrl;
     periodsSheet.getRange(periodRow, 1, 1, 8).setValues([rowData]);
 
-    Logger.log('archiveSurveyPeriod_: Archived ' + periodId + ' → ' + (pastFolderUrl || '(no Drive URL)'));
+    log_('archiveSurveyPeriod_', 'Archived ' + periodId + ' → ' + (pastFolderUrl || '(no Drive URL)'));
 
   } catch(e) {
-    Logger.log('archiveSurveyPeriod_ error: ' + e.message);
+    log_('archiveSurveyPeriod_ error', e.message);
   }
 }
 
@@ -462,7 +462,7 @@ function incrementPeriodResponseCount_(periodId) {
       }
     }
   } catch(e) {
-    Logger.log('incrementPeriodResponseCount_ error: ' + e.message);
+    log_('incrementPeriodResponseCount_ error', e.message);
   } finally {
     lock.releaseLock();
   }
@@ -483,12 +483,12 @@ function autoTriggerQuarterlyPeriod() {
   // Only open on the 1st day of quarter-start months: Jan(0), Apr(3), Jul(6), Oct(9)
   var quarterStarts = [0, 3, 6, 9];
   if (quarterStarts.indexOf(month) === -1 || day !== 1) {
-    Logger.log('autoTriggerQuarterlyPeriod: not a quarter start, skipping.');
+    log_('autoTriggerQuarterlyPeriod', 'not a quarter start, skipping.');
     return;
   }
 
   var result = openNewSurveyPeriod('Auto (quarterly trigger)');
-  Logger.log('autoTriggerQuarterlyPeriod: ' + JSON.stringify(result));
+  log_('autoTriggerQuarterlyPeriod', JSON.stringify(result));
 }
 
 /**
@@ -513,7 +513,7 @@ function setupQuarterlyTrigger() {
     .atHour(6)  // 6 AM
     .create();
 
-  Logger.log('setupQuarterlyTrigger: Monthly trigger installed for autoTriggerQuarterlyPeriod on day 1 at 6 AM.');
+  log_('setupQuarterlyTrigger', 'Monthly trigger installed for autoTriggerQuarterlyPeriod on day 1 at 6 AM.');
   SpreadsheetApp.getActiveSpreadsheet()
     .toast('Quarterly survey trigger installed. New periods will open automatically on Jan 1, Apr 1, Jul 1, Oct 1.', 'Survey Engine', 5);
 }
@@ -600,7 +600,7 @@ function getPendingSurveyMembers() {
         }
       }
     } catch(enrichErr) {
-      Logger.log('getPendingSurveyMembers enrichment error: ' + enrichErr.message);
+      log_('getPendingSurveyMembers enrichment error', enrichErr.message);
     }
 
     // Second pass: build enriched pending member objects
@@ -640,7 +640,7 @@ function getPendingSurveyMembers() {
     };
 
   } catch(e) {
-    Logger.log('getPendingSurveyMembers error: ' + e.message);
+    log_('getPendingSurveyMembers error', e.message);
     return { periodId: null, periodName: null, total: 0, pending: 0, completed: 0, rate: 0, members: [] };
   }
 }
@@ -673,7 +673,7 @@ function getSatisfactionSummary() {
     try {
       var cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+    } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
     var ss       = SpreadsheetApp.getActiveSpreadsheet();
     var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
@@ -738,11 +738,11 @@ function getSatisfactionSummary() {
       sections:      sections
     };
 
-    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 600); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 600); } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
     return result;
 
   } catch(e) {
-    Logger.log('getSatisfactionSummary error: ' + e.message);
+    log_('getSatisfactionSummary error', e.message);
     return { periodId: null, periodName: '', responseCount: 0, sections: {} };
   }
 }
@@ -771,12 +771,12 @@ function pushSurveyOpenNotification_(periodName) {
         expiresDate: '',
         recipient: 'All'
       });
-      Logger.log('pushSurveyOpenNotification_: Notification created for ' + periodName);
+      log_('pushSurveyOpenNotification_', 'Notification created for ' + periodName);
     } else {
-      Logger.log('pushSurveyOpenNotification_: createNotification not available, skipping.');
+      log_('pushSurveyOpenNotification_', 'createNotification not available, skipping.');
     }
   } catch(e) {
-    Logger.log('pushSurveyOpenNotification_ error: ' + e.message);
+    log_('pushSurveyOpenNotification_ error', e.message);
   }
 }
 
@@ -796,7 +796,7 @@ function autoSurveyReminderWeekly() {
       sendSurveyCompletionReminders();
     }
   } catch(e) {
-    Logger.log('autoSurveyReminderWeekly error: ' + e.message);
+    log_('autoSurveyReminderWeekly error', e.message);
   }
 }
 
@@ -818,7 +818,7 @@ function setupWeeklyReminderTrigger() {
     .atHour(9)
     .create();
 
-  Logger.log('setupWeeklyReminderTrigger: Weekly reminder trigger installed (Tuesdays at 9 AM).');
+  log_('setupWeeklyReminderTrigger', 'Weekly reminder trigger installed (Tuesdays at 9 AM).');
 }
 
 // ── Global wrappers (callable from webapp via google.script.run) ─────────────
@@ -935,7 +935,7 @@ function menuInstallSurveyTriggers() {
   try {
     SpreadsheetApp.getUi().alert('Triggers Installed', msg, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (_uiErr) {
-    Logger.log(msg);
+    log_('menuInstallSurveyTriggers', msg);
   }
 }
 
@@ -1020,7 +1020,7 @@ function menuToggleRTOSection() {
     var cache = CacheService.getScriptCache();
     cache.remove('surveyQuestions_v1');
     cache.remove('satisfactionColMap_v1');
-  } catch (_c) { Logger.log('_c: ' + (_c.message || _c)); }
+  } catch (_c) { log_('_c', (_c.message || _c)); }
 
   var action = currentlyActive ? 'deactivated (hidden)' : 'activated (visible)';
   ui.alert(
@@ -1078,7 +1078,7 @@ function isRTOToggleLocked_(ss) {
 
     return true; // No closed periods yet
   } catch(e) {
-    Logger.log('isRTOToggleLocked_ error: ' + e.message);
+    log_('isRTOToggleLocked_ error', e.message);
     return true; // Default to locked on error
   }
 }
@@ -1100,5 +1100,5 @@ function setupOpenDeferredTrigger() {
     .forSpreadsheet(SpreadsheetApp.getActive())
     .onOpen()
     .create();
-  Logger.log('setupOpenDeferredTrigger: onOpenDeferred_ installed as installable onOpen trigger.');
+  log_('setupOpenDeferredTrigger', 'onOpenDeferred_ installed as installable onOpen trigger.');
 }

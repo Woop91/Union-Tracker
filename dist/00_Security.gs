@@ -114,7 +114,7 @@ function enableDashboardMemberAuth() {
 
   var props = PropertiesService.getScriptProperties();
   props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'true');
-  Logger.log('Dashboard member authentication ENABLED');
+  log_('enableDashboardMemberAuth', 'Dashboard member authentication ENABLED');
 
   if (typeof secureLog === 'function') {
     secureLog('DashboardAuthEnabled', 'Member auth required for dashboards', {});
@@ -135,7 +135,7 @@ function enableDashboardMemberAuth() {
 function disableDashboardMemberAuth() {
   var props = PropertiesService.getScriptProperties();
   props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'false');
-  Logger.log('Dashboard member authentication DISABLED');
+  log_('disableDashboardMemberAuth', 'Dashboard member authentication DISABLED');
 
   if (typeof secureLog === 'function') {
     secureLog('DashboardAuthDisabled', 'Member auth not required for dashboards', {});
@@ -223,8 +223,10 @@ function escapeForFormula(input) {
     .replace(/\\/g, '\\\\')    // Escape backslashes
     .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
     .replace(/\t/g, ' ')       // Replace tab characters (tab can trigger formula interpretation)
-    .replace(/^(\s*)[=+\-@]/, function(match, leadingSpace) {
-      // Prefix formula-starting characters with a single quote, even after leading whitespace
+    .replace(/^(\s*)[=+\-@]/, function(match) {
+      // Prefix formula-starting characters with a single quote, even after leading whitespace.
+      // Input is single-line at this point (\r\n already replaced with spaces above),
+      // so no multiline flag needed — just re-check after tab→space replacement.
       return "'" + match;
     });
 }
@@ -295,7 +297,7 @@ function checkWebAppAuthorization(requiredRole, sessionToken) {
     // Previously this auto-authorized non-privileged users, exposing member data
     // if an admin disabled AC to troubleshoot. Now disabled = locked down.
     if (!ACCESS_CONTROL.ENABLED) {
-      Logger.log('ACCESS_CONTROL is disabled — denying access (fail-secure). Re-enable to restore normal operation.');
+      log_('checkWebAppAuthorization', 'ACCESS_CONTROL is disabled — denying access (fail-secure). Re-enable to restore normal operation.');
       result.message = 'Access control is currently disabled. Contact your administrator to re-enable it.';
       return result;
     }
@@ -321,7 +323,7 @@ function checkWebAppAuthorization(requiredRole, sessionToken) {
 
   } catch (e) {
     result.message = 'Authorization check failed: ' + e.message;
-    Logger.log('Authorization error: ' + e.message);
+    log_('Authorization error', e.message);
     return result;
   }
 }
@@ -353,16 +355,28 @@ function getUserRole_(email) {
       return role;
     }
 
-    // Check if user is in the stewards list
+    // Delegate to DataService's O(1) email index when available (avoids full sheet scan)
+    if (typeof DataService !== 'undefined' && typeof DataService.getUserRole === 'function') {
+      var dsRole = DataService.getUserRole(email);
+      if (dsRole) {
+        role = dsRole;
+        try { CacheService.getScriptCache().put(cacheKey, role, ACCESS_CONTROL.AUTH_CACHE_DURATION || 300); } catch(_) {}
+        return role;
+      }
+      // DataService returned null → user not in directory → anonymous
+      return 'anonymous';
+    }
+
+    // Fallback: scan Member Directory directly (DataService not yet loaded or unavailable)
     if (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) {
       var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberSheet) {
         var data = memberSheet.getDataRange().getValues();
         for (var i = 1; i < data.length; i++) {
-          var memberEmail = data[i][MEMBER_COLS.EMAIL - 1] || '';
+          var memberEmail = col_(data[i], MEMBER_COLS.EMAIL) || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
-            var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
-            var roleCol = MEMBER_COLS.ROLE ? data[i][MEMBER_COLS.ROLE - 1] : '';
+            var isSteward = col_(data[i], MEMBER_COLS.IS_STEWARD);
+            var roleCol = MEMBER_COLS.ROLE ? col_(data[i], MEMBER_COLS.ROLE) : '';
             var roleRaw = String(roleCol || '').trim().toLowerCase();
             var isBoth = roleRaw === 'both' || roleRaw === 'steward/member';
             if (isBoth) {
@@ -381,7 +395,7 @@ function getUserRole_(email) {
 
     return 'anonymous';
   } catch (e) {
-    Logger.log('Error getting user role: ' + e.message);
+    log_('Error getting user role', e.message);
     return 'anonymous';
   }
 }
@@ -486,7 +500,7 @@ function secureLog(context, message, data) {
     logMessage += ' | Data: ' + JSON.stringify(maskObjectPII_(data));
   }
 
-  Logger.log(logMessage);
+  log_('secureLog', logMessage);
 }
 
 // ============================================================================
@@ -640,7 +654,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       try {
         chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
         adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
 
       if (chiefEmail) recipients.push(chiefEmail);
       if (adminEmails) {
@@ -656,7 +670,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       try {
         var ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
         if (ownerEmail) recipients.push(ownerEmail);
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
 
     // FIX-SEC-01 (cont): Quota check removed — safeSendEmail_() handles this internally.
@@ -697,7 +711,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     });
 
   } catch (e) {
-    Logger.log('Failed to send security alert email: ' + e.message);
+    log_('Failed to send security alert email', e.message);
   }
 }
 
@@ -744,7 +758,7 @@ function queueSecurityDigestEvent_(eventType, description, details) {
       props.setProperty('SECURITY_DIGEST_QUEUE', jsonStr);
     } finally { lock.releaseLock(); }
   } catch (e) {
-    Logger.log('Failed to queue security digest event: ' + e.message);
+    log_('Failed to queue security digest event', e.message);
   }
 }
 
@@ -765,10 +779,10 @@ function sendDailySecurityDigest() {
     var auditIntegrity = null;
     var vaultIntegrity = null;
     if (typeof verifyAuditLogIntegrity === 'function') {
-      try { auditIntegrity = verifyAuditLogIntegrity(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      try { auditIntegrity = verifyAuditLogIntegrity(); } catch (_e) { log_('_e', (_e.message || _e)); }
     }
     if (typeof verifySurveyVaultIntegrity === 'function') {
-      try { vaultIntegrity = verifySurveyVaultIntegrity(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      try { vaultIntegrity = verifySurveyVaultIntegrity(); } catch (_e) { log_('_e', (_e.message || _e)); }
     }
 
     // Gather recipients
@@ -784,13 +798,13 @@ function sendDailySecurityDigest() {
             if (trimmed && recipients.indexOf(trimmed) === -1) recipients.push(trimmed);
           });
         }
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
     if (recipients.length === 0) {
       try {
         var ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
         if (ownerEmail) recipients.push(ownerEmail);
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
 
     if (recipients.length === 0) return;
@@ -867,11 +881,11 @@ function sendDailySecurityDigest() {
     // Clear the queue only after successful email send
     props.setProperty('SECURITY_DIGEST_QUEUE', '[]');
 
-    Logger.log('Security digest sent with ' + queue.length + ' events');
+    log_('sendDailySecurityDigest', 'Security digest sent with ' + queue.length + ' events');
 
   } catch (e) {
     // Events remain in the queue so the next digest run can retry
-    Logger.log('Failed to send security digest: ' + e.message);
+    log_('Failed to send security digest', e.message);
   }
 }
 

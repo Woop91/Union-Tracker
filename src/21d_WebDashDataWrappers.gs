@@ -37,13 +37,13 @@ function _resolveCallerEmail(sessionToken) {
   try {
     var email = Session.getActiveUser().getEmail();
     if (email) return email.toLowerCase().trim();
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
   // Fallback: verify session token server-side — never trust plain email from client
   if (sessionToken && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
     var tokenEmail = Auth.resolveEmailFromToken(sessionToken);
     if (tokenEmail) return tokenEmail.toLowerCase().trim();
   }
-  return '';
+  return null;
 }
 
 /**
@@ -96,7 +96,7 @@ function dataGetMemberGrievances(sessionToken) { if (_isPINSession(sessionToken)
 /** @param {string} sessionToken @returns {Object} Member's closed grievance history. Requires auth. PIN-restricted. */
 function dataGetMemberGrievanceHistory(sessionToken) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; if (!_isGrievancesEnabled()) return { success: true, history: [] }; return DataService.getMemberGrievanceHistory(e); }
 /** @param {string} sessionToken @param {string} stewardEmail @returns {Object|null} Steward contact info. Requires auth. PIN-restricted. */
-function dataGetStewardContact(sessionToken, stewardEmail) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) { Logger.log('dataGetStewardContact: auth failed'); return null; } return DataService.getStewardContact(stewardEmail || e); }
+function dataGetStewardContact(sessionToken, stewardEmail) { if (_isPINSession(sessionToken)) return _PIN_RESTRICTED_RESPONSE; var e = _resolveCallerEmail(sessionToken); if (!e) { log_('dataGetStewardContact', 'auth failed'); return null; } return DataService.getStewardContact(stewardEmail || e); }
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 // Steward: view any member's full profile; Member: view own profile only
@@ -162,7 +162,7 @@ function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(session
 /** @param {string} sessionToken @returns {Object[]} All members from directory. Requires steward auth. */
 function dataGetAllMembers(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getAllMembers(); }
 /** @param {string} sessionToken @param {string} [scope] @returns {Object} Survey tracking for steward's members. Requires steward auth. */
-function dataGetStewardSurveyTracking(sessionToken, scope) { var s = _requireStewardAuth(sessionToken); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
+function dataGetStewardSurveyTracking(sessionToken, scope) { var s = _requireStewardAuth(sessionToken); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { log_('dataGetStewardSurveyTracking error', e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
 /** @param {string} sessionToken @param {Object} filter @param {string} msg @param {string} subject @returns {Object} Sends broadcast email. Requires steward auth. */
 function dataSendBroadcast(sessionToken, filter, msg, subject) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg, subject); }
 /** @param {string} sessionToken @returns {Object} Aggregated survey results. Requires steward auth. */
@@ -176,9 +176,9 @@ function dataSubmitSurveyResponse(sessionToken, responses) { var e = _resolveCal
 /** @param {string} sessionToken @param {string} memberEmail @param {string} type @param {string} notes @param {string} duration @param {string} memberName @returns {Object} Logs member contact. Requires steward auth. */
 function dataLogMemberContact(sessionToken, memberEmail, type, notes, duration, memberName) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.logMemberContact(s, memberEmail, type, notes, duration, memberName); }); }
 /** @param {string} sessionToken @param {string} memberEmail @returns {Object[]} Contact history for a member. Requires steward auth. */
-function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) { Logger.log('dataGetMemberContactHistory: auth failed'); return []; } return DataService.getMemberContactHistory(s, memberEmail); }
+function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) { log_('dataGetMemberContactHistory', 'auth failed'); return []; } return DataService.getMemberContactHistory(s, memberEmail); }
 /** @param {string} sessionToken @returns {Object[]} Full contact log for a steward. Requires steward auth. */
-function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) { Logger.log('dataGetStewardContactLog: auth failed'); return []; } return DataService.getStewardContactLog(s); }
+function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) { log_('dataGetStewardContactLog', 'auth failed'); return []; } return DataService.getStewardContactLog(s); }
 
 // S2: Batch badge counts — replaces 3 serial client calls with 1 round-trip
 /**
@@ -229,13 +229,13 @@ function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
         }
       }
     } catch (driveErr) {
-      Logger.log('dataSendDirectMessage Drive log error: ' + driveErr.message);
+      log_('dataSendDirectMessage Drive log error', driveErr.message);
       // Non-fatal — email already sent
     }
 
     return { success: true, message: 'Message sent.' };
   } catch (e) {
-    Logger.log('dataSendDirectMessage error: ' + e.message);
+    log_('dataSendDirectMessage error', e.message);
     return { success: false, message: 'Failed to send: ' + e.message };
   }
 }
@@ -272,7 +272,7 @@ function dataGetMemberCaseFolderUrl(sessionToken, memberEmail) {
     if (target.driveFolderUrl) return { success: true, url: target.driveFolderUrl, grievanceId: target.grievanceId };
     return { success: false, url: null, message: 'No Drive folder linked to this case.' };
   } catch (e) {
-    Logger.log('dataGetMemberCaseFolderUrl error: ' + e.message);
+    log_('dataGetMemberCaseFolderUrl error', e.message);
     return { success: false, url: null, message: 'Error fetching case folder.' };
   }
 }
@@ -302,7 +302,7 @@ function dataGetTasks(sessionToken, statusFilter) { var s = _requireStewardAuth(
 /** @param {string} sessionToken @param {string} taskId @returns {Object} Completes a steward task. Requires steward auth. */
 function dataCompleteTask(sessionToken, taskId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.completeTask(s, taskId); }); }
 /** @param {string} sessionToken @returns {Object} Member stats for steward's caseload. Requires auth. */
-function dataGetStewardMemberStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
+function dataGetStewardMemberStats(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { log_('dataGetStewardMemberStats error', err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
 /**
  * Returns the steward directory with phone visibility based on caller's role. Requires auth.
  * @param {string} sessionToken
@@ -316,7 +316,7 @@ function dataGetStewardDirectory(sessionToken) {
     var callerIsSteward = callerRec && (callerRec.isSteward === true);
     return DataService.getStewardDirectory(callerIsSteward);
   } catch (err) {
-    Logger.log('dataGetStewardDirectory error: ' + err.message + '\n' + (err.stack || ''));
+    log_('dataGetStewardDirectory error', err.message + '\n' + (err.stack || ''));
     return [];
   }
 }
@@ -326,13 +326,13 @@ function dataGetStewardDirectory(sessionToken) {
 // ═══════════════════════════════════════
 
 /** @param {string} sessionToken @returns {Object[]} Non-member contacts. Steward-only. */
-function dataGetNonMemberContacts(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; try { return DataService.getNonMemberContacts(); } catch (err) { Logger.log('dataGetNonMemberContacts error: ' + err.message); return []; } }
+function dataGetNonMemberContacts(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; try { return DataService.getNonMemberContacts(); } catch (err) { log_('dataGetNonMemberContacts error', err.message); return []; } }
 /** @param {string} sessionToken @param {Object} data @returns {Object} Add non-member contact. Steward-only. */
-function dataAddNonMemberContact(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.addNonMemberContact(data); } catch (err) { Logger.log('dataAddNonMemberContact error: ' + err.message); return { success: false, error: err.message }; } }); }
+function dataAddNonMemberContact(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.addNonMemberContact(data); } catch (err) { log_('dataAddNonMemberContact error', err.message); return { success: false, error: err.message }; } }); }
 /** @param {string} sessionToken @param {string} contactId @param {Object} data @returns {Object} Update non-member contact. Steward-only. */
-function dataUpdateNonMemberContact(sessionToken, contactId, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.updateNonMemberContact(contactId, data); } catch (err) { Logger.log('dataUpdateNonMemberContact error: ' + err.message); return { success: false, error: err.message }; } }); }
+function dataUpdateNonMemberContact(sessionToken, contactId, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.updateNonMemberContact(contactId, data); } catch (err) { log_('dataUpdateNonMemberContact error', err.message); return { success: false, error: err.message }; } }); }
 /** @param {string} sessionToken @param {string} contactId @returns {Object} Delete non-member contact. Steward-only. */
-function dataDeleteNonMemberContact(sessionToken, contactId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.deleteNonMemberContact(contactId); } catch (err) { Logger.log('dataDeleteNonMemberContact error: ' + err.message); return { success: false, error: err.message }; } }); }
+function dataDeleteNonMemberContact(sessionToken, contactId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, error: 'Not authorized.' }; return withScriptLock_(function() { try { return DataService.deleteNonMemberContact(contactId); } catch (err) { log_('dataDeleteNonMemberContact error', err.message); return { success: false, error: err.message }; } }); }
 
 // ─── ADD MEMBER (webapp) ──────────────────────────────────────────────────────
 /** @param {string} sessionToken @returns {Object} Config-driven dropdown options for the Add Member form. Steward-only. */
@@ -363,7 +363,7 @@ function dataGetAddMemberOptions(sessionToken) {
       duesStatuses:  _configList(CONFIG_COLS.DUES_STATUSES)
     };
   } catch (err) {
-    Logger.log('dataGetAddMemberOptions error: ' + err.message);
+    log_('dataGetAddMemberOptions error', err.message);
     return { success: false, error: err.message };
   }
 }
@@ -437,11 +437,11 @@ function dataAddMemberFromWebapp(sessionToken, memberData) {
           if (_v && _ddFields[_d].col) addToConfigDropdown_(_ddFields[_d].col, _v);
         }
       } catch (_syncErr) {
-        Logger.log('dataAddMemberFromWebapp config sync: ' + _syncErr.message);
+        log_('dataAddMemberFromWebapp config sync', _syncErr.message);
       }
       return { success: true, memberId: memberId, message: 'Member added successfully.' };
     } catch (err) {
-      Logger.log('dataAddMemberFromWebapp error: ' + err.message);
+      log_('dataAddMemberFromWebapp error', err.message);
       return { success: false, error: err.message };
     }
   });
@@ -522,11 +522,11 @@ function dataGetInsightsBatch(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { stats: { available: false }, hotSpots: [], perf: [], sat: { categories: [] }, memberStats: null, workload: { available: false } };
   var result = {};
-  try { result.stats = DataService.getGrievanceStats(); } catch (_e) { result.stats = { available: false }; Logger.log('InsightsBatch stats: ' + _e.message); }
-  try { result.hotSpots = DataService.getGrievanceHotSpots(); } catch (_e) { result.hotSpots = []; Logger.log('InsightsBatch hotSpots: ' + _e.message); }
-  try { result.perf = DataService.getAllStewardPerformance(); } catch (_e) { result.perf = []; Logger.log('InsightsBatch perf: ' + _e.message); }
-  try { result.sat = DataService.getSatisfactionTrends(); } catch (_e) { result.sat = { categories: [] }; Logger.log('InsightsBatch sat: ' + _e.message); }
-  try { result.memberStats = DataService.getMembershipStats(); } catch (_e) { result.memberStats = null; Logger.log('InsightsBatch memberStats: ' + _e.message); }
+  try { result.stats = DataService.getGrievanceStats(); } catch (_e) { result.stats = { available: false }; log_('InsightsBatch stats', _e.message); }
+  try { result.hotSpots = DataService.getGrievanceHotSpots(); } catch (_e) { result.hotSpots = []; log_('InsightsBatch hotSpots', _e.message); }
+  try { result.perf = DataService.getAllStewardPerformance(); } catch (_e) { result.perf = []; log_('InsightsBatch perf', _e.message); }
+  try { result.sat = DataService.getSatisfactionTrends(); } catch (_e) { result.sat = { categories: [] }; log_('InsightsBatch sat', _e.message); }
+  try { result.memberStats = DataService.getMembershipStats(); } catch (_e) { result.memberStats = null; log_('InsightsBatch memberStats', _e.message); }
   result.workload = { available: false };
   return result;
 }
@@ -541,7 +541,7 @@ function dataRefreshNavData(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { kpis: null, badges: { notificationCount: 0, taskCount: 0, overdueTaskCount: 0, qaUnansweredCount: 0 } };
   var kpis = null;
-  try { kpis = DataService.getStewardKPIs(s); } catch (_e) { Logger.log('RefreshNavData kpis: ' + _e.message); }
+  try { kpis = DataService.getStewardKPIs(s); } catch (_e) { log_('RefreshNavData kpis', _e.message); }
   var badges = DataService.getBadgeCounts(s, 'steward');
   return { kpis: kpis, badges: badges };
 }
@@ -614,7 +614,7 @@ function dataAddMeetingMinutes(sessionToken, data, idemKey) { var s = _requireSt
  */
 function BACKFILL_MINUTES_DRIVE_DOCS() {
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { log_('_e', (_e.message || _e)); }
 
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) return { processed: 0, skipped: 0, errors: 0, message: 'No active spreadsheet.' };
@@ -634,7 +634,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
     if (!minutesFolderId) {
       minutesFolderId = PropertiesService.getScriptProperties().getProperty('MINUTES_FOLDER_ID') || '';
     }
-  } catch (_re) { Logger.log('_re: ' + (_re.message || _re)); }
+  } catch (_re) { log_('_re', (_re.message || _re)); }
 
   var data      = sheet.getDataRange().getValues();
   var tz        = Session.getScriptTimeZone();
@@ -700,7 +700,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
         try {
           DriveApp.getFolderById(minutesFolderId).addFile(docFile);
           DriveApp.getRootFolder().removeFile(docFile);
-        } catch (_mv) { Logger.log('_mv: ' + (_mv.message || _mv)); }
+        } catch (_mv) { log_('_mv', (_mv.message || _mv)); }
       }
 
       // Write URL back to sheet immediately (0-indexed col + 1 = 1-indexed for getRange)
@@ -715,7 +715,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
       }
 
     } catch (docErr) {
-      Logger.log('BACKFILL_MINUTES_DRIVE_DOCS row ' + i + ': ' + docErr.message);
+      log_('BACKFILL_MINUTES_DRIVE_DOCS', 'BACKFILL_MINUTES_DRIVE_DOCS row ' + i + ': ' + docErr.message);
       errors++;
     }
   }
@@ -731,7 +731,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
 
   if (ui) ui.alert('\uD83D\uDCC4 Minutes Backfill', summary, ui.ButtonSet.OK);
   else ss.toast('\u2705 Backfill done: ' + processed + ' created, ' + errors + ' errors.', '\uD83D\uDCC4 Minutes Backfill', 8);
-  Logger.log('BACKFILL_MINUTES_DRIVE_DOCS: processed=' + processed + ' skipped=' + skipped + ' errors=' + errors);
+  log_('BACKFILL_MINUTES_DRIVE_DOCS', 'processed=' + processed + ' skipped=' + skipped + ' errors=' + errors);
   return { processed: processed, skipped: skipped, errors: errors, message: summary };
 }
 // OPT-1: Dedicated steward dashboard init — single round-trip combining cases, KPIs, badges, member count.
@@ -791,7 +791,7 @@ function dataEnsureSheetsIfNeeded(sessionToken) {
     props.setProperty(initKey, new Date().toISOString());
     return { initialized: true };
   } catch (err) {
-    Logger.log('Auto-init sheets warning: ' + err.message);
+    log_('Auto-init sheets warning', err.message);
     return { initialized: false, error: err.message };
   }
 }
@@ -848,7 +848,7 @@ function _ensureAllSheetsInternal() {
       created.push(pair[0]);
     } catch (err) {
       failed.push(pair[0] + ': ' + err.message);
-      Logger.log('Auto-init ' + pair[0] + ' failed: ' + err.message);
+      log_('_ensureAllSheetsInternal', 'Auto-init ' + pair[0] + ' failed: ' + err.message);
     }
   });
 
@@ -886,7 +886,7 @@ function dataGetBroadcastFilterOptions(sessionToken) {
     try {
       var config = ConfigReader.getConfig();
       broadcastScopeAll = (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes');
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
     return {
       locations: Object.keys(locations).sort(),
       officeDays: Object.keys(officeDays).sort(),
@@ -895,7 +895,7 @@ function dataGetBroadcastFilterOptions(sessionToken) {
       totalMembers: members.length
     };
   } catch (e) {
-    Logger.log('dataGetBroadcastFilterOptions error: ' + e.message + '\n' + (e.stack || ''));
+    log_('dataGetBroadcastFilterOptions error', e.message + '\n' + (e.stack || ''));
     return { locations: [], officeDays: [], hasDuesPayingColumn: false, broadcastScopeAll: false, totalMembers: 0 };
   }
 }
@@ -990,7 +990,7 @@ function dataLogResourceClick(sessionToken, resourceId, resourceTitle) {
     sheet.appendRow([new Date(), email, String(resourceId), String(resourceTitle || '')]);
     return { success: true };
   } catch (e) {
-    Logger.log('dataLogResourceClick error: ' + e.message);
+    log_('dataLogResourceClick error', e.message);
     return { success: false };
   }
 }
@@ -1056,14 +1056,14 @@ function dataGetEngagementStats(sessionToken) {
         if (status === 'completed') completedCount++;
       }
       surveyParticipation = stRows.length > 0 ? Math.round((completedCount / Math.max(totalMembers, 1)) * 100) : 0;
-    } catch (_se) { Logger.log('_se: ' + (_se.message || _se)); }
+    } catch (_se) { log_('_se', (_se.message || _se)); }
 
     // ── Weekly question votes ───────────────────────────────────────────────
     var weeklyQuestionVotes = 0;
     try {
       var wqRows = _rows(SHEETS.WEEKLY_RESPONSES || '_Weekly_Responses');
       weeklyQuestionVotes = wqRows.length;
-    } catch (_we) { Logger.log('_we: ' + (_we.message || _we)); }
+    } catch (_we) { log_('_we', (_we.message || _we)); }
 
     // ── Event attendance (unique members at any meeting) ────────────────────
     var eventAttendance = 0;
@@ -1076,7 +1076,7 @@ function dataGetEngagementStats(sessionToken) {
         if (ciEmail) attendeeSet[ciEmail] = true;
       }
       eventAttendance = Object.keys(attendeeSet).length;
-    } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+    } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
     // ── Grievance filing rate ───────────────────────────────────────────────
     var grievanceFilingRate = 0;
@@ -1096,7 +1096,7 @@ function dataGetEngagementStats(sessionToken) {
           grievanceFilingRate = Math.round((grievants.length / totalMembers) * 100);
         }
       }
-    } catch (_ge) { Logger.log('_ge: ' + (_ge.message || _ge)); }
+    } catch (_ge) { log_('_ge', (_ge.message || _ge)); }
 
     // ── Steward contact rate ────────────────────────────────────────────────
     var stewardContactRate = 0;
@@ -1113,7 +1113,7 @@ function dataGetEngagementStats(sessionToken) {
         var contacted = Object.keys(contactedSet).filter(function(e) { return memberEmails.indexOf(e) >= 0; });
         stewardContactRate = Math.round((contacted.length / totalMembers) * 100);
       }
-    } catch (_cl) { Logger.log('_cl: ' + (_cl.message || _cl)); }
+    } catch (_cl) { log_('_cl', (_cl.message || _cl)); }
 
     // ── Resource views (v4.32.1 — total clicks from _Resource_Click_Log) ────
     // ── Membership trends (last 6 months, by hire date) ─────────────────────
@@ -1147,7 +1147,7 @@ function dataGetEngagementStats(sessionToken) {
         }
         for (var mk2 in monthMap) membershipTrends.push(monthMap[mk2]);
       }
-    } catch (_te) { Logger.log('_te: ' + (_te.message || _te)); }
+    } catch (_te) { log_('_te', (_te.message || _te)); }
 
     // ── Meeting attendance trends (last 6 months) ─────────────────────────
     var meetingTrends = [];
@@ -1186,7 +1186,7 @@ function dataGetEngagementStats(sessionToken) {
           avgMeetingAttendance = meetingTrends.length > 0 ? Math.round(mtAttTotal / meetingTrends.length) : 0;
         }
       }
-    } catch (_mt) { Logger.log('_mt: ' + (_mt.message || _mt)); }
+    } catch (_mt) { log_('_mt', (_mt.message || _mt)); }
 
     // ── Contact Log volume (last 6 months) ──────────────────────────────
     var contactTrends = [];
@@ -1211,13 +1211,13 @@ function dataGetEngagementStats(sessionToken) {
         }
         for (var clk in clMap) contactTrends.push({ month: clk, count: clMap[clk] });
       }
-    } catch (_cl2) { Logger.log('_cl2: ' + (_cl2.message || _cl2)); }
+    } catch (_cl2) { log_('_cl2', (_cl2.message || _cl2)); }
 
     // ── Satisfaction trends ──────────────────────────────────────────────
     var satisfactionData = null;
     try {
       satisfactionData = DataService.getSatisfactionTrends();
-    } catch (_sat) { Logger.log('_sat: ' + (_sat.message || _sat)); }
+    } catch (_sat) { log_('_sat', (_sat.message || _sat)); }
 
     // ── Steward task completion rate ─────────────────────────────────────
     var taskCompletionRate = null;
@@ -1237,7 +1237,7 @@ function dataGetEngagementStats(sessionToken) {
         }
         taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : null;
       }
-    } catch (_tk) { Logger.log('_tk: ' + (_tk.message || _tk)); }
+    } catch (_tk) { log_('_tk', (_tk.message || _tk)); }
 
     // ── Notification engagement ──────────────────────────────────────────
     var notifTotal = 0;
@@ -1258,7 +1258,7 @@ function dataGetEngagementStats(sessionToken) {
           if (nDismissed) notifDismissed++;
         }
       }
-    } catch (_ni) { Logger.log('_ni: ' + (_ni.message || _ni)); }
+    } catch (_ni) { log_('_ni', (_ni.message || _ni)); }
 
     // ── QA Forum activity ────────────────────────────────────────────────
     var qaQuestions = 0;
@@ -1276,7 +1276,7 @@ function dataGetEngagementStats(sessionToken) {
           qaUpvotes += parseInt(qaData[qi][6], 10) || 0;
         }
       }
-    } catch (_qa) { Logger.log('_qa: ' + (_qa.message || _qa)); }
+    } catch (_qa) { log_('_qa', (_qa.message || _qa)); }
 
     // ── Steward coverage ratio & workload equity (v4.31.5) ───────────────
     var stewardCoverage = [];
@@ -1342,7 +1342,7 @@ function dataGetEngagementStats(sessionToken) {
           }
         }
       }
-    } catch (_sc) { Logger.log('_sc: ' + (_sc.message || _sc)); }
+    } catch (_sc) { log_('_sc', (_sc.message || _sc)); }
 
     return {
       surveyParticipation:  surveyParticipation,
@@ -1373,7 +1373,7 @@ function dataGetEngagementStats(sessionToken) {
       workloadEquity:        workloadEquity,
     };
   } catch (e) {
-    Logger.log('dataGetEngagementStats error: ' + e.message + '\n' + (e.stack || ''));
+    log_('dataGetEngagementStats error', e.message + '\n' + (e.stack || ''));
     return null;
   }
 }
@@ -1512,7 +1512,7 @@ function dataGetMyEngagementScore(sessionToken) {
       maxScore: 100
     };
   } catch (err) {
-    Logger.log('dataGetMyEngagementScore error: ' + err.message);
+    log_('dataGetMyEngagementScore error', err.message);
     return null;
   }
 }
@@ -1527,7 +1527,7 @@ function dataGetResourceStats(sessionToken) {
   try {
     return DataService.getResourceStats();
   } catch (e) {
-    Logger.log('dataGetResourceStats error: ' + e.message);
+    log_('dataGetResourceStats error', e.message);
     return null;
   }
 }
@@ -1542,7 +1542,7 @@ function dataLogTabVisit(sessionToken, tab, role) {
   try {
     return DataService.logTabVisit(e, tab, role);
   } catch (err) {
-    Logger.log('dataLogTabVisit error: ' + err.message);
+    log_('dataLogTabVisit error', err.message);
     return { success: false };
   }
 }
@@ -1556,7 +1556,7 @@ function dataGetUsageStats(sessionToken) {
   try {
     return DataService.getUsageStats();
   } catch (e) {
-    Logger.log('dataGetUsageStats error: ' + e.message);
+    log_('dataGetUsageStats error', e.message);
     return null;
   }
 }
@@ -1579,14 +1579,14 @@ function dataGetUsageStats(sessionToken) {
 function dataGetMemberCount(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
-  try { return DataService.getMemberCount(); } catch (e) { Logger.log('dataGetMemberCount error: ' + e.message); return { total: 0, withGrievances: 0 }; }
+  try { return DataService.getMemberCount(); } catch (e) { log_('dataGetMemberCount error', e.message); return { total: 0, withGrievances: 0 }; }
 }
 
 /** Returns distinct filter dropdown values for the Members finder panel. Requires steward auth. */
 function dataGetFilterDropdownValues(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { locations: [], units: [], stewards: [] };
-  try { return DataService.getFilterDropdownValues(); } catch (e) { Logger.log('dataGetFilterDropdownValues error: ' + e.message); return { locations: [], units: [], stewards: [] }; }
+  try { return DataService.getFilterDropdownValues(); } catch (e) { log_('dataGetFilterDropdownValues error', e.message); return { locations: [], units: [], stewards: [] }; }
 }
 
 /**
@@ -1598,7 +1598,7 @@ function dataGetFilterDropdownValues(sessionToken) {
 function dataGetMembersPaginated(sessionToken, opts) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
-  try { return DataService.getMembersPaginated(s, opts || {}); } catch (e) { Logger.log('dataGetMembersPaginated error: ' + e.message); return { members: [], total: 0, page: 1, pageSize: 25 }; }
+  try { return DataService.getMembersPaginated(s, opts || {}); } catch (e) { log_('dataGetMembersPaginated error', e.message); return { members: [], total: 0, page: 1, pageSize: 25 }; }
 }
 
 /**
@@ -1609,7 +1609,7 @@ function dataGetMembersPaginated(sessionToken, opts) {
 function dataGetSheetHealth(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
-  try { return DataService.getSheetHealth(); } catch (e) { Logger.log('dataGetSheetHealth error: ' + e.message); return { members: { rows: 0, status: 'ok' }, grievances: { rows: 0, status: 'ok' } }; }
+  try { return DataService.getSheetHealth(); } catch (e) { log_('dataGetSheetHealth error', e.message); return { members: { rows: 0, status: 'ok' }, grievances: { rows: 0, status: 'ok' } }; }
 }
 
 /**
@@ -1734,7 +1734,7 @@ function dataSetDefaultView(sessionToken, viewPref) {
     props.setProperty('defaultView_' + email.toLowerCase(), viewPref);
     return { success: true, defaultView: viewPref };
   } catch (err) {
-    Logger.log('dataSetDefaultView error: ' + err.message);
+    log_('dataSetDefaultView error', err.message);
     return { success: false, message: 'Failed to save preference.' };
   }
 }
@@ -1774,7 +1774,7 @@ function dataGetWebAppSearchResults(sessionToken, query, tab) {
     var results = getWebAppSearchResults(query || '', tab || 'all');
     return { success: true, results: results || [] };
   } catch (e) {
-    Logger.log('dataGetWebAppSearchResults error: ' + e.message);
+    log_('dataGetWebAppSearchResults error', e.message);
     return { success: false, message: 'Search failed: ' + e.message };
   }
 }
@@ -1796,7 +1796,7 @@ function dataUndoToIndex(sessionToken, targetIndex) {
     undoToIndex(Math.floor(targetIndex));
     return { success: true, message: 'Undone to index ' + targetIndex };
   } catch (e) {
-    Logger.log('dataUndoToIndex error: ' + e.message);
+    log_('dataUndoToIndex error', e.message);
     return { success: false, message: e.message };
   }
 }
@@ -1813,7 +1813,7 @@ function dataExportUndoHistory(sessionToken) {
     var url = exportUndoHistoryToSheet();
     return { success: true, sheetUrl: url };
   } catch (e) {
-    Logger.log('dataExportUndoHistory error: ' + e.message);
+    log_('dataExportUndoHistory error', e.message);
     return { success: false, message: e.message };
   }
 }
@@ -1830,7 +1830,7 @@ function dataGetUndoHistory(sessionToken) {
     var history = getUndoHistory();
     return { success: true, history: history };
   } catch (e) {
-    Logger.log('dataGetUndoHistory error: ' + e.message);
+    log_('dataGetUndoHistory error', e.message);
     return { success: false, message: e.message };
   }
 }
@@ -1852,7 +1852,7 @@ function dataWebCheckInMember(sessionToken, meetingId, pin) {
   try {
     return webCheckInMember(meetingId, email, pin);
   } catch (e) {
-    Logger.log('dataWebCheckInMember error: ' + e.message);
+    log_('dataWebCheckInMember error', e.message);
     return { success: false, message: 'Check-in failed: ' + e.message };
   }
 }
@@ -1915,7 +1915,7 @@ function dataGetDeadlineCalendarData(sessionToken) {
   try {
     return { success: true, data: getDeadlineCalendarData() };
   } catch (e) {
-    Logger.log('dataGetDeadlineCalendarData error: ' + e.message);
+    log_('dataGetDeadlineCalendarData error', e.message);
     return { success: false, message: e.message };
   }
 }
@@ -1935,7 +1935,7 @@ function dataGetCorrelationAlerts(sessionToken) {
   try {
     return { success: true, alerts: JSON.parse(getCorrelationAlerts(false)) };
   } catch (e) {
-    Logger.log('dataGetCorrelationAlerts error: ' + e.message);
+    log_('dataGetCorrelationAlerts error', e.message);
     return { success: true, alerts: [] };
   }
 }
@@ -1951,7 +1951,7 @@ function dataGetCorrelationSummary(sessionToken) {
   try {
     return { success: true, summary: JSON.parse(getCorrelationSummary(false)) };
   } catch (e) {
-    Logger.log('dataGetCorrelationSummary error: ' + e.message);
+    log_('dataGetCorrelationSummary error', e.message);
     return { success: true, summary: { total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, topInsights: [], actionableCount: 0, disabled: true } };
   }
 }
@@ -2178,7 +2178,7 @@ function dataBulkSendEmail(sessionToken, memberEmails, subject, body) {
       }
       sent++;
     } catch (e) {
-      Logger.log('Bulk email failed for ' + memberEmails[i] + ': ' + e.message);
+      log_('dataBulkSendEmail', 'Bulk email failed for ' + memberEmails[i] + ': ' + e.message);
     }
   }
   return { success: true, sent: sent };
@@ -2268,7 +2268,7 @@ function dataLogUsageEvents(sessionToken, payload) {
 
     return { success: true, logged: rows.length };
   } catch (err) {
-    Logger.log('dataLogUsageEvents error: ' + err.message);
+    log_('dataLogUsageEvents error', err.message);
     return { success: false, message: 'Logging failed.' };
   }
 }
@@ -2461,7 +2461,7 @@ function dataGetUsageAnalytics(sessionToken, days) {
       recentErrors: errors.slice(-20).reverse(),
     };
   } catch (err) {
-    Logger.log('dataGetUsageAnalytics error: ' + err.message);
+    log_('dataGetUsageAnalytics error', err.message);
     return { success: false, message: 'Analytics query failed.' };
   }
 }
@@ -2506,7 +2506,7 @@ function _getActiveMeetingForCheckIn(email) {
           }
         }
       }
-    } catch (_e) { Logger.log('_getActiveMeetingForCheckIn alreadyCheckedIn check: ' + _e.message); }
+    } catch (_e) { log_('_getActiveMeetingForCheckIn alreadyCheckedIn check', _e.message); }
 
     return {
       meetingId: meeting.id,
@@ -2516,7 +2516,7 @@ function _getActiveMeetingForCheckIn(email) {
       alreadyCheckedIn: alreadyCheckedIn
     };
   } catch (_e) {
-    Logger.log('_getActiveMeetingForCheckIn error: ' + _e.message);
+    log_('_getActiveMeetingForCheckIn error', _e.message);
     return null;
   }
 }

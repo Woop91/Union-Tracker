@@ -84,6 +84,9 @@ module.exports = [
         withErrorHandling: 'readonly',
         successResponse: 'readonly',
         errorResponse: 'readonly',
+        log_: 'readonly',
+        col_: 'readonly',
+        setCol_: 'readonly',
         isTruthyValue: 'readonly',
         PerformanceTimer: 'readonly',
         sanitizeForQuery: 'readonly',
@@ -191,7 +194,6 @@ module.exports = [
         TimelineService: 'readonly',
         TwoFactorService: 'readonly',
         WeeklyQuestions: 'readonly',
-        // WorkloadService excluded from SolidBase but still referenced in typeof guards
         WorkloadService: 'readonly',
         WorkloadPortal: 'readonly',
         TestRunner: 'readonly',
@@ -254,6 +256,8 @@ module.exports = [
         _sanitizeConfig: 'readonly',
 
         // Cross-file functions (02_DataManagers.gs)
+        MEMBER_FIELD_MAP: 'readonly',
+        applyFieldUpdates_: 'readonly',
         addMember: 'readonly',
         getMemberList: 'readonly',
         getMemberById: 'readonly',
@@ -313,6 +317,9 @@ module.exports = [
         applyWinRateGradients: 'readonly',
         openGrievanceFormForRow_: 'readonly',
         _refreshNavBadges: 'readonly',
+
+        // Cross-file functions (03_UIComponents.gs)
+        showDialog_: 'readonly',
 
         // Cross-file functions (03_UIFormatting.gs / 04_UIMenus.gs / UI)
         createDashboardMenu: 'readonly',
@@ -536,7 +543,7 @@ module.exports = [
         // Timeline
         tlAddTimelineEvent: 'readonly',
 
-        // Workload — excluded from SolidBase but still referenced in typeof guards
+        // Workload
         setupWorkloadReminderSystem: 'readonly',
         initWorkloadTrackerSheets: 'readonly',
         getWorkloadHistorySSO: 'readonly',
@@ -648,8 +655,8 @@ module.exports = [
         BACKFILL_MINUTES_DRIVE_DOCS: 'readonly',
         doGet: 'readonly',
         computeAuditRowHash_: 'readonly',
-        getOrCreateMinutesSheet: 'readonly'
-        // getVersionHistory_ is DDS-only (SB uses global VERSION_HISTORY)
+        getOrCreateMinutesSheet: 'readonly',
+        getVersionHistory_: 'readonly'
       }
     },
 

@@ -32,24 +32,6 @@
   <script type="application/json" id="page-data"><?!= pageData ?></script>
   <script>
  
- (function _migrateLSPrefix() {
-  if (localStorage.getItem('sb_ls_migrated')) return;
-  try {
-  var keys = Object.keys(localStorage);
-  for (var i = 0; i < keys.length; i++) {
-   if (keys[i].indexOf('sb_') === 0) {
-   var newKey = 'sb_' + keys[i].slice(4);
-   if (!localStorage.getItem(newKey)) {
-    localStorage.setItem(newKey, localStorage.getItem(keys[i]));
-   }
-   localStorage.removeItem(keys[i]);
-   }
-  }
-  } catch (_e) {  }
-  localStorage.setItem('sb_ls_migrated', '1');
- })();
-
- 
  
  
  var PAGE_DATA = JSON.parse(document.getElementById('page-data').textContent);
@@ -104,10 +86,10 @@
  
  if (CURRENT_VIEW !== 'auth' && SESSION_TOKEN && !IS_PIN_SESSION) {
   try {
-  var _bioAvail = localStorage.getItem('sb_biometric_available');
-  var _bioPrompted = localStorage.getItem('sb_devicekey_prompted');
+  var _bioAvail = localStorage.getItem('dds_biometric_available');
+  var _bioPrompted = localStorage.getItem('dds_devicekey_prompted');
   if (!_bioAvail && !_bioPrompted && typeof PasswordCredential !== 'undefined' && navigator.credentials && navigator.credentials.store) {
-   localStorage.setItem('sb_devicekey_prompted', 'true');
+   localStorage.setItem('dds_devicekey_prompted', 'true');
    google.script.run
    .withSuccessHandler(function(result) {
     if (result && result.success && result.deviceKey) {
@@ -119,9 +101,9 @@
      });
      navigator.credentials.store(cred).then(function() {
      try {
-      localStorage.setItem('sb_biometric_available', 'true');
-      localStorage.setItem('sb_biometric_name', result.displayName || '');
-      localStorage.setItem('sb_credential_type', 'device_key');
+      localStorage.setItem('dds_biometric_available', 'true');
+      localStorage.setItem('dds_biometric_name', result.displayName || '');
+      localStorage.setItem('dds_credential_type', 'device_key');
      } catch (_) {}
      }).catch(function() {});
     } catch (_) {}
@@ -192,7 +174,7 @@
    
    if (_swrApplied) {
    try {
-    var oldCache = localStorage.getItem('sb_batchData_' + CURRENT_VIEW);
+    var oldCache = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
     if (oldCache) {
     var oldData = JSON.parse(oldCache);
     
@@ -211,7 +193,7 @@
    } catch (_diffErr) {  }
    }
    
-   safeLSSet('sb_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch }));
+   safeLSSet('dds_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch }));
    for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](_preloadedBatch);
    _preloadCallbacks = [];
   })
@@ -266,7 +248,7 @@
  (function _trySWR() {
   if (CURRENT_VIEW !== 'steward' && CURRENT_VIEW !== 'member') return;
   try {
-  var raw = localStorage.getItem('sb_batchData_' + CURRENT_VIEW);
+  var raw = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
   if (!raw) return;
   var parsed = JSON.parse(raw);
   
@@ -305,7 +287,7 @@
   // (server-side UserProperties can't work per-user in Execute-as-Me webapps)
   var _userAccentHue = (function() {
   try {
-   var saved = localStorage.getItem('sb_accentHue');
+   var saved = localStorage.getItem('dds_accentHue');
    if (saved !== null) {
    var parsed = parseInt(saved, 10);
    if (!isNaN(parsed) && parsed >= 0 && parsed <= 360) return parsed;
@@ -529,9 +511,9 @@
   
   var TAB_COLORS = {
   cases: '#ff3366', members: '#8b5cf6', insights: '#06d6a0', contactlog: '#3b82f6',
-  tasks: '#f59e0b', home: '#ff3366',
+  tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
   more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
-  resources: '#8b5cf6', orgchart: '#06d6a0', qaforum: '#f59e0b',
+  poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
   polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
   events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
   testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
@@ -629,10 +611,20 @@
   _manageCrtOverlay(isCyber);
 
   
-  var embedRoot = document.querySelector('.oc-embed');
+  var embedRoot = document.querySelector('.madds-embed');
   if (embedRoot) {
    if (!AppState.isDark) embedRoot.classList.add('light');
    else embedRoot.classList.remove('light');
+  }
+  var agencyRoot = document.querySelector('.agency-oc');
+  if (agencyRoot) {
+   if (AppState.isDark) agencyRoot.classList.add('dark');
+   else agencyRoot.classList.remove('dark');
+  }
+  var pomsRoot = document.querySelector('.poms-root');
+  if (pomsRoot) {
+   if (AppState.isDark) pomsRoot.classList.add('poms-dark');
+   else pomsRoot.classList.remove('poms-dark');
   }
   }
 
@@ -670,13 +662,13 @@
   function setStyle(styleId) {
   if (!styles[styleId]) styleId = 'default';
   AppState.navTheme = styleId;
-  safeLSSet('sb_navTheme', styleId);
+  safeLSSet('dds_navTheme', styleId);
   apply();
   }
 
   function updatePalette(hue) {
   palette = generatePalette(hue);
-  safeLSSet('sb_accentHue', String(hue));
+  safeLSSet('dds_accentHue', String(hue));
   apply();
   }
 
@@ -687,7 +679,7 @@
   function setCyberNeon(neonKey) {
   if (!CYBER_NEONS[neonKey]) neonKey = 'red';
   AppState.cyberNeon = neonKey;
-  safeLSSet('sb_cyberNeon', neonKey);
+  safeLSSet('dds_cyberNeon', neonKey);
   apply();
   }
 
@@ -760,14 +752,14 @@
   var evictable = [];
   for (var i = 0; i < localStorage.length; i++) {
    var k = localStorage.key(i);
-   if (k && k.indexOf('sb_') === 0 && !PROTECTED_KEYS[k]) evictable.push(k);
+   if (k && k.indexOf('dds_') === 0 && !PROTECTED_KEYS[k]) evictable.push(k);
   }
   evictable.forEach(function(k) { try { localStorage.removeItem(k); } catch(_) {} });
   try { localStorage.setItem(key, value); } catch (_) {
    
    for (var j = 0; j < localStorage.length; j++) {
    var bk = localStorage.key(j);
-   if (bk && bk.indexOf('sb_batchData') === 0) { try { localStorage.removeItem(bk); } catch(_) {} }
+   if (bk && bk.indexOf('dds_batchData') === 0) { try { localStorage.removeItem(bk); } catch(_) {} }
    }
    try { localStorage.setItem(key, value); } catch (_) {  }
   }
@@ -1133,7 +1125,7 @@
  
  
  var _tabPrefetchDone = false;
- var _TAB_FREQ_KEY = 'sb_tabFreq';
+ var _TAB_FREQ_KEY = 'dds_tabFreq';
  var _MAX_PREFETCH = 3;
 
  
@@ -1246,7 +1238,7 @@
   activeRole: CURRENT_VIEW, 
   isDark: (function() {
   try {
-   var v = localStorage.getItem('sb_isDark');
+   var v = localStorage.getItem('dds_isDark');
    if (v !== null) return v === 'true';
    
    if (typeof window.matchMedia === 'function') {
@@ -1255,8 +1247,8 @@
    return true;
   } catch(e) { return true; }
   })(),
-  navTheme: (function() { try { return localStorage.getItem('sb_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
-  cyberNeon: (function() { try { return localStorage.getItem('sb_cyberNeon') || 'red'; } catch(e) { return 'red'; } })(),
+  navTheme: (function() { try { return localStorage.getItem('dds_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
+  cyberNeon: (function() { try { return localStorage.getItem('dds_cyberNeon') || 'red'; } catch(e) { return 'red'; } })(),
   colorTheme: (PAGE_DATA.colorTheme || 'default'),
   colorThemes: (PAGE_DATA.colorThemes || []),
   user: CURRENT_USER,
@@ -1287,11 +1279,11 @@
 
   
   function _save() {
-  safeLSSet('sb_splitView', JSON.stringify({ enabled: _state.enabled, splitRatio: _state.splitRatio }));
+  safeLSSet('dds_splitView', JSON.stringify({ enabled: _state.enabled, splitRatio: _state.splitRatio }));
   }
   function _load() {
   try {
-   var s = JSON.parse(localStorage.getItem('sb_splitView'));
+   var s = JSON.parse(localStorage.getItem('dds_splitView'));
    if (s) {
    _state.splitRatio = Math.max(0.3, Math.min(0.7, s.splitRatio || 0.5));
    // Don't auto-enable on load — user must toggle
@@ -2657,7 +2649,7 @@
    className: 'sidebar-item',
    onClick: function() {
    AppState.isDark = !AppState.isDark;
-   safeLSSet('sb_isDark', AppState.isDark);
+   safeLSSet('dds_isDark', AppState.isDark);
    UnifiedTheme.apply();
    _handleTabNav(role, activeTab);
    }
@@ -2782,10 +2774,13 @@
   { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
   { group: 'Manage' },
   { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+  { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
   { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
   { group: 'Reference' },
+  { id: 'poms', icon: '\uD83D\uDCD8', label: 'POMS Ref.' },
   { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
   { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Union' },
+  { id: 'maddsorgchart', icon: '\uD83C\uDFE2', label: 'Agency' },
   { group: 'Community' },
   { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
   { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2834,7 +2829,7 @@
    className: 'more-menu-item', style: { cursor: 'pointer', padding: '0' },
    onClick: function() {
    AppState.isDark = !AppState.isDark;
-   safeLSSet('sb_isDark', AppState.isDark);
+   safeLSSet('dds_isDark', AppState.isDark);
    UnifiedTheme.apply();
    _handleTabNav(role, moreTab);
    }
@@ -3089,7 +3084,7 @@
     }
    });
    
-   var embedRoot = wrap.querySelector('.oc-embed');
+   var embedRoot = wrap.querySelector('.madds-embed');
    if (embedRoot) {
     if (!AppState.isDark) embedRoot.classList.add('light');
     else embedRoot.classList.remove('light');
@@ -3120,17 +3115,88 @@
 
  
  function renderAgencyOrgChart(appContainer, role) {
+  var mySwitch = _navSwitchId;
+  var myGen = _renderGeneration;
   renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
-  container.innerHTML = '';
-  container.appendChild(el('div', { className: 'empty-state' }, 'Agency org chart is not available in this edition.'));
+  showLoading(container);
+  google.script.run
+   .withSuccessHandler(function(html) {
+   if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return;
+   container.innerHTML = '';
+   container.classList.add('orgchart-content');
+   var wrap = el('div');
+   wrap.innerHTML = html;
+   container.appendChild(wrap);
+   
+   wrap.querySelectorAll('script').forEach(function(old) {
+    try {
+    var s = document.createElement('script');
+    s.textContent = old.textContent;
+    old.parentNode.removeChild(old);
+    document.head.appendChild(s);
+    } catch (scriptErr) {
+    console.error('Agency org chart script re-execution failed:', scriptErr);
+    }
+   });
+   
+   var agencyRoot = wrap.querySelector('.agency-oc');
+   if (agencyRoot) {
+    if (AppState.isDark) agencyRoot.classList.add('dark');
+    else agencyRoot.classList.remove('dark');
+   }
+   
+   if (typeof window.agencyOC_init === 'function') {
+    try { window.agencyOC_init(); } catch (_e) {  }
+   }
+   })
+   .withFailureHandler(function(err) {
+   container.innerHTML = '';
+   container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load agency org chart.'));
+   })
+   .getAgencyOrgChartHtml();
   });
  }
 
  
  function renderPOMSReference(appContainer, role) {
+  var mySwitch = _navSwitchId;
+  var myGen = _renderGeneration; 
   renderPageLayout(appContainer, role, 'poms', function(container) {
-  container.innerHTML = '';
-  container.appendChild(el('div', { className: 'empty-state' }, 'POMS Reference is not available in this edition.'));
+  showLoading(container);
+  
+  container.style.height = 'calc(100vh - 56px)';
+  container.style.padding = '0';
+  container.style.overflow = 'hidden';
+  google.script.run
+   .withSuccessHandler(function(html) {
+   if (_navSwitchId !== mySwitch || myGen !== _renderGeneration) return; 
+   container.innerHTML = '';
+   var wrap = el('div');
+   wrap.style.height = '100%';
+   wrap.innerHTML = html;
+   container.appendChild(wrap);
+   
+   var pomsRoot = wrap.querySelector('.poms-root');
+   if (pomsRoot) {
+    if (AppState.isDark) pomsRoot.classList.add('poms-dark');
+    else pomsRoot.classList.remove('poms-dark');
+   }
+   
+   wrap.querySelectorAll('script').forEach(function(old) {
+    try {
+    var s = document.createElement('script');
+    s.textContent = old.textContent;
+    old.parentNode.replaceChild(s, old);
+    } catch (scriptErr) {
+    console.error('POMS script re-execution failed:', scriptErr);
+    }
+   });
+   })
+   .withFailureHandler(function(err) {
+   container.innerHTML = '';
+   container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load POMS Reference.'));
+   })
+   .getPOMSReferenceHtml();
   });
  }
 
@@ -3310,6 +3376,29 @@
   _navProgressDone();
   return;
   }
+  if (tabId === 'maddsorgchart') {
+  if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
+   if (typeof _renderDuesGate === 'function') {
+   _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
+   }
+   _navProgressDone();
+   return;
+  }
+  _hideAllVisiblePanes();
+  _splitRenderTarget = 'primary';
+  renderAgencyOrgChart(app, role);
+  _activePane = _layoutCache.content;
+  _navProgressDone();
+  return;
+  }
+  if (tabId === 'poms') {
+  _hideAllVisiblePanes();
+  _splitRenderTarget = 'primary';
+  renderPOMSReference(app, role);
+  _activePane = _layoutCache.content;
+  _navProgressDone();
+  return;
+  }
 
   
   if (switchId !== _navSwitchId) { _navProgressDone(); return; }
@@ -3451,6 +3540,7 @@
    case 'cases': return renderMyCases;
    case 'profile': return renderUpdateProfile;
    case 'resources': return renderMemberResources;
+   case 'workload': return renderWorkloadTracker;
    case 'weeklyq': 
    case 'polls': return renderPollsPage;
    case 'survey': return renderSurveyResultsPage;
@@ -3495,6 +3585,7 @@
    case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
    case 'timeline': return renderStewardTimelinePage;
    case 'mentorship': return renderMentorshipPage;
+   case 'workload': return renderWorkloadTracker;
    case 'accesslog': return renderAccessLogPage;
    case 'engagement': return renderEngagementDashboard;
    case 'failsafe': return renderFailsafePage;
@@ -4612,7 +4703,7 @@
     google.script.run
     .withSuccessHandler(function(batch) {
      if (!batch) return;
-     safeLSSet('sb_batchData_' + AppState.activeRole, JSON.stringify({ ts: Date.now(), data: batch }));
+     safeLSSet('dds_batchData_' + AppState.activeRole, JSON.stringify({ ts: Date.now(), data: batch }));
      
      if (batch.notificationCount !== undefined) AppState.notificationCount = batch.notificationCount;
      if (batch.taskCount !== undefined) AppState.taskCount = batch.taskCount;
@@ -4630,7 +4721,7 @@
    if (typeof AppState !== 'undefined') {
    var origBatchData = AppState.batchData;
    if (origBatchData) {
-    try { localStorage.setItem('sb_offline_cache', JSON.stringify(origBatchData)); } catch(_) {  }
+    try { localStorage.setItem('dds_offline_cache', JSON.stringify(origBatchData)); } catch(_) {  }
    }
    }
   })();

@@ -79,7 +79,7 @@ var FailsafeService = (function () {
       var cacheKey = 'fs_sheet_' + sheetName;
       var cached = cache.get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
     var sheet = ss.getSheetByName(sheetName);
@@ -87,7 +87,7 @@ var FailsafeService = (function () {
     var data = sheet.getDataRange().getValues();
     try {
       cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
     return data;
   }
 
@@ -208,7 +208,7 @@ var FailsafeService = (function () {
       // Check MailApp quota
       var remaining = MailApp.getRemainingDailyQuota();
       if (remaining < 5) {
-        Logger.log('Email quota low (' + remaining + '), stopping digest processing.');
+        log_('processScheduledDigests', 'Email quota low (' + remaining + '), stopping digest processing.');
         break;
       }
 
@@ -223,7 +223,7 @@ var FailsafeService = (function () {
           var sendLock = LockService.getScriptLock();
           // Try to acquire lock — if another execution already sent, skip
           if (!sendLock.tryLock(5000)) {
-            Logger.log('Could not acquire send lock for ' + email + ', skipping to avoid duplicate.');
+            log_('processScheduledDigests', 'Could not acquire send lock for ' + email + ', skipping to avoid duplicate.');
             continue;
           }
           try {
@@ -246,7 +246,7 @@ var FailsafeService = (function () {
           }
         }
       } catch (err) {
-        Logger.log('Digest send error for ' + email + ': ' + err.message);
+        log_('processScheduledDigests', 'Digest send error for ' + email + ': ' + err.message);
       }
     }
 
@@ -277,7 +277,7 @@ var FailsafeService = (function () {
           gHtml += '</ul>';
           sections.push(gHtml);
         }
-      } catch (e) { Logger.log('Digest grievance error: ' + e.message); }
+      } catch (e) { log_('Digest grievance error', e.message); }
     }
 
     // Workload
@@ -303,7 +303,7 @@ var FailsafeService = (function () {
             sections.push('<h3>Workload History (' + memberEntries.length + ' entries)</h3><p>You have ' + memberEntries.length + ' workload submissions on file.</p>');
           }
         }
-      } catch (e) { Logger.log('Digest workload error: ' + e.message); }
+      } catch (e) { log_('Digest workload error', e.message); }
     }
 
     // Tasks
@@ -319,7 +319,7 @@ var FailsafeService = (function () {
           tHtml += '</ul>';
           sections.push(tHtml);
         }
-      } catch (e) { Logger.log('Digest tasks error: ' + e.message); }
+      } catch (e) { log_('Digest tasks error', e.message); }
     }
 
     if (sections.length === 0) return null;
@@ -373,7 +373,7 @@ var FailsafeService = (function () {
         folder.createFile(fileName, csv, MimeType.CSV);
         backedUp++;
       } catch (e) {
-        Logger.log('Backup error for ' + sheetName + ': ' + e.message);
+        log_('backupCriticalSheets', 'Backup error for ' + sheetName + ': ' + e.message);
       }
     }
 
@@ -459,7 +459,7 @@ var FailsafeService = (function () {
       allFiles.sort(function(a, b) { return b.name < a.name ? -1 : b.name > a.name ? 1 : 0; });
       // Delete everything beyond MAX_BACKUP_FILES
       for (var i = MAX_BACKUP_FILES; i < allFiles.length; i++) {
-        try { allFiles[i].file.setTrashed(true); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+        try { allFiles[i].file.setTrashed(true); } catch (_e) { log_('_e', (_e.message || _e)); }
       }
     });
   }
@@ -477,7 +477,7 @@ var FailsafeService = (function () {
       folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
       folder.setDescription('Automated backups — contains member PII. Do not share.');
     } catch (_e) {
-      Logger.log('Could not restrict backup folder sharing: ' + _e.message);
+      log_('Could not restrict backup folder sharing', _e.message);
     }
     return folder;
   }
@@ -749,6 +749,11 @@ function fsDiagnostic(sessionToken) {
     'Member Satisfaction': SHEETS.SATISFACTION,
     'Survey Questions': SHEETS.SURVEY_QUESTIONS,
     'Failsafe Config': SHEETS.FAILSAFE_CONFIG,
+    'Workload Vault': SHEETS.WORKLOAD_VAULT,
+    'Workload Reporting': SHEETS.WORKLOAD_REPORTING,
+    'Workload Archive': SHEETS.WORKLOAD_ARCHIVE,
+    'Workload Reminders': SHEETS.WORKLOAD_REMINDERS,
+    'Workload UserMeta': SHEETS.WORKLOAD_USERMETA,
     'Audit Log': SHEETS.AUDIT_LOG,
     'Meeting Check-In Log': SHEETS.MEETING_CHECKIN_LOG,
     'Steward Performance': SHEETS.STEWARD_PERFORMANCE_CALC,
@@ -778,7 +783,7 @@ function fsDiagnostic(sessionToken) {
   try {
     var testAuth = checkWebAppAuthorization('steward', sessionToken);
     authOk = testAuth && testAuth.isAuthorized;
-  } catch (_) { Logger.log('_: ' + (_.message || _)); }
+  } catch (_) { log_('_', (_.message || _)); }
 
   return {
     success: true,

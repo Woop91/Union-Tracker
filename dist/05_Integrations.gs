@@ -91,7 +91,7 @@ function setupDashboardDriveFolders() {
   try {
     rootFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
   } catch (shareErr) {
-    Logger.log('setupDashboardDriveFolders: FATAL — could not set root folder to PRIVATE: ' + shareErr.message);
+    log_('setupDashboardDriveFolders', 'FATAL — could not set root folder to PRIVATE: ' + shareErr.message);
     throw new Error('Could not set root folder sharing to PRIVATE. Aborting setup to prevent data exposure. Error: ' + shareErr.message);
   }
 
@@ -113,21 +113,21 @@ function setupDashboardDriveFolders() {
 
   subDefs.forEach(function(def) {
     var sub = _getOrCreateNamedFolder_(def.name, def.propKey, props, configSheet, rootFolder);
-    if (!sub) { Logger.log('Could not create subfolder: ' + def.name); return; }
+    if (!sub) { log_('Could not create subfolder', def.name); return; }
     result[def.propKey] = sub.getId();
     // Minutes/ folder: anyone with link can view (members use the link to browse docs)
     // All other subfolders inherit the root PRIVATE setting.
     if (def.name === DRIVE_CONFIG.MINUTES_SUBFOLDER) {
       try {
         sub.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        Logger.log('Minutes folder set to view-only public link.');
+        log_('setupDashboardDriveFolders', 'Minutes folder set to view-only public link.');
       } catch (mShareErr) {
-        Logger.log('Could not set Minutes folder sharing: ' + mShareErr.message);
+        log_('Could not set Minutes folder sharing', mShareErr.message);
       }
     }
     // Also write to Config sheet using the config-specific key
     _writeConfigFolderId_(configSheet, CONFIG_COLS[def.cfgKey], sub.getId(), sub.getUrl());
-    Logger.log('Drive folder ready: ' + def.name + ' (' + sub.getId() + ')');
+    log_('Drive folder ready', def.name + ' (' + sub.getId() + ')');
   });
 
   // Write root folder IDs to Config
@@ -149,7 +149,7 @@ function _getOrCreateNamedFolder_(name, propKey, props, configSheet, parentFolde
     try {
       var found = DriveApp.getFolderById(storedId);
       if (found) return found;
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
 
   // Try name search inside parent (or all of Drive)
@@ -181,7 +181,7 @@ function _writeConfigFolderId_(configSheet, colIndex, folderId, folderUrl) {
       configSheet.getRange(3, colIndex + 1).setValue(folderUrl);
     }
   } catch (e) {
-    Logger.log('_writeConfigFolderId_: could not write col ' + colIndex + ': ' + e.message);
+    log_('_writeConfigFolderId_', 'could not write col ' + colIndex + ': ' + e.message);
   }
 }
 
@@ -211,7 +211,7 @@ function setupDashboardCalendar() {
         _writeCalendarIdToConfig_(configSheet, storedId);
         return { success: true, calendarId: storedId, calendarName: existingCal.getName() };
       }
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
 
   // Search by name
@@ -235,7 +235,7 @@ function setupDashboardCalendar() {
   props.setProperty('UNION_CALENDAR_ID', newId);
   _writeCalendarIdToConfig_(configSheet, newId);
 
-  Logger.log('Created union events calendar: ' + calendarName + ' (' + newId + ')');
+  log_('Created union events calendar', calendarName + ' (' + newId + ')');
   return { success: true, calendarId: newId, calendarName: calendarName };
 }
 
@@ -248,7 +248,7 @@ function _writeCalendarIdToConfig_(configSheet, calendarId) {
   try {
     configSheet.getRange(3, CONFIG_COLS.CALENDAR_ID).setValue(calendarId || '');
   } catch (e) {
-    Logger.log('_writeCalendarIdToConfig_: ' + e.message);
+    log_('_writeCalendarIdToConfig_', e.message);
   }
 }
 
@@ -267,7 +267,7 @@ function getOrCreateRootFolder() {
   if (storedId) {
     try {
       return DriveApp.getFolderById(storedId);
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
 
   // Find or create the DashboardTest root, then the Grievances subfolder inside it.
@@ -290,7 +290,7 @@ function getOrCreateRootFolder() {
   // Lock root if it's new (best-effort)
   try {
     rootFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
 
   grievancesFolder.setDescription('Individual case folders — Auto-managed by Union Dashboard');
 
@@ -445,14 +445,14 @@ function getOrCreateMemberAdminFolder(memberEmail) {
           }
         }
       } catch (writeErr) {
-        Logger.log('getOrCreateMemberAdminFolder URL writeback error: ' + writeErr.message);
+        log_('getOrCreateMemberAdminFolder URL writeback error', writeErr.message);
       }
     }
 
     return { masterFolder: masterFolder, grievancesFolder: grievancesFolder };
 
   } catch (err) {
-    Logger.log('getOrCreateMemberAdminFolder error for ' + memberEmail + ': ' + err.message);
+    log_('getOrCreateMemberAdminFolder', 'getOrCreateMemberAdminFolder error for ' + memberEmail + ': ' + err.message);
     return null;
   }
 }
@@ -500,7 +500,7 @@ function setupDriveFolderForGrievance(grievanceId) {
       var membersRootId = props.getProperty('MEMBERS_FOLDER_ID') || '';
       var membersRoot   = null;
       if (membersRootId) {
-        try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+        try { membersRoot = DriveApp.getFolderById(membersRootId); } catch (_e) { log_('_e', (_e.message || _e)); }
       }
       if (!membersRoot) {
         // Resolve Members/ folder explicitly — do NOT fall back to Grievances/ root.
@@ -511,7 +511,7 @@ function setupDriveFolderForGrievance(grievanceId) {
             var dashRoot = DriveApp.getFolderById(dashRootId);
             var mIter = dashRoot.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
             membersRoot = mIter.hasNext() ? mIter.next() : dashRoot.createFolder(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
-          } catch (_e) { Logger.log('setupDriveFolderForGrievance fallback: ' + _e.message); }
+          } catch (_e) { log_('setupDriveFolderForGrievance fallback', _e.message); }
         }
         if (!membersRoot) {
           var fallbackIter = DriveApp.getFoldersByName(DRIVE_CONFIG.MEMBERS_SUBFOLDER);
@@ -546,7 +546,7 @@ function setupDriveFolderForGrievance(grievanceId) {
       try {
         caseFolder.addEditor(memberEmail);
       } catch (shareErr) {
-        Logger.log('setupDriveFolderForGrievance: could not share with member ' + memberEmail + ': ' + shareErr.message);
+        log_('setupDriveFolderForGrievance', 'could not share with member ' + memberEmail + ': ' + shareErr.message);
       }
     }
 
@@ -558,7 +558,7 @@ function setupDriveFolderForGrievance(grievanceId) {
       try {
         caseFolder.addEditor(stewardEmail);
       } catch (shareErr) {
-        Logger.log('setupDriveFolderForGrievance: could not share with steward ' + stewardEmail + ': ' + shareErr.message);
+        log_('setupDriveFolderForGrievance', 'could not share with steward ' + stewardEmail + ': ' + shareErr.message);
       }
     }
 
@@ -578,7 +578,7 @@ function setupDriveFolderForGrievance(grievanceId) {
     return { success: true, folderId: caseFolder.getId(), folderUrl: caseFolder.getUrl(), message: 'Folder created successfully' };
 
   } catch (error) {
-    Logger.log('setupDriveFolderForGrievance error: ' + error.message);
+    log_('setupDriveFolderForGrievance error', error.message);
     return errorResponse(error.message, 'setupDriveFolderForGrievance');
   }
 }
@@ -632,15 +632,15 @@ function cleanupEmptyDriveFolders() {
     if (sheet && sheet.getLastRow() > 1) {
       var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.STATUS).getValues();
       for (var i = 0; i < data.length; i++) {
-        var status = String(data[i][GRIEVANCE_COLS.STATUS - 1] || '').toLowerCase();
+        var status = String(col_(data[i], GRIEVANCE_COLS.STATUS) || '').toLowerCase();
         if (status === 'resolved' || status === 'closed' || status === 'withdrawn') {
-          var gId = String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '');
+          var gId = String(col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) || '');
           if (gId) resolvedIds[gId] = true;
         }
       }
     }
   } catch (sheetErr) {
-    Logger.log('cleanupEmptyDriveFolders: sheet read error: ' + sheetErr.message);
+    log_('cleanupEmptyDriveFolders', 'sheet read error: ' + sheetErr.message);
   }
 
   // Structure: Members/<LastName, FirstName>/Grievances/<CaseId - Date>/
@@ -691,12 +691,12 @@ function cleanupEmptyDriveFolders() {
             skipped++;
           }
         } catch (folderErr) {
-          Logger.log('cleanupEmptyDriveFolders: error on case folder: ' + folderErr.message);
+          log_('cleanupEmptyDriveFolders', 'error on case folder: ' + folderErr.message);
           skipped++;
         }
       }
     } catch (memberErr) {
-      Logger.log('cleanupEmptyDriveFolders: error on member folder: ' + memberErr.message);
+      log_('cleanupEmptyDriveFolders', 'error on member folder: ' + memberErr.message);
       skipped++;
     }
   }
@@ -815,10 +815,9 @@ function setupFolderForSelectedGrievance() {
       ui.ButtonSet.YES_NO);
 
     if (response === ui.Button.YES) {
-      var html = HtmlService.createHtmlOutput(
-        '<script>window.open(' + JSON.stringify(existingUrl) + ', "_blank"); google.script.host.close();</script>'
-      ).setWidth(1).setHeight(1);
-      ui.showModalDialog(html, 'Opening folder...');
+      showDialog_(
+        '<script>window.open(' + JSON.stringify(existingUrl) + ', "_blank"); google.script.host.close();</script>',
+        'Opening folder...', 1, 1);
     }
     return;
   }
@@ -865,8 +864,8 @@ function batchCreateAllMissingFolders() {
 
   var missingFolders = [];
   for (var i = 0; i < data.length; i++) {
-    var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var folderUrl = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1];
+    var grievanceId = col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID);
+    var folderUrl = col_(data[i], GRIEVANCE_COLS.DRIVE_FOLDER_URL);
 
     if (grievanceId && !folderUrl) {
       missingFolders.push(grievanceId);
@@ -913,14 +912,14 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
 
   // H-05: Null check after getSheetByName
   if (!sheet) {
-    Logger.log('updateGrievanceFolderLink: Grievance Log sheet not found');
+    log_('updateGrievanceFolderLink', 'Grievance Log sheet not found');
     return;
   }
 
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+    if (col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) === grievanceId) {
       sheet.getRange(i + 1, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folderUrl);
       break;
     }
@@ -997,9 +996,9 @@ function createMeetingCalendarEvent(meetingData) {
       // F31: Quota-aware error handling for calendar creation
       var msg = String(calErr.message || '');
       if (msg.indexOf('quota') !== -1 || msg.indexOf('limit') !== -1 || msg.indexOf('rate') !== -1) {
-        Logger.log('Calendar quota exceeded, skipping event creation: ' + msg);
+        log_('Calendar quota exceeded, skipping event creation', msg);
       } else {
-        Logger.log('Error creating calendar event: ' + msg);
+        log_('Error creating calendar event', msg);
       }
       return '';
     }
@@ -1011,7 +1010,7 @@ function createMeetingCalendarEvent(meetingData) {
 
     return event.getId();
   } catch (error) {
-    Logger.log('Error creating meeting calendar event: ' + error.message);
+    log_('Error creating meeting calendar event', error.message);
     return '';
   }
 }
@@ -1062,10 +1061,10 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     var meetingType = '';
 
     for (var i = 1; i < data.length; i++) {
-      if (String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
-        meetingName = data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '';
-        meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
-        meetingType = data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '';
+      if (String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
+        meetingName = col_(data[i], MEETING_CHECKIN_COLS.MEETING_NAME) || '';
+        meetingDate = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DATE);
+        meetingType = col_(data[i], MEETING_CHECKIN_COLS.MEETING_TYPE) || '';
         break;
       }
     }
@@ -1117,7 +1116,7 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
 
     return { success: true, message: 'Attendance report emailed to ' + recipientEmails };
   } catch (error) {
-    Logger.log('Error emailing attendance report: ' + error.message);
+    log_('Error emailing attendance report', error.message);
     return errorResponse(error.message);
   }
 }
@@ -1222,7 +1221,7 @@ function createMeetingDocs(meetingData) {
       });
     }
   } catch (error) {
-    Logger.log('Error creating meeting docs: ' + error.message);
+    log_('Error creating meeting docs', error.message);
     result.success = false;
     result.error = error.message;
   }
@@ -1246,11 +1245,11 @@ function setDocViewOnlyByLink(docUrl) {
     try {
       file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
     } catch (domainError) {
-      Logger.log('Domain sharing unavailable, falling back to ANYONE_WITH_LINK: ' + domainError.message);
+      log_('Domain sharing unavailable, falling back to ANYONE_WITH_LINK', domainError.message);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     }
   } catch (error) {
-    Logger.log('Error setting doc to view-only: ' + error.message);
+    log_('Error setting doc to view-only', error.message);
   }
 }
 
@@ -1271,7 +1270,7 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
     return e.trim() && emailRegex.test(e.trim());
   });
   if (emails.length === 0) {
-    Logger.log('No valid email addresses in recipient list');
+    log_('emailMeetingDocLink', 'No valid email addresses in recipient list');
     return;
   }
 
@@ -1293,7 +1292,7 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
       name: 'Union Dashboard'
     });
   } catch (error) {
-    Logger.log('Error emailing meeting doc link: ' + error.message);
+    log_('Error emailing meeting doc link', error.message);
   }
 }
 
@@ -1310,15 +1309,15 @@ function getAllStewardEmails_() {
     var data = sheet.getDataRange().getValues();
     var emails = [];
     for (var i = 1; i < data.length; i++) {
-      var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+      var isSteward = col_(data[i], MEMBER_COLS.IS_STEWARD);
       if (isTruthyValue(isSteward)) {
-        var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+        var email = String(col_(data[i], MEMBER_COLS.EMAIL) || '').trim();
         if (email) emails.push(email);
       }
     }
     return emails.join(', ');
   } catch (e) {
-    Logger.log('Error getting all steward emails: ' + e.message);
+    log_('Error getting all steward emails', e.message);
     return '';
   }
 }
@@ -1346,22 +1345,22 @@ function processMeetingDocNotifications() {
     var allStewardEmails = null;  // Lazy-loaded
 
     for (var i = 1; i < data.length; i++) {
-      var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+      var meetingId = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || '');
       if (!meetingId || processed[meetingId]) continue;
       processed[meetingId] = true;
 
-      var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+      var meetingDate = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DATE);
       if (!(meetingDate instanceof Date)) continue;
 
       var meetingDay = new Date(meetingDate);
       meetingDay.setHours(0, 0, 0, 0);
       var diffDays = Math.round((meetingDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
 
-      var meetingName = String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '');
-      var notifyEmails = String(data[i][MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] || '');
-      var notesUrl = String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || '');
-      var agendaUrl = String(data[i][MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] || '');
-      var agendaStewards = String(data[i][MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] || '');
+      var meetingName = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_NAME) || '');
+      var notifyEmails = String(col_(data[i], MEETING_CHECKIN_COLS.NOTIFY_STEWARDS) || '');
+      var notesUrl = String(col_(data[i], MEETING_CHECKIN_COLS.NOTES_DOC_URL) || '');
+      var agendaUrl = String(col_(data[i], MEETING_CHECKIN_COLS.AGENDA_DOC_URL) || '');
+      var agendaStewards = String(col_(data[i], MEETING_CHECKIN_COLS.AGENDA_STEWARDS) || '');
       var dateStr = Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'MM/dd/yyyy');
 
       // 3 days before: send agenda link to SELECTED stewards only
@@ -1395,7 +1394,7 @@ function processMeetingDocNotifications() {
       }
     }
   } catch (error) {
-    Logger.log('Error processing meeting doc notifications: ' + error.message);
+    log_('Error processing meeting doc notifications', error.message);
   }
   return result;
 }
@@ -1431,7 +1430,7 @@ function setupDriveFolderForMember(memberId) {
     }
     var memberEmail = '';
     for (var i = 1; i < memberData.length; i++) {
-      if (String(memberData[i][MEMBER_COLS.MEMBER_ID - 1]) === String(memberId)) {
+      if (String(col_(memberData[i], MEMBER_COLS.MEMBER_ID)) === String(memberId)) {
         memberEmail = emailCol !== -1 ? String(memberData[i][emailCol]).trim() : '';
         break;
       }
@@ -1522,7 +1521,7 @@ function syncDeadlinesToCalendar() {
     };
 
   } catch (error) {
-    Logger.log('Error syncing to calendar: ' + error);
+    log_('Error syncing to calendar', error);
     return errorResponse(error.message);
   }
 }
@@ -1590,7 +1589,7 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
         existingEvent.setDescription(description);
         return { synced: true, updated: true };
       }
-    } catch (_lookupErr) { Logger.log('_lookupErr: ' + (_lookupErr.message || _lookupErr)); }
+    } catch (_lookupErr) { log_('_lookupErr', (_lookupErr.message || _lookupErr)); }
   }
 
   // Fallback: search by day in case event exists without stored ID
@@ -1630,7 +1629,7 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
  */
 function safeSendEmail(options) {
   if (MailApp.getRemainingDailyQuota() < 1) {
-    Logger.log('Email quota exceeded, skipping: ' + (options.subject || 'no subject'));
+    log_('Email quota exceeded, skipping', (options.subject || 'no subject'));
     return false;
   }
   MailApp.sendEmail(options);
@@ -1698,7 +1697,7 @@ function sendDeadlineReminders(daysAhead) {
     };
 
   } catch (error) {
-    Logger.log('Error sending reminders: ' + error);
+    log_('Error sending reminders', error);
     return errorResponse(error.message);
   }
 }
@@ -1749,7 +1748,7 @@ function sendEmailToMember(memberId, subject, body) {
     };
 
   } catch (error) {
-    Logger.log('Error sending email: ' + error);
+    log_('Error sending email', error);
     return errorResponse(error.message);
   }
 }
@@ -1784,7 +1783,7 @@ function getOrCreateMemberFolder(name, id) {
     folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
-    Logger.log('Archive folder not found, using root: ' + e.message);
+    log_('Archive folder not found, using root', e.message);
     rootFolder = getOrCreateRootFolder();
     folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
@@ -1846,7 +1845,7 @@ function createSignatureReadyPDF(folder, data) {
     return pdf;
 
   } catch (e) {
-    Logger.log('Error creating signature PDF: ' + e.message);
+    log_('Error creating signature PDF', e.message);
     throw new Error('Failed to create PDF: ' + e.message);
   }
 }
@@ -1929,10 +1928,9 @@ function createPDFForSelectedGrievance() {
     }
 
     // Open folder in new tab
-    var html = HtmlService.createHtmlOutput(
-      '<script>window.open(' + JSON.stringify(folder.getUrl()) + ', "_blank"); google.script.host.close();</script>'
-    ).setWidth(100).setHeight(50);
-    ui.showModalDialog(html, 'Opening folder...');
+    showDialog_(
+      '<script>window.open(' + JSON.stringify(folder.getUrl()) + ', "_blank"); google.script.host.close();</script>',
+      'Opening folder...', 100, 50);
 
   } catch (e) {
     ui.alert('Error', 'Failed to create PDF: ' + e.message, ui.ButtonSet.OK);
@@ -2075,7 +2073,7 @@ function onGrievanceFormSubmit(e) {
     }
 
   } catch (err) {
-    Logger.log('Error processing form submission: ' + err.message);
+    log_('Error processing form submission', err.message);
   }
 }
 
@@ -2149,13 +2147,13 @@ function getWebAppGrievanceList() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) {
-      Logger.log('getWebAppGrievanceList: No active spreadsheet');
+      log_('getWebAppGrievanceList', 'No active spreadsheet');
       return [];
     }
 
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
     if (!sheet) {
-      Logger.log('getWebAppGrievanceList: Grievance Log sheet not found');
+      log_('getWebAppGrievanceList', 'Grievance Log sheet not found');
       return [];
     }
 
@@ -2163,7 +2161,7 @@ function getWebAppGrievanceList() {
 
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
-      Logger.log('getWebAppGrievanceList: No data rows in sheet');
+      log_('getWebAppGrievanceList', 'No data rows in sheet');
       return [];
     }
 
@@ -2171,39 +2169,39 @@ function getWebAppGrievanceList() {
     var tz = Session.getScriptTimeZone();
 
     var result = data.map(function(row) {
-      var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
+      var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID) || '';
       // Skip blank rows - must have a valid grievance ID starting with G
       if (!isGrievanceId_(grievanceId)) return null;
 
-      var filed = row[GRIEVANCE_COLS.DATE_FILED - 1];
-      var incident = row[GRIEVANCE_COLS.INCIDENT_DATE - 1];
-      var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
-      var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+      var filed = col_(row, GRIEVANCE_COLS.DATE_FILED);
+      var incident = col_(row, GRIEVANCE_COLS.INCIDENT_DATE);
+      var nextDue = col_(row, GRIEVANCE_COLS.NEXT_ACTION_DUE);
+      var daysToDeadline = col_(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
 
       return {
         id: grievanceId,
-        memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1] || '',
-        name: ((row[GRIEVANCE_COLS.FIRST_NAME - 1] || '') + ' ' + (row[GRIEVANCE_COLS.LAST_NAME - 1] || '')).trim(),
-        status: row[GRIEVANCE_COLS.STATUS - 1] || 'Filed',
-        step: row[GRIEVANCE_COLS.CURRENT_STEP - 1] || 'Step I',
-        category: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'N/A',
-        articles: row[GRIEVANCE_COLS.ARTICLES - 1] || 'N/A',
+        memberId: col_(row, GRIEVANCE_COLS.MEMBER_ID) || '',
+        name: ((col_(row, GRIEVANCE_COLS.FIRST_NAME) || '') + ' ' + (col_(row, GRIEVANCE_COLS.LAST_NAME) || '')).trim(),
+        status: col_(row, GRIEVANCE_COLS.STATUS) || 'Filed',
+        step: col_(row, GRIEVANCE_COLS.CURRENT_STEP) || 'Step I',
+        category: col_(row, GRIEVANCE_COLS.ISSUE_CATEGORY) || 'N/A',
+        articles: col_(row, GRIEVANCE_COLS.ARTICLES) || 'N/A',
         filedDate: filed instanceof Date ? Utilities.formatDate(filed, tz, 'MM/dd/yyyy') : (filed || 'N/A'),
         incidentDate: incident instanceof Date ? Utilities.formatDate(incident, tz, 'MM/dd/yyyy') : (incident || 'N/A'),
         nextActionDue: nextDue instanceof Date ? Utilities.formatDate(nextDue, tz, 'MM/dd/yyyy') : (nextDue || 'N/A'),
         daysToDeadline: daysToDeadline,
         isOverdue: daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0),
-        daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || 0,
-        location: row[GRIEVANCE_COLS.LOCATION - 1] || 'N/A',
-        steward: row[GRIEVANCE_COLS.STEWARD - 1] || 'N/A',
-        resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || ''
+        daysOpen: col_(row, GRIEVANCE_COLS.DAYS_OPEN) || 0,
+        location: col_(row, GRIEVANCE_COLS.LOCATION) || 'N/A',
+        steward: col_(row, GRIEVANCE_COLS.STEWARD) || 'N/A',
+        resolution: col_(row, GRIEVANCE_COLS.RESOLUTION) || ''
       };
     }).filter(function(g) { return g !== null; }).slice(0, 100);
 
-    Logger.log('getWebAppGrievanceList: Returning ' + result.length + ' grievances');
+    log_('getWebAppGrievanceList', 'Returning ' + result.length + ' grievances');
     return result;
   } catch (e) {
-    Logger.log('getWebAppGrievanceList error: ' + e.toString());
+    log_('getWebAppGrievanceList error', e.toString());
     throw new Error('Failed to load grievances: ' + e.message);
   }
 }
@@ -2216,13 +2214,13 @@ function getWebAppMemberList() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) {
-      Logger.log('getWebAppMemberList: No active spreadsheet');
+      log_('getWebAppMemberList', 'No active spreadsheet');
       return [];
     }
 
     var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!sheet) {
-      Logger.log('getWebAppMemberList: Member Directory sheet not found');
+      log_('getWebAppMemberList', 'Member Directory sheet not found');
       return [];
     }
 
@@ -2230,37 +2228,37 @@ function getWebAppMemberList() {
 
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
-      Logger.log('getWebAppMemberList: No data rows in sheet');
+      log_('getWebAppMemberList', 'No data rows in sheet');
       return [];
     }
 
     var data = sheet.getRange(2, 1, lastRow - 1, MEMBER_COLS.QUICK_ACTIONS).getValues();
 
     var result = data.map(function(row) {
-      var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
+      var memberId = col_(row, MEMBER_COLS.MEMBER_ID) || '';
       // Skip blank rows - must have a valid member ID starting with M
       if (!isMemberId_(memberId)) return null;
 
       return {
         id: memberId,
-        firstName: row[MEMBER_COLS.FIRST_NAME - 1] || '',
-        lastName: row[MEMBER_COLS.LAST_NAME - 1] || '',
-        name: ((row[MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (row[MEMBER_COLS.LAST_NAME - 1] || '')).trim(),
-        title: row[MEMBER_COLS.JOB_TITLE - 1] || 'N/A',
-        location: row[MEMBER_COLS.WORK_LOCATION - 1] || 'N/A',
-        unit: row[MEMBER_COLS.UNIT - 1] || 'N/A',
-        email: row[MEMBER_COLS.EMAIL - 1] || '',
-        phone: row[MEMBER_COLS.PHONE - 1] || '',
-        isSteward: isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1]),
-        supervisor: row[MEMBER_COLS.SUPERVISOR - 1] || 'N/A',
-        hasOpenGrievance: isTruthyValue(row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1])
+        firstName: col_(row, MEMBER_COLS.FIRST_NAME) || '',
+        lastName: col_(row, MEMBER_COLS.LAST_NAME) || '',
+        name: ((col_(row, MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(row, MEMBER_COLS.LAST_NAME) || '')).trim(),
+        title: col_(row, MEMBER_COLS.JOB_TITLE) || 'N/A',
+        location: col_(row, MEMBER_COLS.WORK_LOCATION) || 'N/A',
+        unit: col_(row, MEMBER_COLS.UNIT) || 'N/A',
+        email: col_(row, MEMBER_COLS.EMAIL) || '',
+        phone: col_(row, MEMBER_COLS.PHONE) || '',
+        isSteward: isTruthyValue(col_(row, MEMBER_COLS.IS_STEWARD)),
+        supervisor: col_(row, MEMBER_COLS.SUPERVISOR) || 'N/A',
+        hasOpenGrievance: isTruthyValue(col_(row, MEMBER_COLS.HAS_OPEN_GRIEVANCE))
       };
     }).filter(function(m) { return m !== null; }).slice(0, 100);
 
-    Logger.log('getWebAppMemberList: Returning ' + result.length + ' members');
+    log_('getWebAppMemberList', 'Returning ' + result.length + ' members');
     return result;
   } catch (e) {
-    Logger.log('getWebAppMemberList error: ' + e.toString());
+    log_('getWebAppMemberList error', e.toString());
     throw new Error('Failed to load members: ' + e.message);
   }
 }
@@ -2301,10 +2299,10 @@ function getWebAppResourceLinks() {
     try {
       // satisfactionForm removed v4.22.7 — survey is native webapp
       var configRow = configSheet.getRange(3, 1, 1, CONFIG_COLS.ORG_WEBSITE).getValues()[0];
-      links.grievanceForm = configRow[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
-      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
-      links.orgWebsite = configRow[CONFIG_COLS.ORG_WEBSITE - 1] || '';
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      links.grievanceForm = col_(configRow, CONFIG_COLS.GRIEVANCE_FORM_URL) || '';
+      links.contactForm = col_(configRow, CONFIG_COLS.CONTACT_FORM_URL) || '';
+      links.orgWebsite = col_(configRow, CONFIG_COLS.ORG_WEBSITE) || '';
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
 
   // Resolve Resources/ folder URL from stored ID (v4.20.18)
@@ -2318,7 +2316,7 @@ function getWebAppResourceLinks() {
     if (resFolderId) {
       links.resourcesFolderUrl = DriveApp.getFolderById(resFolderId).getUrl();
     }
-  } catch (_re) { Logger.log('_re: ' + (_re.message || _re)); }
+  } catch (_re) { log_('_re', (_re.message || _re)); }
 
   return links;
 }
@@ -2512,7 +2510,7 @@ function showConstantContactSetup() {
     '✅ Constant Contact Configured', 5
   );
 
-  Logger.log('Constant Contact API credentials configured');
+  log_('showConstantContactSetup', 'Constant Contact API credentials configured');
 }
 
 /**
@@ -2556,7 +2554,7 @@ function authorizeConstantContact() {
     '&state=' + encodeURIComponent(state);
 
   // Show the URL for the user to visit
-  var html = HtmlService.createHtmlOutput(
+  showDialog_(
     '<style>' +
     'body{font-family:Arial,sans-serif;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:8px;max-width:500px}' +
@@ -2595,10 +2593,8 @@ function authorizeConstantContact() {
     '    .withFailureHandler(function(e){alert("Error: "+e.message);})' +
     '    .exchangeConstantContactCode(match[1]);' +
     '}' +
-    '</script>'
-  ).setWidth(550).setHeight(520);
-
-  ui.showModalDialog(html, '📧 Authorize Constant Contact');
+    '</script>',
+    '📧 Authorize Constant Contact', 550, 520);
 }
 
 /**
@@ -2647,10 +2643,10 @@ function exchangeConstantContactCode(code) {
     // Store tokens
     storeConstantContactTokens_(body);
 
-    Logger.log('Constant Contact authorized successfully');
+    log_('exchangeConstantContactCode', 'Constant Contact authorized successfully');
     return 'Authorized Successfully!';
   } catch (e) {
-    Logger.log('CC token exchange error: ' + e.message);
+    log_('CC token exchange error', e.message);
     throw e;
   }
 }
@@ -2720,7 +2716,7 @@ function getConstantContactToken_() {
   try {
     var response = UrlFetchApp.fetch(CC_CONFIG.TOKEN_URL, options);
     if (response.getResponseCode() !== 200) {
-      Logger.log('CC token refresh failed: ' + response.getContentText());
+      log_('CC token refresh failed', response.getContentText());
       return null;
     }
 
@@ -2728,7 +2724,7 @@ function getConstantContactToken_() {
     storeConstantContactTokens_(body);
     return body.access_token;
   } catch (e) {
-    Logger.log('CC token refresh error: ' + e.message);
+    log_('CC token refresh error', e.message);
     return null;
   }
 }
@@ -2792,13 +2788,13 @@ function ccApiGet_(endpoint, params) {
     }
 
     if (code !== 200) {
-      Logger.log('CC API error (' + code + '): ' + response.getContentText());
+      log_('ccApiGet_', 'CC API error (' + code + '): ' + response.getContentText());
       return null;
     }
 
     return JSON.parse(response.getContentText());
   } catch (e) {
-    Logger.log('CC API request error: ' + e.message);
+    log_('CC API request error', e.message);
     return null;
   }
 }
@@ -2978,7 +2974,7 @@ function syncConstantContactEngagement() {
   var processedCount = 0;
 
   for (var i = 0; i < memberData.length; i++) {
-    var memberEmail = (memberData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+    var memberEmail = (col_(memberData[i], MEMBER_COLS.EMAIL) || '').toString().toLowerCase().trim();
     var contactId = memberEmail ? emailToContactId[memberEmail] : null;
 
     if (contactId) {
@@ -2996,8 +2992,8 @@ function syncConstantContactEngagement() {
         openRateUpdates.push([engagement.openRate]);
         contactDateUpdates.push([engagement.lastActivityDate || '']);
       } else {
-        openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
-        contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
+        openRateUpdates.push([numericField_(col_(memberData[i], MEMBER_COLS.OPEN_RATE))]);
+        contactDateUpdates.push([col_(memberData[i], MEMBER_COLS.RECENT_CONTACT_DATE) || '']);
       }
 
       // Progress update every 25 contacts
@@ -3006,8 +3002,8 @@ function syncConstantContactEngagement() {
       }
     } else {
       // No CC match — preserve existing values
-      openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
-      contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
+      openRateUpdates.push([numericField_(col_(memberData[i], MEMBER_COLS.OPEN_RATE))]);
+      contactDateUpdates.push([col_(memberData[i], MEMBER_COLS.RECENT_CONTACT_DATE) || '']);
     }
   }
 
@@ -3025,7 +3021,7 @@ function syncConstantContactEngagement() {
     '• Members without CC match: ' + (memberData.length - matchCount);
 
   ui.alert('✅ CC Sync Complete', summary, ui.ButtonSet.OK);
-  Logger.log('CC sync: ' + matchCount + ' matches out of ' + memberData.length + ' members');
+  log_('CC sync', matchCount + ' matches out of ' + memberData.length + ' members');
 }
 
 /**
@@ -3097,7 +3093,7 @@ function disconnectConstantContact() {
     'Constant Contact disconnected. All credentials removed.',
     '🔌 Disconnected', 5
   );
-  Logger.log('Constant Contact credentials removed');
+  log_('disconnectConstantContact', 'Constant Contact credentials removed');
 }
 
 // ============================================================================
@@ -3130,15 +3126,15 @@ function getWebAppResourceCategories() {
 
     var categories = data
       .filter(function(row) {
-        var setting = String(row[RESOURCE_CONFIG_COLS.SETTING - 1] || '').trim();
-        var active  = String(row[RESOURCE_CONFIG_COLS.ACTIVE - 1]  || '').toLowerCase();
-        var value   = String(row[RESOURCE_CONFIG_COLS.VALUE - 1]   || '').trim();
+        var setting = String(col_(row, RESOURCE_CONFIG_COLS.SETTING) || '').trim();
+        var active  = String(col_(row, RESOURCE_CONFIG_COLS.ACTIVE)  || '').toLowerCase();
+        var value   = String(col_(row, RESOURCE_CONFIG_COLS.VALUE)   || '').trim();
         return setting === 'Category' && active === 'yes' && value !== '';
       })
       .map(function(row) {
         return {
-          name:  String(row[RESOURCE_CONFIG_COLS.VALUE - 1]).trim(),
-          order: Number(row[RESOURCE_CONFIG_COLS.SORT_ORDER - 1]) || 999
+          name:  String(col_(row, RESOURCE_CONFIG_COLS.VALUE)).trim(),
+          order: Number(col_(row, RESOURCE_CONFIG_COLS.SORT_ORDER)) || 999
         };
       });
 
@@ -3189,23 +3185,23 @@ function getWebAppResourcesList(audience) {
     var tz = Session.getScriptTimeZone();
 
     var result = data.map(function(row) {
-      var visible = String(row[RESOURCES_COLS.VISIBLE - 1] || '').toLowerCase();
+      var visible = String(col_(row, RESOURCES_COLS.VISIBLE) || '').toLowerCase();
       if (visible !== 'yes') return null;
 
-      var rowAudience = row[RESOURCES_COLS.AUDIENCE - 1] || 'All';
+      var rowAudience = col_(row, RESOURCES_COLS.AUDIENCE) || 'All';
       if (audience && audience !== 'All' && rowAudience !== 'All' && rowAudience !== audience) return null;
 
-      var dateAdded = row[RESOURCES_COLS.DATE_ADDED - 1];
+      var dateAdded = col_(row, RESOURCES_COLS.DATE_ADDED);
 
       return {
-        id: row[RESOURCES_COLS.RESOURCE_ID - 1] || '',
-        title: row[RESOURCES_COLS.TITLE - 1] || '',
-        category: row[RESOURCES_COLS.CATEGORY - 1] || 'General',
-        summary: row[RESOURCES_COLS.SUMMARY - 1] || '',
-        content: row[RESOURCES_COLS.CONTENT - 1] || '',
-        url: row[RESOURCES_COLS.URL - 1] || '',
-        icon: row[RESOURCES_COLS.ICON - 1] || '📄',
-        sortOrder: row[RESOURCES_COLS.SORT_ORDER - 1] || 999,
+        id: col_(row, RESOURCES_COLS.RESOURCE_ID) || '',
+        title: col_(row, RESOURCES_COLS.TITLE) || '',
+        category: col_(row, RESOURCES_COLS.CATEGORY) || 'General',
+        summary: col_(row, RESOURCES_COLS.SUMMARY) || '',
+        content: col_(row, RESOURCES_COLS.CONTENT) || '',
+        url: col_(row, RESOURCES_COLS.URL) || '',
+        icon: col_(row, RESOURCES_COLS.ICON) || '📄',
+        sortOrder: col_(row, RESOURCES_COLS.SORT_ORDER) || 999,
         audience: rowAudience,
         dateAdded: dateAdded instanceof Date ? Utilities.formatDate(dateAdded, tz, 'MMM d, yyyy') : (dateAdded || '')
       };
@@ -3216,7 +3212,7 @@ function getWebAppResourcesList(audience) {
 
     return result;
   } catch (e) {
-    Logger.log('getWebAppResourcesList error: ' + e.toString());
+    log_('getWebAppResourcesList error', e.toString());
     return [];
   }
 }
@@ -3243,20 +3239,20 @@ function getWebAppResourcesListAll() {
     var tz = Session.getScriptTimeZone();
 
     return data.map(function(row) {
-      var dateAdded = row[RESOURCES_COLS.DATE_ADDED - 1];
+      var dateAdded = col_(row, RESOURCES_COLS.DATE_ADDED);
       return {
-        id: row[RESOURCES_COLS.RESOURCE_ID - 1] || '',
-        title: row[RESOURCES_COLS.TITLE - 1] || '',
-        category: row[RESOURCES_COLS.CATEGORY - 1] || 'General',
-        summary: row[RESOURCES_COLS.SUMMARY - 1] || '',
-        content: row[RESOURCES_COLS.CONTENT - 1] || '',
-        url: row[RESOURCES_COLS.URL - 1] || '',
-        icon: row[RESOURCES_COLS.ICON - 1] || '\uD83D\uDCC4',
-        sortOrder: row[RESOURCES_COLS.SORT_ORDER - 1] || 999,
-        visible: String(row[RESOURCES_COLS.VISIBLE - 1] || '').toLowerCase() === 'yes',
-        audience: row[RESOURCES_COLS.AUDIENCE - 1] || 'All',
+        id: col_(row, RESOURCES_COLS.RESOURCE_ID) || '',
+        title: col_(row, RESOURCES_COLS.TITLE) || '',
+        category: col_(row, RESOURCES_COLS.CATEGORY) || 'General',
+        summary: col_(row, RESOURCES_COLS.SUMMARY) || '',
+        content: col_(row, RESOURCES_COLS.CONTENT) || '',
+        url: col_(row, RESOURCES_COLS.URL) || '',
+        icon: col_(row, RESOURCES_COLS.ICON) || '\uD83D\uDCC4',
+        sortOrder: col_(row, RESOURCES_COLS.SORT_ORDER) || 999,
+        visible: String(col_(row, RESOURCES_COLS.VISIBLE) || '').toLowerCase() === 'yes',
+        audience: col_(row, RESOURCES_COLS.AUDIENCE) || 'All',
         dateAdded: dateAdded instanceof Date ? Utilities.formatDate(dateAdded, tz, 'MMM d, yyyy') : (dateAdded || ''),
-        addedBy: row[RESOURCES_COLS.ADDED_BY - 1] || ''
+        addedBy: col_(row, RESOURCES_COLS.ADDED_BY) || ''
       };
     }).filter(function(r) { return r.id; });
   } catch (e) {
@@ -3291,7 +3287,7 @@ function addWebAppResource(sessionToken, data) {
       var allData = sheet.getDataRange().getValues();
       var maxNum = 0;
       for (var i = 1; i < allData.length; i++) {
-        var existId = String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '');
+        var existId = String(col_(allData[i], RESOURCES_COLS.RESOURCE_ID) || '');
         var match = existId.match(/RES-(\d+)/);
         if (match) {
           var num = parseInt(match[1], 10);
@@ -3347,19 +3343,19 @@ function updateWebAppResource(sessionToken, resourceId, data) {
 
       var allData = sheet.getDataRange().getValues();
       for (var i = 1; i < allData.length; i++) {
-        if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        if (String(col_(allData[i], RESOURCES_COLS.RESOURCE_ID) || '').trim() === resourceId) {
           // M-PERF: Batch write — modify row copy in-memory, write back in single call
           var rowData = allData[i].slice();
           // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
-          if (data.title !== undefined)     rowData[RESOURCES_COLS.TITLE - 1] = escapeForFormula(data.title);
-          if (data.category !== undefined)  rowData[RESOURCES_COLS.CATEGORY - 1] = escapeForFormula(data.category);
-          if (data.summary !== undefined)   rowData[RESOURCES_COLS.SUMMARY - 1] = escapeForFormula(data.summary);
-          if (data.content !== undefined)   rowData[RESOURCES_COLS.CONTENT - 1] = escapeForFormula(data.content);
-          if (data.url !== undefined)       rowData[RESOURCES_COLS.URL - 1] = escapeForFormula(data.url);
-          if (data.icon !== undefined)      rowData[RESOURCES_COLS.ICON - 1] = escapeForFormula(data.icon);
-          if (data.sortOrder !== undefined) rowData[RESOURCES_COLS.SORT_ORDER - 1] = data.sortOrder;
-          if (data.visible !== undefined)   rowData[RESOURCES_COLS.VISIBLE - 1] = escapeForFormula(data.visible);
-          if (data.audience !== undefined)  rowData[RESOURCES_COLS.AUDIENCE - 1] = escapeForFormula(data.audience);
+          if (data.title !== undefined)     setCol_(rowData, RESOURCES_COLS.TITLE, escapeForFormula(data.title));
+          if (data.category !== undefined)  setCol_(rowData, RESOURCES_COLS.CATEGORY, escapeForFormula(data.category));
+          if (data.summary !== undefined)   setCol_(rowData, RESOURCES_COLS.SUMMARY, escapeForFormula(data.summary));
+          if (data.content !== undefined)   setCol_(rowData, RESOURCES_COLS.CONTENT, escapeForFormula(data.content));
+          if (data.url !== undefined)       setCol_(rowData, RESOURCES_COLS.URL, escapeForFormula(data.url));
+          if (data.icon !== undefined)      setCol_(rowData, RESOURCES_COLS.ICON, escapeForFormula(data.icon));
+          if (data.sortOrder !== undefined) setCol_(rowData, RESOURCES_COLS.SORT_ORDER, data.sortOrder);
+          if (data.visible !== undefined)   setCol_(rowData, RESOURCES_COLS.VISIBLE, escapeForFormula(data.visible));
+          if (data.audience !== undefined)  setCol_(rowData, RESOURCES_COLS.AUDIENCE, escapeForFormula(data.audience));
           sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
           return { success: true, message: 'Resource updated' };
         }
@@ -3389,7 +3385,7 @@ function deleteWebAppResource(sessionToken, resourceId) {
 
       var allData = sheet.getDataRange().getValues();
       for (var i = 1; i < allData.length; i++) {
-        if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        if (String(col_(allData[i], RESOURCES_COLS.RESOURCE_ID) || '').trim() === resourceId) {
           sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('No');
           return { success: true, message: 'Resource hidden' };
         }
@@ -3417,7 +3413,7 @@ function restoreWebAppResource(sessionToken, resourceId) {
 
     var allData = sheet.getDataRange().getValues();
     for (var i = 1; i < allData.length; i++) {
-      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+      if (String(col_(allData[i], RESOURCES_COLS.RESOURCE_ID) || '').trim() === resourceId) {
         sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('Yes');
         return { success: true, message: 'Resource restored' };
       }
@@ -3479,48 +3475,48 @@ function getKnowledgeContent(placement, audience, type) {
       var row = data[i];
 
       // Filter: Active
-      var active = String(row[KNOWLEDGE_COLS.ACTIVE - 1] || '').toLowerCase();
+      var active = String(col_(row, KNOWLEDGE_COLS.ACTIVE) || '').toLowerCase();
       if (active !== 'yes') continue;
 
       // Filter: Placement
       if (placement) {
-        var rowPlacement = row[KNOWLEDGE_COLS.PLACEMENT - 1] || '';
+        var rowPlacement = col_(row, KNOWLEDGE_COLS.PLACEMENT) || '';
         if (rowPlacement !== placement) continue;
       }
 
       // Filter: Audience
       if (audience && audience !== 'All') {
-        var rowAudience = row[KNOWLEDGE_COLS.AUDIENCE - 1] || 'All';
+        var rowAudience = col_(row, KNOWLEDGE_COLS.AUDIENCE) || 'All';
         if (rowAudience !== 'All' && rowAudience !== audience) continue;
       }
 
       // Filter: Type
       if (type) {
-        var rowType = row[KNOWLEDGE_COLS.TYPE - 1] || '';
+        var rowType = col_(row, KNOWLEDGE_COLS.TYPE) || '';
         if (rowType !== type) continue;
       }
 
       // Filter: Date scheduling
-      var startDate = row[KNOWLEDGE_COLS.START_DATE - 1];
+      var startDate = col_(row, KNOWLEDGE_COLS.START_DATE);
       if (startDate instanceof Date && startDate > now) continue;
-      var endDate = row[KNOWLEDGE_COLS.END_DATE - 1];
+      var endDate = col_(row, KNOWLEDGE_COLS.END_DATE);
       if (endDate instanceof Date && endDate < now) continue;
 
       // Parse bullets from pipe-delimited string
-      var bulletsRaw = row[KNOWLEDGE_COLS.BULLETS - 1] || '';
+      var bulletsRaw = col_(row, KNOWLEDGE_COLS.BULLETS) || '';
       var bullets = bulletsRaw ? String(bulletsRaw).split('|').map(function(b) { return b.trim(); }).filter(function(b) { return b; }) : [];
 
       result.push({
-        id: row[KNOWLEDGE_COLS.CONTENT_ID - 1] || '',
-        type: row[KNOWLEDGE_COLS.TYPE - 1] || '',
-        category: row[KNOWLEDGE_COLS.CATEGORY - 1] || 'General',
-        title: row[KNOWLEDGE_COLS.TITLE - 1] || '',
-        content: row[KNOWLEDGE_COLS.CONTENT - 1] || '',
-        attribution: row[KNOWLEDGE_COLS.ATTRIBUTION - 1] || '',
+        id: col_(row, KNOWLEDGE_COLS.CONTENT_ID) || '',
+        type: col_(row, KNOWLEDGE_COLS.TYPE) || '',
+        category: col_(row, KNOWLEDGE_COLS.CATEGORY) || 'General',
+        title: col_(row, KNOWLEDGE_COLS.TITLE) || '',
+        content: col_(row, KNOWLEDGE_COLS.CONTENT) || '',
+        attribution: col_(row, KNOWLEDGE_COLS.ATTRIBUTION) || '',
         bullets: bullets,
-        audience: row[KNOWLEDGE_COLS.AUDIENCE - 1] || 'All',
-        placement: row[KNOWLEDGE_COLS.PLACEMENT - 1] || '',
-        priority: row[KNOWLEDGE_COLS.PRIORITY - 1] || 999
+        audience: col_(row, KNOWLEDGE_COLS.AUDIENCE) || 'All',
+        placement: col_(row, KNOWLEDGE_COLS.PLACEMENT) || '',
+        priority: col_(row, KNOWLEDGE_COLS.PRIORITY) || 999
       });
     }
 
@@ -3532,7 +3528,7 @@ function getKnowledgeContent(placement, audience, type) {
 
     return result;
   } catch (e) {
-    Logger.log('getKnowledgeContent error: ' + e.toString());
+    log_('getKnowledgeContent error', e.toString());
     return [];
   }
 }
@@ -3565,25 +3561,25 @@ function getKnowledgeContentAll() {
     var tz = Session.getScriptTimeZone();
 
     var result = data.map(function(row) {
-      var bulletsRaw = row[KNOWLEDGE_COLS.BULLETS - 1] || '';
-      var dateAdded = row[KNOWLEDGE_COLS.DATE_ADDED - 1];
+      var bulletsRaw = col_(row, KNOWLEDGE_COLS.BULLETS) || '';
+      var dateAdded = col_(row, KNOWLEDGE_COLS.DATE_ADDED);
       return {
-        id: row[KNOWLEDGE_COLS.CONTENT_ID - 1] || '',
-        type: row[KNOWLEDGE_COLS.TYPE - 1] || '',
-        category: row[KNOWLEDGE_COLS.CATEGORY - 1] || 'General',
-        title: row[KNOWLEDGE_COLS.TITLE - 1] || '',
-        content: row[KNOWLEDGE_COLS.CONTENT - 1] || '',
-        attribution: row[KNOWLEDGE_COLS.ATTRIBUTION - 1] || '',
+        id: col_(row, KNOWLEDGE_COLS.CONTENT_ID) || '',
+        type: col_(row, KNOWLEDGE_COLS.TYPE) || '',
+        category: col_(row, KNOWLEDGE_COLS.CATEGORY) || 'General',
+        title: col_(row, KNOWLEDGE_COLS.TITLE) || '',
+        content: col_(row, KNOWLEDGE_COLS.CONTENT) || '',
+        attribution: col_(row, KNOWLEDGE_COLS.ATTRIBUTION) || '',
         bullets: bulletsRaw ? String(bulletsRaw).split('|').map(function(b) { return b.trim(); }).filter(function(b) { return b; }) : [],
         bulletsRaw: String(bulletsRaw),
-        audience: row[KNOWLEDGE_COLS.AUDIENCE - 1] || 'All',
-        placement: row[KNOWLEDGE_COLS.PLACEMENT - 1] || '',
-        active: String(row[KNOWLEDGE_COLS.ACTIVE - 1] || '').toLowerCase() === 'yes',
-        priority: row[KNOWLEDGE_COLS.PRIORITY - 1] || 999,
-        startDate: row[KNOWLEDGE_COLS.START_DATE - 1] instanceof Date ? Utilities.formatDate(row[KNOWLEDGE_COLS.START_DATE - 1], tz, 'yyyy-MM-dd') : '',
-        endDate: row[KNOWLEDGE_COLS.END_DATE - 1] instanceof Date ? Utilities.formatDate(row[KNOWLEDGE_COLS.END_DATE - 1], tz, 'yyyy-MM-dd') : '',
+        audience: col_(row, KNOWLEDGE_COLS.AUDIENCE) || 'All',
+        placement: col_(row, KNOWLEDGE_COLS.PLACEMENT) || '',
+        active: String(col_(row, KNOWLEDGE_COLS.ACTIVE) || '').toLowerCase() === 'yes',
+        priority: col_(row, KNOWLEDGE_COLS.PRIORITY) || 999,
+        startDate: col_(row, KNOWLEDGE_COLS.START_DATE) instanceof Date ? Utilities.formatDate(col_(row, KNOWLEDGE_COLS.START_DATE), tz, 'yyyy-MM-dd') : '',
+        endDate: col_(row, KNOWLEDGE_COLS.END_DATE) instanceof Date ? Utilities.formatDate(col_(row, KNOWLEDGE_COLS.END_DATE), tz, 'yyyy-MM-dd') : '',
         dateAdded: dateAdded instanceof Date ? Utilities.formatDate(dateAdded, tz, 'MMM d, yyyy') : (dateAdded || ''),
-        addedBy: row[KNOWLEDGE_COLS.ADDED_BY - 1] || ''
+        addedBy: col_(row, KNOWLEDGE_COLS.ADDED_BY) || ''
       };
     }).filter(function(r) { return r.id; });
 
@@ -3642,7 +3638,7 @@ function addKnowledgeContent(sessionToken, data) {
       var allData = sheet.getDataRange().getValues();
       var maxNum = 0;
       for (var i = 1; i < allData.length; i++) {
-        var existId = String(allData[i][KNOWLEDGE_COLS.CONTENT_ID - 1] || '');
+        var existId = String(col_(allData[i], KNOWLEDGE_COLS.CONTENT_ID) || '');
         var match = existId.match(/KE-(\d+)/);
         if (match) {
           var num = parseInt(match[1], 10);
@@ -3735,23 +3731,23 @@ function updateKnowledgeContent(sessionToken, contentId, data) {
 
       var allData = sheet.getDataRange().getValues();
       for (var i = 1; i < allData.length; i++) {
-        if (String(allData[i][KNOWLEDGE_COLS.CONTENT_ID - 1] || '').trim() === contentId) {
+        if (String(col_(allData[i], KNOWLEDGE_COLS.CONTENT_ID) || '').trim() === contentId) {
           var rowData = allData[i].slice();
-          if (data.type !== undefined)        rowData[KNOWLEDGE_COLS.TYPE - 1] = escapeForFormula(data.type);
-          if (data.category !== undefined)    rowData[KNOWLEDGE_COLS.CATEGORY - 1] = escapeForFormula(data.category);
-          if (data.title !== undefined)       rowData[KNOWLEDGE_COLS.TITLE - 1] = escapeForFormula(data.title);
-          if (data.content !== undefined)     rowData[KNOWLEDGE_COLS.CONTENT - 1] = escapeForFormula(data.content);
-          if (data.attribution !== undefined) rowData[KNOWLEDGE_COLS.ATTRIBUTION - 1] = escapeForFormula(data.attribution);
+          if (data.type !== undefined)        setCol_(rowData, KNOWLEDGE_COLS.TYPE, escapeForFormula(data.type));
+          if (data.category !== undefined)    setCol_(rowData, KNOWLEDGE_COLS.CATEGORY, escapeForFormula(data.category));
+          if (data.title !== undefined)       setCol_(rowData, KNOWLEDGE_COLS.TITLE, escapeForFormula(data.title));
+          if (data.content !== undefined)     setCol_(rowData, KNOWLEDGE_COLS.CONTENT, escapeForFormula(data.content));
+          if (data.attribution !== undefined) setCol_(rowData, KNOWLEDGE_COLS.ATTRIBUTION, escapeForFormula(data.attribution));
           if (data.bullets !== undefined) {
             var bullets = Array.isArray(data.bullets) ? data.bullets.join('|') : String(data.bullets);
-            rowData[KNOWLEDGE_COLS.BULLETS - 1] = escapeForFormula(bullets);
+            setCol_(rowData, KNOWLEDGE_COLS.BULLETS, escapeForFormula(bullets));
           }
-          if (data.audience !== undefined)    rowData[KNOWLEDGE_COLS.AUDIENCE - 1] = escapeForFormula(data.audience);
-          if (data.placement !== undefined)   rowData[KNOWLEDGE_COLS.PLACEMENT - 1] = escapeForFormula(data.placement);
-          if (data.active !== undefined)      rowData[KNOWLEDGE_COLS.ACTIVE - 1] = escapeForFormula(data.active);
-          if (data.priority !== undefined)    rowData[KNOWLEDGE_COLS.PRIORITY - 1] = data.priority;
-          if (data.startDate !== undefined)   rowData[KNOWLEDGE_COLS.START_DATE - 1] = data.startDate;
-          if (data.endDate !== undefined)     rowData[KNOWLEDGE_COLS.END_DATE - 1] = data.endDate;
+          if (data.audience !== undefined)    setCol_(rowData, KNOWLEDGE_COLS.AUDIENCE, escapeForFormula(data.audience));
+          if (data.placement !== undefined)   setCol_(rowData, KNOWLEDGE_COLS.PLACEMENT, escapeForFormula(data.placement));
+          if (data.active !== undefined)      setCol_(rowData, KNOWLEDGE_COLS.ACTIVE, escapeForFormula(data.active));
+          if (data.priority !== undefined)    setCol_(rowData, KNOWLEDGE_COLS.PRIORITY, data.priority);
+          if (data.startDate !== undefined)   setCol_(rowData, KNOWLEDGE_COLS.START_DATE, data.startDate);
+          if (data.endDate !== undefined)     setCol_(rowData, KNOWLEDGE_COLS.END_DATE, data.endDate);
           sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
 
           _invalidateKnowledgeCache_();
@@ -3784,7 +3780,7 @@ function deleteKnowledgeContent(sessionToken, contentId) {
 
       var allData = sheet.getDataRange().getValues();
       for (var i = 1; i < allData.length; i++) {
-        if (String(allData[i][KNOWLEDGE_COLS.CONTENT_ID - 1] || '').trim() === contentId) {
+        if (String(col_(allData[i], KNOWLEDGE_COLS.CONTENT_ID) || '').trim() === contentId) {
           sheet.getRange(i + 1, KNOWLEDGE_COLS.ACTIVE).setValue('No');
           _invalidateKnowledgeCache_();
           return { success: true, message: 'Content deactivated' };
@@ -3816,7 +3812,7 @@ function restoreKnowledgeContent(sessionToken, contentId) {
 
       var allData = sheet.getDataRange().getValues();
       for (var i = 1; i < allData.length; i++) {
-        if (String(allData[i][KNOWLEDGE_COLS.CONTENT_ID - 1] || '').trim() === contentId) {
+        if (String(col_(allData[i], KNOWLEDGE_COLS.CONTENT_ID) || '').trim() === contentId) {
           sheet.getRange(i + 1, KNOWLEDGE_COLS.ACTIVE).setValue('Yes');
           _invalidateKnowledgeCache_();
           return { success: true, message: 'Content restored' };
@@ -3880,25 +3876,25 @@ function getDeadlineCalendarData() {
   var deadlines = [];
 
   for (var i = 1; i < data.length; i++) {
-    var status = String(data[i][GRIEVANCE_COLS.STATUS - 1] || '').trim();
+    var status = String(col_(data[i], GRIEVANCE_COLS.STATUS) || '').trim();
 
     // Only include open/active grievances (skip Closed, Won, Withdrawn, Denied, Settled)
     var closedStatuses = ['Closed', 'Won', 'Withdrawn', 'Denied', 'Settled'];
     if (closedStatuses.indexOf(status) !== -1) continue;
 
-    var grievanceId = String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '').trim();
+    var grievanceId = String(col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) || '').trim();
     if (!grievanceId) continue;
 
-    var firstName = String(data[i][GRIEVANCE_COLS.FIRST_NAME - 1] || '').trim();
-    var lastName = String(data[i][GRIEVANCE_COLS.LAST_NAME - 1] || '').trim();
+    var firstName = String(col_(data[i], GRIEVANCE_COLS.FIRST_NAME) || '').trim();
+    var lastName = String(col_(data[i], GRIEVANCE_COLS.LAST_NAME) || '').trim();
     var memberName = (firstName + ' ' + lastName).trim() || 'Unknown Member';
-    var currentStep = String(data[i][GRIEVANCE_COLS.CURRENT_STEP - 1] || '').trim();
-    var steward = String(data[i][GRIEVANCE_COLS.STEWARD - 1] || '').trim();
-    var issueCategory = String(data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '').trim();
+    var currentStep = String(col_(data[i], GRIEVANCE_COLS.CURRENT_STEP) || '').trim();
+    var steward = String(col_(data[i], GRIEVANCE_COLS.STEWARD) || '').trim();
+    var issueCategory = String(col_(data[i], GRIEVANCE_COLS.ISSUE_CATEGORY) || '').trim();
 
     // Determine the relevant due date based on the current step
     var dueDate = null;
-    var nextActionDue = data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
+    var nextActionDue = col_(data[i], GRIEVANCE_COLS.NEXT_ACTION_DUE);
 
     // Prefer NEXT_ACTION_DUE if it's a valid date
     if (nextActionDue instanceof Date && !isNaN(nextActionDue.getTime())) {
@@ -3940,7 +3936,7 @@ function getDeadlineCalendarData() {
     }
 
     // Also use pre-computed DAYS_TO_DEADLINE if available and dueDate wasn't from NEXT_ACTION_DUE
-    var daysToDeadline = data[i][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+    var daysToDeadline = col_(data[i], GRIEVANCE_COLS.DAYS_TO_DEADLINE);
     if (typeof daysToDeadline === 'number' && !isNaN(daysToDeadline) && !(nextActionDue instanceof Date)) {
       daysRemaining = daysToDeadline;
       urgency = daysRemaining < 3 ? 'red' : (daysRemaining <= 7 ? 'orange' : 'green');
@@ -4370,11 +4366,11 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { log_('_e', (_e.message || _e)); }
 
   if (!sheet) {
     var msg = 'Notifications sheet not found. Nothing to migrate.';
-    Logger.log(msg);
+    log_('MIGRATE_ADD_DISMISS_MODE_COLUMN', msg);
     if (ui) ui.alert(msg);
     return;
   }
@@ -4385,7 +4381,7 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
   for (var i = 0; i < headerRow.length; i++) {
     if (String(headerRow[i]).toLowerCase() === 'dismiss_mode') {
       var alreadyMsg = 'Already has Dismiss_Mode column at col ' + (i + 1) + '. No changes made.';
-      Logger.log(alreadyMsg);
+      log_('MIGRATE_ADD_DISMISS_MODE_COLUMN', alreadyMsg);
       if (ui) ui.alert(alreadyMsg);
       return;
     }
@@ -4419,7 +4415,7 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
 
   var successMsg = 'Migration complete. Dismiss_Mode column added at col ' + newColIndex +
     '. All ' + (lastDataRow - 1) + ' existing rows backfilled with "Dismissible".';
-  Logger.log(successMsg);
+  log_('MIGRATE_ADD_DISMISS_MODE_COLUMN', successMsg);
   if (ui) ui.alert(successMsg);
 }
 
@@ -4431,7 +4427,7 @@ function MIGRATE_ADD_DISMISS_MODE_COLUMN() {
 function SETUP_DRIVE_FOLDERS() {
   var result = setupDashboardDriveFolders();
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { log_('_e', (_e.message || _e)); }
   var msg = result.success
     ? '✅ Drive folders ready!\n\n' + result.rootFolderName + ': ' + result.rootFolderUrl +
       '\n\nAll folder IDs have been saved to the Config sheet.' +
@@ -4439,7 +4435,7 @@ function SETUP_DRIVE_FOLDERS() {
       '\n🔒 All other subfolders: PRIVATE.'
     : '❌ Drive folder setup failed — check Apps Script logs.';
   if (ui) ui.alert('📁 Drive Folder Setup', msg, ui.ButtonSet.OK);
-  else Logger.log('SETUP_DRIVE_FOLDERS: ' + JSON.stringify(result));
+  else log_('SETUP_DRIVE_FOLDERS', JSON.stringify(result));
   return result;
 }
 
@@ -4463,7 +4459,7 @@ function generateGrievancePDF_(formData) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || '',
+      'agency':     formData.agency     || getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Organization',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4523,7 +4519,7 @@ function generateGrievancePDF_(formData) {
 
     return pdfBlob;
   } catch (e) {
-    Logger.log('generateGrievancePDF_ error: ' + e.message + '\n' + (e.stack || ''));
+    log_('generateGrievancePDF_ error', e.message + '\n' + (e.stack || ''));
     return null;
   }
 }
@@ -4597,7 +4593,7 @@ function generateDraftGrievancePDF_(formData, grievanceId, documentHash) {
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || '',
+      'agency':     formData.agency     || getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Organization',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4657,7 +4653,7 @@ function generateDraftGrievancePDF_(formData, grievanceId, documentHash) {
     return pdfBlob;
   } catch (e) {
     if (typeof secureLog === 'function') secureLog('esign', 'generateDraftGrievancePDF_ error', { error: e.message });
-    else Logger.log('generateDraftGrievancePDF_ error: ' + e.message);
+    else log_('generateDraftGrievancePDF_ error', e.message);
     return null;
   }
 }
@@ -4682,7 +4678,7 @@ function generateSignedGrievancePDF_(formData, grievanceId, documentHash, sigBas
       'grievant':   formData.grievant   || '',
       'jobtitle':   formData.jobtitle   || '',
       'startdate':  formData.startdate  || '',
-      'agency':     formData.agency     || '',
+      'agency':     formData.agency     || getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Organization',
       'region':     formData.region     || '',
       'workloc':    formData.workloc    || '',
       'articles':   formData.articles   || '',
@@ -4759,7 +4755,7 @@ function generateSignedGrievancePDF_(formData, grievanceId, documentHash, sigBas
     return pdfBlob;
   } catch (e) {
     if (typeof secureLog === 'function') secureLog('esign', 'generateSignedGrievancePDF_ error', { error: e.message });
-    else Logger.log('generateSignedGrievancePDF_ error: ' + e.message);
+    else log_('generateSignedGrievancePDF_ error', e.message);
     return null;
   }
 }
@@ -4855,10 +4851,10 @@ function getGrievanceForSigning(sigToken) {
       if (memberDir && memberDir.getLastRow() > 1) {
         var mData = memberDir.getDataRange().getValues();
         for (var j = 1; j < mData.length; j++) {
-          var sEmail = String(mData[j][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim();
+          var sEmail = String(col_(mData[j], MEMBER_COLS.EMAIL) || '').toLowerCase().trim();
           if (sEmail === stewardEmail.toLowerCase().trim()) {
-            var sFirst = String(mData[j][MEMBER_COLS.FIRST_NAME - 1] || '').trim();
-            var sLast  = String(mData[j][MEMBER_COLS.LAST_NAME - 1]  || '').trim();
+            var sFirst = String(col_(mData[j], MEMBER_COLS.FIRST_NAME) || '').trim();
+            var sLast  = String(col_(mData[j], MEMBER_COLS.LAST_NAME)  || '').trim();
             if (sFirst || sLast) stewardName = (sFirst + ' ' + sLast).trim();
             break;
           }
@@ -4889,7 +4885,7 @@ function getGrievanceForSigning(sigToken) {
     };
   } catch (e) {
     if (typeof secureLog === 'function') secureLog('esign', 'getGrievanceForSigning error', { error: e.message });
-    else Logger.log('getGrievanceForSigning error: ' + e.message);
+    else log_('getGrievanceForSigning error', e.message);
     return { success: false, message: 'Error loading grievance.' };
   }
 }
@@ -4979,8 +4975,8 @@ function submitGrievanceSignature(sigToken, sigBase64) {
       if (memberDir && memberDir.getLastRow() > 1) {
         var mAll = memberDir.getDataRange().getValues();
         for (var m = 1; m < mAll.length; m++) {
-          if (String(mAll[m][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim() === memberEmail) {
-            var hd = mAll[m][MEMBER_COLS.HIRE_DATE - 1];
+          if (String(col_(mAll[m], MEMBER_COLS.EMAIL) || '').toLowerCase().trim() === memberEmail) {
+            var hd = col_(mAll[m], MEMBER_COLS.HIRE_DATE);
             if (hd) {
               try { hireDateStr = Utilities.formatDate(new Date(hd), tz, 'yyyy-MM-dd'); } catch (_e) { hireDateStr = String(hd); }
             }
@@ -5002,7 +4998,7 @@ function submitGrievanceSignature(sigToken, sigBase64) {
       grievant:   memberName,
       jobtitle:   '', // from member dir if available
       startdate:  hireDateStr,
-      agency:     '',
+      agency:     getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Organization',
       region:     regionVal,
       workloc:    workLoc,
       articles:   grievanceObj.articles,
@@ -5036,7 +5032,7 @@ function submitGrievanceSignature(sigToken, sigBase64) {
         caseFolder.createFile(signedPdfBlob);
       } catch (driveErr) {
         if (typeof secureLog === 'function') secureLog('esign', 'Drive save error', { error: driveErr.message });
-        else Logger.log('submitGrievanceSignature: Drive save error: ' + driveErr.message);
+        else log_('submitGrievanceSignature', 'Drive save error: ' + driveErr.message);
       }
     }
 
@@ -5092,7 +5088,7 @@ function submitGrievanceSignature(sigToken, sigBase64) {
     };
   } catch (e) {
     if (typeof secureLog === 'function') secureLog('esign', 'submitGrievanceSignature error', { error: e.message });
-    else Logger.log('submitGrievanceSignature error: ' + e.message);
+    else log_('submitGrievanceSignature error', e.message);
     return { success: false, message: 'Error processing signature.' };
   }
 }
@@ -5136,24 +5132,24 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     var allMembers = memberDir.getDataRange().getValues();
     var emailLower = data.memberEmail.toLowerCase().trim();
     for (var i = 1; i < allMembers.length; i++) {
-      var rowEmail = String(allMembers[i][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim();
+      var rowEmail = String(col_(allMembers[i], MEMBER_COLS.EMAIL) || '').toLowerCase().trim();
       if (rowEmail === emailLower) {
         memberData = {
-          memberId:     String(allMembers[i][MEMBER_COLS.MEMBER_ID - 1]    || '').trim(),
-          firstName:    String(allMembers[i][MEMBER_COLS.FIRST_NAME - 1]   || '').trim(),
-          lastName:     String(allMembers[i][MEMBER_COLS.LAST_NAME - 1]    || '').trim(),
+          memberId:     String(col_(allMembers[i], MEMBER_COLS.MEMBER_ID)    || '').trim(),
+          firstName:    String(col_(allMembers[i], MEMBER_COLS.FIRST_NAME)   || '').trim(),
+          lastName:     String(col_(allMembers[i], MEMBER_COLS.LAST_NAME)    || '').trim(),
           email:        emailLower,
-          phone:        String(allMembers[i][MEMBER_COLS.PHONE - 1]        || '').trim(),
-          jobTitle:     String(allMembers[i][MEMBER_COLS.JOB_TITLE - 1]    || '').trim(),
-          workLocation: String(allMembers[i][MEMBER_COLS.WORK_LOCATION - 1]|| '').trim(),
-          unit:         String(allMembers[i][MEMBER_COLS.UNIT - 1]         || '').trim(),
-          supervisor:   String(allMembers[i][MEMBER_COLS.SUPERVISOR - 1]   || '').trim(),
-          manager:      String(allMembers[i][MEMBER_COLS.MANAGER - 1]      || '').trim(),
-          hireDate:     allMembers[i][MEMBER_COLS.HIRE_DATE - 1] || '',
-          streetAddress:String(allMembers[i][MEMBER_COLS.STREET_ADDRESS - 1]|| '').trim(),
-          city:         String(allMembers[i][MEMBER_COLS.CITY - 1]         || '').trim(),
-          state:        String(allMembers[i][MEMBER_COLS.STATE - 1]        || '').trim(),
-          zipCode:      String(allMembers[i][MEMBER_COLS.ZIP_CODE - 1]     || '').trim()
+          phone:        String(col_(allMembers[i], MEMBER_COLS.PHONE)        || '').trim(),
+          jobTitle:     String(col_(allMembers[i], MEMBER_COLS.JOB_TITLE)    || '').trim(),
+          workLocation: String(col_(allMembers[i], MEMBER_COLS.WORK_LOCATION)|| '').trim(),
+          unit:         String(col_(allMembers[i], MEMBER_COLS.UNIT)         || '').trim(),
+          supervisor:   String(col_(allMembers[i], MEMBER_COLS.SUPERVISOR)   || '').trim(),
+          manager:      String(col_(allMembers[i], MEMBER_COLS.MANAGER)      || '').trim(),
+          hireDate:     col_(allMembers[i], MEMBER_COLS.HIRE_DATE) || '',
+          streetAddress:String(col_(allMembers[i], MEMBER_COLS.STREET_ADDRESS)|| '').trim(),
+          city:         String(col_(allMembers[i], MEMBER_COLS.CITY)         || '').trim(),
+          state:        String(col_(allMembers[i], MEMBER_COLS.STATE)        || '').trim(),
+          zipCode:      String(col_(allMembers[i], MEMBER_COLS.ZIP_CODE)     || '').trim()
         };
         break;
       }
@@ -5174,34 +5170,34 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     var totalCols = getGrievanceHeaders().length;
     var rowData = new Array(totalCols).fill('');
 
-    rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
-    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = escapeForFormula(memberData.memberId);
-    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = escapeForFormula(memberData.firstName);
+    setCol_(rowData, GRIEVANCE_COLS.GRIEVANCE_ID, grievanceId);
+    setCol_(rowData, GRIEVANCE_COLS.MEMBER_ID, escapeForFormula(memberData.memberId));
+    setCol_(rowData, GRIEVANCE_COLS.FIRST_NAME, escapeForFormula(memberData.firstName));
     if (GRIEVANCE_COLS.LAST_NAME) {
-      rowData[GRIEVANCE_COLS.LAST_NAME - 1]     = escapeForFormula(memberData.lastName);
+      setCol_(rowData, GRIEVANCE_COLS.LAST_NAME, escapeForFormula(memberData.lastName));
     }
-    rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
-    rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = data.step || 1;
+    setCol_(rowData, GRIEVANCE_COLS.STATUS, GRIEVANCE_STATUS.OPEN);
+    setCol_(rowData, GRIEVANCE_COLS.CURRENT_STEP, data.step || 1);
     if (data.incidentDate) {
-      rowData[GRIEVANCE_COLS.INCIDENT_DATE - 1] = new Date(data.incidentDate);
+      setCol_(rowData, GRIEVANCE_COLS.INCIDENT_DATE, new Date(data.incidentDate));
     }
-    rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
-    rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
-    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = escapeForFormula(data.articles || '');
-    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = escapeForFormula(data.issueCategory || '');
-    rowData[GRIEVANCE_COLS.MEMBER_EMAIL - 1]    = escapeForFormula(memberData.email);
-    rowData[GRIEVANCE_COLS.LOCATION - 1]        = escapeForFormula(memberData.workLocation);
-    rowData[GRIEVANCE_COLS.STEWARD - 1]         = escapeForFormula(stewardEmail);
-    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = escapeForFormula(data.description || '');
-    rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
+    setCol_(rowData, GRIEVANCE_COLS.DATE_FILED, filingDate);
+    setCol_(rowData, GRIEVANCE_COLS.STEP1_DUE, deadlines.step1Due);
+    setCol_(rowData, GRIEVANCE_COLS.ARTICLES, escapeForFormula(data.articles || ''));
+    setCol_(rowData, GRIEVANCE_COLS.ISSUE_CATEGORY, escapeForFormula(data.issueCategory || ''));
+    setCol_(rowData, GRIEVANCE_COLS.MEMBER_EMAIL, escapeForFormula(memberData.email));
+    setCol_(rowData, GRIEVANCE_COLS.LOCATION, escapeForFormula(memberData.workLocation));
+    setCol_(rowData, GRIEVANCE_COLS.STEWARD, escapeForFormula(stewardEmail));
+    setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormula(data.description || ''));
+    setCol_(rowData, GRIEVANCE_COLS.LAST_UPDATED, new Date());
     if (GRIEVANCE_COLS.ACTION_TYPE) {
-      rowData[GRIEVANCE_COLS.ACTION_TYPE - 1]   = 'Grievance';
+      setCol_(rowData, GRIEVANCE_COLS.ACTION_TYPE, 'Grievance');
     }
 
     // ── Signature tracking fields ──
     var sigToken = generateSignatureToken_(grievanceId);
-    if (GRIEVANCE_COLS.SIGNATURE_STATUS) rowData[GRIEVANCE_COLS.SIGNATURE_STATUS - 1] = 'Pending';
-    if (GRIEVANCE_COLS.SIGNATURE_TOKEN)  rowData[GRIEVANCE_COLS.SIGNATURE_TOKEN - 1]  = sigToken;
+    if (GRIEVANCE_COLS.SIGNATURE_STATUS) setCol_(rowData, GRIEVANCE_COLS.SIGNATURE_STATUS, 'Pending');
+    if (GRIEVANCE_COLS.SIGNATURE_TOKEN)  setCol_(rowData, GRIEVANCE_COLS.SIGNATURE_TOKEN, sigToken);
 
     grievanceSheet.appendRow(rowData);
 
@@ -5227,7 +5223,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
         if (_gv && _grDDFields[_gd].col) addToConfigDropdown_(_grDDFields[_gd].col, _gv);
       }
     } catch (_grSyncErr) {
-      Logger.log('initiateGrievance config sync: ' + _grSyncErr.message);
+      log_('initiateGrievance config sync', _grSyncErr.message);
     }
 
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_CREATED, {
@@ -5264,7 +5260,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
       grievant:   memberData.firstName + ' ' + memberData.lastName,
       jobtitle:   formOverrides.jobtitle || memberData.jobTitle,
       startdate:  formOverrides.startdate || hireDateStr,
-      agency:     formOverrides.agency || '',
+      agency:     formOverrides.agency || getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Organization',
       region:     formOverrides.region || regionVal,
       workloc:    formOverrides.workloc || memberData.workLocation,
       managers:   formOverrides.managers || memberData.manager || memberData.supervisor,
@@ -5306,7 +5302,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
         caseFolder.createFile(pdfBlob);
         pdfSaved = true;
       } catch (pdfErr) {
-        Logger.log('initiateGrievance: PDF save failed: ' + pdfErr.message);
+        log_('initiateGrievance', 'PDF save failed: ' + pdfErr.message);
       }
     }
 
@@ -5315,10 +5311,10 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     try {
       // Try to resolve steward's display name
       for (var j = 1; j < allMembers.length; j++) {
-        var sEmail = String(allMembers[j][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim();
+        var sEmail = String(col_(allMembers[j], MEMBER_COLS.EMAIL) || '').toLowerCase().trim();
         if (sEmail === stewardEmail.toLowerCase().trim()) {
-          var sFirst = String(allMembers[j][MEMBER_COLS.FIRST_NAME - 1] || '').trim();
-          var sLast  = String(allMembers[j][MEMBER_COLS.LAST_NAME - 1] || '').trim();
+          var sFirst = String(col_(allMembers[j], MEMBER_COLS.FIRST_NAME) || '').trim();
+          var sLast  = String(col_(allMembers[j], MEMBER_COLS.LAST_NAME) || '').trim();
           if (sFirst || sLast) stewardName = (sFirst + ' ' + sLast).trim();
           break;
         }
@@ -5350,7 +5346,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     };
 
   } catch (error) {
-    Logger.log('initiateGrievance error: ' + error.message + '\n' + (error.stack || ''));
+    log_('initiateGrievance error', error.message + '\n' + (error.stack || ''));
     return errorResponse(error.message, 'initiateGrievance');
   }
 }
@@ -5404,7 +5400,7 @@ function getGrievanceFormOptions() {
 
     return result;
   } catch (e) {
-    Logger.log('getGrievanceFormOptions error: ' + e.message);
+    log_('getGrievanceFormOptions error', e.message);
     return {};
   }
 }
@@ -5416,13 +5412,13 @@ function getGrievanceFormOptions() {
 function SETUP_CALENDAR() {
   var result = setupDashboardCalendar();
   var ui;
-  try { ui = SpreadsheetApp.getUi(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  try { ui = SpreadsheetApp.getUi(); } catch (_e) { log_('_e', (_e.message || _e)); }
   var msg = result.success
     ? '✅ Calendar ready!\n\nCalendar: ' + result.calendarName +
       '\nID: ' + result.calendarId +
       '\n\nCalendar ID has been saved to the Config sheet.'
     : '❌ Calendar setup failed — check Apps Script logs.';
   if (ui) ui.alert('📅 Calendar Setup', msg, ui.ButtonSet.OK);
-  else Logger.log('SETUP_CALENDAR: ' + JSON.stringify(result));
+  else log_('SETUP_CALENDAR', JSON.stringify(result));
   return result;
 }

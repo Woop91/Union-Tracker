@@ -313,7 +313,7 @@ function clearQuickCaptureNotes() {
  * A fast notepad for capturing thoughts without losing focus
  */
 function showQuickCaptureNotepad() {
-  var html = HtmlService.createHtmlOutput(
+  showDialog_(
     '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 16px; color: #F8FAFC; }' +
@@ -400,12 +400,8 @@ function showQuickCaptureNotepad() {
     '    saveNotes();' +
     '  }' +
     '});' +
-    '</script></body></html>'
-  )
-  .setWidth(500)
-  .setHeight(450);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture Notepad');
+    '</script></body></html>',
+    '📝 Quick Capture Notepad', 500, 450);
 }
 /**
  * Generates HTML for import dialog
@@ -554,16 +550,16 @@ function processMemberImport(csvData) {
 
       // Build row data — escapeForFormula on all string inputs to prevent formula injection
       var rowData = [];
-      rowData[MEMBER_COLS.FIRST_NAME - 1] = _eff(values[columnMap.firstName] || '');
-      rowData[MEMBER_COLS.LAST_NAME - 1] = _eff(values[columnMap.lastName] || '');
-      rowData[MEMBER_COLS.EMAIL - 1] = columnMap.email !== undefined ? _eff(values[columnMap.email] || '') : '';
-      rowData[MEMBER_COLS.PHONE - 1] = columnMap.phone !== undefined ? _eff(values[columnMap.phone] || '') : '';
-      rowData[MEMBER_COLS.JOB_TITLE - 1] = columnMap.jobTitle !== undefined ? _eff(values[columnMap.jobTitle] || '') : '';
-      rowData[MEMBER_COLS.UNIT - 1] = columnMap.unit !== undefined ? _eff(values[columnMap.unit] || '') : '';
-      rowData[MEMBER_COLS.WORK_LOCATION - 1] = columnMap.workLocation !== undefined ? _eff(values[columnMap.workLocation] || '') : '';
-      rowData[MEMBER_COLS.SUPERVISOR - 1] = columnMap.supervisor !== undefined ? _eff(values[columnMap.supervisor] || '') : '';
-      rowData[MEMBER_COLS.IS_STEWARD - 1] = columnMap.isSteward !== undefined ? (values[columnMap.isSteward] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'No';
-      rowData[MEMBER_COLS.DUES_PAYING - 1] = columnMap.duesPaying !== undefined ? (values[columnMap.duesPaying] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'Yes';
+      setCol_(rowData, MEMBER_COLS.FIRST_NAME, _eff(values[columnMap.firstName] || ''));
+      setCol_(rowData, MEMBER_COLS.LAST_NAME, _eff(values[columnMap.lastName] || ''));
+      setCol_(rowData, MEMBER_COLS.EMAIL, columnMap.email !== undefined ? _eff(values[columnMap.email] || '') : '');
+      setCol_(rowData, MEMBER_COLS.PHONE, columnMap.phone !== undefined ? _eff(values[columnMap.phone] || '') : '');
+      setCol_(rowData, MEMBER_COLS.JOB_TITLE, columnMap.jobTitle !== undefined ? _eff(values[columnMap.jobTitle] || '') : '');
+      setCol_(rowData, MEMBER_COLS.UNIT, columnMap.unit !== undefined ? _eff(values[columnMap.unit] || '') : '');
+      setCol_(rowData, MEMBER_COLS.WORK_LOCATION, columnMap.workLocation !== undefined ? _eff(values[columnMap.workLocation] || '') : '');
+      setCol_(rowData, MEMBER_COLS.SUPERVISOR, columnMap.supervisor !== undefined ? _eff(values[columnMap.supervisor] || '') : '');
+      setCol_(rowData, MEMBER_COLS.IS_STEWARD, columnMap.isSteward !== undefined ? (values[columnMap.isSteward] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'No');
+      setCol_(rowData, MEMBER_COLS.DUES_PAYING, columnMap.duesPaying !== undefined ? (values[columnMap.duesPaying] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'Yes');
 
       // Fill empty cells
       while (rowData.length < numCols) {
@@ -672,10 +668,9 @@ function showBreakReminder() {
  */
 function showComfortViewControlPanel() {
   var settings = getComfortViewSettings();
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom:3px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(){location.reload()}).toggleZebraStripes()">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(){location.reload()}).toggleGridlinesComfortView()">' + (settings.hideGridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
-  ).setWidth(500).setHeight(500);
-  SpreadsheetApp.getUi().showModalDialog(html, '♿ Comfort View Panel');
+  showDialog_(
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:' + SHEET_COLORS.DIALOG_ACCENT + ';border-bottom:3px solid ' + SHEET_COLORS.DIALOG_ACCENT + ';padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid ' + SHEET_COLORS.DIALOG_ACCENT + '}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:' + SHEET_COLORS.DIALOG_ACCENT + ';color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:' + SHEET_COLORS.DIALOG_ACCENT_DARK + '}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(){location.reload()}).toggleZebraStripes()">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(){location.reload()}).toggleGridlinesComfortView()">' + (settings.hideGridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetComfortViewSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>',
+    '♿ Comfort View Panel', 500, 500);
 }
 
 /**
@@ -721,10 +716,7 @@ function showThemeManager() {
  * and displays the appropriate interface (mobile or desktop)
  */
 function showSmartDashboard() {
-  var html = HtmlService.createHtmlOutput(getSmartDashboardHtml())
-    .setWidth(800)
-    .setHeight(700);
-  SpreadsheetApp.getUi().showModalDialog(html, '📋 Dashboard Pend');
+  showDialog_(getSmartDashboardHtml(), '📋 Dashboard Pend', 800, 700);
 }
 
 /**

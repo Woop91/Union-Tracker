@@ -61,7 +61,7 @@ var ConfigReader = (function () {
         try {
           _memo = JSON.parse(cached);
           return _memo;
-        } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+        } catch (_e) { log_('_e', (_e.message || _e)); }
       }
     }
 
@@ -126,7 +126,7 @@ var ConfigReader = (function () {
       cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
     } catch (e) {
       // Cache write failed — non-fatal, will just re-read next time
-      Logger.log('ConfigReader: Cache write failed: ' + e.message);
+      log_('ConfigReader', 'Cache write failed: ' + e.message);
     }
 
     return config;

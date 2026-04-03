@@ -137,10 +137,10 @@ function DIAGNOSE_SETUP() {
     var invalidDates = 0;
 
     for (var i = 1; i < data.length; i++) {
-      var memberId = data[i][GRIEVANCE_COLS.MEMBER_ID - 1];
-      var filingDate = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
+      var memberId = col_(data[i], GRIEVANCE_COLS.MEMBER_ID);
+      var filingDate = col_(data[i], GRIEVANCE_COLS.DATE_FILED);
 
-      if (!memberId && data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
+      if (!memberId && col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID)) {
         orphanedGrievances++;
       }
 
@@ -270,7 +270,7 @@ function REPAIR_DASHBOARD() {
     });
 
   } catch (error) {
-    Logger.log('Error in REPAIR_DASHBOARD: ' + error.message);
+    log_('Error in REPAIR_DASHBOARD', error.message);
     ui.alert('❌ Error', 'Repair failed: ' + error.message, ui.ButtonSet.OK);
 
     logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
@@ -399,7 +399,7 @@ function _updateStep_featureSheets(ss, summary) {
       }
     } catch (e) {
       summary.errors.push(featureSteps[i].name + ': ' + e.message);
-      Logger.log('UPDATE_ALL_SHEETS feature "' + featureSteps[i].name + '": ' + e.message);
+      log_('fn', 'UPDATE_ALL_SHEETS feature "' + featureSteps[i].name + '": ' + e.message);
     }
   }
   ss.toast('Feature sheets ready', '🔄 Step 3/8', 2);
@@ -538,7 +538,7 @@ function UPDATE_ALL_SHEETS() {
       steps[i].fn(ss, summary);
     } catch (e) {
       summary.errors.push(steps[i].name + ': ' + e.message);
-      Logger.log('UPDATE_ALL_SHEETS ' + steps[i].name + ' error: ' + e.message);
+      log_('UPDATE_ALL_SHEETS', 'UPDATE_ALL_SHEETS ' + steps[i].name + ' error: ' + e.message);
     }
   }
 
@@ -569,7 +569,7 @@ function UPDATE_ALL_SHEETS() {
     ui.alert('🔄 Update All Sheets — Complete', resultMsg, ui.ButtonSet.OK);
   }
 
-  Logger.log('UPDATE_ALL_SHEETS complete: ' + JSON.stringify(summary));
+  log_('UPDATE_ALL_SHEETS complete', JSON.stringify(summary));
   return summary;
 }
 
@@ -639,7 +639,7 @@ function removeDeprecatedTabs() {
         ss.deleteSheet(sheet);
         removed.push(name);
       } catch (_e) {
-        Logger.log('Could not delete sheet: ' + name);
+        log_('Could not delete sheet', name);
       }
     }
   }
@@ -667,11 +667,7 @@ function removeDeprecatedTabs() {
 function showRepairDialog() {
   var diagnostics = DIAGNOSE_SETUP();
 
-  var html = HtmlService.createHtmlOutput(getRepairDialogHtml_(diagnostics))
-    .setWidth(500)
-    .setHeight(400);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '🔧 Repair Dashboard');
+  showDialog_(getRepairDialogHtml_(diagnostics), '🔧 Repair Dashboard', 500, 400);
 }
 
 /**
@@ -826,8 +822,7 @@ function showModalDiagnostics() {
     '<button class="btn" onclick="google.script.host.close()">Close</button>' +
     '</body></html>';
 
-  var output = HtmlService.createHtmlOutput(html).setWidth(500).setHeight(400);
-  SpreadsheetApp.getUi().showModalDialog(output, '🔍 Modal Diagnostics');
+  showDialog_(html, '🔍 Modal Diagnostics', 500, 400);
 }
 
 /**
@@ -837,11 +832,7 @@ function showModalDiagnostics() {
 function showDiagnosticsDialog() {
   var results = DIAGNOSE_SETUP();
 
-  var html = HtmlService.createHtmlOutput(getDiagnosticsDialogHtml_(results))
-    .setWidth(550)
-    .setHeight(450);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '🩺 System Diagnostics');
+  showDialog_(getDiagnosticsDialogHtml_(results), '🩺 System Diagnostics', 550, 450);
 }
 
 /**
@@ -958,14 +949,14 @@ function getCachedData(key, loader, ttl) {
     var cached = null;
     try {
       cached = memCache.get(key);
-    } catch (_memErr) { Logger.log('_memErr: ' + (_memErr.message || _memErr)); }
+    } catch (_memErr) { log_('_memErr', (_memErr.message || _memErr)); }
     if (cached) {
       try {
-        if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Memory] ' + key);
+        if (CACHE_CONFIG.ENABLE_LOGGING) log_('getCachedData', '[CACHE HIT - Memory] ' + key);
         return JSON.parse(cached);
       } catch (_parseErr) {
         // Corrupted cache entry, remove it
-        try { memCache.remove(key); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+        try { memCache.remove(key); } catch (_e) { log_('_e', (_e.message || _e)); }
       }
     }
 
@@ -979,30 +970,30 @@ function getCachedData(key, loader, ttl) {
           // Refresh memory cache from properties
           var str = JSON.stringify(obj.data);
           if (str.length < 100000) {
-            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) { log_('_e', (_e.message || _e)); }
           }
-          if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Props] ' + key);
+          if (CACHE_CONFIG.ENABLE_LOGGING) log_('getCachedData', '[CACHE HIT - Props] ' + key);
           return obj.data;
         } else {
           // Expired - clean up stale property
-          try { propsCache.deleteProperty(key); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+          try { propsCache.deleteProperty(key); } catch (_e) { log_('_e', (_e.message || _e)); }
         }
       }
-    } catch (_propsErr) { Logger.log('_propsErr: ' + (_propsErr.message || _propsErr)); }
+    } catch (_propsErr) { log_('_propsErr', (_propsErr.message || _propsErr)); }
 
     // Cache miss - load fresh data
-    if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE MISS] ' + key);
+    if (CACHE_CONFIG.ENABLE_LOGGING) log_('getCachedData', '[CACHE MISS] ' + key);
     var data = loader();
     setCachedData(key, data, ttl);
     return data;
 
   } catch (e) {
-    Logger.log('Cache error for ' + key + ': ' + e.message);
+    log_('getCachedData', 'Cache error for ' + key + ': ' + e.message);
     // Fallback to direct load on error
     try {
       return loader();
     } catch (loaderErr) {
-      Logger.log('Loader also failed for ' + key + ': ' + loaderErr.message);
+      log_('getCachedData', 'Loader also failed for ' + key + ': ' + loaderErr.message);
       return null;
     }
   }
@@ -1028,7 +1019,7 @@ function setCachedData(key, data, ttl) {
         var memCache = CacheService.getScriptCache();
         memCache.put(key, str, Math.min(ttl, 21600));
       } catch (_memErr) {
-        Logger.log('Memory cache write failed for ' + key + ': data too large or service unavailable');
+        log_('setCachedData', 'Memory cache write failed for ' + key + ': data too large or service unavailable');
       }
     }
 
@@ -1039,11 +1030,11 @@ function setCachedData(key, data, ttl) {
         var propsCache = PropertiesService.getScriptProperties();
         propsCache.setProperty(key, wrappedStr);
       } catch (_propsErr) {
-        Logger.log('Properties cache write failed for ' + key);
+        log_('setCachedData', 'Properties cache write failed for ' + key);
       }
     }
   } catch (e) {
-    Logger.log('Set cache error for ' + key + ': ' + e.message);
+    log_('setCachedData', 'Set cache error for ' + key + ': ' + e.message);
   }
 }
 /**
@@ -1060,7 +1051,7 @@ function invalidateAllCaches() {
 
     SpreadsheetApp.getActiveSpreadsheet().toast('All caches cleared', 'Cache', 3);
   } catch (e) {
-    Logger.log('Clear all caches error: ' + e.message);
+    log_('Clear all caches error', e.message);
   }
 }
 
@@ -1080,7 +1071,7 @@ function warmUpCaches() {
     warmWebAppCaches_();
     SpreadsheetApp.getActiveSpreadsheet().toast('Caches warmed successfully', 'Cache', 3);
   } catch (e) {
-    Logger.log('Cache warmup error: ' + e.message);
+    log_('Cache warmup error', e.message);
     SpreadsheetApp.getActiveSpreadsheet().toast('Cache warmup failed: ' + e.message, 'Error', 5);
   }
 }
@@ -1119,7 +1110,7 @@ function warmWebAppCaches_() {
         cache.put(cacheKey, json, ttl);
       }
     } catch (_e) {
-      Logger.log('warmWebAppCaches_ error for ' + sheetsToWarm[i] + ': ' + _e.message);
+      log_('warmWebAppCaches_', 'warmWebAppCaches_ error for ' + sheetsToWarm[i] + ': ' + _e.message);
     }
   }
 }
@@ -1169,7 +1160,7 @@ function getCachedStewards() {
   return getCachedData(CACHE_KEYS.ALL_STEWARDS, function() {
     var members = getCachedMembers();
     return members.filter(function(row) {
-      return isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1]);
+      return isTruthyValue(col_(row, MEMBER_COLS.IS_STEWARD));
     });
   }, 600);
 }
@@ -1196,10 +1187,10 @@ function getCachedDashboardMetrics() {
     today.setHours(0, 0, 0, 0);
 
     grievances.forEach(function(row) {
-      var status = row[GRIEVANCE_COLS.STATUS - 1];
-      var issue = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1];
-      var steward = row[GRIEVANCE_COLS.STEWARD - 1];
-      var deadline = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
+      var status = col_(row, GRIEVANCE_COLS.STATUS);
+      var issue = col_(row, GRIEVANCE_COLS.ISSUE_CATEGORY);
+      var steward = col_(row, GRIEVANCE_COLS.STEWARD);
+      var deadline = col_(row, GRIEVANCE_COLS.NEXT_ACTION_DUE);
 
       // Calculate days to deadline
       var daysTo = null;
@@ -1246,7 +1237,7 @@ function showCacheStatusDashboard() {
         if (obj.timestamp) {
           age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
         }
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
 
     // M-13: Apply escapeHtml() to dynamic values embedded in HTML
@@ -1258,7 +1249,7 @@ function showCacheStatusDashboard() {
       '</tr>';
   }).join('');
 
-  var html = HtmlService.createHtmlOutput(
+  showDialog_(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
@@ -1283,10 +1274,8 @@ function showCacheStatusDashboard() {
     '<script>' +
     'function warmUp(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Warm-up failed: "+e.message)}).warmUpCaches()}' +
     'function clearAll(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Clear failed: "+e.message)}).invalidateAllCaches()}' +
-    '</script></body></html>'
-  ).setWidth(600).setHeight(450);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '🗄️ Cache Status');
+    '</script></body></html>',
+    '🗄️ Cache Status', 600, 450);
 }
 
 /**
@@ -1590,10 +1579,10 @@ function restoreFromSnapshot(snapshot, confirmed) {
       } catch (_hideErr) {
         backupSheet.hideSheet();
       }
-      Logger.log('Pre-restore backup saved to hidden sheet: ' + backupSheetName);
+      log_('Pre-restore backup saved to hidden sheet', backupSheetName);
     }
   } catch (_backupErr) {
-    Logger.log('Warning: Could not create pre-restore backup sheet: ' + _backupErr.message);
+    log_('Warning', 'Could not create pre-restore backup sheet: ' + _backupErr.message);
     // Continue with restore — backup failure should not block the operation,
     // but log a warning for audit trail
   }
@@ -1818,13 +1807,13 @@ function logAuditEvent(eventType, details) {
           );
         }
       } catch (cpErr) {
-        Logger.log('Warning: Could not save audit chain checkpoint: ' + cpErr.message);
+        log_('Warning', 'Could not save audit chain checkpoint: ' + cpErr.message);
       }
       auditSheet.deleteRows(2, rowsToDelete);
     }
 
   } catch (error) {
-    Logger.log('Error logging audit event: ' + error);
+    log_('Error logging audit event', error);
     // Don't throw - audit logging shouldn't break main functionality
   }
 }
@@ -1959,7 +1948,7 @@ function NUCLEAR_WIPE_GRIEVANCES() {
     } catch (_hideErr) {
       snapshotSheet.hideSheet();
     }
-    Logger.log('Pre-wipe snapshot saved to hidden sheet: ' + snapshotName);
+    log_('Pre-wipe snapshot saved to hidden sheet', snapshotName);
   }
 
   if (lastRow > 1) {
@@ -1995,7 +1984,7 @@ function createWeeklySnapshot() {
   var archiveFolderId = '';
   try {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
 
   var folder;
   if (!archiveFolderId) {
@@ -2015,7 +2004,7 @@ function createWeeklySnapshot() {
           configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).setValue(archiveFolderId);
         }
       } catch (_saveErr) {
-        Logger.log('Could not save archive folder ID to config: ' + _saveErr.message);
+        log_('Could not save archive folder ID to config', _saveErr.message);
       }
       ss.toast('Auto-created archive folder in Google Drive.', 'Archive Setup', 3);
     } catch (createErr) {
@@ -2064,12 +2053,12 @@ function createAutomatedSnapshot() {
   try {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
   } catch (e) {
-    Logger.log('Could not get archive folder ID: ' + e.message);
+    log_('Could not get archive folder ID', e.message);
     return errorResponse('Archive folder not configured');
   }
 
   if (!archiveFolderId) {
-    Logger.log('Archive folder not configured');
+    log_('createAutomatedSnapshot', 'Archive folder not configured');
     return errorResponse('Archive folder not configured');
   }
 
@@ -2088,7 +2077,7 @@ function createAutomatedSnapshot() {
     return { success: true, snapshotName: snapshotName };
 
   } catch (e) {
-    Logger.log('Failed to create automated snapshot: ' + e.message);
+    log_('Failed to create automated snapshot', e.message);
     return errorResponse(e.message);
   }
 }
@@ -2150,14 +2139,14 @@ function cleanupOldExportFiles() {
         }
       }
     } catch (_e) {
-      Logger.log('Export cleanup search error (' + patterns[p] + '): ' + _e.message);
+      log_('cleanupOldExportFiles', 'Export cleanup search error (' + patterns[p] + '): ' + _e.message);
     }
   }
 
   if (trashed > 0) {
     logAuditEvent('EXPORT_FILES_CLEANED', 'Trashed ' + trashed + ' export file(s) older than ' + RETENTION_DAYS + ' days');
   }
-  Logger.log('cleanupOldExportFiles: trashed ' + trashed + ' file(s)');
+  log_('cleanupOldExportFiles', 'trashed ' + trashed + ' file(s)');
 }
 
 /**
@@ -2226,7 +2215,7 @@ function navigateToAuditLog() {
 function showSettingsDialog() {
   const currentSettings = getSettings();
 
-  const html = HtmlService.createHtmlOutput(`
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -2340,9 +2329,8 @@ function showSettingsDialog() {
       </script>
     </body>
     </html>
-  `).setWidth(500).setHeight(550);
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Dashboard Settings');
+  `;
+  showDialog_(htmlContent, 'Dashboard Settings', 500, 550);
 }
 
 /**
@@ -2449,7 +2437,7 @@ function batchSetValues(sheet, updates) {
 
   // H-4: Guard against updates targeting the header row (row <= 1)
   updates = updates.filter(function(u) {
-    if (u.row <= 1) { Logger.log('batchSetValues: skipped update targeting header row=' + u.row); return false; }
+    if (u.row <= 1) { log_('batchSetValues', 'skipped update targeting header row=' + u.row); return false; }
     return true;
   });
   if (updates.length === 0) return;
@@ -2508,7 +2496,7 @@ function executeWithRetry(fn, options) {
       lastError = error;
 
       // Log the error
-      Logger.log('Attempt ' + (attempt + 1) + ' failed: ' + error.message);
+      log_('executeWithRetry', 'Attempt ' + (attempt + 1) + ' failed: ' + error.message);
       onError(error, attempt);
 
       // Check if we should retry
@@ -2652,15 +2640,15 @@ function findOrphanedGrievances() {
   var orphaned = [];
 
   grievanceData.forEach(function(row, index) {
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID);
+    var memberId = col_(row, GRIEVANCE_COLS.MEMBER_ID);
 
     if (memberId && !validMemberIds[memberId]) {
       orphaned.push({
         row: index + 2,
         grievanceId: grievanceId,
         memberId: memberId,
-        memberName: (row[GRIEVANCE_COLS.FIRST_NAME - 1] || '') + ' ' + (row[GRIEVANCE_COLS.LAST_NAME - 1] || '')
+        memberName: (col_(row, GRIEVANCE_COLS.FIRST_NAME) || '') + ' ' + (col_(row, GRIEVANCE_COLS.LAST_NAME) || '')
       });
     }
   });
@@ -2689,8 +2677,8 @@ function calculateStewardWorkload() {
   var activeStatuses = ['Open', 'Pending Info', 'In Arbitration', 'Appealed'];
 
   grievanceData.forEach(function(row) {
-    var status = row[GRIEVANCE_COLS.STATUS - 1];
-    var steward = row[GRIEVANCE_COLS.STEWARD - 1];
+    var status = col_(row, GRIEVANCE_COLS.STATUS);
+    var steward = col_(row, GRIEVANCE_COLS.STEWARD);
 
     if (steward && activeStatuses.indexOf(status) !== -1) {
       if (!stewardCounts[steward]) {
@@ -2705,7 +2693,7 @@ function calculateStewardWorkload() {
       stewardCounts[steward].totalAssigned++;
 
       // Check if urgent (days to deadline <= 7)
-      var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+      var daysToDeadline = col_(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
       if (typeof daysToDeadline === 'number' && daysToDeadline <= 7) {
         stewardCounts[steward].urgentCount++;
       }
@@ -2914,7 +2902,7 @@ function archiveClosedGrievances(daysOld) {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) {
-    Logger.log('Grievance Log not found');
+    log_('archiveClosedGrievances', 'Grievance Log not found');
     return { archived: 0 };
   }
 
@@ -2932,7 +2920,7 @@ function archiveClosedGrievances(daysOld) {
   // H-18: Acquire lock so read-archive-delete is atomic; prevents duplicate archival on concurrent calls
   var archiveLock = LockService.getScriptLock();
   if (!archiveLock.tryLock(30000)) {
-    Logger.log('archiveClosedGrievances: could not acquire lock');
+    log_('archiveClosedGrievances', 'could not acquire lock');
     return { archived: 0, error: 'Lock unavailable' };
   }
   try {
@@ -2942,8 +2930,8 @@ function archiveClosedGrievances(daysOld) {
     var rowIndicesToDelete = [];
 
     data.forEach(function(row, index) {
-      var status = row[GRIEVANCE_COLS.STATUS - 1];
-      var dateClosed = row[GRIEVANCE_COLS.DATE_CLOSED - 1];
+      var status = col_(row, GRIEVANCE_COLS.STATUS);
+      var dateClosed = col_(row, GRIEVANCE_COLS.DATE_CLOSED);
 
       if (closedStatuses.indexOf(status) !== -1 && dateClosed instanceof Date && dateClosed < cutoffDate) {
         rowsToArchive.push(row);
@@ -2970,12 +2958,12 @@ function archiveClosedGrievances(daysOld) {
         _successfulDeletes++;
       } catch (deleteErr) {
         failedDeletes.push({ row: rowIndex, error: deleteErr.message });
-        Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
+        log_('archiveClosedGrievances', 'Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
       }
     });
     if (failedDeletes.length > 0) {
       var failedRows = failedDeletes.map(function(f) { return f.row; });
-      Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));
+      log_('Warning', failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));
     }
 
     // Log the archive operation
@@ -2990,7 +2978,7 @@ function archiveClosedGrievances(daysOld) {
       failedDeletes.forEach(function(item) {
         var dataIdx = item.row - 2;
         if (dataIdx >= 0 && dataIdx < data.length) {
-          var gId = data[dataIdx][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+          var gId = col_(data[dataIdx], GRIEVANCE_COLS.GRIEVANCE_ID);
           if (gId) failedGrievanceIds.push(String(gId));
         }
       });
@@ -3055,7 +3043,7 @@ function onEditWithAuditLogging(e) {
       validateMemberIdOnEdit(e);
     }
   } catch (err) {
-    Logger.log('onEditWithAuditLogging error: ' + err.message);
+    log_('onEditWithAuditLogging error', err.message);
   }
 }
 
@@ -3104,19 +3092,19 @@ function auditAllTriggers() {
     duplicates: duplicates.length > 0 ? duplicates : 'none'
   };
 
-  Logger.log('=== TRIGGER AUDIT ===');
-  Logger.log('Total triggers: ' + result.totalCount);
+  log_('auditAllTriggers', '=== TRIGGER AUDIT ===');
+  log_('Total triggers', result.totalCount);
   for (var j = 0; j < report.length; j++) {
     var r = report[j];
-    Logger.log('  [' + j + '] ' + r.handler + ' (' + r.eventType + ', ' + r.source + ')');
+    log_('auditAllTriggers', '  [' + j + '] ' + r.handler + ' (' + r.eventType + ', ' + r.source + ')');
   }
   if (duplicates.length > 0) {
-    Logger.log('⚠️ DUPLICATES FOUND:');
+    log_('⚠️ DUPLICATES FOUND', '');
     for (var d = 0; d < duplicates.length; d++) {
-      Logger.log('  ' + duplicates[d].handler + ' × ' + duplicates[d].count);
+      log_('auditAllTriggers', '  ' + duplicates[d].handler + ' × ' + duplicates[d].count);
     }
   }
-  Logger.log('=== END AUDIT ===');
+  log_('auditAllTriggers', '=== END AUDIT ===');
 
   return result;
 }
@@ -3153,12 +3141,12 @@ function cleanupDuplicateTriggers(dryRun) {
   }
 
   var action = dryRun ? 'WOULD REMOVE (dry run)' : 'REMOVED';
-  Logger.log('=== TRIGGER CLEANUP — ' + action + ' ===');
-  Logger.log('Kept: ' + kept.length + ' | Removed: ' + removed.length);
+  log_('cleanupDuplicateTriggers', '=== TRIGGER CLEANUP — ' + action + ' ===');
+  log_('Kept', kept.length + ' | Removed: ' + removed.length);
   for (var r = 0; r < removed.length; r++) {
-    Logger.log('  ❌ ' + removed[r]);
+    log_('cleanupDuplicateTriggers', '  ❌ ' + removed[r]);
   }
-  Logger.log('=== END CLEANUP ===');
+  log_('cleanupDuplicateTriggers', '=== END CLEANUP ===');
 
   return { removed: removed, kept: kept, dryRun: dryRun };
 }
@@ -3197,7 +3185,7 @@ function archiveOldAuditLogs_(daysOld) {
 
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) {
-    Logger.log('archiveOldAuditLogs_: lock contention — skipped');
+    log_('archiveOldAuditLogs_', 'lock contention — skipped');
     return { archived: 0, error: 'Lock unavailable' };
   }
 
@@ -3233,7 +3221,7 @@ function archiveOldAuditLogs_(daysOld) {
     var backupFolder = typeof _getOrCreateBackupFolder === 'function' ? _getOrCreateBackupFolder() : DriveApp.getRootFolder();
     var fileName = 'AUDIT_LOG_ARCHIVE_' + new Date().toISOString().slice(0, 10) + '.csv';
     var file = backupFolder.createFile(fileName, csv, 'text/csv');
-    Logger.log('Audit log archive backup: ' + file.getId() + ' (' + rowsToArchive.length + ' rows)');
+    log_('Audit log archive backup', file.getId() + ' (' + rowsToArchive.length + ' rows)');
 
     // Delete rows bottom-up to avoid index shifting
     for (var d = deleteIndices.length - 1; d >= 0; d--) {
@@ -3253,7 +3241,7 @@ function archiveOldAuditLogs_(daysOld) {
 function dailyAuditArchive() {
   var result = archiveOldAuditLogs_(90);
   if (result.archived > 0) {
-    Logger.log('dailyAuditArchive: archived ' + result.archived + ' entries');
+    log_('dailyAuditArchive', 'archived ' + result.archived + ' entries');
   }
 }
 
@@ -3324,19 +3312,19 @@ function migrateContactLogFolderUrlColumn() {
 
     // ── Already migrated? ───────────────────────────────────────────────────
     if (oldIdx === -1) {
-      Logger.log('migrateContactLogFolderUrlColumn: old column "' + OLD_HEADER + '" not found — already migrated or never existed. Nothing to do.');
+      log_('migrateContactLogFolderUrlColumn', 'old column "' + OLD_HEADER + '" not found — already migrated or never existed. Nothing to do.');
       SpreadsheetApp.getActive().toast('"' + OLD_HEADER + '" column not found — nothing to migrate.', '✅ Already clean', 5);
       return;
     }
 
     // ── New column must exist (run CREATE_DASHBOARD first) ──────────────────
     if (newIdx === -1) {
-      Logger.log('migrateContactLogFolderUrlColumn: new column "' + NEW_HEADER + '" not found. Run CREATE_DASHBOARD first to add it.');
+      log_('migrateContactLogFolderUrlColumn', 'new column "' + NEW_HEADER + '" not found. Run CREATE_DASHBOARD first to add it.');
       SpreadsheetApp.getActive().toast('Run CREATE_DASHBOARD first to add the "' + NEW_HEADER + '" column, then re-run this migration.', '⚠ New column missing', 10);
       return;
     }
 
-    Logger.log('migrateContactLogFolderUrlColumn: old col index=' + oldIdx + ', new col index=' + newIdx + ', rows=' + lastRow);
+    log_('migrateContactLogFolderUrlColumn', 'old col index=' + oldIdx + ', new col index=' + newIdx + ', rows=' + lastRow);
 
     // ── Read all data rows ──────────────────────────────────────────────────
     var copied   = 0;
@@ -3358,13 +3346,13 @@ function migrateContactLogFolderUrlColumn() {
           copied++;
         } else if (oldVal && newVal) {
           skipped++;
-          Logger.log('migrateContactLogFolderUrlColumn: row ' + (r + 2) + ' skipped — new column already has value: ' + newVal);
+          log_('migrateContactLogFolderUrlColumn', 'row ' + (r + 2) + ' skipped — new column already has value: ' + newVal);
         }
       }
 
       if (copied > 0) {
         newColCells.setValues(newColVals);
-        Logger.log('migrateContactLogFolderUrlColumn: copied ' + copied + ' URL(s) to new column.');
+        log_('migrateContactLogFolderUrlColumn', 'copied ' + copied + ' URL(s) to new column.');
       }
     }
 
@@ -3373,15 +3361,15 @@ function migrateContactLogFolderUrlColumn() {
     if (lastRow > 1) {
       sheet.getRange(2, oldIdx + 1, lastRow - 1, 1).clearContent();
     }
-    Logger.log('migrateContactLogFolderUrlColumn: old column cleared.');
+    log_('migrateContactLogFolderUrlColumn', 'old column cleared.');
 
     // ── Summary ─────────────────────────────────────────────────────────────
     var msg = 'Copied ' + copied + ' URL(s). Skipped ' + skipped + ' (already set). Old column cleared.';
-    Logger.log('migrateContactLogFolderUrlColumn: complete — ' + msg);
+    log_('migrateContactLogFolderUrlColumn', 'complete — ' + msg);
     SpreadsheetApp.getActive().toast(msg, '✅ Migration complete', 8);
 
   } catch (err) {
-    Logger.log('migrateContactLogFolderUrlColumn ERROR: ' + err.message);
+    log_('migrateContactLogFolderUrlColumn ERROR', err.message);
     SpreadsheetApp.getActive().toast('Migration error: ' + err.message, '❌ Migration failed', 10);
   }
 }

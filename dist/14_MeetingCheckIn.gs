@@ -44,10 +44,7 @@
  * Show the Setup Meeting dialog for stewards
  */
 function showSetupMeetingDialog() {
-  var html = HtmlService.createHtmlOutput(getSetupMeetingHtml_())
-    .setWidth(520)
-    .setHeight(720);
-  SpreadsheetApp.getUi().showModalDialog(html, '📝 Setup New Meeting');
+  showDialog_(getSetupMeetingHtml_(), '📝 Setup New Meeting', 520, 720);
 }
 
 /**
@@ -162,7 +159,7 @@ function createMeeting(meetingData) {
     try {
       qrInfo = getMeetingQRCode(meetingId);
     } catch (_qrErr) {
-      Logger.log('createMeeting: QR code generation skipped: ' + _qrErr.message);
+      log_('createMeeting', 'QR code generation skipped: ' + _qrErr.message);
     }
   }
 
@@ -193,19 +190,19 @@ function getStewardEmailsForMeetingSetup() {
 
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
-      var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+      var isSteward = col_(data[i], MEMBER_COLS.IS_STEWARD);
       if (isTruthyValue(isSteward)) {
-        var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+        var email = String(col_(data[i], MEMBER_COLS.EMAIL) || '').trim();
         if (email) {
           result.push({
-            name: (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || ''),
+            name: (col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || ''),
             email: email
           });
         }
       }
     }
   } catch (e) {
-    Logger.log('Error getting steward emails: ' + e.message);
+    log_('Error getting steward emails', e.message);
   }
   return result;
 }
@@ -220,7 +217,7 @@ function generateMeetingId_(sheet, dateStr) {
   var maxNum = 0;
 
   for (var i = 1; i < data.length; i++) {
-    var id = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+    var id = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || '');
     if (id.indexOf(prefix) === 0) {
       var num = parseInt(id.substring(prefix.length), 10);
       if (!isNaN(num) && num > maxNum) {
@@ -257,15 +254,15 @@ function getCheckInEligibleMeetings() {
   var meetingsMap = {};
 
   for (var i = 1; i < data.length; i++) {
-    var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+    var meetingId = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || '');
     if (!meetingId) continue;
     if (meetingsMap[meetingId]) continue;
 
-    var eventStatus = String(data[i][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+    var eventStatus = String(col_(data[i], MEETING_CHECKIN_COLS.EVENT_STATUS) || '');
     // Only allow Scheduled or Active meetings for check-in
     if (eventStatus === MEETING_STATUS.COMPLETED) continue;
 
-    var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+    var meetingDate = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DATE);
     if (!(meetingDate instanceof Date)) continue;
 
     var d = new Date(meetingDate);
@@ -275,8 +272,8 @@ function getCheckInEligibleMeetings() {
     if (d.getTime() !== today.getTime()) continue;
 
     // Check time window: from start of day to meeting end + deactivate buffer
-    var meetingTime = String(data[i][MEETING_CHECKIN_COLS.MEETING_TIME - 1] || '09:00');
-    var durationHours = parseFloat(data[i][MEETING_CHECKIN_COLS.MEETING_DURATION - 1]) || 1;
+    var meetingTime = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_TIME) || '09:00');
+    var durationHours = parseFloat(col_(data[i], MEETING_CHECKIN_COLS.MEETING_DURATION)) || 1;
     var timeParts = meetingTime.split(':');
     var startHour = parseInt(timeParts[0], 10) || 9;
     var startMin = parseInt(timeParts[1], 10) || 0;
@@ -290,9 +287,9 @@ function getCheckInEligibleMeetings() {
     if (now < deactivateTime) {
       meetingsMap[meetingId] = {
         id: meetingId,
-        name: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
+        name: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_NAME) || ''),
         date: meetingDate.toLocaleDateString(),
-        type: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
+        type: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_TYPE) || ''),
         time: meetingTime
       };
     }
@@ -317,10 +314,7 @@ function getCheckInEligibleMeetings() {
  * This stays open so multiple members can check in sequentially
  */
 function showMeetingCheckInDialog() {
-  var html = HtmlService.createHtmlOutput(getMeetingCheckInHtml_())
-    .setWidth(600)
-    .setHeight(550);
-  SpreadsheetApp.getUi().showModalDialog(html, '📝 Meeting Check-In');
+  showDialog_(getMeetingCheckInHtml_(), '📝 Meeting Check-In', 600, 550);
 }
 
 /**
@@ -358,12 +352,12 @@ function processMeetingCheckIn(meetingId, email, pin) {
   var storedHash = '';
 
   for (var i = 1; i < memberData.length; i++) {
-    var rowEmail = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
+    var rowEmail = String(col_(memberData[i], MEMBER_COLS.EMAIL) || '').trim().toLowerCase();
     if (rowEmail === email) {
-      memberId = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '');
-      memberName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
-                   String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
-      storedHash = String(memberData[i][MEMBER_PIN_COLS.PIN_HASH - 1] || '');
+      memberId = String(col_(memberData[i], MEMBER_COLS.MEMBER_ID) || '');
+      memberName = String(col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' +
+                   String(col_(memberData[i], MEMBER_COLS.LAST_NAME) || '');
+      storedHash = String(col_(memberData[i], MEMBER_PIN_COLS.PIN_HASH) || '');
       break;
     }
   }
@@ -415,8 +409,8 @@ function processMeetingCheckIn(meetingId, email, pin) {
 
     var checkInData = checkInSheet.getDataRange().getValues();
     for (var j = 1; j < checkInData.length; j++) {
-      var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
-      var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
+      var rowMeetingId = String(col_(checkInData[j], MEETING_CHECKIN_COLS.MEETING_ID) || '');
+      var rowMemberId = String(col_(checkInData[j], MEETING_CHECKIN_COLS.MEMBER_ID) || '');
       if (rowMeetingId === meetingId && rowMemberId === memberId) {
         return errorResponse(memberName.trim() + ' is already checked in to this meeting.');
       }
@@ -427,10 +421,10 @@ function processMeetingCheckIn(meetingId, email, pin) {
     var meetingDate = '';
     var meetingType = '';
     for (var k = 1; k < checkInData.length; k++) {
-      if (String(checkInData[k][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
-        meetingName = checkInData[k][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '';
-        meetingDate = checkInData[k][MEETING_CHECKIN_COLS.MEETING_DATE - 1] || '';
-        meetingType = checkInData[k][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '';
+      if (String(col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
+        meetingName = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_NAME) || '';
+        meetingDate = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_DATE) || '';
+        meetingType = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_TYPE) || '';
         break;
       }
     }
@@ -449,8 +443,8 @@ function processMeetingCheckIn(meetingId, email, pin) {
 
     // If this is a Scheduled meeting getting its first check-in, mark as Active
     for (var m = 1; m < checkInData.length; m++) {
-      if (String(checkInData[m][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
-        var currentStatus = String(checkInData[m][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+      if (String(col_(checkInData[m], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
+        var currentStatus = String(col_(checkInData[m], MEETING_CHECKIN_COLS.EVENT_STATUS) || '');
         if (currentStatus === MEETING_STATUS.SCHEDULED) {
           checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
         }
@@ -497,14 +491,14 @@ function getMeetingAttendees(meetingId) {
   var attendees = [];
 
   for (var i = 1; i < data.length; i++) {
-    var rowMeetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
-    var rowMemberId = String(data[i][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
+    var rowMeetingId = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || '');
+    var rowMemberId = String(col_(data[i], MEETING_CHECKIN_COLS.MEMBER_ID) || '');
     if (rowMeetingId === meetingId && rowMemberId) {
       attendees.push({
         memberId: rowMemberId,
-        name: String(data[i][MEETING_CHECKIN_COLS.MEMBER_NAME - 1] || ''),
-        time: data[i][MEETING_CHECKIN_COLS.CHECKIN_TIME - 1]
-          ? new Date(data[i][MEETING_CHECKIN_COLS.CHECKIN_TIME - 1]).toLocaleTimeString()
+        name: String(col_(data[i], MEETING_CHECKIN_COLS.MEMBER_NAME) || ''),
+        time: col_(data[i], MEETING_CHECKIN_COLS.CHECKIN_TIME)
+          ? new Date(col_(data[i], MEETING_CHECKIN_COLS.CHECKIN_TIME)).toLocaleTimeString()
           : ''
       });
     }
@@ -548,12 +542,12 @@ function updateMeetingStatuses() {
   var processedIds = {};
 
   for (var i = 1; i < data.length; i++) {
-    var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+    var meetingId = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || '');
     if (!meetingId || processedIds[meetingId]) continue;
     processedIds[meetingId] = true;
 
-    var eventStatus = String(data[i][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
-    var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+    var eventStatus = String(col_(data[i], MEETING_CHECKIN_COLS.EVENT_STATUS) || '');
+    var meetingDate = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DATE);
     if (!(meetingDate instanceof Date)) continue;
 
     var d = new Date(meetingDate);
@@ -567,8 +561,8 @@ function updateMeetingStatuses() {
 
     // Deactivate: Active (or Scheduled past-date) meetings that have expired
     if (eventStatus === MEETING_STATUS.ACTIVE || eventStatus === MEETING_STATUS.SCHEDULED) {
-      var meetingTime = String(data[i][MEETING_CHECKIN_COLS.MEETING_TIME - 1] || '09:00');
-      var durationHours = parseFloat(data[i][MEETING_CHECKIN_COLS.MEETING_DURATION - 1]) || 1;
+      var meetingTime = String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_TIME) || '09:00');
+      var durationHours = parseFloat(col_(data[i], MEETING_CHECKIN_COLS.MEETING_DURATION)) || 1;
       var timeParts = meetingTime.split(':');
       var startHour = parseInt(timeParts[0], 10) || 9;
       var startMin = parseInt(timeParts[1], 10) || 0;
@@ -582,12 +576,12 @@ function updateMeetingStatuses() {
         deactivated++;
 
         // Email attendance report if steward emails are configured
-        var notifyEmails = String(data[i][MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] || '').trim();
+        var notifyEmails = String(col_(data[i], MEETING_CHECKIN_COLS.NOTIFY_STEWARDS) || '').trim();
         if (notifyEmails && typeof emailMeetingAttendanceReport === 'function') {
           try {
             emailMeetingAttendanceReport(meetingId, notifyEmails);
           } catch (emailError) {
-            Logger.log('Error emailing attendance for ' + meetingId + ': ' + emailError.message);
+            log_('updateMeetingStatuses', 'Error emailing attendance for ' + meetingId + ': ' + emailError.message);
           }
         }
 
@@ -596,7 +590,7 @@ function updateMeetingStatuses() {
           try {
             saveAttendanceToDriveFolder_(meetingId, data[i]);
           } catch (driveErr) {
-            Logger.log('Error saving attendance to Drive for ' + meetingId + ': ' + driveErr.message);
+            log_('updateMeetingStatuses', 'Error saving attendance to Drive for ' + meetingId + ': ' + driveErr.message);
           }
         }
       }
@@ -610,7 +604,7 @@ function updateMeetingStatuses() {
   }
 
   if (activated > 0 || deactivated > 0) {
-    Logger.log('Meeting status update: ' + activated + ' activated, ' + deactivated + ' deactivated');
+    log_('Meeting status update', activated + ' activated, ' + deactivated + ' deactivated');
   }
 
   return { activated: activated, deactivated: deactivated };
@@ -640,7 +634,7 @@ function cleanupExpiredMeetings() {
   var rowsToDelete = [];
 
   for (var i = data.length - 1; i >= 1; i--) {
-    var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+    var meetingDate = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DATE);
     if (meetingDate instanceof Date && meetingDate < cutoff) {
       rowsToDelete.push(i + 1); // 1-indexed sheet row
     }
@@ -1097,17 +1091,17 @@ function processQRCheckIn(meetingId, phone, pin) {
   var storedHash = '';
 
   for (var i = 1; i < memberData.length; i++) {
-    var rowPhone = String(memberData[i][MEMBER_COLS.PHONE - 1] || '').trim();
+    var rowPhone = String(col_(memberData[i], MEMBER_COLS.PHONE) || '').trim();
     var rowDigits = rowPhone.replace(/\D/g, '');
     if (rowDigits.length === 11 && rowDigits.charAt(0) === '1') {
       rowDigits = rowDigits.substring(1);
     }
     if (rowDigits.length === 10 && rowDigits === inputDigits) {
-      memberId = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '');
-      memberName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
-                   String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
-      memberEmail = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
-      storedHash = String(memberData[i][MEMBER_PIN_COLS.PIN_HASH - 1] || '');
+      memberId = String(col_(memberData[i], MEMBER_COLS.MEMBER_ID) || '');
+      memberName = String(col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' +
+                   String(col_(memberData[i], MEMBER_COLS.LAST_NAME) || '');
+      memberEmail = String(col_(memberData[i], MEMBER_COLS.EMAIL) || '').trim().toLowerCase();
+      storedHash = String(col_(memberData[i], MEMBER_PIN_COLS.PIN_HASH) || '');
       break;
     }
   }
@@ -1160,8 +1154,8 @@ function processQRCheckIn(meetingId, phone, pin) {
 
     // Check if already checked in
     for (var j = 1; j < checkInData.length; j++) {
-      var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
-      var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
+      var rowMeetingId = String(col_(checkInData[j], MEETING_CHECKIN_COLS.MEETING_ID) || '');
+      var rowMemberId = String(col_(checkInData[j], MEETING_CHECKIN_COLS.MEMBER_ID) || '');
       if (rowMeetingId === meetingId && rowMemberId === memberId) {
         return errorResponse(memberName.trim() + ' is already checked in to this meeting.');
       }
@@ -1173,10 +1167,10 @@ function processQRCheckIn(meetingId, phone, pin) {
     var meetingType = '';
     var meetingFound = false;
     for (var k = 1; k < checkInData.length; k++) {
-      if (String(checkInData[k][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
-        meetingName = checkInData[k][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '';
-        meetingDate = checkInData[k][MEETING_CHECKIN_COLS.MEETING_DATE - 1] || '';
-        meetingType = checkInData[k][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '';
+      if (String(col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
+        meetingName = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_NAME) || '';
+        meetingDate = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_DATE) || '';
+        meetingType = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_TYPE) || '';
         meetingFound = true;
         break;
       }
@@ -1200,8 +1194,8 @@ function processQRCheckIn(meetingId, phone, pin) {
 
     // Auto-activate Scheduled meetings on first check-in
     for (var m = 1; m < checkInData.length; m++) {
-      if (String(checkInData[m][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
-        var currentStatus = String(checkInData[m][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+      if (String(col_(checkInData[m], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
+        var currentStatus = String(col_(checkInData[m], MEETING_CHECKIN_COLS.EVENT_STATUS) || '');
         if (currentStatus === MEETING_STATUS.SCHEDULED) {
           checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
         }
@@ -1246,7 +1240,7 @@ function getMeetingQRCode(meetingId) {
   try {
     webAppUrl = ScriptApp.getService().getUrl() || '';
   } catch (_e) {
-    Logger.log('getMeetingQRCode: could not get web app URL: ' + _e.message);
+    log_('getMeetingQRCode', 'could not get web app URL: ' + _e.message);
   }
 
   if (!webAppUrl) {
@@ -1272,10 +1266,7 @@ function getMeetingQRCode(meetingId) {
  * Stewards display or print this for members to scan at in-person meetings.
  */
 function showMeetingQRCodeDialog() {
-  var html = HtmlService.createHtmlOutput(getMeetingQRCodeHtml_())
-    .setWidth(480)
-    .setHeight(620);
-  SpreadsheetApp.getUi().showModalDialog(html, '📱 Meeting QR Check-In Code');
+  showDialog_(getMeetingQRCodeHtml_(), '📱 Meeting QR Check-In Code', 480, 620);
 }
 
 /**
@@ -1419,10 +1410,10 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
     if (!folderId) {
       folderId = PropertiesService.getScriptProperties().getProperty('EVENT_CHECKIN_FOLDER_ID') || '';
     }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
 
   if (!folderId) {
-    Logger.log('saveAttendanceToDriveFolder_: Event Check-In folder ID not configured — skipping Drive save for ' + meetingId);
+    log_('saveAttendanceToDriveFolder_', 'Event Check-In folder ID not configured — skipping Drive save for ' + meetingId);
     return;
   }
 
@@ -1434,19 +1425,19 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
   var allData = checkInSheet.getDataRange().getValues();
   var attendees = [];
   for (var i = 1; i < allData.length; i++) {
-    if (String(allData[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+    if (String(col_(allData[i], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
       attendees.push(allData[i]);
     }
   }
   if (attendees.length === 0) {
-    Logger.log('saveAttendanceToDriveFolder_: no attendees for ' + meetingId + ', skipping Drive save');
+    log_('saveAttendanceToDriveFolder_', 'no attendees for ' + meetingId + ', skipping Drive save');
     return;
   }
 
   // Build meeting metadata from the passed row (or first matching row)
   var metaRow = meetingRow || attendees[0];
-  var meetingName = String(metaRow[MEETING_CHECKIN_COLS.MEETING_NAME - 1] || 'Meeting');
-  var meetingDate = metaRow[MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+  var meetingName = String(col_(metaRow, MEETING_CHECKIN_COLS.MEETING_NAME) || 'Meeting');
+  var meetingDate = col_(metaRow, MEETING_CHECKIN_COLS.MEETING_DATE);
   var dateStr = meetingDate instanceof Date
     ? Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'yyyy-MM-dd')
     : String(meetingDate || new Date().toDateString());
@@ -1465,9 +1456,9 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
   body.appendParagraph('Attendees').setHeading(DocumentApp.ParagraphHeading.HEADING2);
 
   attendees.forEach(function(row, idx) {
-    var memberId   = String(row[MEETING_CHECKIN_COLS.MEMBER_ID   - 1] || '');
-    var memberName = String(row[MEETING_CHECKIN_COLS.MEMBER_NAME - 1] || '');
-    var checkInTime = row[MEETING_CHECKIN_COLS.CHECKIN_TIME - 1];
+    var memberId   = String(col_(row, MEETING_CHECKIN_COLS.MEMBER_ID) || '');
+    var memberName = String(col_(row, MEETING_CHECKIN_COLS.MEMBER_NAME) || '');
+    var checkInTime = col_(row, MEETING_CHECKIN_COLS.CHECKIN_TIME);
     var timeStr = checkInTime instanceof Date
       ? Utilities.formatDate(checkInTime, Session.getScriptTimeZone(), 'h:mm a')
       : String(checkInTime || '');
@@ -1482,8 +1473,8 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
     var folder  = DriveApp.getFolderById(folderId);
     folder.addFile(docFile);
     DriveApp.getRootFolder().removeFile(docFile);
-    Logger.log('saveAttendanceToDriveFolder_: saved "' + docTitle + '" to Event Check-In/ folder');
+    log_('saveAttendanceToDriveFolder_', 'saved "' + docTitle + '" to Event Check-In/ folder');
   } catch (moveErr) {
-    Logger.log('saveAttendanceToDriveFolder_: could not move doc to Event Check-In/ folder: ' + moveErr.message);
+    log_('saveAttendanceToDriveFolder_', 'could not move doc to Event Check-In/ folder: ' + moveErr.message);
   }
 }

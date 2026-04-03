@@ -46,7 +46,7 @@
 function getFormUrlFromConfig(formType) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet) { Logger.log('Config sheet not found'); return ''; }
+  if (!configSheet) { log_('getFormUrlFromConfig', 'Config sheet not found'); return ''; }
 
   var configCol, defaultUrl;
 
@@ -58,7 +58,7 @@ function getFormUrlFromConfig(formType) {
     // 'contact' case removed — contact form deprecated
     // 'satisfaction' case removed v4.22.7 — Google Form deprecated, survey is now native webapp only
     default:
-      Logger.log('Unknown form type: ' + formType);
+      log_('Unknown form type', formType);
       return '';
   }
 
@@ -71,7 +71,7 @@ function getFormUrlFromConfig(formType) {
   }
 
   // REL-02: Log a warning when falling back to default URL so admins know config is missing
-  Logger.log('getFormUrlFromConfig: Config sheet missing or invalid for "' + formType + '" — using hardcoded default URL');
+  log_('getFormUrlFromConfig', 'Config sheet missing or invalid for "' + formType + '" — using hardcoded default URL');
   return defaultUrl;
 }
 
@@ -123,7 +123,7 @@ function saveFormUrlsToConfig_silent(ss) {
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
   if (!configSheet) {
-    Logger.log('Config sheet not found - cannot save form URLs');
+    log_('saveFormUrlsToConfig_silent', 'Config sheet not found - cannot save form URLs');
     return;
   }
 
@@ -259,7 +259,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
         SpreadsheetApp.getUi().ButtonSet.OK
       );
     }
-    Logger.log('auditAndRemoveSatisfactionTrigger: no stale trigger found.');
+    log_('auditAndRemoveSatisfactionTrigger', 'no stale trigger found.');
     return false;
   }
 
@@ -274,13 +274,13 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
       ui.ButtonSet.YES_NO
     );
     if (resp !== ui.Button.YES) {
-      Logger.log('auditAndRemoveSatisfactionTrigger: user declined removal.');
+      log_('auditAndRemoveSatisfactionTrigger', 'user declined removal.');
       return false;
     }
   }
 
   ScriptApp.deleteTrigger(found);
-  Logger.log('auditAndRemoveSatisfactionTrigger: stale trigger removed successfully.');
+  log_('auditAndRemoveSatisfactionTrigger', 'stale trigger removed successfully.');
   if (!autoDelete) {
     SpreadsheetApp.getUi().alert(
       'Trigger Removed',
@@ -400,10 +400,10 @@ function checkDeadlinesAndNotify_() {
   var urgent = [];
 
   for (var i = 1; i < data.length; i++) {
-    var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var status = data[i][GRIEVANCE_COLS.STATUS - 1];
-    var daysToDeadline = data[i][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var currentStep = data[i][GRIEVANCE_COLS.CURRENT_STEP - 1];
+    var grievanceId = col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID);
+    var status = col_(data[i], GRIEVANCE_COLS.STATUS);
+    var daysToDeadline = col_(data[i], GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+    var currentStep = col_(data[i], GRIEVANCE_COLS.CURRENT_STEP);
 
     var closedStatuses = GRIEVANCE_CLOSED_STATUSES;
     if (closedStatuses.indexOf(status) !== -1) continue;
@@ -482,7 +482,7 @@ function sendStewardDeadlineAlerts() {
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet || !memberSheet) {
-    Logger.log('Required sheets not found for steward alerts');
+    log_('sendStewardDeadlineAlerts', 'Required sheets not found for steward alerts');
     return;
   }
 
@@ -497,11 +497,11 @@ function sendStewardDeadlineAlerts() {
   // Build member lookup for steward emails
   var memberLookup = {};
   for (var m = 1; m < memberData.length; m++) {
-    var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = col_(memberData[m], MEMBER_COLS.MEMBER_ID);
     if (memberId) {
       memberLookup[memberId] = {
-        name: (memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (memberData[m][MEMBER_COLS.LAST_NAME - 1] || ''),
-        steward: memberData[m][MEMBER_COLS.ASSIGNED_STEWARD - 1] || ''
+        name: (col_(memberData[m], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(memberData[m], MEMBER_COLS.LAST_NAME) || ''),
+        steward: col_(memberData[m], MEMBER_COLS.ASSIGNED_STEWARD) || ''
       };
     }
   }
@@ -512,13 +512,13 @@ function sendStewardDeadlineAlerts() {
 
   for (var i = 1; i < grievanceData.length; i++) {
     var row = grievanceData[i];
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
-    var status = row[GRIEVANCE_COLS.STATUS - 1];
-    var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
-    var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
-    var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var steward = row[GRIEVANCE_COLS.STEWARD - 1] || '';
+    var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID);
+    memberId = col_(row, GRIEVANCE_COLS.MEMBER_ID);
+    var status = col_(row, GRIEVANCE_COLS.STATUS);
+    var currentStep = col_(row, GRIEVANCE_COLS.CURRENT_STEP);
+    var nextDue = col_(row, GRIEVANCE_COLS.NEXT_ACTION_DUE);
+    var daysToDeadline = col_(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+    var steward = col_(row, GRIEVANCE_COLS.STEWARD) || '';
 
     // Skip closed grievances
     if (closedStatuses.indexOf(status) !== -1) continue;
@@ -560,12 +560,12 @@ function sendStewardDeadlineAlerts() {
   // Keys are normalized (trimmed, lowercased) for robust matching against grievance data
   var stewardEmails = {};
   for (var s = 1; s < memberData.length; s++) {
-    var isSteward = memberData[s][MEMBER_COLS.IS_STEWARD - 1];
+    var isSteward = col_(memberData[s], MEMBER_COLS.IS_STEWARD);
     if (isTruthyValue(isSteward)) {
-      var sFirstName = memberData[s][MEMBER_COLS.FIRST_NAME - 1] || '';
-      var sLastName = memberData[s][MEMBER_COLS.LAST_NAME - 1] || '';
+      var sFirstName = col_(memberData[s], MEMBER_COLS.FIRST_NAME) || '';
+      var sLastName = col_(memberData[s], MEMBER_COLS.LAST_NAME) || '';
       var sFullName = (sFirstName + ' ' + sLastName).trim();
-      var sEmail = memberData[s][MEMBER_COLS.EMAIL - 1] || '';
+      var sEmail = col_(memberData[s], MEMBER_COLS.EMAIL) || '';
       if (sFullName && sEmail && sEmail.indexOf('@') !== -1) {
         stewardEmails[sFullName.toLowerCase()] = sEmail;
       }
@@ -643,13 +643,13 @@ function sendStewardDeadlineAlerts() {
       emailsSent++;
       // Mask name in logs for privacy
       var maskedSteward = typeof maskName === 'function' ? maskName(stewardName) : '[REDACTED]';
-      Logger.log('Sent alert to ' + maskedSteward + ': ' + grievances.length + ' grievances');
+      log_('sendStewardDeadlineAlerts', 'Sent alert to ' + maskedSteward + ': ' + grievances.length + ' grievances');
     } catch (e) {
-      Logger.log('Failed to send steward alert: ' + e.message);
+      log_('Failed to send steward alert', e.message);
     }
   }
 
-  Logger.log('Steward deadline alerts complete. Sent ' + emailsSent + ' emails.');
+  log_('sendStewardDeadlineAlerts', 'Steward deadline alerts complete. Sent ' + emailsSent + ' emails.');
   return emailsSent;
 }
 
@@ -693,7 +693,7 @@ function executeSendRandomSurveyEmails(opts) {
   // Get survey email log from Config (uses dedicated columns, not PDF_FOLDER_ID)
   var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
   if (!surveyLogCol || surveyLogCol < 1) {
-    Logger.log('SURVEY_LOG_IDS column not mapped — skipping survey log read');
+    log_('executeSendRandomSurveyEmails', 'SURVEY_LOG_IDS column not mapped — skipping survey log read');
     return 'Survey log column not configured. Cannot track sent emails.';
   }
   var surveyLog = {};
@@ -707,7 +707,7 @@ function executeSendRandomSurveyEmails(opts) {
         }
       });
     }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
 
   var cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - opts.excludeDays);
@@ -755,7 +755,7 @@ function executeSendRandomSurveyEmails(opts) {
   if (configSheet && configSheet.getLastRow() >= 3) {
     try {
       surveyUrl = configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '';
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
   if (!surveyUrl) surveyUrl = SATISFACTION_FORM_CONFIG.FORM_URL; // legacy fallback
   var newLogEntries = [];
@@ -968,13 +968,13 @@ function populateSurveyTrackingFromMembers() {
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!trackingSheet || !memberSheet) {
-    Logger.log('populateSurveyTracking: Required sheets not found');
+    log_('populateSurveyTracking', 'Required sheets not found');
     return;
   }
 
   var memberData = memberSheet.getDataRange().getValues();
   if (memberData.length < 2) {
-    Logger.log('populateSurveyTracking: No members found');
+    log_('populateSurveyTracking', 'No members found');
     return;
   }
 
@@ -986,13 +986,13 @@ function populateSurveyTrackingFromMembers() {
     var hasResponseData = false;
     for (var chk = 0; chk < existingData.length; chk++) {
       // Check Completed Date column for any response timestamps
-      if (existingData[chk][SURVEY_TRACKING_COLS.COMPLETED_DATE - 1]) {
+      if (col_(existingData[chk], SURVEY_TRACKING_COLS.COMPLETED_DATE)) {
         hasResponseData = true;
         break;
       }
     }
     if (hasResponseData) {
-      Logger.log('populateSurveyTracking: Existing survey response data found — skipping clear to avoid data loss. Use startNewSurveyRound() to reset.');
+      log_('populateSurveyTracking', 'Existing survey response data found — skipping clear to avoid data loss. Use startNewSurveyRound() to reset.');
       return;
     }
     trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).clear();
@@ -1000,18 +1000,18 @@ function populateSurveyTrackingFromMembers() {
 
   var rows = [];
   for (var i = 1; i < memberData.length; i++) {
-    var memberId = memberData[i][MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = col_(memberData[i], MEMBER_COLS.MEMBER_ID);
     if (!memberId) continue;
 
-    var firstName = memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '';
-    var lastName = memberData[i][MEMBER_COLS.LAST_NAME - 1] || '';
+    var firstName = col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '';
+    var lastName = col_(memberData[i], MEMBER_COLS.LAST_NAME) || '';
 
     rows.push([
       memberId,                                                        // A - Member ID
       (firstName + ' ' + lastName).trim(),                             // B - Member Name
-      memberData[i][MEMBER_COLS.EMAIL - 1] || '',                      // C - Email
-      memberData[i][MEMBER_COLS.WORK_LOCATION - 1] || '',              // D - Work Location
-      memberData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',           // E - Assigned Steward
+      col_(memberData[i], MEMBER_COLS.EMAIL) || '',                      // C - Email
+      col_(memberData[i], MEMBER_COLS.WORK_LOCATION) || '',              // D - Work Location
+      col_(memberData[i], MEMBER_COLS.ASSIGNED_STEWARD) || '',           // E - Assigned Steward
       'Not Completed',                                                 // F - Current Status
       '',                                                              // G - Completed Date
       0,                                                               // H - Total Missed
@@ -1024,7 +1024,7 @@ function populateSurveyTrackingFromMembers() {
     trackingSheet.getRange(2, 1, rows.length, SURVEY_TRACKING_HEADER_MAP_.length).setValues(rows);
   }
 
-  Logger.log('populateSurveyTracking: Populated ' + rows.length + ' member rows');
+  log_('populateSurveyTracking', 'Populated ' + rows.length + ' member rows');
 }
 
 /**
@@ -1042,22 +1042,22 @@ function updateSurveyTrackingOnSubmit_(matchedMemberId) {
 
   var data = trackingSheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (data[i][SURVEY_TRACKING_COLS.MEMBER_ID - 1] === matchedMemberId) {
+    if (col_(data[i], SURVEY_TRACKING_COLS.MEMBER_ID) === matchedMemberId) {
       // M-PERF: Batch write — read row, modify 3 cells, write back in single call
       var rowNum = i + 1;
       var totalCols = trackingSheet.getLastColumn();
       var rowData = trackingSheet.getRange(rowNum, 1, 1, totalCols).getValues()[0];
-      rowData[SURVEY_TRACKING_COLS.CURRENT_STATUS - 1] = 'Completed';
-      rowData[SURVEY_TRACKING_COLS.COMPLETED_DATE - 1] = new Date();
-      var prevCompleted = parseInt(data[i][SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1]) || 0;
-      rowData[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1] = prevCompleted + 1;
+      setCol_(rowData, SURVEY_TRACKING_COLS.CURRENT_STATUS, 'Completed');
+      setCol_(rowData, SURVEY_TRACKING_COLS.COMPLETED_DATE, new Date());
+      var prevCompleted = parseInt(col_(data[i], SURVEY_TRACKING_COLS.TOTAL_COMPLETED)) || 0;
+      setCol_(rowData, SURVEY_TRACKING_COLS.TOTAL_COMPLETED, prevCompleted + 1);
       trackingSheet.getRange(rowNum, 1, 1, totalCols).setValues([rowData]);
-      Logger.log('Survey tracking updated for member: ' + matchedMemberId);
+      log_('Survey tracking updated for member', matchedMemberId);
       return;
     }
   }
 
-  Logger.log('Survey tracking: member ' + matchedMemberId + ' not found in tracking sheet');
+  log_('Survey tracking', 'member ' + matchedMemberId + ' not found in tracking sheet');
 }
 
 /**
@@ -1070,10 +1070,10 @@ function startNewSurveyRound() {
   var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
 
   if (!trackingSheet || trackingSheet.getLastRow() < 2) {
-    Logger.log('startNewSurveyRound: No tracking data found');
+    log_('startNewSurveyRound', 'No tracking data found');
     try {
       SpreadsheetApp.getUi().alert('No survey tracking data found. Run "Populate Survey Tracking" first.');
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
     return;
   }
 
@@ -1081,8 +1081,8 @@ function startNewSurveyRound() {
   var updates = [];
 
   for (var i = 1; i < data.length; i++) {
-    var currentStatus = data[i][SURVEY_TRACKING_COLS.CURRENT_STATUS - 1];
-    var totalMissed = parseInt(data[i][SURVEY_TRACKING_COLS.TOTAL_MISSED - 1]) || 0;
+    var currentStatus = col_(data[i], SURVEY_TRACKING_COLS.CURRENT_STATUS);
+    var totalMissed = parseInt(col_(data[i], SURVEY_TRACKING_COLS.TOTAL_MISSED)) || 0;
 
     // Increment missed count for members who didn't complete last round
     if (currentStatus !== 'Completed') {
@@ -1101,13 +1101,13 @@ function startNewSurveyRound() {
       .setValues(updates);
   }
 
-  Logger.log('startNewSurveyRound: Reset ' + updates.length + ' members for new round');
+  log_('startNewSurveyRound', 'Reset ' + updates.length + ' members for new round');
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast(
       'New survey round started. ' + updates.length + ' members reset to Not Completed.',
       'Survey Tracking', 5
     );
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
 }
 
 /**
@@ -1119,10 +1119,10 @@ function sendSurveyCompletionReminders() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet) { Logger.log('Config sheet not found'); }
+  if (!configSheet) { log_('sendSurveyCompletionReminders', 'Config sheet not found'); }
 
   if (!trackingSheet || trackingSheet.getLastRow() < 2) {
-    Logger.log('sendSurveyCompletionReminders: No tracking data');
+    log_('sendSurveyCompletionReminders', 'No tracking data');
     return 'No survey tracking data found.';
   }
 
@@ -1131,7 +1131,7 @@ function sendSurveyCompletionReminders() {
   if (configSheet && configSheet.getLastRow() >= 3) {
     try {
       surveyUrl = configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '';
-    } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+    } catch (_e) { log_('_e', (_e.message || _e)); }
   }
 
   var data = trackingSheet.getDataRange().getValues();
@@ -1148,10 +1148,10 @@ function sendSurveyCompletionReminders() {
   }
 
   for (var i = 1; i < data.length; i++) {
-    var status = data[i][SURVEY_TRACKING_COLS.CURRENT_STATUS - 1];
-    var email = (data[i][SURVEY_TRACKING_COLS.EMAIL - 1] || '').toString().trim();
-    var memberName = data[i][SURVEY_TRACKING_COLS.MEMBER_NAME - 1] || 'Member';
-    var lastReminder = data[i][SURVEY_TRACKING_COLS.LAST_REMINDER_SENT - 1];
+    var status = col_(data[i], SURVEY_TRACKING_COLS.CURRENT_STATUS);
+    var email = (col_(data[i], SURVEY_TRACKING_COLS.EMAIL) || '').toString().trim();
+    var memberName = col_(data[i], SURVEY_TRACKING_COLS.MEMBER_NAME) || 'Member';
+    var lastReminder = col_(data[i], SURVEY_TRACKING_COLS.LAST_REMINDER_SENT);
 
     if (status === 'Completed' || !email || !email.includes('@')) continue;
 
@@ -1193,13 +1193,13 @@ function sendSurveyCompletionReminders() {
         secureLog('sendSurveyCompletionReminders', 'Reminder email failed', { email: email, error: emailError.message });
       } else {
         var masked = typeof maskEmail === 'function' ? maskEmail(email) : '[REDACTED]';
-        Logger.log('Reminder email failed for ' + masked + ': ' + emailError.message);
+        log_('sendSurveyCompletionReminders', 'Reminder email failed for ' + masked + ': ' + emailError.message);
       }
     }
   }
 
   var result = 'Reminders sent: ' + sentCount + ', Skipped (cooldown): ' + skippedCount;
-  Logger.log('sendSurveyCompletionReminders: ' + result);
+  log_('sendSurveyCompletionReminders', result);
   return result;
 }
 
@@ -1220,9 +1220,9 @@ function getSurveyCompletionStats() {
   var completed = 0;
 
   for (var i = 1; i < data.length; i++) {
-    if (!data[i][SURVEY_TRACKING_COLS.MEMBER_ID - 1]) continue;
+    if (!col_(data[i], SURVEY_TRACKING_COLS.MEMBER_ID)) continue;
     total++;
-    if (data[i][SURVEY_TRACKING_COLS.CURRENT_STATUS - 1] === 'Completed') {
+    if (col_(data[i], SURVEY_TRACKING_COLS.CURRENT_STATUS) === 'Completed') {
       completed++;
     }
   }
@@ -1244,7 +1244,7 @@ function getSurveyCompletionStats() {
 function showSurveyTrackingDialog() {
   var stats = getSurveyCompletionStats();
 
-  var html = HtmlService.createHtmlOutput(
+  var htmlContent =
     '<!DOCTYPE html><html><head><base target="_top">' +
     '<style>' +
     'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
@@ -1286,10 +1286,9 @@ function showSurveyTrackingDialog() {
     'function confirmNewRound(){' +
     '  if(confirm("Start a new survey round?\\n\\nThis will:\\n- Reset all members to Not Completed\\n- Increment missed count for non-respondents\\n\\nContinue?")){' +
     '    run("startNewSurveyRound");}}' +
-    '</script></body></html>'
-  ).setWidth(520).setHeight(520);
+    '</script></body></html>';
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Survey Completion Tracker');
+  showDialog_(htmlContent, 'Survey Completion Tracker', 520, 520);
 }
 
 /**
@@ -1358,7 +1357,7 @@ function getSurveyQuestions() {
   try {
     var cached = CacheService.getScriptCache().get(CACHE_KEY);
     if (cached) return JSON.parse(cached);
-  } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+  } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1485,12 +1484,12 @@ function getSurveyQuestions() {
     };
 
     // Cache 5 minutes
-    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(result), 300); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(result), 300); } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
     return result;
 
   } catch(e) {
-    Logger.log('getSurveyQuestions error: ' + e.message);
+    log_('getSurveyQuestions error', e.message);
     return { questions: [], sections: [], sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' }, period: null };
   }
 }
@@ -1509,7 +1508,7 @@ function getSatisfactionColMap_() {
   try {
     var cached = CacheService.getScriptCache().get(CACHE_KEY);
     if (cached) return JSON.parse(cached);
-  } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+  } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
   try {
     var satSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SATISFACTION);
@@ -1522,11 +1521,11 @@ function getSatisfactionColMap_() {
       if (key) map[key] = i + 1;
     });
 
-    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(map), 300); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(map), 300); } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
     return map;
 
   } catch(e) {
-    Logger.log('getSatisfactionColMap_ error: ' + e.message);
+    log_('getSatisfactionColMap_ error', e.message);
     return {};
   }
 }
@@ -1575,13 +1574,13 @@ function syncSatisfactionSheetColumns_(activeQuestions) {
     });
 
     // Invalidate cache so next call re-reads the updated headers
-    try { CacheService.getScriptCache().remove('satisfactionColMap_v1'); } catch (_ce) { Logger.log('_ce: ' + (_ce.message || _ce)); }
+    try { CacheService.getScriptCache().remove('satisfactionColMap_v1'); } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
-    Logger.log('syncSatisfactionSheetColumns_: Added ' + missing.length + ' column(s): ' + missing.map(function(q){return q.id;}).join(', '));
+    log_('syncSatisfactionSheetColumns_', 'Added ' + missing.length + ' column(s): ' + missing.map(function(q){return q.id;}).join(', '));
     return colMap;
 
   } catch(e) {
-    Logger.log('syncSatisfactionSheetColumns_ error: ' + e.message);
+    log_('syncSatisfactionSheetColumns_ error', e.message);
     return getSatisfactionColMap_();
   }
 }
@@ -1642,9 +1641,9 @@ function submitSurveyResponse(callerEmail, responses) {
           2, 1, vaultSheet.getLastRow() - 1, vaultSheet.getLastColumn()
         ).getValues();
         for (var v = 0; v < vaultData.length; v++) {
-          var vHash   = String(vaultData[v][SURVEY_VAULT_COLS.EMAIL   - 1] || '');
-          var vPeriod = String(vaultData[v][SURVEY_VAULT_COLS.QUARTER - 1] || '');
-          var vLatest = String(vaultData[v][SURVEY_VAULT_COLS.IS_LATEST - 1] || '');
+          var vHash   = String(col_(vaultData[v], SURVEY_VAULT_COLS.EMAIL) || '');
+          var vPeriod = String(col_(vaultData[v], SURVEY_VAULT_COLS.QUARTER) || '');
+          var vLatest = String(col_(vaultData[v], SURVEY_VAULT_COLS.IS_LATEST) || '');
           if (vHash === emailHash && vPeriod === periodId && vLatest !== 'Superseded') {
             return { success: false, message: 'You have already submitted a response for this survey period.' };
           }
@@ -1722,18 +1721,18 @@ function submitSurveyResponse(callerEmail, responses) {
               }
             }
           }
-        } catch (_ex) { Logger.log('_ex: ' + (_ex.message || _ex)); }
+        } catch (_ex) { log_('_ex', (_ex.message || _ex)); }
 
         var memberIdHash = memberId ? hashForVault_(memberId) : '';
         var vaultRow = new Array(8).fill('');
-        vaultRow[SURVEY_VAULT_COLS.RESPONSE_ROW     - 1] = newResponseRow;
-        vaultRow[SURVEY_VAULT_COLS.EMAIL            - 1] = emailHash;
-        vaultRow[SURVEY_VAULT_COLS.VERIFIED         - 1] = 'Yes';
-        vaultRow[SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] = memberIdHash;
-        vaultRow[SURVEY_VAULT_COLS.QUARTER          - 1] = periodId;
-        vaultRow[SURVEY_VAULT_COLS.IS_LATEST        - 1] = 'Latest';
-        vaultRow[SURVEY_VAULT_COLS.SUPERSEDED_BY    - 1] = '';
-        vaultRow[SURVEY_VAULT_COLS.REVIEWER_NOTES   - 1] = '';
+        setCol_(vaultRow, SURVEY_VAULT_COLS.RESPONSE_ROW, newResponseRow);
+        setCol_(vaultRow, SURVEY_VAULT_COLS.EMAIL, emailHash);
+        setCol_(vaultRow, SURVEY_VAULT_COLS.VERIFIED, 'Yes');
+        setCol_(vaultRow, SURVEY_VAULT_COLS.MATCHED_MEMBER_ID, memberIdHash);
+        setCol_(vaultRow, SURVEY_VAULT_COLS.QUARTER, periodId);
+        setCol_(vaultRow, SURVEY_VAULT_COLS.IS_LATEST, 'Latest');
+        setCol_(vaultRow, SURVEY_VAULT_COLS.SUPERSEDED_BY, '');
+        setCol_(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES, '');
         vaultSheet.appendRow(vaultRow);
       }
 
@@ -1743,13 +1742,13 @@ function submitSurveyResponse(callerEmail, responses) {
         var trackData = trackSheet.getDataRange().getValues();
         var callerNorm = callerEmail.toLowerCase().trim();
         for (var t = 1; t < trackData.length; t++) {
-          var tEmail = String(trackData[t][SURVEY_TRACKING_COLS.EMAIL - 1] || '').toLowerCase().trim();
+          var tEmail = String(col_(trackData[t], SURVEY_TRACKING_COLS.EMAIL) || '').toLowerCase().trim();
           if (tEmail === callerNorm) {
             var tLastCol = trackSheet.getLastColumn();
             var tRow = trackSheet.getRange(t + 1, 1, 1, tLastCol).getValues()[0];
-            tRow[SURVEY_TRACKING_COLS.CURRENT_STATUS  - 1] = 'Completed';
-            tRow[SURVEY_TRACKING_COLS.COMPLETED_DATE  - 1] = new Date();
-            tRow[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1] = (parseInt(tRow[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1], 10) || 0) + 1;
+            setCol_(tRow, SURVEY_TRACKING_COLS.CURRENT_STATUS, 'Completed');
+            setCol_(tRow, SURVEY_TRACKING_COLS.COMPLETED_DATE, new Date());
+            setCol_(tRow, SURVEY_TRACKING_COLS.TOTAL_COMPLETED, (parseInt(col_(tRow, SURVEY_TRACKING_COLS.TOTAL_COMPLETED), 10) || 0) + 1);
             trackSheet.getRange(t + 1, 1, 1, tLastCol).setValues([tRow]);
             break;
           }
@@ -1757,13 +1756,13 @@ function submitSurveyResponse(callerEmail, responses) {
       }
 
       // ── Update period response count + invalidate summary cache ────────
-      try { incrementPeriodResponseCount_(periodId); } catch (_ex) { Logger.log('_ex: ' + (_ex.message || _ex)); }
-      try { CacheService.getScriptCache().remove('satisfactionSummary_' + periodId); } catch (_ex) { Logger.log('_ex: ' + (_ex.message || _ex)); }
+      try { incrementPeriodResponseCount_(periodId); } catch (_ex) { log_('_ex', (_ex.message || _ex)); }
+      try { CacheService.getScriptCache().remove('satisfactionSummary_' + periodId); } catch (_ex) { log_('_ex', (_ex.message || _ex)); }
 
       return { success: true, message: 'Thank you — your anonymous response has been recorded.' };
 
     } catch(e) {
-      Logger.log('submitSurveyResponse error: ' + e.message + '\n' + (e.stack || ''));
+      log_('submitSurveyResponse error', e.message + '\n' + (e.stack || ''));
       return { success: false, message: 'Error submitting survey. Please try again.' };
     }
   }, 30);

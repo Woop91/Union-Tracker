@@ -144,7 +144,7 @@ var TrendAlertService = (function () {
         }
       }
     } catch (e) {
-      Logger.log('_detectGrievanceSpike error: ' + e.message);
+      log_('_detectGrievanceSpike error', e.message);
     }
     return alerts;
   }
@@ -207,7 +207,7 @@ var TrendAlertService = (function () {
         }
       }
     } catch (e) {
-      Logger.log('_detectSatisfactionDrop error: ' + e.message);
+      log_('_detectSatisfactionDrop error', e.message);
     }
     return alerts;
   }
@@ -272,7 +272,7 @@ var TrendAlertService = (function () {
         }
       }
     } catch (e) {
-      Logger.log('_detectWinRateDecline error: ' + e.message);
+      log_('_detectWinRateDecline error', e.message);
     }
     return alerts;
   }
@@ -336,7 +336,7 @@ var TrendAlertService = (function () {
         }
       }
     } catch (e) {
-      Logger.log('_detectDeadlineMissSpike error: ' + e.message);
+      log_('_detectDeadlineMissSpike error', e.message);
     }
     return alerts;
   }
@@ -358,7 +358,7 @@ var TrendAlertService = (function () {
     // Acquire lock to make read-deduplicate-write atomic and prevent duplicate alerts
     var lock = LockService.getScriptLock();
     if (!lock.tryLock(15000)) {
-      Logger.log('TrendAlertService.runDetection: could not acquire lock — skipping this run');
+      log_('TrendAlertService.runDetection', 'could not acquire lock — skipping this run');
       return 0;
     }
     try {

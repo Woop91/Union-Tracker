@@ -61,7 +61,7 @@ function onOpen() {
     createDashboardMenu();
     if (typeof buildDevMenu === 'function') buildDevMenu();
   } catch (error) {
-    Logger.log('Error in onOpen: ' + error);
+    log_('Error in onOpen', error);
   }
 }
 
@@ -81,7 +81,7 @@ function onOpenDeferred_() {
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
-    Logger.log('onOpenDeferred_: getActiveSpreadsheet() returned null');
+    log_('onOpenDeferred_', 'getActiveSpreadsheet() returned null');
     return;
   }
 
@@ -91,19 +91,19 @@ function onOpenDeferred_() {
     try {
       syncColumnMaps();
     } catch (syncError) {
-      Logger.log('Column sync skipped: ' + syncError.message);
+      log_('Column sync skipped', syncError.message);
     }
 
     try {
       ensureAllSheetColumns_();
     } catch (colError) {
-      Logger.log('Column check skipped: ' + colError.message);
+      log_('Column check skipped', colError.message);
     }
 
     try {
       loadUnitCodes_();
     } catch (unitCodeErr) {
-      Logger.log('Unit codes load skipped: ' + unitCodeErr.message);
+      log_('Unit codes load skipped', unitCodeErr.message);
     }
 
     try {
@@ -111,7 +111,7 @@ function onOpenDeferred_() {
         migrateSheetTabTitles_(ss);
       }
     } catch (migrateError) {
-      Logger.log('Sheet tab title migration skipped: ' + migrateError.message);
+      log_('Sheet tab title migration skipped', migrateError.message);
     }
 
     try {
@@ -119,13 +119,13 @@ function onOpenDeferred_() {
         applyTabColors_(ss);
       }
     } catch (tabError) {
-      Logger.log('Tab colors not applied: ' + tabError.message);
+      log_('Tab colors not applied', tabError.message);
     }
 
     try {
       enforceHiddenSheets();
     } catch (hideError) {
-      Logger.log('Hidden sheet enforcement skipped: ' + hideError.message);
+      log_('Hidden sheet enforcement skipped', hideError.message);
     }
 
     // EventBus subscribers are NOT registered here — GAS runs each trigger
@@ -154,10 +154,10 @@ function onOpenDeferred_() {
         }
       }
     } catch (modalErr) {
-      Logger.log('Auto-open tab modal skipped: ' + modalErr.message);
+      log_('Auto-open tab modal skipped', modalErr.message);
     }
   } catch (deferredErr) {
-    Logger.log('onOpenDeferred_ failed: ' + deferredErr.message + '\n' + deferredErr.stack);
+    log_('onOpenDeferred_ failed', deferredErr.message + '\n' + deferredErr.stack);
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('DEFERRED_INIT_FAILED', 'onOpenDeferred_ error: ' + deferredErr.message);
     }
@@ -186,14 +186,14 @@ function onEdit(e) {
     // Restore column positions that syncColumnMaps() resolved in onOpen().
     // Without this, each onEdit execution would start with array-order defaults
     // which are wrong if a user manually reordered columns.
-    try { loadCachedColumnMaps_(); } catch (_cacheErr) { Logger.log('_cacheErr: ' + (_cacheErr.message || _cacheErr)); }
+    try { loadCachedColumnMaps_(); } catch (_cacheErr) { log_('_cacheErr', (_cacheErr.message || _cacheErr)); }
 
     // Ensure EventBus subscribers are registered for this execution context.
     // GAS runs each trigger invocation in an isolated context — global state
     // from onOpenDeferred_ doesn't persist into onEdit executions.
     try {
       if (typeof registerEventBusSubscribers === 'function') registerEventBusSubscribers();
-    } catch (_busErr) { Logger.log('_busErr: ' + (_busErr.message || _busErr)); }
+    } catch (_busErr) { log_('_busErr', (_busErr.message || _busErr)); }
 
     var sheet = e.range.getSheet();
     var sheetName = sheet.getName();
@@ -222,7 +222,7 @@ function onEdit(e) {
       try {
         onEditMultiSelect(e);
       } catch (multiSelectError) {
-        Logger.log('MultiSelect handler error: ' + multiSelectError.message);
+        log_('MultiSelect handler error', multiSelectError.message);
       }
     }
 
@@ -238,7 +238,7 @@ function onEdit(e) {
     }
 
   } catch (error) {
-    Logger.log('Error in onEdit: ' + error);
+    log_('Error in onEdit', error);
   }
 }
 
@@ -285,7 +285,7 @@ function onSelectionChange(e) {
     if (typeof onSelectionChangeMultiSelect === 'function') {
       onSelectionChangeMultiSelect(e);
     }
-  } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+  } catch (_err) { log_('_err', (_err.message || _err)); }
 }
 
 /**
@@ -323,7 +323,7 @@ function onTabSwitch_(sheetName) {
         return;
       }
     }
-  } catch (_e) { Logger.log('onTabSwitch_ error: ' + (_e.message || _e)); }
+  } catch (_e) { log_('onTabSwitch_ error', (_e.message || _e)); }
 }
 
 /**
@@ -367,7 +367,7 @@ function showCurrentTabModal() {
       'No quick actions modal available for the "' + sheetName + '" tab.',
       'Tab Quick Actions', 3);
   } catch (e) {
-    Logger.log('showCurrentTabModal error: ' + e.message);
+    log_('showCurrentTabModal error', e.message);
   }
 }
 
@@ -501,7 +501,7 @@ function handleSecurityAudit_(e) {
 
   } catch (auditError) {
     // Silently fail - don't break user's edit for audit logging
-    Logger.log('Audit log error: ' + auditError.message);
+    log_('Audit log error', auditError.message);
   }
 }
 
@@ -547,7 +547,7 @@ function applyAutoStyleToRow_(sheet, row) {
       }
     }
   } catch (styleError) {
-    Logger.log('Auto-style error: ' + styleError.message);
+    log_('Auto-style error', styleError.message);
   }
 }
 
@@ -600,7 +600,7 @@ function handleStageGateWorkflow_(e) {
       }
     }
   } catch (workflowError) {
-    Logger.log('Workflow error: ' + workflowError.message);
+    log_('Workflow error', workflowError.message);
   }
 }
 
@@ -617,7 +617,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    Logger.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
+    log_('sendEscalationAlert_', 'Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
     return;
   }
 
@@ -635,10 +635,10 @@ function sendEscalationAlert_(memberName, caseID, status) {
       SpreadsheetApp.getActiveSpreadsheet().toast('Escalation alert sent to Chief Steward', 'Alert Sent', 3);
     } catch (_sendErr) {
       _queueEscalationEmail(chiefStewardEmail, subject, body);
-      Logger.log('Escalation email queued for daily flush (simple trigger context)');
+      log_('sendEscalationAlert_', 'Escalation email queued for daily flush (simple trigger context)');
     }
   } catch (emailError) {
-    Logger.log('Escalation email error: ' + emailError.message);
+    log_('Escalation email error', emailError.message);
   }
 }
 
@@ -677,7 +677,7 @@ function flushEscalationEmailQueue() {
       safeSendEmail_({ to: queue[i].to, subject: queue[i].subject, body: queue[i].body });
       sent++;
     } catch(e) {
-      Logger.log('flushEscalationEmailQueue error: ' + e.message);
+      log_('flushEscalationEmailQueue error', e.message);
     }
   }
   props.deleteProperty('ESCALATION_EMAIL_QUEUE');
@@ -698,7 +698,7 @@ function getConfigValue_(columnNum, fallback) {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
     if (!configSheet) {
-      Logger.log('Config sheet not found');
+      log_('getConfigValue_', 'Config sheet not found');
       return fb;
     }
 
@@ -706,7 +706,7 @@ function getConfigValue_(columnNum, fallback) {
     var value = configSheet.getRange(3, columnNum).getValue();
     return value ? String(value).trim() : fb;
   } catch (e) {
-    Logger.log('Error reading config value col ' + columnNum + ': ' + e.message);
+    log_('getConfigValue_', 'Error reading config value col ' + columnNum + ': ' + e.message);
     return fb;
   }
 }
@@ -726,7 +726,7 @@ function getEscalationStatuses_() {
       if (values.length > 0) return values;
     }
   } catch (e) {
-    Logger.log('Error reading escalation statuses: ' + e.message);
+    log_('Error reading escalation statuses', e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -761,7 +761,7 @@ function loadUnitCodes_() {
       COMMAND_CONFIG.UNIT_CODES = codes;
     }
   } catch (e) {
-    Logger.log('Error loading unit codes: ' + e.message);
+    log_('Error loading unit codes', e.message);
   }
 }
 
@@ -809,7 +809,7 @@ function getEscalationSteps_() {
       if (values.length > 0) return values;
     }
   } catch (e) {
-    Logger.log('Error reading escalation steps: ' + e.message);
+    log_('Error reading escalation steps', e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -848,20 +848,20 @@ function handleGrievanceEdit(e) {
   if (statusAndDateCols.indexOf(col) !== -1) {
     // Compute the actual next deadline based on current step, matching the logic
     // in recalculateDownstreamDeadlines_. Only set to a real deadline date, not now().
-    var currentStep = rowData[GRIEVANCE_COLS.CURRENT_STEP - 1];
-    var status = rowData[GRIEVANCE_COLS.STATUS - 1];
+    var currentStep = col_(rowData, GRIEVANCE_COLS.CURRENT_STEP);
+    var status = col_(rowData, GRIEVANCE_COLS.STATUS);
     var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
 
     if (closedStatuses.indexOf(status) === -1 && currentStep) {
       var nextActionDate = '';
       if (currentStep === 'Informal') {
-        nextActionDate = rowData[GRIEVANCE_COLS.FILING_DEADLINE - 1];
+        nextActionDate = col_(rowData, GRIEVANCE_COLS.FILING_DEADLINE);
       } else if (currentStep === 'Step I') {
-        nextActionDate = rowData[GRIEVANCE_COLS.STEP1_DUE - 1];
+        nextActionDate = col_(rowData, GRIEVANCE_COLS.STEP1_DUE);
       } else if (currentStep === 'Step II') {
-        nextActionDate = rowData[GRIEVANCE_COLS.STEP2_DUE - 1];
+        nextActionDate = col_(rowData, GRIEVANCE_COLS.STEP2_DUE);
       } else if (currentStep === 'Step III') {
-        nextActionDate = rowData[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1];
+        nextActionDate = col_(rowData, GRIEVANCE_COLS.STEP3_APPEAL_DUE);
       }
 
       if (nextActionDate instanceof Date) {
@@ -882,14 +882,14 @@ function handleGrievanceEdit(e) {
   if (col === GRIEVANCE_COLS.STATUS) {
     try {
       const settings = typeof getSettings === 'function' ? getSettings() : {};
-      const grievanceId = rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+      const grievanceId = col_(rowData, GRIEVANCE_COLS.GRIEVANCE_ID);
 
       // Auto-sync to calendar if enabled
       if (settings.autoSyncCalendar && grievanceId && typeof syncSingleGrievanceToCalendar === 'function') {
         syncSingleGrievanceToCalendar(grievanceId);
       }
     } catch (settingsError) {
-      Logger.log('Settings error in handleGrievanceEdit: ' + settingsError.message);
+      log_('Settings error in handleGrievanceEdit', settingsError.message);
     }
   }
 
@@ -1134,7 +1134,7 @@ function syncDropdownToConfig_(e, sheetName) {
   // (handles pastes, programmatic setValue, and multi-cell edits)
   var newValue = e.value;
   if (!newValue && e.range && e.range.getNumRows() === 1 && e.range.getNumColumns() === 1) {
-    try { newValue = e.range.getValue(); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    try { newValue = e.range.getValue(); } catch (_) { log_('_', (_.message || _)); }
   }
   if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
   newValue = newValue.trim();
@@ -1219,7 +1219,7 @@ function syncDropdownToConfig_(e, sheetName) {
         setDropdownValidation(e.range.getSheet(), col, configSheet, configCol);
       }
     } catch (_refreshErr) {
-      Logger.log('syncDropdownToConfig_ validation refresh: ' + _refreshErr.message);
+      log_('syncDropdownToConfig_ validation refresh', _refreshErr.message);
     }
   }
 }
@@ -1250,8 +1250,8 @@ function handleConfigStewardEdit_(e) {
   // If a name was removed (cell cleared or old value replaced), set that member to No
   if (oldValue && oldValue !== newValue) {
     for (var i = 1; i < memberData.length; i++) {
-      var firstName = (memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim();
-      var lastName = (memberData[i][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim();
+      var firstName = (col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '').toString().trim();
+      var lastName = (col_(memberData[i], MEMBER_COLS.LAST_NAME) || '').toString().trim();
       var fullName = firstName + ' ' + lastName;
       if (fullName === oldValue) {
         memberSheet.getRange(i + 1, MEMBER_COLS.IS_STEWARD).setValue('No');
@@ -1263,11 +1263,11 @@ function handleConfigStewardEdit_(e) {
   // If a new name was added, set that member to Yes
   if (newValue) {
     for (var j = 1; j < memberData.length; j++) {
-      var fn = (memberData[j][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim();
-      var ln = (memberData[j][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim();
+      var fn = (col_(memberData[j], MEMBER_COLS.FIRST_NAME) || '').toString().trim();
+      var ln = (col_(memberData[j], MEMBER_COLS.LAST_NAME) || '').toString().trim();
       var full = fn + ' ' + ln;
       if (full === newValue) {
-        var currentStatus = memberData[j][MEMBER_COLS.IS_STEWARD - 1];
+        var currentStatus = col_(memberData[j], MEMBER_COLS.IS_STEWARD);
         if (!isTruthyValue(currentStatus)) {
           memberSheet.getRange(j + 1, MEMBER_COLS.IS_STEWARD).setValue('Yes');
         }
@@ -1362,7 +1362,7 @@ function dailyTrigger() {
         meetingStatusResult = updateMeetingStatuses();
       }
     } catch (e) {
-      Logger.log('Meeting status update error: ' + e);
+      log_('Meeting status update error', e);
     }
 
     // Process meeting doc notifications (agenda 3 days before, notes 1 day before, publish 1 day after)
@@ -1372,7 +1372,7 @@ function dailyTrigger() {
         meetingDocResult = processMeetingDocNotifications();
       }
     } catch (e) {
-      Logger.log('Meeting doc notification error: ' + e);
+      log_('Meeting doc notification error', e);
     }
 
     // Cleanup expired meeting check-in records (>90 days old)
@@ -1380,7 +1380,7 @@ function dailyTrigger() {
     try {
       meetingRowsCleaned = cleanupExpiredMeetings();
     } catch (e) {
-      Logger.log('Meeting cleanup error: ' + e);
+      log_('Meeting cleanup error', e);
     }
 
     // v4.36.0 — Run trend alert detection
@@ -1389,7 +1389,7 @@ function dailyTrigger() {
         triggerDailyTrendDetection();
       }
     } catch (e) {
-      Logger.log('Trend detection error: ' + e.message);
+      log_('Trend detection error', e.message);
     }
 
     // ── v4.33.1 DAILY MAINTENANCE: previously orphaned functions now wired ──
@@ -1406,7 +1406,7 @@ function dailyTrigger() {
         if (!isNaN(aDays) && aDays > 0) auditArchiveDays = aDays;
       }
     } catch (e) {
-      Logger.log('Could not read archive threshold from Config, using defaults: ' + e.message);
+      log_('Could not read archive threshold from Config, using defaults', e.message);
     }
 
     // Auto-archive closed grievances older than configured days
@@ -1416,11 +1416,11 @@ function dailyTrigger() {
       if (typeof archiveClosedGrievances === 'function') {
         archiveResult = archiveClosedGrievances(grievanceArchiveDays) || archiveResult;
         if (archiveResult.archived > 0) {
-          Logger.log('dailyTrigger: auto-archived ' + archiveResult.archived + ' closed grievances');
+          log_('dailyTrigger', 'auto-archived ' + archiveResult.archived + ' closed grievances');
         }
       }
     } catch (e) {
-      Logger.log('Auto-archive grievances error: ' + e.message);
+      log_('Auto-archive grievances error', e.message);
     }
 
     // Archive old audit log entries to Drive CSV
@@ -1431,7 +1431,7 @@ function dailyTrigger() {
         auditArchiveResult = archiveOldAuditLogs_(auditArchiveDays) || auditArchiveResult;
       }
     } catch (e) {
-      Logger.log('Audit log archive error: ' + e.message);
+      log_('Audit log archive error', e.message);
     }
 
     // Send daily security digest (batched HIGH/CRITICAL events from the last 24h)
@@ -1444,7 +1444,7 @@ function dailyTrigger() {
         sendDailySecurityDigest();
       }
     } catch (e) {
-      Logger.log('Security digest error: ' + e.message);
+      log_('Security digest error', e.message);
     }
 
     // Cleanup expired auth session tokens (removes tokens older than TTL)
@@ -1454,7 +1454,7 @@ function dailyTrigger() {
         authCleanupExpiredTokens();
       }
     } catch (e) {
-      Logger.log('Auth token cleanup error: ' + e.message);
+      log_('Auth token cleanup error', e.message);
     }
 
     // Log the trigger run
@@ -1472,7 +1472,7 @@ function dailyTrigger() {
     });
 
   } catch (error) {
-    Logger.log('Error in dailyTrigger: ' + error);
+    log_('Error in dailyTrigger', error);
   }
 }
 
@@ -1499,7 +1499,7 @@ function initializeDashboard() {
  * v4.3.7 - Complete rewrite with search, menu reference, and FAQ
  */
 function showHelpDialog() {
-  const html = HtmlService.createHtmlOutput(`
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -1991,9 +1991,8 @@ function showHelpDialog() {
       </script>
     </body>
     </html>
-  `).setWidth(700).setHeight(750);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - Dashboard v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')');
+  `;
+  showDialog_(htmlContent, '📖 Help & Features Guide - Dashboard v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')', 700, 750);
 }
 
 // ============================================================================
@@ -2014,7 +2013,7 @@ function updateGrievance(grievanceId, updates) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      if (col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -2047,7 +2046,7 @@ function updateGrievance(grievanceId, updates) {
     return { success: true, message: 'Grievance updated successfully' };
 
   } catch (error) {
-    Logger.log('Error updating grievance: ' + error);
+    log_('Error updating grievance', error);
     return errorResponse(error.message);
   }
 }
@@ -2063,7 +2062,7 @@ function handleBulkStatusSelection(selectedIds) {
   }
 
   // Show status selection dialog
-  const html = HtmlService.createHtmlOutput(`
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -2103,9 +2102,8 @@ function handleBulkStatusSelection(selectedIds) {
       </script>
     </body>
     </html>
-  `).setWidth(400).setHeight(300);
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Bulk Status Update');
+  `;
+  showDialog_(htmlContent, 'Bulk Status Update', 400, 300);
 }
 
 // ============================================================================
@@ -2116,7 +2114,7 @@ function handleBulkStatusSelection(selectedIds) {
  * Shows new member dialog
  */
 function showNewMemberDialog() {
-  const html = HtmlService.createHtmlOutput(`
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -2253,9 +2251,8 @@ function showNewMemberDialog() {
       </script>
     </body>
     </html>
-  `).setWidth(600).setHeight(500);
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Add New Member');
+  `;
+  showDialog_(htmlContent, 'Add New Member', 600, 500);
 }
 
 /**
@@ -2286,19 +2283,19 @@ function addNewMember(memberData) {
     }
     // Prepare row data using MEMBER_COLS constants (1-indexed)
     var rowData = new Array(maxMemberCol).fill('');
-    rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
-    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
-    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
-    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
-    rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
-    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
-    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
-    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
-    rowData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-    rowData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
-    rowData[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(memberData.employeeId || '');
-    rowData[MEMBER_COLS.DEPARTMENT - 1] = escapeForFormula(memberData.department || '');
-    rowData[MEMBER_COLS.HIRE_DATE - 1] = memberData.hireDate ? new Date(memberData.hireDate) : '';
+    setCol_(rowData, MEMBER_COLS.MEMBER_ID, newId);
+    setCol_(rowData, MEMBER_COLS.FIRST_NAME, escapeForFormula(memberData.firstName || ''));
+    setCol_(rowData, MEMBER_COLS.LAST_NAME, escapeForFormula(memberData.lastName || ''));
+    setCol_(rowData, MEMBER_COLS.JOB_TITLE, escapeForFormula(memberData.jobTitle || ''));
+    setCol_(rowData, MEMBER_COLS.WORK_LOCATION, escapeForFormula(memberData.workLocation || ''));
+    setCol_(rowData, MEMBER_COLS.UNIT, escapeForFormula(memberData.unit || ''));
+    setCol_(rowData, MEMBER_COLS.EMAIL, escapeForFormula(memberData.email || ''));
+    setCol_(rowData, MEMBER_COLS.PHONE, escapeForFormula(memberData.phone || ''));
+    setCol_(rowData, MEMBER_COLS.IS_STEWARD, 'No');
+    setCol_(rowData, MEMBER_COLS.RECENT_CONTACT_DATE, new Date());
+    setCol_(rowData, MEMBER_COLS.EMPLOYEE_ID, escapeForFormula(memberData.employeeId || ''));
+    setCol_(rowData, MEMBER_COLS.DEPARTMENT, escapeForFormula(memberData.department || ''));
+    setCol_(rowData, MEMBER_COLS.HIRE_DATE, memberData.hireDate ? new Date(memberData.hireDate) : '');
 
     sheet.appendRow(rowData);
 
@@ -2315,7 +2312,7 @@ function addNewMember(memberData) {
     };
 
   } catch (error) {
-    Logger.log('Error adding member: ' + error);
+    log_('Error adding member', error);
     return errorResponse(error.message);
   }
 }
@@ -2398,7 +2395,7 @@ function exportMemberDirectory(format) {
  * Menu wrapper - calls the backend findExistingMember() with user input
  */
 function showFindMemberDialog() {
-  const html = HtmlService.createHtmlOutput(`
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -2472,9 +2469,8 @@ function showFindMemberDialog() {
       </script>
     </body>
     </html>
-  `).setWidth(500).setHeight(450);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '🔍 Find Member');
+  `;
+  showDialog_(htmlContent, '🔍 Find Member', 500, 450);
 }
 
 /**
@@ -2496,10 +2492,10 @@ function searchMembersForDialog(term) {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const firstName = (row[MEMBER_COLS.FIRST_NAME - 1] || '').toString().toLowerCase();
-    const lastName = (row[MEMBER_COLS.LAST_NAME - 1] || '').toString().toLowerCase();
-    const email = (row[MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase();
-    const memberId = (row[MEMBER_COLS.MEMBER_ID - 1] || '').toString().toLowerCase();
+    const firstName = (col_(row, MEMBER_COLS.FIRST_NAME) || '').toString().toLowerCase();
+    const lastName = (col_(row, MEMBER_COLS.LAST_NAME) || '').toString().toLowerCase();
+    const email = (col_(row, MEMBER_COLS.EMAIL) || '').toString().toLowerCase();
+    const memberId = (col_(row, MEMBER_COLS.MEMBER_ID) || '').toString().toLowerCase();
 
     if (firstName.includes(searchLower) ||
         lastName.includes(searchLower) ||
@@ -2507,9 +2503,9 @@ function searchMembersForDialog(term) {
         memberId.includes(searchLower)) {
       results.push({
         row: i + 1,
-        name: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
-        email: row[MEMBER_COLS.EMAIL - 1],
-        id: row[MEMBER_COLS.MEMBER_ID - 1]
+        name: col_(row, MEMBER_COLS.FIRST_NAME) + ' ' + col_(row, MEMBER_COLS.LAST_NAME),
+        email: col_(row, MEMBER_COLS.EMAIL),
+        id: col_(row, MEMBER_COLS.MEMBER_ID)
       });
 
       if (results.length >= 10) break; // Limit results

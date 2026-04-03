@@ -251,7 +251,7 @@ function createSurveyQuestionsSheet(ss) {
     sheet.getRange(1, QC.NOTES).setNote('✏ Internal notes. Never shown to members.');
   }
 
-  Logger.log('createSurveyQuestionsSheet: ' + (isNew ? 'Created' : 'Updated') + ' — ' + toAdd.length + ' questions added.');
+  log_('createSurveyQuestionsSheet', (isNew ? 'Created' : 'Updated') + ' — ' + toAdd.length + ' questions added.');
   return sheet;
 }
 
@@ -268,15 +268,15 @@ function clearSurveyQuestionsCache() {
     var cache = CacheService.getScriptCache();
     cache.remove('surveyQuestions_v1');
     cache.remove('satisfactionColMap_v1');
-    Logger.log('clearSurveyQuestionsCache: Cache cleared.');
+    log_('clearSurveyQuestionsCache', 'Cache cleared.');
     try {
       SpreadsheetApp.getActiveSpreadsheet().toast(
         'Survey questions cache cleared. Changes take effect immediately on next load.',
         'Cache Cleared', 4
       );
-    } catch (_ui) { Logger.log('_ui: ' + (_ui.message || _ui)); }
+    } catch (_ui) { log_('_ui', (_ui.message || _ui)); }
   } catch(e) {
-    Logger.log('clearSurveyQuestionsCache error: ' + e.message);
+    log_('clearSurveyQuestionsCache error', e.message);
   }
 }
 
@@ -316,11 +316,11 @@ function createSatisfactionSheet(ss) {
       if (qSheet && qSheet.getLastRow() > 1) {
         qData = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, 16).getValues();
       }
-    } catch(e) { Logger.log('createSatisfactionSheet: could not read Survey Questions: ' + e.message); }
+    } catch(e) { log_('createSatisfactionSheet', 'could not read Survey Questions: ' + e.message); }
 
     qData.forEach(function(row) {
-      var id     = String(row[SURVEY_QUESTIONS_COLS.QUESTION_ID - 1] || '').trim();
-      var active = String(row[SURVEY_QUESTIONS_COLS.ACTIVE - 1] || '').trim().toUpperCase();
+      var id     = String(col_(row, SURVEY_QUESTIONS_COLS.QUESTION_ID) || '').trim();
+      var active = String(col_(row, SURVEY_QUESTIONS_COLS.ACTIVE) || '').trim().toUpperCase();
       if (id && active !== 'N') headers.push(id);
     });
 
@@ -348,12 +348,12 @@ function createSatisfactionSheet(ss) {
       var activeQs = (questionsData.questions || []).filter(function(q) { return q.active; });
       syncSatisfactionSheetColumns_(activeQs);
     } catch(e) {
-      Logger.log('createSatisfactionSheet: sync error (non-fatal): ' + e.message);
+      log_('createSatisfactionSheet', 'sync error (non-fatal): ' + e.message);
     }
   }
 
   sheet.setTabColor(COLORS.UNION_GREEN);
-  Logger.log('createSatisfactionSheet: ' + (hasUserData ? 'Synced columns (data preserved)' : 'Rebuilt with dynamic headers'));
+  log_('createSatisfactionSheet', (hasUserData ? 'Synced columns (data preserved)' : 'Rebuilt with dynamic headers'));
 }
 
 // ============================================================================
@@ -535,7 +535,7 @@ function createFeedbackSheet(ss) {
     .build();
   sheet.getRange(2, FEEDBACK_COLS.STATUS, 998, 1).setDataValidation(statusRule);
 
-  Logger.log('Feedback & Development sheet created');
+  log_('createFeedbackSheet', 'Feedback & Development sheet created');
 
   // Set tab color
   sheet.setTabColor(COLORS.CHART_YELLOW);
@@ -598,7 +598,7 @@ function populateRoadmapItems(sheet) {
 
   if (!hasExistingData) {
     sheet.getRange(2, 1, roadmapItems.length, roadmapItems[0].length).setValues(roadmapItems);
-    Logger.log('Populated ' + roadmapItems.length + ' roadmap items in Feedback sheet');
+    log_('populateRoadmapItems', 'Populated ' + roadmapItems.length + ' roadmap items in Feedback sheet');
   }
 }
 
@@ -1562,7 +1562,7 @@ function createFAQSheet(ss) {
     .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
   sheet.setRowHeight(row, 28);
 
-  var versionHistory = VERSION_HISTORY.map(function(entry) {
+  var versionHistory = getVersionHistory_().map(function(entry) {
     return ['v' + entry.version + ' (' + entry.date + ')', entry.codename, entry.changes];
   });
 

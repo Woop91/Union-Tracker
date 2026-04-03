@@ -484,11 +484,11 @@ function seedFeedbackData() {
   var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
 
   if (!sheet) {
-    Logger.log('Feedback sheet not found. Creating it...');
+    log_('seedFeedbackData', 'Feedback sheet not found. Creating it...');
     createFeedbackSheet(ss);
     sheet = ss.getSheetByName(SHEETS.FEEDBACK);
     if (!sheet) {
-      Logger.log('Could not create Feedback sheet');
+      log_('seedFeedbackData', 'Could not create Feedback sheet');
       return;
     }
   }
@@ -503,7 +503,7 @@ function seedFeedbackData() {
     }
   }
   if (dataRowCount > 0) {
-    Logger.log('Feedback sheet already has data. Skipping seed.');
+    log_('seedFeedbackData', 'Feedback sheet already has data. Skipping seed.');
     return;
   }
 
@@ -531,17 +531,17 @@ function seedFeedbackData() {
   function buildFeedbackRow(timestamp, submittedBy, category, type, priority, title, description, status, assignedTo, resolution, notes) {
     var row = [];
     for (var i = 0; i < maxCol; i++) { row.push(''); }
-    row[FEEDBACK_COLS.TIMESTAMP - 1] = timestamp;
-    row[FEEDBACK_COLS.SUBMITTED_BY - 1] = submittedBy;
-    row[FEEDBACK_COLS.CATEGORY - 1] = category;
-    row[FEEDBACK_COLS.TYPE - 1] = type;
-    row[FEEDBACK_COLS.PRIORITY - 1] = priority;
-    row[FEEDBACK_COLS.TITLE - 1] = title;
-    row[FEEDBACK_COLS.DESCRIPTION - 1] = description;
-    row[FEEDBACK_COLS.STATUS - 1] = status;
-    row[FEEDBACK_COLS.ASSIGNED_TO - 1] = assignedTo;
-    row[FEEDBACK_COLS.RESOLUTION - 1] = resolution;
-    row[FEEDBACK_COLS.NOTES - 1] = notes;
+    setCol_(row, FEEDBACK_COLS.TIMESTAMP, timestamp);
+    setCol_(row, FEEDBACK_COLS.SUBMITTED_BY, submittedBy);
+    setCol_(row, FEEDBACK_COLS.CATEGORY, category);
+    setCol_(row, FEEDBACK_COLS.TYPE, type);
+    setCol_(row, FEEDBACK_COLS.PRIORITY, priority);
+    setCol_(row, FEEDBACK_COLS.TITLE, title);
+    setCol_(row, FEEDBACK_COLS.DESCRIPTION, description);
+    setCol_(row, FEEDBACK_COLS.STATUS, status);
+    setCol_(row, FEEDBACK_COLS.ASSIGNED_TO, assignedTo);
+    setCol_(row, FEEDBACK_COLS.RESOLUTION, resolution);
+    setCol_(row, FEEDBACK_COLS.NOTES, notes);
     return row;
   }
 
@@ -596,7 +596,7 @@ function seedFeedbackData() {
   // Format timestamp column
   sheet.getRange(2, FEEDBACK_COLS.TIMESTAMP, sampleFeedback.length, 1).setNumberFormat('MM/dd/yyyy HH:mm');
 
-  Logger.log('Seeded ' + sampleFeedback.length + ' sample feedback entries');
+  log_('buildFeedbackRow', 'Seeded ' + sampleFeedback.length + ' sample feedback entries');
 }
 
 /**
@@ -617,18 +617,18 @@ function seedSurveyTrackingData() {
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!trackingSheet) {
-    Logger.log('Survey Tracking sheet not found. It will be created during setup.');
+    log_('seedSurveyTrackingData', 'Survey Tracking sheet not found. It will be created during setup.');
     return;
   }
 
   if (!memberSheet || memberSheet.getLastRow() < 2) {
-    Logger.log('Member Directory empty or missing. Skipping survey tracking seed.');
+    log_('seedSurveyTrackingData', 'Member Directory empty or missing. Skipping survey tracking seed.');
     return;
   }
 
   // Check if already seeded
   if (trackingSheet.getLastRow() > 1) {
-    Logger.log('Survey Tracking already has data. Skipping seed.');
+    log_('seedSurveyTrackingData', 'Survey Tracking already has data. Skipping seed.');
     return;
   }
 
@@ -637,14 +637,14 @@ function seedSurveyTrackingData() {
   var now = new Date();
 
   for (var i = 1; i < memberData.length; i++) {
-    var memberId = memberData[i][MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = col_(memberData[i], MEMBER_COLS.MEMBER_ID);
     if (!memberId) continue;
 
-    var firstName = memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '';
-    var lastName = memberData[i][MEMBER_COLS.LAST_NAME - 1] || '';
-    var email = memberData[i][MEMBER_COLS.EMAIL - 1] || '';
-    var location = memberData[i][MEMBER_COLS.WORK_LOCATION - 1] || '';
-    var steward = memberData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '';
+    var firstName = col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '';
+    var lastName = col_(memberData[i], MEMBER_COLS.LAST_NAME) || '';
+    var email = col_(memberData[i], MEMBER_COLS.EMAIL) || '';
+    var location = col_(memberData[i], MEMBER_COLS.WORK_LOCATION) || '';
+    var steward = col_(memberData[i], MEMBER_COLS.ASSIGNED_STEWARD) || '';
 
     // ~40% completed current round
     var completed = Math.random() < 0.4;
@@ -691,7 +691,7 @@ function seedSurveyTrackingData() {
     trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
   }
 
-  Logger.log('Seeded survey tracking for ' + rows.length + ' members');
+  log_('seedSurveyTrackingData', 'Seeded survey tracking for ' + rows.length + ' members');
 }
 
 /**
@@ -705,11 +705,11 @@ function seedSatisfactionData() {
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
   if (!sheet) {
-    Logger.log('Satisfaction sheet not found. Creating it...');
+    log_('seedSatisfactionData', 'Satisfaction sheet not found. Creating it...');
     createSatisfactionSheet(ss);
     sheet = ss.getSheetByName(SHEETS.SATISFACTION);
     if (!sheet) {
-      Logger.log('Could not create Satisfaction sheet');
+      log_('seedSatisfactionData', 'Could not create Satisfaction sheet');
       return;
     }
   }
@@ -724,7 +724,7 @@ function seedSatisfactionData() {
     }
   }
   if (hasData) {
-    Logger.log('Satisfaction sheet already has data. Skipping seed.');
+    log_('seedSatisfactionData', 'Satisfaction sheet already has data. Skipping seed.');
     return;
   }
 
@@ -822,105 +822,105 @@ function seedSatisfactionData() {
     for (var c = 0; c < maxCol; c++) { row.push(''); }
 
     // Timestamp
-    row[SATISFACTION_COLS.TIMESTAMP - 1] = timestamp;
+    setCol_(row, SATISFACTION_COLS.TIMESTAMP, timestamp);
 
     // Work Context (Q1-5)
-    row[SATISFACTION_COLS.Q1_WORKSITE - 1] = randomItem(worksites);
-    row[SATISFACTION_COLS.Q2_ROLE - 1] = randomItem(roles);
-    row[SATISFACTION_COLS.Q3_SHIFT - 1] = randomItem(shifts);
-    row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] = randomItem(tenures);
-    row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] = hadStewardContact ? 'Yes' : 'No';
+    setCol_(row, SATISFACTION_COLS.Q1_WORKSITE, randomItem(worksites));
+    setCol_(row, SATISFACTION_COLS.Q2_ROLE, randomItem(roles));
+    setCol_(row, SATISFACTION_COLS.Q3_SHIFT, randomItem(shifts));
+    setCol_(row, SATISFACTION_COLS.Q4_TIME_IN_ROLE, randomItem(tenures));
+    setCol_(row, SATISFACTION_COLS.Q5_STEWARD_CONTACT, hadStewardContact ? 'Yes' : 'No');
 
     // Overall Satisfaction (Q6-9) - everyone answers
-    row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q7_TRUST_UNION - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q9_RECOMMEND - 1] = weightedRating();
+    setCol_(row, SATISFACTION_COLS.Q6_SATISFIED_REP, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q7_TRUST_UNION, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q8_FEEL_PROTECTED, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q9_RECOMMEND, weightedRating());
 
     // Steward Ratings 3A (Q10-17) - only if had contact
     if (hadStewardContact) {
-      row[SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q11_TREATED_RESPECT - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q14_ADVOCATED - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q17_STEWARD_IMPROVE - 1] = randomItem(stewardComments);
+      setCol_(row, SATISFACTION_COLS.Q10_TIMELY_RESPONSE, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q11_TREATED_RESPECT, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q13_FOLLOWED_THROUGH, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q14_ADVOCATED, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q15_SAFE_CONCERNS, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q16_CONFIDENTIALITY, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q17_STEWARD_IMPROVE, randomItem(stewardComments));
     }
 
     // Steward Access 3B (Q18-20) - only if NO contact
     if (!hadStewardContact) {
-      row[SATISFACTION_COLS.Q18_KNOW_CONTACT - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q19_CONFIDENT_HELP - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q20_EASY_FIND - 1] = weightedRating();
+      setCol_(row, SATISFACTION_COLS.Q18_KNOW_CONTACT, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q19_CONFIDENT_HELP, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q20_EASY_FIND, weightedRating());
     }
 
     // Chapter Effectiveness (Q21-25) - everyone
-    row[SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q22_CHAPTER_COMM - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q23_ORGANIZES - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q24_REACH_CHAPTER - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q25_FAIR_REP - 1] = weightedRating();
+    setCol_(row, SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q22_CHAPTER_COMM, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q23_ORGANIZES, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q24_REACH_CHAPTER, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q25_FAIR_REP, weightedRating());
 
     // Local Leadership (Q26-31) - everyone
-    row[SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q29_ACCOUNTABLE - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1] = weightedRating();
+    setCol_(row, SATISFACTION_COLS.Q26_DECISIONS_CLEAR, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q29_ACCOUNTABLE, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q30_FAIR_PROCESSES, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS, weightedRating());
 
     // Contract Enforcement (Q32-36) - everyone
-    row[SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] = filedGrievance ? 'Yes' : 'No';
+    setCol_(row, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q33_REALISTIC_TIMELINES, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q34_CLEAR_UPDATES, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q36_FILED_GRIEVANCE, filedGrievance ? 'Yes' : 'No');
 
     // Representation 6A (Q37-40) - only if filed grievance
     if (filedGrievance) {
-      row[SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q38_FELT_SUPPORTED - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q39_UPDATES_OFTEN - 1] = weightedRating();
-      row[SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1] = weightedRating();
+      setCol_(row, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q38_FELT_SUPPORTED, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q39_UPDATES_OFTEN, weightedRating());
+      setCol_(row, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED, weightedRating());
     }
 
     // Communication (Q41-45) - everyone
-    row[SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q42_ENOUGH_INFO - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q43_FIND_EASILY - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q44_ALL_SHIFTS - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1] = weightedRating();
+    setCol_(row, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q42_ENOUGH_INFO, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q43_FIND_EASILY, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q44_ALL_SHIFTS, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q45_MEETINGS_WORTH, weightedRating());
 
     // Member Voice (Q46-50) - everyone
-    row[SATISFACTION_COLS.Q46_VOICE_MATTERS - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q47_SEEKS_INPUT - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q48_DIGNITY - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1] = weightedRating();
+    setCol_(row, SATISFACTION_COLS.Q46_VOICE_MATTERS, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q47_SEEKS_INPUT, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q48_DIGNITY, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q49_NEWER_SUPPORTED, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q50_CONFLICT_RESPECT, weightedRating());
 
     // Value & Action (Q51-55) - everyone
-    row[SATISFACTION_COLS.Q51_GOOD_VALUE - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q54_HOW_INVOLVED - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q55_WIN_TOGETHER - 1] = weightedRating();
+    setCol_(row, SATISFACTION_COLS.Q51_GOOD_VALUE, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q52_PRIORITIES_NEEDS, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q53_PREPARED_MOBILIZE, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q54_HOW_INVOLVED, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q55_WIN_TOGETHER, weightedRating());
 
     // Scheduling (Q56-63) - everyone
-    row[SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q58_CLEAR_CRITERIA - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q59_WORK_EXPECTATIONS - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1] = weightedRating();
-    row[SATISFACTION_COLS.Q63_SCHEDULING_CHALLENGE - 1] = randomItem(schedulingChallenges);
+    setCol_(row, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q58_CLEAR_CRITERIA, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q59_WORK_EXPECTATIONS, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS, weightedRating());
+    setCol_(row, SATISFACTION_COLS.Q63_SCHEDULING_CHALLENGE, randomItem(schedulingChallenges));
 
     // Priorities & Close (Q64-67) - everyone
-    row[SATISFACTION_COLS.Q64_TOP_PRIORITIES - 1] = randomPriorities();
-    row[SATISFACTION_COLS.Q65_ONE_CHANGE - 1] = randomItem(oneChanges);
-    row[SATISFACTION_COLS.Q66_KEEP_DOING - 1] = randomItem(keepDoing);
+    setCol_(row, SATISFACTION_COLS.Q64_TOP_PRIORITIES, randomPriorities());
+    setCol_(row, SATISFACTION_COLS.Q65_ONE_CHANGE, randomItem(oneChanges));
+    setCol_(row, SATISFACTION_COLS.Q66_KEEP_DOING, randomItem(keepDoing));
     // Q67_ADDITIONAL left as '' (mostly empty)
 
     sampleData.push(row);
@@ -939,7 +939,7 @@ function seedSatisfactionData() {
   // Format timestamp column
   sheet.getRange(2, 1, sampleData.length, 1).setNumberFormat('MM/dd/yyyy HH:mm');
 
-  Logger.log('Seeded ' + sampleData.length + ' sample survey responses');
+  log_('randomPriorities', 'Seeded ' + sampleData.length + ' sample survey responses');
 }
 
 /**
@@ -988,7 +988,7 @@ function restoreConfigFromSheetData_() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!configSheet) {
-    Logger.log('restoreConfigFromSheetData_: Config sheet not found');
+    log_('restoreConfigFromSheetData_', 'Config sheet not found');
     return;
   }
 
@@ -1083,13 +1083,13 @@ function restoreConfigFromSheetData_() {
   }
 
   if (totalRestored > 0) {
-    Logger.log('restoreConfigFromSheetData_: restored ' + totalRestored + ' missing Config entries');
+    log_('restoreConfigFromSheetData_', 'restored ' + totalRestored + ' missing Config entries');
     SpreadsheetApp.getActiveSpreadsheet().toast(
       'Restored ' + totalRestored + ' entries from sheet data',
       '🔄 Config Restore', 3
     );
   } else {
-    Logger.log('restoreConfigFromSheetData_: no missing entries found');
+    log_('restoreConfigFromSheetData_', 'no missing entries found');
   }
 }
 
@@ -1229,14 +1229,14 @@ function SEED_MEMBERS_ONLY(count) {
   // Second pass: collect steward emails and assign to all members
   var stewardEmails = [];
   for (var s = 0; s < allRows.length; s++) {
-    if (allRows[s][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
-      stewardEmails.push(allRows[s][MEMBER_COLS.EMAIL - 1]);
+    if (col_(allRows[s], MEMBER_COLS.IS_STEWARD) === 'Yes') {
+      stewardEmails.push(col_(allRows[s], MEMBER_COLS.EMAIL));
     }
   }
-  if (stewardEmails.length === 0) stewardEmails.push(allRows[0][MEMBER_COLS.EMAIL - 1]);
+  if (stewardEmails.length === 0) stewardEmails.push(col_(allRows[0], MEMBER_COLS.EMAIL));
 
   for (var a = 0; a < allRows.length; a++) {
-    allRows[a][MEMBER_COLS.ASSIGNED_STEWARD - 1] = randomChoice(stewardEmails);
+    setCol_(allRows[a], MEMBER_COLS.ASSIGNED_STEWARD, randomChoice(stewardEmails));
   }
 
   // Write all rows in batches
@@ -1273,63 +1273,63 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
   for (var i = 0; i < maxCol; i++) { row.push(''); }
 
   // Identity & Core Info
-  row[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-  row[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-  row[MEMBER_COLS.LAST_NAME - 1] = lastName;
-  row[MEMBER_COLS.JOB_TITLE - 1] = jobTitle;
+  setCol_(row, MEMBER_COLS.MEMBER_ID, memberId);
+  setCol_(row, MEMBER_COLS.FIRST_NAME, firstName);
+  setCol_(row, MEMBER_COLS.LAST_NAME, lastName);
+  setCol_(row, MEMBER_COLS.JOB_TITLE, jobTitle);
 
   // Location & Work
-  row[MEMBER_COLS.WORK_LOCATION - 1] = location;
-  row[MEMBER_COLS.UNIT - 1] = unit;
+  setCol_(row, MEMBER_COLS.WORK_LOCATION, location);
+  setCol_(row, MEMBER_COLS.UNIT, unit);
   // CUBICLE left empty (hidden column, not seeded)
-  row[MEMBER_COLS.OFFICE_DAYS - 1] = officeDays;
+  setCol_(row, MEMBER_COLS.OFFICE_DAYS, officeDays);
 
   // Contact Information
-  row[MEMBER_COLS.EMAIL - 1] = email;
-  row[MEMBER_COLS.PHONE - 1] = phone;
-  row[MEMBER_COLS.PREFERRED_COMM - 1] = prefComm;
-  row[MEMBER_COLS.BEST_TIME - 1] = bestTime;
+  setCol_(row, MEMBER_COLS.EMAIL, email);
+  setCol_(row, MEMBER_COLS.PHONE, phone);
+  setCol_(row, MEMBER_COLS.PREFERRED_COMM, prefComm);
+  setCol_(row, MEMBER_COLS.BEST_TIME, bestTime);
 
   // Organizational Structure
-  row[MEMBER_COLS.SUPERVISOR - 1] = supervisor;
-  row[MEMBER_COLS.MANAGER - 1] = manager;
-  row[MEMBER_COLS.IS_STEWARD - 1] = isSteward;
-  row[MEMBER_COLS.COMMITTEES - 1] = committees;
-  row[MEMBER_COLS.ASSIGNED_STEWARD - 1] = assignedSteward;
+  setCol_(row, MEMBER_COLS.SUPERVISOR, supervisor);
+  setCol_(row, MEMBER_COLS.MANAGER, manager);
+  setCol_(row, MEMBER_COLS.IS_STEWARD, isSteward);
+  setCol_(row, MEMBER_COLS.COMMITTEES, committees);
+  setCol_(row, MEMBER_COLS.ASSIGNED_STEWARD, assignedSteward);
 
   // Engagement Metrics
-  row[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] = randomDate(lastMonth, today);
-  row[MEMBER_COLS.LAST_INPERSON_MTG - 1] = randomDate(lastMonth, today);
-  row[MEMBER_COLS.OPEN_RATE - 1] = Math.floor(Math.random() * 100);
-  row[MEMBER_COLS.VOLUNTEER_HOURS - 1] = Math.floor(Math.random() * 20);
+  setCol_(row, MEMBER_COLS.LAST_VIRTUAL_MTG, randomDate(lastMonth, today));
+  setCol_(row, MEMBER_COLS.LAST_INPERSON_MTG, randomDate(lastMonth, today));
+  setCol_(row, MEMBER_COLS.OPEN_RATE, Math.floor(Math.random() * 100));
+  setCol_(row, MEMBER_COLS.VOLUNTEER_HOURS, Math.floor(Math.random() * 20));
 
   // Member Interests
-  row[MEMBER_COLS.INTEREST_LOCAL - 1] = Math.random() < 0.3 ? 'Yes' : 'No';
-  row[MEMBER_COLS.INTEREST_CHAPTER - 1] = Math.random() < 0.2 ? 'Yes' : 'No';
-  row[MEMBER_COLS.INTEREST_ALLIED - 1] = Math.random() < 0.1 ? 'Yes' : 'No';
+  setCol_(row, MEMBER_COLS.INTEREST_LOCAL, Math.random() < 0.3 ? 'Yes' : 'No');
+  setCol_(row, MEMBER_COLS.INTEREST_CHAPTER, Math.random() < 0.2 ? 'Yes' : 'No');
+  setCol_(row, MEMBER_COLS.INTEREST_ALLIED, Math.random() < 0.1 ? 'Yes' : 'No');
 
   // Steward Contact Tracking
-  row[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = recentContactDate || '';
-  row[MEMBER_COLS.CONTACT_STEWARD - 1] = contactSteward || '';
-  row[MEMBER_COLS.CONTACT_NOTES - 1] = contactNotes || '';
+  setCol_(row, MEMBER_COLS.RECENT_CONTACT_DATE, recentContactDate || '');
+  setCol_(row, MEMBER_COLS.CONTACT_STEWARD, contactSteward || '');
+  setCol_(row, MEMBER_COLS.CONTACT_NOTES, contactNotes || '');
 
   // Grievance Management (script-calculated, leave empty)
   // HAS_OPEN_GRIEVANCE, GRIEVANCE_STATUS, NEXT_DEADLINE left as ''
-  row[MEMBER_COLS.START_GRIEVANCE - 1] = false;
+  setCol_(row, MEMBER_COLS.START_GRIEVANCE, false);
 
   // Address Data (sample MA addresses)
   var streets = ['123 Main St', '456 Oak Ave', '789 Elm Blvd', '321 Park Rd', '654 Cedar Ln',
     '987 Maple Dr', '147 Pine Way', '258 Birch Ct', '369 Walnut St', '741 Spruce Ave'];
   var cities = ['Boston', 'Worcester', 'Springfield', 'Cambridge', 'Lowell',
     'Brockton', 'Quincy', 'New Bedford', 'Fall River', 'Lawrence'];
-  row[MEMBER_COLS.STREET_ADDRESS - 1] = randomChoice(streets);
-  row[MEMBER_COLS.CITY - 1] = randomChoice(cities);
-  row[MEMBER_COLS.STATE - 1] = 'MA';
-  row[MEMBER_COLS.ZIP_CODE - 1] = '0' + String(Math.floor(Math.random() * 9000) + 1000);
+  setCol_(row, MEMBER_COLS.STREET_ADDRESS, randomChoice(streets));
+  setCol_(row, MEMBER_COLS.CITY, randomChoice(cities));
+  setCol_(row, MEMBER_COLS.STATE, 'MA');
+  setCol_(row, MEMBER_COLS.ZIP_CODE, '0' + String(Math.floor(Math.random() * 9000) + 1000));
 
   // Dues Status
   var duesStatuses = ['Current', 'Current', 'Current', 'Current', 'Past Due', 'Inactive'];
-  row[MEMBER_COLS.DUES_STATUS - 1] = randomChoice(duesStatuses);
+  setCol_(row, MEMBER_COLS.DUES_STATUS, randomChoice(duesStatuses));
 
   return row;
 }
@@ -1372,8 +1372,8 @@ function SEED_GRIEVANCES(count) {
   // Collect steward emails from Member Directory (not Config names)
   var stewardEmails = [];
   for (var se = 1; se < memberData.length; se++) {
-    if (String(memberData[se][MEMBER_COLS.IS_STEWARD - 1]).trim().toLowerCase() === 'yes') {
-      var sEmail = String(memberData[se][MEMBER_COLS.EMAIL - 1]).trim();
+    if (String(col_(memberData[se], MEMBER_COLS.IS_STEWARD)).trim().toLowerCase() === 'yes') {
+      var sEmail = String(col_(memberData[se], MEMBER_COLS.EMAIL)).trim();
       if (sEmail) stewardEmails.push(sEmail);
     }
   }
@@ -1400,7 +1400,7 @@ function SEED_GRIEVANCES(count) {
   // Create shuffled list of member indices (excluding header row)
   var memberIndices = [];
   for (var m = 1; m < memberData.length; m++) {
-    if (memberData[m][MEMBER_COLS.MEMBER_ID - 1]) {
+    if (col_(memberData[m], MEMBER_COLS.MEMBER_ID)) {
       memberIndices.push(m);
     }
   }
@@ -1425,15 +1425,15 @@ function SEED_GRIEVANCES(count) {
     var memberRow = memberData[shuffledMembers[memberIndex]];
     memberIndex++;
 
-    var memberId = memberRow[MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = col_(memberRow, MEMBER_COLS.MEMBER_ID);
     if (!memberId) continue;
 
-    var firstName = memberRow[MEMBER_COLS.FIRST_NAME - 1] || '';
-    var lastName = memberRow[MEMBER_COLS.LAST_NAME - 1] || '';
-    var memberEmail = memberRow[MEMBER_COLS.EMAIL - 1] || '';
-    var memberUnit = memberRow[MEMBER_COLS.UNIT - 1] || '';
-    var memberLocation = memberRow[MEMBER_COLS.WORK_LOCATION - 1] || '';
-    var memberSteward = memberRow[MEMBER_COLS.ASSIGNED_STEWARD - 1] || randomChoice(stewardEmails);
+    var firstName = col_(memberRow, MEMBER_COLS.FIRST_NAME) || '';
+    var lastName = col_(memberRow, MEMBER_COLS.LAST_NAME) || '';
+    var memberEmail = col_(memberRow, MEMBER_COLS.EMAIL) || '';
+    var memberUnit = col_(memberRow, MEMBER_COLS.UNIT) || '';
+    var memberLocation = col_(memberRow, MEMBER_COLS.WORK_LOCATION) || '';
+    var memberSteward = col_(memberRow, MEMBER_COLS.ASSIGNED_STEWARD) || randomChoice(stewardEmails);
 
     var grievanceId = generateNameBasedId('G', firstName, lastName, existingGrievanceIds);
     existingGrievanceIds[grievanceId] = true;
@@ -1574,54 +1574,54 @@ function generateSingleGrievanceRow(grievanceId, memberId, firstName, lastName, 
   for (var i = 0; i < maxCol; i++) { row.push(''); }
 
   // Identity
-  row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId;
-  row[GRIEVANCE_COLS.MEMBER_ID - 1] = memberId;
-  row[GRIEVANCE_COLS.FIRST_NAME - 1] = firstName;
-  row[GRIEVANCE_COLS.LAST_NAME - 1] = lastName;
+  setCol_(row, GRIEVANCE_COLS.GRIEVANCE_ID, grievanceId);
+  setCol_(row, GRIEVANCE_COLS.MEMBER_ID, memberId);
+  setCol_(row, GRIEVANCE_COLS.FIRST_NAME, firstName);
+  setCol_(row, GRIEVANCE_COLS.LAST_NAME, lastName);
 
   // Status & Assignment
-  row[GRIEVANCE_COLS.STATUS - 1] = status;
-  row[GRIEVANCE_COLS.CURRENT_STEP - 1] = step;
+  setCol_(row, GRIEVANCE_COLS.STATUS, status);
+  setCol_(row, GRIEVANCE_COLS.CURRENT_STEP, step);
 
   // Timeline - Filing
-  row[GRIEVANCE_COLS.INCIDENT_DATE - 1] = incidentDate;
-  row[GRIEVANCE_COLS.FILING_DEADLINE - 1] = filingDeadline;
-  row[GRIEVANCE_COLS.DATE_FILED - 1] = dateFiled;
+  setCol_(row, GRIEVANCE_COLS.INCIDENT_DATE, incidentDate);
+  setCol_(row, GRIEVANCE_COLS.FILING_DEADLINE, filingDeadline);
+  setCol_(row, GRIEVANCE_COLS.DATE_FILED, dateFiled);
 
   // Timeline - Step I
-  row[GRIEVANCE_COLS.STEP1_DUE - 1] = step1Due;
-  row[GRIEVANCE_COLS.STEP1_RCVD - 1] = step1Rcvd;
+  setCol_(row, GRIEVANCE_COLS.STEP1_DUE, step1Due);
+  setCol_(row, GRIEVANCE_COLS.STEP1_RCVD, step1Rcvd);
 
   // Timeline - Step II
-  row[GRIEVANCE_COLS.STEP2_APPEAL_DUE - 1] = step2AppealDue;
-  row[GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1] = step2AppealFiled;
-  row[GRIEVANCE_COLS.STEP2_DUE - 1] = step2Due;
-  row[GRIEVANCE_COLS.STEP2_RCVD - 1] = step2Rcvd;
+  setCol_(row, GRIEVANCE_COLS.STEP2_APPEAL_DUE, step2AppealDue);
+  setCol_(row, GRIEVANCE_COLS.STEP2_APPEAL_FILED, step2AppealFiled);
+  setCol_(row, GRIEVANCE_COLS.STEP2_DUE, step2Due);
+  setCol_(row, GRIEVANCE_COLS.STEP2_RCVD, step2Rcvd);
 
   // Timeline - Step III
-  row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1] = step3AppealDue;
-  row[GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1] = step3AppealFiled;
-  row[GRIEVANCE_COLS.DATE_CLOSED - 1] = dateClosed;
+  setCol_(row, GRIEVANCE_COLS.STEP3_APPEAL_DUE, step3AppealDue);
+  setCol_(row, GRIEVANCE_COLS.STEP3_APPEAL_FILED, step3AppealFiled);
+  setCol_(row, GRIEVANCE_COLS.DATE_CLOSED, dateClosed);
 
   // Calculated Metrics
-  row[GRIEVANCE_COLS.DAYS_OPEN - 1] = daysOpen;
-  row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] = nextActionDue;
-  row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] = daysToDeadline;
+  setCol_(row, GRIEVANCE_COLS.DAYS_OPEN, daysOpen);
+  setCol_(row, GRIEVANCE_COLS.NEXT_ACTION_DUE, nextActionDue);
+  setCol_(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE, daysToDeadline);
 
   // Case Details
-  row[GRIEVANCE_COLS.ARTICLES - 1] = articles;
-  row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category;
+  setCol_(row, GRIEVANCE_COLS.ARTICLES, articles);
+  setCol_(row, GRIEVANCE_COLS.ISSUE_CATEGORY, category);
 
   // Contact & Location
-  row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] = email;
-  row[GRIEVANCE_COLS.LOCATION - 1] = location;
-  row[GRIEVANCE_COLS.STEWARD - 1] = steward;
+  setCol_(row, GRIEVANCE_COLS.MEMBER_EMAIL, email);
+  setCol_(row, GRIEVANCE_COLS.LOCATION, location);
+  setCol_(row, GRIEVANCE_COLS.STEWARD, steward);
 
   // Resolution
-  row[GRIEVANCE_COLS.RESOLUTION - 1] = resolution;
+  setCol_(row, GRIEVANCE_COLS.RESOLUTION, resolution);
 
   // Coordinator Notifications
-  row[GRIEVANCE_COLS.MESSAGE_ALERT - 1] = false;
+  setCol_(row, GRIEVANCE_COLS.MESSAGE_ALERT, false);
   // COORDINATOR_MESSAGE, ACKNOWLEDGED_BY, ACKNOWLEDGED_DATE left as ''
 
   // Drive Integration
@@ -1650,11 +1650,11 @@ function seedScriptOwnerMember_(ss) {
   try {
     ownerEmail = Session.getActiveUser().getEmail();
   } catch (e) {
-    Logger.log('Could not get script owner email: ' + e.message);
+    log_('Could not get script owner email', e.message);
     return;
   }
   if (!ownerEmail) {
-    Logger.log('Script owner email is empty. Skipping owner seed.');
+    log_('seedScriptOwnerMember_', 'Script owner email is empty. Skipping owner seed.');
     return;
   }
 
@@ -1664,8 +1664,8 @@ function seedScriptOwnerMember_(ss) {
   // Check if owner already exists
   var existingData = memberSheet.getDataRange().getValues();
   for (var i = 1; i < existingData.length; i++) {
-    if (String(existingData[i][MEMBER_COLS.EMAIL - 1]).trim().toLowerCase() === ownerEmail.toLowerCase()) {
-      Logger.log('Script owner already exists in Member Directory. Skipping.');
+    if (String(col_(existingData[i], MEMBER_COLS.EMAIL)).trim().toLowerCase() === ownerEmail.toLowerCase()) {
+      log_('seedScriptOwnerMember_', 'Script owner already exists in Member Directory. Skipping.');
       return;
     }
   }
@@ -1673,8 +1673,8 @@ function seedScriptOwnerMember_(ss) {
   // Find a steward email from existing members for assignment
   var stewardEmails = [];
   for (var j = 1; j < existingData.length; j++) {
-    if (String(existingData[j][MEMBER_COLS.IS_STEWARD - 1]).trim().toLowerCase() === 'yes') {
-      stewardEmails.push(String(existingData[j][MEMBER_COLS.EMAIL - 1]).trim());
+    if (String(col_(existingData[j], MEMBER_COLS.IS_STEWARD)).trim().toLowerCase() === 'yes') {
+      stewardEmails.push(String(col_(existingData[j], MEMBER_COLS.EMAIL)).trim());
     }
   }
   var assignedStewardEmail = stewardEmails.length > 0 ? randomChoice(stewardEmails) : '';
@@ -1690,7 +1690,7 @@ function seedScriptOwnerMember_(ss) {
 
   memberSheet.getRange(memberSheet.getLastRow() + 1, 1, 1, ownerRow.length).setValues([ownerRow]);
   trackSeededMemberId('M-OWNER');
-  Logger.log('Added script owner (' + ownerEmail + ') as test steward member');
+  log_('seedScriptOwnerMember_', 'Added script owner (' + ownerEmail + ') as test steward member');
 }
 
 // ============================================================================
@@ -1705,7 +1705,7 @@ function seedContactLogData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!memberSheet || memberSheet.getLastRow() < 2) {
-    Logger.log('Member Directory empty. Skipping contact log seed.');
+    log_('seedContactLogData', 'Member Directory empty. Skipping contact log seed.');
     return;
   }
 
@@ -1719,7 +1719,7 @@ function seedContactLogData() {
 
   // Skip if already has data
   if (clSheet.getLastRow() > 1) {
-    Logger.log('Contact log already has data. Skipping seed.');
+    log_('seedContactLogData', 'Contact log already has data. Skipping seed.');
     return;
   }
 
@@ -1729,9 +1729,9 @@ function seedContactLogData() {
   var membersByAssignment = {};
 
   for (var i = 1; i < memberData.length; i++) {
-    var email = String(memberData[i][MEMBER_COLS.EMAIL - 1]).trim().toLowerCase();
-    var isSteward = String(memberData[i][MEMBER_COLS.IS_STEWARD - 1]).trim().toLowerCase();
-    var assignedSteward = String(memberData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1]).trim().toLowerCase();
+    var email = String(col_(memberData[i], MEMBER_COLS.EMAIL)).trim().toLowerCase();
+    var isSteward = String(col_(memberData[i], MEMBER_COLS.IS_STEWARD)).trim().toLowerCase();
+    var assignedSteward = String(col_(memberData[i], MEMBER_COLS.ASSIGNED_STEWARD)).trim().toLowerCase();
 
     if (isSteward === 'yes') {
       stewardEmailList.push(email);
@@ -1743,7 +1743,7 @@ function seedContactLogData() {
   }
 
   if (stewardEmailList.length === 0) {
-    Logger.log('No stewards found. Skipping contact log seed.');
+    log_('seedContactLogData', 'No stewards found. Skipping contact log seed.');
     return;
   }
 
@@ -1804,7 +1804,7 @@ function seedContactLogData() {
   }
 
   clSheet.getRange(2, 1, rows.length, 8).setValues(rows);
-  Logger.log('Seeded ' + rows.length + ' contact log entries');
+  log_('seedContactLogData', 'Seeded ' + rows.length + ' contact log entries');
 }
 
 /**
@@ -1876,11 +1876,11 @@ function seedCalendarEvents() {
         var created = cal.createEvent(evt.title, start, end, { description: evt.desc });
         createdIds.push(created.getId());
       } catch (e) {
-        Logger.log('Calendar event creation failed for "' + evt.title + '": ' + e.message);
+        log_('seedCalendarEvents', 'Calendar event creation failed for "' + evt.title + '": ' + e.message);
       }
     });
     PropertiesService.getScriptProperties().setProperty('SEEDED_CALENDAR_EVENT_IDS', JSON.stringify(createdIds));
-    Logger.log('Seeded ' + createdIds.length + ' calendar events');
+    log_('seedCalendarEvents', 'Seeded ' + createdIds.length + ' calendar events');
   }
 
   // Always seed events into _Timeline_Events as fallback data source
@@ -1915,7 +1915,7 @@ function seedCalendarEvents() {
     });
     var startRow = Math.max(tlSheet.getLastRow() + 1, 2);
     tlSheet.getRange(startRow, 1, tlRows.length, 12).setValues(tlRows);
-    Logger.log('Seeded ' + tlRows.length + ' events into Timeline sheet');
+    log_('seedCalendarEvents', 'Seeded ' + tlRows.length + ' events into Timeline sheet');
   }
 }
 
@@ -1939,13 +1939,13 @@ function seedWeeklyQuestions() {
   // --- Question Pool (member-submitted candidates for random draw) ---
   var poolSheet = ss.getSheetByName(SHEETS.QUESTION_POOL);
   if (!poolSheet) {
-    Logger.log('_Question_Pool sheet not found. Skipping weekly questions seed.');
+    log_('seedWeeklyQuestions', '_Question_Pool sheet not found. Skipping weekly questions seed.');
     return;
   }
 
   var poolAlreadySeeded = poolSheet.getLastRow() > 1;
   if (poolAlreadySeeded) {
-    Logger.log('_Question_Pool already has data. Refreshing active poll dates only.');
+    log_('seedWeeklyQuestions', '_Question_Pool already has data. Refreshing active poll dates only.');
   }
 
   var poolQuestions = [
@@ -2072,7 +2072,7 @@ function seedWeeklyQuestions() {
     }
   }
 
-  Logger.log('seedWeeklyQuestions: ' + poolQuestions.length + ' pool questions, 2 active polls, 20 responses seeded (period: ' + weekStr + ').');
+  log_('seedWeeklyQuestions', poolQuestions.length + ' pool questions, 2 active polls, 20 responses seeded (period: ' + weekStr + ').');
 }
 
 // ============================================================================
@@ -2111,7 +2111,7 @@ function seedUnionStatsData() {
   };
 
   PropertiesService.getScriptProperties().setProperty('SEEDED_UNION_STATS', JSON.stringify(stats));
-  Logger.log('Seeded union stats data');
+  log_('seedUnionStatsData', 'Seeded union stats data');
 }
 
 // ============================================================================
@@ -2120,7 +2120,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds sample content including
+ * by createResourcesSheet(). Adds union-specific content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -2133,7 +2133,7 @@ function seedResourcesData() {
       sheet = createResourcesSheet(ss);
     }
     if (!sheet) {
-      Logger.log('Resources sheet not found. Skipping resource seed.');
+      log_('seedResourcesData', 'Resources sheet not found. Skipping resource seed.');
       return;
     }
   }
@@ -2141,7 +2141,7 @@ function seedResourcesData() {
   // Check how many resources already exist
   var existingRows = sheet.getLastRow() - 1; // minus header
   if (existingRows >= 15) {
-    Logger.log('Resources sheet already has ' + existingRows + ' entries. Skipping seed.');
+    log_('seedResourcesData', 'Resources sheet already has ' + existingRows + ' entries. Skipping seed.');
     return;
   }
 
@@ -2197,7 +2197,7 @@ function seedResourcesData() {
   sheet.getRange(existingRows + 2, 1, additionalResources.length, headers.length)
     .setValues(additionalResources);
 
-  Logger.log('Seeded ' + additionalResources.length + ' additional resources (total: ' + (existingRows + additionalResources.length) + ')');
+  log_('seedResourcesData', 'Seeded ' + additionalResources.length + ' additional resources (total: ' + (existingRows + additionalResources.length) + ')');
 }
 
 // ============================================================================
@@ -2218,7 +2218,7 @@ function seedNotificationsData() {
       sheet = createNotificationsSheet(ss);
     }
     if (!sheet) {
-      Logger.log('Notifications sheet not found. Skipping notification seed.');
+      log_('seedNotificationsData', 'Notifications sheet not found. Skipping notification seed.');
       return;
     }
   }
@@ -2226,7 +2226,7 @@ function seedNotificationsData() {
   // Check existing data
   var existingRows = sheet.getLastRow() - 1;
   if (existingRows >= 6) {
-    Logger.log('Notifications sheet already has ' + existingRows + ' entries. Skipping seed.');
+    log_('seedNotificationsData', 'Notifications sheet already has ' + existingRows + ' entries. Skipping seed.');
     return;
   }
 
@@ -2251,7 +2251,7 @@ function seedNotificationsData() {
       'Contract Negotiations Update',
       'The bargaining committee met with management on ' + fmt(threeDaysAgo) + '. Key topics discussed: wage increases, telecommuting policy, and caseload limits. A full update will be shared at the next general membership meeting. Your support matters — please attend.',
       'Normal',
-      'bargaining@yourlocal.org',
+      'bargaining@seiu509.org',
       'Bargaining Committee',
       fmt(threeDaysAgo),
       fmt(inOneMonth),
@@ -2266,7 +2266,7 @@ function seedNotificationsData() {
       'Workload Survey Due This Friday',
       'Please submit your weekly workload tracker by end of day Friday. Your data helps the union build the case for adequate staffing. Submissions are anonymous and take less than 2 minutes.',
       'Urgent',
-      'workload@yourlocal.org',
+      'workload@seiu509.org',
       'Workload Committee',
       today,
       fmt(inOneWeek),
@@ -2281,7 +2281,7 @@ function seedNotificationsData() {
       'New Know Your Rights Resources Available',
       'We have added new educational resources to the Learn tab including FMLA rights, ADA accommodations, anti-retaliation protections, and caseload standards. Check them out and know your rights!',
       'Normal',
-      'education@yourlocal.org',
+      'education@seiu509.org',
       'Education Committee',
       today,
       fmt(inOneMonth),
@@ -2296,7 +2296,7 @@ function seedNotificationsData() {
       'Steward Office Hours This Week',
       'Your stewards will be available for drop-in office hours this week: Tuesday 12-1pm and Thursday 3-4pm in the break room. No appointment needed. Bring your questions about the contract, grievances, or any workplace concerns.',
       'Normal',
-      'stewards@yourlocal.org',
+      'stewards@seiu509.org',
       'Steward Team',
       today,
       fmt(inTwoWeeks),
@@ -2310,7 +2310,7 @@ function seedNotificationsData() {
   sheet.getRange(existingRows + 2, 1, notifications.length, headers.length)
     .setValues(notifications);
 
-  Logger.log('Seeded ' + notifications.length + ' notifications (total: ' + (existingRows + notifications.length) + ')');
+  log_('fmt', 'Seeded ' + notifications.length + ' notifications (total: ' + (existingRows + notifications.length) + ')');
 }
 
 // ============================================================================
@@ -2327,13 +2327,13 @@ function seedWorkloadData() {
   var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
 
   if (!vault) {
-    Logger.log('Workload Vault sheet not found. Skipping workload seed.');
+    log_('seedWorkloadData', 'Workload Vault sheet not found. Skipping workload seed.');
     return;
   }
 
   // Check existing data
   if (vault.getLastRow() > 1) {
-    Logger.log('Workload Vault already has data. Skipping seed.');
+    log_('seedWorkloadData', 'Workload Vault already has data. Skipping seed.');
     return;
   }
 
@@ -2367,7 +2367,7 @@ function seedWorkloadData() {
     var timestamp = new Date(now.getTime() - daysAgo * 86400000);
     var email = emails[Math.floor(Math.random() * emails.length)];
 
-    // Realistic caseload numbers for social workers
+    // Realistic caseload numbers
     var priorityCases = Math.floor(Math.random() * 8) + 1;
     var pendingCases = Math.floor(Math.random() * 15) + 5;
     var unreadDocs = Math.floor(Math.random() * 20);
@@ -2438,7 +2438,7 @@ function seedWorkloadData() {
     try { WorkloadService.refreshLedger(); } catch (_e) { /* ok */ }
   }
 
-  Logger.log('Seeded ' + rows.length + ' workload submissions');
+  log_('seedWorkloadData', 'Seeded ' + rows.length + ' workload submissions');
 }
 
 // ============================================================================
@@ -2459,7 +2459,7 @@ function seedStewardTasksData() {
   }
 
   if (sheet.getLastRow() > 1) {
-    Logger.log('Steward Tasks already has data. Skipping seed.');
+    log_('seedStewardTasksData', 'Steward Tasks already has data. Skipping seed.');
     return;
   }
 
@@ -2480,7 +2480,7 @@ function seedStewardTasksData() {
   ];
 
   sheet.getRange(2, 1, tasks.length, 12).setValues(tasks);
-  Logger.log('Seeded ' + tasks.length + ' steward tasks');
+  log_('seedStewardTasksData', 'Seeded ' + tasks.length + ' steward tasks');
 }
 
 // ============================================================================
@@ -2494,7 +2494,7 @@ function seedMinutesData() {
   var sheet = getOrCreateMinutesSheet();
 
   if (sheet.getLastRow() > 1) {
-    Logger.log('Meeting Minutes already has data. Skipping seed.');
+    log_('seedMinutesData', 'Meeting Minutes already has data. Skipping seed.');
     return;
   }
 
@@ -2523,7 +2523,7 @@ function seedMinutesData() {
   ];
 
   sheet.getRange(2, 1, minutes.length, 7).setValues(minutes);
-  Logger.log('Seeded ' + minutes.length + ' meeting minutes');
+  log_('seedMinutesData', 'Seeded ' + minutes.length + ' meeting minutes');
 }
 
 // ============================================================================
@@ -2538,12 +2538,12 @@ function seedMeetingCheckinData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
   if (!sheet) {
-    Logger.log('Meeting Check-In Log sheet not found. Skipping seed.');
+    log_('seedMeetingCheckinData', 'Meeting Check-In Log sheet not found. Skipping seed.');
     return;
   }
 
   if (sheet.getLastRow() > 1) {
-    Logger.log('Meeting Check-In Log already has data. Skipping seed.');
+    log_('seedMeetingCheckinData', 'Meeting Check-In Log already has data. Skipping seed.');
     return;
   }
 
@@ -2564,7 +2564,7 @@ function seedMeetingCheckinData() {
   } catch (_e) { /* headless */ }
 
   if (emails.length === 0) {
-    Logger.log('No members found for meeting check-in seed.');
+    log_('seedMeetingCheckinData', 'No members found for meeting check-in seed.');
     return;
   }
 
@@ -2601,22 +2601,22 @@ function seedMeetingCheckinData() {
   function buildCheckinRow(id, meetingName, meetingDate, meetingType, memberId, memberName, checkinTime, email, meetingTime, duration, status, notify, calEventId, notesUrl, agendaUrl, agendaStewards) {
     var row = [];
     for (var ci = 0; ci < 16; ci++) { row.push(''); }
-    row[MEETING_CHECKIN_COLS.MEETING_ID - 1] = id;
-    row[MEETING_CHECKIN_COLS.MEETING_NAME - 1] = meetingName;
-    row[MEETING_CHECKIN_COLS.MEETING_DATE - 1] = meetingDate;
-    row[MEETING_CHECKIN_COLS.MEETING_TYPE - 1] = meetingType;
-    row[MEETING_CHECKIN_COLS.MEMBER_ID - 1] = memberId || '';
-    row[MEETING_CHECKIN_COLS.MEMBER_NAME - 1] = memberName || '';
-    row[MEETING_CHECKIN_COLS.CHECKIN_TIME - 1] = checkinTime || '';
-    row[MEETING_CHECKIN_COLS.EMAIL - 1] = email || '';
-    row[MEETING_CHECKIN_COLS.MEETING_TIME - 1] = meetingTime || '';
-    row[MEETING_CHECKIN_COLS.MEETING_DURATION - 1] = duration || '';
-    row[MEETING_CHECKIN_COLS.EVENT_STATUS - 1] = status || '';
-    row[MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] = notify || '';
-    row[MEETING_CHECKIN_COLS.CALENDAR_EVENT_ID - 1] = calEventId || '';
-    row[MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] = notesUrl || '';
-    row[MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] = agendaUrl || '';
-    row[MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] = agendaStewards || '';
+    setCol_(row, MEETING_CHECKIN_COLS.MEETING_ID, id);
+    setCol_(row, MEETING_CHECKIN_COLS.MEETING_NAME, meetingName);
+    setCol_(row, MEETING_CHECKIN_COLS.MEETING_DATE, meetingDate);
+    setCol_(row, MEETING_CHECKIN_COLS.MEETING_TYPE, meetingType);
+    setCol_(row, MEETING_CHECKIN_COLS.MEMBER_ID, memberId || '');
+    setCol_(row, MEETING_CHECKIN_COLS.MEMBER_NAME, memberName || '');
+    setCol_(row, MEETING_CHECKIN_COLS.CHECKIN_TIME, checkinTime || '');
+    setCol_(row, MEETING_CHECKIN_COLS.EMAIL, email || '');
+    setCol_(row, MEETING_CHECKIN_COLS.MEETING_TIME, meetingTime || '');
+    setCol_(row, MEETING_CHECKIN_COLS.MEETING_DURATION, duration || '');
+    setCol_(row, MEETING_CHECKIN_COLS.EVENT_STATUS, status || '');
+    setCol_(row, MEETING_CHECKIN_COLS.NOTIFY_STEWARDS, notify || '');
+    setCol_(row, MEETING_CHECKIN_COLS.CALENDAR_EVENT_ID, calEventId || '');
+    setCol_(row, MEETING_CHECKIN_COLS.NOTES_DOC_URL, notesUrl || '');
+    setCol_(row, MEETING_CHECKIN_COLS.AGENDA_DOC_URL, agendaUrl || '');
+    setCol_(row, MEETING_CHECKIN_COLS.AGENDA_STEWARDS, agendaStewards || '');
     return row;
   }
 
@@ -2663,7 +2663,7 @@ function seedMeetingCheckinData() {
   ));
 
   sheet.getRange(2, 1, rows.length, 16).setValues(rows);
-  Logger.log('Seeded ' + rows.length + ' meeting check-in records (including 2 active today)');
+  log_('buildCheckinRow', 'Seeded ' + rows.length + ' meeting check-in records (including 2 active today)');
 }
 
 // ============================================================================
@@ -2682,13 +2682,13 @@ function seedTimelineData() {
     }
     sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet) {
-      Logger.log('Timeline Events sheet not found. Skipping seed.');
+      log_('seedTimelineData', 'Timeline Events sheet not found. Skipping seed.');
       return;
     }
   }
 
   if (sheet.getLastRow() > 1) {
-    Logger.log('Timeline Events already has data. Skipping seed.');
+    log_('seedTimelineData', 'Timeline Events already has data. Skipping seed.');
     return;
   }
 
@@ -2731,7 +2731,7 @@ function seedTimelineData() {
   ];
 
   sheet.getRange(2, 1, events.length, 12).setValues(events);
-  Logger.log('Seeded ' + events.length + ' timeline events');
+  log_('seedTimelineData', 'Seeded ' + events.length + ' timeline events');
 }
 
 // ============================================================================
@@ -2755,12 +2755,12 @@ function seedQAForumData() {
   var answerSheet = ss.getSheetByName(SHEETS.QA_ANSWERS);
 
   if (!forumSheet || !answerSheet) {
-    Logger.log('QA Forum sheets not found. Skipping seed.');
+    log_('seedQAForumData', 'QA Forum sheets not found. Skipping seed.');
     return;
   }
 
   if (forumSheet.getLastRow() > 1) {
-    Logger.log('QA Forum already has data. Skipping seed.');
+    log_('seedQAForumData', 'QA Forum already has data. Skipping seed.');
     return;
   }
 
@@ -2774,11 +2774,11 @@ function seedQAForumData() {
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberData = memberSheet.getDataRange().getValues();
     for (var m = 1; m < memberData.length && memberEmails.length < 30; m++) {
-      var mEmail = String(memberData[m][MEMBER_COLS.EMAIL - 1] || '').trim();
-      var mFirst = String(memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '');
-      var mLast = String(memberData[m][MEMBER_COLS.LAST_NAME - 1] || '');
+      var mEmail = String(col_(memberData[m], MEMBER_COLS.EMAIL) || '').trim();
+      var mFirst = String(col_(memberData[m], MEMBER_COLS.FIRST_NAME) || '');
+      var mLast = String(col_(memberData[m], MEMBER_COLS.LAST_NAME) || '');
       var mName = (mFirst + ' ' + mLast).trim();
-      var isSteward = String(memberData[m][MEMBER_COLS.IS_STEWARD - 1] || '').toLowerCase() === 'yes';
+      var isSteward = String(col_(memberData[m], MEMBER_COLS.IS_STEWARD) || '').toLowerCase() === 'yes';
       if (mEmail) {
         memberEmails.push(mEmail);
         memberNames.push(mName);
@@ -2940,7 +2940,7 @@ function seedQAForumData() {
     answerSheet.getRange(2, 1, answerRows.length, 8).setValues(answerRows);
   }
 
-  Logger.log('Seeded ' + questionRows.length + ' questions and ' + answerRows.length + ' answers in QA Forum');
+  log_('seedQAForumData', 'Seeded ' + questionRows.length + ' questions and ' + answerRows.length + ' answers in QA Forum');
 }
 // ============================================================================
 // SEED: MEMBER TASKS
@@ -2972,7 +2972,7 @@ function seedMemberTasksData() {
     var existing = sheet.getRange(2, 11, sheet.getLastRow() - 1, 1).getValues();
     for (var c = 0; c < existing.length; c++) {
       if (String(existing[c][0]).toLowerCase().trim() === 'member') {
-        Logger.log('Member tasks already exist. Skipping seed.');
+        log_('seedMemberTasksData', 'Member tasks already exist. Skipping seed.');
         return;
       }
     }
@@ -3007,7 +3007,7 @@ function seedMemberTasksData() {
   ];
 
   sheet.getRange(sheet.getLastRow() + 1, 1, tasks.length, 12).setValues(tasks);
-  Logger.log('Seeded ' + tasks.length + ' member tasks');
+  log_('seedMemberTasksData', 'Seeded ' + tasks.length + ' member tasks');
 }
 
 // ============================================================================
@@ -3032,14 +3032,14 @@ function seedCaseChecklistData() {
   }
 
   if (sheet.getLastRow() > 1) {
-    Logger.log('Case Checklist already has data. Skipping seed.');
+    log_('seedCaseChecklistData', 'Case Checklist already has data. Skipping seed.');
     return;
   }
 
   // Get a few seeded grievance IDs and their types from Grievance Log
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) {
-    Logger.log('No grievances to link checklists to. Skipping seed.');
+    log_('seedCaseChecklistData', 'No grievances to link checklists to. Skipping seed.');
     return;
   }
 
@@ -3061,7 +3061,7 @@ function seedCaseChecklistData() {
   }
 
   if (targets.length === 0) {
-    Logger.log('No valid grievance IDs found. Skipping checklist seed.');
+    log_('seedCaseChecklistData', 'No valid grievance IDs found. Skipping checklist seed.');
     return;
   }
 
@@ -3117,7 +3117,7 @@ function seedCaseChecklistData() {
   }
 
   sheet.getRange(2, 1, rows.length, 12).setValues(rows);
-  Logger.log('Seeded ' + rows.length + ' checklist items for ' + targets.length + ' cases');
+  log_('seedCaseChecklistData', 'Seeded ' + rows.length + ' checklist items for ' + targets.length + ' cases');
 }
 
 // ============================================================================
@@ -3131,9 +3131,9 @@ function seedCaseChecklistData() {
 function seedSurveyQuestionsData() {
   if (typeof createSurveyQuestionsSheet === 'function') {
     createSurveyQuestionsSheet();
-    Logger.log('Survey Questions sheet seeded via createSurveyQuestionsSheet()');
+    log_('seedSurveyQuestionsData', 'Survey Questions sheet seeded via createSurveyQuestionsSheet()');
   } else {
-    Logger.log('createSurveyQuestionsSheet not available. Skipping.');
+    log_('seedSurveyQuestionsData', 'createSurveyQuestionsSheet not available. Skipping.');
   }
 }
 
@@ -3164,7 +3164,7 @@ function NUKE_SEEDED_DATA() {
       PropertiesService.getScriptProperties().setProperty('PRE_NUKE_SNAPSHOT', JSON.stringify(preNukeBackup));
     }
   } catch (_backupErr) {
-    Logger.log('Pre-nuke backup skipped: ' + _backupErr.message);
+    log_('Pre-nuke backup skipped', _backupErr.message);
   }
 
   // Check if already disabled
@@ -3343,9 +3343,9 @@ function NUKE_SEEDED_DATA() {
         var lastDataRow = satisfactionSheet.getLastRow();
         satisfactionSheet.getRange(2, 1, lastDataRow - 1, 68).clearContent();
         surveyCleared = true;
-        Logger.log('Survey response data cleared from Member Satisfaction');
+        log_('NUKE_SEEDED_DATA', 'Survey response data cleared from Member Satisfaction');
       } catch (e) {
-        Logger.log('Could not clear survey data: ' + e.message);
+        log_('Could not clear survey data', e.message);
       }
     }
 
@@ -3356,9 +3356,9 @@ function NUKE_SEEDED_DATA() {
       try {
         ss.deleteSheet(feedbackToDelete);
         feedbackDeleted = true;
-        Logger.log('Feedback & Development sheet deleted');
+        log_('NUKE_SEEDED_DATA', 'Feedback & Development sheet deleted');
       } catch (e) {
-        Logger.log('Could not delete Feedback sheet: ' + e.message);
+        log_('Could not delete Feedback sheet', e.message);
       }
     }
 
@@ -3369,9 +3369,9 @@ function NUKE_SEEDED_DATA() {
       try {
         ss.deleteSheet(functionChecklistToDelete);
         functionChecklistDeleted = true;
-        Logger.log('Function Checklist sheet deleted');
+        log_('NUKE_SEEDED_DATA', 'Function Checklist sheet deleted');
       } catch (e) {
-        Logger.log('Could not delete Function Checklist sheet: ' + e.message);
+        log_('Could not delete Function Checklist sheet', e.message);
       }
     }
 
@@ -3382,9 +3382,9 @@ function NUKE_SEEDED_DATA() {
       try {
         ss.deleteSheet(auditLogToDelete);
         auditLogDeleted = true;
-        Logger.log('_Audit_Log sheet deleted');
+        log_('NUKE_SEEDED_DATA', '_Audit_Log sheet deleted');
       } catch (e) {
-        Logger.log('Could not delete _Audit_Log sheet: ' + e.message);
+        log_('Could not delete _Audit_Log sheet', e.message);
       }
     }
 
@@ -3402,7 +3402,7 @@ function NUKE_SEEDED_DATA() {
           } catch (_e) { /* event may already be deleted */ }
         });
       }
-    } catch (e) { Logger.log('Calendar cleanup error: ' + e.message); }
+    } catch (e) { log_('Calendar cleanup error', e.message); }
 
     // Clear weekly questions data
     var weeklyCleared = false;
@@ -3412,7 +3412,7 @@ function NUKE_SEEDED_DATA() {
         try {
           wSheet.getRange(2, 1, wSheet.getLastRow() - 1, wSheet.getLastColumn()).clearContent();
           weeklyCleared = true;
-        } catch (e) { Logger.log('Could not clear ' + name + ': ' + e.message); }
+        } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear ' + name + ': ' + e.message); }
       }
     });
 
@@ -3424,7 +3424,7 @@ function NUKE_SEEDED_DATA() {
         var resLastRow = resourcesSheet.getLastRow();
         resourcesSheet.getRange(2, 1, resLastRow - 1, resourcesSheet.getLastColumn()).clearContent();
         resourcesCleared = true;
-      } catch (e) { Logger.log('Could not clear Resources: ' + e.message); }
+      } catch (e) { log_('Could not clear Resources', e.message); }
     }
 
     // Clear notifications data
@@ -3435,7 +3435,7 @@ function NUKE_SEEDED_DATA() {
         var notifLastRow = notifSheet.getLastRow();
         notifSheet.getRange(2, 1, notifLastRow - 1, notifSheet.getLastColumn()).clearContent();
         notificationsCleared = true;
-      } catch (e) { Logger.log('Could not clear Notifications: ' + e.message); }
+      } catch (e) { log_('Could not clear Notifications', e.message); }
     }
 
     // Clear workload vault data
@@ -3446,7 +3446,7 @@ function NUKE_SEEDED_DATA() {
         var wlLastRow = workloadVault.getLastRow();
         workloadVault.getRange(2, 1, wlLastRow - 1, workloadVault.getLastColumn()).clearContent();
         workloadCleared = true;
-      } catch (e) { Logger.log('Could not clear Workload Vault: ' + e.message); }
+      } catch (e) { log_('Could not clear Workload Vault', e.message); }
     }
 
     // Clear seeded member tasks (rows with MT_SEED_ prefix) from _Steward_Tasks
@@ -3461,7 +3461,7 @@ function NUKE_SEEDED_DATA() {
             memberTasksCleared = true;
           }
         }
-      } catch (e) { Logger.log('Could not clear member tasks: ' + e.message); }
+      } catch (e) { log_('Could not clear member tasks', e.message); }
     }
 
     // Clear seeded case checklist items (rows with CL-SEED- prefix)
@@ -3476,7 +3476,7 @@ function NUKE_SEEDED_DATA() {
             checklistCleared = true;
           }
         }
-      } catch (e) { Logger.log('Could not clear case checklist: ' + e.message); }
+      } catch (e) { log_('Could not clear case checklist', e.message); }
     }
 
     // Clear tracked IDs from Script Properties
@@ -3512,7 +3512,7 @@ function NUKE_SEEDED_DATA() {
       ui.ButtonSet.OK);
 
   } catch (error) {
-    Logger.log('Error in NUKE_SEEDED_DATA: ' + error.message);
+    log_('Error in NUKE_SEEDED_DATA', error.message);
     ui.alert('❌ Error', 'Nuke failed: ' + error.message, ui.ButtonSet.OK);
   }
 }
@@ -3957,10 +3957,10 @@ function showValidationReport(issues, total) {
   var rate = total > 0 ? (((total - issues.length) / total) * 100).toFixed(1) : 100;
   var rows = issues.slice(0, 50).map(function(i) { return '<tr><td>' + escapeHtml(i.row) + '</td><td>' + escapeHtml(i.field) + '</td><td>' + escapeHtml(i.value) + '</td><td>' + escapeHtml(i.message) + '</td></tr>'; }).join('');
   if (issues.length > 50) rows += '<tr><td colspan="4">...and ' + (issues.length - 50) + ' more</td></tr>';
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px}h2{color:#1a73e8}.summary{display:flex;gap:20px;margin:20px 0}.stat{flex:1;padding:20px;border-radius:8px;text-align:center}.stat.good{background:#e8f5e9}.stat.warning{background:#fff3e0}.stat.bad{background:#ffebee}.num{font-size:32px;font-weight:bold}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:10px;text-align:left;border:1px solid #ddd}th{background:#f5f5f5}</style></head><body><h2>📊 Validation Report</h2><div class="summary"><div class="stat ' + (issues.length === 0 ? 'good' : issues.length < 10 ? 'warning' : 'bad') + '"><div class="num">' + rate + '%</div><div>Pass Rate</div></div><div class="stat good"><div class="num">' + total + '</div><div>Records</div></div><div class="stat ' + (issues.length === 0 ? 'good' : 'bad') + '"><div class="num">' + issues.length + '</div><div>Issues</div></div></div>' + (issues.length > 0 ? '<table><tr><th>Row</th><th>Field</th><th>Value</th><th>Issue</th></tr>' + rows + '</table>' : '<div style="text-align:center;padding:40px;color:#4caf50">✅ No issues found!</div>') + '</body></html>'
-  ).setWidth(700).setHeight(500);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Validation Report');
+  showDialog_(
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px}h2{color:#1a73e8}.summary{display:flex;gap:20px;margin:20px 0}.stat{flex:1;padding:20px;border-radius:8px;text-align:center}.stat.good{background:#e8f5e9}.stat.warning{background:#fff3e0}.stat.bad{background:#ffebee}.num{font-size:32px;font-weight:bold}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:10px;text-align:left;border:1px solid #ddd}th{background:#f5f5f5}</style></head><body><h2>📊 Validation Report</h2><div class="summary"><div class="stat ' + (issues.length === 0 ? 'good' : issues.length < 10 ? 'warning' : 'bad') + '"><div class="num">' + rate + '%</div><div>Pass Rate</div></div><div class="stat good"><div class="num">' + total + '</div><div>Records</div></div><div class="stat ' + (issues.length === 0 ? 'good' : 'bad') + '"><div class="num">' + issues.length + '</div><div>Issues</div></div></div>' + (issues.length > 0 ? '<table><tr><th>Row</th><th>Field</th><th>Value</th><th>Issue</th></tr>' + rows + '</table>' : '<div style="text-align:center;padding:40px;color:#4caf50">✅ No issues found!</div>') + '</body></html>',
+    'Validation Report', 700, 500
+  );
 }
 
 /**
@@ -3968,10 +3968,10 @@ function showValidationReport(issues, total) {
  * @returns {void}
  */
 function showValidationSettings() {
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px}h2{color:#1a73e8}.setting{margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;display:flex;justify-content:space-between;align-items:center}.title{font-weight:bold}.desc{color:#666;font-size:13px}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;width:100%;margin-top:20px}</style></head><body><h2>⚙️ Validation Settings</h2><div class="setting"><div><div class="title">Email Validation</div><div class="desc">Validate format as you type</div></div><span>✅</span></div><div class="setting"><div><div class="title">Phone Auto-format</div><div class="desc">Format to (XXX) XXX-XXXX</div></div><span>✅</span></div><div class="setting"><div><div class="title">Duplicate Detection</div><div class="desc">Warn on duplicate IDs</div></div><span>✅</span></div><button onclick="google.script.run.runBulkValidation();google.script.host.close()">🔍 Run Bulk Validation</button></body></html>'
-  ).setWidth(450).setHeight(400);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Validation Settings');
+  showDialog_(
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px}h2{color:#1a73e8}.setting{margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;display:flex;justify-content:space-between;align-items:center}.title{font-weight:bold}.desc{color:#666;font-size:13px}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;width:100%;margin-top:20px}</style></head><body><h2>⚙️ Validation Settings</h2><div class="setting"><div><div class="title">Email Validation</div><div class="desc">Validate format as you type</div></div><span>✅</span></div><div class="setting"><div><div class="title">Phone Auto-format</div><div class="desc">Format to (XXX) XXX-XXXX</div></div><span>✅</span></div><div class="setting"><div><div class="title">Duplicate Detection</div><div class="desc">Warn on duplicate IDs</div></div><span>✅</span></div><button onclick="google.script.run.runBulkValidation();google.script.host.close()">🔍 Run Bulk Validation</button></body></html>',
+    'Validation Settings', 450, 400
+  );
 }
 
 /**
@@ -4028,7 +4028,7 @@ function onEditValidation(e) {
       else { e.range.clearNote(); e.range.setBackground(null); if (r.formatted !== val) e.range.setValue(r.formatted); }
     }
   }
-  } catch (err) { Logger.log('onEditValidation error: ' + (err.message || err)); }
+  } catch (err) { log_('onEditValidation error', (err.message || err)); }
 }
 
 /**

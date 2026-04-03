@@ -64,7 +64,7 @@ var Auth = (function () {
       if (ssoUser && ssoUser !== '') {
         return { email: ssoUser.toLowerCase(), method: 'sso' };
       }
-    } catch (_err) { Logger.log('_err: ' + (_err.message || _err)); }
+    } catch (_err) { log_('_err', (_err.message || _err)); }
 
     // 3. Check magic link token in URL
     if (params.token) {
@@ -113,10 +113,10 @@ var Auth = (function () {
 
     // Validate email exists in directory
     step = 'lookup';
-    Logger.log('Auth.sendMagicLink STEP 0: looking up ' + email + ' in Member Directory');
+    log_('Auth.sendMagicLink STEP 0', 'looking up ' + email + ' in Member Directory');
     var userRecord = DataService.findUserByEmail(email);
     if (!userRecord) {
-      Logger.log('Auth.sendMagicLink: email not found in directory — returning generic message');
+      log_('Auth.sendMagicLink', 'email not found in directory — returning generic message');
       // Don't reveal whether email exists — security best practice
       // Simulate processing time to prevent timing-based enumeration
       Utilities.sleep(500 + Math.floor(Math.random() * 500));
@@ -124,7 +124,7 @@ var Auth = (function () {
     }
 
     step = 'config';
-    Logger.log('Auth.sendMagicLink STEP 1: user found, building token for ' + email);
+    log_('Auth.sendMagicLink STEP 1', 'user found, building token for ' + email);
     // ConfigReader.getConfig() can throw if its CacheService cache expired and
     // getActiveSpreadsheet() returns null in certain web app execution contexts.
     // Magic link emails only need a few config fields — fall back to safe defaults
@@ -133,9 +133,9 @@ var Auth = (function () {
     try {
       config = ConfigReader.getConfig();
     } catch (cfgErr) {
-      Logger.log('Auth.sendMagicLink: ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
+      log_('Auth.sendMagicLink', 'ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
       config = {
-        orgName: 'SB',
+        orgName: 'DDS',
         logoInitials: '',
         accentHue: 250,
         magicLinkExpiryMs: 7 * 24 * 60 * 60 * 1000,
@@ -144,14 +144,14 @@ var Auth = (function () {
     }
 
     step = 'token';
-    Logger.log('Auth.sendMagicLink STEP 2: config loaded, orgName=' + config.orgName);
+    log_('Auth.sendMagicLink STEP 2', 'config loaded, orgName=' + config.orgName);
     var token = _generateMagicToken(email, config);
 
     step = 'url';
-    Logger.log('Auth.sendMagicLink STEP 3: token generated, fetching web app URL');
+    log_('Auth.sendMagicLink STEP 3', 'token generated, fetching web app URL');
     var webAppUrl = ScriptApp.getService().getUrl();
     if (!webAppUrl) {
-      Logger.log('Auth.sendMagicLink ERROR: ScriptApp.getService().getUrl() returned null — is this script deployed as a web app?');
+      log_('Auth.sendMagicLink ERROR', 'ScriptApp.getService().getUrl() returned null — is this script deployed as a web app?');
       return { success: false, message: 'Web app URL could not be resolved. Please contact your administrator.' };
     }
 
@@ -167,11 +167,11 @@ var Auth = (function () {
     var htmlBody = _buildEmailHtml(config, signInUrl, email);
 
     step = 'send';
-    Logger.log('Auth.sendMagicLink STEP 4: attempting email send to ' + email);
+    log_('Auth.sendMagicLink STEP 4', 'attempting email send to ' + email);
 
     return _sendMagicLinkEmail(email, subject, htmlBody, config.orgName);
     } catch (outerErr) {
-      Logger.log('Auth.sendMagicLink OUTER ERROR at step [' + step + ']: ' + outerErr.message + '\n' + (outerErr.stack || ''));
+      log_('sendMagicLink', 'Auth.sendMagicLink OUTER ERROR at step [' + step + ']: ' + outerErr.message + '\n' + (outerErr.stack || ''));
 
       // Provide actionable error messages based on which step failed
       var outerMsg = 'Failed to send email. ';
@@ -223,14 +223,14 @@ var Auth = (function () {
         }
       }
     } catch (_evictErr) {
-      Logger.log('Auto token eviction failed: ' + _evictErr.message);
+      log_('Auto token eviction failed', _evictErr.message);
     }
 
     var config;
     try {
       config = ConfigReader.getConfig();
     } catch (_cfgErr) {
-      Logger.log('Auth.createSessionToken: ConfigReader failed (' + _cfgErr.message + ') — using default cookie duration');
+      log_('Auth.createSessionToken', 'ConfigReader failed (' + _cfgErr.message + ') — using default cookie duration');
       config = { cookieDurationMs: 30 * 24 * 60 * 60 * 1000 }; // 30 days default
     }
     var token = _generateToken();
@@ -246,7 +246,7 @@ var Auth = (function () {
       if (authMethod) sessionObj.authMethod = authMethod;
       props.setProperty(SESSION_PREFIX + token, JSON.stringify(sessionObj));
     } catch (propErr) {
-      Logger.log('Auth.createSessionToken: PropertiesService write failed (' + propErr.message + ')');
+      log_('Auth.createSessionToken', 'PropertiesService write failed (' + propErr.message + ')');
       // C3: Return error instead of a token that doesn't exist server-side
       return { error: 'session_storage_failed', message: 'Could not persist session. Please try again.' };
     }
@@ -266,7 +266,7 @@ var Auth = (function () {
 
     // Verify deletion — a surviving session token is a security risk
     if (props.getProperty(key) !== null) {
-      Logger.log('SECURITY WARNING: session token ' + key.substring(0, 12) + '... was not deleted — forcing overwrite');
+      log_('SECURITY WARNING', 'session token ' + key.substring(0, 12) + '... was not deleted — forcing overwrite');
       try { props.setProperty(key, '{"invalidated":true}'); } catch (_) {}
     }
   }
@@ -297,14 +297,14 @@ var Auth = (function () {
       }
     }
 
-    Logger.log('Auth: Cleaned up ' + cleaned + ' expired tokens.');
+    log_('Auth', 'Cleaned up ' + cleaned + ' expired tokens.');
 
     // Fix 2.9: Monitor PropertiesService quota (500KB limit)
     // Reuse the already-loaded snapshot when no deletions occurred (avoids double getProperties call)
     var sizeSource = cleaned > 0 ? props.getProperties() : all;
     var totalSize = JSON.stringify(sizeSource).length;
     if (totalSize > 400000) {
-      Logger.log('WARNING: ScriptProperties usage at ' + Math.round(totalSize / 1024) + 'KB / 500KB');
+      log_('WARNING', 'ScriptProperties usage at ' + Math.round(totalSize / 1024) + 'KB / 500KB');
       // M9: Escalate via recordSecurityEvent so admins get notified
       if (typeof recordSecurityEvent === 'function') {
         recordSecurityEvent('QUOTA_WARNING', 'HIGH', 'ScriptProperties at ' + Math.round(totalSize / 1024) + 'KB / 500KB', { totalSize: totalSize });
@@ -344,10 +344,10 @@ var Auth = (function () {
         name: (orgName || 'Dashboard') + ' Dashboard',
         noReply: false,
       });
-      Logger.log('Auth._sendMagicLinkEmail: GmailApp send succeeded');
+      log_('Auth._sendMagicLinkEmail', 'GmailApp send succeeded');
       return { success: true, message: 'Sign-in link sent to ' + email };
     } catch (gmailErr) {
-      Logger.log('Auth._sendMagicLinkEmail GmailApp FAILED: ' + gmailErr.message + ' — trying MailApp fallback');
+      log_('Auth._sendMagicLinkEmail GmailApp FAILED', gmailErr.message + ' — trying MailApp fallback');
       sendError = gmailErr;
     }
 
@@ -357,7 +357,7 @@ var Auth = (function () {
       var remaining = 0;
       try { remaining = MailApp.getRemainingDailyQuota(); } catch (_q) { remaining = 1; }
       if (remaining <= 0) {
-        Logger.log('Auth._sendMagicLinkEmail: MailApp quota exhausted');
+        log_('Auth._sendMagicLinkEmail', 'MailApp quota exhausted');
         return { success: false, message: 'Email quota reached for today. Please use Google Sign-In or try again tomorrow.' };
       }
 
@@ -367,10 +367,10 @@ var Auth = (function () {
         htmlBody: htmlBody,
         noReply: true,
       });
-      Logger.log('Auth._sendMagicLinkEmail: MailApp fallback send succeeded');
+      log_('Auth._sendMagicLinkEmail', 'MailApp fallback send succeeded');
       return { success: true, message: 'Sign-in link sent to ' + email };
     } catch (mailErr) {
-      Logger.log('Auth._sendMagicLinkEmail BOTH senders FAILED. GmailApp: ' + sendError.message + ' | MailApp: ' + mailErr.message);
+      log_('Auth._sendMagicLinkEmail BOTH senders FAILED. GmailApp', sendError.message + ' | MailApp: ' + mailErr.message);
 
       var msg = 'Failed to send sign-in link. ';
       var combinedMsg = (sendError.message || '') + ' ' + (mailErr.message || '');
@@ -425,8 +425,10 @@ var Auth = (function () {
       }
 
       // C1+C4: Immediately delete token after successful validation.
-      // Eliminates TOCTOU race (two concurrent requests validating same token)
-      // and prevents token accumulation in PropertiesService quota.
+      // KNOWN LIMITATION: PropertiesService get+delete is not atomic.
+      // Two concurrent requests could both validate the same token.
+      // Risk is minimal: magic links are single-use email tokens, window is milliseconds.
+      // LockService was considered but rejected for latency on the hot auth path.
       props.deleteProperty(TOKEN_PREFIX + token);
 
       return data.email;
@@ -562,7 +564,7 @@ var Auth = (function () {
         created: Date.now()
       }));
     } catch (err) {
-      Logger.log('Auth.registerDeviceKey: storage failed: ' + err.message);
+      log_('Auth.registerDeviceKey', 'storage failed: ' + err.message);
       return { success: false, message: 'Could not register device key.' };
     }
 
@@ -623,7 +625,7 @@ var Auth = (function () {
 
       return { success: true, sessionToken: token, email: data.email, displayName: displayName };
     } catch (err) {
-      Logger.log('Auth.loginWithDeviceKey error: ' + err.message);
+      log_('Auth.loginWithDeviceKey error', err.message);
       return { success: false, message: 'Device key validation failed.' };
     }
   }
@@ -679,7 +681,7 @@ function authCreateSessionToken() {
   var email = '';
   try {
     email = Session.getActiveUser().getEmail();
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
   if (!email) {
     return { error: 'Unable to resolve authenticated user. Please sign in again.' };
   }
@@ -738,7 +740,7 @@ function authCleanupExpiredTokens() {
  */
 function testAuthEmailSend(testEmail) {
   var to = testEmail || Session.getEffectiveUser().getEmail();
-  var subject = '[SolidBase] Magic Link Email Test';
+  var subject = '[DDS-Dashboard] Magic Link Email Test';
   var htmlBody = '<p>This is a test of the magic link email system.</p>'
     + '<p>If you received this, email sending is working correctly.</p>'
     + '<p>Sent at: ' + new Date().toISOString() + '</p>';
@@ -746,23 +748,23 @@ function testAuthEmailSend(testEmail) {
   var results = { to: to, gmail: null, mailapp: null };
 
   try {
-    GmailApp.sendEmail(to, subject + ' (GmailApp)', '', { htmlBody: htmlBody, name: 'SolidBase Test' });
+    GmailApp.sendEmail(to, subject + ' (GmailApp)', '', { htmlBody: htmlBody, name: 'DDS-Dashboard Test' });
     results.gmail = 'SUCCESS';
-    Logger.log('testAuthEmailSend: GmailApp → SUCCESS');
+    log_('testAuthEmailSend', 'GmailApp → SUCCESS');
   } catch (e) {
     results.gmail = 'FAILED: ' + e.message;
-    Logger.log('testAuthEmailSend: GmailApp → FAILED: ' + e.message);
+    log_('testAuthEmailSend', 'GmailApp → FAILED: ' + e.message);
   }
 
   try {
     MailApp.sendEmail({ to: to, subject: subject + ' (MailApp)', htmlBody: htmlBody, noReply: true });
     results.mailapp = 'SUCCESS';
-    Logger.log('testAuthEmailSend: MailApp → SUCCESS');
+    log_('testAuthEmailSend', 'MailApp → SUCCESS');
   } catch (e) {
     results.mailapp = 'FAILED: ' + e.message;
-    Logger.log('testAuthEmailSend: MailApp → FAILED: ' + e.message);
+    log_('testAuthEmailSend', 'MailApp → FAILED: ' + e.message);
   }
 
-  Logger.log('testAuthEmailSend results: ' + JSON.stringify(results));
+  log_('testAuthEmailSend results', JSON.stringify(results));
   return results;
 }

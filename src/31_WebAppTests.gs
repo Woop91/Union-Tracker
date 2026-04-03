@@ -340,7 +340,7 @@ function test_portal_noDuplicateIndices() {
       var val = set.obj[keys[k]];
       if (typeof val !== 'number') continue;
       if (seen[val]) {
-        Logger.log('Portal duplicate: ' + set.name + '.' + keys[k] + ' and ' + seen[val] + ' = ' + val);
+        log_('Portal duplicate', set.name + '.' + keys[k] + ' and ' + seen[val] + ' = ' + val);
       }
       seen[val] = keys[k];
     }
@@ -414,7 +414,7 @@ function test_weeklyq_getPoolCountCallable() {
     TestRunner.assertTrue(count >= 0, 'pool count >= 0');
   } catch (e) {
     // Sheet may not exist — that's OK
-    Logger.log('test_weeklyq_getPoolCountCallable: ' + e.message);
+    log_('test_weeklyq_getPoolCountCallable', e.message);
   }
 }
 
@@ -428,7 +428,7 @@ function test_weeklyq_getPollFrequencyCallable() {
       'frequency "' + freq + '" is valid (weekly|biweekly|monthly)');
   } catch (e) {
     // Sheet may not exist — acceptable
-    Logger.log('test_weeklyq_getPollFrequencyCallable: ' + e.message);
+    log_('test_weeklyq_getPollFrequencyCallable', e.message);
   }
 }
 
@@ -449,17 +449,15 @@ function test_weeklyq_autoSelectExists() {
 
 /* ========================================================================
  * WORKLOAD SUITE — WorkloadService module, categories, health
- * Guarded: all tests skip when WorkloadService is excluded from this edition.
  * ======================================================================== */
 
 function test_workload_moduleExists() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertNotNull(WorkloadService, 'WorkloadService module');
   TestRunner.assertType(WorkloadService, 'object', 'WorkloadService is object');
 }
 
+/** Tests workload: public API complete. */
 function test_workload_publicAPIComplete() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   var expected = [
     'initSheets', 'processFormSSO', 'getHistorySSO',
     'getDashboardDataSSO', 'getReminderSSO', 'setReminderSSO',
@@ -472,10 +470,11 @@ function test_workload_publicAPIComplete() {
   }
 }
 
+/** Tests workload: sub categories exposed. */
 function test_workload_subCategoriesExposed() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertNotNull(WorkloadService.SUB_CATEGORIES, 'SUB_CATEGORIES');
   TestRunner.assertType(WorkloadService.SUB_CATEGORIES, 'object', 'SUB_CATEGORIES is object');
+  // Verify known category keys
   var keys = ['priority', 'pending', 'unread', 'todo', 'referrals', 'ce', 'assistance', 'aged'];
   for (var i = 0; i < keys.length; i++) {
     TestRunner.assertHasKey(WorkloadService.SUB_CATEGORIES, keys[i],
@@ -485,26 +484,27 @@ function test_workload_subCategoriesExposed() {
   }
 }
 
+/** Tests workload: category labels exposed. */
 function test_workload_categoryLabelsExposed() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertNotNull(WorkloadService.CATEGORY_LABELS, 'CATEGORY_LABELS');
   TestRunner.assertType(WorkloadService.CATEGORY_LABELS, 'object', 'CATEGORY_LABELS is object');
+  // Should have t1-t8 mappings
   for (var t = 1; t <= 8; t++) {
     TestRunner.assertHasKey(WorkloadService.CATEGORY_LABELS, 't' + t,
       'CATEGORY_LABELS.t' + t);
   }
 }
 
+/** Tests workload: get sub categories callable. */
 function test_workload_getSubCategoriesCallable() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   var cats = WorkloadService.getSubCategories();
   TestRunner.assertNotNull(cats, 'getSubCategories returns value');
   TestRunner.assertType(cats, 'object', 'returns object');
   TestRunner.assertHasKey(cats, 'priority', 'has priority key');
 }
 
+/** Tests workload: global wrappers exist. */
 function test_workload_globalWrappersExist() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   var wrappers = [
     'processWorkloadFormSSO', 'getWorkloadHistorySSO', 'getWorkloadDashboardDataSSO',
     'getWorkloadReminderSSO', 'setWorkloadReminderSSO', 'exportWorkloadHistoryCSV',
@@ -516,17 +516,18 @@ function test_workload_globalWrappersExist() {
   }
 }
 
+/** Tests workload: trigger handlers exist. */
 function test_workload_triggerHandlersExist() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertEquals('function', typeof initWorkloadTrackerSheets, 'initWorkloadTrackerSheets');
   TestRunner.assertEquals('function', typeof processWorkloadReminders, 'processWorkloadReminders');
   TestRunner.assertEquals('function', typeof refreshWorkloadLedger, 'refreshWorkloadLedger');
 }
 
+/** Tests workload: wrappers reject null token. */
 function test_workload_wrappersRejectNullToken() {
-  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   try {
     var result = getWorkloadHistorySSO(null);
+    // Should return empty/null for null token
     if (Array.isArray(result)) {
       TestRunner.assertEquals(0, result.length, 'getWorkloadHistorySSO(null) returns empty array');
     }
@@ -578,7 +579,7 @@ function test_qaforum_getQuestionsReturnsArray() {
     TestRunner.assertTrue(Array.isArray(result), 'getQuestions returns array');
   } catch (e) {
     // Sheet may not exist — acceptable for new installs
-    Logger.log('test_qaforum_getQuestionsReturnsArray: ' + e.message);
+    log_('test_qaforum_getQuestionsReturnsArray', e.message);
   }
 }
 
@@ -605,7 +606,7 @@ function test_qaforum_paginationDefaults() {
       TestRunner.assertTrue(result.length <= 10, 'page size respected (max 10 results)');
     }
   } catch (e) {
-    Logger.log('test_qaforum_paginationDefaults: ' + e.message);
+    log_('test_qaforum_paginationDefaults', e.message);
   }
 }
 
@@ -651,7 +652,7 @@ function test_timeline_getEventsReturnsArray() {
     TestRunner.assertTrue(Array.isArray(result), 'getTimelineEvents returns array');
   } catch (e) {
     // Sheet may not exist
-    Logger.log('test_timeline_getEventsReturnsArray: ' + e.message);
+    log_('test_timeline_getEventsReturnsArray', e.message);
   }
 }
 
@@ -733,7 +734,7 @@ function test_failsafe_digestConfigReturnsShape() {
     TestRunner.assertType(config, 'object', 'config is object');
   } catch (e) {
     // Sheet may not exist — acceptable
-    Logger.log('test_failsafe_digestConfigReturnsShape: ' + e.message);
+    log_('test_failsafe_digestConfigReturnsShape', e.message);
   }
 }
 

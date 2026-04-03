@@ -247,14 +247,14 @@ var EngagementService = (function () {
     var results = [];
     var totalScore = 0;
     for (var i = 1; i < memberData.length; i++) {
-      var email = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+      var email = String(col_(memberData[i], MEMBER_COLS.EMAIL) || '').trim();
       if (!email) continue;
-      var dues = String(memberData[i][MEMBER_COLS.DUES_STATUS - 1] || '').trim().toLowerCase();
+      var dues = String(col_(memberData[i], MEMBER_COLS.DUES_STATUS) || '').trim().toLowerCase();
       if (dues === 'inactive') continue;
 
-      var firstName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '').trim();
-      var lastName = String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '').trim();
-      var unit = String(memberData[i][MEMBER_COLS.UNIT - 1] || '').trim();
+      var firstName = String(col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '').trim();
+      var lastName = String(col_(memberData[i], MEMBER_COLS.LAST_NAME) || '').trim();
+      var unit = String(col_(memberData[i], MEMBER_COLS.UNIT) || '').trim();
 
       var result = computeScoreForMember(email, cachedData);
       var oldScore = existingScores[email.toLowerCase().trim()] || 0;

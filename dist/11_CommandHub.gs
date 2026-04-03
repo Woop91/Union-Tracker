@@ -419,9 +419,9 @@ function addRepoLinkToFAQ_(ss) {
       'The repository includes instructions for setting up a fresh copy with sample data generation (Seed) and data reset (Nuke) features.'
     );
 
-    Logger.log('Added repo link to FAQ sheet');
+    log_('addRepoLinkToFAQ_', 'Added repo link to FAQ sheet');
   } catch (e) {
-    Logger.log('Error adding repo link to FAQ: ' + e.message);
+    log_('Error adding repo link to FAQ', e.message);
   }
 }
 
@@ -464,12 +464,12 @@ function applyTabColors_(ss) {
     if (sheet) {
       try {
         sheet.setTabColor(color);
-        Logger.log('Tab color applied to: ' + sheet.getName());
+        log_('Tab color applied to', sheet.getName());
       } catch (e) {
-        Logger.log('Tab color error for ' + sheetName + ': ' + e.message);
+        log_('applyColor', 'Tab color error for ' + sheetName + ': ' + e.message);
       }
     } else {
-      Logger.log('Sheet not found for tab color: ' + sheetName);
+      log_('Sheet not found for tab color', sheetName);
     }
   }
 
@@ -508,7 +508,7 @@ function applyTabColors_(ss) {
   applyColor(SHEETS.TEST_RESULTS, TAB_COLORS.ORANGE);
   applyColor(SHEETS.NON_MEMBER_CONTACTS, TAB_COLORS.ORANGE);
 
-  Logger.log('Tab colors applied successfully');
+  log_('applyColor', 'Tab colors applied successfully');
 }
 
 /**
@@ -552,11 +552,7 @@ function darkenColor_(color, percent) {
  * Shows quick member search dialog
  */
 function showSearchDialog() {
-  var html = HtmlService.createHtmlOutput(getSearchDialogHtml_())
-    .setWidth(500)
-    .setHeight(400);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '🔍 Member Search');
+  showDialog_(getSearchDialogHtml_(), '🔍 Member Search', 500, 400);
 }
 
 /**
@@ -715,7 +711,7 @@ function navigateToMember(memberId) {
   var data = sheet.getDataRange().getValues();
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+    if (col_(data[i], MEMBER_COLS.MEMBER_ID) === memberId) {
       sheet.activate();
       sheet.setActiveRange(sheet.getRange(i + 1, 1));
       SpreadsheetApp.getActiveSpreadsheet().toast(
@@ -896,7 +892,7 @@ function wger(fileId, options) {
     };
 
   } catch (e) {
-    Logger.log('WGER OCR error: ' + e.message);
+    log_('WGER OCR error', e.message);
     if (typeof logAuditEvent === 'function') logAuditEvent('OCR_ERROR', {
       fileId: fileId,
       error: e.message
@@ -990,7 +986,7 @@ function performCloudVisionOCR_(imageBlob, mode, options) {
     var responseText = response.getContentText();
 
     if (responseCode !== 200) {
-      Logger.log('Cloud Vision API error: ' + responseText);
+      log_('Cloud Vision API error', responseText);
       return {
         success: false,
         message: 'Cloud Vision API returned error code: ' + responseCode
@@ -1017,7 +1013,7 @@ function performCloudVisionOCR_(imageBlob, mode, options) {
     };
 
   } catch (e) {
-    Logger.log('Cloud Vision OCR error: ' + e.message);
+    log_('Cloud Vision OCR error', e.message);
     return {
       success: false,
       message: 'Cloud Vision API call failed: ' + e.message
@@ -1107,7 +1103,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     var grievanceRow = -1;
 
     for (var i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      if (col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) === grievanceId) {
         grievanceRow = i + 1;
         break;
       }
@@ -1164,7 +1160,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
         }
       } catch (e) {
         // Date parsing failed, skip
-        Logger.log('Date parsing failed for: ' + dateMatch[1] + ' - ' + e.message);
+        log_('Date parsing failed for', dateMatch[1] + ' - ' + e.message);
       }
     }
 
@@ -1314,14 +1310,14 @@ function getRecentSurveyAverage(unitName) {
     if (!vEntry || !isTruthyValue(vEntry.verified) || !isTruthyValue(vEntry.isLatest)) continue;
 
     // Check if worksite matches unit (partial match for flexibility)
-    var worksite = (row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '').toString().trim().toLowerCase();
+    var worksite = (col_(row, SATISFACTION_COLS.Q1_WORKSITE) || '').toString().trim().toLowerCase();
 
     if (worksite.indexOf(unitLower) !== -1 || unitLower.indexOf(worksite) !== -1) {
       // Compute overall satisfaction from Q6-Q9 (v4.23.0: no pre-computed AVG col)
-      var q6 = parseFloat(row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1]) || 0;
-      var q7 = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
-      var q8 = parseFloat(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]) || 0;
-      var q9 = parseFloat(row[SATISFACTION_COLS.Q9_RECOMMEND - 1]) || 0;
+      var q6 = parseFloat(col_(row, SATISFACTION_COLS.Q6_SATISFIED_REP)) || 0;
+      var q7 = parseFloat(col_(row, SATISFACTION_COLS.Q7_TRUST_UNION)) || 0;
+      var q8 = parseFloat(col_(row, SATISFACTION_COLS.Q8_FEEL_PROTECTED)) || 0;
+      var q9 = parseFloat(col_(row, SATISFACTION_COLS.Q9_RECOMMEND)) || 0;
       var count = (q6>0?1:0)+(q7>0?1:0)+(q8>0?1:0)+(q9>0?1:0);
       if (count > 0) scores.push((q6+q7+q8+q9)/count);
     }
@@ -1475,9 +1471,7 @@ function showGrievanceTrends() {
  * Uses the wger OCR function for text extraction
  */
 function showOCRDialog() {
-  var ui = SpreadsheetApp.getUi();
-
-  var html = HtmlService.createHtmlOutput(
+  showDialog_(
     '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
     '<style>' +
     '* { box-sizing: border-box; }' +
@@ -1591,12 +1585,8 @@ function showOCRDialog() {
     'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
     '  if (e.key === "Enter") runOCR();' +
     '});' +
-    '</script>'
-  )
-  .setWidth(500)
-  .setHeight(540);
-
-  ui.showModalDialog(html, '📝 WGER OCR Transcription');
+    '</script>',
+    '📝 WGER OCR Transcription', 500, 540);
 }
 
 /**
@@ -1604,7 +1594,6 @@ function showOCRDialog() {
  * Checks current status, provides instructions, and allows API key entry
  */
 function setupOCRApiKey() {
-  var ui = SpreadsheetApp.getUi();
   var props = PropertiesService.getScriptProperties();
   var currentKey = props.getProperty('CLOUD_VISION_API_KEY');
 
@@ -1613,7 +1602,7 @@ function setupOCRApiKey() {
     ? '✅ API Key Configured (ends with: ...' + escapeHtml(currentKey.slice(-6)) + ')'
     : '❌ API Key Not Configured';
 
-  var html = HtmlService.createHtmlOutput(
+  var htmlContent = (
     '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
     '<style>' +
     '* { box-sizing: border-box; }' +
@@ -1728,11 +1717,8 @@ function setupOCRApiKey() {
     '  el.textContent = message;' +
     '}' +
     '</script>'
-  )
-  .setWidth(520)
-  .setHeight(620);
-
-  ui.showModalDialog(html, '🔧 OCR Setup - Cloud Vision API');
+  );
+  showDialog_(htmlContent, '🔧 OCR Setup - Cloud Vision API', 520, 620);
 }
 
 /**
@@ -1829,9 +1815,7 @@ function testOCRConnection() {
  * Helps stewards cite "Past Practice" during Step 1 meetings.
  */
 function showSearchPrecedents() {
-  var ui = SpreadsheetApp.getUi();
-
-  var html = HtmlService.createHtmlOutput(
+  var htmlContent = (
     '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
     '<style>' +
     'body { font-family: Roboto, Arial, sans-serif; padding: 16px; margin: 0; }' +
@@ -1914,11 +1898,8 @@ function showSearchPrecedents() {
     '  if (e.key === "Enter") searchPrecedents();' +
     '});' +
     '</script>'
-  )
-  .setWidth(600)
-  .setHeight(520);
-
-  ui.showModalDialog(html, '📚 Search Precedents - Past Practice');
+  );
+  showDialog_(htmlContent, '📚 Search Precedents - Past Practice', 600, 520);
 }
 
 /**
@@ -1952,23 +1933,23 @@ function searchPrecedentsData(query, outcomeFilter) {
     var row = data[i];
 
     // Get status and check if closed/resolved
-    var status = (row[GRIEVANCE_COLS.STATUS - 1] || '').toString().toLowerCase();
+    var status = (col_(row, GRIEVANCE_COLS.STATUS) || '').toString().toLowerCase();
     var isClosed = closedStatuses.some(function(s) { return status.indexOf(s) !== -1; });
 
     if (!isClosed) continue;
 
     // Get grievance data
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
-    var firstName = row[GRIEVANCE_COLS.FIRST_NAME - 1] || '';
-    var lastName = row[GRIEVANCE_COLS.LAST_NAME - 1] || '';
-    var issueCategory = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
-    var article = row[GRIEVANCE_COLS.ARTICLES - 1] || '';
-    var location = row[GRIEVANCE_COLS.LOCATION - 1] || '';
-    var resolution = row[GRIEVANCE_COLS.RESOLUTION - 1] || '';
+    var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID) || '';
+    var firstName = col_(row, GRIEVANCE_COLS.FIRST_NAME) || '';
+    var lastName = col_(row, GRIEVANCE_COLS.LAST_NAME) || '';
+    var issueCategory = col_(row, GRIEVANCE_COLS.ISSUE_CATEGORY) || '';
+    var article = col_(row, GRIEVANCE_COLS.ARTICLES) || '';
+    var location = col_(row, GRIEVANCE_COLS.LOCATION) || '';
+    var resolution = col_(row, GRIEVANCE_COLS.RESOLUTION) || '';
     var dateResolved = '';
 
     // Try to get resolution date from Step III received or last updated field
-    var step3Rcvd = row[GRIEVANCE_COLS.STEP3_RCVD - 1];
+    var step3Rcvd = col_(row, GRIEVANCE_COLS.STEP3_RCVD);
     if (step3Rcvd) {
       dateResolved = Utilities.formatDate(new Date(step3Rcvd), Session.getScriptTimeZone(), 'MMM yyyy');
     }
@@ -2095,7 +2076,7 @@ function getSecureGrievanceStats_() {
   var stats = { total: 0, open: 0, won: 0, pending: 0, resolved: 0, denied: 0 };
 
   for (var i = 1; i < data.length; i++) {
-    var status = data[i][GRIEVANCE_COLS.STATUS - 1];
+    var status = col_(data[i], GRIEVANCE_COLS.STATUS);
     if (!status) continue;
 
     stats.total++;
@@ -2143,12 +2124,12 @@ function getSecureAllStewards_() {
   var stewards = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+    if (col_(data[i], MEMBER_COLS.IS_STEWARD) === 'Yes') {
       stewards.push({
-        'First Name': data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
-        'Last Name': data[i][MEMBER_COLS.LAST_NAME - 1] || '',
-        'Unit': data[i][MEMBER_COLS.UNIT - 1] || 'General',
-        'Work Location': data[i][MEMBER_COLS.WORK_LOCATION - 1] || ''
+        'First Name': col_(data[i], MEMBER_COLS.FIRST_NAME) || '',
+        'Last Name': col_(data[i], MEMBER_COLS.LAST_NAME) || '',
+        'Unit': col_(data[i], MEMBER_COLS.UNIT) || 'General',
+        'Work Location': col_(data[i], MEMBER_COLS.WORK_LOCATION) || ''
       });
     }
   }
@@ -2180,8 +2161,8 @@ function getSecureSatisfactionStats_() {
     var satScores = [];
 
     for (var i = 1; i < data.length; i++) {
-      var trustVal = parseFloat(data[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
-      var satVal = parseFloat(data[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
+      var trustVal = parseFloat(col_(data[i], SATISFACTION_COLS.Q7_TRUST_UNION));
+      var satVal = parseFloat(col_(data[i], SATISFACTION_COLS.Q6_SATISFIED_REP));
 
       if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
         trustScores.push(trustVal);
@@ -2206,7 +2187,7 @@ function getSecureSatisfactionStats_() {
       result.recentTrend = recent > previous + 0.2 ? 'improving' : (recent < previous - 0.2 ? 'declining' : 'stable');
     }
   } catch (e) {
-    Logger.log('Error in getSecureSatisfactionStats_: ' + e.message);
+    log_('Error in getSecureSatisfactionStats_', e.message);
   }
 
   return result;
@@ -2228,9 +2209,9 @@ function getStewardWorkload() {
   // Get all stewards first
   var memberData = memberSheet.getDataRange().getValues();
   for (var i = 1; i < memberData.length; i++) {
-    if (memberData[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
-      var name = (memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
-                 (memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
+    if (col_(memberData[i], MEMBER_COLS.IS_STEWARD) === 'Yes') {
+      var name = (col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' +
+                 (col_(memberData[i], MEMBER_COLS.LAST_NAME) || '');
       workload[name.trim()] = { name: name.trim(), openCases: 0, totalCases: 0 };
     }
   }
@@ -2238,8 +2219,8 @@ function getStewardWorkload() {
   // Count grievances per steward
   var gData = grievanceSheet.getDataRange().getValues();
   for (var g = 1; g < gData.length; g++) {
-    var steward = gData[g][GRIEVANCE_COLS.STEWARD - 1];
-    var status = gData[g][GRIEVANCE_COLS.STATUS - 1];
+    var steward = col_(gData[g], GRIEVANCE_COLS.STEWARD);
+    var status = col_(gData[g], GRIEVANCE_COLS.STATUS);
 
     if (steward && workload[steward]) {
       workload[steward].totalCases++;
@@ -2264,7 +2245,7 @@ function getContractPdfUrl_() {
       var url = configSheet.getRange(3, CONFIG_COLS.ORG_WEBSITE).getValue();
       if (url) return url;
     }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
   return '#';
 }
 
@@ -2280,7 +2261,7 @@ function getResourceDriveUrl_() {
       var folderId = configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).getValue();
       if (folderId) return 'https://drive.google.com/drive/folders/' + folderId;
     }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
   return '#';
 }
 
@@ -2425,16 +2406,16 @@ function getMemberProfile(memberId) {
   var data = memberSheet.getDataRange().getValues();
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+    if (col_(data[i], MEMBER_COLS.MEMBER_ID) === memberId) {
       return {
         memberId: memberId,
-        firstName: data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
-        lastName: data[i][MEMBER_COLS.LAST_NAME - 1] || '',
-        unit: data[i][MEMBER_COLS.UNIT - 1] || 'General',
-        workLocation: data[i][MEMBER_COLS.WORK_LOCATION - 1] || '',
+        firstName: col_(data[i], MEMBER_COLS.FIRST_NAME) || '',
+        lastName: col_(data[i], MEMBER_COLS.LAST_NAME) || '',
+        unit: col_(data[i], MEMBER_COLS.UNIT) || 'General',
+        workLocation: col_(data[i], MEMBER_COLS.WORK_LOCATION) || '',
         duesPaying: true,
-        isSteward: data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
-        volunteerHours: parseFloat(data[i][MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0
+        isSteward: col_(data[i], MEMBER_COLS.IS_STEWARD) === 'Yes',
+        volunteerHours: parseFloat(col_(data[i], MEMBER_COLS.VOLUNTEER_HOURS)) || 0
       };
     }
   }
@@ -2459,10 +2440,10 @@ function sendMemberDashboardEmail(memberId) {
   var member = null;
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+    if (col_(data[i], MEMBER_COLS.MEMBER_ID) === memberId) {
       member = {
-        email: data[i][MEMBER_COLS.EMAIL - 1],
-        firstName: data[i][MEMBER_COLS.FIRST_NAME - 1]
+        email: col_(data[i], MEMBER_COLS.EMAIL),
+        firstName: col_(data[i], MEMBER_COLS.FIRST_NAME)
       };
       break;
     }

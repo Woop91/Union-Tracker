@@ -99,6 +99,40 @@ function errorResponse(error, context, errorCode) {
 }
 
 /**
+ * Lightweight logging wrapper. Standardizes the Logger.log format
+ * across the codebase. Use this for info/debug logging.
+ * For structured error handling with sheet logging, use handleError() instead.
+ * @param {string} context - Function or module name
+ * @param {string} message - Log message
+ * @param {string} [level='INFO'] - Log level (INFO, DEBUG, WARNING, ERROR)
+ */
+function log_(context, message, level) {
+  Logger.log('[' + (level || 'INFO') + '] ' + context + ': ' + message);
+}
+
+/**
+ * Reads a value from a row array using a 1-indexed column reference.
+ * Replaces the error-prone `row[COLS.X - 1]` pattern.
+ * @param {Array} row - The data row array (0-indexed)
+ * @param {number} colRef - 1-indexed column constant (e.g., MEMBER_COLS.FIRST_NAME)
+ * @returns {*} The value at that column position
+ */
+function col_(row, colRef) {
+  return row[colRef - 1];
+}
+
+/**
+ * Writes a value to a row array using a 1-indexed column reference.
+ * Replaces the error-prone `row[COLS.X - 1] = value` pattern.
+ * @param {Array} row - The data row array (0-indexed)
+ * @param {number} colRef - 1-indexed column constant (e.g., MEMBER_COLS.FIRST_NAME)
+ * @param {*} value - The value to write
+ */
+function setCol_(row, colRef, value) {
+  row[colRef - 1] = value;
+}
+
+/**
  * Normalizes boolean-like values from Google Sheets to a consistent boolean.
  * Handles: true, 'Yes', 'TRUE', 'true', 'yes', 1, '1'
  * @param {*} value - The value to check
@@ -376,30 +410,49 @@ var DRIVE_CONFIG = {
   SUBFOLDER_TEMPLATE_SIMPLE: '{grievanceId} - {date}'
 };
 
+// M-43: _configCellCache is intentionally never invalidated. In Google Apps Script,
+// each script execution is short-lived (max 6 minutes) and runs in an isolated
+// context, so module-level caches are automatically cleared when the execution ends.
+// No manual invalidation is needed.
+var _configCellCache = {};
+
+/**
+ * Shared helper: reads a single Config sheet cell (row 3, given column),
+ * caches the result per cacheKey, and returns fallback on miss or error.
+ * @private
+ * @param {string} cacheKey - Unique key for this config value
+ * @param {number} colConst - Column constant (e.g., CONFIG_COLS.ORG_NAME)
+ * @param {string} fallback - Value to return if cell is empty or unreadable
+ * @returns {string} The cell value (as string) or fallback
+ */
+function _readConfigCell(cacheKey, colConst, fallback) {
+  if (_configCellCache[cacheKey] !== undefined) return _configCellCache[cacheKey];
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet && colConst) {
+      var val = String(configSheet.getRange(3, colConst).getValue() || '').trim();
+      if (val) {
+        _configCellCache[cacheKey] = val;
+        return _configCellCache[cacheKey];
+      }
+    }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
+  _configCellCache[cacheKey] = fallback;
+  return _configCellCache[cacheKey];
+}
+
 /**
  * Returns the root Drive folder name for this deployment.
  * Derived from the ORG_NAME value in the Config sheet (row 3).
  * Example: "SEIU Local 509" → "SEIU Local 509 Dashboard"
  * Falls back to DRIVE_CONFIG.ROOT_FOLDER_FALLBACK if Config is not yet set up.
- * Memoized per script execution (same pattern as getSystemName_).
+ * Memoized per script execution.
  * @returns {string} Root folder name
  */
-var _cachedDriveRootName_ = null;
 function getDriveRootFolderName_() {
-  if (_cachedDriveRootName_ !== null) return _cachedDriveRootName_;
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-    if (configSheet && CONFIG_COLS.ORG_NAME) {
-      var orgName = String(configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue() || '').trim();
-      if (orgName) {
-        _cachedDriveRootName_ = orgName + ' Dashboard';
-        return _cachedDriveRootName_;
-      }
-    }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
-  _cachedDriveRootName_ = DRIVE_CONFIG.ROOT_FOLDER_FALLBACK;
-  return _cachedDriveRootName_;
+  var orgName = _readConfigCell('driveRootOrg', CONFIG_COLS.ORG_NAME, '');
+  return orgName ? orgName + ' Dashboard' : DRIVE_CONFIG.ROOT_FOLDER_FALLBACK;
 }
 
 /**
@@ -408,26 +461,8 @@ function getDriveRootFolderName_() {
  * @private
  * @returns {string} Organization name (e.g., "SEIU Local")
  */
-// M-43: _cachedOrgName / _cachedSystemName / _cachedLocalNumber are intentionally
-// never invalidated. In Google Apps Script, each script execution is short-lived
-// (max 6 minutes) and runs in an isolated context, so module-level caches are
-// automatically cleared when the execution ends. No manual invalidation is needed.
-var _cachedOrgName = null;
 function getOrgNameFromConfig_() {
-  if (_cachedOrgName !== null) return _cachedOrgName;
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-    if (configSheet) {
-      var orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue();
-      if (orgName) {
-        _cachedOrgName = orgName;
-        return _cachedOrgName;
-      }
-    }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
-  _cachedOrgName = 'SolidBase';
-  return _cachedOrgName;
+  return _readConfigCell('orgName', CONFIG_COLS.ORG_NAME, 'SolidBase');
 }
 
 /**
@@ -452,22 +487,8 @@ function getSystemName_() {
  * @private
  * @returns {string} Local number
  */
-var _cachedLocalNumber = null;
 function getLocalNumberFromConfig_() {
-  if (_cachedLocalNumber !== null) return _cachedLocalNumber;
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-    if (configSheet) {
-      var localNumber = configSheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER).getValue();
-      if (localNumber) {
-        _cachedLocalNumber = String(localNumber);
-        return _cachedLocalNumber;
-      }
-    }
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
-  _cachedLocalNumber = '';
-  return _cachedLocalNumber;
+  return _readConfigCell('localNumber', CONFIG_COLS.LOCAL_NUMBER, '');
 }
 
 // ============================================================================
@@ -495,12 +516,22 @@ var VERSION_INFO = (function() {
 })();
 
 /**
- * Complete version history with release dates and codenames.
+ * Lazy-loaded version history — only materialized on first access.
+ * Call getVersionHistory_() instead of referencing VERSION_HISTORY directly.
+ * @private
+ */
+var _versionHistoryCache = null;
+
+/**
+ * Returns the complete version history with release dates and codenames.
  * Ordered newest-first. Every version that has ever shipped is listed here
  * so that UI, audit, and diagnostic code can look up any past release date.
- * @const {Array<Object>}
+ * Lazy-loaded: the array is built on first call, then cached.
+ * @returns {Array<Object>} Version history entries
  */
-var VERSION_HISTORY = [
+function getVersionHistory_() {
+  if (_versionHistoryCache) return _versionHistoryCache;
+  _versionHistoryCache = [
   { version: '4.50.7', date: '2026-04-02', codename: 'Trigger Persistence', changes: 'Fixed onOpenDeferred_ deleting its own installable trigger — leftover code from old one-shot approach caused deferred init to run only once after install (no column sync, tab colors, or modals on subsequent opens). Tab modals now auto-open on spreadsheet open via installable trigger (full authorization). Session invalidation hardened with deletion verification. TrendAlertService.runDetection() wrapped in LockService to prevent duplicate alerts from concurrent triggers.' },
   { version: '4.50.6', date: '2026-04-01', codename: 'Tab Modal Fix', changes: 'Fixed tab modals not auto-opening on sheet tab navigation. Root cause: GAS simple triggers (onSelectionChange) cannot call showModalDialog(). Fix: onTabSwitch_ now uses toast() hint instead of blocked modal call. Added showCurrentTabModal() convenience function that auto-detects active sheet and shows the right modal — accessible via menu. Tab Modals submenu moved to top-level menu item for discoverability.' },
   { version: '4.50.5', date: '2026-04-01', codename: 'Config Seed Alignment', changes: 'Fixed createConfigSheet using stale CONFIG_COLS positions for seedConfigDefault_ and _applyYesNoValidation after header rewrite. syncColumnMaps() now runs after writing new headers, so seeds and yes/no dropdowns target the correct columns. One-time repair clears misaligned yes/no values and stale data validations from Branding columns (Logo Initials, Steward Label, etc.) that received Feature Toggle dropdowns from the v4.50.0-v4.50.4 bug. Moved INSIGHTS_CACHE_TTL_MIN seed from Branding section to Feature Toggles section to match CONFIG_HEADER_MAP_ grouping.' },
@@ -514,7 +545,7 @@ var VERSION_HISTORY = [
   { version: '4.43.1', date: '2026-03-27', codename: 'One-Tap Check-In', changes: 'In-app one-tap meeting check-in banner. When a steward activates a meeting, logged-in members and stewards see a green check-in banner at the top of their dashboard. One tap checks them in — no PIN re-entry needed (session-authenticated). Banner shows confirmed state after check-in or if already checked in. Active meeting data included in batch payloads for zero-latency display. dataWebAppCheckIn() endpoint with TOCTOU lock and audit logging (MEETING_WEBAPP_CHECKIN). New .checkin-banner CSS with slide-in animation.' },
   { version: '4.43.0', date: '2026-03-27', codename: 'QR Attendance', changes: 'QR code mobile attendance system. Stewards generate QR codes for meetings (Calendar & Meetings > QR Code Check-In). Members scan with phone, enter phone number + PIN to check in. New ?page=qr-checkin web route with dark/light mode mobile-optimized UI. processQRCheckIn() authenticates by phone number instead of email. getMeetingQRCode() generates QR via Google Charts API. createMeeting() now includes QR URL in response. Full security: PIN lockout, rate limiting, TOCTOU lock, audit logging (MEETING_QR_CHECKIN). Device key authentication enables biometric sign-in for all login methods. Remember-me defaults to ON. PIN auto-submits on 6th digit.' },
   { version: '4.42.0', date: '2026-03-27', codename: 'Biometric Login', changes: 'Password manager and biometric sign-in support. PIN and email forms wrapped in <form> elements with proper autocomplete attributes (username, current-password, email) for password manager detection. Credential Management API integration saves PIN credentials after successful login (Chrome/Edge). iOS/Safari: form semantics trigger native Keychain save with Face ID/Touch ID autofill. Biometric sign-in button on auth choose screen when saved credentials exist. Platform-aware biometric labels (Face ID, Touch ID, Fingerprint, Windows Hello). Auto-submit flow for Credential API retrieval. Forget saved credentials option on login screen.' },
-  { version: '4.40.0', date: '2026-03-25', codename: 'PIN Login GA', changes: 'PIN login enabled in all environments (dev + production). Removed IS_DEV_MODE gates from auth_view.html PIN button, steward_view.html Manage PIN button, and 13_MemberSelfService.gs comments. Added isDevMode to auth page PAGE_DATA. Login page restyled: black background, glass card with backdrop blur, brighter quotes with text glow. Default org name fallback changed to the dashboard.' },
+  { version: '4.40.0', date: '2026-03-25', codename: 'PIN Login GA', changes: 'PIN login enabled in all environments (dev + production). Removed IS_DEV_MODE gates from auth_view.html PIN button, steward_view.html Manage PIN button, and 13_MemberSelfService.gs comments. Added isDevMode to auth page PAGE_DATA. Login page restyled: black background, glass card with backdrop blur, brighter quotes with text glow. Default org name fallback changed to DDS.' },
   { version: '4.39.0', date: '2026-03-24', codename: 'DEV PIN Login', changes: 'DEV ONLY (IS_DEV_MODE gate): (1) devAuthLoginByPIN(pin) — PIN-only login scan, no email, global rate limit 10/15min, audit logged. (2) showAuthPIN() on login screen — only when IS_DEV_MODE=true, redirects with sessionToken. (3) devStewardManageMemberPIN(sessionToken, email) — steward generates/resets PIN from webapp, returns plaintext once. (4) Manage PIN button in steward member detail panel — one-time display with copy button. All dev-only functions are IS_DEV_MODE gated.' },
   { version: '4.38.0', date: '2026-03-24', codename: 'Reliability', changes: 'Default view preference for dual-role users (sidebar selector, dataSetDefaultView endpoint, ScriptProperties storage). Loading fence on _loadMemberViewThen prevents double-tap concurrent fetches. Try/catch on mobile header role-switch buttons. Magic-link auth fix: removed Session.getActiveUser() checks from getMemberViewHtml/getOrgChartHtml/getPOMSReferenceHtml (returns empty for Execute-as-Me). Test runner included in prod builds (tab gated by IS_DEV_MODE). initMemberView verification after script injection with error UI.' },
   { version: '4.37.1', date: '2026-03-24', codename: 'Lazy Member View', changes: 'Lazy-load member_view.html for dual-role users to stay under GAS ~820KB HtmlOutput limit. Conditional template inclusion: steward/both get steward_view only, member-only get member_view inline. getMemberViewHtml() server endpoint for on-demand fetch.' },
@@ -526,7 +557,7 @@ var VERSION_HISTORY = [
   { version: '4.34.2', date: '2026-03-22', codename: 'Enable Defaults', changes: 'Enable all safety/security/maintenance features by default. BROADCAST_SCOPE_ALL default changed from no to yes. ENABLE_CORRELATION now seeded as yes with yes/no dropdown validation. All security features (ACCESS_CONTROL, DASHBOARD_MEMBER_AUTH, ERROR_LOGGING, NOTIFY_ON_CRITICAL) were already enabled by default.' },
   { version: '4.34.1', date: '2026-03-21', codename: 'Theme Unification', changes: 'Theme sync: org_chart.html and poms_reference.html now follow AppState dark/light toggle (class toggle on .madds-embed and .poms-root). Live toggle via UnifiedTheme.apply() also updates embedded components. esign.html: 7 hardcoded colors replaced with CSS vars (--accentHover, --accentMuted, --badge-*, --canvas-bg) with dark media query overrides. OS theme detection: first-visit default now respects prefers-color-scheme instead of always-dark. Modal overlay uses theme-aware --overlay-bg (light=0.35, dark=0.55). Offline banner uses var(--danger) instead of hardcoded #ef4444. Dead code removed: unused last7Keys variable, orphaned resourceDownloads local computation. Build fix: minifyHtml() now normalizes \\r\\n→\\n before regex processing, fixing dist-parity CI failure on Windows builds.' },
   { version: '4.31.1', date: '2026-03-20', codename: 'Public Dashboard Removal', changes: 'Remove orphaned 04e_PublicDashboard.gs (~3K lines). File was never routed via doGet and confirmed no public dashboard will exist. Deleted: src/04e_PublicDashboard.gs, dist/04e_PublicDashboard.gs, test/04e_PublicDashboard.test.js. Removed from build.js file list and architecture/auth-denial/UIService test file lists. XSS threshold in architecture.test.js lowered from 130 to 10 (04e contributed ~122 false positives). Updated all documentation references across AI_REFERENCE.md, CODE_REVIEW.md, DEVELOPER_GUIDE.md, FEATURES.md, README.md, CONTRIBUTING.md, QUICK_DEPLOY.md, presentation.html. Changelog entries in VERSION_HISTORY preserved as historical record.' },
-  { version: '4.32.0', date: '2026-03-19', codename: 'Workforce Mobility Survey', changes: 'New survey Section 13 (WORKFORCE_RETENTION) and Section 13A (WORKFORCE_LEAVING) added to quarterly member survey. Section 13 (always shown, 4 questions): q80 likelihood to stay (radio: Very Likely–Very Unlikely), q81 exploring outside the org (radio-branch — Yes triggers 13A), q84 union addressing retention factors (slider-10), q86 optional open text. Section 13A (conditional on q81=Yes, 2 questions): q82 types of opportunities outside the org (checkbox, max 2: state transfer | leaving state service | private | non-profit/education | not sure), q83 reasons for leaving (checkbox, max 3: Pay & Benefits | Workload | Management | Limited Advancement or Transfer Opportunities | Work-Life Balance | RTO Policy | Burnout | Culture | Other — transfer awareness from former q85 folded into this option). Standalone q85 removed. Looker: Workforce Retention Avg, Likelihood to Stay, Exploring Outside the Org columns added to both _Looker_Satisfaction and _Looker_Anon_Satisfaction headers and refresh functions. getSatisfactionSummary() workforce section added. Section colors: WORKFORCE_RETENTION #e8f4f8, WORKFORCE_LEAVING #fdecea. Always active (not toggled). Visible to all dashboard roles.' },
+  { version: '4.32.0', date: '2026-03-19', codename: 'Workforce Mobility Survey', changes: 'New survey Section 13 (WORKFORCE_RETENTION) and Section 13A (WORKFORCE_LEAVING) added to quarterly member survey. Section 13 (always shown, 4 questions): q80 likelihood to stay (radio: Very Likely–Very Unlikely), q81 exploring outside DDS (radio-branch — Yes triggers 13A), q84 union addressing retention factors (slider-10), q86 optional open text. Section 13A (conditional on q81=Yes, 2 questions): q82 types of opportunities outside DDS (checkbox, max 2: MA state transfer | leaving state service | private | non-profit/education | not sure), q83 reasons for leaving (checkbox, max 3: Pay & Benefits | Workload | Management | Limited Advancement or Transfer Opportunities | Work-Life Balance | RTO Policy | Burnout | Culture | Other — transfer awareness from former q85 folded into this option). Standalone q85 removed. Looker: Workforce Retention Avg, Likelihood to Stay, Exploring Outside DDS columns added to both _Looker_Satisfaction and _Looker_Anon_Satisfaction headers and refresh functions. getSatisfactionSummary() workforce section added. Section colors: WORKFORCE_RETENTION #e8f4f8, WORKFORCE_LEAVING #fdecea. Always active (not toggled). Visible to all dashboard roles.' },
   { version: '4.31.0', date: '2026-03-17', codename: 'Security Hardening', changes: 'Security: magic token immediate-delete (TOCTOU fix), session token error handling, bootstrap admin audit logging, resource IDs removed from client config. Reliability: email index cache invalidation, Drive sharing fatal errors, preload race guard, layout render generation counter, timer/observer cleanup. Features: 15min auto-logout with 2min warning modal, Chart.js SRI integrity hash. Perf: glow animation transform/opacity, keyboard handler dedup. Removed ~1385 lines deprecated Interactive Dashboard code.' },
   { version: '4.30.2', date: '2026-03-17', codename: 'Contact Log Name Matching', changes: 'Contact Log stores member name (col 9). Autocomplete triggers at 1 char. By Member tab gets autocomplete. Recent contacts display member name.' },
   { version: '4.28.7', date: '2026-03-15', codename: 'Gmail Scope Test + Auth Sweep', changes: 'Fix gmailAppAccessible test (gmail.send has no side-effect-free probe). Fix testRunnerEndpointsGated false failure (SSO bypasses null-token rejection). 4 new authsweep tests for wq/qa/tl/fs endpoints. Full auth sweep: 100+ endpoints verified, 10 scopes confirmed, no auth gaps.' },
@@ -554,7 +585,7 @@ var VERSION_HISTORY = [
   { version: '4.23.1', date: '2026-03-07', codename: 'System-Wide Session Token Auth Fix', changes: 'SYSTEMIC FIX: All 42+ server wrapper functions that call _requireStewardAuth() or _resolveCallerEmail() now accept sessionToken as first parameter. Root cause: getActiveUser() returns empty in Execute-as-Me webapp for magic link / session token users — every steward operation was silently broken for non-SSO auth. Server: sessionToken param added to all wrappers across 21_WebDashDataService.gs (36 functions), 08e_SurveyEngine.gs (2), 24_WeeklyQuestions.gs (8), 26_QAForum.gs (4), 27_TimelineService.gs (5). Direct Session.getActiveUser() calls in wq wrappers replaced with _resolveCallerEmail(sessionToken). Client: steward_view.html + member_view.html updated to pass SESSION_TOKEN instead of CURRENT_USER.email to all server calls. Q1 fix: server echoes back session token in pageData for method=session users (22_WebDashApp.gs). CLIENT: SESSION_TOKEN now reads PAGE_DATA.sessionToken || localStorage fallback. dataToggleChecklistItem double-paren syntax error fixed.' },
   { version: '4.23.0', date: '2026-03-07', codename: 'Dynamic Survey Schema', changes: 'Option B fully dynamic survey schema. New sheet: 📋 Survey Questions (16 cols: Question ID, Section, Section Key, Section Title, Question Text, Type, Required, Active, Options, Branch Parent, Branch Value, Branch Target, Max Selections, Slider Min/Max, Notes). Owner edits Question Text, Active, Options, Slider Labels, Notes directly — no deployment needed. Adding a new row to Survey Questions auto-creates a new column in 📊 Member Satisfaction on next submission. Setting Active=N deactivates a question. Satisfaction sheet rebuilt with dynamic headers: Timestamp | Period ID | Survey Version | q1 | q2 … qN. New functions: createSurveyQuestionsSheet() (seeds 67 questions, color-coded by section, non-destructive on re-run), getSatisfactionColMap_() (runtime header→col lookup, 5-min cache), syncSatisfactionSheetColumns_() (auto-appends missing question columns), clearSurveyQuestionsCache() (menu-callable). Rewrites: getSurveyQuestions() reads from sheet with 5-min cache; submitSurveyResponse() builds row via col map not hardcoded positions; getSatisfactionSummary() groups questions dynamically by Section Key. 04c and 04d updated to use getSatisfactionColMap_(). SATISFACTION_COLS kept as deprecated reference. New constants: SHEETS.SURVEY_QUESTIONS, SURVEY_QUESTIONS_COLS, SATISFACTION_PREFIX. Wired into CREATE_DASHBOARD setup and initSurveyEngine().' },
   { version: '4.22.7', date: '2026-03-07', codename: 'Survey Form URL Deprecation Cleanup', changes: 'Full removal of SATISFACTION_FORM_URL / satisfactionFormUrl / surveyFormUrl across 8 files. Deprecated since v4.21.0 (Google Form integration replaced by native webapp survey), now fully removed. 01_Core.gs: constant replaced with comment. 08c: satisfaction case removed from getFormUrlFromConfig(); saveFormUrlsToConfig_silent() no longer writes/formats satisfaction URL; sendSurveyCompletionReminders() now reads MOBILE_DASHBOARD_URL (member portal) instead of form URL. 04c: satisfactionForm removed from resource links; range now stops at ORG_WEBSITE. 04e: surveyUrl now reads MOBILE_DASHBOARD_URL. 05_Integrations: satisfactionForm removed from resource links, double-semicolon typo fixed. 11_CommandHub: Form Links color section removed. 20_WebDashConfigReader: satisfactionFormUrl line removed. 21_WebDashDataService: surveyFormUrl removed from resource links response. 22_WebDashApp: surveyFormUrl removed from sanitized config. member_view.html: dead else-if fallback branch removed from survey banner onClick handler.' },
-  { version: '4.22.6', date: '2026-03-06', codename: 'Org Chart Default', changes: 'Replace org_chart.html with org chart. CSS scoped to .madds-embed wrapper, :root vars moved into .madds-embed scope, body/body.light → .madds-embed/.madds-embed.light, #mode-toggle renamed #madds-mode-toggle, toggleMode() renamed maddstoggleMode() to avoid SPA collisions, Google Fonts loaded dynamically. Serves same HTML fragment via existing getOrgChartHtml() in 22_WebDashApp.gs — no server-side changes required.' },
+  { version: '4.22.6', date: '2026-03-06', codename: 'MADDS Org Chart Default', changes: 'Replace org_chart.html with MADDS chart sourced from 509d repo (Woop91/509d). Full Local 509 org chart (SEIU Local 509 — Main Internal Breakout Chart, updated 2026-03-01) is now default in both DDS-Dashboard and Union-Tracker. Conversion: CSS scoped to .madds-embed wrapper, :root vars moved into .madds-embed scope, body/body.light → .madds-embed/.madds-embed.light, #mode-toggle renamed #madds-mode-toggle, toggleMode() renamed maddstoggleMode() to avoid SPA collisions, Google Fonts loaded dynamically. Serves same HTML fragment via existing getOrgChartHtml() in 22_WebDashApp.gs — no server-side changes required.' },
   { version: '4.22.6', date: '2026-03-06', codename: 'Events Sentinel Propagation Fix', changes: 'Bug fix: home widget events section crashed when getUpcomingEvents returned a sentinel object ({_notConfigured} or {_calNotFound}) — events.length on a plain object returns undefined, rendering "undefined" in KPI counter and crashing forEach. Added Array.isArray guard before rendering and before DataCache.set. DataCache.set now only caches actual arrays; sentinel objects are dropped, preventing the bad value from poisoning the client-side cache on subsequent home re-renders.' },
   { version: '4.22.4', date: '2026-03-06', codename: 'Events Access & Calendar Targeting', changes: 'Events tab dues gate removed — any authenticated member can view events regardless of dues status. More menu Events item lock icon removed. Create Event button URL now includes &src=calendarId param so new events land on the union calendar, not the steward personal calendar. No structural changes to backend auth — dataGetUpcomingEvents still requires valid session.' },
   { version: '4.22.3', date: '2026-03-06', codename: 'Events Tab Hardening', changes: 'Bug fix: ISO date formatter in Add-to-Calendar URLs changed from .replace(\".000Z\",\"Z\") to .replace(/\\.\\d+Z$/,\"Z\") — handles any millisecond value (was silently broken for non-.000 ms values). Bug fix: CalendarApp.getCalendarById() returning null now returns {_calNotFound:true} sentinel instead of [] — distinguishes typo/permission error from genuinely empty calendar. Frontend handles _calNotFound with diagnostic message. Bug fix: Add-to-Calendar URL now includes &details= param (ev.description) in both home widget and Events page — was silently omitted. Feature: Steward Events page now shows \"Manage in Google Calendar\" and \"Create Event\" action buttons when a calendarId is configured. _sanitizeConfig in 22_WebDashApp.gs now exposes calendarId (non-sensitive) so frontend can conditionally show management links.' },
@@ -614,7 +645,10 @@ var VERSION_HISTORY = [
   { version: '4.0.0', date: '2026-01-05', codename: 'Strategic Command Center',                   changes: 'Unified master engine, audit logging, sabotage protection, batch processing, mobile views' },
   { version: '3.6.0', date: '2025-12-20', codename: 'Data Managers',                              changes: 'Member and Grievance data manager refactor, improved validation' },
   { version: '2.0.0', date: '2025-11-15', codename: 'Modular Architecture',                       changes: 'Split monolith into modular source files, build system, UI/business logic separation' }
-];
+  ];
+  return _versionHistoryCache;
+}
+
 // ============================================================================
 // SHEET NAMES
 // ============================================================================
@@ -828,7 +862,7 @@ function setSheetVeryHidden_(sheet) {
     try {
       sheet.hideSheet();
     } catch (_hideError) {
-      Logger.log('Could not hide sheet "' + sheet.getName() + '": ' + _hideError.message);
+      log_('setSheetVeryHidden_', 'Could not hide sheet "' + sheet.getName() + '": ' + _hideError.message);
     }
   }
 
@@ -865,7 +899,7 @@ function setSheetVisible_(sheet) {
     try {
       sheet.showSheet();
     } catch (_showError) {
-      Logger.log('Could not show sheet "' + sheet.getName() + '": ' + _showError.message);
+      log_('setSheetVisible_', 'Could not show sheet "' + sheet.getName() + '": ' + _showError.message);
     }
   }
 
@@ -903,7 +937,7 @@ function protectHiddenSheet_(sheet) {
     }
     // The owner is always retained by Google Sheets automatically
   } catch (_e) {
-    Logger.log('Could not protect sheet "' + sheet.getName() + '": ' + _e.message);
+    log_('protectHiddenSheet_', 'Could not protect sheet "' + sheet.getName() + '": ' + _e.message);
   }
 }
 
@@ -965,7 +999,7 @@ function enforceHiddenSheets() {
   }
 
   if (enforced > 0) {
-    Logger.log('enforceHiddenSheets: re-hid ' + enforced + ' of ' + checked + ' hidden sheets');
+    log_('enforceHiddenSheets', 're-hid ' + enforced + ' of ' + checked + ' hidden sheets');
   }
 
   return { checked: checked, enforced: enforced };
@@ -982,7 +1016,7 @@ function installHiddenSheetEnforcerTrigger() {
   // Check if trigger already exists
   for (var i = 0; i < triggers.length; i++) {
     if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
-      Logger.log('Hidden sheet enforcer trigger already installed');
+      log_('installHiddenSheetEnforcerTrigger', 'Hidden sheet enforcer trigger already installed');
       return;
     }
   }
@@ -992,7 +1026,7 @@ function installHiddenSheetEnforcerTrigger() {
     .everyHours(1)
     .create();
 
-  Logger.log('Installed hourly hidden-sheet enforcer trigger');
+  log_('installHiddenSheetEnforcerTrigger', 'Installed hourly hidden-sheet enforcer trigger');
 }
 // ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
@@ -2076,7 +2110,7 @@ function resolveColumnsFromSheet_(sheetName, headerMap, options) {
 
     return cols;
   } catch (_e) {
-    Logger.log('detectColumnLayout_ error: ' + _e.message);
+    log_('detectColumnLayout_ error', _e.message);
     return null;
   }
 }
@@ -2133,7 +2167,7 @@ function syncColumnMaps() {
             if (entry.headerRenames[oldH]) {
               sheet.getRange(hRow, ri + 1).setValue(entry.headerRenames[oldH]);
               sheetHeaders[ri] = entry.headerRenames[oldH];
-              Logger.log('syncColumnMaps: renamed "' + oldH + '" → "' + entry.headerRenames[oldH] + '" in ' + entry.sheet + ' col ' + (ri + 1));
+              log_('syncColumnMaps', 'renamed "' + oldH + '" → "' + entry.headerRenames[oldH] + '" in ' + entry.sheet + ' col ' + (ri + 1));
             }
           }
         }
@@ -2162,11 +2196,11 @@ function syncColumnMaps() {
           result.warnings.push(entry.name + ': backfilled ' + missingCols.length + ' missing columns (' +
             missingCols.map(function(c) { return c.key; }).join(', ') + ')');
           result.synced.push(entry.name + '_BACKFILL');
-          Logger.log('syncColumnMaps: Added ' + missingCols.length + ' missing columns to ' + entry.sheet + ': ' +
+          log_('syncColumnMaps', 'Added ' + missingCols.length + ' missing columns to ' + entry.sheet + ': ' +
             missingCols.map(function(c) { return c.header; }).join(', '));
         }
       } catch (_bfErr) {
-        Logger.log('syncColumnMaps backfill ' + entry.sheet + ': ' + _bfErr.message);
+        log_('syncColumnMaps', 'syncColumnMaps backfill ' + entry.sheet + ': ' + _bfErr.message);
       }
     }
 
@@ -2212,9 +2246,9 @@ function syncColumnMaps() {
   }
 
   if (result.synced.length > 0) {
-    Logger.log('syncColumnMaps: Updated ' + result.synced.join(', '));
+    log_('syncColumnMaps', 'Updated ' + result.synced.join(', '));
     if (result.warnings.length > 0) {
-      Logger.log('Column changes detected:\n  ' + result.warnings.join('\n  '));
+      log_('syncColumnMaps', 'Column changes detected:\n  ' + result.warnings.join('\n  '));
     }
     // Column positions changed — invalidate ConfigReader's cache so it re-reads
     // the sheet with correct column positions instead of serving stale values.
@@ -2344,7 +2378,7 @@ function ensureMinimumColumns(sheet, requiredColumns) {
   if (currentColumns < requiredColumns) {
     var columnsToAdd = requiredColumns - currentColumns;
     sheet.insertColumnsAfter(currentColumns, columnsToAdd);
-    Logger.log('Added ' + columnsToAdd + ' columns to ' + sheet.getName() + ' (now has ' + requiredColumns + ' columns)');
+    log_('ensureMinimumColumns', 'Added ' + columnsToAdd + ' columns to ' + sheet.getName() + ' (now has ' + requiredColumns + ' columns)');
   }
 }
 
@@ -2488,16 +2522,16 @@ var GRIEVANCE_STATUS_PRIORITY = {
 var GRIEVANCE_STATUS = {
   OPEN: 'Open',
   PENDING: 'Pending Info',
-  PENDING_INFO: 'Pending Info',
+  PENDING_INFO: 'Pending Info',       // Alias for PENDING — used in 02_DataManagers.gs
   SETTLED: 'Settled',
   WITHDRAWN: 'Withdrawn',
   DENIED: 'Denied',
   WON: 'Won',
   APPEALED: 'Appealed',
   IN_ARBITRATION: 'In Arbitration',
-  AT_ARBITRATION: 'In Arbitration',
+  AT_ARBITRATION: 'In Arbitration',   // Alias for IN_ARBITRATION — used in 02_DataManagers.gs; migrate callers then remove
   CLOSED: 'Closed',
-  RESOLVED: 'Settled'  // Alias for backward compatibility
+  RESOLVED: 'Settled'                 // Note: RESOLVED maps to 'Settled' — legacy alias (used in 03_UIComponents, 06_Maintenance)
 };
 
 /**
@@ -2515,8 +2549,10 @@ var GRIEVANCE_CLOSED_STATUSES = [
 ];
 
 /**
- * Grievance outcome constants for programmatic access
- * Use these constants instead of hardcoded strings
+ * Grievance outcome constants for programmatic access.
+ * @deprecated v4.50.8 — Prefer GRIEVANCE_STATUS for status/outcome checks.
+ *   GRIEVANCE_OUTCOMES duplicates a subset of GRIEVANCE_STATUS values.
+ *   Remaining prod caller: 08d_AuditAndFormulas.gs:1407.
  * @const {Object}
  */
 var GRIEVANCE_OUTCOMES = {
@@ -2596,7 +2632,7 @@ function getDeadlineRules() {
       };
     }
   } catch (e) {
-    Logger.log('Error reading deadline config: ' + e.message);
+    log_('Error reading deadline config', e.message);
   }
   // Fallback to defaults
   return {
@@ -2714,19 +2750,30 @@ var SCALE_THRESHOLDS = {
 // ============================================================================
 
 /**
+ * Build the job metadata field configuration array from current *_COLS values.
+ * Single source of truth — used by both JOB_METADATA_FIELDS init and rebuild.
+ * @private
+ * @returns {Array<Object>} 7 field config entries
+ */
+function _buildJobMetadataFields() {
+  return [
+    { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
+    { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
+    { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
+    { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
+    { label: 'Director', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Directors' },
+    { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
+    { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
+  ];
+}
+
+/**
  * Job metadata field configuration
  * Maps each Member Directory field to its corresponding Config sheet column
  * @const {Array<Object>}
  */
-var JOB_METADATA_FIELDS = [
-  { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
-  { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
-  { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
-  { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
-  { label: 'Director', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Directors' },
-  { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
-  { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
-];
+var JOB_METADATA_FIELDS = _buildJobMetadataFields();
+
 /**
  * Get job metadata field config by member column number
  * @param {number} memberCol - The member column number
@@ -2748,16 +2795,9 @@ function getJobMetadataByMemberCol(memberCol) {
  * @private
  */
 function rebuildJobMetadataFields_() {
+  var fresh = _buildJobMetadataFields();
   JOB_METADATA_FIELDS.length = 0; // clear in-place to preserve the reference
-  JOB_METADATA_FIELDS.push(
-    { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
-    { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
-    { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
-    { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
-    { label: 'Director', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Directors' },
-    { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
-    { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
-  );
+  for (var i = 0; i < fresh.length; i++) JOB_METADATA_FIELDS.push(fresh[i]);
 }
 
 // ============================================================================
@@ -2877,7 +2917,7 @@ try {
     // onEdit) not just doGetWebDashboard and onOpen.
     syncColumnMaps();
   }
-} catch (_initCache) { try { Logger.log('Column map cold-cache init failed: ' + (_initCache.message || _initCache)); } catch(_) {} }
+} catch (_initCache) { try { log_('Column map cold-cache init failed', (_initCache.message || _initCache)); } catch(_) {} }
 
 // ============================================================================
 // ID GENERATION

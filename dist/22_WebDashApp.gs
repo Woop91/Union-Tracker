@@ -54,7 +54,7 @@ function doGet(e) {
       return HtmlService.createHtmlOutputFromFile('esign')
         .setTitle('Grievance E-Signature — ' + (function() { try { return getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Local'; } catch(_) { return 'Your Local'; } })());
     } catch (esignErr) {
-      Logger.log('doGet esign error: ' + esignErr.message);
+      log_('doGet esign error', esignErr.message);
       return _serveFatalError('E-Signature page unavailable.');
     }
   }
@@ -67,7 +67,7 @@ function doGet(e) {
     try {
       return _serveRSVPPage(e);
     } catch (rsvpErr) {
-      Logger.log('doGet rsvp error: ' + rsvpErr.message);
+      log_('doGet rsvp error', rsvpErr.message);
       return _serveFatalError('RSVP page unavailable.');
     }
   }
@@ -80,7 +80,7 @@ function doGet(e) {
     try {
       return _serveQRCheckInPage(e);
     } catch (qrErr) {
-      Logger.log('doGet qr-checkin error: ' + qrErr.message);
+      log_('doGet qr-checkin error', qrErr.message);
       return _serveFatalError('QR Check-In page unavailable.');
     }
   }
@@ -88,14 +88,14 @@ function doGet(e) {
   try {
     return doGetWebDashboard(e);
   } catch (fatalErr) {
-    Logger.log('doGet FATAL: ' + fatalErr.message + '\n' + (fatalErr.stack || ''));
+    log_('doGet FATAL', fatalErr.message + '\n' + (fatalErr.stack || ''));
     // Log additional context for debugging
     try {
-      Logger.log('doGet FATAL context: ConfigReader=' + (typeof ConfigReader) +
+      log_('doGet FATAL context', 'ConfigReader=' + (typeof ConfigReader) +
         ', Auth=' + (typeof Auth) +
         ', DataService=' + (typeof DataService) +
         ', SHEETS=' + (typeof SHEETS));
-    } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    } catch (_) { log_('_', (_.message || _)); }
     return _serveFatalError(fatalErr.message);
   }
 }
@@ -118,7 +118,7 @@ function doGetWebDashboard(e) {
       syncColumnMaps();
       _coldSync = true;
     }
-  } catch (_syncErr) { Logger.log('doGet column sync: ' + (_syncErr.message || _syncErr)); }
+  } catch (_syncErr) { log_('doGet column sync', (_syncErr.message || _syncErr)); }
 
   // Load config once at top — reused in both success and error paths (Fix 2.1)
   // After a cold column sync, force-refresh so ConfigReader doesn't serve
@@ -127,7 +127,7 @@ function doGetWebDashboard(e) {
   try {
     config = _coldSync ? ConfigReader.refreshConfig() : ConfigReader.getConfig();
   } catch (cfgErr) {
-    Logger.log('doGetWebDashboard: config load failed: ' + cfgErr.message);
+    log_('doGetWebDashboard', 'config load failed: ' + cfgErr.message);
     config = { orgName: 'SolidBase', orgAbbrev: 'SolidBase', logoInitials: 'SolidBase', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
@@ -186,7 +186,7 @@ function doGetWebDashboard(e) {
             recordSecurityEvent('BOOTSTRAP_ADMIN', 'MEDIUM', 'Script owner granted admin access without directory entry', { email: user.email });
           }
         }
-      } catch (_ownerErr) { Logger.log('_ownerErr: ' + (_ownerErr.message || _ownerErr)); }
+      } catch (_ownerErr) { log_('_ownerErr', (_ownerErr.message || _ownerErr)); }
     }
 
     if (!userRecord) {
@@ -205,7 +205,7 @@ function doGetWebDashboard(e) {
       // Auto-remember SSO users — no toggle needed; Google auth is already trusted
       var ssoToken = Auth.createSessionToken(user.email, 'sso');
       if (ssoToken && typeof ssoToken === 'object' && ssoToken.error) {
-        Logger.log('SSO auto-session storage failed: ' + ssoToken.message);
+        log_('SSO auto-session storage failed', ssoToken.message);
       } else {
         sessionToken = ssoToken;
       }
@@ -213,7 +213,7 @@ function doGetWebDashboard(e) {
       var tokenResult = Auth.createSessionToken(user.email);
       // C3: Handle session storage failure — createSessionToken may return error object
       if (tokenResult && typeof tokenResult === 'object' && tokenResult.error) {
-        Logger.log('Session token storage failed: ' + tokenResult.message);
+        log_('Session token storage failed', tokenResult.message);
         // Proceed without remember-me; user will need to re-authenticate next visit
       } else {
         sessionToken = tokenResult;
@@ -230,13 +230,13 @@ function doGetWebDashboard(e) {
 
     var elapsed = Date.now() - _doGetStart;
     if (elapsed > 20000) {
-      Logger.log('doGet slow: ' + elapsed + 'ms before serving dashboard');
+      log_('doGet slow', elapsed + 'ms before serving dashboard');
     }
 
     return _serveDashboard(config, userRecord, role, sessionToken, initialTab, user.method);
 
   } catch (err) {
-    Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
+    log_('WebApp doGet error', err.message + '\n' + err.stack);
     return _serveError(config, 'error', err.message);
   }
 }
@@ -353,7 +353,7 @@ function _serveError(config, type, detail) {
 
   // Log the actual error detail server-side; never expose raw error messages to the client
   if (type === 'error' && detail) {
-    Logger.log('WebApp _serveError: ' + detail);
+    log_('WebApp _serveError', detail);
   }
 
   template.pageData = JSON.stringify({
@@ -424,7 +424,7 @@ function _sanitizeConfig(config) {
  * @returns {HtmlOutput}
  */
 function _serveFatalError(detail) {
-  if (detail) Logger.log('_serveFatalError detail: ' + detail);
+  if (detail) log_('_serveFatalError detail', detail);
 
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -780,7 +780,7 @@ function _getWebAppUrlSafe() {
   try {
     return ScriptApp.getService().getUrl() || '';
   } catch (_e) {
-    Logger.log('_getWebAppUrlSafe: ScriptApp.getService().getUrl() failed: ' + _e.message);
+    log_('_getWebAppUrlSafe', 'ScriptApp.getService().getUrl() failed: ' + _e.message);
     return '';
   }
 }
@@ -811,7 +811,7 @@ function getMemberViewHtml() {
     // No CacheService — member_view.html exceeds the 100KB per-key limit.
     return HtmlService.createHtmlOutputFromFile('member_view').getContent();
   } catch (e) {
-    Logger.log('getMemberViewHtml error: ' + e.message);
+    log_('getMemberViewHtml error', e.message);
     return '';
   }
 }
@@ -836,7 +836,7 @@ function getOrgChartHtml() {
     try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
     return html;
   } catch (e) {
-    Logger.log('getOrgChartHtml error: ' + e.message);
+    log_('getOrgChartHtml error', e.message);
     return '<div class="empty-state">Org chart could not be loaded.</div>';
   }
 }
@@ -882,11 +882,11 @@ function diagnoseWebApp() {
     try {
       var val = fn();
       results.push({ step: name, ok: true, ms: Date.now() - t0, detail: val });
-      Logger.log('✓ ' + name + ' (' + (Date.now() - t0) + 'ms)');
+      log_('step', '✓ ' + name + ' (' + (Date.now() - t0) + 'ms)');
       return val;
     } catch (err) {
       results.push({ step: name, ok: false, ms: Date.now() - t0, error: err.message });
-      Logger.log('✗ ' + name + ' (' + (Date.now() - t0) + 'ms): ' + err.message);
+      log_('step', '✗ ' + name + ' (' + (Date.now() - t0) + 'ms): ' + err.message);
       return null;
     }
   }
@@ -994,18 +994,18 @@ function diagnoseWebApp() {
     return 'OK';
   });
 
-  Logger.log('\n=== DIAGNOSIS COMPLETE (' + (Date.now() - start) + 'ms total) ===');
+  log_('step', '\n=== DIAGNOSIS COMPLETE (' + (Date.now() - start) + 'ms total) ===');
   var failed = results.filter(function(r) { return !r.ok; });
   if (failed.length === 0) {
-    Logger.log('All steps passed. If the web app still fails to load:');
-    Logger.log('  1. Check that you created a NEW deployment version after clasp push');
-    Logger.log('  2. Clear browser cache and try incognito window');
-    Logger.log('  3. Check Apps Script editor Executions log for doGet errors');
-    Logger.log('  4. If HTML output > 450 KB, the page may be too large for GAS');
+    log_('All steps passed. If the web app still fails to load', '');
+    log_('step', '  1. Check that you created a NEW deployment version after clasp push');
+    log_('step', '  2. Clear browser cache and try incognito window');
+    log_('step', '  3. Check Apps Script editor Executions log for doGet errors');
+    log_('step', '  4. If HTML output > 450 KB, the page may be too large for GAS');
   } else {
-    Logger.log(failed.length + ' step(s) failed:');
+    log_('step', failed.length + ' step(s) failed:');
     for (var i = 0; i < failed.length; i++) {
-      Logger.log('  ✗ ' + failed[i].step + ': ' + failed[i].error);
+      log_('step', '  ✗ ' + failed[i].step + ': ' + failed[i].error);
     }
   }
   return results;

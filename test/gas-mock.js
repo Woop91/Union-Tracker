@@ -400,6 +400,13 @@ global.UrlFetchApp = {
   }))
 };
 
+// --- log_ (defined in 01_Core.gs) ---
+// Available as a global so test files that don't load 01_Core.gs can still
+// use files that call log_() without a ReferenceError.
+global.log_ = function(context, message, level) {
+  Logger.log('[' + (level || 'INFO') + '] ' + context + ': ' + message);
+};
+
 // --- Auth helpers (defined in 21_WebDashDataService.gs) ---
 // Mocked globally so test files that don't load WebDashDataService can still
 // test wrapper functions in 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.

@@ -218,18 +218,18 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
       var checklistId = 'CL-' + String(maxNum + 1 + i).padStart(5, '0');
 
       var row = [];
-      row[CHECKLIST_COLS.CHECKLIST_ID - 1] = checklistId;
-      row[CHECKLIST_COLS.CASE_ID - 1] = caseId;
-      row[CHECKLIST_COLS.ACTION_TYPE - 1] = actionType;
-      row[CHECKLIST_COLS.ITEM_TEXT - 1] = item.text;
-      row[CHECKLIST_COLS.CATEGORY - 1] = item.category;
-      row[CHECKLIST_COLS.REQUIRED - 1] = item.required ? 'Yes' : 'No';
-      row[CHECKLIST_COLS.COMPLETED - 1] = false;
-      row[CHECKLIST_COLS.COMPLETED_BY - 1] = '';
-      row[CHECKLIST_COLS.COMPLETED_DATE - 1] = '';
-      row[CHECKLIST_COLS.DUE_DATE - 1] = '';
-      row[CHECKLIST_COLS.NOTES - 1] = '';
-      row[CHECKLIST_COLS.SORT_ORDER - 1] = i + 1;
+      setCol_(row, CHECKLIST_COLS.CHECKLIST_ID, checklistId);
+      setCol_(row, CHECKLIST_COLS.CASE_ID, caseId);
+      setCol_(row, CHECKLIST_COLS.ACTION_TYPE, actionType);
+      setCol_(row, CHECKLIST_COLS.ITEM_TEXT, item.text);
+      setCol_(row, CHECKLIST_COLS.CATEGORY, item.category);
+      setCol_(row, CHECKLIST_COLS.REQUIRED, item.required ? 'Yes' : 'No');
+      setCol_(row, CHECKLIST_COLS.COMPLETED, false);
+      setCol_(row, CHECKLIST_COLS.COMPLETED_BY, '');
+      setCol_(row, CHECKLIST_COLS.COMPLETED_DATE, '');
+      setCol_(row, CHECKLIST_COLS.DUE_DATE, '');
+      setCol_(row, CHECKLIST_COLS.NOTES, '');
+      setCol_(row, CHECKLIST_COLS.SORT_ORDER, i + 1);
 
       rows.push(row);
       itemsCreated.push({
@@ -293,20 +293,20 @@ function getChecklistItems(caseId) {
 
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
-    if (row[CHECKLIST_COLS.CASE_ID - 1] === caseId) {
+    if (col_(row, CHECKLIST_COLS.CASE_ID) === caseId) {
       items.push({
-        checklistId: row[CHECKLIST_COLS.CHECKLIST_ID - 1],
-        caseId: row[CHECKLIST_COLS.CASE_ID - 1],
-        actionType: row[CHECKLIST_COLS.ACTION_TYPE - 1],
-        itemText: row[CHECKLIST_COLS.ITEM_TEXT - 1],
-        category: row[CHECKLIST_COLS.CATEGORY - 1],
-        required: row[CHECKLIST_COLS.REQUIRED - 1] === 'Yes',
-        completed: row[CHECKLIST_COLS.COMPLETED - 1] === true,
-        completedBy: row[CHECKLIST_COLS.COMPLETED_BY - 1],
-        completedDate: row[CHECKLIST_COLS.COMPLETED_DATE - 1],
-        dueDate: row[CHECKLIST_COLS.DUE_DATE - 1],
-        notes: row[CHECKLIST_COLS.NOTES - 1],
-        sortOrder: row[CHECKLIST_COLS.SORT_ORDER - 1],
+        checklistId: col_(row, CHECKLIST_COLS.CHECKLIST_ID),
+        caseId: col_(row, CHECKLIST_COLS.CASE_ID),
+        actionType: col_(row, CHECKLIST_COLS.ACTION_TYPE),
+        itemText: col_(row, CHECKLIST_COLS.ITEM_TEXT),
+        category: col_(row, CHECKLIST_COLS.CATEGORY),
+        required: col_(row, CHECKLIST_COLS.REQUIRED) === 'Yes',
+        completed: col_(row, CHECKLIST_COLS.COMPLETED) === true,
+        completedBy: col_(row, CHECKLIST_COLS.COMPLETED_BY),
+        completedDate: col_(row, CHECKLIST_COLS.COMPLETED_DATE),
+        dueDate: col_(row, CHECKLIST_COLS.DUE_DATE),
+        notes: col_(row, CHECKLIST_COLS.NOTES),
+        sortOrder: col_(row, CHECKLIST_COLS.SORT_ORDER),
         rowIndex: i + 2  // 1-indexed, accounting for header
       });
     }
@@ -420,9 +420,9 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
   var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
 
   for (var i = 0; i < data.length; i++) {
-    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
+    if (col_(data[i], CHECKLIST_COLS.CHECKLIST_ID) === checklistId) {
       var row = i + 2;
-      var caseId = data[i][CHECKLIST_COLS.CASE_ID - 1];
+      var caseId = col_(data[i], CHECKLIST_COLS.CASE_ID);
 
       // Update completed status
       sheet.getRange(row, CHECKLIST_COLS.COMPLETED).setValue(completed);
@@ -490,7 +490,7 @@ function addChecklistItem(caseId, itemText, category, required, dueDate) {
       var grievanceData = grievanceSheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.ACTION_TYPE).getValues();
       for (var j = 0; j < grievanceData.length; j++) {
         if (grievanceData[j][0] === caseId) {
-          actionType = grievanceData[j][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
+          actionType = col_(grievanceData[j], GRIEVANCE_COLS.ACTION_TYPE) || 'Grievance';
           break;
         }
       }
@@ -550,8 +550,8 @@ function deleteChecklistItem(checklistId) {
   var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
 
   for (var i = 0; i < data.length; i++) {
-    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
-      var caseId = data[i][CHECKLIST_COLS.CASE_ID - 1];
+    if (col_(data[i], CHECKLIST_COLS.CHECKLIST_ID) === checklistId) {
+      var caseId = col_(data[i], CHECKLIST_COLS.CASE_ID);
       var row = i + 2;
       sheet.deleteRow(row);
 
@@ -582,24 +582,24 @@ function updateChecklistItem(checklistId, updates) {
   var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
 
   for (var i = 0; i < data.length; i++) {
-    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
+    if (col_(data[i], CHECKLIST_COLS.CHECKLIST_ID) === checklistId) {
       var row = i + 2;
       var rowData = data[i].slice(); // copy row; apply all changes in-memory
 
       if (updates.itemText !== undefined) {
-        rowData[CHECKLIST_COLS.ITEM_TEXT - 1] = escapeForFormula(updates.itemText);
+        setCol_(rowData, CHECKLIST_COLS.ITEM_TEXT, escapeForFormula(updates.itemText));
       }
       if (updates.category !== undefined) {
-        rowData[CHECKLIST_COLS.CATEGORY - 1] = escapeForFormula(updates.category);
+        setCol_(rowData, CHECKLIST_COLS.CATEGORY, escapeForFormula(updates.category));
       }
       if (updates.required !== undefined) {
-        rowData[CHECKLIST_COLS.REQUIRED - 1] = updates.required ? 'Yes' : 'No';
+        setCol_(rowData, CHECKLIST_COLS.REQUIRED, updates.required ? 'Yes' : 'No');
       }
       if (updates.dueDate !== undefined) {
-        rowData[CHECKLIST_COLS.DUE_DATE - 1] = updates.dueDate;
+        setCol_(rowData, CHECKLIST_COLS.DUE_DATE, updates.dueDate);
       }
       if (updates.notes !== undefined) {
-        rowData[CHECKLIST_COLS.NOTES - 1] = escapeForFormula(updates.notes);
+        setCol_(rowData, CHECKLIST_COLS.NOTES, escapeForFormula(updates.notes));
       }
 
       // Write entire row in one API call instead of one setValue per field
@@ -719,11 +719,7 @@ function showChecklistDialog() {
     return;
   }
 
-  var html = HtmlService.createHtmlOutput(getChecklistDialogHtml(caseId))
-    .setWidth(700)
-    .setHeight(600);
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Case Checklist: ' + caseId);
+  showDialog_(getChecklistDialogHtml(caseId), 'Case Checklist: ' + caseId, 700, 600);
 }
 
 /**
@@ -926,9 +922,9 @@ function createChecklistForCaseId(caseId) {
   var issueCategory = '';
 
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) === String(caseId)) {
-      actionType = data[i][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
-      issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
+    if (String(col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID)) === String(caseId)) {
+      actionType = col_(data[i], GRIEVANCE_COLS.ACTION_TYPE) || 'Grievance';
+      issueCategory = col_(data[i], GRIEVANCE_COLS.ISSUE_CATEGORY) || '';
       break;
     }
   }
@@ -1156,7 +1152,7 @@ function setupChecklistCalcSheet() {
   // Hide the sheet (mobile-safe via Sheets API + protection)
   setSheetVeryHidden_(sheet);
 
-  Logger.log('_Checklist_Calc sheet setup complete with self-healing formulas');
+  log_('setupChecklistCalcSheet', '_Checklist_Calc sheet setup complete with self-healing formulas');
   return sheet;
 }
 
@@ -1179,7 +1175,7 @@ function syncChecklistCalcToGrievanceLog() {
   // Get grievance log
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!grievanceSheet) {
-    Logger.log('Grievance Log not found');
+    log_('syncChecklistCalcToGrievanceLog', 'Grievance Log not found');
     return errorResponse('Grievance Log not found');
   }
 
@@ -1225,7 +1221,7 @@ function syncChecklistCalcToGrievanceLog() {
       .setValues(progressValues);
   }
 
-  Logger.log('Synced checklist progress: ' + updatedCount + ' cases updated');
+  log_('Synced checklist progress', updatedCount + ' cases updated');
   return { success: true, updatedCount: updatedCount };
 }
 /**
@@ -1309,7 +1305,7 @@ function getHeaderMap(sheetName, forceRefresh) {
     if (cached) {
       try {
         return JSON.parse(cached);
-      } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+      } catch (_e) { log_('_e', (_e.message || _e)); }
     }
   }
 
@@ -1332,7 +1328,7 @@ function getHeaderMap(sheetName, forceRefresh) {
   // Cache for 5 minutes
   try {
     cache.put(cacheKey, JSON.stringify(headerMap), EXTENSION_CONFIG.CACHE_TTL_SECONDS);
-  } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  } catch (_e) { log_('_e', (_e.message || _e)); }
 
   return headerMap;
 }
@@ -1606,7 +1602,7 @@ function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNo
   let rowIndex = -1;
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+    if (col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) === grievanceId) {
       rowIndex = i + 1;
       break;
     }

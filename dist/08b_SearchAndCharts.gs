@@ -76,14 +76,14 @@ function getDesktopSearchData(query, tab, filters) {
       var mData = mSheet.getRange(2, 1, mSheet.getLastRow() - 1, lastCol).getValues();
 
       mData.forEach(function(row, index) {
-        var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
-        var firstName = row[MEMBER_COLS.FIRST_NAME - 1] || '';
-        var lastName = row[MEMBER_COLS.LAST_NAME - 1] || '';
+        var memberId = col_(row, MEMBER_COLS.MEMBER_ID) || '';
+        var firstName = col_(row, MEMBER_COLS.FIRST_NAME) || '';
+        var lastName = col_(row, MEMBER_COLS.LAST_NAME) || '';
         var fullName = firstName + ' ' + lastName;
-        var email = row[MEMBER_COLS.EMAIL - 1] || '';
-        var jobTitle = row[MEMBER_COLS.JOB_TITLE - 1] || '';
-        var location = row[MEMBER_COLS.WORK_LOCATION - 1] || '';
-        var isSteward = row[MEMBER_COLS.IS_STEWARD - 1] || '';
+        var email = col_(row, MEMBER_COLS.EMAIL) || '';
+        var jobTitle = col_(row, MEMBER_COLS.JOB_TITLE) || '';
+        var location = col_(row, MEMBER_COLS.WORK_LOCATION) || '';
+        var isSteward = col_(row, MEMBER_COLS.IS_STEWARD) || '';
 
         // Apply filters
         if (filters.location && location !== filters.location) return;
@@ -118,15 +118,15 @@ function getDesktopSearchData(query, tab, filters) {
       var gData = gSheet.getRange(2, 1, gSheet.getLastRow() - 1, lastGCol).getValues();
 
       gData.forEach(function(row, index) {
-        var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
-        var firstName = row[GRIEVANCE_COLS.FIRST_NAME - 1] || '';
-        var lastName = row[GRIEVANCE_COLS.LAST_NAME - 1] || '';
+        var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID) || '';
+        var firstName = col_(row, GRIEVANCE_COLS.FIRST_NAME) || '';
+        var lastName = col_(row, GRIEVANCE_COLS.LAST_NAME) || '';
         var fullName = firstName + ' ' + lastName;
-        var status = row[GRIEVANCE_COLS.STATUS - 1] || '';
-        var issueType = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
-        var location = row[GRIEVANCE_COLS.LOCATION - 1] || '';
-        var steward = row[GRIEVANCE_COLS.STEWARD - 1] || '';
-        var dateFiled = row[GRIEVANCE_COLS.DATE_FILED - 1] || '';
+        var status = col_(row, GRIEVANCE_COLS.STATUS) || '';
+        var issueType = col_(row, GRIEVANCE_COLS.ISSUE_CATEGORY) || '';
+        var location = col_(row, GRIEVANCE_COLS.LOCATION) || '';
+        var steward = col_(row, GRIEVANCE_COLS.STEWARD) || '';
+        var dateFiled = col_(row, GRIEVANCE_COLS.DATE_FILED) || '';
 
         // Apply filters
         if (filters.status && status !== filters.status) return;
@@ -308,13 +308,13 @@ function advancedSearch(filters) {
         var matches = true;
 
         // Apply department filter (matches against Unit column, not Job Title)
-        if (filters.department && row[MEMBER_COLS.UNIT - 1] !== filters.department) {
+        if (filters.department && col_(row, MEMBER_COLS.UNIT) !== filters.department) {
           matches = false;
         }
 
         // Apply name filter
         if (filters.name && matches) {
-          var fullName = (row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1]).toLowerCase();
+          var fullName = (col_(row, MEMBER_COLS.FIRST_NAME) + ' ' + col_(row, MEMBER_COLS.LAST_NAME)).toLowerCase();
           if (fullName.indexOf(filters.name.toLowerCase()) === -1) {
             matches = false;
           }
@@ -322,17 +322,17 @@ function advancedSearch(filters) {
 
         // Apply steward filter
         if (filters.stewardOnly && matches) {
-          if (!isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) {
+          if (!isTruthyValue(col_(row, MEMBER_COLS.IS_STEWARD))) {
             matches = false;
           }
         }
 
-        if (matches && row[MEMBER_COLS.MEMBER_ID - 1]) {
+        if (matches && col_(row, MEMBER_COLS.MEMBER_ID)) {
           results.push({
-            id: row[MEMBER_COLS.MEMBER_ID - 1],
+            id: col_(row, MEMBER_COLS.MEMBER_ID),
             type: 'member',
-            title: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
-            subtitle: row[MEMBER_COLS.JOB_TITLE - 1],
+            title: col_(row, MEMBER_COLS.FIRST_NAME) + ' ' + col_(row, MEMBER_COLS.LAST_NAME),
+            subtitle: col_(row, MEMBER_COLS.JOB_TITLE),
             row: i + 1
           });
         }
@@ -351,31 +351,31 @@ function advancedSearch(filters) {
         var gMatches = true;
 
         // Apply status filter
-        if (filters.status && gRow[GRIEVANCE_COLS.STATUS - 1] !== filters.status) {
+        if (filters.status && col_(gRow, GRIEVANCE_COLS.STATUS) !== filters.status) {
           gMatches = false;
         }
 
         // Apply date range filter
         if (filters.startDate && gMatches) {
-          var filedDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
+          var filedDate = col_(gRow, GRIEVANCE_COLS.DATE_FILED);
           if (filedDate && new Date(filedDate) < new Date(filters.startDate)) {
             gMatches = false;
           }
         }
 
         if (filters.endDate && gMatches) {
-          var endFiledDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
+          var endFiledDate = col_(gRow, GRIEVANCE_COLS.DATE_FILED);
           if (endFiledDate && new Date(endFiledDate) > new Date(filters.endDate)) {
             gMatches = false;
           }
         }
 
-        if (gMatches && gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
+        if (gMatches && col_(gRow, GRIEVANCE_COLS.GRIEVANCE_ID)) {
           results.push({
-            id: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+            id: col_(gRow, GRIEVANCE_COLS.GRIEVANCE_ID),
             type: 'grievance',
-            title: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
-            subtitle: gRow[GRIEVANCE_COLS.STATUS - 1] + ' - ' + gRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
+            title: col_(gRow, GRIEVANCE_COLS.GRIEVANCE_ID),
+            subtitle: col_(gRow, GRIEVANCE_COLS.STATUS) + ' - ' + col_(gRow, GRIEVANCE_COLS.ISSUE_CATEGORY),
             row: j + 1
           });
         }
@@ -429,11 +429,11 @@ function getMemberList() {
   var members = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1]) {
+    if (col_(data[i], MEMBER_COLS.MEMBER_ID)) {
       members.push({
-        id: data[i][MEMBER_COLS.MEMBER_ID - 1],
-        name: data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1],
-        department: data[i][MEMBER_COLS.UNIT - 1]
+        id: col_(data[i], MEMBER_COLS.MEMBER_ID),
+        name: col_(data[i], MEMBER_COLS.FIRST_NAME) + ' ' + col_(data[i], MEMBER_COLS.LAST_NAME),
+        department: col_(data[i], MEMBER_COLS.UNIT)
       });
     }
   }
@@ -817,10 +817,10 @@ function createStewardLeaderboardChart_(sheet) {
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
     var gData = grievanceSheet.getDataRange().getValues();
     for (var g = 1; g < gData.length; g++) {
-      var stewardName = gData[g][GRIEVANCE_COLS.STEWARD - 1] || '';
+      var stewardName = col_(gData[g], GRIEVANCE_COLS.STEWARD) || '';
       if (stewardName) {
         caseCounts[stewardName] = (caseCounts[stewardName] || 0) + 1;
-        var gStatus = gData[g][GRIEVANCE_COLS.STATUS - 1] || '';
+        var gStatus = col_(gData[g], GRIEVANCE_COLS.STATUS) || '';
         if (gStatus === GRIEVANCE_STATUS.WON || gStatus === GRIEVANCE_STATUS.SETTLED) {
           winCounts[stewardName] = (winCounts[stewardName] || 0) + 1;
         }
@@ -832,8 +832,8 @@ function createStewardLeaderboardChart_(sheet) {
 
   // Find stewards and look up their case counts
   for (var i = 1; i < data.length; i++) {
-    if (isTruthyValue(data[i][MEMBER_COLS.IS_STEWARD - 1])) {
-      var fullName = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
+    if (isTruthyValue(col_(data[i], MEMBER_COLS.IS_STEWARD))) {
+      var fullName = col_(data[i], MEMBER_COLS.FIRST_NAME) + ' ' + col_(data[i], MEMBER_COLS.LAST_NAME);
       stewards.push({
         name: fullName,
         cases: caseCounts[fullName] || 0,

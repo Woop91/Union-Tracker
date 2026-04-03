@@ -221,7 +221,7 @@ function _adminIsAuthorized_(email) {
     }
     return false;
   } catch (e) {
-    Logger.log('_adminIsAuthorized_ error: ' + e.message);
+    log_('_adminIsAuthorized_ error', e.message);
     return false; // fail-closed on error
   }
 }
@@ -297,7 +297,7 @@ function adminGetSettings() {
       isOwner: isOwner
     };
   } catch (e) {
-    Logger.log('adminGetSettings error: ' + e.message);
+    log_('adminGetSettings error', e.message);
     return { success: false, error: 'Failed to load settings: ' + e.message };
   }
 }
@@ -382,12 +382,12 @@ function adminSaveSettings(changes) {
 
     // Bust caches after writes
     if (saved > 0) {
-      try { ConfigReader.refreshConfig(); } catch (_e) { Logger.log('Cache refresh: ' + (_e.message || _e)); }
+      try { ConfigReader.refreshConfig(); } catch (_e) { log_('Cache refresh', (_e.message || _e)); }
     }
 
     return { success: true, saved: saved };
   } catch (e) {
-    Logger.log('adminSaveSettings error: ' + e.message);
+    log_('adminSaveSettings error', e.message);
     return { success: false, error: 'Save failed: ' + e.message };
   }
 }
@@ -455,10 +455,10 @@ function adminSaveListValues(configColKey, values) {
       }
 
       // Re-sync data validations so dropdowns reflect new values
-      try { setupDataValidations(); } catch (_e) { Logger.log('Validation sync: ' + (_e.message || _e)); }
+      try { setupDataValidations(); } catch (_e) { log_('Validation sync', (_e.message || _e)); }
 
       // Bust caches
-      try { ConfigReader.refreshConfig(); } catch (_e) { Logger.log('Cache refresh: ' + (_e.message || _e)); }
+      try { ConfigReader.refreshConfig(); } catch (_e) { log_('Cache refresh', (_e.message || _e)); }
 
       logAuditEvent('ADMIN_SETTINGS_LIST_CHANGE', {
         field: configColKey,
@@ -475,7 +475,7 @@ function adminSaveListValues(configColKey, values) {
     if (e.message && e.message.indexOf('lock') !== -1) {
       return { success: false, error: 'Another save is in progress. Please try again.' };
     }
-    Logger.log('adminSaveListValues error: ' + e.message);
+    log_('adminSaveListValues error', e.message);
     return { success: false, error: 'Save failed: ' + e.message };
   }
 }

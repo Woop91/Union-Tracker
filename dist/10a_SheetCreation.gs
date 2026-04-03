@@ -62,7 +62,7 @@ function createConfigSheet(ss) {
   if (!isExistingSheet) {
     sheet.clear();
   } else {
-    Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
+    log_('createConfigSheet', 'Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
 
     // Rename columns whose headers changed between versions (e.g. Managers → Directors).
     // Must run BEFORE orphan detection so the renamed header is recognized as valid.
@@ -74,7 +74,7 @@ function createConfigSheet(ss) {
         var oldName = String(renameRow[rn]).trim();
         if (CONFIG_HEADER_RENAMES_[oldName]) {
           sheet.getRange(2, rn + 1).setValue(CONFIG_HEADER_RENAMES_[oldName]);
-          Logger.log('createConfigSheet: renamed header "' + oldName + '" → "' + CONFIG_HEADER_RENAMES_[oldName] + '"');
+          log_('createConfigSheet', 'renamed header "' + oldName + '" → "' + CONFIG_HEADER_RENAMES_[oldName] + '"');
         }
       }
     }
@@ -117,7 +117,7 @@ function createConfigSheet(ss) {
       var existingHeaders = sheet.getRange(2, 1, 1, existingLastCol).getValues()[0];
       _skipMigration = columnHeaders.every(function(h, i) { return existingHeaders[i] === h; });
       if (_skipMigration) {
-        Logger.log('createConfigSheet: headers already match — skipping migration');
+        log_('createConfigSheet', 'headers already match — skipping migration');
       }
     }
   }
@@ -151,7 +151,7 @@ function createConfigSheet(ss) {
       }
 
       if (needsMigration && lastDataRow >= 3) {
-        Logger.log('createConfigSheet: headers reordered — migrating row 3+ data to match new layout');
+        log_('createConfigSheet', 'headers reordered — migrating row 3+ data to match new layout');
         var dataRows = sheet.getRange(3, 1, lastDataRow - 2, lastCol).getValues();
 
         // Remap each data row: new column order pulls from old column positions
@@ -168,7 +168,7 @@ function createConfigSheet(ss) {
         // Clear old data first to avoid stale values in columns beyond new width
         sheet.getRange(3, 1, lastDataRow - 2, lastCol).clearContent();
         sheet.getRange(3, 1, remapped.length, columnHeaders.length).setValues(remapped);
-        Logger.log('createConfigSheet: migrated ' + remapped.length + ' data row(s) across ' + columnHeaders.length + ' columns');
+        log_('createConfigSheet', 'migrated ' + remapped.length + ' data row(s) across ' + columnHeaders.length + ' columns');
       }
     }
   }
@@ -223,7 +223,7 @@ function createConfigSheet(ss) {
         var repairVal = String(repairCell.getValue() || '').toLowerCase().trim();
         if (repairVal === 'yes' || repairVal === 'no') {
           repairCell.clearContent();
-          Logger.log('createConfigSheet: cleared misaligned toggle value "' + repairVal + '" from non-toggle col ' + nonToggleRepairCols[bc]);
+          log_('createConfigSheet', 'cleared misaligned toggle value "' + repairVal + '" from non-toggle col ' + nonToggleRepairCols[bc]);
         }
       } catch (_v) {}
     }
@@ -236,7 +236,7 @@ function createConfigSheet(ss) {
 
   // ── Organization (A–J)
   seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['SB'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['DDS'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.UNION_PARENT, ['Your Parent Union'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STATE_REGION, ['Your State'], isExistingSheet);
@@ -307,7 +307,7 @@ function createConfigSheet(ss) {
 
   // ── Branding & UX (BQ–BV)
   seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['SB'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['DDS'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MEMBER_LABEL, ['Member'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
@@ -428,7 +428,7 @@ function _migrateOrphanedColumns(sheet) {
     }
     i += count;
   }
-  Logger.log('_migrateOrphanedColumns: deleted ' + toDelete.length +
+  log_('_migrateOrphanedColumns', 'deleted ' + toDelete.length +
     ' orphaned column(s) — sheet now has ' + sheet.getMaxColumns() + ' columns');
   return toDelete.length;
 }
@@ -531,7 +531,7 @@ function _applyYesNoValidation(sheet, col, helpText) {
       cell.setValue('yes');
     } else if (val !== 'yes' && val !== 'no') {
       cell.setValue('yes');
-      Logger.log('_applyYesNoValidation col ' + col + ': replaced unexpected value "' + raw + '" with "yes"');
+      log_('_applyYesNoValidation', '_applyYesNoValidation col ' + col + ': replaced unexpected value "' + raw + '" with "yes"');
     }
     // Try with helpText first; GAS has a known quirk where setDataValidation
     // can throw when helpText is set.  Fall back to no helpText.
@@ -551,7 +551,7 @@ function _applyYesNoValidation(sheet, col, helpText) {
       cell.setDataValidation(rule);
     }
   } catch (e) {
-    Logger.log('_applyYesNoValidation col ' + col + ' FAILED: ' + e.message);
+    log_('_applyYesNoValidation', '_applyYesNoValidation col ' + col + ' FAILED: ' + e.message);
   }
 }
 
@@ -567,12 +567,12 @@ function _applyYesNoValidation(sheet, col, helpText) {
 function populateConfigFromSheetData() {
   // Always resolve fresh column positions from actual sheet headers.
   // Prevents stale MEMBER_COLS/CONFIG_COLS after header renames.
-  try { syncColumnMaps(); } catch (_e) { Logger.log('populateConfig syncColumnMaps: ' + (_e.message || _e)); }
+  try { syncColumnMaps(); } catch (_e) { log_('populateConfig syncColumnMaps', (_e.message || _e)); }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!configSheet) {
-    try { SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.'); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    try { SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.'); } catch (_) { log_('_', (_.message || _)); }
     return;
   }
 
@@ -669,16 +669,16 @@ function populateConfigFromSheetData() {
       var mData = memberSheet.getDataRange().getValues();
       var stewardBucket = initBucket_(CONFIG_COLS.STEWARDS);
       for (var sr = 1; sr < mData.length; sr++) {
-        var isSteward = (mData[sr][MEMBER_COLS.IS_STEWARD - 1] || '').toString().trim();
+        var isSteward = (col_(mData[sr], MEMBER_COLS.IS_STEWARD) || '').toString().trim();
         if (isSteward.toLowerCase() === 'yes' || isSteward === '1' || isSteward.toLowerCase() === 'true') {
-          var fName = (mData[sr][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim();
-          var lName = (mData[sr][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim();
+          var fName = (col_(mData[sr], MEMBER_COLS.FIRST_NAME) || '').toString().trim();
+          var lName = (col_(mData[sr], MEMBER_COLS.LAST_NAME) || '').toString().trim();
           var fullName = (fName + ' ' + lName).trim();
           if (fullName) addValue_(stewardBucket, fullName);
         }
       }
     }
-  } catch (_stErr) { Logger.log('populateConfig steward sync: ' + _stErr.message); }
+  } catch (_stErr) { log_('populateConfig steward sync', _stErr.message); }
 
   // ── Phase 2: Batch-write all columns ──
   for (var col in colBuckets) {
@@ -848,7 +848,7 @@ function applyConfigSheetStyling(sheet) {
   applySectionColors_(sheet, lastCol);
 
   ss.toast('Config sheet styling applied!', 'Theme Applied', 3);
-  Logger.log('Config sheet styling applied to ' + lastCol + ' columns');
+  log_('applyConfigSheetStyling', 'Config sheet styling applied to ' + lastCol + ' columns');
 }
 
 /**
@@ -1161,7 +1161,7 @@ function _addMissingMemberHeaders_(sheet) {
       .setHorizontalAlignment('center');
 
     added.push(header);
-    Logger.log('_addMissingMemberHeaders_: added column "' + header + '" at col ' + targetCol);
+    log_('_addMissingMemberHeaders_', 'added column "' + header + '" at col ' + targetCol);
 
     // ── Per-column post-setup ───────────────────────────────────────────────
     // Dues Paying: checkbox + conditional formatting
@@ -1260,7 +1260,7 @@ function createMemberDirectory(ss) {
         if (HEADER_RENAMES_[oldH]) {
           sheet.getRange(1, ri + 1).setValue(HEADER_RENAMES_[oldH]);
           existingHeaders[ri] = HEADER_RENAMES_[oldH];
-          Logger.log('createMemberDirectory: renamed header "' + oldH + '" → "' + HEADER_RENAMES_[oldH] + '" in col ' + (ri + 1));
+          log_('createMemberDirectory', 'renamed header "' + oldH + '" → "' + HEADER_RENAMES_[oldH] + '" in col ' + (ri + 1));
         }
       }
 
@@ -1281,7 +1281,7 @@ function createMemberDirectory(ss) {
       // Delete right-to-left to avoid shifting issues
       for (var dd = dupeColsToDelete.length - 1; dd >= 0; dd--) {
         sheet.deleteColumn(dupeColsToDelete[dd]);
-        Logger.log('createMemberDirectory: deleted duplicate column at col ' + dupeColsToDelete[dd]);
+        log_('createMemberDirectory', 'deleted duplicate column at col ' + dupeColsToDelete[dd]);
       }
     }
 
@@ -1289,7 +1289,7 @@ function createMemberDirectory(ss) {
     // Data in existing columns is never touched.
     var added = _addMissingMemberHeaders_(sheet);
     if (added.length > 0) {
-      Logger.log('createMemberDirectory: added ' + added.length + ' missing column(s): ' + added.join(', '));
+      log_('createMemberDirectory', 'added ' + added.length + ' missing column(s): ' + added.join(', '));
       SpreadsheetApp.getActive().toast(
         'Added ' + added.length + ' new column(s): ' + added.join(', '),
         '\uD83D\uDCCB Member Directory', 5
@@ -1373,7 +1373,7 @@ function createMemberDirectory(ss) {
 
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
   } catch (e) {
-    Logger.log('Member Directory column group setup skipped: ' + e.toString());
+    log_('Member Directory column group setup skipped', e.toString());
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1565,7 +1565,7 @@ function _addMissingGrievanceHeaders_(sheet) {
       .setHorizontalAlignment('center');
 
     added.push(header);
-    Logger.log('_addMissingGrievanceHeaders_: added column "' + header + '" at col ' + targetCol);
+    log_('_addMissingGrievanceHeaders_', 'added column "' + header + '" at col ' + targetCol);
 
     // ── Per-column post-setup ───────────────────────────────────────────────
     // Add cases here for any Grievance column that needs special formatting on first-add.
@@ -1602,7 +1602,7 @@ function createGrievanceLog(ss) {
     // Data in existing columns is never touched.
     var added = _addMissingGrievanceHeaders_(sheet);
     if (added.length > 0) {
-      Logger.log('createGrievanceLog: added ' + added.length + ' missing column(s): ' + added.join(', '));
+      log_('createGrievanceLog', 'added ' + added.length + ' missing column(s): ' + added.join(', '));
       SpreadsheetApp.getActive().toast(
         'Added ' + added.length + ' new column(s): ' + added.join(', '),
         '\uD83D\uDCCB Grievance Log', 5
@@ -1685,7 +1685,7 @@ function createGrievanceLog(ss) {
     // Hide Drive Folder ID column (AG) - internal use only
     sheet.hideColumns(GRIEVANCE_COLS.DRIVE_FOLDER_ID, 1);
   } catch (e) {
-    Logger.log('Column group setup skipped: ' + e.toString());
+    log_('Column group setup skipped', e.toString());
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1885,7 +1885,7 @@ function createVolunteerHoursSheet(ss) {
   // Set tab color
   sheet.setTabColor('#8B5CF6');  // Purple for volunteer hours
 
-  Logger.log('Volunteer Hours sheet created');
+  log_('createVolunteerHoursSheet', 'Volunteer Hours sheet created');
 }
 
 /**
@@ -1973,7 +1973,7 @@ function createMeetingAttendanceSheet(ss) {
   // Set tab color
   sheet.setTabColor('#10B981');  // Green for meeting attendance
 
-  Logger.log('Meeting Attendance sheet created');
+  log_('createMeetingAttendanceSheet', 'Meeting Attendance sheet created');
 }
 
 /**
@@ -2024,7 +2024,7 @@ function createMeetingCheckInLogSheet(ss) {
   // Set tab color
   sheet.setTabColor('#8B5CF6');  // Purple for check-in
 
-  Logger.log('Meeting Check-In Log sheet created');
+  log_('createMeetingCheckInLogSheet', 'Meeting Check-In Log sheet created');
 }
 
 /**
@@ -2062,7 +2062,7 @@ function ensureGrievanceArchiveSheet_(ss) {
   }
   // Very hidden — only accessible via script
   setSheetVeryHidden_(archive);
-  Logger.log('Created grievance archive sheet: ' + SHEETS.GRIEVANCE_ARCHIVE);
+  log_('Created grievance archive sheet', SHEETS.GRIEVANCE_ARCHIVE);
   return archive;
 }
 
@@ -2102,6 +2102,6 @@ function ensureNonMemberContactsSheet_(ss) {
     .build();
   sheet.getRange(2, NMC_COLS.IS_STEWARD, 500, 1).setDataValidation(stewardRule);
 
-  Logger.log('Created Non-Member Contacts sheet: ' + SHEETS.NON_MEMBER_CONTACTS);
+  log_('Created Non-Member Contacts sheet', SHEETS.NON_MEMBER_CONTACTS);
   return sheet;
 }

@@ -226,7 +226,7 @@ var TestRunner = (function () {
       // ── Global timeout check before each suite ──
       if (new Date().getTime() - startTime > MAX_RUNTIME_MS) {
         timedOut = true;
-        Logger.log('TestRunner: Global timeout reached (' + MAX_RUNTIME_MS + 'ms) — skipping remaining suites.');
+        log_('TestRunner', 'Global timeout reached (' + MAX_RUNTIME_MS + 'ms) — skipping remaining suites.');
         // Count remaining tests as skipped
         for (var ri = si; ri < suiteNames.length; ri++) {
           var remaining = suites[suiteNames[ri]];
@@ -259,7 +259,7 @@ var TestRunner = (function () {
           results.summary.skipped += leftInSuite;
           results.summary.total += leftInSuite;
           timedOut = true;
-          Logger.log('TestRunner: Timeout mid-suite "' + suiteName + '" — skipping ' + leftInSuite + ' remaining tests.');
+          log_('TestRunner', 'Timeout mid-suite "' + suiteName + '" — skipping ' + leftInSuite + ' remaining tests.');
           break;
         }
 
@@ -281,7 +281,7 @@ var TestRunner = (function () {
 
         // Flag tests that ran too long (informational — they still completed)
         if (testResult.duration > PER_TEST_MAX_MS) {
-          Logger.log('TestRunner: SLOW test "' + test.name + '" took ' + testResult.duration + 'ms (limit: ' + PER_TEST_MAX_MS + 'ms)');
+          log_('TestRunner', 'SLOW test "' + test.name + '" took ' + testResult.duration + 'ms (limit: ' + PER_TEST_MAX_MS + 'ms)');
           testResult.slow = true;
         }
 
@@ -313,7 +313,7 @@ var TestRunner = (function () {
       var json = JSON.stringify(results);
       PropertiesService.getScriptProperties().setProperty(RESULTS_KEY, json);
     } catch (e) {
-      Logger.log('TestRunner: Failed to store results — ' + e.message);
+      log_('TestRunner', 'Failed to store results — ' + e.message);
     }
   }
 
@@ -464,14 +464,14 @@ function runScheduledTests() {
   // Log unified error summary for Apps Script console visibility
   if (results.summary.failed > 0) {
     var summary = TestRunner.getErrorSummary();
-    Logger.log('TestRunner: ' + summary.totalErrors + ' FAILURE(S) in ' + summary.totalTests + ' tests (' + results.duration + 'ms)');
+    log_('TestRunner', summary.totalErrors + ' FAILURE(S) in ' + summary.totalTests + ' tests (' + results.duration + 'ms)');
     for (var i = 0; i < summary.failures.length; i++) {
       var f = summary.failures[i];
-      Logger.log('  [' + f.suite.toUpperCase() + '] ' + f.test + ' — ' + f.error);
+      log_('runScheduledTests', '  [' + f.suite.toUpperCase() + '] ' + f.test + ' — ' + f.error);
     }
     _sendTestFailureEmail(results);
   } else {
-    Logger.log('TestRunner: All ' + results.summary.passed + ' tests passed (' + results.duration + 'ms)');
+    log_('TestRunner', 'All ' + results.summary.passed + ' tests passed (' + results.duration + 'ms)');
   }
 }
 
@@ -491,7 +491,7 @@ function _getTestNotifyEmail() {
     // Basic email validation
     return (val && val.indexOf('@') > 0) ? val : null;
   } catch (e) {
-    Logger.log('TestRunner: Failed to read notify email — ' + e.message);
+    log_('TestRunner', 'Failed to read notify email — ' + e.message);
     return null;
   }
 }
@@ -505,7 +505,7 @@ function _getTestNotifyEmail() {
 function _sendTestFailureEmail(results) {
   var email = _getTestNotifyEmail();
   if (!email) {
-    Logger.log('TestRunner: No TEST_NOTIFY_EMAIL configured — skipping failure notification.');
+    log_('TestRunner', 'No TEST_NOTIFY_EMAIL configured — skipping failure notification.');
     return;
   }
 
@@ -513,7 +513,7 @@ function _sendTestFailureEmail(results) {
     // Check daily quota — don't burn emails if quota is low
     var remaining = MailApp.getRemainingDailyQuota();
     if (remaining < 5) {
-      Logger.log('TestRunner: MailApp quota too low (' + remaining + ') — skipping email.');
+      log_('TestRunner', 'MailApp quota too low (' + remaining + ') — skipping email.');
       return;
     }
 
@@ -596,9 +596,9 @@ function _sendTestFailureEmail(results) {
       htmlBody: html
     });
 
-    Logger.log('TestRunner: Failure email sent to ' + email);
+    log_('TestRunner', 'Failure email sent to ' + email);
   } catch (e) {
-    Logger.log('TestRunner: Failed to send notification email — ' + e.message);
+    log_('TestRunner', 'Failed to send notification email — ' + e.message);
   }
 }
 
@@ -613,27 +613,27 @@ function runTestsFromMenu() {
 
   if (results.summary.failed > 0) {
     var summary = TestRunner.getErrorSummary();
-    Logger.log('=== TEST ERROR SUMMARY ===');
-    Logger.log(summary.totalErrors + ' failure(s) across ' + summary.totalTests + ' total tests');
+    log_('runTestsFromMenu', '=== TEST ERROR SUMMARY ===');
+    log_('runTestsFromMenu', summary.totalErrors + ' failure(s) across ' + summary.totalTests + ' total tests');
     for (var i = 0; i < summary.failures.length; i++) {
       var f = summary.failures[i];
-      Logger.log('[' + f.suite.toUpperCase() + '] ' + f.test + ': ' + f.error);
+      log_('runTestsFromMenu', '[' + f.suite.toUpperCase() + '] ' + f.test + ': ' + f.error);
     }
-    Logger.log('=== END ERROR SUMMARY ===');
+    log_('runTestsFromMenu', '=== END ERROR SUMMARY ===');
     msg += ' — see View > Logs for details';
   }
 
   // Show results dialog (more visible than toast)
   var icon = results.summary.failed > 0 ? '❌' : '✅';
-  var html = HtmlService.createHtmlOutput(
+  showDialog_(
     '<div style="font-family:sans-serif;padding:16px;">' +
     '<h2 style="margin:0 0 12px;">' + icon + ' Test Results</h2>' +
     '<p style="font-size:16px;font-weight:600;">' + msg + '</p>' +
     (results.timedOut ? '<p style="color:#f59e0b;">⚠ Some suites timed out</p>' : '') +
     '<p style="color:#666;font-size:13px;">Full details in View → Logs or use the SPA Test Runner tab.</p>' +
-    '</div>'
-  ).setWidth(400).setHeight(180);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Test Runner Results');
+    '</div>',
+    'Test Runner Results', 400, 180
+  );
 }
 
 /**
@@ -1148,7 +1148,7 @@ function test_colmap_noDuplicatePositions() {
       if (seen[val]) {
         // This is an alias — just note it, don't fail.
         // Aliases are intentional (e.g., LOCATION = WORK_LOCATION)
-        Logger.log('TestRunner: ' + set.name + ' alias detected: ' +
+        log_('TestRunner', set.name + ' alias detected: ' +
           keys[k] + ' and ' + seen[val] + ' both map to col ' + val);
       }
       seen[val] = keys[k];
@@ -1922,7 +1922,7 @@ function test_emailsend_mailAppAccessible() {
   } catch (e) {
     // Downgrade to warning — GmailApp is the primary sender post-v4.25.8.
     // MailApp failure = fallback is broken but primary path still works.
-    Logger.log('test_emailsend_mailAppAccessible WARNING: MailApp scope not authorized. '
+    log_('test_emailsend_mailAppAccessible WARNING', 'MailApp scope not authorized. '
       + 'GmailApp path still works. To fix: re-deploy web app and re-authorize scopes. '
       + 'Error: ' + e.message);
     // Soft-fail: mark as passed but log the warning

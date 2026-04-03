@@ -441,11 +441,7 @@ function openCellMultiSelectEditor() {
  * @param {string} callback - Name of function to call with selections
  */
 function showMultiSelectDialog(title, items, callback) {
-  const html = HtmlService.createHtmlOutput(getMultiSelectHtml(items, callback))
-    .setWidth(DIALOG_SIZES.MEDIUM.width)
-    .setHeight(DIALOG_SIZES.MEDIUM.height);
-
-  SpreadsheetApp.getUi().showModalDialog(html, title);
+  showDialog_(getMultiSelectHtml(items, callback), title, DIALOG_SIZES.MEDIUM.width, DIALOG_SIZES.MEDIUM.height);
 }
 
 /**

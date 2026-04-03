@@ -49,7 +49,7 @@ function CREATE_DASHBOARD() {
   try {
     ui = SpreadsheetApp.getUi();
   } catch (e) {
-    Logger.log('UI not available, proceeding without confirmation: ' + e.message);
+    log_('UI not available, proceeding without confirmation', e.message);
   }
 
   if (ui) {
@@ -111,7 +111,7 @@ function CREATE_DASHBOARD() {
           ss.toast('Drive folders skipped — check logs', '⚠️ Warning', 3);
         }
       } catch (driveErr) {
-        Logger.log('Drive folder setup error: ' + driveErr.message);
+        log_('Drive folder setup error', driveErr.message);
         ss.toast('Drive folders skipped: ' + driveErr.message, '⚠️ Warning', 4);
       }
     }
@@ -126,7 +126,7 @@ function CREATE_DASHBOARD() {
           ss.toast('Calendar setup skipped — check logs', '⚠️ Warning', 3);
         }
       } catch (calErr) {
-        Logger.log('Calendar setup error: ' + calErr.message);
+        log_('Calendar setup error', calErr.message);
         ss.toast('Calendar skipped: ' + calErr.message, '⚠️ Warning', 4);
       }
     }
@@ -243,7 +243,7 @@ function CREATE_DASHBOARD() {
         createResourcesSheet(ss);
         ss.toast('📚 Resources sheet created', '🏗️ Progress', 2);
       } catch (resError) {
-        Logger.log('Resources sheet skipped: ' + resError.message);
+        log_('Resources sheet skipped', resError.message);
       }
     }
 
@@ -252,7 +252,7 @@ function CREATE_DASHBOARD() {
         createResourceConfigSheet(ss);
         ss.toast('📚 Resource Config sheet created', '🏗️ Progress', 2);
       } catch (rcError) {
-        Logger.log('Resource Config sheet skipped: ' + rcError.message);
+        log_('Resource Config sheet skipped', rcError.message);
       }
     }
 
@@ -272,7 +272,7 @@ function CREATE_DASHBOARD() {
         initWorkloadTrackerSheets();
         ss.toast('Workload Tracker sheets created', '🏗️ Progress', 2);
       } catch (wtError) {
-        Logger.log('Workload tracker sheets skipped: ' + wtError.message);
+        log_('Workload tracker sheets skipped', wtError.message);
       }
     }
 
@@ -282,7 +282,7 @@ function CREATE_DASHBOARD() {
         initPortalSheets();
         ss.toast('Portal sheets created', '🏗️ Progress', 2);
       } catch (portalError) {
-        Logger.log('Portal sheets skipped: ' + portalError.message);
+        log_('Portal sheets skipped', portalError.message);
       }
     }
 
@@ -292,7 +292,7 @@ function CREATE_DASHBOARD() {
         WeeklyQuestions.initWeeklyQuestionSheets();
         ss.toast('Weekly Questions sheets created', '🏗️ Progress', 2);
       } catch (wqError) {
-        Logger.log('Weekly Questions sheets skipped: ' + wqError.message);
+        log_('Weekly Questions sheets skipped', wqError.message);
       }
     }
 
@@ -302,7 +302,7 @@ function CREATE_DASHBOARD() {
       _ensureStewardTasksSheet(ss);
       ss.toast('Contact Log & Steward Tasks sheets created', '🏗️ Progress', 2);
     } catch (ctError) {
-      Logger.log('Contact/Tasks sheets skipped: ' + ctError.message);
+      log_('Contact/Tasks sheets skipped', ctError.message);
     }
 
     // Initialize Q&A Forum sheets (v4.17.0)
@@ -311,7 +311,7 @@ function CREATE_DASHBOARD() {
         QAForum.initQAForumSheets();
         ss.toast('Q&A Forum sheets created', '🏗️ Progress', 2);
       } catch (qaError) {
-        Logger.log('Q&A Forum sheets skipped: ' + qaError.message);
+        log_('Q&A Forum sheets skipped', qaError.message);
       }
     }
 
@@ -321,7 +321,7 @@ function CREATE_DASHBOARD() {
         TimelineService.initTimelineSheet();
         ss.toast('Timeline Events sheet created', '🏗️ Progress', 2);
       } catch (tlError) {
-        Logger.log('Timeline sheet skipped: ' + tlError.message);
+        log_('Timeline sheet skipped', tlError.message);
       }
     }
 
@@ -331,7 +331,7 @@ function CREATE_DASHBOARD() {
         FailsafeService.initFailsafeSheet();
         ss.toast('Failsafe Config sheet created', '🏗️ Progress', 2);
       } catch (fsError) {
-        Logger.log('Failsafe sheet skipped: ' + fsError.message);
+        log_('Failsafe sheet skipped', fsError.message);
       }
     }
 
@@ -364,7 +364,7 @@ function CREATE_DASHBOARD() {
     }
 
   } catch (error) {
-    Logger.log('Error in CREATE_DASHBOARD: ' + error.message);
+    log_('Error in CREATE_DASHBOARD', error.message);
     if (ui) {
       ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
     }
@@ -484,7 +484,7 @@ function getOrCreateSheet(ss, name) {
           sheet = ss.getSheetByName(legacyNames[i]);
           if (sheet) {
             sheet.setName(name);
-            Logger.log('Auto-renamed sheet "' + legacyNames[i] + '" → "' + name + '"');
+            log_('getOrCreateSheet', 'Auto-renamed sheet "' + legacyNames[i] + '" → "' + name + '"');
             break;
           }
         }
@@ -497,7 +497,7 @@ function getOrCreateSheet(ss, name) {
     var lastRow = sheet.getLastRow();
     if (lastRow >= 1) {
       // Sheet has headers or data - preserve it.
-      Logger.log('Sheet "' + name + '" has ' + lastRow + ' row(s) - preserving existing content');
+      log_('getOrCreateSheet', 'Sheet "' + name + '" has ' + lastRow + ' row(s) - preserving existing content');
       return sheet;
     }
     // Sheet is completely empty - safe to clear and rebuild
@@ -565,7 +565,7 @@ function reorderSheetsToStandard(ss) {
     }
   }
 
-  Logger.log('Sheets reordered to standard layout');
+  log_('reorderSheetsToStandard', 'Sheets reordered to standard layout');
 }
 
 /**
@@ -584,7 +584,7 @@ function reorderSheetsToStandard(ss) {
 function setupHiddenSheets(ss) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) {
-    Logger.log('setupHiddenSheets: could not acquire lock — skipping to avoid concurrent rebuild');
+    log_('setupHiddenSheets', 'could not acquire lock — skipping to avoid concurrent rebuild');
     return;
   }
   try {
@@ -635,8 +635,8 @@ function setupHiddenSheets(ss) {
     setSheetVeryHidden_(archGriev);
   }
 
-  // Workload Archive — guarded: only created if WorkloadService is present
-  if (typeof WorkloadService !== 'undefined' && typeof SHEETS !== 'undefined' && SHEETS.WORKLOAD_ARCHIVE) {
+  // Workload Archive — created empty if missing (auto-populated by WorkloadService.archiveOldData)
+  if (typeof SHEETS !== 'undefined' && SHEETS.WORKLOAD_ARCHIVE) {
     var wlArchive = ss.getSheetByName(SHEETS.WORKLOAD_ARCHIVE);
     if (!wlArchive) {
       wlArchive = ss.insertSheet(SHEETS.WORKLOAD_ARCHIVE);
@@ -679,13 +679,13 @@ function migrateSheetTabTitles_(ss) {
         sheet.setName(newName);
         renamed.push(oldName + ' → ' + newName);
       } catch (e) {
-        Logger.log('migrateSheetTabTitles_: failed to rename "' + oldName + '": ' + e.message);
+        log_('migrateSheetTabTitles_', 'failed to rename "' + oldName + '": ' + e.message);
       }
     }
   }
 
   if (renamed.length > 0) {
-    Logger.log('migrateSheetTabTitles_: renamed ' + renamed.length + ' sheet(s): ' + renamed.join(', '));
+    log_('migrateSheetTabTitles_', 'renamed ' + renamed.length + ' sheet(s): ' + renamed.join(', '));
   }
   return renamed;
 }
@@ -733,7 +733,7 @@ function migrateSheetTabTitles() {
 function setupDataValidations() {
   // Re-sync column maps from actual sheet headers before applying validations.
   // This guarantees dropdowns land on the correct columns even if the layout changed.
-  try { syncColumnMaps(); } catch (_e) { Logger.log('_e: ' + (_e.message || _e)); }
+  try { syncColumnMaps(); } catch (_e) { log_('_e', (_e.message || _e)); }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -971,7 +971,7 @@ function onEditMultiSelect(e) {
       5
     );
   } catch (err) {
-    Logger.log('onEditMultiSelect error: ' + err.message);
+    log_('onEditMultiSelect error', err.message);
   }
 }
 
@@ -1006,7 +1006,7 @@ function onSelectionChangeMultiSelect(e) {
     props.setProperty('lastMultiSelectCell', currentCell);
     openCellMultiSelectEditor();
   } catch (err) {
-    Logger.log('onSelectionChangeMultiSelect error: ' + err.message);
+    log_('onSelectionChangeMultiSelect error', err.message);
   }
 }
 

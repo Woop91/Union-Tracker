@@ -72,13 +72,13 @@ function getCurrentStewardInfo_(ss) {
 
   var data = memberSheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    var email = data[i][MEMBER_COLS.EMAIL - 1];
-    var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+    var email = col_(data[i], MEMBER_COLS.EMAIL);
+    var isSteward = col_(data[i], MEMBER_COLS.IS_STEWARD);
 
     if (email && email.toLowerCase() === currentUserEmail.toLowerCase() && isTruthyValue(isSteward)) {
       return {
-        firstName: data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
-        lastName: data[i][MEMBER_COLS.LAST_NAME - 1] || '',
+        firstName: col_(data[i], MEMBER_COLS.FIRST_NAME) || '',
+        lastName: col_(data[i], MEMBER_COLS.LAST_NAME) || '',
         email: email
       };
     }
@@ -134,12 +134,12 @@ function shareWithCoordinators_(folder) {
         } catch (shareError) {
           // Mask email in log for privacy
           var maskedEmail = typeof maskEmail === 'function' ? maskEmail(email) : '[REDACTED]';
-          Logger.log('Could not share with ' + maskedEmail + ': ' + shareError.message);
+          log_('shareWithCoordinators_', 'Could not share with ' + maskedEmail + ': ' + shareError.message);
         }
       }
     }
   } catch (e) {
-    Logger.log('Error sharing with coordinators: ' + e.message);
+    log_('Error sharing with coordinators', e.message);
   }
 }
 
@@ -303,7 +303,7 @@ function syncAllDashboardData() {
       if (syncSteps[si].fn) {
         try { syncSteps[si].fn(); } catch (stepErr) {
           syncErrors.push(syncSteps[si].name + ': ' + stepErr.message);
-          Logger.log('syncAllDashboardData step error: ' + syncSteps[si].name + ' - ' + stepErr.message);
+          log_('syncAllDashboardData step error', syncSteps[si].name + ' - ' + stepErr.message);
         }
       }
     }
@@ -315,7 +315,7 @@ function syncAllDashboardData() {
     }
   } catch (e) {
     SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing: ' + e.message, '❌ Error', 5);
-    Logger.log('syncAllDashboardData error: ' + e.toString());
+    log_('syncAllDashboardData error', e.toString());
   } finally {
     lock.releaseLock();
   }
@@ -364,7 +364,7 @@ function showGrievanceFiles() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
   var ui = SpreadsheetApp.getUi();
-  var response, html;
+  var response;
 
   if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
     ui.alert('📁 View Files', 'Please go to the Grievance Log sheet and select a grievance row first.', ui.ButtonSet.OK);
@@ -407,10 +407,10 @@ function showGrievanceFiles() {
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var safeUrl = String(folderUrl).replace(/[<>"']/g, '');
-        html = HtmlService.createHtmlOutput(
-          '<script>window.open(' + JSON.stringify(safeUrl) + ', "_blank");google.script.host.close();</script>'
-        ).setWidth(1).setHeight(1);
-        ui.showModalDialog(html, 'Opening folder...');
+        showDialog_(
+          '<script>window.open(' + JSON.stringify(safeUrl) + ', "_blank");google.script.host.close();</script>',
+          'Opening folder...', 1, 1
+        );
       }
     } else {
       response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
@@ -418,10 +418,10 @@ function showGrievanceFiles() {
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var safeUrl2 = String(folderUrl).replace(/[<>"']/g, '');
-        html = HtmlService.createHtmlOutput(
-          '<script>window.open(' + JSON.stringify(safeUrl2) + ', "_blank");google.script.host.close();</script>'
-        ).setWidth(1).setHeight(1);
-        ui.showModalDialog(html, 'Opening folder...');
+        showDialog_(
+          '<script>window.open(' + JSON.stringify(safeUrl2) + ', "_blank");google.script.host.close();</script>',
+          'Opening folder...', 1, 1
+        );
       }
     }
   } catch (e) {
@@ -503,9 +503,9 @@ function buildGrievanceMemberLookup() {
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.LAST_NAME).getValues();
 
   data.forEach(function(row) {
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var firstName = row[GRIEVANCE_COLS.FIRST_NAME - 1] || '';
-    var lastName = row[GRIEVANCE_COLS.LAST_NAME - 1] || '';
+    var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID);
+    var firstName = col_(row, GRIEVANCE_COLS.FIRST_NAME) || '';
+    var lastName = col_(row, GRIEVANCE_COLS.LAST_NAME) || '';
 
     if (grievanceId) {
       lookup[grievanceId] = (firstName + ' ' + lastName).trim() || 'Unknown';
@@ -604,15 +604,15 @@ function sortGrievanceLogByStatus() {
   // Sort with Message Alert first, then by status priority
   rows.sort(function(a, b) {
     // FIRST: Message Alert rows go to the very top
-    var alertA = a.d[GRIEVANCE_COLS.MESSAGE_ALERT - 1] === true;
-    var alertB = b.d[GRIEVANCE_COLS.MESSAGE_ALERT - 1] === true;
+    var alertA = col_(a.d, GRIEVANCE_COLS.MESSAGE_ALERT) === true;
+    var alertB = col_(b.d, GRIEVANCE_COLS.MESSAGE_ALERT) === true;
 
     if (alertA && !alertB) return -1; // A has alert, B doesn't - A goes first
     if (!alertA && alertB) return 1;  // B has alert, A doesn't - B goes first
 
     // SECOND: Sort by status priority
-    var statusA = a.d[GRIEVANCE_COLS.STATUS - 1] || '';
-    var statusB = b.d[GRIEVANCE_COLS.STATUS - 1] || '';
+    var statusA = col_(a.d, GRIEVANCE_COLS.STATUS) || '';
+    var statusB = col_(b.d, GRIEVANCE_COLS.STATUS) || '';
 
     var priorityA = GRIEVANCE_STATUS_PRIORITY[statusA] || 99;
     var priorityB = GRIEVANCE_STATUS_PRIORITY[statusB] || 99;
@@ -622,8 +622,8 @@ function sortGrievanceLogByStatus() {
     }
 
     // THIRD: Sort by Days to Deadline - most urgent first
-    var daysA = a.d[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var daysB = b.d[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+    var daysA = col_(a.d, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+    var daysB = col_(b.d, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
 
     // Handle non-numeric values: 'Overdue' → -1 (most urgent), blank/null → 9999 (least urgent)
     if (typeof daysA !== 'number' || isNaN(daysA)) daysA = (daysA === 'Overdue' ? -1 : 9999);
@@ -645,7 +645,7 @@ function sortGrievanceLogByStatus() {
   // Apply highlighting to Message Alert rows
   applyMessageAlertHighlighting_(sheet, lastRow);
 
-  Logger.log('Grievance Log sorted by status priority');
+  log_('sortGrievanceLogByStatus', 'Grievance Log sorted by status priority');
   ss.toast('Grievance Log sorted by status priority', 'Sorted', 2);
 }
 
@@ -693,11 +693,11 @@ function autoCreateMissingGrievanceFolders_() {
   var created = 0;
 
   for (var i = 0; i < data.length; i++) {
-    var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var firstName = data[i][GRIEVANCE_COLS.FIRST_NAME - 1];
-    var lastName = data[i][GRIEVANCE_COLS.LAST_NAME - 1];
-    var dateFiled = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
-    var existingFolderId = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1];
+    var grievanceId = col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID);
+    var firstName = col_(data[i], GRIEVANCE_COLS.FIRST_NAME);
+    var lastName = col_(data[i], GRIEVANCE_COLS.LAST_NAME);
+    var dateFiled = col_(data[i], GRIEVANCE_COLS.DATE_FILED);
+    var existingFolderId = col_(data[i], GRIEVANCE_COLS.DRIVE_FOLDER_ID);
 
     // Skip if no grievance ID or already has a folder
     if (!grievanceId || existingFolderId) continue;
@@ -737,10 +737,10 @@ function autoCreateMissingGrievanceFolders_() {
       sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folder.getUrl());
 
       created++;
-      Logger.log('Auto-created folder for ' + grievanceId + ': ' + folder.getUrl());
+      log_('autoCreateMissingGrievanceFolders_', 'Auto-created folder for ' + grievanceId + ': ' + folder.getUrl());
 
     } catch (e) {
-      Logger.log('Error auto-creating folder for ' + grievanceId + ': ' + e.message);
+      log_('autoCreateMissingGrievanceFolders_', 'Error auto-creating folder for ' + grievanceId + ': ' + e.message);
     }
   }
 
@@ -757,7 +757,7 @@ function autoCreateMissingGrievanceFolders_() {
  */
 function openGrievanceFormForRow_(sheet, row) {
   var rowData = sheet.getRange(row, 1, 1, MEMBER_COLS.START_GRIEVANCE).getValues()[0];
-  var memberId = rowData[MEMBER_COLS.MEMBER_ID - 1];
+  var memberId = col_(rowData, MEMBER_COLS.MEMBER_ID);
 
   if (!memberId) {
     SpreadsheetApp.getActiveSpreadsheet().toast('This row has no Member ID', '⚠️ Cannot Start Grievance', 3);
@@ -766,13 +766,13 @@ function openGrievanceFormForRow_(sheet, row) {
 
   var memberData = {
     memberId: memberId,
-    firstName: rowData[MEMBER_COLS.FIRST_NAME - 1] || '',
-    lastName: rowData[MEMBER_COLS.LAST_NAME - 1] || '',
-    jobTitle: rowData[MEMBER_COLS.JOB_TITLE - 1] || '',
-    workLocation: rowData[MEMBER_COLS.WORK_LOCATION - 1] || '',
-    unit: rowData[MEMBER_COLS.UNIT - 1] || '',
-    email: rowData[MEMBER_COLS.EMAIL - 1] || '',
-    manager: rowData[MEMBER_COLS.MANAGER - 1] || ''
+    firstName: col_(rowData, MEMBER_COLS.FIRST_NAME) || '',
+    lastName: col_(rowData, MEMBER_COLS.LAST_NAME) || '',
+    jobTitle: col_(rowData, MEMBER_COLS.JOB_TITLE) || '',
+    workLocation: col_(rowData, MEMBER_COLS.WORK_LOCATION) || '',
+    unit: col_(rowData, MEMBER_COLS.UNIT) || '',
+    email: col_(rowData, MEMBER_COLS.EMAIL) || '',
+    manager: col_(rowData, MEMBER_COLS.MANAGER) || ''
   };
 
   // Get current user as steward
@@ -783,12 +783,10 @@ function openGrievanceFormForRow_(sheet, row) {
   var formUrl = buildGrievanceFormUrl_(memberData, stewardData);
 
   // Open form in new window
-  var ui = SpreadsheetApp.getUi();
-  var html = HtmlService.createHtmlOutput(
-    '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
-  ).setWidth(200).setHeight(50);
-
-  ui.showModalDialog(html, 'Opening Grievance Form...');
+  showDialog_(
+    '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>',
+    'Opening Grievance Form...', 200, 50
+  );
 
   ss.toast('Grievance form opened for ' + memberData.firstName + ' ' + memberData.lastName, '📋 Form Opened', 3);
 }
@@ -831,8 +829,8 @@ function checkDataQuality() {
   var invalidMemberIds = 0;
 
   grievanceData.forEach(function(row) {
-    var _grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    var _grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID);
+    var memberId = col_(row, GRIEVANCE_COLS.MEMBER_ID);
 
     if (!memberId || memberId === '') {
       missingMemberIds++;
@@ -868,7 +866,7 @@ function fixDataQualityIssues() {
     return;
   }
 
-  var html = HtmlService.createHtmlOutput(
+  showDialog_(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
     'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:8px}' +
@@ -890,9 +888,9 @@ function fixDataQualityIssues() {
     '<div class="fix-option"><strong>Option 2:</strong> Add missing members to Member Directory first</div>' +
     '<p style="margin-top:20px"><button class="primary" onclick="google.script.run.showGrievancesWithMissingMemberIds();google.script.host.close()">📋 View Affected Rows</button>' +
     '<button class="secondary" onclick="google.script.host.close()">Close</button></p>' +
-    '</div></body></html>'
-  ).setWidth(500).setHeight(450);
-  ui.showModalDialog(html, '⚠️ Data Quality Issues');
+    '</div></body></html>',
+    '⚠️ Data Quality Issues', 500, 450
+  );
 }
 
 /**
@@ -934,8 +932,8 @@ function showGrievancesWithMissingMemberIds() {
   var problemRows = [];
 
   grievanceData.forEach(function(row, index) {
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID);
+    var memberId = col_(row, GRIEVANCE_COLS.MEMBER_ID);
     var rowNum = index + 2;
 
     if (!memberId || memberId === '') {
@@ -985,7 +983,7 @@ function repairGrievanceCheckboxes() {
   // Re-apply checkboxes to Message Alert column (AC = column 29)
   grievanceSheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, lastRow - 1, 1).insertCheckboxes();
 
-  Logger.log('Repaired checkboxes for ' + (lastRow - 1) + ' grievance rows');
+  log_('repairGrievanceCheckboxes', 'Repaired checkboxes for ' + (lastRow - 1) + ' grievance rows');
 }
 
 /**
@@ -1003,7 +1001,7 @@ function repairMemberCheckboxes() {
   // Re-apply checkboxes to Start Grievance column (AE = column 31)
   memberSheet.getRange(2, MEMBER_COLS.START_GRIEVANCE, lastRow - 1, 1).insertCheckboxes();
 
-  Logger.log('Repaired checkboxes for ' + (lastRow - 1) + ' member rows');
+  log_('repairMemberCheckboxes', 'Repaired checkboxes for ' + (lastRow - 1) + ' member rows');
 }
 // ============================================================================
 // ENGAGEMENT TRACKING SYNC FUNCTIONS
@@ -1034,7 +1032,7 @@ function buildMemberIdSet_(memberData) {
   var set = {};
   // Start at 1 to skip header row (index 0)
   for (var i = 1; i < memberData.length; i++) {
-    var id = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+    var id = String(col_(memberData[i], MEMBER_COLS.MEMBER_ID) || '').trim();
     // Skip empty values and the header label itself (safeguard against
     // data arrays that don't include a header at index 0)
     if (id !== '' && id !== 'Member ID') set[id] = true;
@@ -1058,7 +1056,7 @@ function parseValidDate_(val, tomorrow) {
  * Dynamic headers, data validation, member existence checks, toast notifications.
  */
 function syncVolunteerHoursToMemberDirectory() {
-  if (isSyncDebounced_('volunteerHours')) { Logger.log('VH sync debounced'); return; }
+  if (isSyncDebounced_('volunteerHours')) { log_('syncVolunteerHoursToMemberDirectory', 'VH sync debounced'); return; }
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -1100,14 +1098,14 @@ function syncVolunteerHoursToMemberDirectory() {
     }
 
     var invalidIds = Object.keys(badIds);
-    if (invalidIds.length > 0) Logger.log('syncVH: ' + invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
+    if (invalidIds.length > 0) log_('syncVH', invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
 
     // M-25: Only update hours for members found in the volunteer sheet.
     // Members with no volunteer data retain their existing hours value.
     var updates = [], membersUpdated = 0;
     var existingHours = memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, memberData.length - 1, 1).getValues();
     for (var j = 1; j < memberData.length; j++) {
-      var mid = String(memberData[j][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+      var mid = String(col_(memberData[j], MEMBER_COLS.MEMBER_ID) || '').trim();
       if (hoursLookup[mid] !== undefined) {
         membersUpdated++;
         updates.push([hoursLookup[mid]]);
@@ -1119,7 +1117,7 @@ function syncVolunteerHoursToMemberDirectory() {
     var expected = memberData.length - 1;
     if (updates.length !== expected) {
       ss.toast('Write aborted: data length mismatch. Check logs.', '⚠️ Sync Error', 5);
-      Logger.log('syncVH: length mismatch updates=' + updates.length + ' expected=' + expected);
+      log_('syncVH', 'length mismatch updates=' + updates.length + ' expected=' + expected);
       return;
     }
     if (updates.length > 0) memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, updates.length, 1).setValues(updates);
@@ -1127,10 +1125,10 @@ function syncVolunteerHoursToMemberDirectory() {
     var totalSum = 0;
     for (var k in hoursLookup) totalSum += hoursLookup[k];
     ss.toast('Synced ' + Math.round(totalSum * 10) / 10 + ' hrs for ' + membersUpdated + ' members, ' + skipped + ' skipped.', '✅ Volunteer Hours', 4);
-    Logger.log('Synced VH: ' + membersUpdated + ' members, ' + skipped + ' skipped');
+    log_('Synced VH', membersUpdated + ' members, ' + skipped + ' skipped');
   } catch (e) {
-    Logger.log('syncVH error: ' + e.message);
-    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing volunteer hours: ' + e.message, '❌ Sync Error', 5); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    log_('syncVH error', e.message);
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing volunteer hours: ' + e.message, '❌ Sync Error', 5); } catch (_) { log_('_', (_.message || _)); }
     throw e;
   } finally {
     lock.releaseLock();
@@ -1142,7 +1140,7 @@ function syncVolunteerHoursToMemberDirectory() {
  * Dynamic headers, case-insensitive type matching, data validation, toast notifications.
  */
 function syncMeetingAttendanceToMemberDirectory() {
-  if (isSyncDebounced_('meetingAttendance')) { Logger.log('MA sync debounced'); return; }
+  if (isSyncDebounced_('meetingAttendance')) { log_('syncMeetingAttendanceToMemberDirectory', 'MA sync debounced'); return; }
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -1195,12 +1193,12 @@ function syncMeetingAttendanceToMemberDirectory() {
     }
 
     var invalidIds = Object.keys(badIds);
-    if (invalidIds.length > 0) Logger.log('syncMA: ' + invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
+    if (invalidIds.length > 0) log_('syncMA', invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
 
     // Write to Member Directory with array length validation
     var updates = [], membersUpdated = 0;
     for (var j = 1; j < memberData.length; j++) {
-      var mid = String(memberData[j][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+      var mid = String(col_(memberData[j], MEMBER_COLS.MEMBER_ID) || '').trim();
       var att = lookup[mid] || { lastVirtual: null, lastInPerson: null };
       if (att.lastVirtual || att.lastInPerson) membersUpdated++;
       updates.push([att.lastVirtual || '', att.lastInPerson || '']);
@@ -1208,16 +1206,16 @@ function syncMeetingAttendanceToMemberDirectory() {
     var expected = memberData.length - 1;
     if (updates.length !== expected) {
       ss.toast('Write aborted: data length mismatch. Check logs.', '⚠️ Sync Error', 5);
-      Logger.log('syncMA: length mismatch updates=' + updates.length + ' expected=' + expected);
+      log_('syncMA', 'length mismatch updates=' + updates.length + ' expected=' + expected);
       return;
     }
     if (updates.length > 0) memberSheet.getRange(2, MEMBER_COLS.LAST_VIRTUAL_MTG, updates.length, 2).setValues(updates);
 
     ss.toast('Synced attendance for ' + membersUpdated + ' members, ' + skipped + ' skipped.', '✅ Meeting Attendance', 4);
-    Logger.log('Synced MA: ' + membersUpdated + ' members, ' + skipped + ' skipped');
+    log_('Synced MA', membersUpdated + ' members, ' + skipped + ' skipped');
   } catch (e) {
-    Logger.log('syncMA error: ' + e.message);
-    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing attendance: ' + e.message, '❌ Sync Error', 5); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+    log_('syncMA error', e.message);
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing attendance: ' + e.message, '❌ Sync Error', 5); } catch (_) { log_('_', (_.message || _)); }
     throw e;
   } finally {
     lock.releaseLock();

@@ -50,7 +50,7 @@ function setupAuditLogSheet() {
     sheet.clear();
   } else {
     // Audit log has existing data — do not clear (compliance requirement)
-    Logger.log('setupAuditLogSheet: Sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear');
+    log_('setupAuditLogSheet', 'Sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear');
 
     // Still apply protection if missing
     protectAuditLogSheet_(sheet);
@@ -123,7 +123,7 @@ function protectAuditLogSheet_(sheet) {
         protection.removeEditor(editors[j]);
       }
     }
-    Logger.log('Audit log sheet protected (owner-only)');
+    log_('protectAuditLogSheet_', 'Audit log sheet protected (owner-only)');
   }
 }
 
@@ -214,7 +214,7 @@ function onEditAudit(e) {
     newValue: newValue,
     recordId: recordId
   });
-  } catch (err) { Logger.log('onEditAudit error: ' + (err.message || err)); }
+  } catch (err) { log_('onEditAudit error', (err.message || err)); }
 }
 /**
  * Remove the audit trigger
@@ -375,7 +375,7 @@ function setupGrievanceCalcSheet() {
   // Hide the sheet
   setSheetVeryHidden_(sheet);
 
-  Logger.log('_Grievance_Calc sheet setup complete');
+  log_('setupGrievanceCalcSheet', '_Grievance_Calc sheet setup complete');
 }
 
 // ============================================================================
@@ -609,7 +609,7 @@ function setupGrievanceFormulasSheet() {
   // Hide the sheet
   setSheetVeryHidden_(sheet);
 
-  Logger.log('_Grievance_Formulas sheet setup complete');
+  log_('vlookupOffset', '_Grievance_Formulas sheet setup complete');
 }
 
 // ============================================================================
@@ -662,7 +662,7 @@ function setupMemberLookupSheet() {
   // Hide the sheet
   setSheetVeryHidden_(sheet);
 
-  Logger.log('_Member_Lookup sheet setup complete');
+  log_('setupMemberLookupSheet', '_Member_Lookup sheet setup complete');
 }
 
 // ============================================================================
@@ -714,7 +714,7 @@ function setupStewardContactCalcSheet() {
   sheet.autoResizeColumns(1, headers.length);
 
   setSheetVeryHidden_(sheet);
-  Logger.log('_Steward_Contact_Calc sheet setup complete with live formulas');
+  log_('setupStewardContactCalcSheet', '_Steward_Contact_Calc sheet setup complete with live formulas');
 }
 
 // ============================================================================
@@ -787,7 +787,7 @@ function setupDashboardCalcSheet() {
   sheet.setColumnWidth(3, 300);
 
   setSheetVeryHidden_(sheet);
-  Logger.log('_Dashboard_Calc sheet setup complete');
+  log_('setupDashboardCalcSheet', '_Dashboard_Calc sheet setup complete');
 }
 
 // ============================================================================
@@ -857,7 +857,7 @@ function setupStewardPerformanceCalcSheet() {
   sheet.getRange('J2').setFormula('=ARRAYFORMULA(IF(A2:A="","",ROUND(F2:F*0.4 + (100-IFERROR(H2:H/C2:C*100,0))*0.3 + MAX(0,100-G2:G/60*100)*0.3,1)))');
 
   setSheetVeryHidden_(sheet);
-  Logger.log('_Steward_Performance_Calc sheet setup complete');
+  log_('setupStewardPerformanceCalcSheet', '_Steward_Performance_Calc sheet setup complete');
 }
 
 // ============================================================================
@@ -879,13 +879,13 @@ function setupAllHiddenSheets() {
   // Kept for backward compatibility with sheets that still reference these formulas.
   // The checklist calc sheet is NOT deprecated (still actively used).
   // TODO: Remove once all orgs confirm no formula references remain
-  try { setupGrievanceCalcSheet(); created++; } catch (_e) { Logger.log('setupGrievanceCalcSheet: ' + (_e.message || _e)); repaired++; }
-  try { setupGrievanceFormulasSheet(); created++; } catch (_e) { Logger.log('setupGrievanceFormulasSheet: ' + (_e.message || _e)); repaired++; }
-  try { setupMemberLookupSheet(); created++; } catch (_e) { Logger.log('setupMemberLookupSheet: ' + (_e.message || _e)); repaired++; }
-  try { setupStewardContactCalcSheet(); created++; } catch (_e) { Logger.log('setupStewardContactCalcSheet: ' + (_e.message || _e)); repaired++; }
-  try { setupDashboardCalcSheet(); created++; } catch (_e) { Logger.log('setupDashboardCalcSheet: ' + (_e.message || _e)); repaired++; }
-  try { setupStewardPerformanceCalcSheet(); created++; } catch (_e) { Logger.log('setupStewardPerformanceCalcSheet: ' + (_e.message || _e)); repaired++; }
-  try { setupChecklistCalcSheet(); created++; } catch (_e) { Logger.log('setupChecklistCalcSheet: ' + (_e.message || _e)); repaired++; }
+  try { setupGrievanceCalcSheet(); created++; } catch (_e) { log_('setupGrievanceCalcSheet', (_e.message || _e)); repaired++; }
+  try { setupGrievanceFormulasSheet(); created++; } catch (_e) { log_('setupGrievanceFormulasSheet', (_e.message || _e)); repaired++; }
+  try { setupMemberLookupSheet(); created++; } catch (_e) { log_('setupMemberLookupSheet', (_e.message || _e)); repaired++; }
+  try { setupStewardContactCalcSheet(); created++; } catch (_e) { log_('setupStewardContactCalcSheet', (_e.message || _e)); repaired++; }
+  try { setupDashboardCalcSheet(); created++; } catch (_e) { log_('setupDashboardCalcSheet', (_e.message || _e)); repaired++; }
+  try { setupStewardPerformanceCalcSheet(); created++; } catch (_e) { log_('setupStewardPerformanceCalcSheet', (_e.message || _e)); repaired++; }
+  try { setupChecklistCalcSheet(); created++; } catch (_e) { log_('setupChecklistCalcSheet', (_e.message || _e)); repaired++; }
 
   ss.toast('Hidden sheets setup complete', '✅ Success', 3);
 
@@ -991,7 +991,7 @@ function verifyHiddenSheets() {
   report.push('============================');
 
   ui.alert('Hidden Sheet Verification', report.join('\n'), ui.ButtonSet.OK);
-  Logger.log(report.join('\n'));
+  log_('verifyHiddenSheets', report.join('\n'));
 }
 
 /**
@@ -1491,7 +1491,7 @@ function setupSurveyTrackingSheet(sheet) {
   // Freeze header row
   sheet.setFrozenRows(1);
 
-  Logger.log('Survey Tracking hidden sheet set up');
+  log_('setupSurveyTrackingSheet', 'Survey Tracking hidden sheet set up');
 }
 
 // ============================================================================
@@ -1590,7 +1590,7 @@ function setupSurveyVaultSheet() {
     }
   }
 
-  Logger.log('Survey Vault hidden sheet set up with protection');
+  log_('setupSurveyVaultSheet', 'Survey Vault hidden sheet set up with protection');
 }
 
 /**
@@ -1609,12 +1609,12 @@ function getVaultDataMap_() {
   var data = vault.getDataRange().getValues();
   var map = {};
   for (var i = 1; i < data.length; i++) {
-    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
+    var responseRow = col_(data[i], SURVEY_VAULT_COLS.RESPONSE_ROW);
     if (!responseRow) continue;
     map[responseRow] = {
-      verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
-      isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
-      quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
+      verified: col_(data[i], SURVEY_VAULT_COLS.VERIFIED) || '',
+      isLatest: col_(data[i], SURVEY_VAULT_COLS.IS_LATEST) || '',
+      quarter: col_(data[i], SURVEY_VAULT_COLS.QUARTER) || '',
       vaultRow: i + 1  // 1-indexed sheet row for updates
     };
   }
@@ -1638,14 +1638,14 @@ function getVaultDataFull_() {
   for (var i = 1; i < data.length; i++) {
     rows.push({
       vaultRow: i + 1,
-      responseRow: data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1],
-      emailHash: data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '',
-      verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
-      memberIdHash: data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '',
-      quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
-      isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
-      supersededBy: data[i][SURVEY_VAULT_COLS.SUPERSEDED_BY - 1] || '',
-      reviewerNotes: data[i][SURVEY_VAULT_COLS.REVIEWER_NOTES - 1] || ''
+      responseRow: col_(data[i], SURVEY_VAULT_COLS.RESPONSE_ROW),
+      emailHash: col_(data[i], SURVEY_VAULT_COLS.EMAIL) || '',
+      verified: col_(data[i], SURVEY_VAULT_COLS.VERIFIED) || '',
+      memberIdHash: col_(data[i], SURVEY_VAULT_COLS.MATCHED_MEMBER_ID) || '',
+      quarter: col_(data[i], SURVEY_VAULT_COLS.QUARTER) || '',
+      isLatest: col_(data[i], SURVEY_VAULT_COLS.IS_LATEST) || '',
+      supersededBy: col_(data[i], SURVEY_VAULT_COLS.SUPERSEDED_BY) || '',
+      reviewerNotes: col_(data[i], SURVEY_VAULT_COLS.REVIEWER_NOTES) || ''
     });
   }
   return rows;
@@ -1712,15 +1712,15 @@ function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
 
   var data = vault.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    var rowEmailHash = (data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '').toString();
-    var rowQuarter = data[i][SURVEY_VAULT_COLS.QUARTER - 1];
-    var rowIsLatest = data[i][SURVEY_VAULT_COLS.IS_LATEST - 1];
+    var rowEmailHash = (col_(data[i], SURVEY_VAULT_COLS.EMAIL) || '').toString();
+    var rowQuarter = col_(data[i], SURVEY_VAULT_COLS.QUARTER);
+    var rowIsLatest = col_(data[i], SURVEY_VAULT_COLS.IS_LATEST);
 
     if ((rowEmailHash === emailHash || rowEmailHash === legacyHash) && rowQuarter === quarter && rowIsLatest === 'Yes') {
       var sheetRow = i + 1;
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.SUPERSEDED_BY).setValue(newVaultRow);
-      Logger.log('Vault: superseded row ' + sheetRow + ' by row ' + newVaultRow);
+      log_('Vault', 'superseded row ' + sheetRow + ' by row ' + newVaultRow);
     }
   }
 }
@@ -1922,11 +1922,11 @@ function verifyAuditLogIntegrity() {
     var storedHash = String(data[i][integrityCol] || '');
     var computed = computeAuditRowHash_(
       previousHash,
-      data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1],
-      data[i][EVENT_AUDIT_COLS.EVENT_TYPE - 1],
-      data[i][EVENT_AUDIT_COLS.USER - 1],
-      data[i][EVENT_AUDIT_COLS.DETAILS - 1],
-      data[i][EVENT_AUDIT_COLS.SESSION_ID - 1]
+      col_(data[i], EVENT_AUDIT_COLS.TIMESTAMP),
+      col_(data[i], EVENT_AUDIT_COLS.EVENT_TYPE),
+      col_(data[i], EVENT_AUDIT_COLS.USER),
+      col_(data[i], EVENT_AUDIT_COLS.DETAILS),
+      col_(data[i], EVENT_AUDIT_COLS.SESSION_ID)
     );
 
     if (storedHash && storedHash !== computed) {
@@ -1980,12 +1980,12 @@ function verifySurveyVaultIntegrity() {
   for (var i = 1; i < data.length; i++) {
     totalEntries++;
     var rowNum = i + 1;
-    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
-    var emailHash = String(data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '');
-    var verified = String(data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '');
-    var memberIdHash = String(data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '');
-    var quarter = String(data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '');
-    var isLatest = String(data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '');
+    var responseRow = col_(data[i], SURVEY_VAULT_COLS.RESPONSE_ROW);
+    var emailHash = String(col_(data[i], SURVEY_VAULT_COLS.EMAIL) || '');
+    var verified = String(col_(data[i], SURVEY_VAULT_COLS.VERIFIED) || '');
+    var memberIdHash = String(col_(data[i], SURVEY_VAULT_COLS.MATCHED_MEMBER_ID) || '');
+    var quarter = String(col_(data[i], SURVEY_VAULT_COLS.QUARTER) || '');
+    var isLatest = String(col_(data[i], SURVEY_VAULT_COLS.IS_LATEST) || '');
 
     // Check for missing response row
     if (!responseRow) {

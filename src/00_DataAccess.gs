@@ -151,12 +151,12 @@ function withScriptLock_(fn, timeoutMs) {
 function _getSheetSafe(name, ss) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
-    Logger.log('_getSheetSafe: getActiveSpreadsheet() returned null for "' + name + '"');
+    log_('_getSheetSafe', 'getActiveSpreadsheet() returned null for "' + name + '"');
     return null;
   }
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
-    Logger.log('_getSheetSafe: Sheet "' + name + '" not found');
+    log_('_getSheetSafe', 'Sheet "' + name + '" not found');
   }
   return sheet;
 }

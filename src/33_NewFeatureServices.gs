@@ -607,7 +607,7 @@ var DigestService = (function () {
 
     // Count unanswered Q&A
     if (typeof QAForum !== 'undefined' && typeof QAForum.getUnansweredCount === 'function') {
-      try { digest.qaActivity = QAForum.getUnansweredCount(); } catch (_) { Logger.log('_: ' + (_.message || _)); }
+      try { digest.qaActivity = QAForum.getUnansweredCount(); } catch (_) { log_('_', (_.message || _)); }
     }
 
     return digest;
@@ -657,10 +657,10 @@ var DigestService = (function () {
         sheet.getRange(i + 1, 4).setValue(now);
         sent++;
       } catch (e) {
-        Logger.log('Digest send failed for ' + email + ': ' + e.message);
+        log_('sendScheduledDigests', 'Digest send failed for ' + email + ': ' + e.message);
       }
     }
-    Logger.log('Digest service: sent ' + sent + ' digest email(s).');
+    log_('Digest service', 'sent ' + sent + ' digest email(s).');
   }
 
   return {
@@ -709,7 +709,7 @@ var DocumentChecklistService = (function () {
         }
       }
     } catch (e) {
-      Logger.log('DocumentChecklist: folder scan failed for ' + driveFolderId + ': ' + e.message);
+      log_('DocumentChecklist', 'folder scan failed for ' + driveFolderId + ': ' + e.message);
     }
 
     return checklist;
@@ -1384,8 +1384,8 @@ var SMSService = (function () {
     var data = sheet.getDataRange().getValues();
     var emailLower = String(email).toLowerCase().trim();
     for (var i = 1; i < data.length; i++) {
-      if (String(data[i][MEMBER_COLS.EMAIL - 1] || '').toLowerCase().trim() === emailLower) {
-        var phone = String(data[i][MEMBER_COLS.PHONE - 1] || '').trim();
+      if (String(col_(data[i], MEMBER_COLS.EMAIL) || '').toLowerCase().trim() === emailLower) {
+        var phone = String(col_(data[i], MEMBER_COLS.PHONE) || '').trim();
         if (!phone) return null;
         // Normalize to E.164 if it looks like a US number
         var digits = phone.replace(/\D/g, '');
@@ -1441,7 +1441,7 @@ var SMSService = (function () {
         result.error || ''
       ]);
     } catch (logErr) {
-      Logger.log('SMSService.sendSMS log error: ' + logErr.message);
+      log_('SMSService.sendSMS log error', logErr.message);
     }
 
     if (result.success) {
@@ -1648,18 +1648,18 @@ var RSVPService = (function () {
     } catch (_) { /* ignore */ }
 
     for (var i = 1; i < members.length; i++) {
-      var email = String(members[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+      var email = String(col_(members[i], MEMBER_COLS.EMAIL) || '').trim();
       if (!email) continue;
       if (existingRsvps[email.toLowerCase()]) continue;
 
       // Optional unit filter
       if (options.unit) {
-        var memberUnit = String(members[i][MEMBER_COLS.UNIT - 1] || '').trim();
+        var memberUnit = String(col_(members[i], MEMBER_COLS.UNIT) || '').trim();
         if (memberUnit.toLowerCase() !== String(options.unit).toLowerCase()) continue;
       }
 
-      var firstName = String(members[i][MEMBER_COLS.FIRST_NAME - 1] || '').trim();
-      var lastName = String(members[i][MEMBER_COLS.LAST_NAME - 1] || '').trim();
+      var firstName = String(col_(members[i], MEMBER_COLS.FIRST_NAME) || '').trim();
+      var lastName = String(col_(members[i], MEMBER_COLS.LAST_NAME) || '').trim();
       var memberName = (firstName + ' ' + lastName).trim();
 
       // Generate RSVP token and links

@@ -202,7 +202,7 @@ function getCorrelationInsights(isPII, cachedData) {
   try {
     data = cachedData || JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   } catch (_e) {
-    Logger.log('getCorrelationInsights: failed to load dashboard data — ' + (_e.message || _e));
+    log_('getCorrelationInsights', 'failed to load dashboard data — ' + (_e.message || _e));
     return JSON.stringify([]); // Return empty insights on data fetch failure
   }
   var insights = [];
@@ -848,7 +848,7 @@ function getCorrelationAlerts(isPII) {
   try {
     dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   } catch (_e) {
-    Logger.log('getCorrelationAlerts: failed to load dashboard data — ' + (_e.message || _e));
+    log_('getCorrelationAlerts', 'failed to load dashboard data — ' + (_e.message || _e));
     return JSON.stringify([]); // Return empty alerts on data fetch failure
   }
   var insightsJson = getCorrelationInsights(isPII, dashboardData);
@@ -898,7 +898,7 @@ function getCorrelationSummary(isPII) {
   try {
     dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   } catch (_e) {
-    Logger.log('getCorrelationSummary: failed to load dashboard data — ' + (_e.message || _e));
+    log_('getCorrelationSummary', 'failed to load dashboard data — ' + (_e.message || _e));
     return JSON.stringify({ total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, highlights: [] });
   }
   var insights = JSON.parse(getCorrelationInsights(isPII, dashboardData));
