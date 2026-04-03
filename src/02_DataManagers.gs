@@ -1111,7 +1111,7 @@ function _getImportMembersScript_() {
     '  {key: "workLocation", label: "Work Location", required: false},' +
     '  {key: "unit", label: "Unit", required: false},' +
     '  {key: "supervisor", label: "Supervisor", required: false},' +
-    '  {key: "manager", label: "Manager", required: false}' +
+    '  {key: "manager", label: "Director", required: false}' +
     '];' +
     '' +
     'function parseCSV() {' +

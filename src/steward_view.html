@@ -111,7 +111,7 @@ function _stewardHeader(container, title, subtitle) {
     }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
       AppState.isDark = !AppState.isDark;
-      try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
+      try { localStorage.setItem('sb_isDark', AppState.isDark); } catch(e) {}
       if (typeof UnifiedTheme !== 'undefined') UnifiedTheme.apply();
       else ThemeEngine.applyTheme(ThemeEngine.getTheme('steward', AppState.isDark));
       _handleTabNav('steward', AppState.activeTab || 'cases');
@@ -585,7 +585,7 @@ function _showCalendarTooltip(dotEl, caseData) {
  */
 function _renderStewardWelcome(container) {
   // Check if dismissed via localStorage
-  try { if (localStorage.getItem('dds_steward_welcomed') === 'true') return; } catch (_e) { return; }
+  try { if (localStorage.getItem('sb_steward_welcomed') === 'true') return; } catch (_e) { return; }
 
   var card = el('div', {
     className: 'card card-glass card-fade-in ' + _TC,
@@ -605,7 +605,7 @@ function _renderStewardWelcome(container) {
     className: 'btn btn-ghost',
     style: { fontSize: '12px' },
     onClick: function () {
-      try { localStorage.setItem('dds_steward_welcomed', 'true'); } catch (_e) { /* sandbox */ }
+      try { localStorage.setItem('sb_steward_welcomed', 'true'); } catch (_e) { /* sandbox */ }
       card.style.opacity = '0';
       card.style.transition = 'opacity 0.3s ease';
       setTimeout(function () { card.remove(); }, 300);
@@ -656,7 +656,7 @@ function _renderStewardWelcome(container) {
     style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', fontSize: '12px', color: 'var(--muted)', cursor: 'pointer' }
   });
   var checkbox = el('input', { type: 'checkbox', onChange: function () {
-    try { localStorage.setItem('dds_steward_welcomed', checkbox.checked ? 'true' : 'false'); } catch (_e) { /* sandbox */ }
+    try { localStorage.setItem('sb_steward_welcomed', checkbox.checked ? 'true' : 'false'); } catch (_e) { /* sandbox */ }
   }});
   dontShow.appendChild(checkbox);
   dontShow.appendChild(el('span', {}, "Don't show this again"));
@@ -5339,152 +5339,10 @@ function _renderMembershipInsights(container, ms, showDetail) {
 }
 
 // ═══════════════════════════════════════
-// PREDICTIVE WORKLOAD BALANCING (steward-only)
+// PREDICTIVE WORKLOAD BALANCING — SolidBase: WorkloadService excluded
 // ═══════════════════════════════════════
-
-/**
- * Renders workload prediction and rebalancing suggestion cards.
- * Called from renderWorkloadTracker (in member_view.html) when role is steward.
- * @param {Element} container - Container to append cards to
- */
-function _renderWorkloadPredictions(container) {
-  // Prediction card
-  var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
-  card.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Workload Predictions'));
-
-  var predictionContent = el('div');
-  card.appendChild(predictionContent);
-
-  serverCall().withSuccessHandler(function(pred) {
-    if (!pred) return;
-
-    var trendIcon = pred.trend === 'increasing' ? '\uD83D\uDCC8' : pred.trend === 'decreasing' ? '\uD83D\uDCC9' : '\u27A1\uFE0F';
-    var trendColor = pred.trend === 'increasing' ? '#ef4444' : pred.trend === 'decreasing' ? '#22c55e' : 'var(--muted)';
-
-    var row = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' } });
-
-    var currentBox = el('div', { style: { textAlign: 'center' } });
-    currentBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700' } }, String(pred.current)));
-    currentBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Current'));
-    row.appendChild(currentBox);
-
-    row.appendChild(el('span', { style: { fontSize: '20px', color: trendColor } }, trendIcon));
-
-    var predictedBox = el('div', { style: { textAlign: 'center' } });
-    predictedBox.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '700', color: trendColor } }, String(pred.predicted)));
-    predictedBox.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Predicted'));
-    row.appendChild(predictedBox);
-
-    predictionContent.appendChild(row);
-
-    // Mini sparkline (CSS bars for history)
-    if (pred.history && pred.history.length > 0) {
-      var maxVal = Math.max.apply(null, pred.history) || 1;
-      var spark = el('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '2px', height: '40px', marginTop: '12px' } });
-      pred.history.forEach(function(v) {
-        var pct = Math.round((v / maxVal) * 100);
-        spark.appendChild(el('div', {
-          style: { flex: '1', height: pct + '%', background: 'var(--accent)', borderRadius: '2px 2px 0 0', minHeight: '2px' },
-          title: String(v) + ' items'
-        }));
-      });
-      predictionContent.appendChild(spark);
-      predictionContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Recent workload history'));
-    }
-  }).withFailureHandler(function() {
-    predictionContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load predictions.'));
-  }).dataGetWorkloadPrediction(SESSION_TOKEN, '');
-
-  container.appendChild(card);
-
-  // Rebalancing suggestions card
-  var rebalCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
-  rebalCard.appendChild(el('div', { style: { fontWeight: '600', fontSize: '15px', marginBottom: '12px' } }, 'Rebalancing Suggestions'));
-
-  var suggestContent = el('div');
-  rebalCard.appendChild(suggestContent);
-
-  serverCall().withSuccessHandler(function(suggestions) {
-    if (!suggestions || suggestions.length === 0) {
-      suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Workload is balanced across stewards.'));
-      return;
-    }
-    suggestions.forEach(function(s) {
-      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
-
-      var leftCol = el('div');
-      leftCol.appendChild(el('div', { style: { fontWeight: '500', fontSize: '14px' } }, escapeHtml(s.stewardEmail)));
-      leftCol.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, escapeHtml(s.suggestion)));
-      row.appendChild(leftCol);
-
-      var rightCol = el('div', { style: { textAlign: 'right', fontSize: '13px' } });
-      rightCol.appendChild(el('div', { style: { fontWeight: '600' } }, s.currentLoad + ' cases'));
-      rightCol.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'avg: ' + s.averageLoad));
-      row.appendChild(rightCol);
-
-      suggestContent.appendChild(row);
-    });
-  }).withFailureHandler(function() {
-    suggestContent.appendChild(el('div', { style: { color: 'var(--muted)', fontStyle: 'italic', fontSize: '13px' } }, 'Unable to load suggestions.'));
-  }).dataGetRebalancingSuggestions(SESSION_TOKEN);
-
-  container.appendChild(rebalCard);
-}
-
-function _renderWorkloadInsights(container, wl, showDetail) {
-  // Workload data is nested: { success, data: { totalSubmissions, members, categories, averages } }
-  var d = (wl && wl.data) || wl || {};
-  if (!d || (!d.totalSubmissions && !d.categories)) return;
-
-  var section = el('div', { className: 'mb-16' });
-  section.appendChild(el('div', { style: {
-    fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
-    color: 'var(--text)', marginBottom: '12px',
-  }}, 'Workload Overview'));
-
-  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '12px' } });
-
-  var totalSubmissions = d.totalSubmissions || 0;
-  var memberCount = d.members || 0;
-  grid.appendChild(_insightCard('SUBMISSIONS', 'var(--info)', _fmtNum(totalSubmissions), memberCount + ' stewards reporting'));
-
-  // Extract averages from the data — averages keys are CATEGORY_LABELS values
-  var avgs = d.averages || {};
-  var avgPriority = parseFloat(avgs['Priority Cases']) || 0;
-  var avgPending = parseFloat(avgs['Pending Cases']) || 0;
-  var avgAged = parseFloat(avgs['Aged Cases']) || 0;
-
-  grid.appendChild(_insightCard('AVG PRIORITY CASES', avgPriority > 5 ? 'var(--danger)' : 'var(--success)', String(avgPriority), 'Per steward average', function() {
-    if (showDetail) showDetail('Workload Breakdown', function(panel) {
-      // Build items from all category averages
-      var items = [];
-      for (var key in avgs) {
-        items.push({ label: key + ' (avg)', count: parseFloat(avgs[key]) || 0 });
-      }
-      items.sort(function(a, b) { return b.count - a.count; });
-      _renderInsightDetailList(panel, items, 'var(--info)');
-      // Workload Tracker nav removed (SolidBase edition)
-    });
-  }));
-
-  grid.appendChild(_insightCard('AVG PENDING', avgPending > 10 ? 'var(--warning)' : 'var(--success)', String(avgPending), 'Cases awaiting action'));
-  grid.appendChild(_insightCard('AVG AGED CASES', avgAged > 3 ? 'var(--danger)' : 'var(--success)', String(avgAged), 'Cases 60+ days old'));
-
-  // Overtime and employment mix from workload data
-  var avgOvertime = parseFloat(avgs['Overtime Hours']) || 0;
-  if (avgOvertime > 0) {
-    grid.appendChild(_insightCard('AVG OVERTIME', avgOvertime > 10 ? 'var(--danger)' : 'var(--warning)', String(avgOvertime) + 'h', 'Hours per steward'));
-  }
-  var avgFTE = parseFloat(avgs['Full-Time Employees']) || parseFloat(avgs['FTE Count']) || 0;
-  var avgPTE = parseFloat(avgs['Part-Time Employees']) || parseFloat(avgs['PTE Count']) || 0;
-  if (avgFTE > 0 || avgPTE > 0) {
-    var mixRatio = avgFTE > 0 ? Math.round((avgFTE / (avgFTE + avgPTE)) * 100) : 0;
-    grid.appendChild(_insightCard('EMPLOYMENT MIX', 'var(--accent)', mixRatio + '% FT', 'FT: ' + avgFTE + ' / PT: ' + avgPTE + ' avg'));
-  }
-
-  section.appendChild(grid);
-  container.appendChild(section);
-}
+function _renderWorkloadPredictions() { /* SolidBase: WorkloadService excluded */ }
+function _renderWorkloadInsights() { /* SolidBase: WorkloadService excluded */ }
 
 function _fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
@@ -5781,6 +5639,489 @@ function _renderSatisfactionSection(container, trends, showDetail) {
   }
 
   container.appendChild(section);
+}
+
+// ═══════════════════════════════════════
+// DIRECTORY EXPLORER — Slicer filters + Sankey + inline edit (v4.51.0)
+// ═══════════════════════════════════════
+
+// Slicer definitions — all shown upfront, options cascade with selections
+var _EXP_SLICERS = [
+  { id: 'workLocation', label: 'Location',   field: 'workLocation' },
+  { id: 'director',     label: 'Director',   field: 'director' },
+  { id: 'unit',         label: 'Unit',       field: 'unit' },
+  { id: 'supervisor',   label: 'Supervisor', field: 'supervisor' },
+  { id: 'jobTitle',     label: 'Job Title',  field: 'jobTitle' },
+  { id: 'assignedSteward', label: 'Steward', field: 'assignedSteward' },
+];
+
+// Editable columns in the results table
+var _EXP_EDIT_COLS = [
+  { key: 'name',         label: 'Name',       editable: false },
+  { key: 'email',        label: 'Email',      editable: false },
+  { key: 'director',     label: 'Director',   editable: true },
+  { key: 'unit',         label: 'Unit',       editable: true },
+  { key: 'supervisor',   label: 'Supervisor', editable: true },
+  { key: 'workLocation', label: 'Location',   editable: true },
+  { key: 'jobTitle',     label: 'Job Title',  editable: true },
+];
+
+function renderDirectoryExplorer(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'explorer', function(container) {
+    _stewardHeader(container, 'Directory Explorer', 'Select criteria to view matching members');
+    var content = el('div', { className: 'content' });
+    showLoading(content, 'explorer');
+    container.appendChild(content);
+
+    var _cacheKey = 'stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || '');
+    function _onLoaded(members) {
+      content.textContent = '';
+      if (!members || members.length === 0) {
+        content.appendChild(el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'No members found.'));
+        return;
+      }
+      _buildExplorerUI(content, members);
+    }
+    function _onError() {
+      content.textContent = '';
+      content.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load members.'));
+    }
+    if (typeof DataCache !== 'undefined') {
+      DataCache.cachedCall(_cacheKey, 'dataGetAllMembers', [SESSION_TOKEN], _onLoaded, _onError, DataCache.STABLE_TTL);
+    } else {
+      serverCall().withSuccessHandler(_onLoaded).withFailureHandler(_onError).dataGetAllMembers(SESSION_TOKEN);
+    }
+  });
+}
+
+function _buildExplorerUI(container, allMembers) {
+  var selections = {}; // { field: 'value' | '' }
+  _EXP_SLICERS.forEach(function(s) { selections[s.field] = ''; });
+  var searchQ = '';
+  var filtered = allMembers.slice();
+
+  // ── KPI strip ──
+  var kpiArea = el('div');
+  container.appendChild(kpiArea);
+
+  // ── Slicer panel — all dropdowns visible upfront ──
+  var slicerCard = el('div', { className: 'card ' + _TC, style: { padding: '12px', marginBottom: '14px' } });
+  var slicerHeader = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' } });
+  slicerHeader.appendChild(el('div', { className: _TL, style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600' } }, 'Select Criteria'));
+  var badge = el('div', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600' }, 'aria-live': 'polite' });
+  slicerHeader.appendChild(badge);
+  slicerCard.appendChild(slicerHeader);
+
+  // Search row
+  var searchInput = el('input', { className: 'search-input', placeholder: 'Search name or email\u2026', 'aria-label': 'Search', style: { marginBottom: '10px' } });
+  slicerCard.appendChild(searchInput);
+
+  // Slicer grid — 2 or 3 columns depending on screen width
+  var slicerGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' } });
+  var slicerSelects = {}; // field → <select> element ref
+
+  _EXP_SLICERS.forEach(function(sdef) {
+    var wrap = el('div');
+    wrap.appendChild(el('label', { style: { fontSize: '10px', fontWeight: '600', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '3px' } }, sdef.label));
+    var row = el('div', { style: { display: 'flex', gap: '4px' } });
+    var sel = el('select', { className: 'form-select ' + _TI, style: { flex: '1', fontSize: '12px', padding: '5px 8px' }, 'aria-label': sdef.label + ' filter' });
+    slicerSelects[sdef.field] = sel;
+    sel.addEventListener('change', function() { selections[sdef.field] = sel.value; _fireChange(); });
+    row.appendChild(sel);
+    // Clear button
+    var clrBtn = el('button', {
+      style: { background: 'none', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 6px', fontSize: '11px', color: 'var(--muted)', cursor: 'pointer', lineHeight: '1' },
+      'aria-label': 'Clear ' + sdef.label,
+      onClick: function() { selections[sdef.field] = ''; sel.value = ''; _fireChange(); }
+    }, '\u2715');
+    row.appendChild(clrBtn);
+    wrap.appendChild(row);
+    slicerGrid.appendChild(wrap);
+  });
+  slicerCard.appendChild(slicerGrid);
+
+  // Clear All button
+  var clearAllRow = el('div', { style: { marginTop: '8px', textAlign: 'right' } });
+  clearAllRow.appendChild(el('button', {
+    className: 'filter-add-btn', style: { fontSize: '11px' },
+    onClick: function() {
+      _EXP_SLICERS.forEach(function(s) { selections[s.field] = ''; });
+      searchInput.value = ''; searchQ = '';
+      _fireChange();
+    }
+  }, 'Clear All'));
+  slicerCard.appendChild(clearAllRow);
+  container.appendChild(slicerCard);
+
+  // ── Sankey chart ──
+  var sankeyConfig = { left: 'director', middle: 'unit', right: 'supervisor' };
+  var _SANKEY_FIELDS = [
+    { v: 'director', l: 'Director' }, { v: 'unit', l: 'Unit' }, { v: 'supervisor', l: 'Supervisor' },
+    { v: 'workLocation', l: 'Location' }, { v: 'jobTitle', l: 'Job Title' }, { v: 'assignedSteward', l: 'Steward' },
+  ];
+  var sankeyCard = el('div', { className: 'card ' + _TC, style: { padding: '12px', marginBottom: '14px' } });
+  var sankeyHdr = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' } });
+  sankeyHdr.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, 'Sankey Flow'));
+  function _mkSankSel(key) {
+    var s = el('select', { className: 'form-select ' + _TI, style: { width: 'auto', fontSize: '11px', padding: '4px 8px' }, 'aria-label': key + ' axis' });
+    _SANKEY_FIELDS.forEach(function(o) { var opt = el('option', { value: o.v }, o.l); if (sankeyConfig[key] === o.v) opt.selected = true; s.appendChild(opt); });
+    s.addEventListener('change', function() { sankeyConfig[key] = s.value; _refreshSankey(); });
+    return s;
+  }
+  sankeyHdr.appendChild(_mkSankSel('left'));
+  sankeyHdr.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '12px' } }, '\u2192'));
+  sankeyHdr.appendChild(_mkSankSel('middle'));
+  sankeyHdr.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '12px' } }, '\u2192'));
+  sankeyHdr.appendChild(_mkSankSel('right'));
+  sankeyCard.appendChild(sankeyHdr);
+  var sankeyArea = el('div', { style: { overflowX: 'auto' } });
+  sankeyCard.appendChild(sankeyArea);
+  container.appendChild(sankeyCard);
+
+  // ── Results table with inline editing ──
+  var tableCard = el('div', { className: 'card ' + _TC, style: { padding: '12px', marginBottom: '14px' } });
+  var tableHdr = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' } });
+  tableHdr.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, 'Results'));
+  var tableBadge = el('div', { style: { fontSize: '11px', color: 'var(--muted)' } });
+  tableHdr.appendChild(tableBadge);
+  tableCard.appendChild(tableHdr);
+  var tableArea = el('div', { style: { overflowX: 'auto' } });
+  tableCard.appendChild(tableArea);
+  container.appendChild(tableCard);
+
+  // ── Search debounce ──
+  var _st = null;
+  searchInput.addEventListener('input', function() { clearTimeout(_st); _st = setTimeout(function() { searchQ = searchInput.value.trim().toLowerCase(); _fireChange(); }, 150); });
+
+  // ── Core: apply slicer selections + search ──
+  function _applySlicers(members) {
+    var result = members;
+    if (searchQ) {
+      result = result.filter(function(m) {
+        return (m.name || '').toLowerCase().indexOf(searchQ) !== -1
+          || (m.email || '').toLowerCase().indexOf(searchQ) !== -1;
+      });
+    }
+    _EXP_SLICERS.forEach(function(sdef) {
+      var val = selections[sdef.field];
+      if (!val) return;
+      result = result.filter(function(m) { return String(m[sdef.field] || '') === val; });
+    });
+    return result;
+  }
+
+  // ── Cascading slicer options: each dropdown shows only values present in data filtered by ALL OTHER selections ──
+  function _refreshSlicerOptions() {
+    _EXP_SLICERS.forEach(function(sdef) {
+      var selEl = slicerSelects[sdef.field];
+      var currentVal = selections[sdef.field];
+
+      // Build subset filtered by all OTHER slicers (not this one) + search
+      var subset = allMembers;
+      if (searchQ) {
+        subset = subset.filter(function(m) {
+          return (m.name || '').toLowerCase().indexOf(searchQ) !== -1
+            || (m.email || '').toLowerCase().indexOf(searchQ) !== -1;
+        });
+      }
+      _EXP_SLICERS.forEach(function(other) {
+        if (other.field === sdef.field) return;
+        var ov = selections[other.field];
+        if (!ov) return;
+        subset = subset.filter(function(m) { return String(m[other.field] || '') === ov; });
+      });
+
+      // Collect distinct values from subset
+      var vals = {};
+      subset.forEach(function(m) {
+        var v = m[sdef.field];
+        if (v !== undefined && v !== null && v !== '') vals[String(v)] = (vals[String(v)] || 0) + 1;
+      });
+      var sorted = Object.keys(vals).sort();
+
+      // Rebuild options, preserving current selection if still valid
+      selEl.innerHTML = '';
+      selEl.appendChild(el('option', { value: '' }, '-- Any (' + sorted.length + ') --'));
+      var stillValid = false;
+      sorted.forEach(function(v) {
+        var opt = el('option', { value: v }, v + ' (' + vals[v] + ')');
+        if (v === currentVal) { opt.selected = true; stillValid = true; }
+        selEl.appendChild(opt);
+      });
+      // If the previous selection is no longer in the available options, clear it
+      if (currentVal && !stillValid) {
+        selections[sdef.field] = '';
+        selEl.value = '';
+      }
+    });
+  }
+
+  // ── Refresh all views ──
+  function _fireChange() {
+    _refreshSlicerOptions();
+    filtered = _applySlicers(allMembers);
+    var activeCount = 0;
+    _EXP_SLICERS.forEach(function(s) { if (selections[s.field]) activeCount++; });
+    badge.textContent = filtered.length + ' match' + (filtered.length !== 1 ? 'es' : '') + (activeCount ? ' (' + activeCount + ' filter' + (activeCount > 1 ? 's' : '') + ')' : '');
+    _refreshKPIs();
+    _refreshSankey();
+    _renderTable(tableArea, filtered);
+  }
+
+  function _refreshKPIs() {
+    kpiArea.innerHTML = '';
+    var dc = {}, uc = {}, sc = {};
+    filtered.forEach(function(m) {
+      if (m.director) dc[m.director] = true;
+      if (m.unit) uc[m.unit] = true;
+      if (m.supervisor) sc[m.supervisor] = true;
+    });
+    renderKPIStrip(kpiArea, [
+      { label: 'Members', value: filtered.length },
+      { label: 'Directors', value: Object.keys(dc).length, color: 'var(--accent)' },
+      { label: 'Units', value: Object.keys(uc).length },
+      { label: 'Supervisors', value: Object.keys(sc).length },
+    ], { columns: 4 });
+  }
+
+  // ── Sankey Renderer ──
+  function _buildSankeyData(members, lf, mf, rf) {
+    var leftMid = {}, midRight = {};
+    var leftSet = {}, midSet = {}, rightSet = {};
+    members.forEach(function(m) {
+      var lv = String(m[lf] || '').trim() || '(blank)';
+      var mv = String(m[mf] || '').trim() || '(blank)';
+      var rv = String(m[rf] || '').trim() || '(blank)';
+      leftSet[lv] = (leftSet[lv] || 0) + 1;
+      midSet[mv] = (midSet[mv] || 0) + 1;
+      rightSet[rv] = (rightSet[rv] || 0) + 1;
+      var lmk = lv + '||' + mv; leftMid[lmk] = (leftMid[lmk] || 0) + 1;
+      var mrk = mv + '||' + rv; midRight[mrk] = (midRight[mrk] || 0) + 1;
+    });
+    return {
+      leftNodes: Object.keys(leftSet).sort(function(a, b) { return leftSet[b] - leftSet[a]; }),
+      midNodes: Object.keys(midSet).sort(function(a, b) { return midSet[b] - midSet[a]; }),
+      rightNodes: Object.keys(rightSet).sort(function(a, b) { return rightSet[b] - rightSet[a]; }),
+      leftSet: leftSet, midSet: midSet, rightSet: rightSet, leftMid: leftMid, midRight: midRight
+    };
+  }
+
+  function _renderSankeyChart(area, data) {
+    area.innerHTML = '';
+    if (!data.leftNodes.length) { area.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px', textAlign: 'center', fontSize: '12px' } }, 'No data to visualize.')); return; }
+
+    var PAD = 4, NW = 18, MIN_H = 3;
+    var maxN = Math.max(data.leftNodes.length, data.midNodes.length, data.rightNodes.length);
+    var svgH = Math.max(280, maxN * 28 + 40);
+    var svgW = 900;
+    var colX = [30, svgW / 2 - NW / 2, svgW - NW - 30];
+    var ns = 'http://www.w3.org/2000/svg';
+
+    function _layout(nodes, totals) {
+      var usable = svgH - PAD * (nodes.length - 1);
+      var tv = 0; nodes.forEach(function(n) { tv += totals[n]; });
+      var pos = [], y = 0;
+      nodes.forEach(function(n) { var h = Math.max(MIN_H, (totals[n] / tv) * usable); pos.push({ name: n, y: y, h: h, val: totals[n] }); y += h + PAD; });
+      var off = (svgH - y + PAD) / 2; pos.forEach(function(p) { p.y += off; });
+      return pos;
+    }
+
+    var lPos = _layout(data.leftNodes, data.leftSet);
+    var mPos = _layout(data.midNodes, data.midSet);
+    var rPos = _layout(data.rightNodes, data.rightSet);
+
+    var lMap = {}, mMap = {}, rMap = {};
+    lPos.forEach(function(p) { lMap[p.name] = p; });
+    mPos.forEach(function(p) { mMap[p.name] = p; });
+    rPos.forEach(function(p) { rMap[p.name] = p; });
+
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + svgW + ' ' + svgH);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', svgH);
+    svg.style.fontFamily = 'var(--fontBody, sans-serif)';
+    svg.style.fontSize = '10px';
+
+    var _colors = ['#7C3AED','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#06B6D4','#8B5CF6','#14B8A6','#F97316','#6366F1','#22C55E','#E11D48','#0EA5E9','#A855F7','#D946EF'];
+    var _cm = {}, _ci = 0;
+    function _gc(n) { if (!_cm[n]) { _cm[n] = _colors[_ci % _colors.length]; _ci++; } return _cm[n]; }
+
+    function _drawFlows(flows, sMap, sOff, dMap, dOff, sx, dx) {
+      var keys = Object.keys(flows).sort(function(a, b) { return flows[b] - flows[a]; });
+      keys.forEach(function(key) {
+        var p = key.split('||'), sN = sMap[p[0]], dN = dMap[p[1]];
+        if (!sN || !dN) return;
+        var v = flows[key], sH = (v / sN.val) * sN.h, dH = (v / dN.val) * dN.h;
+        var y0 = sOff[p[0]], y1 = dOff[p[1]];
+        sOff[p[0]] += sH; dOff[p[1]] += dH;
+        var x0 = sx + NW, x1 = dx, cx = (x0 + x1) / 2;
+        var path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', 'M' + x0 + ',' + y0 + ' C' + cx + ',' + y0 + ' ' + cx + ',' + y1 + ' ' + x1 + ',' + y1 + ' L' + x1 + ',' + (y1 + dH) + ' C' + cx + ',' + (y1 + dH) + ' ' + cx + ',' + (y0 + sH) + ' ' + x0 + ',' + (y0 + sH) + ' Z');
+        path.setAttribute('fill', _gc(p[0])); path.setAttribute('fill-opacity', '0.35');
+        path.setAttribute('stroke', _gc(p[0])); path.setAttribute('stroke-opacity', '0.5'); path.setAttribute('stroke-width', '0.5');
+        path.style.transition = 'fill-opacity 0.15s';
+        path.addEventListener('mouseenter', function() { path.setAttribute('fill-opacity', '0.65'); });
+        path.addEventListener('mouseleave', function() { path.setAttribute('fill-opacity', '0.35'); });
+        var t = document.createElementNS(ns, 'title');
+        t.textContent = p[0] + ' \u2192 ' + p[1] + ': ' + v;
+        path.appendChild(t);
+        svg.appendChild(path);
+      });
+    }
+
+    var lOO = {}, mIL = {}, mOO = {}, rIO = {};
+    lPos.forEach(function(p) { lOO[p.name] = p.y; });
+    mPos.forEach(function(p) { mIL[p.name] = p.y; mOO[p.name] = p.y; });
+    rPos.forEach(function(p) { rIO[p.name] = p.y; });
+    _drawFlows(data.leftMid, lMap, lOO, mMap, mIL, colX[0], colX[1]);
+    _drawFlows(data.midRight, mMap, mOO, rMap, rIO, colX[1], colX[2]);
+
+    function _drawNodes(pos, x, anc) {
+      pos.forEach(function(p) {
+        var r = document.createElementNS(ns, 'rect');
+        r.setAttribute('x', x); r.setAttribute('y', p.y); r.setAttribute('width', NW); r.setAttribute('height', p.h);
+        r.setAttribute('fill', _gc(p.name)); r.setAttribute('rx', '3');
+        var tt = document.createElementNS(ns, 'title'); tt.textContent = p.name + ': ' + p.val;
+        r.appendChild(tt); svg.appendChild(r);
+        var txt = document.createElementNS(ns, 'text');
+        txt.setAttribute('fill', 'var(--text, #ccc)'); txt.setAttribute('font-size', '10');
+        var lbl = p.name.length > 22 ? p.name.substring(0, 20) + '\u2026' : p.name;
+        if (anc === 'end') { txt.setAttribute('x', x - 4); txt.setAttribute('y', p.y + p.h / 2 + 3); txt.setAttribute('text-anchor', 'end'); }
+        else if (anc === 'mid') { txt.setAttribute('x', x + NW / 2); txt.setAttribute('y', p.y - 4); txt.setAttribute('text-anchor', 'middle'); }
+        else { txt.setAttribute('x', x + NW + 4); txt.setAttribute('y', p.y + p.h / 2 + 3); txt.setAttribute('text-anchor', 'start'); }
+        txt.textContent = lbl + ' (' + p.val + ')';
+        svg.appendChild(txt);
+      });
+    }
+    _drawNodes(lPos, colX[0], 'end');
+    _drawNodes(mPos, colX[1], 'mid');
+    _drawNodes(rPos, colX[2], 'start');
+
+    // Column headers
+    var _fl = {}; _SANKEY_FIELDS.forEach(function(o) { _fl[o.v] = o.l; });
+    [{ x: colX[0] + NW / 2, l: _fl[sankeyConfig.left] || sankeyConfig.left },
+     { x: colX[1] + NW / 2, l: _fl[sankeyConfig.middle] || sankeyConfig.middle },
+     { x: colX[2] + NW / 2, l: _fl[sankeyConfig.right] || sankeyConfig.right }].forEach(function(h) {
+      var ht = document.createElementNS(ns, 'text');
+      ht.setAttribute('x', h.x); ht.setAttribute('y', 14); ht.setAttribute('text-anchor', 'middle');
+      ht.setAttribute('fill', 'var(--accent, #7C3AED)'); ht.setAttribute('font-size', '12'); ht.setAttribute('font-weight', '600');
+      ht.textContent = h.l; svg.appendChild(ht);
+    });
+    area.appendChild(svg);
+  }
+
+  function _refreshSankey() {
+    var sd = _buildSankeyData(filtered, sankeyConfig.left, sankeyConfig.middle, sankeyConfig.right);
+    _renderSankeyChart(sankeyArea, sd);
+  }
+
+  // ── Inline-editable results table ──
+  function _renderTable(area, members) {
+    area.innerHTML = '';
+    tableBadge.textContent = members.length + ' member' + (members.length !== 1 ? 's' : '');
+    if (members.length === 0) {
+      area.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px', textAlign: 'center', fontSize: '12px' } }, 'No members match. Adjust your selections above.'));
+      return;
+    }
+
+    var table = el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
+    var thead = el('thead');
+    var headRow = el('tr');
+    _EXP_EDIT_COLS.forEach(function(c) {
+      headRow.appendChild(el('th', { style: { textAlign: 'left', padding: '7px 8px', borderBottom: '2px solid var(--border)', fontWeight: '600', fontSize: '11px', color: 'var(--muted)', whiteSpace: 'nowrap' } }, c.label));
+    });
+    headRow.appendChild(el('th', { style: { width: '60px', padding: '7px 4px', borderBottom: '2px solid var(--border)' } }));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = el('tbody');
+    members.forEach(function(m) {
+      var tr = el('tr', { style: { borderBottom: '1px solid var(--border)' } });
+      var edits = {}; // track pending edits per row
+      var inputEls = {};
+
+      _EXP_EDIT_COLS.forEach(function(c) {
+        var td = el('td', { style: { padding: '4px 8px', verticalAlign: 'middle' } });
+        if (c.editable) {
+          var inp = el('input', {
+            type: 'text',
+            value: String(m[c.key] || ''),
+            className: _TI,
+            style: { width: '100%', fontSize: '12px', padding: '3px 6px', border: '1px solid transparent', borderRadius: '4px', background: 'transparent', color: 'var(--text)', minWidth: '80px', boxSizing: 'border-box' },
+            'aria-label': c.label + ' for ' + (m.name || m.email)
+          });
+          inp.addEventListener('focus', function() { inp.style.border = '1px solid var(--accent)'; inp.style.background = 'var(--inputBg, rgba(255,255,255,0.05))'; });
+          inp.addEventListener('blur', function() {
+            var changed = inp.value.trim() !== String(m[c.key] || '');
+            inp.style.border = changed ? '1px solid var(--warning, #F59E0B)' : '1px solid transparent';
+            if (!changed) inp.style.background = 'transparent';
+          });
+          inp.addEventListener('input', function() {
+            var newVal = inp.value.trim();
+            if (newVal !== String(m[c.key] || '')) { edits[c.key] = newVal; }
+            else { delete edits[c.key]; }
+            saveBtn.style.display = Object.keys(edits).length > 0 ? '' : 'none';
+          });
+          inputEls[c.key] = inp;
+          td.appendChild(inp);
+        } else {
+          td.textContent = String(m[c.key] || '\u2014');
+          td.style.whiteSpace = 'nowrap';
+          td.style.maxWidth = '160px';
+          td.style.overflow = 'hidden';
+          td.style.textOverflow = 'ellipsis';
+        }
+        tr.appendChild(td);
+      });
+
+      // Save button (hidden until changes are made)
+      var actionTd = el('td', { style: { padding: '4px', verticalAlign: 'middle', textAlign: 'center' } });
+      var saveBtn = el('button', {
+        style: { display: 'none', fontSize: '11px', padding: '4px 10px', borderRadius: '4px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600' },
+        onClick: function() {
+          if (Object.keys(edits).length === 0) return;
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving\u2026';
+          serverCall().withSuccessHandler(function(result) {
+            if (result && result.success) {
+              // Update local member object
+              for (var k in edits) { m[k] = edits[k]; }
+              edits = {};
+              saveBtn.style.display = 'none';
+              saveBtn.disabled = false;
+              saveBtn.textContent = 'Save';
+              // Flash success on row
+              tr.style.background = 'rgba(16,185,129,0.1)';
+              setTimeout(function() { tr.style.background = ''; }, 1200);
+              // Reset input borders
+              for (var ik in inputEls) { inputEls[ik].style.border = '1px solid transparent'; inputEls[ik].style.background = 'transparent'; }
+              // Invalidate member cache so other tabs see updates
+              if (typeof DataCache !== 'undefined') DataCache.invalidate('stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || ''));
+            } else {
+              saveBtn.disabled = false;
+              saveBtn.textContent = 'Save';
+              tr.style.background = 'rgba(239,68,68,0.1)';
+              setTimeout(function() { tr.style.background = ''; }, 2000);
+            }
+          }).withFailureHandler(function() {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+            tr.style.background = 'rgba(239,68,68,0.1)';
+            setTimeout(function() { tr.style.background = ''; }, 2000);
+          }).dataUpdateMemberBySteward(SESSION_TOKEN, m.email, edits);
+        }
+      }, 'Save');
+      actionTd.appendChild(saveBtn);
+      tr.appendChild(actionTd);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    area.appendChild(table);
+  }
+
+  // ── Initial render ──
+  _refreshSlicerOptions();
+  _fireChange();
 }
 
 // ═══════════════════════════════════════
@@ -6388,9 +6729,9 @@ function showAddMemberModal(onSuccess) {
     var gDues = _field('duesStatus', 'Dues Status', false); gDues.appendChild(_selectInput('duesStatus', opts.duesStatuses));
     formArea.appendChild(_row(gUnit, gDues));
 
-    // Supervisor + Manager
+    // Supervisor + Director
     var gSup = _field('supervisor', 'Supervisor', false); gSup.appendChild(_selectInput('supervisor', opts.supervisors));
-    var gMgr = _field('manager',    'Manager',    false); gMgr.appendChild(_selectInput('manager',    opts.managers));
+    var gMgr = _field('manager',    'Director',   false); gMgr.appendChild(_selectInput('manager',    opts.managers));
     formArea.appendChild(_row(gSup, gMgr));
 
     // Employee ID + Hire Date
@@ -9426,7 +9767,7 @@ function renderNewGrievanceForm(appContainer) {
         ['Incident Date', data.incidentDate || '\u2014'],
         ['Issue Category', data.issueCategory || '\u2014'],
         ['Articles', data.articles || '\u2014'],
-        ['Manager(s)', [data.formOverrides.managers, data.formOverrides.managers2].filter(Boolean).join(', ') || '\u2014'],
+        ['Director(s)', [data.formOverrides.managers, data.formOverrides.managers2].filter(Boolean).join(', ') || '\u2014'],
         ['Statement', data.description || '\u2014'],
         ['Remedy', data.remedy || '\u2014']
       ];

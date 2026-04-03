@@ -344,6 +344,12 @@ function registerEventBusSubscribers() {
   }, { priority: 100, id: 'config_steward_handler' });
 
   EventBus.on('sheet:edit:CONFIG', function(e) {
+    if (typeof warnInvalidConfigValue_ === 'function') {
+      try { warnInvalidConfigValue_(e); } catch (_err) { Logger.log('warnInvalidConfigValue_: ' + (_err.message || _err)); }
+    }
+  }, { priority: 90, id: 'config_type_validator' });
+
+  EventBus.on('sheet:edit:CONFIG', function(e) {
     if (typeof syncConfigToSheetValidation_ === 'function') {
       try { syncConfigToSheetValidation_(e); } catch (_err) { Logger.log('syncConfigToSheetValidation_: ' + (_err.message || _err)); }
     }

@@ -64,6 +64,21 @@ function createConfigSheet(ss) {
   } else {
     Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
 
+    // Rename columns whose headers changed between versions (e.g. Managers → Directors).
+    // Must run BEFORE orphan detection so the renamed header is recognized as valid.
+    var CONFIG_HEADER_RENAMES_ = { 'Managers': 'Directors' };
+    var renameLastCol = sheet.getLastColumn();
+    if (renameLastCol > 0) {
+      var renameRow = sheet.getRange(2, 1, 1, renameLastCol).getValues()[0];
+      for (var rn = 0; rn < renameRow.length; rn++) {
+        var oldName = String(renameRow[rn]).trim();
+        if (CONFIG_HEADER_RENAMES_[oldName]) {
+          sheet.getRange(2, rn + 1).setValue(CONFIG_HEADER_RENAMES_[oldName]);
+          Logger.log('createConfigSheet: renamed header "' + oldName + '" → "' + CONFIG_HEADER_RENAMES_[oldName] + '"');
+        }
+      }
+    }
+
     // Migration: detect and remove orphaned columns left behind by past
     // CONFIG_HEADER_MAP_ removals (Yes/No, Satisfaction Form URL, etc.).
     // Deleting them shifts data left so it re-aligns with new headers.
@@ -188,22 +203,27 @@ function createConfigSheet(ss) {
   // Steward Label, etc.) instead of Feature Toggle columns, letting users
   // accidentally set branding values to "yes"/"no".
   if (isExistingSheet) {
-    var brandingRepairCols = [
-      CONFIG_COLS.LOGO_INITIALS, CONFIG_COLS.STEWARD_LABEL,
-      CONFIG_COLS.MEMBER_LABEL, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS,
-      CONFIG_COLS.COOKIE_DURATION_DAYS
+    // Every non-toggle Config column that the pre-v4.50.5 stale-CONFIG_COLS
+    // bug could have smeared yes/no dropdowns onto.  Covers Branding & UX,
+    // the numeric Feature Toggle fields, and Retention.
+    var nonToggleRepairCols = [
+      CONFIG_COLS.ACCENT_HUE, CONFIG_COLS.LOGO_INITIALS,
+      CONFIG_COLS.STEWARD_LABEL, CONFIG_COLS.MEMBER_LABEL,
+      CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, CONFIG_COLS.COOKIE_DURATION_DAYS,
+      CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN,
+      CONFIG_COLS.GRIEVANCE_ARCHIVE_DAYS, CONFIG_COLS.AUDIT_ARCHIVE_DAYS
     ];
-    for (var bc = 0; bc < brandingRepairCols.length; bc++) {
-      if (!brandingRepairCols[bc]) continue;
+    for (var bc = 0; bc < nonToggleRepairCols.length; bc++) {
+      if (!nonToggleRepairCols[bc]) continue;
       try {
-        var repairCell = sheet.getRange(3, brandingRepairCols[bc]);
+        var repairCell = sheet.getRange(3, nonToggleRepairCols[bc]);
         repairCell.clearDataValidations();
         // Clear yes/no values from non-boolean columns — these are toggle values
         // that landed here due to the stale CONFIG_COLS bug.
         var repairVal = String(repairCell.getValue() || '').toLowerCase().trim();
         if (repairVal === 'yes' || repairVal === 'no') {
           repairCell.clearContent();
-          Logger.log('createConfigSheet: cleared misaligned toggle value "' + repairVal + '" from branding col ' + brandingRepairCols[bc]);
+          Logger.log('createConfigSheet: cleared misaligned toggle value "' + repairVal + '" from non-toggle col ' + nonToggleRepairCols[bc]);
         }
       } catch (_v) {}
     }
@@ -440,15 +460,27 @@ function repairConfigData() {
     }
   }
 
-  // Step 2: clear data rows and re-seed
+  // Step 2: clear ALL data rows (row 3+) — a full reset
   var lastRow = sheet.getLastRow();
   if (lastRow >= 3) {
-    sheet.getRange(3, 1, lastRow - 2, expected.length).clearContent();
+    sheet.getRange(3, 1, lastRow - 2, Math.max(expected.length, maxCol)).clearContent();
   }
 
-  // Re-run createConfigSheet with cleared data (isExistingSheet will be false since rows ≤ 2)
+  // Step 3: rebuild Config from scratch (headers + default seeds + toggle validations)
   createConfigSheet(ss);
-  ss.toast('Config data repaired — default values re-seeded. Check and restore any custom values.', 'Repair Complete', 5);
+  SpreadsheetApp.flush();  // ensure writes are visible to subsequent reads
+
+  // Step 4: backfill Config dropdown columns from existing sheet data
+  // (Job Titles, Locations, Stewards, Statuses, etc. from Member Dir & Grievance Log)
+  ss.toast('Populating Config from existing sheet data...', '🔧 Repair', 3);
+  populateConfigFromSheetData();
+  SpreadsheetApp.flush();
+
+  // Step 5: reapply data validations so dropdowns reflect new Config values
+  ss.toast('Reapplying dropdown validations...', '🔧 Repair', 3);
+  setupDataValidations();
+
+  ss.toast('Config fully repaired — defaults seeded, sheet data imported, validations applied.', '✅ Repair Complete', 5);
 }
 
 /**
@@ -498,18 +530,28 @@ function _applyYesNoValidation(sheet, col, helpText) {
     if (val === '') {
       cell.setValue('yes');
     } else if (val !== 'yes' && val !== 'no') {
-      // Non-boolean value in a toggle column — likely misaligned data.
-      // Log a warning instead of silently overwriting, which destroys data.
-      Logger.log('_applyYesNoValidation col ' + col + ': unexpected value "' + raw + '" — skipping (may indicate column misalignment)');
+      cell.setValue('yes');
+      Logger.log('_applyYesNoValidation col ' + col + ': replaced unexpected value "' + raw + '" with "yes"');
     }
-    var rule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(['yes', 'no'], true)
-      .setAllowInvalid(true)
-      .setHelpText(helpText)
-      .build();
-    cell.setDataValidation(rule);
+    // Try with helpText first; GAS has a known quirk where setDataValidation
+    // can throw when helpText is set.  Fall back to no helpText.
+    var rule;
+    try {
+      rule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(['yes', 'no'], true)
+        .setAllowInvalid(true)
+        .setHelpText(helpText)
+        .build();
+      cell.setDataValidation(rule);
+    } catch (_ht) {
+      rule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(['yes', 'no'], true)
+        .setAllowInvalid(true)
+        .build();
+      cell.setDataValidation(rule);
+    }
   } catch (e) {
-    Logger.log('_applyYesNoValidation col ' + col + ' skipped: ' + e.message);
+    Logger.log('_applyYesNoValidation col ' + col + ' FAILED: ' + e.message);
   }
 }
 
@@ -523,66 +565,156 @@ function _applyYesNoValidation(sheet, col, helpText) {
  * Callable from menu: Union Hub > Admin > Populate Config from Sheet Data
  */
 function populateConfigFromSheetData() {
+  // Always resolve fresh column positions from actual sheet headers.
+  // Prevents stale MEMBER_COLS/CONFIG_COLS after header renames.
+  try { syncColumnMaps(); } catch (_e) { Logger.log('populateConfig syncColumnMaps: ' + (_e.message || _e)); }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!configSheet) {
-    SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.');
+    try { SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.'); } catch (_) { Logger.log('_: ' + (_.message || _)); }
     return;
   }
 
   var added = 0;
 
-  // Gather all dropdown and multi-select mappings
-  var sources = [
-    { sheetName: SHEETS.MEMBER_DIR, maps: DROPDOWN_MAP.MEMBER_DIR.concat(MULTI_SELECT_COLS.MEMBER_DIR) },
-    { sheetName: SHEETS.GRIEVANCE_LOG, maps: DROPDOWN_MAP.GRIEVANCE_LOG.concat(MULTI_SELECT_COLS.GRIEVANCE_LOG) }
+  // Maps configCol → { existing: {}, newValues: [] }
+  var colBuckets = {};
+
+  // Pre-read ALL Config data in one batch
+  var configLastRow = configSheet.getLastRow();
+  var configDataRows = configLastRow >= 3 ? configLastRow - 2 : 0;
+  var configMaxCol = configSheet.getLastColumn();
+  var allConfigData = configDataRows > 0 && configMaxCol > 0
+    ? configSheet.getRange(3, 1, configDataRows, configMaxCol).getValues()
+    : [];
+
+  // Helper: init a bucket for a Config column
+  function initBucket_(configCol) {
+    if (colBuckets[configCol]) return colBuckets[configCol];
+    var existingSet = {};
+    for (var c = 0; c < allConfigData.length; c++) {
+      var cv = (allConfigData[c][configCol - 1] || '').toString().trim();
+      if (cv) existingSet[cv] = true;
+    }
+    colBuckets[configCol] = { existing: existingSet, newValues: [] };
+    return colBuckets[configCol];
+  }
+
+  // Helper: add a value to bucket if new
+  function addValue_(bucket, val) {
+    if (val && !bucket.existing[val]) {
+      bucket.existing[val] = true;
+      bucket.newValues.push(val);
+      added++;
+    }
+  }
+
+  // ── Phase 1a: Single-select columns (DROPDOWN_MAP) ──
+  // NO comma-split — the cell value IS the value (e.g. "Unit 8", "Boston, MA")
+  // NO numeric filter — single-digit values like "8" are valid unit codes
+  var singleSources = [
+    { sheetName: SHEETS.MEMBER_DIR, maps: DROPDOWN_MAP.MEMBER_DIR },
+    { sheetName: SHEETS.GRIEVANCE_LOG, maps: DROPDOWN_MAP.GRIEVANCE_LOG }
   ];
-
-  for (var s = 0; s < sources.length; s++) {
-    var sourceSheet = ss.getSheetByName(sources[s].sheetName);
-    if (!sourceSheet || sourceSheet.getLastRow() < 2) continue;
-
-    var data = sourceSheet.getDataRange().getValues();
-
-    for (var m = 0; m < sources[s].maps.length; m++) {
-      var mapping = sources[s].maps[m];
-      var targetCol = mapping.col;       // column in source sheet (1-indexed)
-      var configCol = mapping.configCol;  // column in Config (1-indexed)
-
-      // Collect existing Config values for this column
-      var existingSet = {};
-      var configLastRow = configSheet.getLastRow();
-      if (configLastRow >= 3) {
-        var configData = configSheet.getRange(3, configCol, configLastRow - 2, 1).getValues();
-        for (var c = 0; c < configData.length; c++) {
-          var cv = (configData[c][0] || '').toString().trim();
-          if (cv) existingSet[cv] = true;
-        }
+  for (var s1 = 0; s1 < singleSources.length; s1++) {
+    var sheet1 = ss.getSheetByName(singleSources[s1].sheetName);
+    if (!sheet1 || sheet1.getLastRow() < 2) continue;
+    var data1 = sheet1.getDataRange().getValues();
+    for (var m1 = 0; m1 < singleSources[s1].maps.length; m1++) {
+      var map1 = singleSources[s1].maps[m1];
+      var bucket1 = initBucket_(map1.configCol);
+      for (var r1 = 1; r1 < data1.length; r1++) {
+        var val1 = (data1[r1][map1.col - 1] || '').toString().trim();
+        addValue_(bucket1, val1);
       }
+    }
+  }
 
-      // Scan the source sheet for unique values in this column
-      for (var r = 1; r < data.length; r++) {
-        var cellVal = (data[r][targetCol - 1] || '').toString().trim();
-        if (!cellVal) continue;
-
-        // Handle comma-separated multi-select values
-        var parts = cellVal.split(',');
-        for (var p = 0; p < parts.length; p++) {
-          var val = parts[p].trim();
-          // Skip pure-numeric values — they're data-entry errors (index numbers
-          // instead of text labels). All dropdown Config columns expect text.
-          if (val && !existingSet[val] && !/^\d+$/.test(val)) {
-            addToConfigDropdown_(configCol, val);
-            existingSet[val] = true;
-            added++;
+  // ── Phase 1b: Multi-select columns (MULTI_SELECT_COLS) ──
+  // Comma-split — values like "Email, Phone" become separate entries
+  // Filter pure-digit values — "1","2","3" are dropdown indices, not real data
+  var multiSources = [
+    { sheetName: SHEETS.MEMBER_DIR, maps: MULTI_SELECT_COLS.MEMBER_DIR },
+    { sheetName: SHEETS.GRIEVANCE_LOG, maps: MULTI_SELECT_COLS.GRIEVANCE_LOG }
+  ];
+  for (var s2 = 0; s2 < multiSources.length; s2++) {
+    var sheet2 = ss.getSheetByName(multiSources[s2].sheetName);
+    if (!sheet2 || sheet2.getLastRow() < 2) continue;
+    var data2 = sheet2.getDataRange().getValues();
+    for (var m2 = 0; m2 < multiSources[s2].maps.length; m2++) {
+      var map2 = multiSources[s2].maps[m2];
+      var bucket2 = initBucket_(map2.configCol);
+      for (var r2 = 1; r2 < data2.length; r2++) {
+        var cellVal2 = (data2[r2][map2.col - 1] || '').toString().trim();
+        if (!cellVal2) continue;
+        var parts2 = cellVal2.split(',');
+        for (var p2 = 0; p2 < parts2.length; p2++) {
+          var val2 = parts2[p2].trim();
+          // Filter pure-digit values — they're dropdown indices, not labels
+          if (val2 && !/^\d+$/.test(val2)) {
+            addValue_(bucket2, val2);
           }
         }
       }
     }
   }
 
-  // Dedup and sort each Config dropdown column
-  deduplicateAndSortConfigColumns_(configSheet);
+  // ── Phase 1c: Steward sync from IS_STEWARD column ──
+  // Stewards are primarily marked via IS_STEWARD=Yes, not the dropdown columns.
+  // Build full names from First+Last where IS_STEWARD is truthy.
+  try {
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (memberSheet && memberSheet.getLastRow() >= 2) {
+      var mData = memberSheet.getDataRange().getValues();
+      var stewardBucket = initBucket_(CONFIG_COLS.STEWARDS);
+      for (var sr = 1; sr < mData.length; sr++) {
+        var isSteward = (mData[sr][MEMBER_COLS.IS_STEWARD - 1] || '').toString().trim();
+        if (isSteward.toLowerCase() === 'yes' || isSteward === '1' || isSteward.toLowerCase() === 'true') {
+          var fName = (mData[sr][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim();
+          var lName = (mData[sr][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim();
+          var fullName = (fName + ' ' + lName).trim();
+          if (fullName) addValue_(stewardBucket, fullName);
+        }
+      }
+    }
+  } catch (_stErr) { Logger.log('populateConfig steward sync: ' + _stErr.message); }
+
+  // ── Phase 2: Batch-write all columns ──
+  for (var col in colBuckets) {
+    col = parseInt(col, 10);
+    var bkt = colBuckets[col];
+
+    // Merge existing + new
+    var allValues = [];
+    for (var er = 0; er < allConfigData.length; er++) {
+      var ev = (allConfigData[er][col - 1] || '').toString().trim();
+      if (ev) allValues.push(ev);
+    }
+    for (var nv = 0; nv < bkt.newValues.length; nv++) {
+      allValues.push(bkt.newValues[nv]);
+    }
+
+    // Deduplicate + sort
+    var seen = {};
+    var unique = [];
+    for (var u = 0; u < allValues.length; u++) {
+      if (!seen[allValues[u]]) {
+        seen[allValues[u]] = true;
+        unique.push(allValues[u]);
+      }
+    }
+    unique.sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
+
+    var rowsNeeded = Math.max(unique.length, configDataRows);
+    if (rowsNeeded === 0) continue;
+
+    var writeData = [];
+    for (var w = 0; w < rowsNeeded; w++) {
+      writeData.push([w < unique.length ? unique[w] : '']);
+    }
+    configSheet.getRange(3, col, rowsNeeded, 1).setValues(writeData);
+  }
 
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
 }
@@ -889,7 +1021,7 @@ function createConfigGuideSheet(ss) {
     ['R', 'Office Locations', 'Member Dir & Grievance Log', 'Boston Office, Springfield Office...'],
     ['U', 'Units', 'Member Dir & Grievance Log', 'Unit 1, Unit 2, Unit 3...'],
     ['X', 'Supervisors', 'Member Directory', 'Names of supervisors'],
-    ['Y', 'Managers', 'Member Directory', 'Names of managers'],
+    ['Y', 'Directors', 'Member Directory', 'Names of directors'],
     ['Z', 'Stewards', 'Member Dir & Grievance Log', 'Names of union stewards'],
     ['AD', 'Grievance Status', 'Grievance Log', 'Open, Pending Info, Settled, Won...'],
     ['AE', 'Grievance Step', 'Grievance Log', 'Informal, Step I, Step II, Step III...'],
@@ -1115,6 +1247,44 @@ function createMemberDirectory(ss) {
       sheet._duesCfRules = [dpTrueRule, dpFalseRule];
     }
   } else {
+    // Existing sheet: rename any columns whose headers changed between versions.
+    // Data is preserved — only the header cell text is updated.
+    // NOTE: syncColumnMaps() also handles renames via headerRenames, but this
+    // serves as a safety net for flows that don't call syncColumnMaps first.
+    var HEADER_RENAMES_ = { 'Manager': 'Director' };
+    var lastCol = sheet.getLastColumn();
+    if (lastCol > 0) {
+      var existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      for (var ri = 0; ri < existingHeaders.length; ri++) {
+        var oldH = String(existingHeaders[ri]).trim();
+        if (HEADER_RENAMES_[oldH]) {
+          sheet.getRange(1, ri + 1).setValue(HEADER_RENAMES_[oldH]);
+          existingHeaders[ri] = HEADER_RENAMES_[oldH];
+          Logger.log('createMemberDirectory: renamed header "' + oldH + '" → "' + HEADER_RENAMES_[oldH] + '" in col ' + (ri + 1));
+        }
+      }
+
+      // Remove duplicate columns created by a previous backfill that ran
+      // before the rename was in place (e.g. both "Manager" and "Director" existed).
+      var headerCount = {};
+      var dupeColsToDelete = [];
+      for (var di = 0; di < existingHeaders.length; di++) {
+        var hdr = String(existingHeaders[di]).trim();
+        if (!hdr) continue;
+        if (headerCount[hdr]) {
+          // Keep the FIRST occurrence (has data), delete later duplicates (empty backfills)
+          dupeColsToDelete.push(di + 1);
+        } else {
+          headerCount[hdr] = true;
+        }
+      }
+      // Delete right-to-left to avoid shifting issues
+      for (var dd = dupeColsToDelete.length - 1; dd >= 0; dd--) {
+        sheet.deleteColumn(dupeColsToDelete[dd]);
+        Logger.log('createMemberDirectory: deleted duplicate column at col ' + dupeColsToDelete[dd]);
+      }
+    }
+
     // Existing sheet: append any columns from MEMBER_HEADER_MAP_ not yet present.
     // Data in existing columns is never touched.
     var added = _addMissingMemberHeaders_(sheet);

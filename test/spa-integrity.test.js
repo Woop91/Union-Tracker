@@ -927,7 +927,8 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
 // G22: Workload Tracker frontend invariants
 // ============================================================================
 
-describe('G22 — Workload Tracker frontend invariants', () => {
+// SolidBase: WorkloadService + workload tracker UI excluded
+describe.skip('G22 — Workload Tracker frontend invariants', () => {
   const memberView = read('member_view.html');
 
   test('WT_CAT_KEY_LABELS map is defined from WT_CATEGORIES', () => {

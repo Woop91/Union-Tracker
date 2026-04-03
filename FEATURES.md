@@ -937,14 +937,13 @@ One-time data migration service for schema changes and column auto-migration.
 
 ## 36. Org Chart
 
-> **Files:** `org_chart.html`, `scripts/sync-org-chart.js` | **Version:** 4.22.6
+> **Files:** `org_chart.html` | **Version:** 4.22.6
 
-Organization chart visualization for the MADDS org chart.
+Organization chart visualization.
 
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
-| **MADDS Org Chart** | Default org chart view showing organizational structure | `org_chart.html` | org chart, structure, MADDS |
-| **Automated Sync Script** | Node.js script for automated org chart data updates | `scripts/sync-org-chart.js` | sync, script, automated |
+| **Org Chart** | Default org chart view showing organizational structure | `org_chart.html` | org chart, structure |
 | **Dedicated Template** | Standalone HTML template for org chart rendering | `org_chart.html` | template, HTML, standalone |
 
 ---

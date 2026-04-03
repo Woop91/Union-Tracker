@@ -242,6 +242,10 @@ function REPAIR_DASHBOARD() {
     ss.toast('Reapplying data validations...', '🔧 Progress', 3);
     setupDataValidations();
 
+    // Backfill Config dropdowns from existing Member Dir / Grievance data
+    ss.toast('Populating Config from existing data...', '🔧 Progress', 3);
+    populateConfigFromSheetData();
+
     // Install triggers
     ss.toast('Installing triggers...', '🔧 Progress', 3);
     installAutoSyncTrigger();
@@ -2748,7 +2752,7 @@ function findMissingConfigValues() {
     { sheet: memberSheet, col: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, name: 'Work Location' },
     { sheet: memberSheet, col: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, name: 'Unit' },
     { sheet: memberSheet, col: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, name: 'Supervisor' },
-    { sheet: memberSheet, col: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, name: 'Manager' },
+    { sheet: memberSheet, col: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, name: 'Director' },
     { sheet: grievanceSheet, col: GRIEVANCE_COLS.STATUS, configCol: CONFIG_COLS.GRIEVANCE_STATUS, name: 'Grievance Status' },
     { sheet: grievanceSheet, col: GRIEVANCE_COLS.CURRENT_STEP, configCol: CONFIG_COLS.GRIEVANCE_STEP, name: 'Grievance Step' },
     { sheet: grievanceSheet, col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, name: 'Issue Category' }

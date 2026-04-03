@@ -32,6 +32,24 @@
   <!-- H-50: Server data injected as inert JSON (not executable). Parsed client-side. -->
   <script type="application/json" id="page-data"><?!= pageData ?></script>
   <script>
+    // SolidBase v4.50.8: migrate dds_ localStorage keys to sb_
+    (function _migrateLSPrefix() {
+      if (localStorage.getItem('sb_ls_migrated')) return;
+      try {
+        var keys = Object.keys(localStorage);
+        for (var i = 0; i < keys.length; i++) {
+          if (keys[i].indexOf('sb_') === 0) {
+            var newKey = 'sb_' + keys[i].slice(4);
+            if (!localStorage.getItem(newKey)) {
+              localStorage.setItem(newKey, localStorage.getItem(keys[i]));
+            }
+            localStorage.removeItem(keys[i]);
+          }
+        }
+      } catch (_e) { /* localStorage blocked */ }
+      localStorage.setItem('sb_ls_migrated', '1');
+    })();
+
     // ═══════════════════════════════════════
     // BOOTSTRAP — Parse server-injected data
     // ═══════════════════════════════════════
@@ -87,10 +105,10 @@
     // Only attempts once per device. PIN users already have biometric via PIN save.
     if (CURRENT_VIEW !== 'auth' && SESSION_TOKEN && !IS_PIN_SESSION) {
       try {
-        var _bioAvail = localStorage.getItem('dds_biometric_available');
-        var _bioPrompted = localStorage.getItem('dds_devicekey_prompted');
+        var _bioAvail = localStorage.getItem('sb_biometric_available');
+        var _bioPrompted = localStorage.getItem('sb_devicekey_prompted');
         if (!_bioAvail && !_bioPrompted && typeof PasswordCredential !== 'undefined' && navigator.credentials && navigator.credentials.store) {
-          localStorage.setItem('dds_devicekey_prompted', 'true');
+          localStorage.setItem('sb_devicekey_prompted', 'true');
           google.script.run
             .withSuccessHandler(function(result) {
               if (result && result.success && result.deviceKey) {
@@ -102,9 +120,9 @@
                   });
                   navigator.credentials.store(cred).then(function() {
                     try {
-                      localStorage.setItem('dds_biometric_available', 'true');
-                      localStorage.setItem('dds_biometric_name', result.displayName || '');
-                      localStorage.setItem('dds_credential_type', 'device_key');
+                      localStorage.setItem('sb_biometric_available', 'true');
+                      localStorage.setItem('sb_biometric_name', result.displayName || '');
+                      localStorage.setItem('sb_credential_type', 'device_key');
                     } catch (_) {}
                   }).catch(function() {});
                 } catch (_) {}
@@ -175,7 +193,7 @@
           // Skip re-render if SWR already showed identical data
           if (_swrApplied) {
             try {
-              var oldCache = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
+              var oldCache = localStorage.getItem('sb_batchData_' + CURRENT_VIEW);
               if (oldCache) {
                 var oldData = JSON.parse(oldCache);
                 // OPT-SWR: Short-circuit diff — skip stringify for obvious mismatches
@@ -194,7 +212,7 @@
             } catch (_diffErr) { /* proceed with re-render */ }
           }
           // C3: Stale-while-revalidate — persist batch data for instant return visits
-          safeLSSet('dds_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch }));
+          safeLSSet('sb_batchData_' + CURRENT_VIEW, JSON.stringify({ ts: Date.now(), data: _preloadedBatch }));
           for (var i = 0; i < _preloadCallbacks.length; i++) _preloadCallbacks[i](_preloadedBatch);
           _preloadCallbacks = [];
         })
@@ -252,7 +270,7 @@
     (function _trySWR() {
       if (CURRENT_VIEW !== 'steward' && CURRENT_VIEW !== 'member') return;
       try {
-        var raw = localStorage.getItem('dds_batchData_' + CURRENT_VIEW);
+        var raw = localStorage.getItem('sb_batchData_' + CURRENT_VIEW);
         if (!raw) return;
         var parsed = JSON.parse(raw);
         // v4.44.0: SWR TTL increased to 2 hours — returning users get instant
@@ -291,7 +309,7 @@
       // (server-side UserProperties can't work per-user in Execute-as-Me webapps)
       var _userAccentHue = (function() {
         try {
-          var saved = localStorage.getItem('dds_accentHue');
+          var saved = localStorage.getItem('sb_accentHue');
           if (saved !== null) {
             var parsed = parseInt(saved, 10);
             if (!isNaN(parsed) && parsed >= 0 && parsed <= 360) return parsed;
@@ -656,13 +674,13 @@
       function setStyle(styleId) {
         if (!styles[styleId]) styleId = 'default';
         AppState.navTheme = styleId;
-        safeLSSet('dds_navTheme', styleId);
+        safeLSSet('sb_navTheme', styleId);
         apply();
       }
 
       function updatePalette(hue) {
         palette = generatePalette(hue);
-        safeLSSet('dds_accentHue', String(hue));
+        safeLSSet('sb_accentHue', String(hue));
         apply();
       }
 
@@ -673,7 +691,7 @@
       function setCyberNeon(neonKey) {
         if (!CYBER_NEONS[neonKey]) neonKey = 'red';
         AppState.cyberNeon = neonKey;
-        safeLSSet('dds_cyberNeon', neonKey);
+        safeLSSet('sb_cyberNeon', neonKey);
         apply();
       }
 
@@ -743,19 +761,19 @@
       try {
         localStorage.setItem(key, value);
       } catch (_e) {
-        // Storage full — evict non-critical dds_ cache entries
+        // Storage full — evict non-critical sb_ cache entries
         var PROTECTED_KEYS = { dashboardSessionToken: 1, dashboardTheme: 1, dashboardSessionRedirectCount: 1 };
         var evictable = [];
         for (var i = 0; i < localStorage.length; i++) {
           var k = localStorage.key(i);
-          if (k && k.indexOf('dds_') === 0 && !PROTECTED_KEYS[k]) evictable.push(k);
+          if (k && k.indexOf('sb_') === 0 && !PROTECTED_KEYS[k]) evictable.push(k);
         }
         evictable.forEach(function(k) { try { localStorage.removeItem(k); } catch(_) {} });
         try { localStorage.setItem(key, value); } catch (_) {
           // Still full — evict batch data specifically
           for (var j = 0; j < localStorage.length; j++) {
             var bk = localStorage.key(j);
-            if (bk && bk.indexOf('dds_batchData') === 0) { try { localStorage.removeItem(bk); } catch(_) {} }
+            if (bk && bk.indexOf('sb_batchData') === 0) { try { localStorage.removeItem(bk); } catch(_) {} }
           }
           try { localStorage.setItem(key, value); } catch (_) { /* give up */ }
         }
@@ -1157,7 +1175,7 @@
     // Calls are staggered 1.5s apart to stay under the 4-concurrent-call throttle.
     // ═══════════════════════════════════════
     var _tabPrefetchDone = false;
-    var _TAB_FREQ_KEY = 'dds_tabFreq';
+    var _TAB_FREQ_KEY = 'sb_tabFreq';
     var _MAX_PREFETCH = 3;
 
     /**
@@ -1284,7 +1302,7 @@
       activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
       isDark: (function() {
         try {
-          var v = localStorage.getItem('dds_isDark');
+          var v = localStorage.getItem('sb_isDark');
           if (v !== null) return v === 'true';
           // First visit: respect OS color scheme preference, default dark if unavailable
           if (typeof window.matchMedia === 'function') {
@@ -1293,8 +1311,8 @@
           return true;
         } catch(e) { return true; }
       })(),
-      navTheme: (function() { try { return localStorage.getItem('dds_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
-      cyberNeon: (function() { try { return localStorage.getItem('dds_cyberNeon') || 'red'; } catch(e) { return 'red'; } })(),
+      navTheme: (function() { try { return localStorage.getItem('sb_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
+      cyberNeon: (function() { try { return localStorage.getItem('sb_cyberNeon') || 'red'; } catch(e) { return 'red'; } })(),
       colorTheme: (PAGE_DATA.colorTheme || 'default'),
       colorThemes: (PAGE_DATA.colorThemes || []),
       user: CURRENT_USER,
@@ -1325,11 +1343,11 @@
 
       // Persist preference
       function _save() {
-        safeLSSet('dds_splitView', JSON.stringify({ enabled: _state.enabled, splitRatio: _state.splitRatio }));
+        safeLSSet('sb_splitView', JSON.stringify({ enabled: _state.enabled, splitRatio: _state.splitRatio }));
       }
       function _load() {
         try {
-          var s = JSON.parse(localStorage.getItem('dds_splitView'));
+          var s = JSON.parse(localStorage.getItem('sb_splitView'));
           if (s) {
             _state.splitRatio = Math.max(0.3, Math.min(0.7, s.splitRatio || 0.5));
             // Don't auto-enable on load — user must toggle
@@ -2714,7 +2732,7 @@
           className: 'sidebar-item',
           onClick: function() {
             AppState.isDark = !AppState.isDark;
-            safeLSSet('dds_isDark', AppState.isDark);
+            safeLSSet('sb_isDark', AppState.isDark);
             UnifiedTheme.apply();
             _handleTabNav(role, activeTab);
           }
@@ -2803,6 +2821,7 @@
         { group: 'Manage' },
         { id: 'tasks', icon: '\u2705', label: 'Tasks' },
         { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
+        { id: 'explorer', icon: '\uD83D\uDD2C', label: 'Explorer' },
         { id: 'accesslog', icon: '\uD83D\uDD0D', label: 'Access Log' },
         { id: 'engagement', icon: '\uD83C\uDFAF', label: 'Engagement' },
         { group: 'Reference' },
@@ -2890,7 +2909,7 @@
           className: 'more-menu-item', style: { cursor: 'pointer', padding: '0' },
           onClick: function() {
             AppState.isDark = !AppState.isDark;
-            safeLSSet('dds_isDark', AppState.isDark);
+            safeLSSet('sb_isDark', AppState.isDark);
             UnifiedTheme.apply();
             _handleTabNav(role, moreTab);
           }
@@ -3543,6 +3562,7 @@
           case 'newgrievance': return renderNewGrievanceForm;
           case 'members': return renderStewardMembers;
           case 'insights': return renderInsightsPage;
+          case 'explorer': return renderDirectoryExplorer;
           case 'stewarddirectory': return renderStewardDirectoryPage;
           case 'broadcast': return renderBroadcast;
           case 'notifications': return renderStewardNotifications;
@@ -4679,7 +4699,7 @@
               google.script.run
                 .withSuccessHandler(function(batch) {
                   if (!batch) return;
-                  safeLSSet('dds_batchData_' + AppState.activeRole, JSON.stringify({ ts: Date.now(), data: batch }));
+                  safeLSSet('sb_batchData_' + AppState.activeRole, JSON.stringify({ ts: Date.now(), data: batch }));
                   // Update AppState counts for badge freshness
                   if (batch.notificationCount !== undefined) AppState.notificationCount = batch.notificationCount;
                   if (batch.taskCount !== undefined) AppState.taskCount = batch.taskCount;
@@ -4697,7 +4717,7 @@
           if (typeof AppState !== 'undefined') {
             var origBatchData = AppState.batchData;
             if (origBatchData) {
-              try { localStorage.setItem('dds_offline_cache', JSON.stringify(origBatchData)); } catch(_) { /* localStorage full or blocked */ }
+              try { localStorage.setItem('sb_offline_cache', JSON.stringify(origBatchData)); } catch(_) { /* localStorage full or blocked */ }
             }
           }
         })();

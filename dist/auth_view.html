@@ -21,25 +21,25 @@ function _trySaveCredential(displayName, pin) {
  } catch (_) {}
  }
  try {
- localStorage.setItem('dds_biometric_available', 'true');
- localStorage.setItem('dds_biometric_name', (displayName || '').split(' ').map(function(w) { return w.charAt(0); }).join('').toUpperCase() || 'You');
+ localStorage.setItem('sb_biometric_available', 'true');
+ localStorage.setItem('sb_biometric_name', (displayName || '').split(' ').map(function(w) { return w.charAt(0); }).join('').toUpperCase() || 'You');
  } catch (_) {}
 }
 
 function _hasSavedCredentials() {
- try { return localStorage.getItem('dds_biometric_available') === 'true'; } catch (_) { return false; }
+ try { return localStorage.getItem('sb_biometric_available') === 'true'; } catch (_) { return false; }
 }
 
 function _getSavedCredentialName() {
- try { return localStorage.getItem('dds_biometric_name') || ''; } catch (_) { return ''; }
+ try { return localStorage.getItem('sb_biometric_name') || ''; } catch (_) { return ''; }
 }
 
 function _clearSavedCredentials() {
  try {
- localStorage.removeItem('dds_biometric_available');
- localStorage.removeItem('dds_biometric_name');
- localStorage.removeItem('dds_credential_type');
- localStorage.removeItem('dds_devicekey_prompted');
+ localStorage.removeItem('sb_biometric_available');
+ localStorage.removeItem('sb_biometric_name');
+ localStorage.removeItem('sb_credential_type');
+ localStorage.removeItem('sb_devicekey_prompted');
  } catch (_) {}
 }
 
@@ -86,7 +86,7 @@ function _autoSubmitPIN(container, credentialValue) {
 
  
  var credType = 'pin';
- try { credType = localStorage.getItem('dds_credential_type') || 'pin'; } catch (_) {}
+ try { credType = localStorage.getItem('sb_credential_type') || 'pin'; } catch (_) {}
 
  if (credType === 'device_key') {
  google.script.run
@@ -157,7 +157,7 @@ function _injectAuthEffects() {
  toggle.addEventListener('click', function() {
  if (typeof AppState === 'undefined') return;
  AppState.isDark = !AppState.isDark;
- try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(_) {}
+ try { localStorage.setItem('sb_isDark', AppState.isDark); } catch(_) {}
  toggle.textContent = AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19';
  if (typeof UnifiedTheme !== 'undefined') UnifiedTheme.apply();
  else if (typeof ThemeEngine !== 'undefined') ThemeEngine.applyTheme(ThemeEngine.getTheme('member', AppState.isDark));
@@ -182,7 +182,7 @@ function _cleanupAuthEffects() {
 function renderAuth(container) {
  // v4.41.0: Respect user's stored preference (default to light for auth)
  var prefersDark = false;
- try { prefersDark = localStorage.getItem('dds_isDark') === 'true'; } catch(_) {}
+ try { prefersDark = localStorage.getItem('sb_isDark') === 'true'; } catch(_) {}
  if (typeof AppState !== 'undefined') AppState.isDark = prefersDark;
 
  if (typeof UnifiedTheme !== 'undefined' && typeof AppState !== 'undefined') {

@@ -449,15 +449,17 @@ function test_weeklyq_autoSelectExists() {
 
 /* ========================================================================
  * WORKLOAD SUITE — WorkloadService module, categories, health
+ * Guarded: all tests skip when WorkloadService is excluded from this edition.
  * ======================================================================== */
 
 function test_workload_moduleExists() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertNotNull(WorkloadService, 'WorkloadService module');
   TestRunner.assertType(WorkloadService, 'object', 'WorkloadService is object');
 }
 
-/** Tests workload: public API complete. */
 function test_workload_publicAPIComplete() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   var expected = [
     'initSheets', 'processFormSSO', 'getHistorySSO',
     'getDashboardDataSSO', 'getReminderSSO', 'setReminderSSO',
@@ -470,11 +472,10 @@ function test_workload_publicAPIComplete() {
   }
 }
 
-/** Tests workload: sub categories exposed. */
 function test_workload_subCategoriesExposed() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertNotNull(WorkloadService.SUB_CATEGORIES, 'SUB_CATEGORIES');
   TestRunner.assertType(WorkloadService.SUB_CATEGORIES, 'object', 'SUB_CATEGORIES is object');
-  // Verify known category keys
   var keys = ['priority', 'pending', 'unread', 'todo', 'referrals', 'ce', 'assistance', 'aged'];
   for (var i = 0; i < keys.length; i++) {
     TestRunner.assertHasKey(WorkloadService.SUB_CATEGORIES, keys[i],
@@ -484,27 +485,26 @@ function test_workload_subCategoriesExposed() {
   }
 }
 
-/** Tests workload: category labels exposed. */
 function test_workload_categoryLabelsExposed() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertNotNull(WorkloadService.CATEGORY_LABELS, 'CATEGORY_LABELS');
   TestRunner.assertType(WorkloadService.CATEGORY_LABELS, 'object', 'CATEGORY_LABELS is object');
-  // Should have t1-t8 mappings
   for (var t = 1; t <= 8; t++) {
     TestRunner.assertHasKey(WorkloadService.CATEGORY_LABELS, 't' + t,
       'CATEGORY_LABELS.t' + t);
   }
 }
 
-/** Tests workload: get sub categories callable. */
 function test_workload_getSubCategoriesCallable() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   var cats = WorkloadService.getSubCategories();
   TestRunner.assertNotNull(cats, 'getSubCategories returns value');
   TestRunner.assertType(cats, 'object', 'returns object');
   TestRunner.assertHasKey(cats, 'priority', 'has priority key');
 }
 
-/** Tests workload: global wrappers exist. */
 function test_workload_globalWrappersExist() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   var wrappers = [
     'processWorkloadFormSSO', 'getWorkloadHistorySSO', 'getWorkloadDashboardDataSSO',
     'getWorkloadReminderSSO', 'setWorkloadReminderSSO', 'exportWorkloadHistoryCSV',
@@ -516,18 +516,17 @@ function test_workload_globalWrappersExist() {
   }
 }
 
-/** Tests workload: trigger handlers exist. */
 function test_workload_triggerHandlersExist() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   TestRunner.assertEquals('function', typeof initWorkloadTrackerSheets, 'initWorkloadTrackerSheets');
   TestRunner.assertEquals('function', typeof processWorkloadReminders, 'processWorkloadReminders');
   TestRunner.assertEquals('function', typeof refreshWorkloadLedger, 'refreshWorkloadLedger');
 }
 
-/** Tests workload: wrappers reject null token. */
 function test_workload_wrappersRejectNullToken() {
+  if (typeof WorkloadService === 'undefined') { TestRunner.skip('WorkloadService excluded'); return; }
   try {
     var result = getWorkloadHistorySSO(null);
-    // Should return empty/null for null token
     if (Array.isArray(result)) {
       TestRunner.assertEquals(0, result.length, 'getWorkloadHistorySSO(null) returns empty array');
     }

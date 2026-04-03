@@ -79,7 +79,7 @@ var ADMIN_SETTINGS_SCHEMA_ = [
       { key: 'OFFICE_DAYS',            label: 'Office Days',             type: 'list', desc: 'Days of the week for scheduling' },
       { key: 'OFFICE_ADDRESSES',       label: 'Office Addresses',        type: 'list', desc: 'Full addresses for office locations' },
       { key: 'SUPERVISORS',            label: 'Supervisors',             type: 'list', desc: 'Supervisor names for member profiles' },
-      { key: 'MANAGERS',               label: 'Managers',                type: 'list', desc: 'Manager names for member profiles' },
+      { key: 'MANAGERS',               label: 'Directors',               type: 'list', desc: 'Director names for member profiles' },
       { key: 'STEWARDS',               label: 'Stewards',                type: 'list', desc: 'Auto-synced with Member Directory steward status', note: 'Changes may be overwritten by steward promotions/demotions' },
       { key: 'STEWARD_COMMITTEES',     label: 'Steward Committees',      type: 'list', desc: 'Committee names for steward assignments' },
       { key: 'COMM_METHODS',           label: 'Communication Methods',   type: 'list', desc: 'Contact preference options (e.g. Email, Phone, Text)' },

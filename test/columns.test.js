@@ -579,7 +579,7 @@ describe('Audit log schemas', () => {
 // ============================================================================
 
 describe('CONFIG_HEADER_MAP_ type annotations', () => {
-  const VALID_TYPES = ['list', 'text', 'number', 'url', 'id', 'email', 'days', 'boolean', 'label', 'csv'];
+  const VALID_TYPES = ['list', 'text', 'number', 'url', 'id', 'email', 'days', 'boolean', 'label', 'csv', 'calid'];
 
   test('every CONFIG_HEADER_MAP_ entry has a type field', () => {
     const missing = CONFIG_HEADER_MAP_.filter(e => !e.type);
@@ -624,7 +624,7 @@ describe('validateConfigValue_', () => {
   test('label type accepts short text', () => {
     expect(validateConfigValue_('STEWARD_LABEL', 'Steward').valid).toBe(true);
     expect(validateConfigValue_('MEMBER_LABEL', 'Member').valid).toBe(true);
-    expect(validateConfigValue_('LOGO_INITIALS', 'SB').valid).toBe(true);
+    expect(validateConfigValue_('LOGO_INITIALS', 'DDS').valid).toBe(true);
   });
 
   test('label type rejects text over 50 chars', () => {

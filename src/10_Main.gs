@@ -101,6 +101,12 @@ function onOpenDeferred_() {
     }
 
     try {
+      loadUnitCodes_();
+    } catch (unitCodeErr) {
+      Logger.log('Unit codes load skipped: ' + unitCodeErr.message);
+    }
+
+    try {
       if (typeof migrateSheetTabTitles_ === 'function') {
         migrateSheetTabTitles_(ss);
       }
@@ -126,7 +132,7 @@ function onOpenDeferred_() {
     // invocation in an isolated context, so onEdit() re-registers on every call.
     // Registering here wastes ~200ms on spreadsheet open for no benefit.
 
-    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F SolidBase', 3);
+    ss.toast('Dashboard loaded successfully', '\uD83C\uDFDB\uFE0F Union Dashboard', 3);
 
     // FIX v4.50.7: Auto-show tab modal for the active sheet on spreadsheet open.
     // This works because onOpenDeferred_ is an INSTALLABLE trigger with full
@@ -725,6 +731,67 @@ function getEscalationStatuses_() {
 
   // Fall back to defaults from COMMAND_CONFIG
   return COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
+}
+
+/**
+ * Loads unit codes from Config sheet into COMMAND_CONFIG.UNIT_CODES.
+ * Expected format per cell: "Unit Name:CODE" (e.g., "Main Station:MS").
+ * Falls back silently if no data or parsing fails.
+ * @private
+ */
+function loadUnitCodes_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (!configSheet) return;
+
+    var values = getConfigValues(configSheet, CONFIG_COLS.UNIT_CODES);
+    if (values.length === 0) return;
+
+    var codes = {};
+    for (var i = 0; i < values.length; i++) {
+      var parts = String(values[i]).split(':');
+      if (parts.length >= 2) {
+        var name = parts[0].trim();
+        var code = parts.slice(1).join(':').trim();
+        if (name && code) codes[name] = code;
+      }
+    }
+    if (Object.keys(codes).length > 0) {
+      COMMAND_CONFIG.UNIT_CODES = codes;
+    }
+  } catch (e) {
+    Logger.log('Error loading unit codes: ' + e.message);
+  }
+}
+
+/**
+ * Validates Config sheet edits and warns the user via toast if the value
+ * doesn't match the column's expected data type.
+ * Non-blocking — warns only, does not reject the edit.
+ * @param {Object} e - The edit event object
+ * @private
+ */
+function warnInvalidConfigValue_(e) {
+  var col = e.range.getColumn();
+  var row = e.range.getRow();
+  if (row < 3) return;
+
+  for (var i = 0; i < CONFIG_HEADER_MAP_.length; i++) {
+    if (CONFIG_COLS[CONFIG_HEADER_MAP_[i].key] === col) {
+      var entry = CONFIG_HEADER_MAP_[i];
+      var value = e.range.getValue();
+      if (!value || String(value).trim() === '') return;
+      var result = validateConfigValue_(entry.key, value);
+      if (!result.valid) {
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          '"' + entry.header + '" expects ' + result.type + ' — got: ' + String(value).substring(0, 30),
+          '\u26A0\uFE0F Config Warning', 8
+        );
+      }
+      return;
+    }
+  }
 }
 
 /**

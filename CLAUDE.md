@@ -29,7 +29,7 @@ Claude has **full access** to **SolidBase** repo (local + remote). For anything 
 - SB Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 **Commit order:** Main first → merge to staging. Never commit directly to staging.
-**Sync flow:** `DDS Main → DDS staging` and `DDS Main → UT Main → UT staging`.
+**Sync flow:** `upstream Main → UT Main → UT staging`.
 
 **Version tracking:** Semver on every commit. Update `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
 

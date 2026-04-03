@@ -919,16 +919,6 @@ function _getTestRegistry() {
     { name: 'test_weeklyq_wrappersRejectNullToken',        fn: test_weeklyq_wrappersRejectNullToken },
     { name: 'test_weeklyq_autoSelectExists',               fn: test_weeklyq_autoSelectExists },
 
-    // ── workload suite (WorkloadService module, categories) ──
-    { name: 'test_workload_moduleExists',                  fn: test_workload_moduleExists },
-    { name: 'test_workload_publicAPIComplete',             fn: test_workload_publicAPIComplete },
-    { name: 'test_workload_subCategoriesExposed',          fn: test_workload_subCategoriesExposed },
-    { name: 'test_workload_categoryLabelsExposed',         fn: test_workload_categoryLabelsExposed },
-    { name: 'test_workload_getSubCategoriesCallable',      fn: test_workload_getSubCategoriesCallable },
-    { name: 'test_workload_globalWrappersExist',           fn: test_workload_globalWrappersExist },
-    { name: 'test_workload_triggerHandlersExist',          fn: test_workload_triggerHandlersExist },
-    { name: 'test_workload_wrappersRejectNullToken',       fn: test_workload_wrappersRejectNullToken },
-
     // ── qaforum suite (QAForum module, question retrieval) ──
     { name: 'test_qaforum_moduleExists',                   fn: test_qaforum_moduleExists },
     { name: 'test_qaforum_publicAPIComplete',              fn: test_qaforum_publicAPIComplete },

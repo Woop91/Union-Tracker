@@ -70,7 +70,7 @@ describe('OC2: Org chart interactive functions are explicitly global', () => {
   const requiredGlobalFunctions = [
     'pillToggle',
     'repToggle',
-    'maToggle',
+    'ocToggle',
     'togglePSGroup',
     'toggleOtherGroup',
     'ocToggleMode',
@@ -266,11 +266,11 @@ describe('OC7: Pill button toggle targets exist in the HTML', () => {
     expect(missing).toEqual([]);
   });
 
-  test('every maToggle target ID has a matching element', () => {
-    const maRegex = /maToggle\('([^']+)'/g;
+  test('every ocToggle target ID has a matching element', () => {
+    const ocRegex = /ocToggle\('([^']+)'/g;
     const targetIds = new Set();
     let m;
-    while ((m = maRegex.exec(orgChartCode)) !== null) {
+    while ((m = ocRegex.exec(orgChartCode)) !== null) {
       targetIds.add(m[1]);
     }
 
@@ -284,7 +284,7 @@ describe('OC7: Pill button toggle targets exist in the HTML', () => {
 
     if (missing.length > 0) {
       // eslint-disable-next-line no-console
-      console.warn('maToggle targets missing from HTML:', missing);
+      console.warn('ocToggle targets missing from HTML:', missing);
     }
     expect(missing).toEqual([]);
   });

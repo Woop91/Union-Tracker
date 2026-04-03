@@ -103,8 +103,8 @@
 .oc-embed.light .tog-btn:hover  { background: #b83d00; }
 .oc-embed.light .grp-btn        { color: #fff; background: #d94800; font-weight: 800; border: none; }
 .oc-embed.light .grp-btn:hover  { background: #b83d00; }
-.oc-embed.light .ma-sub-btn     { color: #fff; background: #0284c7; border: none; font-weight: 700; }
-.oc-embed.light .ma-sub-btn:hover { background: #0369a1; }
+.oc-embed.light .oc-sub-btn     { color: #fff; background: #0284c7; border: none; font-weight: 700; }
+.oc-embed.light .oc-sub-btn:hover { background: #0369a1; }
 .oc-embed.light #oc-mode-toggle    { background: #6d28d9; color: #fff; font-weight: 800; }
 .oc-embed.light #oc-mode-toggle:hover { background: #5b21b6; }
 
@@ -419,7 +419,7 @@
 }
 .grp-btn:hover { background: rgba(240,192,64,0.12); }
 
-.ma-sub-btn {
+.oc-sub-btn {
   font-size: 0.65rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
   padding: 1px 7px; border-radius: 8px; cursor: pointer;
   border: 1px solid rgba(62,207,178,0.3);
@@ -712,8 +712,8 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
     flex: 1 1 180px;
   }
 
-  /* MA sub-sections — JS sets display:flex/none. CSS adds wrap/gap. */
-  #ma-org, #ma-jeb, #ma-voc, #ma-atlarge, #ma-vr-stewards {
+  /* OC sub-sections — JS sets display:flex/none. CSS adds wrap/gap. */
+  #oc-org, #oc-jeb, #oc-voc, #oc-atlarge, #oc-vr-stewards {
     flex-wrap: wrap;
     gap: 6px;
     justify-content: center;
@@ -827,16 +827,16 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
   /* Larger tap targets for fingers */
   .tog-btn, .grp-btn { padding: 8px 16px; font-size: 0.65rem; margin-top: 2px !important; margin-bottom: 2px; }
   .pill-btn { padding: 8px 18px; font-size: 0.65rem; }
-  .ma-sub-btn { padding: 4px 12px; font-size: 0.65rem; }
+  .oc-sub-btn { padding: 4px 12px; font-size: 0.65rem; }
 
-  /* MA sub-sections: vertical on mobile */
-  #ma-org, #ma-jeb, #ma-voc, #ma-atlarge, #ma-vr-stewards {
+  /* OC sub-sections: vertical on mobile */
+  #oc-org, #oc-jeb, #oc-voc, #oc-atlarge, #oc-vr-stewards {
     flex-direction: column;
   }
   .rep-btn { padding: 5px 12px; font-size: 0.65rem; }
 
-  /* Dave & Heidi cards — narrow ONLY on mobile */
-  #dave-foley-card { min-width: 0 !important; max-width: min(55vw, 200px) !important; width: 55vw !important; }
+  /* VP & Chapter cards — narrow ONLY on mobile */
+  #vp-officer-card { min-width: 0 !important; max-width: min(55vw, 200px) !important; width: 55vw !important; }
   #primary-chapter-card { min-width: 0 !important; max-width: min(50vw, 180px) !important; width: 50vw !important; }
 
   /* Increase text sizes to fill mobile width */
@@ -1769,12 +1769,12 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
         <div class="staff-list" style="width:230px;">
           <div class="sl-title">Executive Board</div>
 
-          <div class="sl-head sl-head-flex">JEB Members<button class="ma-sub-btn" onclick="maToggle('ma-jeb','▶ show','▼ hide',this)">▶ show</button></div>
-          <div id="ma-jeb" style="display:none;">
+          <div class="sl-head sl-head-flex">JEB Members<button class="oc-sub-btn" onclick="ocToggle('oc-jeb','▶ show','▼ hide',this)">▶ show</button></div>
+          <div id="oc-jeb" style="display:none;">
             <div class="sl-item">Division — JEB Member Name
               <span class="contact"><a href="mailto:jeb@yourlocal.org">jeb@yourlocal.org</a></span>
             </div>
-          </div><!-- /ma-jeb -->
+          </div><!-- /oc-jeb -->
           <div class="sl-item">Division — Board Member Name
             <span class="contact"><a href="mailto:board@yourlocal.org">board@yourlocal.org</a></span>
           </div>
@@ -1788,9 +1788,9 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
           <div class="sl-head sl-head-flex">
             CEB — Division A
-            <button class="ma-sub-btn" onclick="maToggle('ma-voc','▶ show','▼ hide',this)">▶ show</button>
+            <button class="oc-sub-btn" onclick="ocToggle('oc-voc','▶ show','▼ hide',this)">▶ show</button>
           </div>
-          <div id="ma-voc" style="display:none;">
+          <div id="oc-voc" style="display:none;">
             <div class="sl-item">Region (1) — Member Name</div>
             <div class="sl-item">Region (2) — <em class="vac">vacant</em></div>
           </div>
@@ -1801,11 +1801,11 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           <div class="sl-item">At-Large (1) — Member Name</div>
           <div class="sl-item">At-Large (2) — Member Name</div>
 
-          <div class="sl-head sl-head-flex">CEB — At-Large<button class="ma-sub-btn" onclick="maToggle('ma-atlarge','▶ show','▼ hide',this)">▶ show</button></div>
-          <div id="ma-atlarge" style="display:none;">
+          <div class="sl-head sl-head-flex">CEB — At-Large<button class="oc-sub-btn" onclick="ocToggle('oc-atlarge','▶ show','▼ hide',this)">▶ show</button></div>
+          <div id="oc-atlarge" style="display:none;">
             <div class="sl-item">Admin — <em class="vac">vacant</em></div>
             <div class="sl-item">At-Large (1) — Member Name</div>
-          </div><!-- /ma-atlarge -->
+          </div><!-- /oc-atlarge -->
         </div>
 
         <!-- RIGHT: Stewards -->
@@ -1818,9 +1818,9 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
 
           <div class="sl-head sl-head-flex">
             Division B
-            <button class="ma-sub-btn" onclick="maToggle('ma-vr-stewards','▶ show','▼ hide',this)">▶ show</button>
+            <button class="oc-sub-btn" onclick="ocToggle('oc-vr-stewards','▶ show','▼ hide',this)">▶ show</button>
           </div>
-          <div id="ma-vr-stewards" style="display:none;">
+          <div id="oc-vr-stewards" style="display:none;">
             <div class="sl-item">Steward Name</div>
             <div class="sl-item">Steward Name</div>
           </div>
@@ -1830,11 +1830,11 @@ footer { margin-top: 36px; font-size: 0.65rem; color: var(--dim); letter-spacing
           </div>
           <div class="sl-head sl-head-flex">
             Internal Organizers
-            <button class="ma-sub-btn" onclick="maToggle('ma-org','▶ show','▼ hide',this)">▶ show</button>
+            <button class="oc-sub-btn" onclick="ocToggle('oc-org','▶ show','▼ hide',this)">▶ show</button>
           </div>
           <div class="sl-item org-item"><span class="org-region">Region A</span><br><span class="org-name">Organizer Name</span></div>
           <div class="sl-item org-item"><span class="org-region">Region B</span><br><span class="org-name">Organizer Name</span></div>
-          <div id="ma-org" style="display:none;">
+          <div id="oc-org" style="display:none;">
             <div class="sl-item org-item"><span class="org-region">Region C</span><br><span class="org-name">Organizer Name</span></div>
           </div>
         </div>
@@ -2900,7 +2900,7 @@ window.repToggle = function(id, btn) {
   btn.setAttribute('aria-expanded', String(!open));
 };
 
-window.maToggle = function(id, showLabel, hideLabel, btn) {
+window.ocToggle = function(id, showLabel, hideLabel, btn) {
   var el = document.getElementById(id);
   if (!el) return;
   var open = el.style.display !== 'none';
@@ -2917,27 +2917,27 @@ window.pillToggle = function(id, btn) {
   btn.setAttribute('aria-expanded', String(!open));
 };
 
-// Collapse MA sub-sections by default
+// Collapse OC sub-sections by default
 window._initDesktopRan = false;
 window.initDesktop = function() {
   if (window._initDesktopRan) return;
   window._initDesktopRan = true;
-  ['ma-jeb','ma-voc','ma-atlarge','ma-org','ma-vr-stewards'].forEach(function(id) {
+  ['oc-jeb','oc-voc','oc-atlarge','oc-org','oc-vr-stewards'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
-  document.querySelectorAll('.ma-sub-btn').forEach(function(btn) {
+  document.querySelectorAll('.oc-sub-btn').forEach(function(btn) {
     btn.textContent = btn.textContent.replace('\u25BC hide', '\u25B6 show');
   });
-  document.querySelectorAll('.ma-sub-btn').forEach(function(btn) {
+  document.querySelectorAll('.oc-sub-btn').forEach(function(btn) {
     var oc = btn.getAttribute('onclick');
     if (!oc) return;
-    var m = oc.match(/maToggle\('([^']+)'/);
+    var m = oc.match(/ocToggle\('([^']+)'/);
     if (!m) return;
     var targetId = m[1];
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      window.maToggle(targetId, '\u25B6 show', '\u25BC hide', this);
+      window.ocToggle(targetId, '\u25B6 show', '\u25BC hide', this);
     });
   });
 };
@@ -2969,7 +2969,7 @@ window.ocToggleMode = function() {
   if (btn) btn.textContent = isLight ? '\uD83C\uDF19 Dark' : '\u2600 Light';
   if (typeof AppState !== 'undefined') {
     AppState.isDark = !isLight;
-    try { localStorage.setItem('dds_isDark', String(!isLight)); } catch(e) {}
+    try { localStorage.setItem('sb_isDark', String(!isLight)); } catch(e) {}
     if (typeof UnifiedTheme !== 'undefined') UnifiedTheme.apply();
   }
 };
@@ -2978,7 +2978,7 @@ window.ocToggleMode = function() {
   var isLight = false;
   try {
     if (typeof AppState !== 'undefined') { isLight = !AppState.isDark; }
-    else { var v = localStorage.getItem('dds_isDark'); isLight = v === 'false'; }
+    else { var v = localStorage.getItem('sb_isDark'); isLight = v === 'false'; }
   } catch(e) {
     isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
   }
@@ -3534,7 +3534,7 @@ _initV9();
 // ── CSP-safe rebind ─────────────────────────────────────────────
 (function _rebindOrgChartHandlers() {
   if (!_root) return;
-  var passThruFns = ['pillToggle','repToggle','maToggle','togglePSGroup','toggleOtherGroup',
+  var passThruFns = ['pillToggle','repToggle','ocToggle','togglePSGroup','toggleOtherGroup',
     'ctrlPanelToggle','setAllBoards','clearSpotlight','cmClose','cmSave','cmOverlayClick',
     'imClose','imSave','imDelete','imOverlayClick','smClose','smSave','smOverlayClick'];
   _root.querySelectorAll('[onclick]').forEach(function(el) {
@@ -3566,7 +3566,7 @@ _initV9();
         if (passThruFns.indexOf(c.fn) !== -1 && c.argsRaw.indexOf('this') !== -1) {
           args = [el];
         }
-        if (c.fn === 'pillToggle' || c.fn === 'repToggle' || c.fn === 'maToggle' || c.fn === 'togglePSGroup' || c.fn === 'toggleOtherGroup') {
+        if (c.fn === 'pillToggle' || c.fn === 'repToggle' || c.fn === 'ocToggle' || c.fn === 'togglePSGroup' || c.fn === 'toggleOtherGroup') {
           // These functions expect the element as last arg
           if (args.indexOf(el) === -1) args.push(el);
         }

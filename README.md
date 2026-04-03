@@ -1,6 +1,6 @@
 # Strategic Command Center
 
-**Version 4.30.0** | Union Steward Dashboard for Google Sheets
+**Version 4.50.7** | Union Steward Dashboard for Google Sheets
 
 A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 43-file modular architecture, 8 HTML templates, and a full SPA web dashboard. 2,900+ automated tests across 58 suites.
 
@@ -71,8 +71,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/SolidBase.git
+   cd SolidBase
    ```
 
 2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
@@ -97,8 +97,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone and install:**
 
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/SolidBase.git
+   cd SolidBase
    npm install
    ```
 
@@ -295,8 +295,7 @@ After that, you have **43 production `.gs` files + 8 `.html` files** and a clean
 - Member notification view with dismiss functionality
 
 ### Org Chart (v4.22.6)
-- MADDS org chart as default view
-- `scripts/sync-org-chart.js` script for syncing org chart data
+- Organization chart as default view
 - Dedicated `org_chart.html` template
 
 ### Q&A Forum (v4.22.6+)
@@ -534,8 +533,8 @@ These sheets power the auto-updating columns. You don't need to edit them.
 ### Setup
 
 ```bash
-git clone https://github.com/Woop91/DDS-Dashboard.git
-cd DDS-Dashboard
+git clone https://github.com/Woop91/SolidBase.git
+cd SolidBase
 npm install
 ```
 
@@ -556,7 +555,6 @@ npm run deploy         # Deploy to Google Apps Script (requires clasp)
 
 ### Scripts
 
-- `scripts/sync-org-chart.js` -- Syncs org chart data for the MADDS org chart view
 - `scripts/check-scope-change.js` -- Pre-push hook: detects OAuth scope changes that require re-authorization
 - `scripts/rollback.sh` -- Git-based GAS deployment rollback (checkout prior commit's dist/ + clasp push)
 

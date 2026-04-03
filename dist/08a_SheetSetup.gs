@@ -220,6 +220,17 @@ function CREATE_DASHBOARD() {
     currentStep_ = 'setupDataValidations';
     ss.toast('Setting up validations...', '🏗️ Progress', 3);
     setupDataValidations();
+
+    // ═══════════════════════════════════════════════════
+    // STEP 5b: Populate Config from existing sheet data
+    // ═══════════════════════════════════════════════════
+    // Backfill Config dropdown columns from values already present in
+    // Member Directory and Grievance Log.  Without this, Config only
+    // has the seeded defaults and the bidirectional onEdit sync only
+    // catches future edits — existing data is never scraped.
+    currentStep_ = 'populateConfigFromSheetData';
+    ss.toast('Populating Config from existing data...', '🏗️ Progress', 3);
+    populateConfigFromSheetData();
     } catch (stepErr) {
       throw new Error('[' + currentStep_ + '] ' + stepErr.message);
     }
@@ -624,8 +635,8 @@ function setupHiddenSheets(ss) {
     setSheetVeryHidden_(archGriev);
   }
 
-  // Workload Archive — created empty if missing (auto-populated by WorkloadService.archiveOldData)
-  if (typeof SHEETS !== 'undefined' && SHEETS.WORKLOAD_ARCHIVE) {
+  // Workload Archive — guarded: only created if WorkloadService is present
+  if (typeof WorkloadService !== 'undefined' && typeof SHEETS !== 'undefined' && SHEETS.WORKLOAD_ARCHIVE) {
     var wlArchive = ss.getSheetByName(SHEETS.WORKLOAD_ARCHIVE);
     if (!wlArchive) {
       wlArchive = ss.insertSheet(SHEETS.WORKLOAD_ARCHIVE);

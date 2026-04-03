@@ -751,7 +751,7 @@ The system now includes a full **SPA Web Dashboard** accessible via the web app 
 - **Q&A Forum** — steward-member communication with steward-only answers (v4.22.6+)
 - **Timeline** — chronological activity feed with inline editing (v4.22.9+)
 - **Share Phone** — steward phone opt-in for member visibility (v4.23.4+)
-- **Org Chart** — MADDS organizational chart view (v4.22.6)
+- **Org Chart** — Organization chart view (v4.22.6)
 - **Deep-Link Routing** — share links to specific pages: `?page=resources`, `?page=notifications`, `?page=workload`, `?page=qa-forum`, `?page=timeline`
 - **Weekly Questions** — configurable weekly check-in questions for members
 

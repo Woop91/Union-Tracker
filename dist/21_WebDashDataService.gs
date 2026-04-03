@@ -72,6 +72,7 @@ var DataService = (function () {
     memberHireDate:      ['hire date', 'date hired', 'start date'],
     memberOpenRate:      ['open rate %', 'open rate', 'email open rate'],
     memberShirtSize:     ['shirt size', 'tshirt size', 't-shirt size'],
+    memberManager:       ['director', 'manager', 'director (manager)'],
 
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -420,6 +421,7 @@ var DataService = (function () {
       zip: user.zip,
       phone: user.phone,
       supervisor: user.supervisor,
+      director: user.director,
       jobTitle: user.jobTitle,
       joined: user.joined,
       memberId: user.memberId || '',
@@ -495,6 +497,64 @@ var DataService = (function () {
       }
 
       return { success: true, message: 'Profile updated.' };
+    }
+
+    return { success: false, message: 'Member not found.' };
+  }
+
+  /**
+   * Steward-level member field update. Supports a broader set of fields than
+   * the self-service updateMemberProfile (which is limited to address/location).
+   * Used by the Directory Explorer inline editor.
+   * @param {string} email - Member email to update
+   * @param {Object} updates - { director, supervisor, unit, workLocation, jobTitle, officeDays }
+   * @returns {{ success: boolean, message: string }}
+   */
+  function updateMemberBySteward(email, updates) {
+    if (!email || !updates) return { success: false, message: 'Invalid request.' };
+    email = String(email).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return { success: false, message: 'Member directory unavailable.' };
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    if (emailCol === -1) return { success: false, message: 'System configuration error.' };
+
+    var editableFields = {
+      director:     HEADERS.memberManager,
+      supervisor:   HEADERS.memberSupervisor,
+      unit:         HEADERS.memberUnit,
+      workLocation: HEADERS.memberWorkLocation,
+      jobTitle:     HEADERS.memberJobTitle,
+      officeDays:   HEADERS.memberOfficeDays,
+    };
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
+      if (rowEmail !== email) continue;
+
+      var rowNum = i + 1;
+      var rowData = data[i].slice();
+      var changed = false;
+      for (var field in updates) {
+        if (!editableFields[field]) continue;
+        var col = _findColumn(colMap, editableFields[field]);
+        if (col === -1) continue;
+        var val = String(updates[field] || '').trim().substring(0, 255);
+        rowData[col] = escapeForFormula(val);
+        changed = true;
+      }
+      if (!changed) return { success: false, message: 'No valid fields to update.' };
+
+      sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
+      _invalidateSheetCache(MEMBER_SHEET);
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('STEWARD_MEMBER_UPDATE', { email: email, fields: Object.keys(updates).join(',') });
+      }
+      return { success: true, message: 'Member updated.' };
     }
 
     return { success: false, message: 'Member not found.' };
@@ -1942,6 +2002,7 @@ var DataService = (function () {
       state: String(_getVal(row, colMap, HEADERS.memberState, '')).trim(),
       zip: String(_getVal(row, colMap, HEADERS.memberZip, '')).trim(),
       supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
+      director: String(_getVal(row, colMap, HEADERS.memberManager, '')).trim(),
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
       memberAdminFolderUrl: String(_getVal(row, colMap, HEADERS.memberAdminFolderUrl, '')).trim(),
       sharePhone: (function() {
@@ -4852,6 +4913,7 @@ var DataService = (function () {
     getUnits: getUnits,
     getFullMemberProfile: getFullMemberProfile,
     updateMemberProfile: updateMemberProfile,
+    updateMemberBySteward: updateMemberBySteward,
     getAssignedStewardInfo: getAssignedStewardInfo,
     getAvailableStewards: getAvailableStewards,
     assignStewardToMember: assignStewardToMember,

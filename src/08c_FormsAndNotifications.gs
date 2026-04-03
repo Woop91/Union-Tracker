@@ -799,6 +799,27 @@ function executeSendRandomSurveyEmails(opts) {
           }
         }
         configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
+
+        // Prune survey log entries older than 180 days to prevent unbounded growth
+        var totalLogRows = configSheet.getLastRow() - 2; // rows 3+ are data
+        if (totalLogRows > 20) {
+          var pruneCutoff = new Date();
+          pruneCutoff.setDate(pruneCutoff.getDate() - 180);
+          var allEntries = configSheet.getRange(3, surveyLogCol, totalLogRows, 2).getValues();
+          var fresh = [];
+          for (var pi = 0; pi < allEntries.length; pi++) {
+            if (allEntries[pi][0]) {
+              var pd = new Date(allEntries[pi][1]);
+              if (!isNaN(pd.getTime()) && pd >= pruneCutoff) fresh.push(allEntries[pi]);
+            }
+          }
+          if (fresh.length < totalLogRows) {
+            configSheet.getRange(3, surveyLogCol, totalLogRows, 2).clearContent();
+            if (fresh.length > 0) {
+              configSheet.getRange(3, surveyLogCol, fresh.length, 2).setValues(fresh);
+            }
+          }
+        }
       } finally { logLock.releaseLock(); }
     }
   }

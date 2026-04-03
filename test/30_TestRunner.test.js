@@ -103,7 +103,22 @@ describe('TestRunner registry consistency', () => {
       registeredNames.add(match[1]);
     }
 
-    const unregistered = definedFns.filter(fn => !registeredNames.has(fn));
+    // SolidBase: WorkloadService test functions exist in 31_WebAppTests.gs
+    // but are intentionally unregistered (WorkloadService excluded from SolidBase)
+    const solidBaseExcluded = new Set([
+      'test_workload_moduleExists',
+      'test_workload_publicAPIComplete',
+      'test_workload_subCategoriesExposed',
+      'test_workload_categoryLabelsExposed',
+      'test_workload_getSubCategoriesCallable',
+      'test_workload_globalWrappersExist',
+      'test_workload_triggerHandlersExist',
+      'test_workload_wrappersRejectNullToken',
+    ]);
+
+    const unregistered = definedFns.filter(fn =>
+      !registeredNames.has(fn) && !solidBaseExcluded.has(fn)
+    );
     expect(unregistered).toEqual([]);
   });
 });
@@ -198,8 +213,9 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
     // webapp one-tap check-in — v4.43.1,
     // leader hub endpoints — v4.46.0,
     // non-member contacts — v4.48.0,
-    // add member from webapp — v4.49.0)
-    expect(untested.length).toBeLessThanOrEqual(64);
+    // add member from webapp — v4.49.0,
+    // directory explorer steward update — v4.51.0)
+    expect(untested.length).toBeLessThanOrEqual(65);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {

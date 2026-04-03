@@ -135,14 +135,6 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('📁 Open Google Drive', 'openGoogleDrive'))
 
-    .addSubMenu(ui.createMenu('📊 Workload Tracker')
-      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
-      .addItem('💾 Create Backup', 'createWorkloadBackup')
-      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData')
-      .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
-      .addSeparator()
-      .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))
-
     .addSubMenu(ui.createMenu('📋 Surveys & Polls')
       .addItem('📂 Open New Survey Period', 'menuOpenNewSurveyPeriod')
       .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
