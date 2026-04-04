@@ -255,6 +255,7 @@ function createConfigSheet(ss) {
 
   // ── Employment (Q–W)
   seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.DUES_STATUSES, ['Current', 'Past Due', 'Inactive'], isExistingSheet);
 
   // ── People (X–AC)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',

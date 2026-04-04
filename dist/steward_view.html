@@ -1870,7 +1870,7 @@ function _showMemberDetail(container, itemEl, member) {
  
  var infoRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px 20px', marginBottom: '12px' } });
  var infoFields = [
- { label: 'Email', value: member.email || '—' },
+ { label: 'Email', value: member.email || '—', missing: !member.email },
  { label: 'Location', value: member.workLocation || '—' },
  { label: 'Office Days', value: member.officeDays || '—' },
  { label: 'Dues', value: member.duesStatus || '—' }
@@ -1878,7 +1878,9 @@ function _showMemberDetail(container, itemEl, member) {
  infoFields.forEach(function(f) {
  var pair = el('div', { style: { minWidth: '100px' } });
  pair.appendChild(el('div', { className: 'text-label' }, f.label));
- pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
+ var valStyle = { fontSize: '13px', color: 'var(--text)', fontWeight: '500' };
+ if (f.missing) { valStyle.background = '#ffcdd2'; valStyle.color = '#c62828'; valStyle.padding = '2px 6px'; valStyle.borderRadius = '4px'; }
+ pair.appendChild(el('div', { style: valStyle }, f.value));
  infoRow.appendChild(pair);
  });
  panel.appendChild(infoRow);
@@ -5955,6 +5957,10 @@ function _buildExplorerUI(container, allMembers) {
    td.style.maxWidth = '160px';
    td.style.overflow = 'hidden';
    td.style.textOverflow = 'ellipsis';
+   if (c.key === 'email' && !m.email) {
+   td.style.background = '#ffcdd2';
+   td.style.color = '#c62828';
+   }
   }
   tr.appendChild(td);
   });

@@ -1550,7 +1550,7 @@ var DataService = (function () {
     var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
-      if (!rec.email) continue;
+      if (!rec.email && !rec.name) continue;
       members.push({
         name: rec.name,
         email: rec.email,
@@ -1560,6 +1560,10 @@ var DataService = (function () {
         hireDate: rec.hireDate,
         hasOpenGrievance: rec.hasOpenGrievance,
         duesStatus: rec.duesStatus,
+        director: rec.director,
+        unit: rec.unit,
+        supervisor: rec.supervisor,
+        jobTitle: rec.jobTitle,
         assignedSteward: stewardCol !== -1 ? String(data[i][stewardCol]).trim() : '',
       });
     }
