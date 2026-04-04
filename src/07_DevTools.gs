@@ -2120,7 +2120,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds union-specific content including
+ * by createResourcesSheet(). Adds DDS/SEIU 509-specific content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -2183,8 +2183,8 @@ function seedResourcesData() {
       'New to the bargaining unit? Here is what you need to know about your rights and benefits.',
       'As a new bargaining unit member you should:\\n\\n1. Know your steward — check the dashboard for contact info\\n2. Read your contract — ask your steward for a copy\\n3. Understand your probation period and what it means\\n4. Set up your PIN for the union dashboard\\n5. Attend new member orientation\\n6. Know your Weingarten rights from day one\\n7. Understand the grievance process\\n8. Complete your workload tracker weekly\\n9. Attend union meetings when possible\\n10. Report any contract violations to your steward\\n\\nYour union is here for you from day one.',
       '', '✅', nextId - 1, 'Yes', 'Members', today, 'System'],
-    ['RES-' + String(nextId++).padStart(3, '0'), 'Collective Bargaining Agreement Summary', 'Contract Article',
-      'Key provisions of the current collective bargaining agreement.',
+    ['RES-' + String(nextId++).padStart(3, '0'), 'DDS Collective Bargaining Agreement Summary', 'Contract Article',
+      'Key provisions of the current collective bargaining agreement between SEIU 509 and DDS.',
       'The CBA covers:\\n- Wages and step increases\\n- Health insurance and benefits\\n- Work schedules and overtime\\n- Grievance and arbitration procedures\\n- Seniority rights\\n- Transfers and promotions\\n- Discipline and discharge (just cause)\\n- Leave policies (sick, personal, vacation)\\n- Workplace safety\\n- Union rights and representation\\n\\nThe full contract is available from your steward or union office. Key articles are referenced in grievance filings — your steward will identify the specific articles that apply to your situation.',
       '', '📜', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Caseload Standards & Workload Rights', 'Policy',
@@ -2367,7 +2367,7 @@ function seedWorkloadData() {
     var timestamp = new Date(now.getTime() - daysAgo * 86400000);
     var email = emails[Math.floor(Math.random() * emails.length)];
 
-    // Realistic caseload numbers
+    // Realistic caseload numbers for DDS social workers
     var priorityCases = Math.floor(Math.random() * 8) + 1;
     var pendingCases = Math.floor(Math.random() * 15) + 5;
     var unreadDocs = Math.floor(Math.random() * 20);

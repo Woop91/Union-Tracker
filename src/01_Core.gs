@@ -292,7 +292,7 @@ function sendCriticalErrorNotification_(errorInfo) {
     try {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     } catch (_e) {
-      systemName = 'SolidBase';
+      systemName = 'Union Dashboard';
     }
     // Mask PII in the email body
     var maskedUser = typeof maskEmail === 'function' ? maskEmail(errorInfo.user) : '[REDACTED]';
@@ -333,7 +333,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.50.7",
+  VERSION: "4.51.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -462,7 +462,7 @@ function getDriveRootFolderName_() {
  * @returns {string} Organization name (e.g., "SEIU Local")
  */
 function getOrgNameFromConfig_() {
-  return _readConfigCell('orgName', CONFIG_COLS.ORG_NAME, 'SolidBase');
+  return _readConfigCell('orgName', CONFIG_COLS.ORG_NAME, 'Union Dashboard');
 }
 
 /**
@@ -510,8 +510,8 @@ var VERSION_INFO = (function() {
     PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-04-01',
-    CODENAME: 'Tab Modal Fix'
+    BUILD_DATE: '2026-04-03',
+    CODENAME: 'Release Audit'
   };
 })();
 
@@ -532,6 +532,7 @@ var _versionHistoryCache = null;
 function getVersionHistory_() {
   if (_versionHistoryCache) return _versionHistoryCache;
   _versionHistoryCache = [
+  { version: '4.51.0', date: '2026-04-03', codename: 'Release Audit', changes: 'Directory Explorer slicer-style filter + SVG Sankey chart + inline editing. Director field in member records. dataUpdateMemberBySteward endpoint. Config hardening (Directors rename). Release audit: fixed dataGetAllMembers/dataGetMemberGrievances/dataGetAvailableStewards returning authError objects instead of arrays, fixed cases sub-tab agency-wide fallback unreachable, wired broadcast recipient count, added mentorship steward/member selector dropdowns, added role+duesPaying fields to getAllMembers(), fixed appsscript.json not copied by build.js.' },
   { version: '4.50.7', date: '2026-04-02', codename: 'Trigger Persistence', changes: 'Fixed onOpenDeferred_ deleting its own installable trigger — leftover code from old one-shot approach caused deferred init to run only once after install (no column sync, tab colors, or modals on subsequent opens). Tab modals now auto-open on spreadsheet open via installable trigger (full authorization). Session invalidation hardened with deletion verification. TrendAlertService.runDetection() wrapped in LockService to prevent duplicate alerts from concurrent triggers.' },
   { version: '4.50.6', date: '2026-04-01', codename: 'Tab Modal Fix', changes: 'Fixed tab modals not auto-opening on sheet tab navigation. Root cause: GAS simple triggers (onSelectionChange) cannot call showModalDialog(). Fix: onTabSwitch_ now uses toast() hint instead of blocked modal call. Added showCurrentTabModal() convenience function that auto-detects active sheet and shows the right modal — accessible via menu. Tab Modals submenu moved to top-level menu item for discoverability.' },
   { version: '4.50.5', date: '2026-04-01', codename: 'Config Seed Alignment', changes: 'Fixed createConfigSheet using stale CONFIG_COLS positions for seedConfigDefault_ and _applyYesNoValidation after header rewrite. syncColumnMaps() now runs after writing new headers, so seeds and yes/no dropdowns target the correct columns. One-time repair clears misaligned yes/no values and stale data validations from Branding columns (Logo Initials, Steward Label, etc.) that received Feature Toggle dropdowns from the v4.50.0-v4.50.4 bug. Moved INSIGHTS_CACHE_TTL_MIN seed from Branding section to Feature Toggles section to match CONFIG_HEADER_MAP_ grouping.' },
@@ -597,7 +598,7 @@ function getVersionHistory_() {
   { version: '4.21.0', date: '2026-03-05', codename: 'Native Survey Engine', changes: 'Deprecate Google Form integration entirely. Full webapp-native satisfaction survey: getSurveyQuestions() returns all 67 questions with types (slider-10, dropdown, radio, checkbox, paragraph), branching rules (Q5→3A/3B, Q36→6A), and slider labels. submitSurveyResponse() maps all 67 SATISFACTION_COLS, period-aware vault dedup per SURVEY_PERIODS sheet. New: getSurveyPeriod(), autoTriggerQuarterlyPeriod(), archiveSurveyPeriod_() (Drive export to Past Survey Questions/), getPendingSurveyMembers(), getSatisfactionSummary() (section averages as plain values). New hidden sheet _Survey_Periods (SURVEY_PERIODS_COLS, 8 cols). New Config cols: Survey Priority Options (Q64 dynamic), Past Surveys Folder ID. Quarterly time trigger installed via setupQuarterlyTrigger(). Survey-open notifications pushed to all active members on period start. Slider label: 1=Strongly Disagree / 10=Strongly Agree (universal across all 52 scale questions). Anonymity architecture preserved: three-layer separation (Satisfaction sheet=anonymous scores, _Survey_Vault=hashed PII only, _Survey_Tracking=completion status only).' },
   { version: '4.20.15', date: '2026-03-05', codename: 'FULL_CODE_REVIEW Final Fixes', changes: 'C-XSS-18: Fix el() boolean attribute handling — el() now uses property assignment (elem[key]=value) for boolean attrs (selected, disabled, checked) instead of setAttribute which would set attr="false" (truthy in DOM). C-XSS-6: Replace escapeHtml() with JSON.stringify() for memberId in onclick JS string context in 03_UIComponents.gs — HTML entities decoded by parser before JS executes, JSON.stringify produces correct escape sequences. LOW: Remove 6 unused _-prefixed variables (_lastRow, _pdfFile, _headers×2, _stepDays, _mgmtResponseDays, _mode, _ss×2) from 04b/04d/04e/05_Integrations.' },
   { version: '4.20.14', date: '2026-03-05', codename: 'Trigger Null Guards', changes: 'onOpenDeferred_ (10_Main.gs): add null guard after getActiveSpreadsheet() — returns null in web app context, would crash ss.toast(). onEditWithAuditLogging (06_Maintenance.gs): add !e || !e.range early return guard and wrap body in try/catch — trigger functions must not throw or GAS silently drops all subsequent edits.' },
-  { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
+  { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names (SEIU 509, MassAbility DDS, SEIU Local in titles/survey subject/vCard ORG) with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
   { version: '4.20.12', date: '2026-03-04', codename: 'Dead Code Removal — Testing Stubs', changes: 'Remove duplicate testing framework section from 06_Maintenance.gs (~84 lines): TEST_RESULTS var (zero callers), TEST_MAX_EXECUTION_MS/TEST_LARGE_DATASET_THRESHOLD (duplicates of 07_DevTools.gs), Assert object (duplicate of 07_DevTools.gs), 4 empty section headers, VALIDATION_PATTERNS/VALIDATION_MESSAGES (duplicates of 07_DevTools.gs), 2 orphaned JSDoc stubs with no function bodies. Active versions of all these remain in 07_DevTools.gs. 16 corresponding test assertions removed from 06_Maintenance.test.js.' },
   { version: '4.20.11', date: '2026-03-04', codename: 'Security & Logic Fixes', changes: 'H-12: Replace vault/reminders/userMeta/archive hideSheet() with setSheetVeryHidden_() in 25_WorkloadService.gs — API-level hide that persists on Google Sheets mobile (previously only UI-layer hide). H-16: Fix contact log sort in getMemberContactHistory and getStewardContactLog (21_WebDashDataService.gs) — was sorting by formatted date string (wrong alphabetical order); now stores _ts timestamp field, sorts numerically, deletes _ts before returning. H-20: Fix win rate denominator in getStewardWorkloadDetailed (02_DataManagers.gs) — was dividing wonCases by totalCases (includes active cases); now uses resolvedCases = Won+Denied+Settled+Withdrawn, matching the formula in getDashboardStats.' },
   { version: '4.20.10', date: '2026-03-04', codename: 'Performance & Data Integrity Fixes', changes: 'H-7: Batch 4 individual configSheet.getValue() calls in getDeadlineRules() into a single getValues() range read — 4 API calls → 1. H-2: sortGrievanceLogByStatus now captures cell notes via getNotes() before sort and restores them via setNotes() after setValues() — preserves user-added notes that would otherwise be silently discarded by the sort.' },

@@ -1,5 +1,5 @@
 {
-  "_scopeReview": "REVIEW: Audit oauthScopes periodically. Remove any scopes no longer needed. Last reviewed: 2026-03-09. All scopes verified in use.",
+  "_scopeReview": "All scopes verified in use 2026-03-09. drive (broad) required: app reads/writes files by ID not created by the app (member folders, shared drives). Cannot narrow to drive.file.",
   "timeZone": "America/New_York",
   "dependencies": {},
   "exceptionLogging": "STACKDRIVER",

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Union Grievance Form</title>
+<title>DDS Optimized Grievance — MassAbility DDS / Local 509</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
@@ -288,7 +288,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 <body>
 
 <div class="toolbar">
-  <span>Union Grievance Form &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
+  <span>DDS Optimized Grievance — Local 509 &nbsp;·&nbsp; "SIGN HERE" labels are hidden on print/PDF.</span>
   <button class="tbtn go" onclick="doEmail()">&#9993; Email</button>
   <button class="tbtn" onclick="window.print()">&#9113; Print&thinsp;/&thinsp;Save PDF</button>
   <button class="tbtn" onclick="doClear()">&#10005; Clear</button>
@@ -341,7 +341,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
 
   <div class="irow">
     <label for="agency" class="lbl">AGENCY:</label>
-    <input id="agency" class="fi" type="text" style="width:1.3in;" value="" title="Agency name">
+    <input id="agency" class="fi" type="text" style="width:1.3in;" value="MassAbility DDS" readonly title="Agency is fixed for this form">
     <span class="lbl" style="margin-left:6px;">REGION:</span>
     <select id="region" class="fi" style="width:1.3in;" onchange="autoFillLocation()">
       <option value=""></option>
@@ -541,7 +541,7 @@ function buildBody(){
 function doEmail(){
   const to=prompt("Recipient email address:");
   if(!to)return;
-  const subText="Union Grievance \u2014 "+(v("grievant")||"Grievant");
+  const subText="DDS Optimized Grievance \u2014 "+(v("grievant")||"Grievant")+" \u2014 Local 509";
   const body=buildBody();
   const mailtoUrl="mailto:"+to+"?subject="+encodeURIComponent(subText)+"&body="+encodeURIComponent(body);
   if(mailtoUrl.length>1900){
@@ -563,7 +563,7 @@ function doClear(){
   });
   document.querySelectorAll("select.fi").forEach(el=>el.selectedIndex=0);
   document.getElementById("step").value="1";
-  document.getElementById("agency").value="";
+  document.getElementById("agency").value="MassAbility DDS";
   syncManagers();
   document.getElementById("managers2").value="";
   ["sig1gdate","sig1sdate","sig2gdate","sig2sdate","sig3gdate","sig3sdate"]

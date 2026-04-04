@@ -1497,8 +1497,8 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
   if (step === 'pin' && data && data.pin) {
     // Member self-set PIN: look up member ID from email, hash supplied PIN, store it
     var pin = String(data.pin).trim();
-    if (pin.length < 6 || !/^\d+$/.test(pin)) {
-      return { success: false, message: 'PIN must be at least 6 digits.' };
+    if (!/^\d{4,6}$/.test(pin)) {
+      return { success: false, message: 'PIN must be 4–6 digits.' };
     }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return { success: false, message: 'System error.' };
@@ -1514,13 +1514,17 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
         break;
       }
     }
-    if (!memberId || memberRow === -1) return { success: false, message: 'Member record not found.' };
+    // Separate conditions: row not found vs. found but Member ID is empty.
+    // If Member ID is blank, fall back to email as hash seed so PIN still works
+    // for members who haven't yet been assigned an ID (e.g. newly added).
+    if (memberRow === -1) return { success: false, message: 'Account not found. Please contact your steward.' };
+    var hashSeed = memberId || e; // email fallback keeps PIN functional without a Member ID
     var existingHash = mData[memberRow - 1][PIN_CONFIG.PIN_COLUMN - 1];
     if (existingHash) return { success: false, message: 'PIN already set. Use PIN reset instead.' };
-    var hashedPin = hashPIN(pin, memberId);
+    var hashedPin = hashPIN(pin, hashSeed);
     mSheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
     if (typeof logAuditEvent === 'function') {
-      logAuditEvent('PIN_SELF_SET', { memberId: memberId, email: e });
+      logAuditEvent('PIN_SELF_SET', { memberId: memberId || '(no-id)', hashSeed: memberId ? 'memberId' : 'email', email: e });
     }
     return { success: true, message: 'PIN set successfully.' };
   }
@@ -1842,11 +1846,12 @@ function memberSetOwnPIN(sessionToken, pin, idemKey) {
     break;
   }
 
-  if (memberRow === -1) return { success: false, message: 'Member not found.' };
-  if (!memberId) return { success: false, message: 'No Member ID on file — cannot set PIN.' };
+  if (memberRow === -1) return { success: false, message: 'Account not found. Please contact your steward.' };
+  // If Member ID is blank, fall back to email as hash seed so PIN still works
+  var hashSeed = memberId || email;
 
   // ── Hash and store ────────────────────────────────────────────────────────
-  var hashedPin = hashPIN(pin, memberId);
+  var hashedPin = hashPIN(pin, hashSeed);
   sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
 
   var action = hadPIN ? 'PIN_RESET_BY_MEMBER' : 'PIN_SET_BY_MEMBER';

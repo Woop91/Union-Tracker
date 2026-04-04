@@ -16,8 +16,6 @@
  *   Excludes development/test files that should not be deployed:
  *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
  *   - DevMenu.gs (dev-only quick deploy menu, guarded by typeof in onOpen)
- *   - 30_TestRunner.gs (test runner — excluded from SolidBase prod)
- *   - 31_WebAppTests.gs (web app tests — excluded from SolidBase prod)
  */
 
 const fs = require('fs');
@@ -59,7 +57,7 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '17_CorrelationEngine.gs',
-  // Web-dashboard SPA modules (load after all SolidBase modules)
+  // Web-dashboard SPA modules (load after all DDS modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
@@ -285,6 +283,19 @@ function build(fileList, shouldMinify) {
     }
   }
 
+  // Copy appsscript.json from root to dist/ (manifest must stay in sync)
+  const appScriptSrc = path.join(__dirname, 'appsscript.json');
+  const appScriptDest = path.join(DIST_DIR, 'appsscript.json');
+  if (fs.existsSync(appScriptSrc)) {
+    let manifest = JSON.parse(fs.readFileSync(appScriptSrc, 'utf8'));
+    // Strip non-standard fields that clasp rejects (e.g., _scopeReview comment)
+    for (const key of Object.keys(manifest)) {
+      if (key.startsWith('_')) delete manifest[key];
+    }
+    fs.writeFileSync(appScriptDest, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    console.log('  Copied: appsscript.json');
+  }
+
   const elapsed = Date.now() - startTime;
   console.log(`\nBuild complete! (${elapsed}ms)`);
   console.log(`  .gs files:  ${copiedGs}`);
@@ -319,8 +330,8 @@ const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
-// Files to exclude in SolidBase production builds.
-// SolidBase excludes test runner + test suite in addition to dev tools.
+// Files to exclude in production builds.
+// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {
@@ -340,7 +351,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current SolidBase prod capacity: 39 .gs + 15 .html + 1 appsscript.json = 55 files
+  // Current prod capacity: 41 .gs + 17 .html + 1 appsscript.json = 59 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
   const gsFileCount = fileList.length;
