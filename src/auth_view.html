@@ -269,12 +269,24 @@ function showAuthChoose(container) {
   header.appendChild(el('div', { className: 'auth-subtitle' }, 'Solidarity is not a slogan'));
   card.appendChild(header);
 
-  // ── Buttons ──
+  // ── Status messages (loggedout, token_expired) ──
+  var ssoError = (PAGE_DATA && PAGE_DATA.error) || null;
+  if (ssoError === 'loggedout') {
+    card.appendChild(el('div', {
+      style: { fontSize: '12px', color: '#059669', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(52,211,153,0.1)', borderRadius: '8px', border: '1px solid rgba(52,211,153,0.2)', marginBottom: '16px' }
+    }, 'Signed out successfully.'));
+  }
+  if (ssoError === 'token_expired') {
+    card.appendChild(el('div', {
+      style: { fontSize: '11px', color: '#d97706', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.15)', marginBottom: '16px' }
+    }, 'This sign-in link has expired or was already used. Please request a new one below.'));
+  }
+
+  // ── Smart default: biometric (returning) vs email (new) ──
   var btns = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' } });
 
-  // ── Biometric / saved credentials button ──
-  // Shown when user has previously saved credentials via PIN login
   if (_hasSavedCredentials()) {
+    // ── STATE 1: Returning user — biometric primary ──
     var bioLabel = _detectBiometricLabel();
     var bioName = _getSavedCredentialName();
     var biometricBtn = el('button', {
@@ -284,16 +296,12 @@ function showAuthChoose(container) {
         biometricBtn.disabled = true;
         biometricBtn.textContent = 'Verifying\u2026';
 
-        // Try Credential Management API first (Chrome/Edge — triggers biometric prompt)
         _tryGetSavedCredential(function(cred) {
           if (cred && cred.password) {
-            // Got credential via API — auto-submit PIN
             _autoSubmitPIN(container, cred.password);
           } else {
-            // Credential API unavailable or denied — show explanation then PIN screen
             biometricBtn.disabled = false;
             biometricBtn.innerHTML = '\uD83D\uDD12 Sign in with ' + escapeHtml(bioLabel);
-            // Brief message before redirecting to PIN
             container.innerHTML = '';
             var w = el('div', { className: 'auth-container fade-in' });
             var c = el('div', { className: 'auth-glass-card', style: { textAlign: 'center', padding: '32px 28px' } });
@@ -310,7 +318,7 @@ function showAuthChoose(container) {
       (bioName ? '<span style="font-size:12px;opacity:0.8;margin-left:4px">(' + escapeHtml(bioName) + ')</span>' : '');
     btns.appendChild(biometricBtn);
 
-    // Subtle link to clear saved credentials
+    // Forget link
     btns.appendChild(el('button', {
       className: 'auth-muted',
       style: { fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer', padding: '0', textAlign: 'center', textDecoration: 'underline', opacity: '0.6' },
@@ -320,62 +328,33 @@ function showAuthChoose(container) {
       }
     }, 'Forget saved credentials'));
 
-    // Divider between biometric and other options
+    // OR divider
     var bioDivider = el('div', { className: 'auth-divider', style: { margin: '4px 0' } });
     bioDivider.appendChild(el('div', { className: 'auth-divider-line' }));
     bioDivider.appendChild(el('span', { className: 'auth-divider-text' }, 'OR'));
     bioDivider.appendChild(el('div', { className: 'auth-divider-line' }));
     btns.appendChild(bioDivider);
+
+    // Email fallback link
+    btns.appendChild(el('button', {
+      className: 'btn btn-secondary',
+      onClick: function() { showAuthEmail(container); }
+    }, '\u2709\uFE0F  Sign in with email'));
+
+    card.appendChild(btns);
+
+  } else {
+    // ── STATE 2: New user — inline email form ──
+    _renderEmailForm(card, { showBack: false, container: container });
   }
 
-  // Check for SSO error from server or URL
-  var ssoError = (PAGE_DATA && PAGE_DATA.error) || null;
-
-  // Google SSO button
-  var googleBtn = el('button', {
-    className: 'btn btn-google',
-    'aria-label': 'Sign in with Google',
-    onClick: function() {
-      if (!WEB_APP_URL) { showAuthError(container, 'Web app URL not available. Please reload the page.'); return; }
-      googleBtn.disabled = true;
-      googleBtn.innerHTML = '<div class="spinner" style="margin-right:16px;vertical-align:middle"></div> Connecting to Google\u2026';
-      window.top.location.href = WEB_APP_URL + '?sso=1';
-    }
-  });
-  googleBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Continue with Google';
-  btns.appendChild(googleBtn);
-
-  // SSO status messages
-  if (ssoError === 'loggedout') {
-    btns.appendChild(el('div', {
-      style: { fontSize: '12px', color: '#059669', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(52,211,153,0.1)', borderRadius: '8px', border: '1px solid rgba(52,211,153,0.2)' }
-    }, 'Signed out successfully.'));
-  }
-  if (ssoError === 'sso_failed') {
-    btns.appendChild(el('div', {
-      style: { fontSize: '11px', color: '#dc2626', textAlign: 'center', lineHeight: '1.5' }
-    }, 'Google sign-in requires a Google account in this browser. Try the email link option instead.'));
-  }
-  if (ssoError === 'token_expired') {
-    btns.appendChild(el('div', {
-      style: { fontSize: '11px', color: '#d97706', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.15)' }
-    }, 'This sign-in link has expired or was already used. Please request a new one below.'));
-  }
-
-  // Email magic link button
-  btns.appendChild(el('button', {
-    className: 'btn btn-secondary',
-    onClick: function() { showAuthEmail(container); }
-  }, '\u2709\uFE0F  Email me a sign-in link'));
-
-  // OR divider
+  // ── PIN trigger (always visible) ──
   var divider = el('div', { className: 'auth-divider' });
   divider.appendChild(el('div', { className: 'auth-divider-line' }));
   divider.appendChild(el('span', { className: 'auth-divider-text' }, 'OR'));
   divider.appendChild(el('div', { className: 'auth-divider-line' }));
-  btns.appendChild(divider);
+  card.appendChild(divider);
 
-  // PIN login trigger
   var pinTrigger = el('div', {
     className: 'auth-pin-trigger',
     role: 'button', tabIndex: 0,
@@ -387,9 +366,7 @@ function showAuthChoose(container) {
   pinLeft.appendChild(el('span', {}, 'Sign in with PIN'));
   pinTrigger.appendChild(pinLeft);
   pinTrigger.appendChild(el('span', { className: 'auth-pin-arrow' }, '\u203A'));
-  btns.appendChild(pinTrigger);
-
-  card.appendChild(btns);
+  card.appendChild(pinTrigger);
 
   // Decorative dots
   var dots = el('div', { className: 'auth-dots' });
@@ -560,29 +537,36 @@ function showAuthPIN(container) {
   }
 }
 
-function showAuthEmail(container) {
-  container.innerHTML = '';
-  var wrapper = el('div', { className: 'auth-container fade-in' });
-  var card    = el('div', { className: 'auth-glass-card' });
+/**
+ * Renders the email sign-in form (input + remember-me + submit).
+ * Used both inline on the main login screen (new users) and as
+ * a separate screen via showAuthEmail (returning user fallback).
+ * @param {HTMLElement} parentEl - Element to append the form into
+ * @param {Object} opts - { showBack: boolean, container: HTMLElement }
+ */
+function _renderEmailForm(parentEl, opts) {
+  opts = opts || {};
 
-  card.appendChild(el('button', {
-    className: 'auth-back-btn',
-    style: { fontSize: '13px', marginBottom: '20px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '0' },
-    'aria-label': 'Go back',
-    onClick: function() { showAuthChoose(container); }
-  }, '\u2190 Back'));
+  if (opts.showBack) {
+    parentEl.appendChild(el('button', {
+      className: 'auth-back-btn',
+      style: { fontSize: '13px', marginBottom: '20px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '0' },
+      'aria-label': 'Go back',
+      onClick: function() { showAuthChoose(opts.container); }
+    }, '\u2190 Back'));
+  }
 
-  card.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left', fontSize: '16px', letterSpacing: '0.02em' } }, 'Sign in with email'));
-  card.appendChild(el('div', { className: 'auth-muted', style: { fontSize: '12px', marginTop: '4px', marginBottom: '24px', lineHeight: '1.5' } }, "We'll send a secure link. No password needed."));
+  parentEl.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left', fontSize: '16px', letterSpacing: '0.02em' } }, 'Sign in with email'));
+  parentEl.appendChild(el('div', { className: 'auth-muted', style: { fontSize: '12px', marginTop: '4px', marginBottom: '24px', lineHeight: '1.5' } }, "We'll send a secure link. No password needed."));
 
-  // ── Form wrapper for password manager autofill ──
+  // Form wrapper for password manager autofill
   var form = el('form', {
     autocomplete: 'on',
     onSubmit: function(e) {
       e.preventDefault();
       var email = emailInput.value.trim();
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
-      showAuthSending(container, email, rememberMe.value);
+      showAuthSending(opts.container, email, rememberMe.value);
     }
   });
   form.setAttribute('action', 'javascript:void(0)');
@@ -635,10 +619,21 @@ function showAuthEmail(container) {
     submitBtn.style.opacity = valid ? '1' : '0.5';
   });
 
-  card.appendChild(form);
+  parentEl.appendChild(form);
+
+  // Auto-focus email input after render
+  setTimeout(function() { emailInput.focus(); }, 50);
+}
+
+function showAuthEmail(container) {
+  container.innerHTML = '';
+  var wrapper = el('div', { className: 'auth-container fade-in' });
+  var card    = el('div', { className: 'auth-glass-card' });
+
+  _renderEmailForm(card, { showBack: true, container: container });
+
   wrapper.appendChild(card);
   container.appendChild(wrapper);
-  emailInput.focus();
   _setupAuthFocusTrap(container);
 }
 

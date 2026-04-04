@@ -128,7 +128,7 @@ function doGetWebDashboard(e) {
     config = _coldSync ? ConfigReader.refreshConfig() : ConfigReader.getConfig();
   } catch (cfgErr) {
     log_('doGetWebDashboard', 'config load failed: ' + cfgErr.message);
-    config = { orgName: 'SolidBase', orgAbbrev: 'SolidBase', logoInitials: 'SolidBase', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'DDS', orgAbbrev: 'DDS', logoInitials: 'DDS', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -141,11 +141,11 @@ function doGetWebDashboard(e) {
       if (e.parameter.loggedout === '1') {
         return _serveAuth(config, e, 'loggedout');
       }
-      // If the user explicitly clicked "Continue with Google" (sso=1 param)
-      // but SSO failed, redirect back with an error flag so the login page
-      // can display a helpful message.
+      // SSO is unreliable with "Execute as: Me" + "Anyone" deployments
+      // (Session.getActiveUser() returns empty). Serve plain login instead
+      // of an error so users land on the email/biometric login flow.
       if (e.parameter.sso === '1') {
-        return _serveAuth(config, e, 'sso_failed');
+        return _serveAuth(config, e);
       }
       // v4.40.0: Magic link expired or already used — show helpful message
       // instead of silently dumping users back to login with no explanation
@@ -819,7 +819,7 @@ function getMemberViewHtml() {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .oc-embed), or error message
+ * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
  */
 function getOrgChartHtml() {
   try {
@@ -843,20 +843,47 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the Agency Org Chart tab.
- * @returns {string} Stub message (agency_org_chart excluded from this edition)
+ * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
  */
 function getAgencyOrgChartHtml() {
-  return '<div style="padding:2rem;text-align:center;color:#888;">Agency org chart is not available in this edition.</div>';
+  try {
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_agency_org_chart_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('agency_org_chart').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    log_('getAgencyOrgChartHtml error', e.message);
+    return '<div class="empty-state">Agency org chart could not be loaded.</div>';
+  }
 }
 
 /**
  * Client-callable: Returns the POMS Reference HTML for lazy-loading.
  * Loaded on-demand when the user navigates to the POMS Reference tab.
- * @returns {string} Stub message (poms_reference excluded from this edition)
+ * @returns {string} Raw HTML content (CSS-scoped under .poms-root), or error message
  */
 function getPOMSReferenceHtml() {
-  return '<div style="padding:2rem;text-align:center;color:#888;">POMS Reference is not available in this edition.</div>';
+  try {
+    // No auth check — user already authenticated via doGet().
+    // Session.getActiveUser().getEmail() returns empty for magic-link users.
+    // PERF: Cache static HTML (same pattern as getOrgChartHtml)
+    var ver = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version) ? VERSION_INFO.version : '';
+    var cacheKey = 'HTML_poms_ref_' + ver;
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var html = HtmlService.createHtmlOutputFromFile('poms_reference').getContent();
+    try { cache.put(cacheKey, html, 21600); } catch (_) { /* exceeds 100KB limit — skip cache */ }
+    return html;
+  } catch (e) {
+    log_('getPOMSReferenceHtml error', e.message);
+    return '<div class="empty-state">POMS Reference could not be loaded.</div>';
+  }
 }
 
 /**
