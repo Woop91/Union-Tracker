@@ -3224,9 +3224,12 @@ function NUKE_SEEDED_DATA() {
     '• ' + grievanceCount + ' seeded grievances (tracked from seed operation)\n' +
     '• Config dropdown values\n' +
     '• Survey responses (Member Satisfaction data cleared)\n' +
+    '• Survey tracking & survey questions data\n' +
     '• Feedback & Development sheet (entire sheet deleted)\n' +
     '• Function Checklist sheet (entire sheet deleted)\n' +
     '• _Audit_Log hidden sheet (entire sheet deleted)\n' +
+    '• Contact log, meeting minutes, meeting check-ins\n' +
+    '• Timeline events, Q&A Forum questions & answers\n' +
     '• Resources, Notifications, and Workload data\n\n' +
     '✅ ALL manually entered data will be PRESERVED.\n\n' +
     '⏱️ IMPORTANT: This process takes approximately 3-5 MINUTES.\n' +
@@ -3246,11 +3249,12 @@ function NUKE_SEEDED_DATA() {
     'This will:\n' +
     '1. Delete ' + memberCount + ' seeded members\n' +
     '2. Delete ' + grievanceCount + ' seeded grievances\n' +
-    '3. Clear survey responses from Member Satisfaction\n' +
+    '3. Clear survey responses, tracking & questions\n' +
     '4. Delete Feedback & Development sheet\n' +
     '5. Delete Function Checklist sheet\n' +
     '6. Delete _Audit_Log hidden sheet\n' +
-    '7. Permanently disable the Demo menu\n\n' +
+    '7. Clear contact log, minutes, check-ins, timeline, Q&A\n' +
+    '8. Permanently disable the Demo menu\n\n' +
     '⏱️ This will take 3-5 MINUTES. DO NOT close the tab!\n' +
     'Wait for the "Running script" dialog to disappear.\n\n' +
     'Are you sure?',
@@ -3479,6 +3483,113 @@ function NUKE_SEEDED_DATA() {
       } catch (e) { log_('Could not clear case checklist', e.message); }
     }
 
+    // Clear seeded contact log entries (CL_SEED_ prefix)
+    var contactLogCleared = false;
+    var contactLogSheet = ss.getSheetByName(SHEETS.CONTACT_LOG);
+    if (contactLogSheet && contactLogSheet.getLastRow() > 1) {
+      try {
+        var clLogData = contactLogSheet.getRange(2, 1, contactLogSheet.getLastRow() - 1, 1).getValues();
+        for (var cli = clLogData.length - 1; cli >= 0; cli--) {
+          if (String(clLogData[cli][0]).indexOf('CL_SEED_') === 0) {
+            contactLogSheet.deleteRow(cli + 2);
+            contactLogCleared = true;
+          }
+        }
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear contact log: ' + e.message); }
+    }
+
+    // Clear survey tracking data (no seed prefix — all rows are seeded)
+    var surveyTrackingCleared = false;
+    var surveyTrackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+    if (surveyTrackingSheet && surveyTrackingSheet.getLastRow() > 1) {
+      try {
+        surveyTrackingSheet.getRange(2, 1, surveyTrackingSheet.getLastRow() - 1, surveyTrackingSheet.getLastColumn()).clearContent();
+        surveyTrackingCleared = true;
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear survey tracking: ' + e.message); }
+    }
+
+    // Clear seeded meeting minutes (MIN_SEED_ prefix)
+    var minutesCleared = false;
+    var minutesSheet = ss.getSheetByName(SHEETS.PORTAL_MINUTES);
+    if (minutesSheet && minutesSheet.getLastRow() > 1) {
+      try {
+        var minData = minutesSheet.getRange(2, 1, minutesSheet.getLastRow() - 1, 1).getValues();
+        for (var mi = minData.length - 1; mi >= 0; mi--) {
+          if (String(minData[mi][0]).indexOf('MIN_SEED_') === 0) {
+            minutesSheet.deleteRow(mi + 2);
+            minutesCleared = true;
+          }
+        }
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear meeting minutes: ' + e.message); }
+    }
+
+    // Clear seeded meeting check-in records (MC_SEED_ prefix)
+    var checkinCleared = false;
+    var checkinSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (checkinSheet && checkinSheet.getLastRow() > 1) {
+      try {
+        var mcData = checkinSheet.getRange(2, 1, checkinSheet.getLastRow() - 1, 1).getValues();
+        for (var mci = mcData.length - 1; mci >= 0; mci--) {
+          if (String(mcData[mci][0]).indexOf('MC_SEED_') === 0) {
+            checkinSheet.deleteRow(mci + 2);
+            checkinCleared = true;
+          }
+        }
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear meeting check-ins: ' + e.message); }
+    }
+
+    // Clear seeded timeline events (TL_SEED_ prefix)
+    var timelineCleared = false;
+    var timelineSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
+    if (timelineSheet && timelineSheet.getLastRow() > 1) {
+      try {
+        var tlData = timelineSheet.getRange(2, 1, timelineSheet.getLastRow() - 1, 1).getValues();
+        for (var tli = tlData.length - 1; tli >= 0; tli--) {
+          if (String(tlData[tli][0]).indexOf('TL_SEED_') === 0) {
+            timelineSheet.deleteRow(tli + 2);
+            timelineCleared = true;
+          }
+        }
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear timeline events: ' + e.message); }
+    }
+
+    // Clear seeded Q&A answers first (QA_SEED_A prefix), then questions (QA_SEED_Q prefix)
+    var qaCleared = false;
+    var qaAnswerSheet = ss.getSheetByName(SHEETS.QA_ANSWERS);
+    if (qaAnswerSheet && qaAnswerSheet.getLastRow() > 1) {
+      try {
+        var qaAData = qaAnswerSheet.getRange(2, 1, qaAnswerSheet.getLastRow() - 1, 1).getValues();
+        for (var qai = qaAData.length - 1; qai >= 0; qai--) {
+          if (String(qaAData[qai][0]).indexOf('QA_SEED_A') === 0) {
+            qaAnswerSheet.deleteRow(qai + 2);
+            qaCleared = true;
+          }
+        }
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear QA answers: ' + e.message); }
+    }
+    var qaForumSheet = ss.getSheetByName(SHEETS.QA_FORUM);
+    if (qaForumSheet && qaForumSheet.getLastRow() > 1) {
+      try {
+        var qaQData = qaForumSheet.getRange(2, 1, qaForumSheet.getLastRow() - 1, 1).getValues();
+        for (var qqi = qaQData.length - 1; qqi >= 0; qqi--) {
+          if (String(qaQData[qqi][0]).indexOf('QA_SEED_Q') === 0) {
+            qaForumSheet.deleteRow(qqi + 2);
+            qaCleared = true;
+          }
+        }
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear QA questions: ' + e.message); }
+    }
+
+    // Clear survey questions data
+    var surveyQuestionsCleared = false;
+    var surveyQuestionsSheet = ss.getSheetByName(SHEETS.SURVEY_QUESTIONS);
+    if (surveyQuestionsSheet && surveyQuestionsSheet.getLastRow() > 1) {
+      try {
+        surveyQuestionsSheet.getRange(2, 1, surveyQuestionsSheet.getLastRow() - 1, surveyQuestionsSheet.getLastColumn()).clearContent();
+        surveyQuestionsCleared = true;
+      } catch (e) { log_('NUKE_SEEDED_DATA', 'Could not clear survey questions: ' + e.message); }
+    }
+
     // Clear tracked IDs from Script Properties
     var props = PropertiesService.getScriptProperties();
     props.deleteProperty('SEEDED_MEMBER_IDS');
@@ -3495,10 +3606,17 @@ function NUKE_SEEDED_DATA() {
       '• ' + deletedMembers + ' members removed\n' +
       '• ' + deletedGrievances + ' grievances removed\n' +
       (surveyCleared ? '• Survey responses cleared from Member Satisfaction\n' : '') +
+      (surveyTrackingCleared ? '• Survey tracking data cleared\n' : '') +
+      (surveyQuestionsCleared ? '• Survey questions cleared\n' : '') +
       (feedbackDeleted ? '• Feedback & Development sheet deleted\n' : '') +
       (functionChecklistDeleted ? '• Function Checklist sheet deleted\n' : '') +
       (auditLogDeleted ? '• _Audit_Log sheet deleted\n' : '') +
       (calEventsDeleted > 0 ? '• ' + calEventsDeleted + ' calendar events deleted\n' : '') +
+      (contactLogCleared ? '• Contact log entries cleared\n' : '') +
+      (minutesCleared ? '• Meeting minutes cleared\n' : '') +
+      (checkinCleared ? '• Meeting check-in records cleared\n' : '') +
+      (timelineCleared ? '• Timeline events cleared\n' : '') +
+      (qaCleared ? '• Q&A Forum questions & answers cleared\n' : '') +
       (weeklyCleared ? '• Weekly questions data cleared\n' : '') +
       (resourcesCleared ? '• Resources data cleared\n' : '') +
       (notificationsCleared ? '• Notifications data cleared\n' : '') +
