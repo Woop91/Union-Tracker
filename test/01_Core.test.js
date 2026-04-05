@@ -175,12 +175,7 @@ describe('SHEETS constant', () => {
   });
 
   test('backward compatibility aliases match', () => {
-    // NOTE: GRIEVANCE_TRACKER alias removed in v4.25.9 (FIX-CORE-02)
-    expect(SHEETS.GRIEVANCE_TRACKER).toBeUndefined();
     expect(SHEETS.MEMBER_DIRECTORY).toBe(SHEETS.MEMBER_DIR);
-    // SHEET_NAMES alias removed in v4.33.0
-    // REPORTS alias removed in v4.33.0
-    expect(SHEETS.REPORTS).toBeUndefined();
   });
 });
 

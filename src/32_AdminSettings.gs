@@ -64,7 +64,8 @@ var ADMIN_SETTINGS_SCHEMA_ = [
       { key: 'CONTRACT_NAME',       label: 'Contract Name',                 type: 'text',  desc: 'Name of the collective bargaining agreement' },
       { key: 'CONTRACT_GRIEVANCE',  label: 'Contract Article (Grievance)',  type: 'text',  desc: 'Article number for grievance procedures' },
       { key: 'CONTRACT_DISCIPLINE', label: 'Contract Article (Discipline)', type: 'text',  desc: 'Article number for discipline procedures' },
-      { key: 'CONTRACT_WORKLOAD',   label: 'Contract Article (Workload)',   type: 'text',  desc: 'Article number for workload provisions' }
+      { key: 'CONTRACT_WORKLOAD',   label: 'Contract Article (Workload)',   type: 'text',  desc: 'Article number for workload provisions' },
+      { key: 'ORG_ABBREV',          label: 'Organization Abbreviation',     type: 'text',  desc: 'Short abbreviation for the organization' }
     ]
   },
   {
@@ -84,7 +85,8 @@ var ADMIN_SETTINGS_SCHEMA_ = [
       { key: 'STEWARD_COMMITTEES',     label: 'Steward Committees',      type: 'list', desc: 'Committee names for steward assignments' },
       { key: 'COMM_METHODS',           label: 'Communication Methods',   type: 'list', desc: 'Contact preference options (e.g. Email, Phone, Text)' },
       { key: 'BEST_TIMES',            label: 'Best Times to Contact',   type: 'list', desc: 'Time preferences for member contact' },
-      { key: 'SURVEY_PRIORITY_OPTIONS', label: 'Survey Priority Options', type: 'list', desc: 'Priority level choices for survey questions' }
+      { key: 'SURVEY_PRIORITY_OPTIONS', label: 'Survey Priority Options', type: 'list', desc: 'Priority level choices for survey questions' },
+      { key: 'DUES_STATUSES',          label: 'Dues Statuses',            type: 'list', desc: 'Dues payment status options for member profiles' }
     ]
   },
   {
@@ -157,6 +159,7 @@ var ADMIN_SETTINGS_SCHEMA_ = [
       { key: 'BROADCAST_SCOPE_ALL',    label: 'Broadcast: All Members',    type: 'toggle', desc: 'Allow stewards to message ALL members (not just assigned)' },
       { key: 'ENABLE_CORRELATION',     label: 'Enable Correlation Engine', type: 'toggle', desc: 'Enable correlation analysis on the Insights page' },
       { key: 'SHOW_GRIEVANCES',        label: 'Show Grievances',           type: 'toggle', desc: 'Show grievance tracking (cases, new grievance, stats). Reload required.' },
+      { key: 'ENABLE_TAB_MODALS',     label: 'Enable Tab Modals',         type: 'toggle', desc: 'Enable tab-based modal dialogs instead of sidebar modals. Reload required.' },
       { key: 'CUSTOM_LINK_1_NAME',     label: 'Custom Link 1 Name',        type: 'text',   desc: 'Display name for first custom sidebar link' },
       { key: 'CUSTOM_LINK_1_URL',      label: 'Custom Link 1 URL',         type: 'url',    desc: 'URL for first custom sidebar link' },
       { key: 'CUSTOM_LINK_2_NAME',     label: 'Custom Link 2 Name',        type: 'text',   desc: 'Display name for second custom sidebar link' },
@@ -272,7 +275,7 @@ function adminGetSettings() {
           for (var r = 0; r < allData.length; r++) {
             var cellVal = allData[r][col - 1];
             if (cellVal !== null && cellVal !== undefined && String(cellVal).trim() !== '') {
-              listVals.push(escapeHtml(String(cellVal).trim()));
+              listVals.push(String(cellVal).trim());
             }
           }
           settings[field.key] = listVals;

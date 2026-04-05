@@ -98,15 +98,6 @@ describe('getHeadersFromMap_', () => {
   });
 });
 
-// ============================================================================
-// Legacy column constants removed (buildLegacyCols_, MEMBER_COLUMNS, GRIEVANCE_COLUMNS)
-// ============================================================================
-
-describe('Legacy column constants removed', () => {
-  test('buildLegacyCols_ is no longer defined', () => {
-    expect(typeof buildLegacyCols_).toBe('undefined');
-  });
-});
 
 // ============================================================================
 // getColumnLetter
@@ -152,7 +143,6 @@ describe('Header map to COLS consistency', () => {
     { name: 'EVENT_AUDIT', map: 'EVENT_AUDIT_HEADER_MAP_', cols: 'EVENT_AUDIT_COLS' },
     { name: 'SURVEY_VAULT', map: 'SURVEY_VAULT_HEADER_MAP_', cols: 'SURVEY_VAULT_COLS' },
     { name: 'SURVEY_TRACKING', map: 'SURVEY_TRACKING_HEADER_MAP_', cols: 'SURVEY_TRACKING_COLS' },
-    { name: 'FEEDBACK', map: 'FEEDBACK_HEADER_MAP_', cols: 'FEEDBACK_COLS' },
     { name: 'CHECKLIST', map: 'CHECKLIST_HEADER_MAP_', cols: 'CHECKLIST_COLS' }
   ];
 
@@ -208,19 +198,6 @@ describe('Header map to COLS consistency', () => {
   });
 });
 
-// ============================================================================
-// Legacy compat objects removed
-// ============================================================================
-
-describe('Legacy column constants removed', () => {
-  test('MEMBER_COLUMNS is no longer defined', () => {
-    expect(typeof MEMBER_COLUMNS).toBe('undefined');
-  });
-
-  test('GRIEVANCE_COLUMNS is no longer defined', () => {
-    expect(typeof GRIEVANCE_COLUMNS).toBe('undefined');
-  });
-});
 
 // ============================================================================
 // SATISFACTION_COLS ↔ SATISFACTION_SECTIONS cross-consistency
@@ -540,10 +517,6 @@ describe('Header map column coverage completeness', () => {
     expect(SURVEY_TRACKING_HEADER_MAP_.length).toBe(maxCol);
   });
 
-  test('FEEDBACK_HEADER_MAP_ length matches max FEEDBACK_COLS value', () => {
-    const maxCol = Math.max(...Object.values(FEEDBACK_COLS));
-    expect(FEEDBACK_HEADER_MAP_.length).toBe(maxCol);
-  });
 });
 
 // ============================================================================

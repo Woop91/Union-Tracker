@@ -26,6 +26,11 @@ global.AUDIT_EVENTS = {
 
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '05_Integrations.gs']);
 
+// Clean up module-level mocks between tests
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 // ============================================================================
 // CALENDAR_CONFIG
 // ============================================================================
@@ -730,5 +735,89 @@ describe('LockService: deleteWebAppResource', () => {
     deleteWebAppResource('token', 'RES-001');
     expect(mockLock.tryLock).toHaveBeenCalled();
     expect(mockLock.releaseLock).toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// T1-1a: addKnowledgeContent audit logging
+// ============================================================================
+
+describe('addKnowledgeContent audit logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+    global.checkWebAppAuthorization = jest.fn(() => ({
+      isAuthorized: true,
+      email: 'steward@test.com'
+    }));
+    global.withScriptLock_ = jest.fn(fn => fn());
+
+    var HEADERS = ['Content ID', 'Type', 'Category', 'Title', 'Content',
+      'Attribution', 'Bullets', 'Audience', 'Placement', 'Active',
+      'Priority', 'Start Date', 'End Date', 'Date Added', 'Added By'];
+    var sheet = createMockSheet(SHEETS.KNOWLEDGE_ENGINE, [HEADERS]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+  });
+
+  test('calls logAuditEvent with KB_CONTENT_CREATED on success', () => {
+    var result = addKnowledgeContent('token123', {
+      title: 'Test Article',
+      content: 'Test body',
+      type: 'Tip',
+      category: 'General'
+    });
+
+    expect(result.success).toBe(true);
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      'KB_CONTENT_CREATED',
+      expect.objectContaining({
+        contentId: expect.stringMatching(/^KE-/),
+        type: 'Tip',
+        addedBy: 'steward@test.com'
+      })
+    );
+  });
+});
+
+// ============================================================================
+// T1-1b: updateKnowledgeContent audit logging
+// ============================================================================
+
+describe('updateKnowledgeContent audit logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+    global.checkWebAppAuthorization = jest.fn(() => ({
+      isAuthorized: true,
+      email: 'steward@test.com'
+    }));
+    global.withScriptLock_ = jest.fn(fn => fn());
+
+    var HEADERS = ['Content ID', 'Type', 'Category', 'Title', 'Content',
+      'Attribution', 'Bullets', 'Audience', 'Placement', 'Active',
+      'Priority', 'Start Date', 'End Date', 'Date Added', 'Added By'];
+    var existingRow = ['KE-001', 'Tip', 'General', 'Old Title', 'Old body',
+      '', '', 'All', 'Home Widget', 'Yes', 999, '', '', '2026-01-01', 'admin@test.com'];
+    var sheet = createMockSheet(SHEETS.KNOWLEDGE_ENGINE, [HEADERS, existingRow]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+  });
+
+  test('calls logAuditEvent with KB_CONTENT_UPDATED on success', () => {
+    var result = updateKnowledgeContent('token123', 'KE-001', {
+      title: 'New Title',
+      category: 'Safety'
+    });
+
+    expect(result.success).toBe(true);
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      'KB_CONTENT_UPDATED',
+      expect.objectContaining({
+        contentId: 'KE-001',
+        fields: expect.stringContaining('title'),
+        updatedBy: 'steward@test.com'
+      })
+    );
   });
 });

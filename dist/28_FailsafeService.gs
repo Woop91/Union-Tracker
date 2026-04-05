@@ -223,7 +223,7 @@ var FailsafeService = (function () {
           var sendLock = LockService.getScriptLock();
           // Try to acquire lock — if another execution already sent, skip
           if (!sendLock.tryLock(5000)) {
-            log_('processScheduledDigests', 'Could not acquire send lock for ' + email + ', skipping to avoid duplicate.');
+            log_('processScheduledDigests', 'Could not acquire send lock for ' + maskEmail(email) + ', skipping to avoid duplicate.');
             continue;
           }
           try {
@@ -246,7 +246,7 @@ var FailsafeService = (function () {
           }
         }
       } catch (err) {
-        log_('processScheduledDigests', 'Digest send error for ' + email + ': ' + err.message);
+        secureLog('processScheduledDigests', 'Digest send error', { email: email, error: err.message });
       }
     }
 
@@ -739,7 +739,6 @@ function fsDiagnostic(sessionToken) {
     'Timeline Events': SHEETS.TIMELINE_EVENTS,
     'QA Forum': SHEETS.QA_FORUM,
     'QA Answers': SHEETS.QA_ANSWERS,
-    'Feedback': SHEETS.FEEDBACK,
     'Case Checklist': SHEETS.CASE_CHECKLIST,
     'Weekly Questions': SHEETS.WEEKLY_QUESTIONS,
     'Weekly Responses': SHEETS.WEEKLY_RESPONSES,

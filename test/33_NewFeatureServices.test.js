@@ -347,6 +347,36 @@ describe('KnowledgeBaseService.searchArticles', () => {
   });
 });
 
+describe('KnowledgeBaseService.searchArticles relevance scoring', () => {
+  test('ranks title matches above full-text matches', () => {
+    var HEADERS = ['ID', 'Article Number', 'Title', 'Summary', 'Full Text', 'Related Grievance Types', 'Tags'];
+    var data = [
+      HEADERS,
+      ['A1', 'Art 5', 'Overtime Rules', 'How overtime works', 'discipline mentioned once here', 'Workload', 'pay'],
+      ['A2', 'Art 12', 'Discipline Procedures', 'Handling discipline cases', 'Full text about discipline', 'Discipline', 'contract,discipline'],
+    ];
+    var sheet = createMockSheet(SHEETS.KNOWLEDGE_BASE, data);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var results = KnowledgeBaseService.searchArticles('discipline');
+    expect(results.length).toBe(2);
+    // A2 should rank first (title + tags + summary + fullText match)
+    expect(results[0].title).toBe('Discipline Procedures');
+  });
+
+  test('returns empty array for no matches', () => {
+    var HEADERS = ['ID', 'Article Number', 'Title', 'Summary', 'Full Text', 'Related Grievance Types', 'Tags'];
+    var data = [HEADERS, ['A1', 'Art 5', 'Overtime', 'Summary', 'Text', 'Workload', 'pay']];
+    var sheet = createMockSheet(SHEETS.KNOWLEDGE_BASE, data);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var results = KnowledgeBaseService.searchArticles('nonexistent');
+    expect(results.length).toBe(0);
+  });
+});
+
 describe('KnowledgeBaseService.getArticle', () => {
   test('returns null when article not found', () => {
     var HEADERS = ['ID', 'Article Number', 'Title', 'Summary', 'Full Text', 'Related Grievance Types', 'Tags'];
@@ -420,6 +450,49 @@ describe('DigestService.setPreferences', () => {
     // Should have appended with 'immediate' as the default fallback
     var appendedRow = sheet.appendRow.mock.calls[0][0];
     expect(appendedRow[1]).toBe('immediate');
+  });
+});
+
+describe('DigestService.setPreferences audit logging', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+  });
+
+  test('calls logAuditEvent on new entry', () => {
+    var HEADERS = ['Email', 'Frequency', 'Types', 'Last Sent'];
+    var data = [HEADERS];
+    var sheet = createMockSheet(SHEETS.NOTIFICATION_PREFS, data);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    DigestService.setPreferences('new@test.com', 'weekly', 'grievances');
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      'DIGEST_PREFS_UPDATED',
+      expect.objectContaining({
+        email: 'new@test.com',
+        frequency: 'weekly'
+      })
+    );
+  });
+
+  test('calls logAuditEvent on existing entry update', () => {
+    var HEADERS = ['Email', 'Frequency', 'Types', 'Last Sent'];
+    var data = [HEADERS, ['user@test.com', 'immediate', 'all', '']];
+    var sheet = createMockSheet(SHEETS.NOTIFICATION_PREFS, data);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    DigestService.setPreferences('user@test.com', 'daily', 'meetings');
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      'DIGEST_PREFS_UPDATED',
+      expect.objectContaining({
+        email: 'user@test.com',
+        frequency: 'daily'
+      })
+    );
   });
 });
 
@@ -864,5 +937,40 @@ describe('NewFeatureServices global wrappers — auth gating', () => {
 
     // Restore
     _resolveCallerEmail.mockReturnValue('test@example.com');
+  });
+});
+
+// ============================================================================
+// CommunicationLogService.updateCommunication
+// ============================================================================
+
+describe('CommunicationLogService.updateCommunication', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+  });
+
+  test('updates subject and notes for own entry', () => {
+    var HEADERS = ['ID', 'Member Email', 'Steward Email', 'Type', 'Subject', 'Notes', 'Timestamp'];
+    var row = ['entry-1', 'member@test.com', 'steward@test.com', 'phone', 'Old Subject', 'Old Notes', new Date()];
+    var sheet = createMockSheet(SHEETS.COMMUNICATION_LOG, [HEADERS, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var result = CommunicationLogService.updateCommunication('steward@test.com', 'entry-1', { subject: 'New Subject', notes: 'New Notes' });
+    expect(result.success).toBe(true);
+    expect(logAuditEvent).toHaveBeenCalledWith('COMMUNICATION_LOG_UPDATED', expect.objectContaining({ entryId: 'entry-1' }));
+  });
+
+  test('rejects edit by different steward', () => {
+    var HEADERS = ['ID', 'Member Email', 'Steward Email', 'Type', 'Subject', 'Notes', 'Timestamp'];
+    var row = ['entry-1', 'member@test.com', 'steward@test.com', 'phone', 'Subject', 'Notes', new Date()];
+    var sheet = createMockSheet(SHEETS.COMMUNICATION_LOG, [HEADERS, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var result = CommunicationLogService.updateCommunication('other@test.com', 'entry-1', { notes: 'Hacked' });
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('your own');
   });
 });

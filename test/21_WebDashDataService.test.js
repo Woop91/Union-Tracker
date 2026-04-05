@@ -1255,3 +1255,89 @@ describe('v4.31.0 H1: _invalidateSheetCache clears _emailIndex', () => {
     expect(user2).not.toBeNull();
   });
 });
+
+// ============================================================================
+// T1-2a: updateMemberBySteward before/after audit
+// ============================================================================
+
+describe('updateMemberBySteward audit enrichment', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+    global.checkWebAppAuthorization = jest.fn(() => ({
+      isAuthorized: true,
+      email: 'steward@test.com',
+      role: 'steward'
+    }));
+  });
+
+  test('audit entry includes before/after values for changed fields', () => {
+    var headers = ['Email', 'Name', 'First Name', 'Last Name', 'Role', 'Unit',
+      'Phone', 'Join Date', 'Dues Status', 'Member ID', 'Work Location',
+      'Office Days', 'Assigned Steward', 'Is Steward', 'Director', 'Supervisor', 'Job Title'];
+    var row = ['member@test.com', 'Jane Doe', 'Jane', 'Doe', 'Member', 'Unit A',
+      '555-0001', new Date('2023-01-15'), 'Active', 'MEM-001', 'HQ',
+      'Mon,Tue', '', false, 'OldDirector', 'OldSuper', 'OldTitle'];
+
+    var sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', [headers, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    DataService.updateMemberBySteward('member@test.com', { director: 'NewDirector' });
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      'STEWARD_MEMBER_UPDATE',
+      expect.objectContaining({
+        email: 'member@test.com',
+        changes: expect.objectContaining({
+          director: expect.objectContaining({
+            from: expect.any(String),
+            to: 'NewDirector'
+          })
+        })
+      })
+    );
+  });
+});
+
+describe('sendBroadcastMessage security', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+    global.checkWebAppAuthorization = jest.fn(() => ({
+      isAuthorized: true,
+      email: 'steward@test.com',
+      role: 'steward'
+    }));
+  });
+
+  test('rate limits after 3 broadcasts per hour', () => {
+    // Mock CacheService to return rate count of 3
+    var mockCache = {
+      get: jest.fn(() => '3'),
+      put: jest.fn()
+    };
+    CacheService.getScriptCache.mockReturnValue(mockCache);
+
+    var result = DataService.sendBroadcastMessage('steward@test.com', {}, 'Hello');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('rate limit');
+  });
+
+  test('sanitizes message with escapeForFormula', () => {
+    // Mock members
+    global.getStewardMembers = jest.fn(() => [{ email: 'member@test.com', name: 'Test' }]);
+    global.ConfigReader = { getConfig: jest.fn(() => ({ orgAbbrev: 'TEST', stewardLabel: 'Steward' })) };
+    var mockCache = { get: jest.fn(() => '0'), put: jest.fn() };
+    CacheService.getScriptCache.mockReturnValue(mockCache);
+
+    // Call with formula-injection attempt
+    DataService.sendBroadcastMessage('steward@test.com', { scope: 'mine' }, '=CMD("malicious")');
+
+    // Verify MailApp was called with sanitized message (escapeForFormula prepends a quote)
+    if (MailApp.sendEmail.mock.calls.length > 0) {
+      var sentMessage = MailApp.sendEmail.mock.calls[0][2];
+      expect(sentMessage).not.toBe('=CMD("malicious")');
+    }
+  });
+});

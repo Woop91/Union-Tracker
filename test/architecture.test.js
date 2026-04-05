@@ -57,7 +57,6 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
-  // '25_WorkloadService.gs', — excluded from SolidBase
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
@@ -441,7 +440,6 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
-    // '25_WorkloadService.gs', — excluded from SolidBase
   ];
 
   webAppFiles.forEach(file => {
@@ -665,6 +663,28 @@ describe('A10: Web app data writes use escapeForFormula where needed', () => {
     );
     // At least half of appendRow calls with user data should truncate
     expect(withTruncation.length).toBeGreaterThanOrEqual(Math.floor(appendRows.length * 0.3));
+  });
+
+  test('appendRow() calls with user string fields use escapeForFormula', () => {
+    // v4.51.1: BUG-10-012 — submitFeedback() used appendRow without escapeForFormula.
+    // Scan all appendRow calls that include user-supplied string fields.
+    const lines = dataServiceSrc.split('\n');
+    const issues = [];
+    lines.forEach((line, idx) => {
+      if (!line.includes('.appendRow(')) return;
+      const trimmed = line.trim();
+      // Skip lines that only contain safe values (dates, IDs, constants)
+      if (trimmed.match(/appendRow\(\[\s*(?:new Date|id|contactId|'[^']*'|\d)/)) return;
+      // If line has String() or feedbackData or contactData or title or description,
+      // it must also have escapeForFormula
+      const hasUserData = trimmed.includes('String(') || trimmed.includes('feedbackData') ||
+        trimmed.includes('contactData') || trimmed.includes('title') ||
+        trimmed.includes('description') || trimmed.includes('message');
+      if (hasUserData && !trimmed.includes('escapeForFormula')) {
+        issues.push(`Line ${idx + 1}: appendRow with user data missing escapeForFormula: ${trimmed.substring(0, 120)}`);
+      }
+    });
+    expect(issues).toEqual([]);
   });
 });
 
@@ -985,7 +1005,6 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
-    // '25_WorkloadService.gs', — excluded from SolidBase
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
@@ -1046,7 +1065,6 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
-    // '25_WorkloadService.gs', — excluded from SolidBase
   ];
   const srcDir = path.resolve(__dirname, '..', 'src');
 
@@ -1374,4 +1392,68 @@ describe('A21: Resource endpoints in 05_Integrations.gs have auth checks', () =>
       expect(integrationsSrc).toContain('function ' + fn + '(');
     });
   });
+});
+
+// ============================================================================
+// A22: EVERY data* WRITE WRAPPER HAS AUTH — NO UNWRAPPED WRITES
+// ============================================================================
+// v4.51.1: D1-C2 — DataService write functions have no self-defense auth.
+// The wrapper layer (21d_WebDashDataWrappers.gs) is the sole auth gate.
+// This structural test ensures every function data*() declaration contains
+// _resolveCallerEmail, _requireStewardAuth, _requireLeaderAuth, or _isPINSession.
+// If a new wrapper is added without auth, this test fails.
+
+describe('A22: Every data* wrapper function has auth check', () => {
+  const wrappersSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21d_WebDashDataWrappers.gs'), 'utf8'
+  );
+
+  // Extract all function data*() declarations
+  const funcRegex = /^function\s+(data\w+)\s*\(/gm;
+  const allDataFunctions = [];
+  let match;
+  while ((match = funcRegex.exec(wrappersSrc)) !== null) {
+    allDataFunctions.push(match[1]);
+  }
+
+  test('found at least 30 data* wrapper functions', () => {
+    expect(allDataFunctions.length).toBeGreaterThanOrEqual(30);
+  });
+
+  // Extract a function body by brace-counting (handles one-liners and multi-line)
+  function extractBody(src, fnName) {
+    const idx = src.indexOf('function ' + fnName + '(');
+    if (idx === -1) return '';
+    const openBrace = src.indexOf('{', idx);
+    if (openBrace === -1) return '';
+    let depth = 1;
+    let i = openBrace + 1;
+    while (i < src.length && depth > 0) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') depth--;
+      i++;
+    }
+    return src.substring(openBrace + 1, i - 1);
+  }
+
+  // Known exceptions: functions with non-standard auth patterns
+  const wrapperExceptions = [
+    'dataEnsureSheetsIfNeeded',          // init helper, checks auth internally
+    'dataGetGrievanceForSigning',        // sigToken auth (delegated to underlying fn)
+    'dataSubmitGrievanceSignature',      // sigToken auth (delegated to underlying fn)
+  ];
+
+  allDataFunctions
+    .filter(fn => !wrapperExceptions.includes(fn))
+    .forEach(fn => {
+      test(`${fn}() contains an auth check`, () => {
+        const body = extractBody(wrappersSrc, fn);
+        expect(body.length).toBeGreaterThan(0);
+        const hasAuth = body.includes('_resolveCallerEmail') ||
+                        body.includes('_requireStewardAuth') ||
+                        body.includes('_requireLeaderAuth') ||
+                        body.includes('_isPINSession');
+        expect(hasAuth).toBe(true);
+      });
+    });
 });

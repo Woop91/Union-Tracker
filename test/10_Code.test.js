@@ -39,7 +39,13 @@ describe('GRIEVANCE_FORM_CONFIG', () => {
     expect(typeof GRIEVANCE_FORM_CONFIG.FORM_URL).toBe('string');
   });
 
-  test('FIELD_IDS has 18 entries', () => {
+  test('FIELD_IDS has expected number of entries', () => {
+    // 18 fields defined in GRIEVANCE_FORM_CONFIG.FIELD_IDS (10c_FormsAndSync.gs):
+    // MEMBER_ID, MEMBER_FIRST_NAME, MEMBER_LAST_NAME, JOB_TITLE,
+    // AGENCY_DEPARTMENT, REGION, WORK_LOCATION, MANAGERS, MEMBER_EMAIL,
+    // STEWARD_FIRST_NAME, STEWARD_LAST_NAME, STEWARD_EMAIL,
+    // DATE_OF_INCIDENT, ARTICLES_VIOLATED, REMEDY_SOUGHT,
+    // DATE_FILED, STEP, CONFIDENTIAL_WAIVER
     expect(Object.keys(GRIEVANCE_FORM_CONFIG.FIELD_IDS).length).toBe(18);
   });
 

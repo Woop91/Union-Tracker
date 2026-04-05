@@ -112,7 +112,8 @@ function pearsonCorrelation_(x, y) {
  */
 function spearmanCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 3) return 0;
+  // n<5 guard: delegates to pearsonCorrelation_ which requires n>=5
+  if (n < 5) return 0;
   return pearsonCorrelation_(toRanks_(x.slice(0, n)), toRanks_(y.slice(0, n)));
 }
 

@@ -42,6 +42,11 @@ global.isProductionMode = jest.fn(() => false);
 
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '22_WebDashApp.gs']);
 
+// Clean up module-level mocks between tests
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 // ============================================================================
 // _serveFatalError
 // ============================================================================

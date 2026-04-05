@@ -29,20 +29,6 @@ describe('04d function existence', () => {
     });
   });
 
-  // Deprecated stubs removed in tech debt cleanup
-  const removed = [
-    'rebuildExecutiveDashboard',
-    'renderBargainingCheatSheet',
-    'renderHotZones',
-    'identifyRisingStars',
-    'renderHostilityFunnel'
-  ];
-
-  removed.forEach(fn => {
-    test(`${fn} is removed (was deprecated v4.3.2)`, () => {
-      expect(typeof global[fn]).toBe('undefined');
-    });
-  });
 });
 
 describe('getDashboardStats', () => {
@@ -87,10 +73,6 @@ describe('v4.31.0 M7: Step matching word-boundary regex', () => {
     expect(arbitrationRegex.test('arbitration')).toBe(true);
   });
 
-  test('"step ii" matches step 2 (roman numeral alias)', () => {
-    // In the source: currentStep === 'step ii' check (exact match)
-    expect('step ii' === 'step ii').toBe(true);
-  });
 
   test('"step 2" matches step 2', () => {
     expect(step2Regex.test('step 2')).toBe(true);

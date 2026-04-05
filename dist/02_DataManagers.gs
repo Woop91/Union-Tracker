@@ -2070,10 +2070,13 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
       const lastUpdatedCol = sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, numRows, 1).getValues();
       const resolutionCol = notes ? sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, numRows, 1).getValues() : null;
 
+      var previousStatuses = {};
+
       for (let i = 1; i < data.length; i++) {
         const grievanceId = col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID);
 
         if (grievanceIds.includes(grievanceId)) {
+          previousStatuses[grievanceId] = statusCol[i - 1][0];
           statusCol[i - 1][0] = newStatus;
           lastUpdatedCol[i - 1][0] = today;
 
@@ -2098,6 +2101,20 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
       sheet.getRange(2, bsCols.LAST_UPDATED, numRows, 1).setValues(lastUpdatedCol);
       if (notes && resolutionCol) {
         sheet.getRange(2, bsCols.RESOLUTION, numRows, 1).setValues(resolutionCol);
+      }
+
+      if (updatedCount === 0) {
+        return { success: false, message: 'No matching grievances found for the provided IDs.' };
+      }
+
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('BULK_STATUS_UPDATE', {
+          grievanceIds: grievanceIds,
+          newStatus: newStatus,
+          previousStatuses: previousStatuses,
+          updatedCount: updatedCount,
+          updatedBy: authResult.email || 'unknown'
+        });
       }
 
       return {

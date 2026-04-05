@@ -34,6 +34,7 @@ const path = require('path');
  */
 function loadSource(filename) {
   const filePath = path.resolve(__dirname, '..', 'src', filename);
+  if (!fs.existsSync(filePath)) return; // SB excludes some DDS-only files
   let code = fs.readFileSync(filePath, 'utf8');
 
   // --- Phase 1: Hoist function declarations ---

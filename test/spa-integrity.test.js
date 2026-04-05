@@ -156,7 +156,6 @@ describe('G9: Mobile More menus cover all sidebar tabs', () => {
       renderStewardDirectoryPage: ['stewarddirectory'],
       renderTimelinePage: ['timeline'],
       renderStewardTimelinePage: ['timeline'],
-      renderFeedbackPage: ['feedback'],
       renderFailsafePage: ['failsafe'],
       renderTestRunnerPage: ['testrunner'],
       renderQAForum: ['qaforum'],
@@ -280,7 +279,7 @@ describe('G11: _ensureAllSheetsInternal covers all feature sheets', () => {
     'CONTACT_LOG', 'STEWARD_TASKS', 'QA_FORUM', 'QA_ANSWERS',
     'TIMELINE_EVENTS', 'FAILSAFE_CONFIG', 'WEEKLY_QUESTIONS',
     'WEEKLY_RESPONSES', 'QUESTION_POOL', 'NOTIFICATIONS', 'AUDIT_LOG',
-    'RESOURCES', 'RESOURCE_CONFIG', 'FEEDBACK', 'CASE_CHECKLIST',
+    'RESOURCES', 'RESOURCE_CONFIG', 'CASE_CHECKLIST',
     'SURVEY_QUESTIONS', 'SATISFACTION',
   ];
 
@@ -313,7 +312,6 @@ describe('G11: _ensureAllSheetsInternal covers all feature sheets', () => {
       'createResourceConfigSheet': ['RESOURCE_CONFIG'],
       'createSurveyQuestionsSheet':['SURVEY_QUESTIONS'],
       'createSatisfactionSheet':   ['SATISFACTION'],
-      'createFeedbackSheet':       ['FEEDBACK'],
       'getOrCreateChecklistSheet': ['CASE_CHECKLIST'],
       '_ensureContactLogSheet':    ['CONTACT_LOG'],
       '_ensureStewardTasksSheet':  ['STEWARD_TASKS'],
@@ -851,9 +849,6 @@ describe('G19: More menu items have route handlers', () => {
 // instead of "Program Operations Manual System". This guard prevents the wrong
 // acronym expansion from reappearing.
 
-// G20: POMS description accuracy
-// These guards prevent the wrong POMS acronym expansion from reappearing.
-// SolidBase: POMS descriptions were removed during scrub; negative guards still apply.
 describe('G20: POMS description accuracy', () => {
   const stewardCode = read('steward_view.html');
   const memberCode = read('member_view.html');
@@ -866,9 +861,13 @@ describe('G20: POMS description accuracy', () => {
     expect(memberCode).not.toContain('Postal Operations Manual');
   });
 
-  // SolidBase: POMS description text removed during DDS scrub
-  test.skip('steward view has correct POMS description — SolidBase-excluded', () => {});
-  test.skip('member view has correct POMS description — SolidBase-excluded', () => {});
+  test('steward view has correct POMS description', () => {
+    expect(stewardCode).toContain('Program Operations Manual System');
+  });
+
+  test('member view has correct POMS description', () => {
+    expect(memberCode).toContain('Program Operations Manual System');
+  });
 });
 
 
@@ -927,8 +926,7 @@ describe('G21: Member dues-gated tabs all have _isDuesPaying() guard', () => {
 // G22: Workload Tracker frontend invariants
 // ============================================================================
 
-// SolidBase: WorkloadService + workload tracker UI excluded
-describe.skip('G22 — Workload Tracker frontend invariants', () => {
+describe('G22 — Workload Tracker frontend invariants', () => {
   const memberView = read('member_view.html');
 
   test('WT_CAT_KEY_LABELS map is defined from WT_CATEGORIES', () => {
@@ -1038,8 +1036,7 @@ describe('G23: Tab navigation race condition guard', () => {
     expect(fnBody).toMatch(/_navSwitchId/);
   });
 
-  // SolidBase: renderPOMSReference is a stub (no async server call), so no _navSwitchId needed
-  test.skip('renderPOMSReference async callback checks _navSwitchId — SolidBase stub', () => {
+  test('renderPOMSReference async callback checks _navSwitchId', () => {
     const fnBody = extractFnBody(indexCode, 'renderPOMSReference');
     expect(fnBody).toMatch(/_navSwitchId/);
   });
@@ -1117,8 +1114,12 @@ describe('G24: Tab stacking prevention', () => {
     expect(orgBlock[0]).toContain('_hideAllVisiblePanes()');
   });
 
-  // SolidBase: poms tab is not routed in _handleTabNav (DDS-specific feature)
-  test.skip('poms early-return uses _hideAllVisiblePanes — SolidBase-excluded', () => {});
+  test('poms early-return uses _hideAllVisiblePanes', () => {
+    const fnBody = extractFnBody(indexCode, '_handleTabNav');
+    const pomsBlock = fnBody.match(/tabId === 'poms'[\s\S]*?renderPOMSReference[\s\S]*?return;/);
+    expect(pomsBlock).not.toBeNull();
+    expect(pomsBlock[0]).toContain('_hideAllVisiblePanes()');
+  });
 
   test('More menu handlers use _hideAllVisiblePanes', () => {
     const fnBody = extractFnBody(indexCode, '_handleTabNav');

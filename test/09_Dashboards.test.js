@@ -57,6 +57,11 @@ global.getSatisfactionColMap_ = jest.fn(() => ({
   'q56': 57, 'q57': 58, 'q58': 59, 'q59': 60, 'q60': 61, 'q61': 62, 'q62': 63
 }));
 
+// Clean up module-level mocks between tests
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 // ============================================================================
 // computeAverage_ - pure math function
 // ============================================================================

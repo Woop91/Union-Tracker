@@ -460,6 +460,7 @@ var DataService = (function () {
 
     // Editable field mappings
     var editableFields = {
+      phone:        HEADERS.memberPhone,        // v4.51.1: member can update phone (BUG-3-001)
       street:       HEADERS.memberStreet,
       city:         HEADERS.memberCity,
       state:        HEADERS.memberState,
@@ -542,21 +543,38 @@ var DataService = (function () {
 
       var rowNum = i + 1;
       var rowData = data[i].slice();
-      var changed = false;
+      var oldValues = {};
+      for (var _f in updates) {
+        if (!editableFields[_f]) continue;
+        var _oldCol = _findColumn(colMap, editableFields[_f]);
+        if (_oldCol !== -1) oldValues[_f] = data[i][_oldCol];
+      }
+      var changedCols = []; // {col: number, val: string}
       for (var field in updates) {
         if (!editableFields[field]) continue;
         var col = _findColumn(colMap, editableFields[field]);
         if (col === -1) continue;
         var val = String(updates[field] || '').trim().substring(0, 255);
-        rowData[col] = escapeForFormula(val);
-        changed = true;
+        changedCols.push({ col: col, val: escapeForFormula(val) });
       }
-      if (!changed) return { success: false, message: 'No valid fields to update.' };
+      if (changedCols.length === 0) return { success: false, message: 'No valid fields to update.' };
 
-      sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
+      // Write only changed columns to preserve formulas in untouched cells (GAMMA-05)
+      // Values already sanitized via escapeForFormula above
+      for (var ci = 0; ci < changedCols.length; ci++) {
+        sheet.getRange(rowNum, changedCols[ci].col + 1).setValue(changedCols[ci].val); // escapeForFormula applied in changedCols.push
+      }
       _invalidateSheetCache(MEMBER_SHEET);
       if (typeof logAuditEvent === 'function') {
-        logAuditEvent('STEWARD_MEMBER_UPDATE', { email: email, fields: Object.keys(updates).join(',') });
+        logAuditEvent('STEWARD_MEMBER_UPDATE', {
+          email: email,
+          changes: Object.keys(updates).reduce(function(acc, f) {
+            if (editableFields[f]) {
+              acc[f] = { from: String(oldValues[f] || ''), to: String(updates[f] || '').trim() };
+            }
+            return acc;
+          }, {})
+        });
       }
       return { success: true, message: 'Member updated.' };
     }
@@ -789,7 +807,7 @@ var DataService = (function () {
     if (idemKey) {
       var idemCache = CacheService.getScriptCache();
       if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
-      idemCache.put('IDEM_' + idemKey, '1', 300);
+      idemCache.put('IDEM_' + idemKey, '1', 600); // 10-minute TTL to reduce duplicate mutation risk
     }
     if (!email || !data) return { success: false, message: 'Missing required data.' };
     if (!data.title || !data.description) return { success: false, message: 'Title and description are required.' };
@@ -853,6 +871,9 @@ var DataService = (function () {
       if (colEmail       !== -1) row[colEmail]       = escapeForFormula(email.toLowerCase().trim());
 
       sheet.appendRow(row);
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('GRIEVANCE_DRAFT_CREATED', { email: email, grievanceId: row[colGrievanceId] || 'unknown' });
+      }
       return { success: true, message: 'Draft submitted.' };
     } catch (e) {
       handleError(e, 'DataService.startGrievanceDraft', ERROR_LEVEL.ERROR);
@@ -1710,6 +1731,15 @@ var DataService = (function () {
     try {
     if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
 
+    // T6-1: Per-user rate limiting — max 3 broadcasts per hour (matches sendUnitBroadcast)
+    var _bcRateKey = 'BROADCAST_RATE_' + stewardEmail.toLowerCase().trim();
+    var _bcCache = CacheService.getScriptCache();
+    var _bcRateCount = parseInt(_bcCache.get(_bcRateKey) || '0', 10);
+    if (_bcRateCount >= 3) {
+      return { success: false, sentCount: 0, message: 'Broadcast rate limit reached (3 per hour). Please try again later.' };
+    }
+    _bcCache.put(_bcRateKey, String(_bcRateCount + 1), 3600);
+
     // Scope: 'mine' = only members assigned to this steward, 'all' = all members
     var scope = (filter && filter.scope === 'all') ? 'all' : 'mine';
     var members = (scope === 'all') ? getAllMembers() : getStewardMembers(stewardEmail);
@@ -1747,6 +1777,9 @@ var DataService = (function () {
     var config = ConfigReader.getConfig();
     var autoSubject = config.orgAbbrev + ' - Message from your ' + config.stewardLabel;
     var subject = (customSubject && String(customSubject).trim()) ? String(customSubject).trim() : autoSubject;
+    // T6-1: Sanitize subject and message for formula injection
+    subject = typeof escapeForFormula === 'function' ? escapeForFormula(subject) : subject;
+    message = typeof escapeForFormula === 'function' ? escapeForFormula(message) : message;
 
     for (var i = 0; i < filtered.length; i++) {
       try {
@@ -1755,7 +1788,7 @@ var DataService = (function () {
       } catch (e) {
         failedCount++;
         failures.push({ email: filtered[i].email, error: e.message });
-        log_('sendBroadcastMessage', 'Broadcast send error for ' + filtered[i].email + ': ' + e.message);
+        log_('sendBroadcastMessage', 'Broadcast send error for ' + maskEmail(filtered[i].email) + ': ' + e.message);
       }
     }
 
@@ -2468,7 +2501,7 @@ var DataService = (function () {
     if (idemKey) {
       var idemCache = CacheService.getScriptCache();
       if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
-      idemCache.put('IDEM_' + idemKey, '1', 300);
+      idemCache.put('IDEM_' + idemKey, '1', 600); // 10-minute TTL to reduce duplicate mutation risk
     }
     if (!stewardEmail || !title) return { success: false, message: 'Missing fields.' };
     // If assignToEmail is provided and caller is chief steward, assign to that steward
@@ -2483,6 +2516,9 @@ var DataService = (function () {
     var id = 'ST_' + Date.now().toString(36);
     sheet.appendRow([id, ownerEmail, escapeForFormula(title.substring(0, 200)), escapeForFormula((description || '').substring(0, 500)), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
     _invalidateSheetCache(SHEETS.STEWARD_TASKS);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('TASK_CREATED', { taskId: id, owner: ownerEmail, createdBy: stewardEmail });
+    }
     return { success: true, message: 'Task created.', taskId: id };
   }
 
@@ -2540,6 +2576,9 @@ var DataService = (function () {
         if (updates.title)    sheet.getRange(i + 1, 3).setValue(escapeForFormula(updates.title.substring(0, 200)));
         if (updates.dueDate !== undefined) sheet.getRange(i + 1, 8).setValue(updates.dueDate || '');
         _invalidateSheetCache(SHEETS.STEWARD_TASKS);
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('TASK_UPDATED', { taskId: taskId, updatedBy: stewardEmail, fields: Object.keys(updates) });
+        }
         return { success: true };
       }
     }
@@ -2561,6 +2600,9 @@ var DataService = (function () {
         sheet.getRange(i + 1, 7).setValue('completed');
         sheet.getRange(i + 1, 10).setValue(new Date());
         _invalidateSheetCache(SHEETS.STEWARD_TASKS);
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('TASK_COMPLETED', { taskId: taskId, completedBy: stewardEmail });
+        }
         return { success: true };
       }
     }
@@ -2601,6 +2643,10 @@ var DataService = (function () {
     ]);
     _invalidateSheetCache(SHEETS.STEWARD_TASKS);
     if (typeof logAuditEvent === 'function') logAuditEvent('MEMBER_TASK_CREATED', 'Task ' + id + ' assigned to ' + memberEmail + ' by ' + stewardEmail);
+    // v4.51.1: Notify member of task assignment (BUG-12-004)
+    if (typeof pushNotification === 'function') {
+      try { pushNotification(memberEmail.toLowerCase().trim(), { title: 'New task assigned: ' + title.substring(0, 100), body: (desc || '').substring(0, 200), type: 'task' }); } catch (_) { /* non-critical */ }
+    }
     return { success: true, message: 'Task assigned to member.', taskId: id };
   }
 
@@ -3713,41 +3759,7 @@ var DataService = (function () {
     };
   }
 
-  /**
-   * Returns feedback items submitted by a specific user, newest first.
-   * @param {string} email
-   * @returns {Object[]} Array of feedback records
-   */
-  function getMyFeedback(email) {
-    if (!email) return [];
-    email = String(email).trim().toLowerCase();
-
-    var ss = _getSS();
-    if (!ss) return [];
-    var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
-    if (!sheet || sheet.getLastRow() <= 1) return [];
-
-    var data = sheet.getDataRange().getValues();
-    var items = [];
-    for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(col_(data[i], FEEDBACK_COLS.SUBMITTED_BY)).trim().toLowerCase();
-      if (rowEmail !== email) continue;
-
-      var ts = col_(data[i], FEEDBACK_COLS.TIMESTAMP);
-      items.push({
-        date: ts instanceof Date ? _formatDate(ts) : String(ts || ''),
-        category: String(col_(data[i], FEEDBACK_COLS.CATEGORY) || ''),
-        type: String(col_(data[i], FEEDBACK_COLS.TYPE) || ''),
-        priority: String(col_(data[i], FEEDBACK_COLS.PRIORITY) || ''),
-        title: String(col_(data[i], FEEDBACK_COLS.TITLE) || ''),
-        description: String(col_(data[i], FEEDBACK_COLS.DESCRIPTION) || ''),
-        status: String(col_(data[i], FEEDBACK_COLS.STATUS) || 'New'),
-        resolution: String(col_(data[i], FEEDBACK_COLS.RESOLUTION) || ''),
-      });
-    }
-    items.reverse(); // newest first
-    return items;
-  }
+  // getMyFeedback removed v4.52.0 (Feedback sheet removed)
 
   // ═══════════════════════════════════════
   // NOTE v4.24.0: Legacy FlashPolls functions (getActivePolls, submitPollVote, addPoll)
@@ -3809,7 +3821,7 @@ var DataService = (function () {
     if (idemKey) {
       var idemCache = CacheService.getScriptCache();
       if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
-      idemCache.put('IDEM_' + idemKey, '1', 300);
+      idemCache.put('IDEM_' + idemKey, '1', 600); // 10-minute TTL to reduce duplicate mutation risk
     }
     if (!stewardEmail || !minutesData || !minutesData.title) {
       return { success: false, message: 'Missing required fields.' };
@@ -4123,12 +4135,23 @@ var DataService = (function () {
         if (rowEmail !== email) continue;
         var meetingDate = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DATE);
         var checkinTime = col_(data[i], MEETING_CHECKIN_COLS.CHECKIN_TIME);
+        var rawDuration = col_(data[i], MEETING_CHECKIN_COLS.MEETING_DURATION);
+        var durationStr = rawDuration ? String(rawDuration) : null;
+        if (durationStr && !isNaN(parseFloat(durationStr))) {
+          var hrs = parseFloat(durationStr);
+          durationStr = hrs === 1 ? '1 hour' : hrs + ' hours';
+        }
         meetings.push({
           meetingId: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_ID) || ''),
           meetingName: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_NAME) || ''),
           meetingDate: meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || ''),
           meetingType: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_TYPE) || ''),
           checkinTime: checkinTime instanceof Date ? _formatDate(checkinTime) : String(checkinTime || ''),
+          duration: durationStr,
+          notesUrl: String(col_(data[i], MEETING_CHECKIN_COLS.NOTES_DOC_URL) || '') || null,
+          agendaUrl: String(col_(data[i], MEETING_CHECKIN_COLS.AGENDA_DOC_URL) || '') || null,
+          minutesTitle: null,
+          minutesBullets: null,
         });
       }
       meetings.reverse(); // newest first
@@ -4177,7 +4200,7 @@ var DataService = (function () {
   }
 
   // ═══════════════════════════════════════
-  // Satisfaction & Feedback (v4.18.0)
+  // Satisfaction (v4.18.0)
   // ═══════════════════════════════════════
 
   /**
@@ -4226,53 +4249,7 @@ var DataService = (function () {
     }
   }
 
-  /**
-   * Submits feedback from a member.
-   * @param {string} email - Submitter email
-   * @param {Object} data - { category, type, priority, title, description }
-   * @returns {Object} { success, message }
-   */
-  function submitFeedback(email, feedbackData, idemKey) {
-    if (idemKey) {
-      var idemCache = CacheService.getScriptCache();
-      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
-      idemCache.put('IDEM_' + idemKey, '1', 300);
-    }
-    try {
-      if (!email || !feedbackData || !feedbackData.title) {
-        return { success: false, message: 'Missing required fields.' };
-      }
-      email = String(email).trim().toLowerCase();
-
-      var ss = _getSS();
-      if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
-      var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
-      if (!sheet) return { success: false, message: 'Feedback sheet not found.' };
-
-      var row = [
-        new Date(),
-        email,
-        String(feedbackData.category || 'General').substring(0, 100),
-        // TYPE column removed v4.24.1 — Category covers same ground
-        String(feedbackData.priority || 'Medium').substring(0, 20),
-        String(feedbackData.title).substring(0, 200),
-        String(feedbackData.description || '').substring(0, 2000),
-        'New',
-        '',
-        '',
-        '',
-      ];
-      sheet.appendRow(row);
-
-      if (typeof logAuditEvent === 'function') {
-        logAuditEvent('FEEDBACK_SUBMITTED', { email: email, title: feedbackData.title.substring(0, 100) });
-      }
-      return { success: true, message: 'Feedback submitted.' };
-    } catch (_e) {
-      log_('submitFeedback error', _e.message);
-      return { success: false, message: 'Failed to submit feedback.' };
-    }
-  }
+  // submitFeedback removed v4.52.0 (Feedback sheet removed)
 
   // ═══════════════════════════════════════
   // PAGINATED MEMBERS — server-side pagination for large member directories
@@ -4800,14 +4777,29 @@ var DataService = (function () {
     // Exclude the sender from the recipient list
     unitMembers = unitMembers.filter(function(m) { return m.email.toLowerCase() !== senderEmail.toLowerCase(); });
     if (unitMembers.length === 0) return { success: false, sentCount: 0, failedCount: 0, message: 'No members found in unit.' };
-    var subj = (subject && subject.trim()) ? subject.trim() : (senderName + ' \u2014 ' + unit + ' Update');
+
+    // v4.51.1: Rate limiting — max 3 broadcasts per leader per hour (BUG-11-001)
+    var rateKey = 'BROADCAST_RATE_' + senderEmail.toLowerCase().trim();
+    var cache = CacheService.getScriptCache();
+    var rateCount = parseInt(cache.get(rateKey) || '0', 10);
+    if (rateCount >= 3) {
+      return { success: false, sentCount: 0, failedCount: 0, message: 'Broadcast rate limit reached (3 per hour). Please try again later.' };
+    }
+    cache.put(rateKey, String(rateCount + 1), 3600);
+
+    // v4.51.1: Sanitize subject and message for formula injection (BUG-11-003)
+    var safeSubj = escapeForFormula((subject && subject.trim()) ? subject.trim() : (senderName + ' \u2014 ' + unit + ' Update'));
+    var safeMessage = escapeForFormula(message.trim());
     var sentCount = 0, failedCount = 0;
     for (var j = 0; j < unitMembers.length; j++) {
-      try {
-        MailApp.sendEmail({ to: unitMembers[j].email, subject: subj, body: message.trim(), replyTo: senderEmail });
+      // v4.51.1: Use safeSendEmail_ for quota protection (BUG-11-001)
+      var sendResult = typeof safeSendEmail_ === 'function'
+        ? safeSendEmail_({ to: unitMembers[j].email, subject: safeSubj, body: safeMessage, replyTo: senderEmail })
+        : (function() { try { MailApp.sendEmail({ to: unitMembers[j].email, subject: safeSubj, body: safeMessage, replyTo: senderEmail }); return { success: true }; } catch (e) { return { success: false, error: e.message }; } })();
+      if (sendResult && sendResult.success) {
         sentCount++;
-      } catch (_e) {
-        log_('sendUnitBroadcast', 'Unit broadcast send failed for ' + unitMembers[j].email + ': ' + (_e.message || _e));
+      } else {
+        secureLog('sendUnitBroadcast', 'send failed', { email: unitMembers[j].email, error: (sendResult && sendResult.error) || 'unknown' });
         failedCount++;
       }
     }
@@ -4870,6 +4862,9 @@ var DataService = (function () {
     setCol_(row, NMC_COLS.CATEGORY, escapeForFormula(contactData.category || 'Other'));
     setCol_(row, NMC_COLS.NOTES, escapeForFormula(contactData.notes || ''));
     sheet.appendRow(row);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('NMC_CREATED', { contactId: contactId });
+    }
     return { success: true, contactId: contactId };
   }
 
@@ -4898,6 +4893,9 @@ var DataService = (function () {
     if (updateData.phone !== undefined)        sheet.getRange(rowIdx, NMC_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
     if (updateData.category !== undefined)     sheet.getRange(rowIdx, NMC_COLS.CATEGORY).setValue(escapeForFormula(updateData.category));
     if (updateData.notes !== undefined)        sheet.getRange(rowIdx, NMC_COLS.NOTES).setValue(escapeForFormula(updateData.notes));
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('NMC_UPDATED', { contactId: contactId, fields: Object.keys(updateData) });
+    }
     return { success: true };
   }
 
@@ -4912,6 +4910,9 @@ var DataService = (function () {
     for (var i = 0; i < ids.length; i++) {
       if (String(ids[i][0]).trim() === contactId) {
         sheet.deleteRow(i + 2);
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('NMC_DELETED', { contactId: contactId });
+        }
         return { success: true };
       }
     }
@@ -4975,8 +4976,7 @@ var DataService = (function () {
     completeMemberTask: completeMemberTask,
     stewardCompleteMemberTask: stewardCompleteMemberTask,
     getStewardAssignedMemberTasks: getStewardAssignedMemberTasks,
-    // v4.17.0 - Feedback, Minutes (Polls removed v4.24.0 — use wq* wrappers)
-    getMyFeedback: getMyFeedback,
+    // v4.17.0 - Minutes (Polls removed v4.24.0 — use wq* wrappers)
     getMeetingMinutes: getMeetingMinutes,
     addMeetingMinutes: addMeetingMinutes,
     // v4.18.0 - Performance, Checklists, Meetings, Satisfaction, Feedback
@@ -4988,7 +4988,6 @@ var DataService = (function () {
     getMemberMeetings: getMemberMeetings,
     getMeetingStats: getMeetingStats,
     getSatisfactionTrends: getSatisfactionTrends,
-    submitFeedback: submitFeedback,
     // Perf: batch + cache
     getBatchData: getBatchData,
     getBadgeCounts: getBadgeCounts,

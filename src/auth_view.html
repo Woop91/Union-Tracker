@@ -540,8 +540,8 @@ function showAuthPIN(container) {
 
   function doSubmit() {
     var pin = pinInput.value.trim();
-    if (!pin || !/^\d{4,6}$/.test(pin)) {
-      statusMsg.textContent = 'Enter a 4\u20136 digit PIN.';
+    if (!pin || !/^\d{6}$/.test(pin)) {
+      statusMsg.textContent = 'Enter your 6-digit PIN.';
       statusMsg.style.color = '#dc2626';
       return;
     }

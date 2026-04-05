@@ -373,7 +373,6 @@ function showCurrentTabModal() {
       showTabModalMemberDirectory: typeof showTabModalMemberDirectory === 'function' ? showTabModalMemberDirectory : null,
       showTabModalGrievanceLog: typeof showTabModalGrievanceLog === 'function' ? showTabModalGrievanceLog : null,
       showTabModalCaseChecklist: typeof showTabModalCaseChecklist === 'function' ? showTabModalCaseChecklist : null,
-      showTabModalFeedback: typeof showTabModalFeedback === 'function' ? showTabModalFeedback : null,
       showTabModalVolunteerHours: typeof showTabModalVolunteerHours === 'function' ? showTabModalVolunteerHours : null,
       showTabModalMeetingAttendance: typeof showTabModalMeetingAttendance === 'function' ? showTabModalMeetingAttendance : null,
       showTabModalMeetingCheckIn: typeof showTabModalMeetingCheckIn === 'function' ? showTabModalMeetingCheckIn : null,
@@ -1922,7 +1921,7 @@ function showHelpDialog() {
         </div>
 
         <div class="version">
-          Dashboard v${VERSION_INFO.CURRENT} (${VERSION_INFO.BUILD_DATE}) | ${VERSION_INFO.CODENAME}
+          Dashboard v${VERSION_INFO.CURRENT} (${VERSION_INFO.BUILD_DATE}) | ${VERSION_INFO.codename}
         </div>
       </div>
 

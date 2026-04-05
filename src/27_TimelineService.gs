@@ -431,19 +431,26 @@ var TimelineService = (function () {
       try { namesArr.push(DriveApp.getFileById(idsArr[f]).getName()); }
       catch (_e) { namesArr.push('Unknown'); }
     }
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] === eventId) {
-        var existingIds = String(data[i][6] || '');
-        var existingNames = String(data[i][7] || '');
-        sheet.getRange(i + 1, 7).setValue(existingIds ? existingIds + ',' + idsArr.join(',') : idsArr.join(','));
-        sheet.getRange(i + 1, 8).setValue(existingNames ? existingNames + ',' + namesArr.join(',') : namesArr.join(','));
-        sheet.getRange(i + 1, 12).setValue(new Date());
-        logAuditEvent('TIMELINE_FILES_ATTACHED', idsArr.length + ' files attached to event ' + eventId);
-        return { success: true, filesAttached: idsArr.length };
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) return { success: false, message: 'Server busy.' };
+    try {
+      var data = sheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] === eventId) {
+          var existingIds = String(data[i][6] || '');
+          var existingNames = String(data[i][7] || '');
+          sheet.getRange(i + 1, 7).setValue(existingIds ? existingIds + ',' + idsArr.join(',') : idsArr.join(','));
+          sheet.getRange(i + 1, 8).setValue(existingNames ? existingNames + ',' + namesArr.join(',') : namesArr.join(','));
+          sheet.getRange(i + 1, 12).setValue(new Date());
+          _cacheInvalidate();
+          logAuditEvent('TIMELINE_FILES_ATTACHED', idsArr.length + ' files attached to event ' + eventId);
+          return { success: true, filesAttached: idsArr.length };
+        }
       }
+      return { success: false, message: 'Event not found.' };
+    } finally {
+      lock.releaseLock();
     }
-    return { success: false, message: 'Event not found.' };
   }
 
   /**

@@ -1406,6 +1406,13 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
     if (!/^\d{6}$/.test(pin)) {
       return { success: false, message: 'PIN must be exactly 6 digits.' };
     }
+    // v4.51.1: PIN strength validation — reject trivially guessable patterns
+    var weakPins = ['000000', '111111', '222222', '333333', '444444', '555555',
+      '666666', '777777', '888888', '999999', '123456', '654321', '012345', '234567',
+      '345678', '456789', '567890', '098765', '987654', '876543', '765432'];
+    if (weakPins.indexOf(pin) !== -1) {
+      return { success: false, message: 'PIN is too common. Please choose a less predictable PIN.' };
+    }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return { success: false, message: 'System error.' };
     var mSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -1646,15 +1653,21 @@ function devRequestPINReset(email) {
     return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
   }
 
-  // Generate new PIN, hash, and store
+  // Generate new PIN and hash it
   var newPin = generateMemberPIN();
   var hashedPin = hashPIN(newPin, memberId);
-  sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
+
+  // Save old PIN hash so we can restore on email failure
+  var pinCell = sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN);
+  var oldHash = pinCell.getValue();
+
+  // Write new hash
+  pinCell.setValue(hashedPin);
 
   // Clear any lockout
   try { if (typeof clearPINAttempts === 'function') clearPINAttempts(memberId); } catch (_) {}
 
-  // Send email with new PIN
+  // Send email with new PIN — if delivery fails, restore old hash
   var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Your Union') : 'Your Union';
   try {
     if (orgName === 'Your Union' && typeof ConfigReader !== 'undefined') {
@@ -1671,10 +1684,21 @@ function devRequestPINReset(email) {
     'For security, please memorize this PIN — it will not be shown again.\n\n' +
     '— ' + orgName;
 
+  var emailSent = false;
   try {
     GmailApp.sendEmail(email, subject, body);
+    emailSent = true;
   } catch (_gmailErr) {
-    try { MailApp.sendEmail(email, subject, body); } catch (_) {}
+    try {
+      MailApp.sendEmail(email, subject, body);
+      emailSent = true;
+    } catch (_) {}
+  }
+
+  if (!emailSent) {
+    // Restore old PIN hash — member keeps existing credentials
+    pinCell.setValue(oldHash);
+    return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
   }
 
   if (typeof logAuditEvent === 'function') {
@@ -1722,6 +1746,13 @@ function memberSetOwnPIN(sessionToken, pin, idemKey) {
   pin = String(pin || '').trim();
   if (!/^\d{6}$/.test(pin)) {
     return { success: false, message: 'PIN must be exactly 6 digits.' };
+  }
+  // v4.51.1: PIN strength validation — reject trivially guessable patterns
+  var weakPins = ['000000', '111111', '222222', '333333', '444444', '555555',
+    '666666', '777777', '888888', '999999', '123456', '654321', '012345', '234567',
+    '345678', '456789', '567890', '098765', '987654', '876543', '765432'];
+  if (weakPins.indexOf(pin) !== -1) {
+    return { success: false, message: 'PIN is too common. Please choose a less predictable PIN.' };
   }
 
   // ── Find member row ───────────────────────────────────────────────────────

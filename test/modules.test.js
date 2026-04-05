@@ -83,16 +83,11 @@ describe('Satisfaction Q9 mapping', () => {
 // ============================================================================
 
 describe('Sheet reordering', () => {
-  test('SHEETS does not have INTERACTIVE property (removed in bug fix)', () => {
-    expect(SHEETS.INTERACTIVE).toBeUndefined();
-  });
-
   test('required sheets for reordering exist in SHEETS constant', () => {
     expect(SHEETS.GETTING_STARTED).toBeDefined();
     expect(SHEETS.FAQ).toBeDefined();
     expect(SHEETS.MEMBER_DIR).toBeDefined();
     expect(SHEETS.GRIEVANCE_LOG).toBeDefined();
-    expect(SHEETS.FEEDBACK).toBeDefined();
   });
 });
 

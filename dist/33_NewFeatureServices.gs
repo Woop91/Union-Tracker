@@ -336,6 +336,38 @@ var CommunicationLogService = (function () {
     return { success: true, id: id };
   }
 
+  function updateCommunication(stewardEmail, entryId, updates) {
+    if (!entryId || !updates) return { success: false, message: 'Missing data.' };
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+    var sheet = ss.getSheetByName(SHEETS.COMMUNICATION_LOG);
+    if (!sheet) return { success: false, message: 'Communication log not found.' };
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === entryId) {
+        // Only the original steward can edit their own entries
+        if (String(data[i][2]).trim().toLowerCase() !== stewardEmail.toLowerCase().trim()) {
+          return { success: false, message: 'You can only edit your own entries.' };
+        }
+        if (updates.type !== undefined) sheet.getRange(i + 1, 4).setValue(updates.type);
+        if (updates.subject !== undefined) {
+          var safeSub = typeof escapeForFormula === 'function' ? escapeForFormula(updates.subject) : updates.subject;
+          sheet.getRange(i + 1, 5).setValue(safeSub);
+        }
+        if (updates.notes !== undefined) {
+          var safeNotes = typeof escapeForFormula === 'function' ? escapeForFormula(updates.notes) : updates.notes;
+          sheet.getRange(i + 1, 6).setValue(safeNotes);
+        }
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('COMMUNICATION_LOG_UPDATED', { entryId: entryId, fields: Object.keys(updates).join(','), updatedBy: stewardEmail });
+        }
+        return { success: true, message: 'Entry updated.' };
+      }
+    }
+    return { success: false, message: 'Entry not found.' };
+  }
+
   function getCommunicationLog(memberEmail) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return [];
@@ -385,6 +417,7 @@ var CommunicationLogService = (function () {
   return {
     initSheet: initSheet,
     logCommunication: logCommunication,
+    updateCommunication: updateCommunication,
     getCommunicationLog: getCommunicationLog,
     getStewardCommunicationSummary: getStewardCommunicationSummary
   };
@@ -419,15 +452,39 @@ var KnowledgeBaseService = (function () {
     if (data.length < 2) return [];
     var q = String(query).toLowerCase().trim();
     if (!q) return _getAllArticles(data);
-    var results = [];
+    var terms = q.split(/\s+/).filter(function(t) { return t.length > 0; });
+    var scored = [];
     for (var i = 1; i < data.length; i++) {
-      var searchable = (String(data[i][1]) + ' ' + String(data[i][2]) + ' ' +
-        String(data[i][3]) + ' ' + String(data[i][6])).toLowerCase();
-      if (searchable.indexOf(q) !== -1) {
-        results.push(_buildArticle(data[i]));
+      var title = String(data[i][2] || '').toLowerCase();
+      var summary = String(data[i][3] || '').toLowerCase();
+      var fullText = String(data[i][4] || '').toLowerCase();
+      var tags = String(data[i][6] || '').toLowerCase();
+      var articleNum = String(data[i][1] || '').toLowerCase();
+      var score = 0;
+      for (var t = 0; t < terms.length; t++) {
+        var term = terms[t];
+        // Title matches worth most
+        if (title.indexOf(term) !== -1) score += 10;
+        // Article number exact match
+        if (articleNum.indexOf(term) !== -1) score += 8;
+        // Tags match
+        if (tags.indexOf(term) !== -1) score += 5;
+        // Summary match
+        if (summary.indexOf(term) !== -1) score += 3;
+        // Full text match (least weight)
+        if (fullText.indexOf(term) !== -1) score += 1;
+      }
+      if (score > 0) {
+        var article = _buildArticle(data[i]);
+        article._score = score;
+        scored.push(article);
       }
     }
-    return results;
+    // Sort by score descending
+    scored.sort(function(a, b) { return b._score - a._score; });
+    // Remove internal score before returning
+    scored.forEach(function(a) { delete a._score; });
+    return scored;
   }
 
   function getArticle(articleId) {
@@ -552,11 +609,17 @@ var DigestService = (function () {
       if (String(data[i][0]).trim().toLowerCase() === target) {
         sheet.getRange(i + 1, 2).setValue(freq);
         sheet.getRange(i + 1, 3).setValue(safeTypes);
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('DIGEST_PREFS_UPDATED', { email: email, frequency: freq, types: safeTypes });
+        }
         return { success: true };
       }
     }
     // New entry
     sheet.appendRow([email, freq, safeTypes, '']);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('DIGEST_PREFS_UPDATED', { email: email, frequency: freq, types: safeTypes });
+    }
     return { success: true };
   }
 
@@ -654,7 +717,7 @@ var DigestService = (function () {
         sheet.getRange(i + 1, 4).setValue(now);
         sent++;
       } catch (e) {
-        log_('sendScheduledDigests', 'Digest send failed for ' + email + ': ' + e.message);
+        log_('sendScheduledDigests', 'Digest send failed for ' + maskEmail(email) + ': ' + e.message);
       }
     }
     log_('Digest service', 'sent ' + sent + ' digest email(s).');
@@ -999,6 +1062,7 @@ function dataGetMemberLeaders(sessionToken) {
 // --- Communication Log (steward-only) ---
 /** @param {string} sessionToken @param {string} memberEmail @param {string} type @param {string} subject @param {string} notes @returns {Object} Result. */
 function dataLogCommunication(sessionToken, memberEmail, type, subject, notes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return CommunicationLogService.logCommunication(s, memberEmail, type, subject, notes); }
+function dataUpdateCommunication(sessionToken, entryId, updates) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return CommunicationLogService.updateCommunication(s, entryId, updates); }
 /** @param {string} sessionToken @param {string} memberEmail @returns {Array} Communication history. */
 function dataGetCommunicationLog(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return CommunicationLogService.getCommunicationLog(memberEmail); }
 

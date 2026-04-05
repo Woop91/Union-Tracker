@@ -187,8 +187,12 @@
     var _preloadCallbacks = [];
     var _preloadViewId = CURRENT_VIEW; // stamp the view at preload request time
 
+    // T2-3: Skip preload for member-default dual-role users — the boot logic at line 1530
+    // will ignore the preloaded batch anyway because _bootRole !== CURRENT_VIEW.
+    var _skipPreload = IS_DUAL_ROLE && CURRENT_VIEW === 'steward' && PAGE_DATA.defaultView === 'member';
+
     var _batchRequestStart = Date.now();
-    if ((CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member') && CURRENT_USER && CURRENT_USER.email) {
+    if (!_skipPreload && (CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member') && CURRENT_USER && CURRENT_USER.email) {
       google.script.run
         .withSuccessHandler(function(batch) {
           // H4: Discard stale preload data if the view changed while the request was in flight
@@ -543,7 +547,7 @@
         tasks: '#f59e0b', workload: '#f97316', home: '#ff3366',
         more: '#ec4899', more_steward: '#ec4899', _steward_more: '#ec4899', _member_more: '#ec4899',
         poms: '#3b82f6', resources: '#8b5cf6', orgchart: '#06d6a0', maddsorgchart: '#1a3560', qaforum: '#f59e0b',
-        polls: '#ec4899', feedback: '#ff3366', broadcast: '#3b82f6', notifications: '#f59e0b',
+        polls: '#ec4899', broadcast: '#3b82f6', notifications: '#f59e0b',
         events: '#06d6a0', timeline: '#8b5cf6', surveytrack: '#ec4899', failsafe: '#f97316',
         testrunner: '#3b82f6', minutes: '#8b5cf6', profile: '#06d6a0', survey: '#ec4899',
         stewarddirectory: '#8b5cf6', mytasks: '#f59e0b', unionstats: '#3b82f6', meetings: '#06d6a0',
@@ -2590,16 +2594,65 @@
       var _secondaryTab = _splitEnabled ? SplitView.getSecondaryTab() : null;
       var _splitTarget = _splitEnabled ? SplitView.getTarget() : 'primary';
 
+      // Collapsible sidebar groups — persist open/closed state per group
+      var _sidebarGroupState = {};
+      try {
+        _sidebarGroupState = JSON.parse(localStorage.getItem('dds_sidebar_groups') || '{}');
+      } catch (_e) {}
+      // Default groups open on first visit (no saved state)
+      var _defaultOpen = { '': true, 'Community': true }; // '' = top items before any group
+      function _isGroupOpen(groupName) {
+        if (_sidebarGroupState.hasOwnProperty(groupName)) return _sidebarGroupState[groupName];
+        return !!_defaultOpen[groupName];
+      }
+      function _toggleGroup(groupName, container) {
+        _sidebarGroupState[groupName] = !_isGroupOpen(groupName);
+        try { localStorage.setItem('dds_sidebar_groups', JSON.stringify(_sidebarGroupState)); } catch (_e) {}
+        container.style.display = _isGroupOpen(groupName) ? '' : 'none';
+      }
+
       var tabs = _getSidebarTabs(role);
+      var currentGroupContainer = null;
+      var currentGroupName = '';
+
+      // Items before any group go into an implicit top group (always open)
+      var topContainer = el('div');
+      sidebar.appendChild(topContainer);
+      currentGroupContainer = topContainer;
+
       tabs.forEach(function(tab) {
         if (tab.divider) {
           sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
+          currentGroupContainer = null;
           return;
         }
         if (tab.group) {
-          sidebar.appendChild(el('div', { className: 'sidebar-group-label' }, tab.group));
+          currentGroupName = tab.group;
+          var isOpen = _isGroupOpen(currentGroupName);
+          var groupItems = el('div', { style: { display: isOpen ? '' : 'none' } });
+
+          var chevron = el('span', {
+            style: { fontSize: '8px', marginLeft: 'auto', transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }
+          }, '\u25B6');
+
+          var label = el('div', {
+            className: 'sidebar-group-label',
+            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', userSelect: 'none' },
+            onClick: (function(gName, gItems, chev) {
+              return function() {
+                _toggleGroup(gName, gItems);
+                chev.style.transform = _isGroupOpen(gName) ? 'rotate(90deg)' : 'rotate(0deg)';
+              };
+            })(currentGroupName, groupItems, chevron)
+          }, [el('span', null, tab.group), chevron]);
+
+          sidebar.appendChild(label);
+          sidebar.appendChild(groupItems);
+          currentGroupContainer = groupItems;
           return;
         }
+
+        // Regular tab item
         var isPrimary = tab.id === activeTab;
         var isSecondary = _splitEnabled && tab.id === _secondaryTab;
         var itemClass = 'sidebar-item' + (isPrimary ? ' active' : '') + (isSecondary ? ' active-secondary' : '');
@@ -2626,7 +2679,19 @@
           onClick: function() { _handleTabNav(role, tab.id); },
           onKeyDown: function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); } }
         }, children);
-        sidebar.appendChild(item);
+
+        // If active tab is in a collapsed group, force that group open
+        if (isPrimary && currentGroupContainer && currentGroupContainer.style.display === 'none') {
+          currentGroupContainer.style.display = '';
+          _sidebarGroupState[currentGroupName] = true;
+          try { localStorage.setItem('dds_sidebar_groups', JSON.stringify(_sidebarGroupState)); } catch (_e) {}
+        }
+
+        if (currentGroupContainer) {
+          currentGroupContainer.appendChild(item);
+        } else {
+          sidebar.appendChild(item);
+        }
       });
 
       // Split View toggle (tablet+ only — hidden on mobile via CSS)
@@ -2902,7 +2967,6 @@
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'reportcard', icon: '\uD83D\uDCCB', label: 'Report Card' },
-        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
       // v4.46.0: Leader Hub — only shown for Member Leaders
       if (IS_LEADER) {
@@ -3165,7 +3229,7 @@
           }, 'Retry'));
           container.appendChild(errCard);
         })
-        .getMemberViewHtml();
+        .getMemberViewHtml(SESSION_TOKEN);
     }
 
     function renderOrgChart(appContainer, role) {
@@ -3213,6 +3277,38 @@
                 btn.setAttribute('aria-expanded', String(!isOpen));
               };
             }
+            // Safety net: define maToggle if script re-execution failed to define it
+            if (typeof window.maToggle !== 'function') {
+              window.maToggle = function(id, showLabel, hideLabel, btn) {
+                var target = document.getElementById(id);
+                if (!target) return;
+                var isOpen = target.style.display !== 'none';
+                target.style.display = isOpen ? 'none' : 'flex';
+                if (btn) btn.textContent = isOpen ? showLabel : hideLabel;
+              };
+            }
+            // Fallback rebind: if CSP blocked inline onclick and _rebindOrgChartHandlers
+            // didn't run, manually rebind any remaining onclick handlers
+            wrap.querySelectorAll('[onclick]').forEach(function(el2) {
+              var raw2 = el2.getAttribute('onclick');
+              if (!raw2) return;
+              el2.removeAttribute('onclick');
+              el2.addEventListener('click', function(ev2) {
+                var fnRe2 = /([\w.]+)\(([^)]*)\)/g, m2;
+                while ((m2 = fnRe2.exec(raw2)) !== null) {
+                  if (m2[1] === 'event.stopPropagation') { ev2.stopPropagation(); continue; }
+                  var fn2 = m2[1].split('.').reduce(function(o, k) { return o && o[k]; }, window);
+                  if (typeof fn2 !== 'function') continue;
+                  var args2 = m2[2] ? m2[2].split(',').map(function(s) {
+                    s = s.trim();
+                    if (s === 'this') return el2;
+                    if (s === 'event') return ev2;
+                    return s.replace(/^['"]|['"]$/g, '');
+                  }) : [];
+                  fn2.apply(null, args2);
+                }
+              });
+            });
             // Safety net: ensure org chart init runs even if DOMContentLoaded already fired
             if (typeof window.initDesktop === 'function') {
               try { window.initDesktop(); } catch (_e) { /* already ran or not available */ }
@@ -3271,6 +3367,28 @@
             if (typeof window.agencyOC_init === 'function') {
               try { window.agencyOC_init(); } catch (_e) { /* already ran */ }
             }
+            // Fallback rebind: if CSP blocked inline onclick and _rebindOCHandlers
+            // didn't run, manually rebind any remaining onclick handlers
+            wrap.querySelectorAll('[onclick]').forEach(function(el2) {
+              var raw2 = el2.getAttribute('onclick');
+              if (!raw2) return;
+              el2.removeAttribute('onclick');
+              el2.addEventListener('click', function(ev2) {
+                var fnRe2 = /([\w.]+)\(([^)]*)\)/g, m2;
+                while ((m2 = fnRe2.exec(raw2)) !== null) {
+                  if (m2[1] === 'event.stopPropagation') { ev2.stopPropagation(); continue; }
+                  var fn2 = window[m2[1]];
+                  if (typeof fn2 !== 'function') continue;
+                  var args2 = m2[2] ? m2[2].split(',').map(function(s) {
+                    s = s.trim();
+                    if (s === 'this') return el2;
+                    if (s === 'event') return ev2;
+                    return s.replace(/^[\s'"]+|[\s'"]+$/g, '');
+                  }) : [];
+                  fn2.apply(null, args2);
+                }
+              });
+            });
           })
           .withFailureHandler(function(err) {
             container.innerHTML = '';
@@ -3361,7 +3479,7 @@
 
     // Tabs that must always re-render (forms, mutation state, must be fresh)
     // v4.44.0: notifications removed — now cached with on-demand refresh button
-    var _ALWAYS_FRESH_TABS = { feedback: 1, profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
+    var _ALWAYS_FRESH_TABS = { profile: 1, broadcast: 1, failsafe: 1, testrunner: 1 };
 
     /** Invalidate cached tab pane(s) — call after data mutations */
     function _invalidateTabCache(tabId) {
@@ -3698,7 +3816,6 @@
           case 'notifications': return renderMemberNotifications;
           case 'meetings': return renderMeetingsPage;
           case 'minutes': return renderMinutesPage;
-          case 'feedback': return function(a) { renderFeedbackPage(a, 'member'); };
           case 'mytasks': return renderMemberTasks;
           case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
           case 'timeline': return renderMemberTimelinePage;
@@ -3727,7 +3844,6 @@
           case 'tasks': return renderStewardTasks;
           case 'events': return renderEventsPage;
           case 'minutes': return renderStewardMinutes;
-          case 'feedback': return function(a) { renderFeedbackPage(a, 'steward'); };
           case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
           case 'timeline': return renderStewardTimelinePage;
           case 'mentorship': return renderMentorshipPage;
@@ -4355,6 +4471,7 @@
           ['k', 'Previous item in list'],
           ['Enter', 'Open focused card'],
           ['Esc', 'Close modal / overlay'],
+          ['Ctrl+Enter', 'Submit form'],
           ['?', 'Show this help']
         ];
 
@@ -4408,6 +4525,18 @@
       document.addEventListener('keydown', function(e) {
         // Skip if user is typing in input/textarea/contenteditable
         var tag = (e.target.tagName || '').toLowerCase();
+        // Ctrl+Enter: submit active form
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          var focused = document.activeElement;
+          if (focused && (focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT')) {
+            var form = focused.closest('.modal-body, .form-container, [data-form], .content, .card, .member-detail-panel, .comm-log-panel');
+            if (form) {
+              var submitBtn = form.querySelector('.btn-primary, button[type="submit"]');
+              if (submitBtn && !submitBtn.disabled) { submitBtn.click(); e.preventDefault(); }
+            }
+          }
+          return;
+        }
         if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
           // Only handle Escape in inputs
           if (e.key === 'Escape') e.target.blur();

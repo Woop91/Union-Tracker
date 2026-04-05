@@ -411,6 +411,11 @@ function _sanitizeConfig(config) {
     insightsCacheTTLMin: config.insightsCacheTTLMin || 5,
     issueCategories: (typeof DEFAULT_CONFIG !== 'undefined' && Array.isArray(DEFAULT_CONFIG.ISSUE_CATEGORY)) ? DEFAULT_CONFIG.ISSUE_CATEGORY : [],
     showGrievances: _isGrievancesEnabled(),
+    // v4.51.1: Feature flags — detect at runtime whether org-specific files exist in the dist.
+    // SolidBase excludes 25_WorkloadService.gs, poms_reference.html, and agency_org_chart.html.
+    hasWorkloadService: typeof WorkloadService !== 'undefined',
+    hasPOMSReference: (function() { try { HtmlService.createHtmlOutputFromFile('poms_reference'); return true; } catch (_) { return false; } })(),
+    hasAgencyOrgChart: (function() { try { HtmlService.createHtmlOutputFromFile('agency_org_chart'); return true; } catch (_) { return false; } })(),
   };
 }
 
@@ -800,14 +805,18 @@ function include(filename) {
  * For dual-role users (steward + member), member_view.html is NOT included
  * in the initial template to stay under the GAS ~820KB HtmlOutput limit.
  * Loaded on-demand when the user switches to member view.
+ * @param {string} sessionToken - Session token for auth validation
  * @returns {string} Raw HTML content (<script> block defining member view functions)
  */
-function getMemberViewHtml() {
+function getMemberViewHtml(sessionToken) {
   try {
-    // No auth check needed — user already authenticated via doGet().
-    // Session.getActiveUser().getEmail() returns empty for magic-link/session-token
-    // users (Execute-as-Me), which was causing this to return '' and silently
-    // breaking the member view switch for dual-role users.
+    // Auth guard: verify caller is authenticated before returning HTML.
+    // _resolveCallerEmail tries SSO first, falls back to session token.
+    var email = _resolveCallerEmail(sessionToken);
+    if (!email) {
+      log_('getMemberViewHtml', 'Auth failed — no valid session');
+      return '';
+    }
     // No CacheService — member_view.html exceeds the 100KB per-key limit.
     return HtmlService.createHtmlOutputFromFile('member_view').getContent();
   } catch (e) {

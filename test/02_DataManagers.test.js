@@ -1348,3 +1348,107 @@ describe('applyFieldUpdates_ helper', () => {
     expect(col_(row, MEMBER_COLS.LAST_NAME)).toBe('ORIGINAL');
   });
 });
+
+// ============================================================================
+// T1-2b: bulkUpdateGrievanceStatus previous-status audit
+// ============================================================================
+
+describe('bulkUpdateGrievanceStatus audit enrichment', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+    global.checkWebAppAuthorization = jest.fn(() => ({
+      isAuthorized: true,
+      email: 'steward@test.com',
+      role: 'steward'
+    }));
+    global.withScriptLock_ = jest.fn(fn => fn());
+  });
+
+  test('audit entry includes previousStatuses map', () => {
+    var headers = new Array(41).fill('');
+    headers[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headers[GRIEVANCE_COLS.STATUS - 1] = 'Status';
+    headers[GRIEVANCE_COLS.LAST_UPDATED - 1] = 'Last Updated';
+    headers[GRIEVANCE_COLS.RESOLUTION - 1] = 'Resolution';
+
+    var row1 = new Array(41).fill('');
+    row1[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-001';
+    row1[GRIEVANCE_COLS.STATUS - 1] = 'Open';
+
+    var row2 = new Array(41).fill('');
+    row2[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-002';
+    row2[GRIEVANCE_COLS.STATUS - 1] = 'Step II';
+
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [headers, row1, row2]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    // Mock resolveColumnsByHeader_ to return fallback columns
+    global.resolveColumnsByHeader_ = jest.fn(function(_sheet, cols) {
+      var result = {};
+      cols.forEach(function(c) { result[c.key] = c.fallback; });
+      return result;
+    });
+
+    bulkUpdateGrievanceStatus(['GRV-001', 'GRV-002'], 'Closed', '');
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      'BULK_STATUS_UPDATE',
+      expect.objectContaining({
+        previousStatuses: expect.objectContaining({
+          'GRV-001': 'Open',
+          'GRV-002': 'Step II'
+        }),
+        newStatus: 'Closed',
+        updatedCount: 2
+      })
+    );
+  });
+});
+
+// ============================================================================
+// T2-1: bulkUpdateGrievanceStatus zero-count handling
+// ============================================================================
+
+describe('bulkUpdateGrievanceStatus zero-count handling', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+    global.checkWebAppAuthorization = jest.fn(() => ({
+      isAuthorized: true,
+      email: 'steward@test.com',
+      role: 'steward'
+    }));
+    global.withScriptLock_ = jest.fn(fn => fn());
+  });
+
+  test('returns success:false when no grievances matched', () => {
+    var headers = new Array(41).fill('');
+    headers[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headers[GRIEVANCE_COLS.STATUS - 1] = 'Status';
+    headers[GRIEVANCE_COLS.LAST_UPDATED - 1] = 'Last Updated';
+    headers[GRIEVANCE_COLS.RESOLUTION - 1] = 'Resolution';
+
+    var row1 = new Array(41).fill('');
+    row1[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-001';
+    row1[GRIEVANCE_COLS.STATUS - 1] = 'Open';
+
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [headers, row1]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    global.resolveColumnsByHeader_ = jest.fn(function(_sheet, cols) {
+      var result = {};
+      cols.forEach(function(c) { result[c.key] = c.fallback; });
+      return result;
+    });
+
+    // Pass IDs that don't exist in the sheet
+    var result = bulkUpdateGrievanceStatus(['GRV-NONEXISTENT'], 'Closed', '');
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('No matching');
+    expect(logAuditEvent).not.toHaveBeenCalled();
+  });
+});

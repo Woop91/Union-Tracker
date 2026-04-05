@@ -49,21 +49,18 @@ describe('EngagementService.computeScoreForMember', () => {
     expect(result.email).toBe('user@test.com');
     expect(result.scores).toBeDefined();
     expect(typeof result.composite).toBe('number');
-    // Survey defaults to 50 when no survey data, workload defaults to 50
-    expect(result.scores.survey).toBe(50);
-    expect(result.scores.workload).toBe(50);
-    // QA with no data should be 0
+    // All dimensions default to 0 when no data (consistent defaults)
+    expect(result.scores.survey).toBe(0);
+    expect(result.scores.workload).toBe(0);
     expect(result.scores.qa).toBe(0);
-    // Contact with no data should be 0
     expect(result.scores.contact).toBe(0);
-    // Meeting with 0 totalMeetings90d defaults to 50
-    expect(result.scores.meeting).toBe(50);
+    expect(result.scores.meeting).toBe(0);
   });
 
   test('returns default scores with null cachedData', () => {
     var result = EngagementService.computeScoreForMember('user@test.com', null);
     expect(result).toBeDefined();
-    expect(result.scores.survey).toBe(50);
+    expect(result.scores.survey).toBe(0);
   });
 
   test('computes survey score from survey data', () => {
@@ -155,10 +152,9 @@ describe('EngagementService.computeScoreForMember', () => {
   });
 
   test('composite score is weighted average', () => {
-    // With all defaults (survey=50, meeting=50, qa=0, workload=50, contact=0):
-    // composite = (50*25 + 50*25 + 0*15 + 50*15 + 0*20) / 100 = (1250+1250+0+750+0)/100 = 33
+    // With all defaults at 0: composite = 0
     var result = EngagementService.computeScoreForMember('user@test.com', {});
-    expect(result.composite).toBe(33); // (1250+1250+750)/100 = 32.5 rounds to 33
+    expect(result.composite).toBe(0);
   });
 
   test('handles email case-insensitivity', () => {

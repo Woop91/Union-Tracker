@@ -112,7 +112,7 @@ var Auth = (function () {
 
     // Validate email exists in directory
     step = 'lookup';
-    log_('Auth.sendMagicLink STEP 0', 'looking up ' + email + ' in Member Directory');
+    secureLog('Auth.sendMagicLink STEP 0', 'looking up member in directory', { email: email });
     var userRecord = DataService.findUserByEmail(email);
     if (!userRecord) {
       log_('Auth.sendMagicLink', 'email not found in directory — returning generic message');
@@ -123,7 +123,7 @@ var Auth = (function () {
     }
 
     step = 'config';
-    log_('Auth.sendMagicLink STEP 1', 'user found, building token for ' + email);
+    secureLog('Auth.sendMagicLink STEP 1', 'user found, building token', { email: email });
     // ConfigReader.getConfig() can throw if its CacheService cache expired and
     // getActiveSpreadsheet() returns null in certain web app execution contexts.
     // Magic link emails only need a few config fields — fall back to safe defaults
@@ -170,7 +170,7 @@ var Auth = (function () {
     var htmlBody = _buildEmailHtml(config, signInUrl, email);
 
     step = 'send';
-    log_('Auth.sendMagicLink STEP 4', 'attempting email send to ' + email);
+    secureLog('Auth.sendMagicLink STEP 4', 'attempting email send', { email: email });
 
     return _sendMagicLinkEmail(email, subject, htmlBody, config.orgName);
     } catch (outerErr) {

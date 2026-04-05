@@ -139,8 +139,23 @@ function _memberHeader(container, title, subtitle) {
     if (IS_DUAL_ROLE) {
       headerRight.appendChild(el('button', {
         style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
-        onClick: function() { _invalidateTabCache(); _activePane = null; _layoutCache = {}; _tabPanesRole = null; AppState.activeRole = 'steward'; AppState.activeTab = 'cases'; var _app = document.getElementById('app'); try { initStewardView(_app); } catch(e) { console.error('Switch to steward error:', e); _app.innerHTML = ''; _app.appendChild(el('div', { style: { textAlign: 'center', padding: '40px' } }, [el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'), el('div', { style: { fontWeight: '600', marginBottom: '8px' } }, 'Failed to switch view'), el('button', { style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' }, onClick: function() { location.reload(); } }, 'Reload')])); } }
+        onClick: function() { _invalidateTabCache(); _activePane = null; _layoutCache = {}; _tabPanesRole = null; AppState.batchData = null; AppState.activeRole = 'steward'; AppState.activeTab = 'cases'; var _app = document.getElementById('app'); try { initStewardView(_app); } catch(e) { console.error('Switch to steward error:', e); _app.innerHTML = ''; _app.appendChild(el('div', { style: { textAlign: 'center', padding: '40px' } }, [el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'), el('div', { style: { fontWeight: '600', marginBottom: '8px' } }, 'Failed to switch view'), el('button', { style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' }, onClick: function() { location.reload(); } }, 'Reload')])); } }
       }, '\uD83D\uDD27 ' + CONFIG.stewardLabel));
+      // Mobile default view preference (v4.51.1) — dual-role users can set login default from mobile header
+      var _mobileIsDefault = AppState.defaultView === 'member';
+      var _mobileDefaultBtn = el('button', {
+        style: { background: _mobileIsDefault ? 'transparent' : 'var(--accentBg)', border: '1px solid ' + (_mobileIsDefault ? 'var(--border)' : 'var(--accentBorder)'), borderRadius: '6px', padding: '4px 8px', fontSize: '10px', color: _mobileIsDefault ? 'var(--muted)' : 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+        onClick: function() {
+          if (_mobileIsDefault) return;
+          AppState.defaultView = 'member';
+          _mobileDefaultBtn.textContent = '\u2713 Default';
+          _mobileDefaultBtn.style.color = 'var(--muted)';
+          _mobileDefaultBtn.style.background = 'transparent';
+          _mobileDefaultBtn.style.borderColor = 'var(--border)';
+          serverCall().withSuccessHandler(function() {}).withFailureHandler(function(err) { console.error('Failed to save default view:', err); }).dataSetDefaultView(SESSION_TOKEN, 'member');
+        }
+      }, _mobileIsDefault ? '\u2713 Default' : '\uD83D\uDCCC Set default');
+      headerRight.appendChild(_mobileDefaultBtn);
     }
     headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
       AppState.isDark = !AppState.isDark;
@@ -202,7 +217,7 @@ function _renderOnboardingWizard(container) {
 
   var STEPS = [
     { key: 'welcome', title: 'Welcome!', desc: 'Let\'s get your account set up in a few quick steps.' },
-    { key: 'pin', title: 'Set Your PIN', desc: 'Create a 4\u20136 digit PIN for quick access to your account.' },
+    { key: 'pin', title: 'Set Your PIN', desc: 'Create a 6-digit PIN for quick access to your account.' },
     { key: 'contact', title: 'Contact Info', desc: 'Add your phone number or address so your steward can reach you.' },
     { key: 'notifications', title: 'Notification Preferences', desc: 'Choose how often you\'d like to receive updates.' },
     { key: 'complete', title: 'You\'re All Set!', desc: 'Your account is ready. Welcome to the dashboard.' }
@@ -287,7 +302,7 @@ function _renderOnboardingWizard(container) {
       backBtn.style.visibility = 'visible';
       nextBtn.textContent = 'Next';
       var pinGroup = el('div', { className: 'form-group' });
-      pinGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-pin' }, 'PIN (4\u20136 digits)'));
+      pinGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-pin' }, 'PIN (6 digits)'));
       var pinInput = el('input', { id: 'onboard-pin', className: 'form-input ' + _TI, type: 'password', placeholder: 'Enter PIN', maxLength: '6', inputMode: 'numeric', autocomplete: 'new-password' });
       pinGroup.appendChild(pinInput);
       stepContent.appendChild(pinGroup);
@@ -309,12 +324,14 @@ function _renderOnboardingWizard(container) {
       phoneGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-phone' }, 'Phone Number'));
       var phoneInput = el('input', { id: 'onboard-phone', className: 'form-input ' + _TI, type: 'tel', placeholder: '(555) 123-4567' });
       phoneGroup.appendChild(phoneInput);
+      phoneGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Only visible to your assigned steward'));
       stepContent.appendChild(phoneGroup);
 
       var addrGroup = el('div', { className: 'form-group' });
       addrGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-address' }, 'Street Address'));
       var addrInput = el('input', { id: 'onboard-address', className: 'form-input ' + _TI, type: 'text', placeholder: '123 Main St' });
       addrGroup.appendChild(addrInput);
+      addrGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Used for union mailing purposes only'));
       stepContent.appendChild(addrGroup);
 
       stepData._phoneInput = phoneInput;
@@ -380,6 +397,8 @@ function _renderOnboardingWizard(container) {
       var confirm = stepData._confirmInput ? stepData._confirmInput.value.trim() : '';
       if (!pin) { statusMsg.textContent = 'Please enter a PIN.'; statusMsg.style.color = 'var(--danger)'; return false; }
       if (!/^\d{6}$/.test(pin)) { statusMsg.textContent = 'PIN must be exactly 6 digits.'; statusMsg.style.color = 'var(--danger)'; return false; }
+      var weakPins = ['000000','111111','222222','333333','444444','555555','666666','777777','888888','999999','123456','654321','012345','234567','345678','456789','567890','098765','987654','876543','765432'];
+      if (weakPins.indexOf(pin) !== -1) { statusMsg.textContent = 'PIN is too common. Please choose a less predictable PIN.'; statusMsg.style.color = 'var(--danger)'; return false; }
       if (pin !== confirm) { statusMsg.textContent = 'PINs do not match.'; statusMsg.style.color = 'var(--danger)'; return false; }
       stepData.pin = pin;
       return true;
@@ -389,6 +408,7 @@ function _renderOnboardingWizard(container) {
       var phone = stepData._phoneInput ? stepData._phoneInput.value.trim() : '';
       var addr = stepData._addrInput ? stepData._addrInput.value.trim() : '';
       if (!phone && !addr) { statusMsg.textContent = 'Please enter a phone number or address.'; statusMsg.style.color = 'var(--danger)'; return false; }
+      if (phone && !/^[\d\s\-\(\)\+]{7,15}$/.test(phone)) { statusMsg.textContent = 'Please enter a valid phone number.'; statusMsg.style.color = 'var(--danger)'; return false; }
       stepData.phone = phone;
       stepData.street = addr;
       return true;
@@ -1149,6 +1169,29 @@ function renderMyCases(appContainer) {
           }).dataCreateGrievanceDrive(SESSION_TOKEN);
         }
       }, '\uD83D\uDCC1 Case Folder'));
+      // Export CSV — client-side only, exports visible cases
+      newCaseBar.appendChild(el('button', {
+        className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '9px 14px' },
+        onClick: function() {
+          var cases = AppState.grievances;
+          if (!cases || cases.length === 0) return;
+          var headers = ['Case ID', 'Member', 'Status', 'Filed Date', 'Days Open', 'Assigned Steward'];
+          var csvRows = [headers.join(',')];
+          var memberName = (CURRENT_USER && (CURRENT_USER.name || CURRENT_USER.email)) || '';
+          cases.forEach(function(g) {
+            csvRows.push([g.id, memberName, g.status, g.filed || '', g.deadlineDays != null ? String(Math.abs(g.deadlineDays)) : '', g.steward || ''].map(function(v) {
+              return '"' + String(v || '').replace(/"/g, '""') + '"';
+            }).join(','));
+          });
+          var csv = csvRows.join('\n');
+          var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url; a.download = 'my_cases_' + new Date().toISOString().slice(0, 10) + '.csv';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      }, '\uD83D\uDCE5 Export CSV'));
       content.appendChild(newCaseBar);
 
       AppState.grievances.forEach(function(g) {
@@ -1466,7 +1509,7 @@ function _maybeShowMemberWelcome(slot) {
     });
 
     // Header
-    var safeName = (data.userName || 'there').replace(/[<>&"']/g, '');
+    var safeName = escapeHtml(data.userName || 'there');
     card.appendChild(el('div', {
       style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' }
     }, 'Welcome, ' + safeName + '!'));
@@ -1968,12 +2011,13 @@ function renderMemberResources(appContainer) {
     hubSection.appendChild(cardsWrap);
     content.appendChild(hubSection);
 
-    // Load resources
+    // Load resources — BUG-03-005 fix (v4.51.1): cache via DataCache (STABLE_TTL)
+    // to avoid redundant server calls on tab switches. Resources rarely change mid-session.
     var allResources = [];
     var activeCategory = 'All';
     showLoading(cardsWrap);
 
-    serverCall().withSuccessHandler(function(resources) {
+    function _onResourcesLoaded(resources) {
       allResources = resources || [];
       // Build category pills
       var categories = ['All'];
@@ -1982,10 +2026,12 @@ function renderMemberResources(appContainer) {
       });
       renderPills(categories);
       renderCards();
-    }).withFailureHandler(function() {
+    }
+
+    DataCache.cachedCall('memberResources', 'getWebAppResourcesList', ['Members'], _onResourcesLoaded, function() {
       cardsWrap.innerHTML = '';
       cardsWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'Unable to load resources.'));
-    }).getWebAppResourcesList('Members');
+    }, DataCache.STABLE_TTL);
 
     function renderPills(categories) {
       pillsWrap.innerHTML = '';
@@ -2100,7 +2146,11 @@ function renderMemberResources(appContainer) {
       });
     }
 
-    searchInput.addEventListener('input', function() { renderCards(); });
+    var _resSearchTimer;
+    searchInput.addEventListener('input', function() {
+      clearTimeout(_resSearchTimer);
+      _resSearchTimer = setTimeout(function() { renderCards(); }, 300);
+    });
 
     container.appendChild(content);
   });
@@ -2135,20 +2185,25 @@ function renderUpdateProfile(appContainer) {
         { label: 'Employee ID', value: profile.employeeId || '' },
         { label: 'Employee Number', value: profile.memberId || profile.employeeNumber || '' },
         { label: 'Hire Date', value: profile.hireDate || profile.joined || '' },
-        { label: 'Email Open Rate', value: profile.openRate ? (String(profile.openRate).indexOf('%') !== -1 ? profile.openRate : profile.openRate + '%') : '' },
+        { label: 'Email Open Rate', value: profile.openRate ? (String(profile.openRate).indexOf('%') !== -1 ? profile.openRate : profile.openRate + '%') : '', tooltip: 'Percentage of union emails you\'ve opened (tracked by Constant Contact)' },
       ];
       var infoSection = el('div', { className: 'card card-glass ' + _TC, style: { padding: '14px 16px', marginBottom: '14px' } });
       infoSection.appendChild(el('div', { className: _TL, style: { fontSize: '10px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, 'Account Info'));
       infoFields.forEach(function(f) {
         if (!f.value) return;
         var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0' } });
-        row.appendChild(el('span', { className: 'text-sm-muted' }, f.label));
+        var labelSpan = el('span', { className: 'text-sm-muted' }, f.label);
+        if (f.tooltip) {
+          labelSpan.appendChild(el('span', { title: f.tooltip, style: { cursor: 'help', marginLeft: '4px', fontSize: '11px', opacity: '0.7' } }, '\u24D8'));
+        }
+        row.appendChild(labelSpan);
         row.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text)', fontWeight: '500' } }, f.value));
         infoSection.appendChild(row);
       });
       content.appendChild(infoSection);
 
       var fields = [
+        { key: 'phone', label: 'Phone Number', value: profile.phone },
         { key: 'street', label: 'Street Address', value: profile.street },
         { key: 'city', label: 'City', value: profile.city },
         { key: 'state', label: 'State', value: profile.state },
@@ -2190,6 +2245,11 @@ function renderUpdateProfile(appContainer) {
       var saveBtn = el('button', { className: 'btn btn-primary ' + _TB, onClick: function() {
         var updates = {};
         for (var k in inputs) updates[k] = inputs[k].value.trim();
+        // Validate phone number
+        if (updates.phone && !/^[\d\s\-\(\)\+]{7,15}$/.test(updates.phone)) {
+          statusMsg.textContent = 'Please enter a valid phone number.'; statusMsg.style.color = 'var(--danger)';
+          inputs.phone.style.borderColor = 'var(--danger)'; return;
+        }
         // Validate zip code and state
         if (updates.zip && !/^\d{5}(-\d{4})?$/.test(updates.zip)) {
           statusMsg.textContent = 'Zip code must be 5 digits (or 5+4 format).'; statusMsg.style.color = 'var(--danger)';
@@ -2311,6 +2371,12 @@ function renderPINSetup(appContainer) {
 
         if (!/^\d{6}$/.test(pin)) {
           statusMsg.textContent = 'PIN must be exactly 6 digits.';
+          statusMsg.style.color = 'var(--danger)';
+          return;
+        }
+        var weakPins = ['000000','111111','222222','333333','444444','555555','666666','777777','888888','999999','123456','654321','012345','234567','345678','456789','567890','098765','987654','876543','765432'];
+        if (weakPins.indexOf(pin) !== -1) {
+          statusMsg.textContent = 'PIN is too common. Please choose a less predictable PIN.';
           statusMsg.style.color = 'var(--danger)';
           return;
         }
@@ -2500,7 +2566,6 @@ function renderMemberMore(appContainer) {
       { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
       { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', action: function() { _handleTabNav('member', 'surveyform'); } },
       { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { _handleTabNav('member', 'survey'); } },
-      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { _handleTabNav('member', 'feedback'); } },
       { group: 'Comms' },
       { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Messages and alerts', action: function() { _handleTabNav('member', 'notifications'); } },
       { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { _handleTabNav('member', 'minutes'); } },
@@ -4403,6 +4468,9 @@ function _renderWTHistory(container) {
           a.href = url; a.download = 'workload_history.csv'; a.click();
           URL.revokeObjectURL(url);
           exportBtn.textContent = 'Export CSV';
+        }).withFailureHandler(function(err) {
+          exportBtn.textContent = 'Export CSV';
+          console.error('exportWorkloadHistoryCSV failed:', err);
         }).exportWorkloadHistoryCSV(SESSION_TOKEN);
       }
     }, 'Export CSV');
@@ -4798,7 +4866,7 @@ function renderEventsPage(appContainer) {
         });
       }).withFailureHandler(function() {
         rsvpSection.appendChild(el('div', { className: 'text-xs-muted' }, 'Could not load meetings.'));
-      }).getCheckInEligibleMeetings();
+      }).getCheckInEligibleMeetings(SESSION_TOKEN);
       container.appendChild(rsvpSection);
     }
 
@@ -4852,10 +4920,37 @@ function renderEventsPage(appContainer) {
           '&dates=' + _toGCalDate(ev.startTime) + '/' + _toGCalDate(ev.endTime) +
           (ev.location ? '&location=' + encodeURIComponent(ev.location) : '') +
           (ev.description ? '&details=' + encodeURIComponent(ev.description) : '');
-        card.appendChild(el('a', {
+        // TODO (v4.52+): Add in-app member RSVP button once a member-facing RSVP endpoint is created.
+        // Current RSVPService is steward-only (token-based email invitations). A future
+        // dataSubmitMemberRsvp(sessionToken, eventId, status) endpoint would enable in-app RSVP.
+        var actionRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' } });
+        actionRow.appendChild(el('a', {
           href: calUrl, target: '_blank',
-          style: { display: 'inline-block', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginTop: '8px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)' }
-        }, '\uD83D\uDCC5 Add to My Calendar'));
+          style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', padding: '6px 14px', borderRadius: '8px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', textDecoration: 'none' }
+        }, '\uD83D\uDCC5 Add to Google Calendar'));
+        // ICS download — works with Outlook, Apple Calendar, and any calendar app (v4.51.1)
+        var _icsBtn = el('button', {
+          style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', padding: '6px 14px', borderRadius: '8px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', cursor: 'pointer', fontFamily: 'var(--fontBody)' },
+          onClick: function() {
+            var _pad2 = function(n) { return n < 10 ? '0' + n : '' + n; };
+            var _toICS = function(d) { return d.getUTCFullYear() + _pad2(d.getUTCMonth() + 1) + _pad2(d.getUTCDate()) + 'T' + _pad2(d.getUTCHours()) + _pad2(d.getUTCMinutes()) + _pad2(d.getUTCSeconds()) + 'Z'; };
+            var icsContent = [
+              'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SolidBase//EN', 'BEGIN:VEVENT',
+              'DTSTART:' + _toICS(startDate), 'DTEND:' + _toICS(endDate),
+              'SUMMARY:' + (ev.title || '').replace(/[,;\\]/g, function(c) { return '\\' + c; }),
+              ev.location ? 'LOCATION:' + ev.location.replace(/[,;\\]/g, function(c) { return '\\' + c; }) : '',
+              ev.description ? 'DESCRIPTION:' + ev.description.replace(/[,;\\]/g, function(c) { return '\\' + c; }).replace(/\n/g, '\\n') : '',
+              'END:VEVENT', 'END:VCALENDAR'
+            ].filter(Boolean).join('\r\n');
+            var blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = (ev.title || 'event').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_') + '.ics';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+          }
+        }, '\uD83D\uDCE5 Download .ics');
+        actionRow.appendChild(_icsBtn);
+        card.appendChild(actionRow);
         content.appendChild(card);
       });
     }).withFailureHandler(function() {
@@ -4881,7 +4976,7 @@ function renderUnionStatsPage(appContainer) {
     var subContent = el('div');
 
     // Client-side cache (mirrors steward Insights pattern)
-    var CACHE_TTL = ((CONFIG && CONFIG.unionStatsCacheTTLMin) || 5) * 60 * 1000;
+    var CACHE_TTL = ((CONFIG && CONFIG.insightsCacheTTLMin) || 5) * 60 * 1000;
     if (!AppState.unionStatsCache) AppState.unionStatsCache = {};
     var cache = AppState.unionStatsCache;
 
@@ -4989,7 +5084,7 @@ function _renderGrievanceFeedbackSection(container, fbData) {
     var tData = fbData.trend.map(function(t) { return t.avg; });
     var tCard = el('div', { className: 'card card-glass p-16-mb-10' });
     tCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Satisfaction Trend'));
-    ChartHelper.createLineChart(tCard, 'griev-fb-trend-chart', tLabels, tData, { yMin: 1, yMax: 5 });
+    ChartHelper.createLineChart(tCard, 'griev-fb-trend-chart', tLabels, [{ label: 'Avg Rating', data: tData }], { yMin: 1, yMax: 5 });
     section.appendChild(tCard);
   }
 
@@ -6178,7 +6273,19 @@ function _renderPollResults(container, q) {
     row.appendChild(bar);
     container.appendChild(row);
   });
-  container.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '6px' } }, total + ' anonymous vote' + (total !== 1 ? 's' : '')));
+  // Participation indicator (v4.51.1) — vote count badge + participation rate if membership known
+  var participationRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' } });
+  participationRow.appendChild(el('span', {
+    style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#fff', fontWeight: '600', background: 'var(--accent)', borderRadius: '10px', padding: '2px 8px' }
+  }, '\uD83D\uDDF3\uFE0F ' + total + ' vote' + (total !== 1 ? 's' : '')));
+  var estMembership = (typeof AppState !== 'undefined' && AppState.memberCount) ? AppState.memberCount : 0;
+  if (estMembership > 0 && total > 0) {
+    var pctParticipation = Math.round((total / estMembership) * 100);
+    participationRow.appendChild(el('span', {
+      style: { fontSize: '11px', color: pctParticipation >= 50 ? 'var(--success)' : pctParticipation >= 25 ? 'var(--warning, #eab308)' : 'var(--muted)', fontWeight: '500' }
+    }, pctParticipation + '% participation'));
+  }
+  container.appendChild(participationRow);
 }
 
 // ── Vote UI ──────────────────────────────────────────────────────────────
@@ -6209,7 +6316,7 @@ function _renderPollVoteUI(qCard, q) {
             }
           }).withFailureHandler(function() {
             btn.disabled = false; btn.textContent = opt;
-          }).wqSubmitResponse(null, q.id, opt);
+          }).wqSubmitResponse(SESSION_TOKEN, q.id, opt);
         }
       }, opt);
       qCard.appendChild(btn);
@@ -6379,8 +6486,7 @@ function renderMinutesPage(appContainer) {
     grievCta.appendChild(el('span', { className: 'text-base' }, 'Have a workplace issue?'));
     grievCta.appendChild(el('button', { className: 'btn btn-primary ' + _TB, style: { fontSize: '12px', padding: '6px 12px' },
       onClick: function() {
-        var app = document.getElementById('app');
-        if (app) renderMyCases(app);
+        _handleTabNav(AppState.activeRole || 'member', 'cases');
       }
     }, '\uD83D\uDCDD Start a Grievance'));
     container.appendChild(grievCta);
@@ -6540,8 +6646,11 @@ function renderMemberTasks(appContainer) {
             actions.appendChild(el('button', {
               style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
               onClick: function() {
-                if (!confirm('Mark "' + (task.title || 'this task') + '" as complete?')) return;
                 serverCall().withSuccessHandler(function() {
+                  // Brief toast notification
+                  var toast = el('div', { style: { position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--success)', color: '#fff', padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', zIndex: '9999', opacity: '1', transition: 'opacity 0.4s ease', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } }, '\u2705 Task completed');
+                  document.body.appendChild(toast);
+                  setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 400); }, 2000);
                   // Notify steward-side badge counts — member completing a task
                   // changes the steward's open/overdue task totals.
                   if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
@@ -6753,11 +6862,25 @@ function renderQAForum(appContainer, role) {
             }
           }, '\u2713 Mark Resolved'));
         }
-        // Resolved badge
+        // Resolved badge + Reopen button (owner or steward only)
         if (q.status === 'resolved') {
           actions.appendChild(el('span', {
             style: { fontSize: '11px', padding: '3px 8px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600', alignSelf: 'center' }
           }, '\u2713 Resolved'));
+          if (q.isOwner || isSteward) {
+            actions.appendChild(el('button', {
+              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+              onClick: function() {
+                if (!confirm('Reopen this question? It will appear as active again.')) return;
+                serverCall().withSuccessHandler(function(r) {
+                  if (r && r.success) {
+                    _renderQuestionDetail(cont, questionId);
+                    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+                  } else { alert((r && r.message) || 'Failed to reopen question.'); }
+                }).withFailureHandler(function(e) { console.error(e.message); }).qaReopenQuestion(SESSION_TOKEN, questionId);
+              }
+            }, '\u21BB Reopen'));
+          }
         }
         qCard.appendChild(actions);
         cont.appendChild(qCard);
@@ -7328,7 +7451,8 @@ function renderLeaderHub(appContainer) {
     var tabs = createSubTabs([
       { id: 'engagement', label: 'Engagement', render: _renderLeaderEngagement },
       { id: 'broadcast', label: 'Broadcast', render: _renderLeaderBroadcast },
-      { id: 'outreach', label: 'Outreach Log', render: _renderLeaderOutreach }
+      { id: 'outreach', label: 'Outreach Log', render: _renderLeaderOutreach },
+      { id: 'mentorships', label: 'Mentorships', render: _renderLeaderMentorships }
     ]);
     content.appendChild(tabs.bar);
     content.appendChild(tabs.content);
@@ -7450,7 +7574,7 @@ function _renderLeaderBroadcast(tabContent) {
   tabContent.appendChild(previewBox);
 
   serverCall().withSuccessHandler(function(members) {
-    if (!members || members.length === 0) {
+    if (!Array.isArray(members) || members.length === 0) {
       previewText.textContent = 'No members found in your unit.';
       sendBtn.disabled = true;
     } else {
@@ -7485,7 +7609,8 @@ function _renderLeaderOutreach(tabContent) {
   var _selectedMember = { email: '', name: '' };
 
   serverCall().withSuccessHandler(function(members) {
-    _unitMembers = members || [];
+    if (!Array.isArray(members)) return;
+    _unitMembers = members;
   }).withFailureHandler(function() {}).dataGetLeaderUnitMembers(SESSION_TOKEN);
 
   memberInput.addEventListener('input', function() {
@@ -7627,5 +7752,75 @@ function _loadLeaderOutreachLog(logList) {
     logList.innerHTML = '';
     logList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load outreach log.'));
   }).dataGetLeaderOutreachLog(SESSION_TOKEN);
+}
+
+// ── Leader Mentorships sub-tab (read-only) ──
+function _renderLeaderMentorships(tabContent) {
+  showLoading(tabContent, 'list');
+  serverCall().withSuccessHandler(function(data) {
+    tabContent.innerHTML = '';
+    if (!data || !data.success) {
+      tabContent.appendChild(el('div', { className: 'card ' + _TC, style: { padding: '20px', color: 'var(--text-secondary)', textAlign: 'center' } },
+        (data && data.message) || 'Unable to load mentorship data.'));
+      return;
+    }
+    var pairings = data.pairings || [];
+    if (pairings.length === 0) {
+      tabContent.appendChild(el('div', { className: 'card ' + _TC, style: { padding: '20px', color: 'var(--text-secondary)', textAlign: 'center', fontStyle: 'italic' } },
+        'No active mentorship pairings in your unit.'));
+      return;
+    }
+
+    // Summary header
+    tabContent.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' } },
+      pairings.length + ' active pairing' + (pairings.length !== 1 ? 's' : '') + ' in your unit'));
+
+    // Pairing cards
+    pairings.forEach(function(p) {
+      var card = el('div', { className: 'card ' + _TC, style: { padding: '14px 16px', marginBottom: '8px' } });
+
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' } });
+
+      // Mentor side
+      var mentorEl = el('div', { style: { flex: '1', minWidth: '120px' } });
+      mentorEl.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '2px' } }, 'Mentor'));
+      mentorEl.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px' } }, escapeHtml(p.mentorName || p.mentorEmail)));
+      if (p.mentorName && p.mentorName !== p.mentorEmail) {
+        mentorEl.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, escapeHtml(p.mentorEmail)));
+      }
+      row.appendChild(mentorEl);
+
+      // Arrow
+      row.appendChild(el('div', { style: { fontSize: '18px', color: 'var(--text-secondary)', flexShrink: '0' } }, '\u2192'));
+
+      // Mentee side
+      var menteeEl = el('div', { style: { flex: '1', minWidth: '120px' } });
+      menteeEl.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '2px' } }, 'Mentee'));
+      menteeEl.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px' } }, escapeHtml(p.menteeName || p.menteeEmail)));
+      if (p.menteeName && p.menteeName !== p.menteeEmail) {
+        menteeEl.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)' } }, escapeHtml(p.menteeEmail)));
+      }
+      row.appendChild(menteeEl);
+
+      // Status badge
+      var statusColor = p.status === 'active' ? 'var(--success, #22c55e)' : 'var(--border-subtle)';
+      row.appendChild(el('span', {
+        style: { padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', background: statusColor, color: '#fff', flexShrink: '0' }
+      }, escapeHtml(p.status || 'active')));
+
+      card.appendChild(row);
+
+      // Meta row: case types + start date
+      var meta = el('div', { style: { display: 'flex', gap: '16px', marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)' } });
+      if (p.caseTypes) meta.appendChild(el('span', {}, 'Focus: ' + escapeHtml(p.caseTypes)));
+      if (p.started) meta.appendChild(el('span', {}, 'Since ' + escapeHtml(String(p.started))));
+      if (meta.childNodes.length > 0) card.appendChild(meta);
+
+      tabContent.appendChild(card);
+    });
+  }).withFailureHandler(function() {
+    tabContent.innerHTML = '';
+    tabContent.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--danger, #ef4444)' } }, 'Failed to load mentorship data.'));
+  }).dataGetLeaderUnitMentorships(SESSION_TOKEN);
 }
 </script>

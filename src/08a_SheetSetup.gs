@@ -67,16 +67,11 @@ function CREATE_DASHBOARD() {
       '• Member Directory\n' +
       '• Grievance Log (with Action Type dropdown)\n' +
       '• ✅ Case Checklist (track grievance tasks)\n' +
-      '• 📊 Member Satisfaction (Survey tracking, hidden)\n' +
-      '• 💡 Feedback & Development (Bug/feature tracking)\n' +
       '• 🤝 Volunteer Hours (track volunteer activities)\n' +
       '• 📅 Meeting Attendance (track meeting participation)\n' +
       '• 📝 Meeting Check-In Log (email+PIN check-in)\n' +
-      '• ✅ Function Checklist (function reference)\n' +
-      '• 📋 Features Reference (complete feature list)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
-      '• 📖 Config Guide (how to use Config tab)\n' +
       '• 📊 Workload Tracker (member caseload tracking)\n' +
       '• 📚 Resources (educational content hub)\n' +
       '• 📚 Resource Config (dynamic category management)\n\n' +
@@ -173,14 +168,6 @@ function CREATE_DASHBOARD() {
     currentStep_ = 'createSatisfactionSheet';
     createSatisfactionSheet(ss);
     ss.toast('Created Member Satisfaction', '🏗️ Progress', 2);
-
-    currentStep_ = 'createFeedbackSheet';
-    createFeedbackSheet(ss);
-    ss.toast('Created Feedback & Development', '🏗️ Progress', 2);
-
-    currentStep_ = 'createFunctionChecklistSheet_';
-    createFunctionChecklistSheet_();
-    ss.toast('Created Function Checklist', '🏗️ Progress', 2);
 
     currentStep_ = 'createGettingStartedSheet';
     createGettingStartedSheet(ss);
@@ -345,10 +332,8 @@ function CREATE_DASHBOARD() {
         '15+ sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
-        '• 📊 Member Satisfaction (hidden), 💡 Feedback (tracking)\n' +
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
-        '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
-        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
+        '• 📚 Getting Started, ❓ FAQ (help)\n' +
         '• 📊 Workload Reporting (member caseload tracking)\n' +
         '• 📚 Resources + Resource Config (educational content hub)\n' +
         '• Portal, Weekly Questions, Contact Log (web dashboard)\n\n' +
@@ -530,14 +515,10 @@ function reorderSheetsToStandard(ss) {
     // 🔵 Engagement — community data
     SHEETS.MEETING_ATTENDANCE,
     SHEETS.MEETING_CHECKIN_LOG,
-    SHEETS.SATISFACTION,
-    SHEETS.FEEDBACK,
     SHEETS.NOTIFICATIONS,
     // 🟠 Config & Admin — owner/admin editable
     SHEETS.SURVEY_QUESTIONS,
     SHEETS.RESOURCE_CONFIG,
-    SHEETS.FUNCTION_CHECKLIST,
-    SHEETS.CONFIG_GUIDE,
     SHEETS.CONFIG
   ];
 

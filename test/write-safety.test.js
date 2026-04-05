@@ -447,7 +447,7 @@ describe('Structural guard: no unsafe static-constant writes (comprehensive)', (
   const CONSTANT_SYSTEMS = [
     'MEMBER_COLS', 'GRIEVANCE_COLS', 'CONFIG_COLS', 'NMC_COLS',
     'CHECKLIST_COLS', 'SURVEY_TRACKING_COLS', 'AUDIT_LOG_COLS',
-    'STEWARD_PERF_COLS', 'MEETING_CHECKIN_COLS', 'FEEDBACK_COLS',
+    'STEWARD_PERF_COLS', 'MEETING_CHECKIN_COLS',
     'RESOURCES_COLS', 'RESOURCE_CONFIG_COLS', 'SURVEY_VAULT_COLS'
   ];
   const CONSTANTS_PATTERN = CONSTANT_SYSTEMS.join('|');
@@ -508,8 +508,6 @@ describe('Structural guard: no unsafe static-constant writes (comprehensive)', (
     { file: null, linePattern: /MEETING_CHECKIN_COLS\.\w+/, reason: 'meeting check-in sheet — separate sheet' },
     // Steward performance writes (separate sheet)
     { file: null, linePattern: /STEWARD_PERF_COLS\.\w+/, reason: 'steward perf sheet — separate sheet' },
-    // Feedback sheet writes (separate sheet)
-    { file: null, linePattern: /FEEDBACK_COLS\.\w+/, reason: 'feedback sheet — separate sheet' },
     // Non-Member Contacts writes (separate sheet, single-cell per field)
     { file: null, linePattern: /NMC_COLS\.\w+/, reason: 'NMC sheet — separate from Member/Grievance' },
   ];

@@ -263,9 +263,6 @@ function SEED_PHASE_2() {
   ss.toast('Seeding survey responses...', '🌱 Phase 2', 2);
   seedSatisfactionData();
 
-  ss.toast('Seeding feedback entries...', '🌱 Phase 2', 2);
-  seedFeedbackData();
-
   ss.toast('Seeding survey tracking data...', '🌱 Phase 2', 2);
   seedSurveyTrackingData();
 
@@ -475,129 +472,9 @@ function seedConfigData() {
   }
 }
 
-/**
- * Seed 3 sample entries in the Feedback & Development sheet
- * Demonstrates bug reports, feature requests, and improvements
- */
-function seedFeedbackData() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
+// seedFeedbackData removed v4.52.0 (Feedback sheet removed)
 
-  if (!sheet) {
-    log_('seedFeedbackData', 'Feedback sheet not found. Creating it...');
-    createFeedbackSheet(ss);
-    sheet = ss.getSheetByName(SHEETS.FEEDBACK);
-    if (!sheet) {
-      log_('seedFeedbackData', 'Could not create Feedback sheet');
-      return;
-    }
-  }
-
-  // Check if column A (data area) already has data beyond header
-  var dataCol = sheet.getRange('A:A').getValues();
-  var dataRowCount = 0;
-  for (var i = 1; i < dataCol.length; i++) {
-    if (dataCol[i][0] !== '') {
-      dataRowCount++;
-      break;
-    }
-  }
-  if (dataRowCount > 0) {
-    log_('seedFeedbackData', 'Feedback sheet already has data. Skipping seed.');
-    return;
-  }
-
-  // Generate 3 sample feedback entries using FEEDBACK_COLS for dynamic column placement
-  var now = new Date();
-  var oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  var threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-
-  var maxCol = FEEDBACK_COLS.NOTES; // last defined column
-  /**
-   * Builds a feedback row array using FEEDBACK_COLS for column placement.
-   * @param {Date} timestamp - Submission timestamp.
-   * @param {string} submittedBy - Submitter name.
-   * @param {string} category - Feedback category.
-   * @param {string} type - Bug/Feature Request/Improvement.
-   * @param {string} priority - Priority level.
-   * @param {string} title - Feedback title.
-   * @param {string} description - Detailed description.
-   * @param {string} status - Current status.
-   * @param {string} assignedTo - Assignee name.
-   * @param {string} resolution - Resolution notes.
-   * @param {string} notes - Additional notes.
-   * @returns {Array} Row array sized to FEEDBACK_COLS.
-   */
-  function buildFeedbackRow(timestamp, submittedBy, category, type, priority, title, description, status, assignedTo, resolution, notes) {
-    var row = [];
-    for (var i = 0; i < maxCol; i++) { row.push(''); }
-    setCol_(row, FEEDBACK_COLS.TIMESTAMP, timestamp);
-    setCol_(row, FEEDBACK_COLS.SUBMITTED_BY, submittedBy);
-    setCol_(row, FEEDBACK_COLS.CATEGORY, category);
-    setCol_(row, FEEDBACK_COLS.TYPE, type);
-    setCol_(row, FEEDBACK_COLS.PRIORITY, priority);
-    setCol_(row, FEEDBACK_COLS.TITLE, title);
-    setCol_(row, FEEDBACK_COLS.DESCRIPTION, description);
-    setCol_(row, FEEDBACK_COLS.STATUS, status);
-    setCol_(row, FEEDBACK_COLS.ASSIGNED_TO, assignedTo);
-    setCol_(row, FEEDBACK_COLS.RESOLUTION, resolution);
-    setCol_(row, FEEDBACK_COLS.NOTES, notes);
-    return row;
-  }
-
-  var twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-  var fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-  var tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
-  var fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-  var twentyDaysAgo = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000);
-
-  var sampleFeedback = [
-    buildFeedbackRow(oneWeekAgo, 'John Smith', 'Dashboard', 'Bug', 'Medium',
-      'Dashboard metrics not refreshing',
-      'The Quick Stats section sometimes shows stale data after editing the Grievance Log. Requires manual refresh to update.',
-      'Resolved', 'Tech Team',
-      'Added auto-refresh trigger on Grievance Log edit. Metrics now update within 30 seconds.',
-      'User confirmed fix working'),
-    buildFeedbackRow(threeDaysAgo, 'Mary Johnson', 'Member Directory', 'Feature Request', 'High',
-      'Bulk import members from CSV',
-      'Would like ability to import multiple members at once from a CSV file instead of entering one by one.',
-      'In Progress', 'Tech Team', '', 'Targeting v2.2 release'),
-    buildFeedbackRow(now, 'Robert Williams', 'Reports', 'Improvement', 'Low',
-      'Add PDF export for Dashboard',
-      'It would be helpful to export the Dashboard as a PDF for sharing with chapter leadership during meetings.',
-      'New', '', '', ''),
-    buildFeedbackRow(twoDaysAgo, 'Linda Garcia', 'Grievance Log', 'Bug', 'High',
-      'Grievance step dates not saving correctly',
-      'When advancing a grievance from Step I to Step II, the date field sometimes reverts to the original filing date instead of the current date.',
-      'New', '', '', 'Reported by two stewards independently'),
-    buildFeedbackRow(fiveDaysAgo, 'James Brown', 'Calendar', 'Feature Request', 'Medium',
-      'Recurring event support for meetings',
-      'We have monthly membership meetings and weekly steward check-ins. Would be great to set these up once as recurring rather than creating each one individually.',
-      'In Review', 'Tech Team', '', 'Evaluating Google Calendar API recurrence support'),
-    buildFeedbackRow(tenDaysAgo, 'Patricia Davis', 'Member Directory', 'Improvement', 'Low',
-      'Color-code members by unit on directory',
-      'It would help stewards quickly identify members in their unit if rows were color-coded or filterable by organizational unit.',
-      'Resolved', 'Tech Team',
-      'Added unit filter dropdown to the Member Directory view.',
-      'Steward confirmed this is helpful'),
-    buildFeedbackRow(fourteenDaysAgo, 'Michael Wilson', 'Dashboard', 'Bug', 'Medium',
-      'Notification badge count off by one',
-      'The notification bell sometimes shows 3 unread but when I open it there are only 2 notifications. Seems like dismissed notifications are still being counted.',
-      'In Progress', 'Tech Team', '', 'Investigating badge refresh timing'),
-    buildFeedbackRow(twentyDaysAgo, 'Sarah Martinez', 'General', 'Feature Request', 'High',
-      'Mobile-friendly layout for stewards in the field',
-      'When I visit members at worksites I use my phone to look things up. The dashboard is hard to navigate on small screens. A responsive or mobile view would be very useful.',
-      'New', '', '', 'Multiple stewards have requested this')
-  ];
-
-  // Write sample data
-  sheet.getRange(2, 1, sampleFeedback.length, sampleFeedback[0].length).setValues(sampleFeedback);
-
-  // Format timestamp column
-  sheet.getRange(2, FEEDBACK_COLS.TIMESTAMP, sampleFeedback.length, 1).setNumberFormat('MM/dd/yyyy HH:mm');
-
-  log_('buildFeedbackRow', 'Seeded ' + sampleFeedback.length + ' sample feedback entries');
-}
+function _seedFeedbackData_REMOVED() { /* removed v4.52.0 */ }
 
 /**
  * Seed survey tracking data from existing Member Directory.
@@ -2120,7 +1997,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds additional content including
+ * by createResourcesSheet(). Adds DDS/SEIU 509-specific content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -2183,8 +2060,8 @@ function seedResourcesData() {
       'New to the bargaining unit? Here is what you need to know about your rights and benefits.',
       'As a new bargaining unit member you should:\\n\\n1. Know your steward — check the dashboard for contact info\\n2. Read your contract — ask your steward for a copy\\n3. Understand your probation period and what it means\\n4. Set up your PIN for the union dashboard\\n5. Attend new member orientation\\n6. Know your Weingarten rights from day one\\n7. Understand the grievance process\\n8. Complete your workload tracker weekly\\n9. Attend union meetings when possible\\n10. Report any contract violations to your steward\\n\\nYour union is here for you from day one.',
       '', '✅', nextId - 1, 'Yes', 'Members', today, 'System'],
-    ['RES-' + String(nextId++).padStart(3, '0'), 'Collective Bargaining Agreement Summary', 'Contract Article',
-      'Key provisions of the current collective bargaining agreement.',
+    ['RES-' + String(nextId++).padStart(3, '0'), 'DDS Collective Bargaining Agreement Summary', 'Contract Article',
+      'Key provisions of the current collective bargaining agreement between SEIU 509 and DDS.',
       'The CBA covers:\\n- Wages and step increases\\n- Health insurance and benefits\\n- Work schedules and overtime\\n- Grievance and arbitration procedures\\n- Seniority rights\\n- Transfers and promotions\\n- Discipline and discharge (just cause)\\n- Leave policies (sick, personal, vacation)\\n- Workplace safety\\n- Union rights and representation\\n\\nThe full contract is available from your steward or union office. Key articles are referenced in grievance filings — your steward will identify the specific articles that apply to your situation.',
       '', '📜', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Caseload Standards & Workload Rights', 'Policy',
@@ -2251,7 +2128,7 @@ function seedNotificationsData() {
       'Contract Negotiations Update',
       'The bargaining committee met with management on ' + fmt(threeDaysAgo) + '. Key topics discussed: wage increases, telecommuting policy, and caseload limits. A full update will be shared at the next general membership meeting. Your support matters — please attend.',
       'Normal',
-      'bargaining@example.org',
+      'bargaining@seiu509.org',
       'Bargaining Committee',
       fmt(threeDaysAgo),
       fmt(inOneMonth),
@@ -2266,7 +2143,7 @@ function seedNotificationsData() {
       'Workload Survey Due This Friday',
       'Please submit your weekly workload tracker by end of day Friday. Your data helps the union build the case for adequate staffing. Submissions are anonymous and take less than 2 minutes.',
       'Urgent',
-      'workload@example.org',
+      'workload@seiu509.org',
       'Workload Committee',
       today,
       fmt(inOneWeek),
@@ -2281,7 +2158,7 @@ function seedNotificationsData() {
       'New Know Your Rights Resources Available',
       'We have added new educational resources to the Learn tab including FMLA rights, ADA accommodations, anti-retaliation protections, and caseload standards. Check them out and know your rights!',
       'Normal',
-      'education@example.org',
+      'education@seiu509.org',
       'Education Committee',
       today,
       fmt(inOneMonth),
@@ -2296,7 +2173,7 @@ function seedNotificationsData() {
       'Steward Office Hours This Week',
       'Your stewards will be available for drop-in office hours this week: Tuesday 12-1pm and Thursday 3-4pm in the break room. No appointment needed. Bring your questions about the contract, grievances, or any workplace concerns.',
       'Normal',
-      'stewards@example.org',
+      'stewards@seiu509.org',
       'Steward Team',
       today,
       fmt(inTwoWeeks),
@@ -3225,8 +3102,6 @@ function NUKE_SEEDED_DATA() {
     '• Config dropdown values\n' +
     '• Survey responses (Member Satisfaction data cleared)\n' +
     '• Survey tracking & survey questions data\n' +
-    '• Feedback & Development sheet (entire sheet deleted)\n' +
-    '• Function Checklist sheet (entire sheet deleted)\n' +
     '• _Audit_Log hidden sheet (entire sheet deleted)\n' +
     '• Contact log, meeting minutes, meeting check-ins\n' +
     '• Timeline events, Q&A Forum questions & answers\n' +
@@ -3250,11 +3125,9 @@ function NUKE_SEEDED_DATA() {
     '1. Delete ' + memberCount + ' seeded members\n' +
     '2. Delete ' + grievanceCount + ' seeded grievances\n' +
     '3. Clear survey responses, tracking & questions\n' +
-    '4. Delete Feedback & Development sheet\n' +
-    '5. Delete Function Checklist sheet\n' +
-    '6. Delete _Audit_Log hidden sheet\n' +
-    '7. Clear contact log, minutes, check-ins, timeline, Q&A\n' +
-    '8. Permanently disable the Demo menu\n\n' +
+    '4. Delete _Audit_Log hidden sheet\n' +
+    '5. Clear contact log, minutes, check-ins, timeline, Q&A\n' +
+    '6. Permanently disable the Demo menu\n\n' +
     '⏱️ This will take 3-5 MINUTES. DO NOT close the tab!\n' +
     'Wait for the "Running script" dialog to disappear.\n\n' +
     'Are you sure?',
@@ -3350,32 +3223,6 @@ function NUKE_SEEDED_DATA() {
         log_('NUKE_SEEDED_DATA', 'Survey response data cleared from Member Satisfaction');
       } catch (e) {
         log_('Could not clear survey data', e.message);
-      }
-    }
-
-    // Delete Feedback & Development sheet entirely
-    var feedbackToDelete = ss.getSheetByName(SHEETS.FEEDBACK);
-    var feedbackDeleted = false;
-    if (feedbackToDelete) {
-      try {
-        ss.deleteSheet(feedbackToDelete);
-        feedbackDeleted = true;
-        log_('NUKE_SEEDED_DATA', 'Feedback & Development sheet deleted');
-      } catch (e) {
-        log_('Could not delete Feedback sheet', e.message);
-      }
-    }
-
-    // Delete Function Checklist sheet entirely
-    var functionChecklistToDelete = ss.getSheetByName(SHEETS.FUNCTION_CHECKLIST);
-    var functionChecklistDeleted = false;
-    if (functionChecklistToDelete) {
-      try {
-        ss.deleteSheet(functionChecklistToDelete);
-        functionChecklistDeleted = true;
-        log_('NUKE_SEEDED_DATA', 'Function Checklist sheet deleted');
-      } catch (e) {
-        log_('Could not delete Function Checklist sheet', e.message);
       }
     }
 
@@ -3608,8 +3455,6 @@ function NUKE_SEEDED_DATA() {
       (surveyCleared ? '• Survey responses cleared from Member Satisfaction\n' : '') +
       (surveyTrackingCleared ? '• Survey tracking data cleared\n' : '') +
       (surveyQuestionsCleared ? '• Survey questions cleared\n' : '') +
-      (feedbackDeleted ? '• Feedback & Development sheet deleted\n' : '') +
-      (functionChecklistDeleted ? '• Function Checklist sheet deleted\n' : '') +
       (auditLogDeleted ? '• _Audit_Log sheet deleted\n' : '') +
       (calEventsDeleted > 0 ? '• ' + calEventsDeleted + ' calendar events deleted\n' : '') +
       (contactLogCleared ? '• Contact log entries cleared\n' : '') +

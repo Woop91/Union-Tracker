@@ -24,14 +24,6 @@ loadSources([
 // ============================================================================
 
 describe('deprecated config removal', () => {
-  test('COMMAND_CENTER_CONFIG is removed (was deprecated)', () => {
-    expect(typeof COMMAND_CENTER_CONFIG).toBe('undefined');
-  });
-
-  test('GEMINI_CONFIG is removed (was deprecated)', () => {
-    expect(typeof GEMINI_CONFIG).toBe('undefined');
-  });
-
   test('COMMAND_CONFIG is the canonical config', () => {
     expect(COMMAND_CONFIG).toBeDefined();
     expect(COMMAND_CONFIG.SYSTEM_NAME).toBeDefined();

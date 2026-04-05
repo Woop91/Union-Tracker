@@ -87,8 +87,7 @@ const HTML_FILES = [
   'steward_view.html',
   'member_view.html',
   'error_view.html',
-  // org_chart.html excluded — contains org-specific PII (names, phones, emails, salaries).
-  // A generic placeholder is shipped in src/ instead; routing code shows it gracefully.
+  'org_chart.html',
   'grievance_form.html',
   'esign.html',
   'AdminSettings.html',
@@ -352,7 +351,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 39 .gs + 14 .html + 1 appsscript.json = 54 files
+  // Current prod capacity: 42 .gs + 17 .html + 1 appsscript.json = 60 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
   const gsFileCount = fileList.length;

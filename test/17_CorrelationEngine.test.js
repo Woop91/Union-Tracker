@@ -31,6 +31,11 @@ global.getConfigValue_ = jest.fn(() => 'yes');
 
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '17_CorrelationEngine.gs']);
 
+// Clean up module-level mocks between tests
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 // ============================================================================
 // 1. statMean_
 // ============================================================================

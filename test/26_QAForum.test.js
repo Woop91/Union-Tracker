@@ -1007,6 +1007,54 @@ describe('QAForum.getFlaggedContent', () => {
 });
 
 // ============================================================================
+// reopenQuestion
+// ============================================================================
+
+describe('reopenQuestion', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.logAuditEvent = jest.fn();
+  });
+
+  test('reopens a resolved question as owner', () => {
+    var HEADERS = ['ID', 'Email', 'Name', 'Anonymous', 'Text', 'Status', 'Upvotes', 'Answer', 'AnswerCount', 'Created', 'Modified'];
+    var row = ['Q-001', 'user@test.com', 'User', false, 'My question', 'resolved', 0, '', 0, new Date(), new Date()];
+    var sheet = createMockSheet(SHEETS.QA_FORUM, [HEADERS, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var result = QAForum.reopenQuestion('user@test.com', 'Q-001', false);
+    expect(result.success).toBe(true);
+    expect(sheet.getRange).toHaveBeenCalledWith(2, 6);
+    expect(logAuditEvent).toHaveBeenCalledWith('QA_QUESTION_REOPENED', expect.stringContaining('Q-001'));
+  });
+
+  test('rejects reopening non-resolved question', () => {
+    var HEADERS = ['ID', 'Email', 'Name', 'Anonymous', 'Text', 'Status', 'Upvotes', 'Answer', 'AnswerCount', 'Created', 'Modified'];
+    var row = ['Q-001', 'user@test.com', 'User', false, 'My question', 'active', 0, '', 0, new Date(), new Date()];
+    var sheet = createMockSheet(SHEETS.QA_FORUM, [HEADERS, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var result = QAForum.reopenQuestion('user@test.com', 'Q-001', false);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Only resolved');
+  });
+
+  test('rejects unauthorized user', () => {
+    var HEADERS = ['ID', 'Email', 'Name', 'Anonymous', 'Text', 'Status', 'Upvotes', 'Answer', 'AnswerCount', 'Created', 'Modified'];
+    var row = ['Q-001', 'owner@test.com', 'Owner', false, 'Question', 'resolved', 0, '', 0, new Date(), new Date()];
+    var sheet = createMockSheet(SHEETS.QA_FORUM, [HEADERS, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var result = QAForum.reopenQuestion('other@test.com', 'Q-001', false);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Not authorized');
+  });
+});
+
+// ============================================================================
 // Global Wrappers
 // ============================================================================
 

@@ -133,6 +133,17 @@ function enableDashboardMemberAuth() {
  * When disabled, dashboards are accessible without member login (default)
  */
 function disableDashboardMemberAuth() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+    var response = ui.alert('Disable Dashboard Authentication',
+      'This will remove the PIN login requirement for ALL dashboard pages.\n\n' +
+      'Members will be able to access dashboards without authentication. Continue?',
+      ui.ButtonSet.YES_NO);
+    if (response !== ui.Button.YES) return;
+  } catch (_uiErr) {
+    // UI not available (e.g., triggered from time-driven or web app context) — proceed without prompt
+  }
+
   var props = PropertiesService.getScriptProperties();
   props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'false');
   log_('disableDashboardMemberAuth', 'Dashboard member authentication DISABLED');
@@ -218,8 +229,6 @@ function escapeForFormula(input) {
   // beginning of a cell value. We also guard against formula chars appearing after
   // leading whitespace, since some spreadsheet engines trim before evaluating.
   return str
-    .replace(/'/g, "''")       // Escape single quotes
-    .replace(/"/g, '""')       // Escape double quotes
     .replace(/\\/g, '\\\\')    // Escape backslashes
     .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
     .replace(/\t/g, ' ')       // Replace tab characters (tab can trigger formula interpretation)

@@ -8,7 +8,7 @@
  * utility functions (executeWithRetry, batchSetValues, DIAGNOSE_SETUP).
  */
 
-require('./gas-mock');
+const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
 const { loadSources } = require('./load-source');
 
 // Load files in GAS load order
@@ -493,5 +493,179 @@ describe('DIAGNOSE_SETUP', () => {
     expect(Array.isArray(result.warnings)).toBe(true);
     expect(Array.isArray(result.errors)).toBe(true);
     expect(result.summary).toBeDefined();
+  });
+});
+
+// ============================================================================
+// T1-3a: _trimAuditWithCheckpoint_ helper
+// ============================================================================
+
+describe('_trimAuditWithCheckpoint_', () => {
+  test('is defined as a function', () => {
+    expect(typeof _trimAuditWithCheckpoint_).toBe('function');
+  });
+
+  test('deletes excess rows and saves checkpoint hash', () => {
+    jest.clearAllMocks();
+
+    var headers = ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column',
+      'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type', 'Integrity Hash'];
+    var data = [headers];
+    for (var i = 0; i < 10002; i++) {
+      data.push([new Date(), 'u***r@test.com', '', '', '', '', '', '{}', 'sess', 'EVENT', 'hash_' + i]);
+    }
+
+    var sheet = createMockSheet('Audit Log', data);
+    sheet.getLastRow.mockReturnValue(10003);
+
+    _trimAuditWithCheckpoint_(sheet, 10003);
+
+    expect(sheet.deleteRows).toHaveBeenCalledWith(2, 2);
+    expect(PropertiesService.getScriptProperties().setProperty).toHaveBeenCalledWith(
+      'AUDIT_CHAIN_CHECKPOINT_HASH',
+      expect.any(String)
+    );
+  });
+});
+
+// ============================================================================
+// T1-3b: _archiveAuditRows_ and archive-before-trim
+// ============================================================================
+
+describe('_archiveAuditRows_', () => {
+  test('is defined as a function', () => {
+    expect(typeof _archiveAuditRows_).toBe('function');
+  });
+
+  test('creates CSV backup and deletes archived rows', () => {
+    jest.clearAllMocks();
+
+    var headers = ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column',
+      'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type', 'Integrity Hash'];
+    var archiveRows = [
+      [new Date('2026-01-01'), 'u***r@test.com', '', '', '', '', '', '{}', 'sess1', 'EVENT_A', 'hash_1'],
+      [new Date('2026-01-02'), 'u***r@test.com', '', '', '', '', '', '{}', 'sess2', 'EVENT_B', 'hash_2']
+    ];
+    var allData = [headers, ...archiveRows];
+
+    var mockFile = { getId: jest.fn(() => 'file-id-123') };
+    var mockFolder = {
+      createFile: jest.fn(() => mockFile),
+      getId: jest.fn(() => 'folder-id'),
+      setSharing: jest.fn(),
+      setDescription: jest.fn()
+    };
+    global._getOrCreateBackupFolder = jest.fn(() => mockFolder);
+
+    var sheet = createMockSheet('Audit Log', allData);
+    sheet.getLastColumn.mockReturnValue(11);
+
+    _archiveAuditRows_(sheet, 2, 2);
+
+    // Should create a CSV file
+    expect(mockFolder.createFile).toHaveBeenCalledWith(
+      expect.stringContaining('AUDIT_LOG_OVERFLOW_'),
+      expect.stringContaining('Timestamp'),
+      'text/csv'
+    );
+
+    // Should save checkpoint hash from last archived row
+    expect(PropertiesService.getScriptProperties().setProperty).toHaveBeenCalledWith(
+      'AUDIT_CHAIN_CHECKPOINT_HASH', 'hash_2'
+    );
+
+    // Should delete the archived rows
+    expect(sheet.deleteRows).toHaveBeenCalledWith(2, 2);
+  });
+
+  test('falls back to DriveApp.getRootFolder when _getOrCreateBackupFolder unavailable', () => {
+    jest.clearAllMocks();
+    var origFn = global._getOrCreateBackupFolder;
+    delete global._getOrCreateBackupFolder;
+
+    var headers = ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column',
+      'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type', 'Integrity Hash'];
+    var row = [new Date(), 'u***r@test.com', '', '', '', '', '', '{}', 's', 'E', 'h'];
+    var sheet = createMockSheet('Audit Log', [headers, row]);
+    sheet.getLastColumn.mockReturnValue(11);
+
+    var mockRootFolder = {
+      createFile: jest.fn(() => ({ getId: jest.fn(() => 'f') })),
+      getId: jest.fn(() => 'root')
+    };
+    DriveApp.getRootFolder.mockReturnValue(mockRootFolder);
+
+    _archiveAuditRows_(sheet, 2, 1);
+
+    expect(DriveApp.getRootFolder).toHaveBeenCalled();
+    expect(mockRootFolder.createFile).toHaveBeenCalled();
+
+    global._getOrCreateBackupFolder = origFn;
+  });
+});
+
+// ============================================================================
+// T1-4: Email Hash column in audit log
+// ============================================================================
+
+describe('logAuditEvent Email Hash column', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.computeAuditRowHash_ = jest.fn(() => 'integrity_hash_value');
+  });
+
+  test('appends Email Hash as 12th column', () => {
+    var headers = ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column',
+      'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type',
+      'Integrity Hash', 'Email Hash'];
+    var sheet = createMockSheet(SHEETS.AUDIT_LOG || 'Audit Log', [headers]);
+    sheet.getLastRow.mockReturnValue(1);
+    sheet.getLastColumn.mockReturnValue(12);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    logAuditEvent('TEST_EVENT', { detail: 'test' });
+
+    expect(sheet.appendRow).toHaveBeenCalledTimes(1);
+    var appendedRow = sheet.appendRow.mock.calls[0][0];
+
+    // Column 12 (index 11) should be a 64-char hex SHA-256 hash
+    expect(appendedRow.length).toBe(12);
+    expect(appendedRow[11]).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test('adds Email Hash header when upgrading existing sheet', () => {
+    var headers = ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column',
+      'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type',
+      'Integrity Hash'];
+    // 11 columns — no Email Hash yet
+    var sheet = createMockSheet(SHEETS.AUDIT_LOG || 'Audit Log', [headers]);
+    sheet.getLastRow.mockReturnValue(1);
+    sheet.getLastColumn.mockReturnValue(11);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    logAuditEvent('TEST_EVENT', { detail: 'test' });
+
+    // Should have written 'Email Hash' header to column 12
+    expect(sheet.getRange).toHaveBeenCalledWith(1, 12);
+  });
+
+  test('SHA-256 hash is deterministic for same email', () => {
+    var headers = ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column',
+      'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type',
+      'Integrity Hash', 'Email Hash'];
+    var sheet = createMockSheet(SHEETS.AUDIT_LOG || 'Audit Log', [headers]);
+    sheet.getLastRow.mockReturnValue(1);
+    sheet.getLastColumn.mockReturnValue(12);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    logAuditEvent('EVENT_1', { a: 1 });
+    logAuditEvent('EVENT_2', { b: 2 });
+
+    var hash1 = sheet.appendRow.mock.calls[0][0][11];
+    var hash2 = sheet.appendRow.mock.calls[1][0][11];
+    expect(hash1).toBe(hash2);
   });
 });

@@ -432,6 +432,10 @@
       }
 
       var val = _settings[field.key] || '';
+      // T5-3: Unescape HTML entities so dirty-state comparison uses the same encoding as user input
+      var _tmp = document.createElement('textarea');
+      _tmp.innerHTML = val;
+      val = _tmp.value;
       input.value = val;
       input.disabled = isDisabled;
 

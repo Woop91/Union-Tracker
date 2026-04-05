@@ -182,3 +182,63 @@ describe('openNewSurveyPeriod (behavioral)', () => {
     }
   });
 });
+
+// ============================================================================
+// T1-5b: Past Survey Questions folder security
+// ============================================================================
+
+describe('Survey archive folder security', () => {
+  test('sets PRIVATE sharing when creating Past Survey Questions folder', () => {
+    jest.clearAllMocks();
+
+    var mockPeriodFolder = {
+      getUrl: jest.fn(() => 'https://drive.google.com/period'),
+      getId: jest.fn(() => 'period-id'),
+      createFile: jest.fn(() => ({ setTrashed: jest.fn() })),
+      getFilesByName: jest.fn(() => ({ hasNext: jest.fn(() => false) }))
+    };
+    var mockParentFolder = {
+      getId: jest.fn(() => 'parent-id'),
+      setSharing: jest.fn(),
+      setDescription: jest.fn(),
+      getFoldersByName: jest.fn(() => ({
+        hasNext: jest.fn(() => false)
+      })),
+      createFolder: jest.fn(() => mockPeriodFolder)
+    };
+    var mockRoot = {
+      getFoldersByName: jest.fn(() => ({
+        hasNext: jest.fn(() => false)
+      })),
+      createFolder: jest.fn(() => mockParentFolder)
+    };
+
+    global.getConfigValue_ = jest.fn(() => null);
+    DriveApp.getRootFolder.mockReturnValue(mockRoot);
+
+    // Must use HIDDEN_SHEETS.SURVEY_PERIODS ('_Survey_Periods') — the source looks up this name
+    // Row must have 8 columns matching SURVEY_PERIODS_HEADER_MAP_ order:
+    // Period ID | Period Name | Start Date | End Date | Status | Archive Folder URL | Created By | Response Count
+    var periodHeaders = ['Period ID', 'Period Name', 'Start Date', 'End Date', 'Status', 'Archive Folder URL', 'Created By', 'Response Count'];
+    var periodRow = ['SP-001', 'Q1-2026', '2026-01-01', '2026-03-31', 'Active', '', 'admin@test.com', 0];
+    var periodSheet = createMockSheet(HIDDEN_SHEETS.SURVEY_PERIODS, [periodHeaders, periodRow]);
+
+    var satisfactionHeaders = ['Period ID', 'Email', 'Rating', 'Comment'];
+    var satisfactionRow = ['SP-001', 'user@test.com', 4, 'Good'];
+    var satisfactionSheet = createMockSheet(SHEETS.SATISFACTION, [satisfactionHeaders, satisfactionRow]);
+
+    var configSheet = createMockSheet(SHEETS.CONFIG, [['key'], ['val']]);
+
+    var ss = createMockSpreadsheet([periodSheet, satisfactionSheet, configSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    if (typeof archiveSurveyPeriod_ === 'function') {
+      try { archiveSurveyPeriod_('SP-001'); } catch (_e) { /* may fail on other mocks */ }
+    }
+
+    expect(mockParentFolder.setSharing).toHaveBeenCalledWith(
+      DriveApp.Access.PRIVATE,
+      DriveApp.Permission.NONE
+    );
+  });
+});

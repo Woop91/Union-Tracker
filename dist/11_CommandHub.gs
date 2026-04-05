@@ -314,7 +314,7 @@ function showV4StatusReport() {
   report += '🏷️ SYSTEM IDENTITY:\n';
   report += '  Name: ' + COMMAND_CONFIG.SYSTEM_NAME + '\n';
   report += '  Version: ' + COMMAND_CONFIG.VERSION + ' (' + VERSION_INFO.BUILD_DATE + ')\n';
-  report += '  Codename: ' + VERSION_INFO.CODENAME + '\n';
+  report += '  Codename: ' + VERSION_INFO.codename + '\n';
   report += '  Architecture: Single-File Modular (10 Virtual Files)\n\n';
 
   // Production Status
@@ -493,7 +493,6 @@ function applyTabColors_(ss) {
   applyColor(SHEETS.MEETING_CHECKIN_LOG, TAB_COLORS.BLUE);
   applyColor(SHEETS.VOLUNTEER_HOURS, TAB_COLORS.BLUE);
   applyColor(SHEETS.SATISFACTION, TAB_COLORS.BLUE);
-  applyColor(SHEETS.FEEDBACK, TAB_COLORS.BLUE);
   applyColor(SHEETS.NOTIFICATIONS, TAB_COLORS.BLUE);
   applyColor(SHEETS.PORTAL_EVENTS, TAB_COLORS.BLUE);
   applyColor(SHEETS.PORTAL_MINUTES, TAB_COLORS.BLUE);
@@ -501,7 +500,6 @@ function applyTabColors_(ss) {
   // 🟠 Orange — Config & Admin (owner editable)
   applyColor(SHEETS.SURVEY_QUESTIONS, TAB_COLORS.ORANGE);
   applyColor(SHEETS.RESOURCE_CONFIG, TAB_COLORS.ORANGE);
-  applyColor(SHEETS.FUNCTION_CHECKLIST, TAB_COLORS.ORANGE);
   applyColor(SHEETS.CONFIG_GUIDE, TAB_COLORS.ORANGE);
   applyColor(SHEETS.CONFIG, TAB_COLORS.ORANGE);
   applyColor(SHEETS.SETTINGS_OVERVIEW, TAB_COLORS.ORANGE);

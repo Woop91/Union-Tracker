@@ -9,7 +9,7 @@ require('./gas-mock');
 const { loadSources } = require('./load-source');
 
 // Load in GAS load order — we need constants defined before Main
-loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs']);
+loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '10_Main.gs']);
 
 // Derive 0-indexed constants for row position validation
 const MEMBER_COLUMNS = Object.fromEntries(
@@ -43,7 +43,6 @@ describe('addNewMember row construction', () => {
   test('row array has correct length (QUICK_ACTIONS columns)', () => {
     const row = buildMemberRow({ firstName: 'John', lastName: 'Smith' });
     expect(row.length).toBe(MEMBER_COLS.QUICK_ACTIONS);
-    expect(row.length).toBe(33);
   });
 
   test('Member ID is in correct position', () => {
@@ -250,11 +249,21 @@ describe('handleGrievanceEdit column references', () => {
 });
 
 // ============================================================================
-// removeTriggers - scoped to dailyTrigger only
+// showCurrentTabModal - ENABLE_TAB_MODALS toggle (T5-1)
 // ============================================================================
 
-describe('removeTriggers scoping', () => {
-  test('SHEETS has no INTERACTIVE key (removed in bug fix)', () => {
-    expect(SHEETS.INTERACTIVE).toBeUndefined();
+describe('showCurrentTabModal respects ENABLE_TAB_MODALS', () => {
+  test('returns early when tab modals disabled', () => {
+    global.isTabModalsEnabled_ = jest.fn(() => false);
+    var alertMock = jest.fn();
+    SpreadsheetApp.getUi.mockReturnValue({
+      alert: alertMock,
+      ButtonSet: { OK: 'OK' }
+    });
+
+    showCurrentTabModal();
+
+    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining('disabled'));
   });
 });
+

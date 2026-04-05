@@ -131,6 +131,7 @@ function createAutocomplete(options) {
   var selected = null;
   var _cache = null;
   var _timer = null;
+  var _highlightIdx = -1;
 
   var wrapper = el('div', { className: 'form-group', style: { position: 'relative' } });
   var input = el('input', {
@@ -165,23 +166,46 @@ function createAutocomplete(options) {
     return row;
   };
 
+  function _updateHighlight() {
+    var items = dropdown.children;
+    for (var i = 0; i < items.length; i++) {
+      items[i].style.background = i === _highlightIdx ? 'var(--accentBg)' : 'transparent';
+      items[i].className = i === _highlightIdx ? 'ac-item highlighted' : 'ac-item';
+    }
+    if (_highlightIdx >= 0 && items[_highlightIdx]) {
+      items[_highlightIdx].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function _selectHighlighted() {
+    var items = dropdown.children;
+    if (_highlightIdx >= 0 && _highlightIdx < items.length) {
+      items[_highlightIdx].click();
+    }
+  }
+
   function loadAndFilter(q) {
     function doFilter(data) {
       dropdown.innerHTML = '';
+      _highlightIdx = -1;
       var matches = data.filter(function(item) { return filterFn(item, q); });
       if (maxResults) matches = matches.slice(0, maxResults);
       if (matches.length === 0) { dropdown.style.display = 'none'; return; }
 
-      matches.forEach(function(item) {
+      matches.forEach(function(item, idx) {
         var row = renderItem(item);
+        row.className = 'ac-item';
         row.addEventListener('click', function() {
           selected = item;
           input.value = item.email || item.name || '';
           dropdown.style.display = 'none';
+          _highlightIdx = -1;
           if (options.onSelect) options.onSelect(item);
         });
-        row.addEventListener('mouseenter', function() { row.style.background = 'var(--accentBg)'; });
-        row.addEventListener('mouseleave', function() { row.style.background = 'transparent'; });
+        row.addEventListener('mouseenter', function() { _highlightIdx = idx; _updateHighlight(); });
+        row.addEventListener('mouseleave', function() { _highlightIdx = -1; _updateHighlight(); });
+        row.addEventListener('touchstart', function() { row.style.background = 'var(--accentBg)'; }, { passive: true });
+        row.addEventListener('touchend', function() { row.style.background = 'transparent'; }, { passive: true });
         dropdown.appendChild(row);
       });
       dropdown.style.display = 'block';
@@ -196,6 +220,7 @@ function createAutocomplete(options) {
 
   input.addEventListener('input', function() {
     selected = null;
+    _highlightIdx = -1;
     var q = input.value.toLowerCase().trim();
     if (q.length < minQuery) { dropdown.style.display = 'none'; return; }
     if (debounceMs > 0) {
@@ -206,10 +231,35 @@ function createAutocomplete(options) {
     }
   });
 
+  // Keyboard navigation for dropdown items
+  input.addEventListener('keydown', function(e) {
+    var items = dropdown.children;
+    if (dropdown.style.display === 'none' || items.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _highlightIdx = _highlightIdx < items.length - 1 ? _highlightIdx + 1 : 0;
+      _updateHighlight();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _highlightIdx = _highlightIdx > 0 ? _highlightIdx - 1 : items.length - 1;
+      _updateHighlight();
+    } else if (e.key === 'Enter') {
+      if (_highlightIdx >= 0) {
+        e.preventDefault();
+        _selectHighlighted();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      dropdown.style.display = 'none';
+      _highlightIdx = -1;
+    }
+  });
+
   // Dismiss on outside click
   var DROPDOWN_BLUR_DELAY_MS = 200; // Delay allows click to register before blur hides dropdown
   input.addEventListener('blur', function() {
-    setTimeout(function() { dropdown.style.display = 'none'; }, DROPDOWN_BLUR_DELAY_MS);
+    setTimeout(function() { dropdown.style.display = 'none'; _highlightIdx = -1; }, DROPDOWN_BLUR_DELAY_MS);
   });
 
   return {

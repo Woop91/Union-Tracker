@@ -394,6 +394,11 @@ var QAForum = (function () {
       var data = sheet.getDataRange().getValues();
       for (var i = 1; i < data.length; i++) {
         if (data[i][0] === questionId) {
+          // v4.51.1: Block self-upvoting (BUG-4-01)
+          var questionAuthor = String(data[i][1] || '').toLowerCase().trim();
+          if (questionAuthor === email.toLowerCase().trim()) {
+            return { success: false, message: 'You cannot upvote your own question.' };
+          }
           var upvoters = String(data[i][7] || '');
           var upvoterList = upvoters ? upvoters.split(',') : [];
           var alreadyVoted = upvoterList.indexOf(emailHash) !== -1;
@@ -583,6 +588,41 @@ var QAForum = (function () {
   }
 
   // ═══════════════════════════════════════
+  // Reopen
+  // ═══════════════════════════════════════
+
+  /**
+   * Reopens a resolved question. Allowed by: question owner OR any steward.
+   * @param {string} email - Caller's email (server-resolved)
+   * @param {string} questionId
+   * @param {boolean} isSteward - Whether caller is a steward
+   */
+  function reopenQuestion(email, questionId, isSteward) {
+    if (!email || !questionId) return { success: false, message: 'Missing data.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+    var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
+    if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Question not found.' };
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === questionId) {
+        var isOwner = String(data[i][1]).toLowerCase().trim() === email.toLowerCase().trim();
+        if (!isOwner && !isSteward) return { success: false, message: 'Not authorized to reopen this question.' };
+        var current = String(data[i][5] || '').toLowerCase().trim();
+        if (current !== 'resolved') return { success: false, message: 'Only resolved questions can be reopened.' };
+        sheet.getRange(i + 1, 6).setValue('active');
+        sheet.getRange(i + 1, 11).setValue(new Date());
+        _invalidateCache(SHEETS.QA_FORUM);
+        logAuditEvent('QA_QUESTION_REOPENED', 'Question ' + questionId + ' reopened by ' + maskEmail(email));
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Question not found.' };
+  }
+
+  // ═══════════════════════════════════════
   // Helpers
   // ═══════════════════════════════════════
 
@@ -690,9 +730,9 @@ var QAForum = (function () {
    * @param {string} [sort] - Sort order: 'recent' or 'popular'.
    * @returns {{questions: Object[], total: number, page: number, pageSize: number}}
    */
-  function getOrgWideQuestions(userEmail, page, pageSize, sort) {
-    // Reuse existing getQuestions but with showResolved=true to include all
-    return getQuestions(userEmail, page, pageSize, sort, true);
+  function getOrgWideQuestions(userEmail, page, pageSize, sort, showResolved) {
+    // Reuse existing getQuestions — pass through user's showResolved preference
+    return getQuestions(userEmail, page, pageSize, sort, showResolved);
   }
 
   // ═══════════════════════════════════════
@@ -711,7 +751,8 @@ var QAForum = (function () {
     moderateQuestion: moderateQuestion,
     moderateAnswer: moderateAnswer,
     getFlaggedContent: getFlaggedContent,
-    resolveQuestion: resolveQuestion
+    resolveQuestion: resolveQuestion,
+    reopenQuestion: reopenQuestion
   };
 
 })();
@@ -737,7 +778,9 @@ function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStew
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
 /** @param {string} sessionToken @param {string} questionId @returns {Object} Resolve result (owner or steward). */
 function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_e) { log_('qaResolveQuestion', 'Error checking steward auth: ' + (_e.message || _e)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
-/** @param {string} sessionToken @param {number} [page] @param {number} [pageSize] @param {string} [sort] @returns {Object} Org-wide paginated question list. */
-function qaGetOrgWideQuestions(sessionToken, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getOrgWideQuestions(e, page, pageSize, sort); }
+/** @param {string} sessionToken @param {string} questionId @returns {Object} Reopen result (owner or steward). */
+function qaReopenQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_e) { log_('qaReopenQuestion', 'Error checking steward auth: ' + (_e.message || _e)); } return QAForum.reopenQuestion(e, questionId, isSteward); }
+/** @param {string} sessionToken @param {number} [page] @param {number} [pageSize] @param {string} [sort] @param {boolean} [showResolved] @returns {Object} Org-wide paginated question list. */
+function qaGetOrgWideQuestions(sessionToken, page, pageSize, sort, showResolved) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getOrgWideQuestions(e, page, pageSize, sort, showResolved); }
 /** @returns {void} Initializes Q&A forum sheets (no auth required — setup only). */
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

@@ -452,7 +452,7 @@ function getOrCreateMemberAdminFolder(memberEmail) {
     return { masterFolder: masterFolder, grievancesFolder: grievancesFolder };
 
   } catch (err) {
-    log_('getOrCreateMemberAdminFolder', 'getOrCreateMemberAdminFolder error for ' + memberEmail + ': ' + err.message);
+    log_('getOrCreateMemberAdminFolder', 'getOrCreateMemberAdminFolder error for ' + maskEmail(memberEmail) + ': ' + err.message);
     return null;
   }
 }
@@ -546,7 +546,7 @@ function setupDriveFolderForGrievance(grievanceId) {
       try {
         caseFolder.addEditor(memberEmail);
       } catch (shareErr) {
-        log_('setupDriveFolderForGrievance', 'could not share with member ' + memberEmail + ': ' + shareErr.message);
+        secureLog('setupDriveFolderForGrievance', 'could not share with member', { email: memberEmail, error: shareErr.message });
       }
     }
 
@@ -558,7 +558,7 @@ function setupDriveFolderForGrievance(grievanceId) {
       try {
         caseFolder.addEditor(stewardEmail);
       } catch (shareErr) {
-        log_('setupDriveFolderForGrievance', 'could not share with steward ' + stewardEmail + ': ' + shareErr.message);
+        secureLog('setupDriveFolderForGrievance', 'could not share with steward', { email: stewardEmail, error: shareErr.message });
       }
     }
 
@@ -3686,6 +3686,10 @@ function addKnowledgeContent(sessionToken, data) {
       // Invalidate cache
       _invalidateKnowledgeCache_();
 
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('KB_CONTENT_CREATED', { contentId: nextId, type: data.type || 'Tip', addedBy: addedBy });
+      }
+
       return { success: true, contentId: nextId, message: 'Content added' };
     });
   } catch (e) {
@@ -3755,6 +3759,9 @@ function updateKnowledgeContent(sessionToken, contentId, data) {
           sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
 
           _invalidateKnowledgeCache_();
+          if (typeof logAuditEvent === 'function') {
+            logAuditEvent('KB_CONTENT_UPDATED', { contentId: contentId, fields: Object.keys(data).join(','), updatedBy: auth.email || 'unknown' });
+          }
           return { success: true, message: 'Content updated' };
         }
       }
@@ -5113,7 +5120,7 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     if (idemKey) {
       var idemCache = CacheService.getScriptCache();
       if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored.' };
-      idemCache.put('IDEM_' + idemKey, '1', 300);
+      idemCache.put('IDEM_' + idemKey, '1', 600); // 10-minute TTL to reduce duplicate mutation risk
     }
 
     if (!stewardEmail || !data || !data.memberEmail) {

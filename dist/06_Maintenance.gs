@@ -58,8 +58,11 @@ function DIAGNOSE_SETUP() {
 
   var skipKeys = {
     DASHBOARD: true,           // Deprecated — removed by removeDeprecatedTabs()
-    SATISFACTION: true,        // Hidden tab — data accessed via modal. removeDeprecatedTabs() hides it.
-    TEST_RESULTS: true,        // Created on-demand by test framework only
+    SATISFACTION: true,        // Hidden tab — data accessed via modal
+    TEST_RESULTS: true,        // Hidden — created on-demand by test framework only
+    SETTINGS_OVERVIEW: true,   // Hidden — admin reference tab
+    CONFIG_GUIDE: true,        // Hidden — documentation tab
+    FEATURES_REFERENCE: true,  // Hidden — reference catalog tab
     MEMBER_DIRECTORY: true     // Backward-compat alias for MEMBER_DIR
   };
 
@@ -365,7 +368,6 @@ function _updateStep_featureSheets(ss, summary) {
   var featureSteps = [
     { name: 'Survey Questions', fn: function() { createSurveyQuestionsSheet(ss); } },
     { name: 'Satisfaction', fn: function() { createSatisfactionSheet(ss); } },
-    { name: 'Feedback', fn: function() { createFeedbackSheet(ss); } },
     { name: 'Resources', fn: function() { if (typeof createResourcesSheet === 'function') createResourcesSheet(ss); } },
     { name: 'Resource Config', fn: function() { if (typeof createResourceConfigSheet === 'function') createResourceConfigSheet(ss); } },
     { name: 'Notifications', fn: function() { if (typeof createNotificationsSheet === 'function') createNotificationsSheet(ss); } },
@@ -376,7 +378,6 @@ function _updateStep_featureSheets(ss, summary) {
     { name: 'FAQ', fn: function() { createFAQSheet(ss); } },
     { name: 'Config Guide', fn: function() { createConfigGuideSheet(ss); } },
     { name: 'Features Reference', fn: function() { createFeaturesReferenceSheet(ss); } },
-    { name: 'Function Checklist', fn: function() { createFunctionChecklistSheet_(); } },
     { name: 'Contact Log', fn: function() { _ensureContactLogSheet(ss); } },
     { name: 'Steward Tasks', fn: function() { _ensureStewardTasksSheet(ss); } },
     { name: 'Workload Tracker', fn: function() { if (typeof initWorkloadTrackerSheets === 'function') initWorkloadTrackerSheets(); } },
@@ -463,19 +464,51 @@ function _updateStep_protection(ss, summary) {
  * @private
  */
 function _updateStep_reorder(ss, summary) {
-  ss.toast('Reordering sheets...', '🔄 Step 7/8', 2);
+  ss.toast('Reordering sheets...', '🔄 Step 7/9', 2);
   reorderSheetsToStandard(ss);
   summary.updated.push('Sheet order');
 }
 
 /**
- * Step 8: Sync all calculation data + repair checkboxes.
+ * Step 8: Auto-hide deprecated and low-value tabs.
+ * These tabs still exist for data/reference but clutter the tab bar.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {Object} summary
+ * @private
+ */
+function _updateStep_hideDeprecatedTabs(ss, summary) {
+  ss.toast('Hiding deprecated tabs...', '🔄 Step 8/9', 2);
+  var toHide = [
+    SHEETS.SATISFACTION,
+    SHEETS.TEST_RESULTS,
+    SHEETS.SETTINGS_OVERVIEW,
+    SHEETS.CONFIG_GUIDE,
+    SHEETS.FEATURES_REFERENCE
+  ];
+  var hiddenCount = 0;
+  for (var i = 0; i < toHide.length; i++) {
+    var sheet = ss.getSheetByName(toHide[i]);
+    if (sheet && !sheet.isSheetHidden()) {
+      sheet.hideSheet();
+      hiddenCount++;
+    }
+  }
+  // Also delete Dashboard if it still exists (deprecated v4.3.2)
+  var dashSheet = ss.getSheetByName(SHEETS.DASHBOARD);
+  if (dashSheet && ss.getSheets().length > 1) {
+    try { ss.deleteSheet(dashSheet); hiddenCount++; } catch (_e) { /* ignore */ }
+  }
+  if (hiddenCount > 0) summary.updated.push(hiddenCount + ' deprecated tabs hidden/removed');
+}
+
+/**
+ * Step 9: Sync all calculation data + repair checkboxes.
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
  * @param {Object} summary
  * @private
  */
 function _updateStep_dataSync(ss, summary) {
-  ss.toast('Syncing calculation data...', '🔄 Step 8/8', 3);
+  ss.toast('Syncing calculation data...', '🔄 Step 9/9', 3);
   syncAllData();
   summary.updated.push('Calculation data synced');
 
@@ -500,6 +533,7 @@ function UPDATE_ALL_SHEETS() {
       '• Reapply data validations (dropdowns)\n' +
       '• Re-enforce hidden sheet protection\n' +
       '• Reorder sheets to standard layout\n' +
+      '• Hide deprecated/reference-only tabs\n' +
       '• Sync all calculation data\n\n' +
       'Your data will NOT be deleted.\n\n' +
       'Continue?',
@@ -530,6 +564,7 @@ function UPDATE_ALL_SHEETS() {
     { name: 'Validation',       fn: _updateStep_validation },
     { name: 'Protection',       fn: _updateStep_protection },
     { name: 'Reorder',          fn: _updateStep_reorder },
+    { name: 'Hide Deprecated',  fn: _updateStep_hideDeprecatedTabs },
     { name: 'Data Sync',        fn: _updateStep_dataSync }
   ];
 
@@ -592,9 +627,13 @@ function removeDeprecatedTabs() {
     SHEETS.DASHBOARD,     // 💼 Dashboard — replaced by modal dashboards (v4.3.2)
     '🎯 Custom View'      // Replaced by modal dashboards (v4.2.3)
   ];
-  // Exact-match names — hide (not delete) because data is still accessed by modals
+  // Exact-match names — hide (not delete) because data is still accessed by modals/code
   var hideMatches = [
-    SHEETS.SATISFACTION   // 📊 Member Satisfaction — data used by showSatisfactionDashboard()
+    SHEETS.SATISFACTION,        // 📊 Member Satisfaction — data used by showSatisfactionDashboard()
+    SHEETS.TEST_RESULTS,        // 🧪 Test Results — dev/testing only
+    SHEETS.SETTINGS_OVERVIEW,   // 🔍 Settings Overview — admin reference, redundant with Config menu
+    SHEETS.CONFIG_GUIDE,        // 📖 Config Guide — documentation, covered by FAQ/help modal
+    SHEETS.FEATURES_REFERENCE   // 📋 Features Reference — reference catalog, covered by help modal
   ];
   // Prefix patterns — delete if name starts with the pattern (intentional wildcard)
   var prefixPatterns = [
@@ -1650,6 +1689,83 @@ function exportUndoHistoryToSheet() {
 // ============================================================================
 
 /**
+ * Archives audit log rows to a Drive CSV before deletion.
+ * Lock-free — safe to call from within withScriptLock_ contexts.
+ * @param {Sheet} auditSheet - The audit log sheet
+ * @param {number} startRow - First row to archive (1-indexed, typically 2)
+ * @param {number} count - Number of rows to archive and delete
+ */
+function _archiveAuditRows_(auditSheet, startRow, count) {
+  var headers = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+  var data = auditSheet.getRange(startRow, 1, count, auditSheet.getLastColumn()).getValues();
+
+  // Build CSV with proper quoting
+  var csv = headers.map(function(h) { return '"' + String(h).replace(/"/g, '""') + '"'; }).join(',') + '\n';
+  for (var r = 0; r < data.length; r++) {
+    csv += data[r].map(function(cell) {
+      var val = cell instanceof Date ? cell.toISOString() : String(cell || '');
+      return '"' + val.replace(/"/g, '""') + '"';
+    }).join(',') + '\n';
+  }
+
+  // Write to Drive (PRIVATE folder)
+  var folder = typeof _getOrCreateBackupFolder === 'function'
+    ? _getOrCreateBackupFolder() : DriveApp.getRootFolder();
+  var fileName = 'AUDIT_LOG_OVERFLOW_' + new Date().toISOString().slice(0, 10) + '_' + count + 'rows.csv';
+  folder.createFile(fileName, csv, 'text/csv');
+
+  // Save checkpoint hash before deletion
+  var hashColIdx = -1;
+  for (var ci = 0; ci < headers.length; ci++) {
+    if (String(headers[ci]).trim() === 'Integrity Hash') { hashColIdx = ci; break; }
+  }
+  if (hashColIdx >= 0) {
+    var checkpointHash = String(data[data.length - 1][hashColIdx] || '');
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('AUDIT_CHAIN_CHECKPOINT_HASH', checkpointHash);
+    props.setProperty('AUDIT_CHAIN_CHECKPOINT_TIMESTAMP', new Date().toISOString());
+  }
+
+  // Delete archived rows
+  auditSheet.deleteRows(startRow, count);
+}
+
+/**
+ * Trims excess audit log rows with checkpoint hash preservation.
+ * Fallback path when archive-before-trim fails.
+ * @param {Sheet} auditSheet - The audit log sheet
+ * @param {number} rowCount - Current total row count including header
+ */
+function _trimAuditWithCheckpoint_(auditSheet, rowCount) {
+  var rowsToDelete = rowCount - 10000 - 1; // -1 for header
+  if (rowsToDelete <= 0) return;
+
+  try {
+    var checkpointRow = 1 + rowsToDelete;
+    var trimHeaders = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+    var hashColIdx = -1;
+    for (var ci = 0; ci < trimHeaders.length; ci++) {
+      if (String(trimHeaders[ci]).trim() === 'Integrity Hash') {
+        hashColIdx = ci + 1;
+        break;
+      }
+    }
+    if (hashColIdx > 0) {
+      var checkpointHash = String(auditSheet.getRange(checkpointRow, hashColIdx).getValue() || '');
+      PropertiesService.getScriptProperties().setProperty(
+        'AUDIT_CHAIN_CHECKPOINT_HASH', checkpointHash
+      );
+      PropertiesService.getScriptProperties().setProperty(
+        'AUDIT_CHAIN_CHECKPOINT_TIMESTAMP', new Date().toISOString()
+      );
+    }
+  } catch (cpErr) {
+    log_('_trimAuditWithCheckpoint_', 'Warning: Could not save audit chain checkpoint: ' + cpErr.message);
+  }
+  auditSheet.deleteRows(2, rowsToDelete);
+}
+
+/**
  * Logs an audit event to the Audit Log sheet.
  * v4.8.1: Adds an Integrity Hash column (F) that forms a hash chain —
  * each row's hash includes the previous row's hash, so any tampering
@@ -1673,6 +1789,7 @@ function logAuditEvent(eventType, details) {
         ? getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_)
         : ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column', 'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type'];
       headerRow.push('Integrity Hash');
+      headerRow.push('Email Hash');
       auditSheet.appendRow(headerRow);
       auditSheet.setFrozenRows(1);
     } else {
@@ -1688,6 +1805,14 @@ function logAuditEvent(eventType, details) {
       if (!hasIntegrityCol) {
         var nextCol = auditSheet.getLastColumn() + 1;
         auditSheet.getRange(1, nextCol).setValue('Integrity Hash');
+      }
+      var hasEmailHashCol = false;
+      for (var eh = 0; eh < headers.length; eh++) {
+        if (String(headers[eh]).trim() === 'Email Hash') { hasEmailHashCol = true; break; }
+      }
+      if (!hasEmailHashCol) {
+        var nextCol2 = auditSheet.getLastColumn() + 1;
+        auditSheet.getRange(1, nextCol2).setValue('Email Hash');
       }
     }
 
@@ -1722,6 +1847,15 @@ function logAuditEvent(eventType, details) {
       integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, rawEmail, detailsJson, sessionId);
     }
 
+    var emailHash = '';
+    try {
+      var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+        rawEmail.toLowerCase().trim());
+      emailHash = digest.map(function(b) {
+        return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2);
+      }).join('');
+    } catch (_hashErr) { /* non-critical */ }
+
     // H-43: Write in 10-col schema: Timestamp, User Email, Sheet, Row, Column,
     // Field Name, Old Value, New Value, Record ID, Action Type, Integrity Hash.
     // For event-level logging, Sheet/Row/Column/Field Name are empty; details go
@@ -1737,41 +1871,20 @@ function logAuditEvent(eventType, details) {
       detailsJson,         // New Value (event details JSON)
       sessionId,           // Record ID (session key)
       eventType,           // Action Type (event type)
-      integrityHash        // Integrity Hash
+      integrityHash,       // Integrity Hash
+      emailHash            // Email Hash (SHA-256)
     ]);
 
-    // Trim old entries if sheet gets too large (keep last 10,000)
-    // CR-30 WARNING: Deleting rows breaks the integrity hash chain because each
-    // row's hash is chained to the previous row. Before trimming, save the hash
-    // of the last row being deleted as a "chain checkpoint" in ScriptProperties
-    // so that verifyAuditLogIntegrity() can start verification from this checkpoint.
-    const rowCount = auditSheet.getLastRow();
-    if (rowCount > 10000) {
-      var rowsToDelete = rowCount - 10000;
-      // Save the hash of the last deleted row as a chain checkpoint
+    // Archive-before-trim: ensure no rows are permanently deleted without a Drive backup
+    var rowCount = auditSheet.getLastRow();
+    if (rowCount > 10001) { // > 10000 data rows + 1 header
+      var rowsToDelete = rowCount - 10001;
       try {
-        var checkpointRow = 1 + rowsToDelete; // last row being deleted (1-indexed, row 1 is header)
-        var trimHeaders = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
-        var hashColIdx = -1;
-        for (var ci = 0; ci < trimHeaders.length; ci++) {
-          if (String(trimHeaders[ci]).trim() === 'Integrity Hash') {
-            hashColIdx = ci + 1;
-            break;
-          }
-        }
-        if (hashColIdx > 0) {
-          var checkpointHash = String(auditSheet.getRange(checkpointRow, hashColIdx).getValue() || '');
-          PropertiesService.getScriptProperties().setProperty(
-            'AUDIT_CHAIN_CHECKPOINT_HASH', checkpointHash
-          );
-          PropertiesService.getScriptProperties().setProperty(
-            'AUDIT_CHAIN_CHECKPOINT_TIMESTAMP', new Date().toISOString()
-          );
-        }
-      } catch (cpErr) {
-        log_('logAuditEvent', 'Warning: Could not save audit chain checkpoint: ' + cpErr.message);
+        _archiveAuditRows_(auditSheet, 2, rowsToDelete);
+      } catch (archiveErr) {
+        log_('logAuditEvent', 'Archive-before-trim failed, falling back to checkpoint trim: ' + archiveErr.message);
+        _trimAuditWithCheckpoint_(auditSheet, rowCount);
       }
-      auditSheet.deleteRows(2, rowsToDelete);
     }
 
   } catch (error) {
@@ -3191,4 +3304,106 @@ function migrateContactLogFolderUrlColumn() {
     log_('migrateContactLogFolderUrlColumn ERROR', err.message);
     SpreadsheetApp.getActive().toast('Migration error: ' + err.message, '❌ Migration failed', 10);
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Column Reorder — physically move Member Directory columns to canonical order
+// ════════════════════════��═══════════════════════════════���═════════════════════
+
+/**
+ * Reorders Member Directory columns to match canonical MEMBER_HEADER_MAP_ order.
+ * Uses sheet.moveColumns() to preserve data, formulas, formatting, and validation.
+ * Extra columns (not in the canonical map) are left at the end in their original relative order.
+ * Duplicate headers are detected and the rightmost copy is deleted.
+ *
+ * Run from Apps Script editor: reorderMemberDirectoryColumns()
+ */
+function reorderMemberDirectoryColumns() {
+  var TAG = 'reorderColumns';
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) {
+    log_(TAG, 'Member Directory sheet not found');
+    SpreadsheetApp.getActive().toast('Member Directory sheet not found.', '❌ Reorder failed', 5);
+    return;
+  }
+
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 2) { log_(TAG, 'Sheet has < 2 columns — nothing to reorder'); return; }
+
+  var canonicalHeaders = getMemberHeaders(); // ordered from MEMBER_HEADER_MAP_
+  var moved = 0;
+
+  // ── Phase 1: Move each canonical column to its target position ─────────
+  for (var target = 0; target < canonicalHeaders.length; target++) {
+    var targetCol = target + 1; // 1-indexed
+    var canonical = canonicalHeaders[target];
+
+    // Re-read headers after each move (positions shift)
+    lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+      .map(function(h) { return String(h).trim(); });
+
+    // Already in place?
+    if (headers[target] === canonical) continue;
+    if (headers[target] && headers[target].toLowerCase() === canonical.toLowerCase()) {
+      // Correct column, wrong case — fix header text in-place
+      sheet.getRange(1, targetCol).setValue(canonical);
+      continue;
+    }
+
+    // Find where this header currently is (case-insensitive)
+    var currentCol = -1;
+    for (var i = target + 1; i < headers.length; i++) {
+      if (headers[i] === canonical || (headers[i] && headers[i].toLowerCase() === canonical.toLowerCase())) {
+        currentCol = i + 1; // 1-indexed
+        break;
+      }
+    }
+
+    if (currentCol === -1) continue; // header not in sheet, skip
+
+    // moveColumns(sourceRange, destinationIndex)
+    // destinationIndex is where the column will END UP (1-indexed)
+    sheet.moveColumns(sheet.getRange(1, currentCol, sheet.getMaxRows(), 1), targetCol);
+    // Fix header case if needed
+    var movedHeader = String(sheet.getRange(1, targetCol).getValue()).trim();
+    if (movedHeader !== canonical) sheet.getRange(1, targetCol).setValue(canonical);
+
+    moved++;
+    log_(TAG, 'moved "' + canonical + '": col ' + currentCol + ' \u2192 col ' + targetCol);
+  }
+
+  // ── Phase 2: Remove duplicate canonical headers ────────────────────────
+  lastCol = sheet.getLastColumn();
+  var finalHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(h) { return String(h).trim(); });
+
+  var seen = {};
+  var dupsToDelete = [];
+  for (var d = 0; d < finalHeaders.length; d++) {
+    var h = finalHeaders[d];
+    if (!h) continue;
+    var lower = h.toLowerCase();
+    if (seen[lower]) {
+      dupsToDelete.push(d + 1); // 1-indexed
+    }
+    seen[lower] = true;
+  }
+
+  // Delete from right to left so indices stay valid
+  dupsToDelete.sort(function(a, b) { return b - a; });
+  for (var dd = 0; dd < dupsToDelete.length; dd++) {
+    var dupCol = dupsToDelete[dd];
+    var dupName = finalHeaders[dupCol - 1];
+    sheet.deleteColumn(dupCol);
+    log_(TAG, 'removed duplicate "' + dupName + '" at col ' + dupCol);
+  }
+
+  // ── Phase 3: Refresh column maps ──────────────────────────────────────
+  SpreadsheetApp.flush();
+  try { syncColumnMaps(); } catch (_e) { /* best effort */ }
+
+  var msg = 'Reordered ' + moved + ' column(s), removed ' + dupsToDelete.length + ' duplicate(s).';
+  log_(TAG, msg);
+  SpreadsheetApp.getActive().toast(msg, '✅ Column reorder complete', 8);
 }

@@ -349,15 +349,21 @@ function archiveSurveyPeriod_(periodId) {
       var parentFolder;
       if (pastFolderId) {
         parentFolder = DriveApp.getFolderById(pastFolderId);
+        try { parentFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE); } catch (_e) {}
       } else {
         // Fall back to root drive folder from Config
         var rootFolderId = getConfigValue_(CONFIG_COLS.DASHBOARD_ROOT_FOLDER_ID);
         var root = rootFolderId ? DriveApp.getFolderById(rootFolderId) : DriveApp.getRootFolder();
         // Create "Past Survey Questions" folder under root
         var pastFolderIter = root.getFoldersByName('Past Survey Questions');
-        parentFolder = pastFolderIter.hasNext()
-          ? pastFolderIter.next()
-          : root.createFolder('Past Survey Questions');
+        if (pastFolderIter.hasNext()) {
+          parentFolder = pastFolderIter.next();
+          try { parentFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE); } catch (_e) {}
+        } else {
+          parentFolder = root.createFolder('Past Survey Questions');
+          parentFolder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+          parentFolder.setDescription('Archived survey data — may contain respondent information. Do not share.');
+        }
       }
 
       // Create period subfolder

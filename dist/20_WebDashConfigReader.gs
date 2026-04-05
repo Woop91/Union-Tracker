@@ -14,7 +14,7 @@
  * WHY IT EXISTS / DESIGN DECISIONS:
  *   The three-tier cache minimizes expensive sheet reads (each getDataRange()
  *   is an IPC call to Google's server). In-execution memo prevents redundant
- *   cache.get() + JSON.parse() within the same GAS execution. 6-hour
+ *   cache.get() + JSON.parse() within the same GAS execution. 5-minute
  *   CacheService TTL balances freshness with performance. The IIFE pattern
  *   creates a clean namespace. SPA-specific settings (accent hue, labels) are
  *   not stored in Config — sensible defaults are used to reduce config

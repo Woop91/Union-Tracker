@@ -115,7 +115,6 @@ function createDashboardMenu() {
       .addItem('📚 Search Precedents', 'showSearchPrecedents'))
 
     .addSeparator()
-    .addItem('💡 Submit Feedback', 'showSubmitFeedbackModal')
     .addItem('🤝 Log Volunteer Hours', 'showLogVolunteerHoursModal')
     .addItem('👥 Add Non-Member Contact', 'showAddContactModal')
     .addItem('✅ Case Checklist Progress', 'showCaseProgressModal')
@@ -198,7 +197,6 @@ function createDashboardMenu() {
       .addItem('👥 Member Directory', 'showTabModalMemberDirectory')
       .addItem('⚖️ Grievance Log', 'showTabModalGrievanceLog')
       .addItem('✅ Case Checklist', 'showTabModalCaseChecklist')
-      .addItem('💡 Feedback', 'showTabModalFeedback')
       .addItem('🤝 Volunteer Hours', 'showTabModalVolunteerHours')
       .addItem('📅 Meeting Attendance', 'showTabModalMeetingAttendance')
       .addItem('📝 Meeting Check-In', 'showTabModalMeetingCheckIn')
@@ -2992,82 +2990,6 @@ function getModalHead_() {
 // MODAL 1: SUBMIT FEEDBACK
 // ============================================================================
 
-/**
- * Shows the Submit Feedback modal dialog.
- * Menu: Tools > Feedback > Submit New Idea/Bug Report
- */
-function showSubmitFeedbackModal() {
-  showDialog_(getSubmitFeedbackHtml_(), '💡 Submit Feedback', DIALOG_SIZES.MEDIUM.width, DIALOG_SIZES.MEDIUM.height);
-}
-
-function getSubmitFeedbackHtml_() {
-  return '<!DOCTYPE html><html><head>' + getModalHead_() + getModalStyles_() + '</head><body>' +
-    '<h2>Submit Feedback or Feature Request</h2>' +
-    '<div id="msg"></div>' +
-    '<div class="form-group"><label>Category</label>' +
-    '<select id="category"><option value="">Select...</option><option>Bug Report</option><option>Feature Request</option><option>Improvement</option><option>Question</option><option>Other</option></select></div>' +
-    '<div class="row"><div class="form-group"><label>Priority</label>' +
-    '<select id="priority"><option value="">Select...</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>' +
-    '<div class="form-group"><label>Status</label><input id="status" value="New" readonly></div></div>' +
-    '<div class="form-group"><label>Title</label><input id="title" placeholder="Brief summary of the feedback"></div>' +
-    '<div class="form-group"><label>Description</label><textarea id="description" rows="4" placeholder="Detailed description..."></textarea></div>' +
-    '<div class="actions"><button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
-    '<button class="btn btn-primary" id="submitBtn" onclick="submitFeedback()">Submit</button></div>' +
-    '<script>' +
-    'function submitFeedback() {' +
-    '  var cat = document.getElementById("category").value;' +
-    '  var pri = document.getElementById("priority").value;' +
-    '  var title = document.getElementById("title").value;' +
-    '  var desc = document.getElementById("description").value;' +
-    '  if (!cat || !pri || !title) { showMsg("Please fill in Category, Priority, and Title.", "error"); return; }' +
-    '  document.getElementById("submitBtn").disabled = true;' +
-    '  document.getElementById("submitBtn").textContent = "Submitting...";' +
-    '  google.script.run.withSuccessHandler(function(r) {' +
-    '    if (r && r.success) { showMsg("Feedback submitted! ID: " + r.id, "success"); setTimeout(function() { google.script.host.close(); }, 1500); }' +
-    '    else { showMsg(r && r.error || "Failed to submit", "error"); document.getElementById("submitBtn").disabled = false; document.getElementById("submitBtn").textContent = "Submit"; }' +
-    '  }).withFailureHandler(function(e) { showMsg("Error: " + e.message, "error"); document.getElementById("submitBtn").disabled = false; document.getElementById("submitBtn").textContent = "Submit"; })' +
-    '  .modalSubmitFeedback(cat, pri, title, desc);' +
-    '}' +
-    'function showMsg(text, type) { var el = document.getElementById("msg"); el.className = "msg msg-" + type; el.textContent = text; el.style.display = "block"; }' +
-    '</script></body></html>';
-}
-
-/**
- * Server-side handler for feedback submission.
- * @param {string} category
- * @param {string} priority
- * @param {string} title
- * @param {string} description
- * @returns {{ success: boolean, id?: string, error?: string }}
- */
-function modalSubmitFeedback(category, priority, title, description) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
-    if (!sheet) return { success: false, error: 'Feedback sheet not found' };
-
-    var timestamp = new Date();
-    var user = Session.getActiveUser().getEmail() || 'Unknown';
-    var id = 'FB-' + Utilities.formatDate(timestamp, 'America/New_York', 'yyyyMMdd-HHmmss');
-
-    sheet.appendRow([
-      timestamp,
-      escapeForFormula(user),
-      escapeForFormula(category),
-      escapeForFormula(priority),
-      escapeForFormula(title),
-      escapeForFormula(description),
-      'New',
-      ''
-    ]);
-
-    return { success: true, id: id };
-  } catch (e) {
-    log_('modalSubmitFeedback', 'Error: ' + e.message);
-    return { success: false, error: e.message };
-  }
-}
-
 // ============================================================================
 // MODAL 2: ADD EVENT
 // ============================================================================
@@ -4245,16 +4167,6 @@ function showTabModalCaseChecklist() {
     '<div class="quick-action" onclick="runAction(\'unlockChecklistSheet\')"><div class="qa-icon">🔓</div><div class="qa-text"><strong>Unlock Sheet</strong><small>Remove protection if locked</small></div></div>' +
     '<div class="tip-box">💡 <strong>Tip:</strong> Each row tracks a grievance case\'s checklist. Checkboxes auto-calculate completion percentage in the progress column.</div>';
   showTabModal_(getTabModalHtml_('CASE_CHECKLIST', '✅ Case Checklist', body), '✅ Case Checklist');
-}
-
-// ── Feedback & Development Tab Modal ──
-
-function showTabModalFeedback() {
-  var body =
-    '<div class="section-label">Quick Actions</div>' +
-    '<div class="quick-action" onclick="runAction(\'showSubmitFeedbackModal\')"><div class="qa-icon">💡</div><div class="qa-text"><strong>Submit New Feedback</strong><small>Report a bug, idea, or feature request</small></div></div>' +
-    '<div class="tip-box">💡 <strong>Tip:</strong> This sheet tracks member and steward feedback, feature requests, and bug reports. New entries appear at the bottom. Use the Category and Priority columns to filter.</div>';
-  showTabModal_(getTabModalHtml_('FEEDBACK', '💡 Feedback & Development', body), '💡 Feedback & Development');
 }
 
 // ── Volunteer Hours Tab Modal ──

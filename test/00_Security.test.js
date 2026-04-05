@@ -122,12 +122,12 @@ describe('escapeForFormula', () => {
     expect(escapeForFormula('a-b')).toBe('a-b');
   });
 
-  test('escapes single quotes', () => {
-    expect(escapeForFormula("it's")).toBe("it''s");
+  test('preserves single quotes (no SQL-style doubling)', () => {
+    expect(escapeForFormula("it's")).toBe("it's");
   });
 
-  test('escapes double quotes', () => {
-    expect(escapeForFormula('say "hi"')).toBe('say ""hi""');
+  test('preserves double quotes (no SQL-style doubling)', () => {
+    expect(escapeForFormula('say "hi"')).toBe('say "hi"');
   });
 
   test('replaces newlines with spaces', () => {

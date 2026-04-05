@@ -254,7 +254,12 @@ var WeeklyQuestions = (function () {
         counts[resp] = (counts[resp] || 0) + 1;
         if (responses[r][R_COLS.EMAIL_HASH] === emailHash) q.hasResponded = true;
       }
-      q.stats = { total: total, counts: counts };
+      // T6-2: Only expose vote counts after user has voted (prevent strategic voting)
+      if (q.hasResponded) {
+        q.stats = { total: total, counts: counts };
+      } else {
+        q.stats = { total: total, counts: null };
+      }
     });
 
     return { questions: active };

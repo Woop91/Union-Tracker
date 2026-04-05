@@ -31,6 +31,11 @@ loadSources([
   '08d_AuditAndFormulas.gs'
 ]);
 
+// Clean up module-level mocks between tests
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 // ============================================================================
 // padRight
 // ============================================================================

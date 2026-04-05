@@ -1383,10 +1383,9 @@ function computeSatisfactionRowAverages(row) {
  * - Grievance Log <-> Member Directory bidirectional sync
  * - Dashboard value computation and updates
  * - Auto-sync triggers and configuration
- * - Feedback sheet metrics sync
  *
  * Dependencies:
- * - 00_Config.gs (SHEETS, GRIEVANCE_COLS, MEMBER_COLS, CONFIG_COLS, FEEDBACK_COLS, COLORS)
+ * - 00_Config.gs (SHEETS, GRIEVANCE_COLS, MEMBER_COLS, CONFIG_COLS, COLORS)
  * - 01_Utilities.gs (getColumnLetter, getConfigValues, getJobMetadataByMemberCol)
  *
  * @author Claude Code Assistant
@@ -2094,9 +2093,6 @@ function onEditAutoSync(e) {
       syncMemberToGrievanceLog();
       // Update Dashboard with new computed values
       syncDashboardValues();
-    } else if (sheetName === SHEETS.FEEDBACK) {
-      // Feedback sheet changed - update computed metrics
-      syncFeedbackValues();
     }
   } catch (error) {
     log_('Auto-sync error', error.message);
@@ -3217,84 +3213,6 @@ function applyDashboardGradients_(sheet) {
 // ============================================================================
 
 /**
- * Sync computed values to Feedback sheet metrics
- */
-function syncFeedbackValues() {
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) { log_('syncFeedbackValues', 'lock contention — skipped'); return; }
-  try {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
-
-  if (!sheet) {
-    log_('syncFeedbackValues', 'Feedback sheet not found');
-    return;
-  }
-
-  var lastRow = sheet.getLastRow();
-
-  // Get feedback data
-  var totalItems = 0;
-  var bugs = 0;
-  var features = 0;
-  var improvements = 0;
-  var newOpen = 0;
-  var resolved = 0;
-  var critical = 0;
-
-  if (lastRow >= 2) {
-    // Get data from columns Category, Status, Priority
-    // TYPE column removed v4.24.1 — Category covers same ground
-    var categoryCol = FEEDBACK_COLS.CATEGORY;
-    var statusCol = FEEDBACK_COLS.STATUS;
-    var priorityCol = FEEDBACK_COLS.PRIORITY;
-
-    var maxCol = Math.max(categoryCol || 0, statusCol || 0, priorityCol || 0);
-    if (maxCol < 1) return; // guard: no valid columns resolved
-
-    var data = sheet.getRange(2, 1, lastRow - 1, maxCol).getValues();
-
-    for (var r = 0; r < data.length; r++) {
-      var row = data[r];
-      if (!row[0]) continue; // Skip empty rows
-
-      totalItems++;
-
-      var category = categoryCol ? row[categoryCol - 1] : '';
-      var status = statusCol ? row[statusCol - 1] : '';
-      var priority = priorityCol ? row[priorityCol - 1] : '';
-
-      if (category === 'Bug' || category === 'Performance') bugs++;
-      else if (category === 'Integration' || category === 'UI/UX') features++;
-      else if (category === 'Reports' || category === 'Search') improvements++;
-
-      if (status === 'New' || status === 'In Progress') newOpen++;
-      else if (status === 'Resolved') resolved++;
-
-      if (priority === 'Critical') critical++;
-    }
-  }
-
-  var resolutionRate = totalItems > 0 ? Math.round(resolved / totalItems * 1000) / 10 + '%' : '0%';
-
-  // Write metrics to columns M-O (13-15), rows 3-10
-  var metricsData = [
-    ['Total Items', totalItems, 'All feedback items'],
-    ['Bugs', bugs, 'Bug reports'],
-    ['Feature Requests', features, 'New feature asks'],
-    ['Improvements', improvements, 'Enhancement suggestions'],
-    ['New/Open', newOpen, 'Unresolved items'],
-    ['Resolved', resolved, 'Completed items'],
-    ['Critical Priority', critical, 'Urgent items'],
-    ['Resolution Rate', resolutionRate, 'Percentage resolved']
-  ];
-
-  sheet.getRange(3, 13, metricsData.length, 3).setValues(metricsData);
-
-  log_('syncFeedbackValues', 'Feedback values synced');
-  } finally { lock.releaseLock(); }
-}
-/**
  * Get data for flagged submissions review
  * @returns {Object} Pending submissions data (email, date, row number - NO survey answers)
  */
@@ -3633,8 +3551,8 @@ function formatGettingStartedTab_(ss) {
   var navGroups = [
     { label: 'CORE DATA', color: '#6A1B9A', tabs: [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG, SHEETS.CASE_CHECKLIST] },
     { label: 'REFERENCE', color: SHEET_COLORS.THEME_GOLD, tabs: [SHEETS.FAQ, SHEETS.RESOURCES, SHEETS.FEATURES_REFERENCE] },
-    { label: 'ENGAGEMENT', color: SHEET_COLORS.TAB_GREEN, tabs: [SHEETS.MEETING_ATTENDANCE, SHEETS.FEEDBACK, SHEETS.SATISFACTION] },
-    { label: 'ADMIN', color: SHEET_COLORS.TAB_RED_ORANGE, tabs: [SHEETS.FUNCTION_CHECKLIST, SHEETS.CONFIG] }
+    { label: 'ENGAGEMENT', color: SHEET_COLORS.TAB_GREEN, tabs: [SHEETS.MEETING_ATTENDANCE, SHEETS.SATISFACTION] },
+    { label: 'ADMIN', color: SHEET_COLORS.TAB_RED_ORANGE, tabs: [SHEETS.CONFIG] }
   ];
 
   var navRow = 3;
@@ -3873,100 +3791,6 @@ function formatResourceConfigTab_(ss) {
   applyRowBanding_(sheet, 2, numCols);
 
   log_('Formatted', 'Resource Config');
-}
-
-// ─── Tab 7: Feedback & Development ──────────────────────────────────────────
-
-function formatFeedbackTab_(ss) {
-  var sheet = getSheetSafe_(ss, SHEETS.FEEDBACK);
-  if (!sheet) return;
-  var numCols = Math.max(sheet.getLastColumn(), 8);
-
-  applyBrandHeader_(sheet, numCols);
-  sheet.setFrozenRows(1);
-  applyColumnWidths_(sheet, { 1: 140, 2: 140, 3: 110, 4: 90, 5: 200, 6: 300, 7: 100, 8: 120 });
-
-  // Conditional formatting: Priority + Status
-  clearConditionalFormats_(sheet);
-  var dataRows = Math.max(sheet.getLastRow() - 1, 50);
-  var priorityRange = sheet.getRange(2, 4, dataRows, 1);
-  var statusRange = sheet.getRange(2, 7, dataRows, 1);
-  var rules = [];
-
-  // Priority: Critical=deep red, High=orange, Medium=amber, Low=gray
-  var priorities = [
-    { text: 'Critical', bg: SHEET_COLORS.THEME_RED, font: SHEET_COLORS.TEXT_WHITE },
-    { text: 'High', bg: '#FED7AA', font: '#9A3412' },
-    { text: 'Medium', bg: SHEET_COLORS.BG_LIGHT_YELLOW, font: '#92400E' },
-    { text: 'Low', bg: SHEET_COLORS.BG_VERY_LIGHT_GRAY, font: SHEET_COLORS.TEXT_GRAY }
-  ];
-  for (var p = 0; p < priorities.length; p++) {
-    var builder = SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo(priorities[p].text)
-      .setBackground(priorities[p].bg)
-      .setRanges([priorityRange]);
-    if (priorities[p].font) builder = builder.setFontColor(priorities[p].font);
-    rules.push(builder.build());
-  }
-
-  // Status: New=blue, Planned=purple, In Progress=amber, Resolved=green, Wont Fix=gray
-  var statuses = [
-    { text: 'New', bg: '#DBEAFE' },
-    { text: 'Planned', bg: '#F3E8FF' },
-    { text: 'In Progress', bg: '#FEF3C7' },
-    { text: 'Resolved', bg: SHEET_COLORS.BG_LIGHT_GREEN },
-    { text: 'Wont Fix', bg: SHEET_COLORS.BG_VERY_LIGHT_GRAY }
-  ];
-  for (var s = 0; s < statuses.length; s++) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo(statuses[s].text)
-      .setBackground(statuses[s].bg)
-      .setRanges([statusRange])
-      .build());
-  }
-
-  sheet.setConditionalFormatRules(rules);
-  applyRowBanding_(sheet, 2, numCols);
-
-  log_('Formatted', 'Feedback & Development');
-}
-
-// ─── Tab 8: Function Checklist ──────────────────────────────────────────────
-
-function formatFunctionChecklistTab_(ss) {
-  var sheet = getSheetSafe_(ss, SHEETS.FUNCTION_CHECKLIST);
-  if (!sheet) return;
-  var numCols = Math.max(sheet.getLastColumn(), 6);
-
-  applyBrandHeader_(sheet, numCols);
-  sheet.setFrozenRows(1);
-  applyColumnWidths_(sheet, { 1: 50, 2: 120, 3: 200, 4: 160, 5: 300, 6: 200 });
-
-  // Conditional formatting: checked rows (col A = TRUE) get green tint
-  clearConditionalFormats_(sheet);
-  var dataRows = Math.max(sheet.getLastRow() - 1, 100);
-  var fullRange = sheet.getRange(2, 1, dataRows, numCols);
-
-  var rules = [];
-  // Whole-row green tint when checkbox is checked
-  rules.push(SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$A2=TRUE')
-    .setBackground(SHEET_COLORS.BG_PALE_GREEN)
-    .setRanges([fullRange])
-    .build());
-  // Whole-row highlight when Notes (col F) is non-empty
-  if (numCols >= 6) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND($A2<>TRUE, LEN($F2)>0)')
-      .setBackground(SHEET_COLORS.BG_LIGHT_YELLOW)
-      .setRanges([fullRange])
-      .build());
-  }
-
-  sheet.setConditionalFormatRules(rules);
-  applyRowBanding_(sheet, 2, numCols);
-
-  log_('Formatted', 'Function Checklist');
 }
 
 // ─── Tab 9: Settings Overview ───────────────────────────────────────────────
@@ -4407,8 +4231,7 @@ function applyTabBarColors_(ss) {
 
   // Green — Engagement / survey tabs
   var greenSheets = [
-    SHEETS.SURVEY_QUESTIONS, SHEETS.SATISFACTION, SHEETS.NOTIFICATIONS,
-    SHEETS.FEEDBACK
+    SHEETS.SURVEY_QUESTIONS, SHEETS.SATISFACTION, SHEETS.NOTIFICATIONS
   ];
 
   // Gold — Documentation / guide tabs
@@ -4419,7 +4242,7 @@ function applyTabBarColors_(ss) {
 
   // Red-Orange — Admin / technical tabs
   var redSheets = [
-    SHEETS.FUNCTION_CHECKLIST, SHEETS.SETTINGS_OVERVIEW, SHEETS.CONFIG
+    SHEETS.SETTINGS_OVERVIEW, SHEETS.CONFIG
   ];
 
   var groups = [
@@ -4469,8 +4292,6 @@ function applyUnionThemeToAllTabs() {
     formatNotificationsTab_(ss);
     formatResourcesTab_(ss);
     formatResourceConfigTab_(ss);
-    formatFeedbackTab_(ss);
-    formatFunctionChecklistTab_(ss);
     formatSettingsOverviewTab_(ss);
     formatEventsTab_(ss);
     formatMeetingMinutesTab_(ss);

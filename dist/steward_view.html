@@ -94,6 +94,23 @@ function _stewardHeader(container, title, subtitle) {
   style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '8px 14px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', minHeight: '36px' },
   onClick: function() { _invalidateTabCache(); _activePane = null; _layoutCache = {}; _tabPanesRole = null; AppState.batchData = null; AppState.activeRole = 'member'; AppState.activeTab = 'home'; var _app = document.getElementById('app'); try { _loadMemberViewThen(_app, function() { initMemberView(_app); }); } catch(e) { console.error('Switch to member error:', e); _app.innerHTML = ''; _app.appendChild(el('div', { style: { textAlign: 'center', padding: '40px' } }, [el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'), el('div', { style: { fontWeight: '600', marginBottom: '8px' } }, 'Failed to switch view'), el('button', { style: { padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer' }, onClick: function() { location.reload(); } }, 'Reload')])); } }
  }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
+ 
+ if (IS_DUAL_ROLE) {
+  var _mobileIsDefault = AppState.defaultView === 'steward';
+  var _mobileDefaultBtn = el('button', {
+  style: { background: _mobileIsDefault ? 'transparent' : 'var(--accentBg)', border: '1px solid ' + (_mobileIsDefault ? 'var(--border)' : 'var(--accentBorder)'), borderRadius: '6px', padding: '4px 8px', fontSize: '10px', color: _mobileIsDefault ? 'var(--muted)' : 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+  onClick: function() {
+   if (_mobileIsDefault) return;
+   AppState.defaultView = 'steward';
+   _mobileDefaultBtn.textContent = '\u2713 Default';
+   _mobileDefaultBtn.style.color = 'var(--muted)';
+   _mobileDefaultBtn.style.background = 'transparent';
+   _mobileDefaultBtn.style.borderColor = 'var(--border)';
+   serverCall().withSuccessHandler(function() {}).withFailureHandler(function(err) { console.error('Failed to save default view:', err); }).dataSetDefaultView(SESSION_TOKEN, 'steward');
+  }
+  }, _mobileIsDefault ? '\u2713 Default' : '\uD83D\uDCCC Set default');
+  headerRight.appendChild(_mobileDefaultBtn);
+ }
  headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
   AppState.isDark = !AppState.isDark;
   try { localStorage.setItem('dds_isDark', AppState.isDark); } catch(e) {}
@@ -2488,6 +2505,8 @@ function renderBroadcast(appContainer) {
   if (days.length > 0) filter.officeDays = days.join(',');
   if (selectedDuesPaying) filter.duesPaying = selectedDuesPaying;
   var customSubject = subjectInput.value.trim() || null;
+  var scopeLabel = selectedScope === 'all' ? 'all members' : selectedScope === 'stewards' ? 'all stewards' : 'filtered members';
+  if (!confirm('Send this broadcast to ' + scopeLabel + '? This cannot be undone.')) return;
   sendBtn.disabled = true;
   statusMsg.textContent = 'Sending...';
   statusMsg.style.color = 'var(--muted)';
@@ -2925,15 +2944,35 @@ function renderStewardResources(appContainer) {
   var activeCategory = 'All';
   showLoading(cardsWrap);
 
+  
+  var _resCacheKey = 'dds_resources_steward';
+  try {
+  var cached = localStorage.getItem(_resCacheKey);
+  if (cached) {
+   var parsed = JSON.parse(cached);
+   if (parsed && parsed.data && Date.now() - parsed.ts < 300000) { 
+   allResources = parsed.data;
+   var categories = ['All'];
+   allResources.forEach(function(r) { if (r.category && categories.indexOf(r.category) === -1) categories.push(r.category); });
+   renderPills(categories);
+   renderCards();
+   }
+  }
+  } catch (_e) {}
+
+  
   serverCall().withSuccessHandler(function(resources) {
   allResources = resources || [];
   var categories = ['All'];
   allResources.forEach(function(r) { if (r.category && categories.indexOf(r.category) === -1) categories.push(r.category); });
   renderPills(categories);
   renderCards();
+  try { localStorage.setItem(_resCacheKey, JSON.stringify({ ts: Date.now(), data: allResources })); } catch (_e) {}
   }).withFailureHandler(function() {
-  cardsWrap.innerHTML = '';
-  cardsWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'Unable to load resources.'));
+  if (allResources.length === 0) { 
+   cardsWrap.innerHTML = '';
+   cardsWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'Unable to load resources.'));
+  }
   }).getWebAppResourcesList('Stewards');
 
   function renderPills(categories) {
@@ -2963,13 +3002,19 @@ function renderStewardResources(appContainer) {
    return;
   }
   filtered.forEach(function(r, idx) {
-   var card = el('div', { className: 'card card-glass res-card card-clickable card-fade-in ' + _TC, style: { animationDelay: (idx * 50) + 'ms' } });
+   var card = el('div', {
+   className: 'card card-glass res-card card-clickable card-fade-in ' + _TC,
+   role: 'button',
+   tabIndex: 0,
+   'aria-expanded': 'false',
+   'aria-label': (r.title || 'Resource') + ', tap to expand',
+   style: { animationDelay: (idx * 50) + 'ms' }
+   });
    card.appendChild(el('div', { className: 'res-card-icon' }, r.icon || '\uD83D\uDCC4'));
    card.appendChild(el('span', { className: 'notif-type-badge notif-type-announcement', style: { fontSize: '10px', marginBottom: '6px' } }, r.category));
    card.appendChild(el('div', { className: 'res-card-title' }, r.title));
    card.appendChild(el('div', { className: 'res-card-summary' }, r.summary));
    var hint = el('div', { className: 'text-xs-muted-mt-8' }, 'Tap to read more \u25BE');
-   card.setAttribute('aria-expanded', 'false');
    card.appendChild(hint);
    var expandContent = el('div', { className: 'res-card-content' });
    if (r.content) expandContent.appendChild(el('div', null, r.content));
@@ -2984,11 +3029,15 @@ function renderStewardResources(appContainer) {
    }
    if (r.dateAdded) expandContent.appendChild(el('div', { className: 'text-xs-muted-mt-8' }, 'Added: ' + r.dateAdded));
    card.appendChild(expandContent);
-   card.addEventListener('click', function() {
+   var _toggleResCard = function() {
    card.classList.toggle('expanded');
    var isExpanded = card.classList.contains('expanded');
    card.setAttribute('aria-expanded', String(isExpanded));
    hint.textContent = isExpanded ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
+   };
+   card.addEventListener('click', _toggleResCard);
+   card.addEventListener('keydown', function(e) {
+   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _toggleResCard(); }
    });
    cardsWrap.appendChild(card);
   });
@@ -4413,27 +4462,62 @@ function _renderContactForm(container) {
  var statusMsg = el('div', { className: 'status-msg' });
  container.appendChild(statusMsg);
 
- container.appendChild(el('button', {
+ var logBtn = el('button', {
  className: 'btn btn-primary ' + _TB,
  onClick: function() {
   var email = memberInput.value.trim();
   if (!email) { statusMsg.textContent = 'Enter a member email.'; statusMsg.style.color = 'var(--danger)'; return; }
+  logBtn.disabled = true;
   statusMsg.textContent = 'Logging...'; statusMsg.style.color = 'var(--muted)';
   serverCall().withSuccessHandler(function(r) {
   statusMsg.textContent = r && r.success ? 'Contact logged!' : 'Error logging contact.';
   statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
   if (r && r.success) { _memberAc.clear(); notesInput.value = ''; }
+  logBtn.disabled = false;
+  }).withFailureHandler(function() {
+  statusMsg.textContent = 'Failed. Try again.';
+  statusMsg.style.color = 'var(--danger)';
+  logBtn.disabled = false;
   }).dataLogMemberContact(SESSION_TOKEN, email, selectedType, notesInput.value.trim(), '', (_memberAc.getSelected() && _memberAc.getSelected().name) || '');
  }
- }, 'Log Contact'));
+ }, 'Log Contact');
+ container.appendChild(logBtn);
 }
 
 function _renderRecentContacts(container) {
- showLoading(container, 'list');
+ 
+ 
+ 
+ 
+ var toggleRow = el('div', { style: { display: 'none', marginBottom: '10px' } });
+ var _showAllStewards = false;
+ var toggleBtn = el('button', {
+ className: 'filter-tab',
+ style: { fontSize: '11px' },
+ onClick: function() {
+  
+  
+  // toggleBtn.className = 'filter-tab' + (_showAllStewards ? ' active' : '');
+  // toggleBtn.textContent = _showAllStewards ? 'All Stewards' : 'My Contacts Only';
+  
+ }
+ }, 'All Stewards');
+ toggleRow.appendChild(toggleBtn);
+ container.appendChild(toggleRow);
+
+ 
+ serverCall().withSuccessHandler(function(isChief) {
+ if (isChief) toggleRow.style.display = 'flex';
+ }).withFailureHandler(function() {}).dataIsChiefSteward(SESSION_TOKEN);
+
+ var listArea = el('div');
+ container.appendChild(listArea);
+
+ showLoading(listArea, 'list');
  serverCall().withSuccessHandler(function(log) {
- container.textContent = '';
+ listArea.textContent = '';
  if (!log || log.length === 0) {
-  container.appendChild(el('div', { className: 'empty-state-sm' }, 'No contacts logged yet.'));
+  listArea.appendChild(el('div', { className: 'empty-state-sm' }, 'No contacts logged yet.'));
   return;
  }
  log.slice(0, 20).forEach(function(entry) {
@@ -4444,7 +4528,7 @@ function _renderRecentContacts(container) {
   card.appendChild(top);
   card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)' } }, entry.type));
   if (entry.notes) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, entry.notes));
-  container.appendChild(card);
+  listArea.appendChild(card);
  });
  }).dataGetStewardContactLog(SESSION_TOKEN);
 }
@@ -4549,10 +4633,17 @@ function _renderTaskList(container, statusFilter) {
    actions.appendChild(el('button', {
    style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
    onClick: function() {
+    
+    var taskCard = this.closest('.card, .card-glass');
+    if (taskCard) { taskCard.style.opacity = '0.4'; taskCard.style.pointerEvents = 'none'; }
     serverCall().withSuccessHandler(function() {
+    if (taskCard) taskCard.remove();
     if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
-    _invalidateTabCache('tasks'); _handleTabNav('steward', 'tasks');
-    }).withFailureHandler(function() { errEl.textContent = 'Failed to complete task.'; }).dataCompleteTask(SESSION_TOKEN, t.id);
+    _invalidateTabCache('tasks');
+    }).withFailureHandler(function() {
+    if (taskCard) { taskCard.style.opacity = '1'; taskCard.style.pointerEvents = ''; }
+    errEl.textContent = 'Failed to complete task.';
+    }).dataCompleteTask(SESSION_TOKEN, t.id);
    }
    }, '\u2705 Complete'));
   })(task, taskErrSpan);
@@ -5650,7 +5741,30 @@ function _buildExplorerUI(container, allMembers) {
  slicerCard.appendChild(slicerGrid);
 
  
- var clearAllRow = el('div', { style: { marginTop: '8px', textAlign: 'right' } });
+ var clearAllRow = el('div', { style: { marginTop: '8px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '8px' } });
+ clearAllRow.appendChild(el('button', {
+ className: 'filter-add-btn', style: { fontSize: '11px' },
+ onClick: function() {
+  if (filtered.length === 0) { alert('No members to export.'); return; }
+  
+  var headers = ['Name', 'Email', 'Unit', 'Work Location', 'Director', 'Supervisor', 'Job Title', 'Assigned Steward', 'Dues Status'];
+  var csvRows = [headers.join(',')];
+  filtered.forEach(function(m) {
+  csvRows.push([m.name, m.email, m.unit, m.workLocation, m.director, m.supervisor, m.jobTitle, m.assignedSteward, m.duesStatus].map(function(v) {
+   return '"' + String(v || '').replace(/"/g, '""') + '"';
+  }).join(','));
+  });
+  var csv = csvRows.join('\n');
+  
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'directory_export_' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+ }
+ }, '\uD83D\uDCE5 Export CSV (' + filtered.length + ')'));
+ var exportBtn = clearAllRow.lastChild; 
  clearAllRow.appendChild(el('button', {
  className: 'filter-add-btn', style: { fontSize: '11px' },
  onClick: function() {
@@ -5775,6 +5889,7 @@ function _buildExplorerUI(container, allMembers) {
  _refreshKPIs();
  _refreshSankey();
  _renderTable(tableArea, filtered);
+ if (exportBtn) exportBtn.textContent = '\uD83D\uDCE5 Export CSV (' + filtered.length + ')';
  }
 
  function _refreshKPIs() {
@@ -5995,10 +6110,29 @@ function _buildExplorerUI(container, allMembers) {
    if (Object.keys(edits).length === 0) return;
    saveBtn.disabled = true;
    saveBtn.textContent = 'Saving\u2026';
+   
+   for (var dk in inputEls) { inputEls[dk].disabled = true; }
+   var _pendingEdits = JSON.parse(JSON.stringify(edits));
+   function _restoreInputs() { for (var rk in inputEls) { inputEls[rk].disabled = false; } }
+   function _showRowError(msg) {
+   tr.style.background = 'rgba(239,68,68,0.1)';
+   var errSpan = tr.querySelector('.exp-row-error');
+   if (!errSpan) { errSpan = el('span', { className: 'exp-row-error', style: { color: 'var(--danger)', fontSize: '11px', marginLeft: '6px' } }); saveBtn.parentNode.appendChild(errSpan); }
+   errSpan.textContent = msg || 'Save failed.';
+   setTimeout(function() { tr.style.background = ''; if (errSpan.parentNode) errSpan.parentNode.removeChild(errSpan); }, 4000);
+   }
    serverCall().withSuccessHandler(function(result) {
+   
+   if (result && result.authError) {
+    _restoreInputs();
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+    _showRowError('Session expired. Please reload to sign in again.');
+    return;
+   }
    if (result && result.success) {
     
-    for (var k in edits) { m[k] = edits[k]; }
+    for (var k in _pendingEdits) { m[k] = _pendingEdits[k]; }
     edits = {};
     saveBtn.style.display = 'none';
     saveBtn.disabled = false;
@@ -6010,18 +6144,24 @@ function _buildExplorerUI(container, allMembers) {
     for (var ik in inputEls) { inputEls[ik].style.border = '1px solid transparent'; inputEls[ik].style.background = 'transparent'; }
     
     if (typeof DataCache !== 'undefined') DataCache.invalidate('stewardMembers_' + (CURRENT_USER && CURRENT_USER.email || ''));
+    
+    _refreshSlicerOptions();
+    _refreshKPIs();
+    _refreshSankey();
+    _restoreInputs();
    } else {
+    _restoreInputs();
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save';
-    tr.style.background = 'rgba(239,68,68,0.1)';
-    setTimeout(function() { tr.style.background = ''; }, 2000);
+    
+    _showRowError((result && result.message) || 'Save failed.');
    }
    }).withFailureHandler(function() {
+   _restoreInputs();
    saveBtn.disabled = false;
    saveBtn.textContent = 'Save';
-   tr.style.background = 'rgba(239,68,68,0.1)';
-   setTimeout(function() { tr.style.background = ''; }, 2000);
-   }).dataUpdateMemberBySteward(SESSION_TOKEN, m.email, edits);
+   _showRowError('Network error. Please try again.');
+   }).dataUpdateMemberBySteward(SESSION_TOKEN, m.email, _pendingEdits);
   }
   }, 'Save');
   actionTd.appendChild(saveBtn);
@@ -7761,109 +7901,6 @@ function _renderAddMinutes(container, onSaveSuccess) {
  }, 'Save Minutes'));
 
  container.appendChild(formCard);
-}
-
-function renderFeedbackPage(appContainer, role) {
- var pageRole = role || 'steward';
- renderPageLayout(appContainer, pageRole, 'feedback', function(container) {
- if (pageRole === 'steward') _stewardHeader(container, 'Feedback', 'Report bugs or suggest features');
- else _memberHeader(container, 'Feedback', 'Report bugs or suggest features');
- var content = el('div', { className: 'content' });
-
- var _st = createSubTabs([
-  { id: 'submit', label: 'Submit', render: function(c) { _renderFeedbackForm(c); } },
-  { id: 'history', label: 'My Submissions', render: function(c) { _renderMyFeedback(c); } }
- ]);
- content.appendChild(_st.bar);
- content.appendChild(_st.content);
- container.appendChild(content);
- });
-}
-
-function _renderFeedbackForm(container) {
- var formCard = el('div', { className: 'card card-glass p-16' });
-
- var categorySelect = el('select', { className: 'msg-textarea', style: { marginBottom: '8px', minHeight: '36px' } });
- ['Bug', 'Feature', 'Improvement', 'Documentation', 'Other'].forEach(function(cat) {
- categorySelect.appendChild(el('option', { value: cat }, cat));
- });
- formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Category'));
- formCard.appendChild(categorySelect);
-
- var priorityBar = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '10px' } });
- var selectedPriority = 'Medium';
- ['Low', 'Medium', 'High'].forEach(function(p) {
- var btn = el('button', { className: 'sub-tab' + (p === 'Medium' ? ' active' : '') + ' flex-1',
-  onClick: function() {
-  selectedPriority = p;
-  priorityBar.querySelectorAll('.sub-tab').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  }
- }, p);
- priorityBar.appendChild(btn);
- });
- formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Priority'));
- formCard.appendChild(priorityBar);
-
- var titleInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Brief title...', style: { marginBottom: '8px', minHeight: '36px' } });
- formCard.appendChild(titleInput);
-
- var descInput = el('textarea', { className: 'msg-textarea', placeholder: 'Describe the issue or suggestion...', style: { marginBottom: '10px', minHeight: '100px' } });
- formCard.appendChild(descInput);
-
- var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '8px' } });
- formCard.appendChild(statusMsg);
-
- formCard.appendChild(el('button', { className: 'btn btn-primary',
- onClick: function() {
-  var title = titleInput.value.trim();
-  if (!title) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
-  statusMsg.textContent = 'Submitting...'; statusMsg.style.color = 'var(--muted)';
-  serverCall().withSuccessHandler(function(result) {
-  if (result && result.success) {
-   statusMsg.textContent = 'Feedback submitted! Thank you.'; statusMsg.style.color = 'var(--success)';
-   titleInput.value = ''; descInput.value = '';
-  } else {
-   statusMsg.textContent = (result && result.message) || 'Error submitting.'; statusMsg.style.color = 'var(--danger)';
-  }
-  }).withFailureHandler(function() {
-  statusMsg.textContent = 'Failed to submit.'; statusMsg.style.color = 'var(--danger)';
-  }).dataSubmitFeedback(SESSION_TOKEN, {
-  category: categorySelect.value, type: '', priority: selectedPriority,
-  title: title, description: descInput.value.trim()
-  }, _genIdemKey());
- }
- }, 'Submit Feedback'));
-
- container.appendChild(formCard);
-}
-
-function _renderMyFeedback(container) {
- showLoading(container, 'list');
- serverCall().withSuccessHandler(function(items) {
- container.innerHTML = '';
- if (!items || items.length === 0) {
-  container.appendChild(el('div', { className: 'empty-state-13' }, 'No feedback submitted yet.'));
-  return;
- }
- items.forEach(function(item) {
-  var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '8px' } });
-  var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } });
-  topRow.appendChild(el('span', { className: 'display-section' }, item.title));
-  var statusColor = item.status === 'New' ? 'var(--info)' : item.status === 'In Progress' ? 'var(--warning)' : item.status === 'Resolved' ? 'var(--success)' : 'var(--muted)';
-  topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', color: statusColor, background: statusColor + '18', padding: '2px 8px', borderRadius: '8px' } }, item.status));
-  card.appendChild(topRow);
-  var meta = el('div', { className: 'text-xs-muted-mb-4' });
-  meta.textContent = item.category + ' \u00B7 ' + item.priority + ' \u00B7 ' + item.date;
-  card.appendChild(meta);
-  if (item.description) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4' } }, item.description.substring(0, 200)));
-  if (item.resolution) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--success)', marginTop: '6px', fontStyle: 'italic' } }, 'Resolution: ' + item.resolution));
-  container.appendChild(card);
- });
- }).withFailureHandler(function() {
- container.innerHTML = '';
- container.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load feedback.'));
- }).dataGetMyFeedback(SESSION_TOKEN); 
 }
 
 function renderEngagementDashboard(appContainer) {
@@ -9693,7 +9730,7 @@ function _updateBulkToolbar() {
 
  var statusBtn = el('button', { className: 'btn btn-primary', onclick: function() { _bulkStatusChange(selected); }}, 'Change Status');
  var exportBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkExport(selected); }}, 'Export CSV');
- var emailBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkEmail(selected); }}, 'Email');
+ var emailBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkEmail(selected, emailBtn); }}, 'Email');
  var folderBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkCreateFolders(selected); }}, 'Create Folders');
  var closeBtn = el('button', { className: 'btn btn-ghost', 'aria-label': 'Clear selection', onclick: function() {
  document.querySelectorAll('.bulk-select-cb').forEach(function(cb) { cb.checked = false; });
@@ -9720,8 +9757,30 @@ function _getSelectedEmails(selected) {
 }
 
 function _bulkStatusChange(selected) {
- var newStatus = prompt('Enter new status for ' + selected.length + ' case(s):');
- if (!newStatus) return;
+ var VALID_STATUSES = ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Denied', 'Won', 'Appealed', 'In Arbitration', 'Closed'];
+ 
+ var overlay = el('div', { style: { position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.4)', zIndex: '9999', display: 'flex', alignItems: 'center', justifyContent: 'center' }});
+ var dialog = el('div', { style: { background: 'var(--cardBg)', borderRadius: '12px', padding: '24px', minWidth: '300px', maxWidth: '90vw', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }});
+ dialog.appendChild(el('div', { style: { fontWeight: '700', fontSize: '16px', marginBottom: '12px' } }, 'Update ' + selected.length + ' case(s)'));
+ var sel = el('select', { className: 'form-select', style: { width: '100%', marginBottom: '16px' }});
+ sel.appendChild(el('option', { value: '' }, '— Select new status —'));
+ VALID_STATUSES.forEach(function(s) { sel.appendChild(el('option', { value: s }, s)); });
+ dialog.appendChild(sel);
+ var btnRow = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' }});
+ btnRow.appendChild(el('button', { className: 'btn', onClick: function() { overlay.remove(); } }, 'Cancel'));
+ btnRow.appendChild(el('button', { className: 'btn btn-primary', onClick: function() {
+ var newStatus = sel.value;
+ if (!newStatus) { sel.style.borderColor = 'var(--danger)'; return; }
+ overlay.remove();
+ _doBulkWithStatus(newStatus);
+ }}, 'Update Status'));
+ dialog.appendChild(btnRow);
+ overlay.appendChild(dialog);
+ overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+ document.body.appendChild(overlay);
+ return; 
+
+ function _doBulkWithStatus(newStatus) {
  var caseIds = _getSelectedCaseIds(selected);
  function _doBulkUpdate() {
  serverCall().withSuccessHandler(function(result) {
@@ -9743,6 +9802,7 @@ function _bulkStatusChange(selected) {
  }).dataBulkUpdateStatus(SESSION_TOKEN, caseIds, newStatus);
  }
  _doBulkUpdate();
+ } 
 }
 
 function _bulkExport(selected) {
@@ -9771,7 +9831,9 @@ function _bulkExport(selected) {
  _doBulkExport();
 }
 
-function _bulkEmail(selected) {
+var _bulkEmailSending = false;
+function _bulkEmail(selected, triggerBtn) {
+ if (_bulkEmailSending) return;
  var emails = _getSelectedEmails(selected);
  if (!emails.length) { alert('No member emails found for selected cases.'); return; }
  var subject = prompt('Email subject:');
@@ -9779,13 +9841,20 @@ function _bulkEmail(selected) {
  var body = prompt('Email body:');
  if (body === null) return; 
 
+ _bulkEmailSending = true;
+ if (triggerBtn) { triggerBtn.disabled = true; triggerBtn.textContent = 'Sending\u2026'; }
+
  serverCall().withSuccessHandler(function(result) {
+ _bulkEmailSending = false;
+ if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = 'Email'; }
  if (result && result.success) {
   alert('Sent ' + result.sent + ' email(s).');
  } else {
   alert((result && result.message) || 'Bulk email failed.');
  }
  }).withFailureHandler(function(err) {
+ _bulkEmailSending = false;
+ if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = 'Email'; }
  alert('Email error: ' + (err && err.message ? err.message : 'Unknown error'));
  }).dataBulkSendEmail(SESSION_TOKEN, emails, subject, body || '');
 }

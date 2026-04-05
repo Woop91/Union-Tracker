@@ -15,6 +15,7 @@
  *   Q&A Activity          — 15%  (min(100, posts*10 + answers*15))
  *   Workload Submissions  — 15%  (submissions in last 90 days, scaled)
  *   Contact Freshness     — 20%  (days since last steward contact)
+ * NOTE: weights match WEIGHTS constant at line ~40: { survey:25, meeting:25, qa:15, workload:15, contact:20 }
  *
  * WHY IT EXISTS / DESIGN DECISIONS:
  *   Helps stewards identify disengaged members before they drop off.
@@ -65,7 +66,7 @@ var EngagementService = (function () {
    * @returns {number} 0-100
    */
   function _computeSurveyScore(email, surveyData) {
-    if (!surveyData || surveyData.length === 0) return 50; // default if no survey system
+    if (!surveyData || surveyData.length === 0) return 0; // no data = no score (consistent defaults)
     var emailLower = email.toLowerCase().trim();
     var total = 0;
     var completed = 0;
@@ -77,7 +78,7 @@ var EngagementService = (function () {
         if (status === 'completed') completed++;
       }
     }
-    if (total === 0) return 50;
+    if (total === 0) return 0;
     return Math.round((completed / total) * 100);
   }
 
@@ -86,7 +87,7 @@ var EngagementService = (function () {
    * @returns {number} 0-100
    */
   function _computeMeetingScore(email, checkInData, totalMeetings90d) {
-    if (totalMeetings90d === 0) return 50;
+    if (totalMeetings90d === 0) return 0;
     var emailLower = email.toLowerCase().trim();
     var attended = 0;
     var now = new Date();
@@ -128,7 +129,7 @@ var EngagementService = (function () {
    * @returns {number} 0-100
    */
   function _computeWorkloadScore(email, workloadData) {
-    if (!workloadData || workloadData.length === 0) return 50;
+    if (!workloadData || workloadData.length === 0) return 0;
     var emailLower = email.toLowerCase().trim();
     var submissions = 0;
     var now = new Date();

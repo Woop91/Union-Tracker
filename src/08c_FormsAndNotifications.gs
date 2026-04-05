@@ -279,7 +279,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * Union Dashboard including:
+ * SEIU Local Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -293,7 +293,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author SolidBase
+ * @author SEIU Local
  * @version 4.51.0
  */
 
@@ -468,8 +468,28 @@ function sendStewardDeadlineAlerts() {
     return;
   }
 
-  var props = PropertiesService.getScriptProperties();
-  var alertDays = parseInt(props.getProperty('alert_days') || '7', 10);
+  // Read alert window from Config sheet (ALERT_DAYS is CSV like "3,7,14");
+  // use the largest value as the alert window. Fall back to ScriptProperties,
+  // then to 7 if neither is set.
+  var alertDays = 7;
+  try {
+    var alertCsv = getConfigValue_(CONFIG_COLS.ALERT_DAYS, '');
+    if (alertCsv) {
+      var parts = String(alertCsv).split(',');
+      var maxVal = 0;
+      for (var p = 0; p < parts.length; p++) {
+        var n = parseInt(parts[p].trim(), 10);
+        if (!isNaN(n) && n > maxVal) maxVal = n;
+      }
+      if (maxVal > 0) alertDays = maxVal;
+    }
+  } catch (_e) {
+    log_('sendStewardDeadlineAlerts', 'Config ALERT_DAYS read error: ' + _e.message);
+  }
+  if (alertDays <= 0) {
+    var props = PropertiesService.getScriptProperties();
+    alertDays = parseInt(props.getProperty('alert_days') || '7', 10);
+  }
 
   var grievanceData = sheet.getDataRange().getValues();
   var memberData = memberSheet.getDataRange().getValues();
@@ -1627,7 +1647,7 @@ function submitSurveyResponse(callerEmail, responses) {
           var vHash   = String(col_(vaultData[v], SURVEY_VAULT_COLS.EMAIL) || '');
           var vPeriod = String(col_(vaultData[v], SURVEY_VAULT_COLS.QUARTER) || '');
           var vLatest = String(col_(vaultData[v], SURVEY_VAULT_COLS.IS_LATEST) || '');
-          if (vHash === emailHash && vPeriod === periodId && vLatest !== 'Superseded') {
+          if (vHash === emailHash && vPeriod === periodId && vLatest === 'Latest') {
             return { success: false, message: 'You have already submitted a response for this survey period.' };
           }
         }
