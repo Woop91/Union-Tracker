@@ -29,7 +29,7 @@
  *   Depends on 01_Core.gs (SHEETS), 06_Maintenance.gs (logAuditEvent).
  *   Used by SPA Q&A views and the navigation badge system.
  *
- * @version 4.43.1
+ * @version 4.51.0
  */
 
 var QAForum = (function () {
@@ -88,7 +88,7 @@ var QAForum = (function () {
       var cacheKey = 'qa_sheet_' + sheetName;
       var cached = cache.get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('QAForum._getCachedSheetData', 'Error reading cache: ' + (_e.message || _e)); }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
     var sheet = ss.getSheetByName(sheetName);
@@ -100,7 +100,7 @@ var QAForum = (function () {
         cache.put(cacheKey, jsonStr, maxAgeSec);
       }
       // If too large, skip caching — data will be read fresh each time
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('QAForum._getCachedSheetData', 'Error writing cache: ' + (_e.message || _e)); }
     return data;
   }
 
@@ -210,7 +210,7 @@ var QAForum = (function () {
           answers.push({
             id: ansData[j][0],
             authorName: String(ansData[j][3] || 'Member'),
-            isSteward: ansData[j][4] === true || ansData[j][4] === 'TRUE',
+            isSteward: isTruthyValue(ansData[j][4]),
             answerText: String(ansData[j][5] || ''),
             status: String(ansData[j][6] || 'active'),
             created: ansData[j][7] instanceof Date ? _fmtDate(ansData[j][7]) : String(ansData[j][7] || '')
@@ -520,7 +520,7 @@ var QAForum = (function () {
         if (String(qData[i][5]).toLowerCase().trim() === 'flagged') {
           flaggedQ.push({
             id: qData[i][0],
-            authorName: qData[i][3] === true || qData[i][3] === 'TRUE' ? 'Anonymous' : String(qData[i][2] || 'Member'),
+            authorName: isTruthyValue(qData[i][3]) ? 'Anonymous' : String(qData[i][2] || 'Member'),
             questionText: String(qData[i][4] || '').substring(0, 200),
             created: qData[i][9] instanceof Date ? _fmtDate(qData[i][9]) : ''
           });
@@ -633,7 +633,7 @@ var QAForum = (function () {
     try {
       var cache = CacheService.getScriptCache();
       cache.remove('qa_sheet_' + sheetName);
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('QAForum._invalidateCache', 'Error: ' + (_e.message || _e)); }
   }
 
   /**
@@ -736,7 +736,7 @@ function qaModerateAnswer(sessionToken, answerId, action) { var e = _requireStew
 /** @param {string} sessionToken @returns {Object} Flagged questions and answers (steward-only). */
 function qaGetFlaggedContent(sessionToken) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.', items: [] }; return QAForum.getFlaggedContent(e); }
 /** @param {string} sessionToken @param {string} questionId @returns {Object} Resolve result (owner or steward). */
-function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_) { log_('_', (_.message || _)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
+function qaResolveQuestion(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; var isSteward = false; try { var auth = checkWebAppAuthorization('steward', sessionToken); isSteward = auth.isAuthorized; } catch (_e) { log_('qaResolveQuestion', 'Error checking steward auth: ' + (_e.message || _e)); } return QAForum.resolveQuestion(e, questionId, isSteward); }
 /** @param {string} sessionToken @param {number} [page] @param {number} [pageSize] @param {string} [sort] @returns {Object} Org-wide paginated question list. */
 function qaGetOrgWideQuestions(sessionToken, page, pageSize, sort) { var e = _resolveCallerEmail(sessionToken); if (!e) return { questions: [], total: 0, page: 1, pageSize: pageSize || 20 }; return QAForum.getOrgWideQuestions(e, page, pageSize, sort); }
 /** @returns {void} Initializes Q&A forum sheets (no auth required — setup only). */

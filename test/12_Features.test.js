@@ -2,11 +2,10 @@
  * Tests for 12_Features.gs
  *
  * Covers EXTENSION_CONFIG, COL_IDX, LOOKER_CONFIG constants,
- * and pure categorization/bucket functions: generateAnonHash_,
- * getDaysBucket_, getContactFrequencyCategory_, getVolunteerHoursBucket_,
- * getEngagementLevel_, categorizeRole_, categorizeTenure_,
- * getScoreBucket_, calculateSectionAvg_, getQuarter_,
- * getOutcomeCategory_, getHeaderMap, and invalidateHeaderCache.
+ * and pure categorization/bucket functions:
+ * getDaysBucket_, getContactFrequencyCategory_,
+ * getEngagementLevel_, getQuarter_,
+ * getOutcomeCategory_, and getHeaderMap.
  */
 
 require('./gas-mock');
@@ -113,40 +112,6 @@ describe('LOOKER_CONFIG', () => {
 });
 
 // ============================================================================
-// generateAnonHash_
-// ============================================================================
-
-describe('generateAnonHash_', () => {
-  test('returns a string starting with "A"', () => {
-    const result = generateAnonHash_('MBR-001');
-    expect(result[0]).toBe('A');
-  });
-
-  test('is deterministic (same input produces same output)', () => {
-    const first = generateAnonHash_('MBR-001');
-    const second = generateAnonHash_('MBR-001');
-    expect(first).toBe(second);
-  });
-
-  test('different inputs produce different outputs', () => {
-    const hash1 = generateAnonHash_('MBR-001');
-    const hash2 = generateAnonHash_('MBR-002');
-    expect(hash1).not.toBe(hash2);
-  });
-
-  test('result length is at most 9 characters (A + up to 8)', () => {
-    const result = generateAnonHash_('MBR-001');
-    expect(result.length).toBeLessThanOrEqual(9);
-  });
-
-  test('handles empty string input', () => {
-    const result = generateAnonHash_('');
-    expect(typeof result).toBe('string');
-    expect(result[0]).toBe('A');
-  });
-});
-
-// ============================================================================
 // getDaysBucket_
 // ============================================================================
 
@@ -237,44 +202,6 @@ describe('getContactFrequencyCategory_', () => {
 });
 
 // ============================================================================
-// getVolunteerHoursBucket_
-// ============================================================================
-
-describe('getVolunteerHoursBucket_', () => {
-  test('0 hours -> None', () => {
-    expect(getVolunteerHoursBucket_(0)).toBe('None');
-  });
-
-  test('1 hour -> 1-5 Hours', () => {
-    expect(getVolunteerHoursBucket_(1)).toBe('1-5 Hours');
-  });
-
-  test('5 hours -> 1-5 Hours', () => {
-    expect(getVolunteerHoursBucket_(5)).toBe('1-5 Hours');
-  });
-
-  test('6 hours -> 6-20 Hours', () => {
-    expect(getVolunteerHoursBucket_(6)).toBe('6-20 Hours');
-  });
-
-  test('20 hours -> 6-20 Hours', () => {
-    expect(getVolunteerHoursBucket_(20)).toBe('6-20 Hours');
-  });
-
-  test('21 hours -> 21-50 Hours', () => {
-    expect(getVolunteerHoursBucket_(21)).toBe('21-50 Hours');
-  });
-
-  test('50 hours -> 21-50 Hours', () => {
-    expect(getVolunteerHoursBucket_(50)).toBe('21-50 Hours');
-  });
-
-  test('51 hours -> 50+ Hours', () => {
-    expect(getVolunteerHoursBucket_(51)).toBe('50+ Hours');
-  });
-});
-
-// ============================================================================
 // getEngagementLevel_
 // ============================================================================
 
@@ -320,206 +247,6 @@ describe('getEngagementLevel_', () => {
 // ============================================================================
 // categorizeRole_
 // ============================================================================
-
-describe('categorizeRole_', () => {
-  test('"Steward" -> Leadership', () => {
-    expect(categorizeRole_('Steward')).toBe('Leadership');
-  });
-
-  test('"Chief Steward" -> Leadership', () => {
-    expect(categorizeRole_('Chief Steward')).toBe('Leadership');
-  });
-
-  test('"Member Leader" -> Leadership', () => {
-    expect(categorizeRole_('Member Leader')).toBe('Leadership');
-  });
-
-  test('"Team Leader" -> Leadership', () => {
-    expect(categorizeRole_('Team Leader')).toBe('Leadership');
-  });
-
-  test('"RN" -> Nursing', () => {
-    expect(categorizeRole_('RN')).toBe('Nursing');
-  });
-
-  test('"Nurse Practitioner" -> Nursing', () => {
-    expect(categorizeRole_('Nurse Practitioner')).toBe('Nursing');
-  });
-
-  test('"LPN" -> Nursing', () => {
-    expect(categorizeRole_('LPN')).toBe('Nursing');
-  });
-
-  test('"Lab Tech" -> Technical/Support', () => {
-    expect(categorizeRole_('Lab Tech')).toBe('Technical/Support');
-  });
-
-  test('"Home Health Aide" -> Technical/Support', () => {
-    expect(categorizeRole_('Home Health Aide')).toBe('Technical/Support');
-  });
-
-  test('"Admin Assistant" -> Administrative', () => {
-    expect(categorizeRole_('Admin Assistant')).toBe('Administrative');
-  });
-
-  test('"Unit Clerk" -> Administrative', () => {
-    expect(categorizeRole_('Unit Clerk')).toBe('Administrative');
-  });
-
-  test('"Social Worker" -> Other', () => {
-    expect(categorizeRole_('Social Worker')).toBe('Other');
-  });
-
-  test('empty string -> Other', () => {
-    expect(categorizeRole_('')).toBe('Other');
-  });
-});
-
-// ============================================================================
-// categorizeTenure_
-// ============================================================================
-
-describe('categorizeTenure_', () => {
-  test('"Less than 1 year" -> New (< 1 year)', () => {
-    expect(categorizeTenure_('Less than 1 year')).toBe('New (< 1 year)');
-  });
-
-  test('"< 1 year" -> New (< 1 year)', () => {
-    expect(categorizeTenure_('< 1 year')).toBe('New (< 1 year)');
-  });
-
-  test('"1-3 years" -> 1-3 Years', () => {
-    expect(categorizeTenure_('1-3 years')).toBe('1-3 Years');
-  });
-
-  test('"1 to 3 years" -> 1-3 Years', () => {
-    expect(categorizeTenure_('1 to 3 years')).toBe('1-3 Years');
-  });
-
-  test('"3-5 years" -> 3-5 Years', () => {
-    expect(categorizeTenure_('3-5 years')).toBe('3-5 Years');
-  });
-
-  test('"3 to 5 years" -> 3-5 Years', () => {
-    expect(categorizeTenure_('3 to 5 years')).toBe('3-5 Years');
-  });
-
-  test('"5-10 years" -> 5-10 Years', () => {
-    expect(categorizeTenure_('5-10 years')).toBe('5-10 Years');
-  });
-
-  test('"5 to 10 years" -> 5-10 Years', () => {
-    expect(categorizeTenure_('5 to 10 years')).toBe('5-10 Years');
-  });
-
-  test('"Over 10 years" -> 10+ Years', () => {
-    expect(categorizeTenure_('Over 10 years')).toBe('10+ Years');
-  });
-
-  test('"20 years" -> 10+ Years (default)', () => {
-    expect(categorizeTenure_('20 years')).toBe('10+ Years');
-  });
-
-  test('empty string -> 10+ Years (default)', () => {
-    expect(categorizeTenure_('')).toBe('10+ Years');
-  });
-});
-
-// ============================================================================
-// getScoreBucket_
-// ============================================================================
-
-describe('getScoreBucket_', () => {
-  test('NaN input -> No Response', () => {
-    expect(getScoreBucket_('N/A')).toBe('No Response');
-  });
-
-  test('empty string -> No Response', () => {
-    expect(getScoreBucket_('')).toBe('No Response');
-  });
-
-  test('null -> No Response', () => {
-    expect(getScoreBucket_(null)).toBe('No Response');
-  });
-
-  test('undefined -> No Response', () => {
-    expect(getScoreBucket_(undefined)).toBe('No Response');
-  });
-
-  test('score 10 -> High (8-10)', () => {
-    expect(getScoreBucket_(10)).toBe('High (8-10)');
-  });
-
-  test('score 8 -> High (8-10)', () => {
-    expect(getScoreBucket_(8)).toBe('High (8-10)');
-  });
-
-  test('score 7.9 -> Medium (5-7)', () => {
-    expect(getScoreBucket_(7.9)).toBe('Medium (5-7)');
-  });
-
-  test('score 5 -> Medium (5-7)', () => {
-    expect(getScoreBucket_(5)).toBe('Medium (5-7)');
-  });
-
-  test('score 4.9 -> Low (1-4)', () => {
-    expect(getScoreBucket_(4.9)).toBe('Low (1-4)');
-  });
-
-  test('score 1 -> Low (1-4)', () => {
-    expect(getScoreBucket_(1)).toBe('Low (1-4)');
-  });
-
-  test('string "9" is parsed as number -> High (8-10)', () => {
-    expect(getScoreBucket_('9')).toBe('High (8-10)');
-  });
-});
-
-// ============================================================================
-// calculateSectionAvg_
-// ============================================================================
-
-describe('calculateSectionAvg_', () => {
-  test('calculates average of valid values (1-10)', () => {
-    const row = [0, 8, 0, 6, 0, 10];
-    const result = calculateSectionAvg_(row, [1, 3, 5]);
-    // (8 + 6 + 10) / 3 = 8.0
-    expect(result).toBe(8);
-  });
-
-  test('ignores values outside 1-10 range', () => {
-    const row = [0, 8, 0, 0, 15, 5];
-    // col 1 = 8 (valid), col 3 = 0 (invalid), col 4 = 15 (invalid), col 5 = 5 (valid)
-    const result = calculateSectionAvg_(row, [1, 3, 4, 5]);
-    // (8 + 5) / 2 = 6.5
-    expect(result).toBe(6.5);
-  });
-
-  test('returns empty string when no valid values', () => {
-    const row = [0, 0, 0, 11, -1];
-    const result = calculateSectionAvg_(row, [0, 1, 2, 3, 4]);
-    expect(result).toBe('');
-  });
-
-  test('rounds to one decimal place', () => {
-    const row = [7, 8, 9];
-    // (7 + 8 + 9) / 3 = 8.0
-    const result = calculateSectionAvg_(row, [0, 1, 2]);
-    expect(result).toBe(8);
-  });
-
-  test('handles single valid value', () => {
-    const row = [0, 0, 7];
-    const result = calculateSectionAvg_(row, [0, 1, 2]);
-    expect(result).toBe(7);
-  });
-
-  test('handles string numeric values', () => {
-    const row = ['', '8', '', '6'];
-    const result = calculateSectionAvg_(row, [1, 3]);
-    expect(result).toBe(7);
-  });
-});
 
 // ============================================================================
 // getQuarter_
@@ -631,21 +358,6 @@ describe('getHeaderMap', () => {
 });
 
 // ============================================================================
-// invalidateHeaderCache
-// ============================================================================
-
-describe('invalidateHeaderCache', () => {
-  test('does not throw', () => {
-    expect(() => invalidateHeaderCache('TestSheet')).not.toThrow();
-  });
-
-  test('invalidateHeaderCache is callable and does not throw', () => {
-    expect(typeof invalidateHeaderCache).toBe('function');
-    expect(() => invalidateHeaderCache('Member Directory')).not.toThrow();
-  });
-});
-
-// ============================================================================
 // Expansion Column Engine — integration-style tests
 // ============================================================================
 
@@ -665,7 +377,6 @@ describe('Expansion Column Engine', () => {
     }));
     const mockSS = createMockSpreadsheet([mockSheet]);
     globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
-    invalidateHeaderCache('Member Directory');
     return mockSheet;
   }
 

@@ -298,19 +298,22 @@ describe('Auth.sendMagicLink', function () {
   });
 
   test('rate limits at 3 per email per 15 min', function () {
-    // Make getScriptCache return a singleton so the source code sees count '3'
-    var rateLimitCache = {
-      get: jest.fn(function () { return '3'; }),
-      put: jest.fn(),
-      remove: jest.fn()
-    };
-    CacheService.getScriptCache.mockReturnValueOnce(rateLimitCache);
+    // Mock _getRateCount to return 0 for global key but 3 (at limit) for per-email key
+    var origGetRateCount = global._getRateCount;
+    global._getRateCount = jest.fn(function (key) {
+      if (key.indexOf('MAGIC_RATE_') === 0) return 3;
+      return 0; // global key under limit
+    });
+    global._setRateCount = jest.fn();
 
     var result = Auth.sendMagicLink('user@test.com', false);
     // Should silently succeed (no enumeration) but not send email
     expect(result.success).toBe(true);
     expect(result.message).toContain('If this email is in our directory');
     expect(MailApp.sendEmail).not.toHaveBeenCalled();
+
+    // Restore
+    global._getRateCount = origGetRateCount;
   });
 
   test('handles quota exhaustion', function () {

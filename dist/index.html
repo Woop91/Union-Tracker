@@ -45,16 +45,37 @@
  var IS_ADMIN = PAGE_DATA.isAdmin || false;
  var IS_LEADER = PAGE_DATA.isLeader || false;
  var APP_VERSION = PAGE_DATA.appVersion || '';
- var SESSION_TOKEN = PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
+ 
+ 
+ 
+ 
+ 
+ var _fragSessionToken = null;
+ try {
+  var _hash = window.top.location.hash || window.location.hash || '';
+  if (_hash && _hash.indexOf('sessionToken=') !== -1) {
+  var _token = _hash.split('sessionToken=')[1];
+  if (_token) {
+   _token = _token.split('&')[0];
+   _fragSessionToken = decodeURIComponent(_token);
+  }
+  }
+ } catch (_fragErr) {  }
+
+ var SESSION_TOKEN = _fragSessionToken || PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
  var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
  
  var WEB_APP_URL = PAGE_DATA.webAppUrl || '';
 
  
+ 
  try {
-  if (window.top === window && window.top.location.search.indexOf('sessionToken') > -1) {
-  var cleanUrl = window.top.location.href.split('?')[0];
+  var _loc = window.top.location;
+  var _needsClean = (_loc.search && _loc.search.indexOf('sessionToken') > -1) ||
+      (_loc.hash && _loc.hash.indexOf('sessionToken') > -1);
+  if (window.top === window && _needsClean) {
+  var cleanUrl = _loc.pathname;
   if (window.top.history && window.top.history.replaceState) {
    window.top.history.replaceState(null, '', cleanUrl);
   }
@@ -141,6 +162,10 @@
     console.warn('Session restore: cleared stale token after ' + redirectCount + ' failed attempts');
    } else {
     safeLSSet('dashboardSessionRedirectCount', String(redirectCount + 1));
+    
+    
+    
+    
     
     window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
    }
@@ -2716,6 +2741,11 @@
  var _DEV_ONLY_TABS = { testrunner: 1 };
  
  var _GRIEVANCE_TABS = { cases: 1, newgrievance: 1 };
+ 
+ var _EXCLUDED_FEATURE_TABS = {};
+ if (!CONFIG.hasWorkloadService) _EXCLUDED_FEATURE_TABS.workload = 1;
+ if (!CONFIG.hasPOMSReference)   _EXCLUDED_FEATURE_TABS.poms = 1;
+ if (!CONFIG.hasAgencyOrgChart)  _EXCLUDED_FEATURE_TABS.maddsorgchart = 1;
 
  function _filterDevTabs(tabs) {
   var filtered = tabs;
@@ -2725,6 +2755,8 @@
   if (CONFIG.showGrievances === false) {
   filtered = filtered.filter(function(t) { return !t.id || !_GRIEVANCE_TABS[t.id]; });
   }
+  
+  filtered = filtered.filter(function(t) { return !t.id || !_EXCLUDED_FEATURE_TABS[t.id]; });
   return filtered;
  }
 
@@ -2807,7 +2839,13 @@
    { id: 'leaderhub', icon: '\uD83C\uDFC5', label: 'Leader Hub' }
   );
   }
-  return memberTabs;
+  
+  return memberTabs.filter(function(t) {
+  if (!t.id) return true;
+  if (_EXCLUDED_FEATURE_TABS[t.id]) return false;
+  if (CONFIG.showGrievances === false && _GRIEVANCE_TABS[t.id]) return false;
+  return true;
+  });
  }
 
  
@@ -3115,6 +3153,13 @@
 
  
  function renderAgencyOrgChart(appContainer, role) {
+  
+  if (!CONFIG.hasAgencyOrgChart) {
+  renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
+   container.appendChild(el('div', { className: 'empty-state' }, 'This feature is not available in this deployment.'));
+  });
+  return;
+  }
   var mySwitch = _navSwitchId;
   var myGen = _renderGeneration;
   renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
@@ -3159,6 +3204,13 @@
 
  
  function renderPOMSReference(appContainer, role) {
+  
+  if (!CONFIG.hasPOMSReference) {
+  renderPageLayout(appContainer, role, 'poms', function(container) {
+   container.appendChild(el('div', { className: 'empty-state' }, 'This feature is not available in this deployment.'));
+  });
+  return;
+  }
   var mySwitch = _navSwitchId;
   var myGen = _renderGeneration; 
   renderPageLayout(appContainer, role, 'poms', function(container) {
@@ -3377,6 +3429,8 @@
   return;
   }
   if (tabId === 'maddsorgchart') {
+  
+  if (!CONFIG.hasAgencyOrgChart) { _handleTabNav(role, 'home'); return; }
   if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
    if (typeof _renderDuesGate === 'function') {
    _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
@@ -3392,6 +3446,8 @@
   return;
   }
   if (tabId === 'poms') {
+  
+  if (!CONFIG.hasPOMSReference) { _handleTabNav(role, 'home'); return; }
   _hideAllVisiblePanes();
   _splitRenderTarget = 'primary';
   renderPOMSReference(app, role);
@@ -3531,6 +3587,10 @@
  function _getTabRenderFn(role, tabId) {
   
   if (CONFIG.showGrievances === false && _GRIEVANCE_TABS[tabId]) {
+  tabId = role === 'member' ? 'home' : 'home';
+  }
+  
+  if (_EXCLUDED_FEATURE_TABS[tabId]) {
   tabId = role === 'member' ? 'home' : 'home';
   }
   if (role === 'member') {

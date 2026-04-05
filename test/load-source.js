@@ -4,6 +4,15 @@
  * Google Apps Script files define functions and var constants as globals.
  * We preprocess the code to ensure top-level `var` and `function` declarations
  * become properties on the `global` object, then eval in global scope.
+ *
+ * KNOWN LIMITATIONS of regex-based source loading:
+ * 1. var/const/let rewriting matches line-starts in multi-line strings (indented code is safe)
+ * 2. Brace-counting for function extraction doesn't handle braces in string literals or regex
+ * 3. Destructured declarations (const { a, b } = ...) are not rewritten to global
+ * 4. Destructured declarations (const { a, b } = ...) are NOT rewritten to global scope.
+ *    Verify no .gs source files use top-level destructuring before adding any.
+ * These are acceptable for this codebase where top-level declarations are not indented
+ * and functions don't contain unmatched braces in strings.
  */
 
 const fs = require('fs');
@@ -25,11 +34,6 @@ const path = require('path');
  */
 function loadSource(filename) {
   const filePath = path.resolve(__dirname, '..', 'src', filename);
-  if (!fs.existsSync(filePath)) {
-    // SolidBase excludes some DDS-specific files (e.g., 25_WorkloadService.gs).
-    // Skip silently so test suites that share the same load list can run.
-    return;
-  }
   let code = fs.readFileSync(filePath, 'utf8');
 
   // --- Phase 1: Hoist function declarations ---

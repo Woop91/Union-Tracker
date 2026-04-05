@@ -814,7 +814,7 @@ describe('KPI computation parity (batch vs individual)', () => {
     const rows = [
       ['GR-1', 'member@test.com', 'Open', 'Step I', new Date(now - 2 * 86400000), new Date('2026-01-01'), 'steward@test.com', 'Unit A', 'High', '', 'Safety', '', ''],
       ['GR-2', 'member@test.com', 'Open', 'Step I', new Date(now + 3 * 86400000), new Date('2026-01-15'), 'steward@test.com', 'Unit A', 'Med', '', 'Pay', '', ''],
-      ['GR-3', 'member@test.com', 'Resolved', 'Step II', '', new Date('2025-06-01'), 'steward@test.com', 'Unit A', 'Low', '', 'Hours', 'Done', '2025-07-01'],
+      ['GR-3', 'member@test.com', 'Won', 'Step II', '', new Date('2025-06-01'), 'steward@test.com', 'Unit A', 'Low', '', 'Hours', 'Done', '2025-07-01'],
       ['GR-4', 'other@test.com', 'Open', 'Step I', new Date(now + 20 * 86400000), new Date('2026-02-01'), 'steward@test.com', 'Unit B', 'Med', '', 'Pay', '', ''],
     ];
     const data = [HEADERS, ...rows];

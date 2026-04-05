@@ -28,7 +28,7 @@
  *   Depends on: 01_Core.gs (SHEETS, RSVP_STATUS, GRIEVANCE_COLS),
  *   00_Security.gs (escapeForFormula, logAuditEvent)
  *
- * @version 4.36.0
+ * @version 4.51.0
  */
 
 // ============================================================================

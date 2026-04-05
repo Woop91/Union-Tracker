@@ -61,7 +61,7 @@ function onOpen() {
     createDashboardMenu();
     if (typeof buildDevMenu === 'function') buildDevMenu();
   } catch (error) {
-    log_('Error in onOpen', error);
+    log_('onOpen', 'Error: ' + (error.message || error));
   }
 }
 
@@ -91,19 +91,19 @@ function onOpenDeferred_() {
     try {
       syncColumnMaps();
     } catch (syncError) {
-      log_('Column sync skipped', syncError.message);
+      log_('onOpenDeferred_', 'Column sync skipped: ' + syncError.message);
     }
 
     try {
       ensureAllSheetColumns_();
     } catch (colError) {
-      log_('Column check skipped', colError.message);
+      log_('onOpenDeferred_', 'Column check skipped: ' + colError.message);
     }
 
     try {
       loadUnitCodes_();
     } catch (unitCodeErr) {
-      log_('Unit codes load skipped', unitCodeErr.message);
+      log_('onOpenDeferred_', 'Unit codes load skipped: ' + unitCodeErr.message);
     }
 
     try {
@@ -186,14 +186,14 @@ function onEdit(e) {
     // Restore column positions that syncColumnMaps() resolved in onOpen().
     // Without this, each onEdit execution would start with array-order defaults
     // which are wrong if a user manually reordered columns.
-    try { loadCachedColumnMaps_(); } catch (_cacheErr) { log_('_cacheErr', (_cacheErr.message || _cacheErr)); }
+    try { loadCachedColumnMaps_(); } catch (_cacheErr) { log_('onEdit', 'Error: ' + (_cacheErr.message || _cacheErr)); }
 
     // Ensure EventBus subscribers are registered for this execution context.
     // GAS runs each trigger invocation in an isolated context — global state
     // from onOpenDeferred_ doesn't persist into onEdit executions.
     try {
       if (typeof registerEventBusSubscribers === 'function') registerEventBusSubscribers();
-    } catch (_busErr) { log_('_busErr', (_busErr.message || _busErr)); }
+    } catch (_busErr) { log_('onEdit', 'EventBus registration error: ' + (_busErr.message || _busErr)); }
 
     var sheet = e.range.getSheet();
     var sheetName = sheet.getName();
@@ -222,7 +222,7 @@ function onEdit(e) {
       try {
         onEditMultiSelect(e);
       } catch (multiSelectError) {
-        log_('MultiSelect handler error', multiSelectError.message);
+        log_('onEdit', 'MultiSelect handler error: ' + multiSelectError.message);
       }
     }
 
@@ -238,7 +238,7 @@ function onEdit(e) {
     }
 
   } catch (error) {
-    log_('Error in onEdit', error);
+    log_('onEdit', 'Error: ' + (error.message || error));
   }
 }
 
@@ -285,7 +285,7 @@ function onSelectionChange(e) {
     if (typeof onSelectionChangeMultiSelect === 'function') {
       onSelectionChangeMultiSelect(e);
     }
-  } catch (_err) { log_('_err', (_err.message || _err)); }
+  } catch (_err) { log_('onSelectionChange', 'Error: ' + (_err.message || _err)); }
 }
 
 /**
@@ -472,32 +472,8 @@ function handleSecurityAudit_(e) {
       ''
     ];
 
-    // Batch audit writes via CacheService to reduce appendRow calls
-    var cache = CacheService.getScriptCache();
-    var queueKey = 'AUDIT_EVENT_QUEUE';
-    var batchLock = LockService.getScriptLock();
-    if (batchLock.tryLock(2000)) {
-      try {
-        var existing = cache.get(queueKey);
-        var queue = existing ? JSON.parse(existing) : [];
-        // Serialize Date for JSON storage
-        auditRow[0] = auditRow[0].toISOString();
-        queue.push(auditRow);
-        if (queue.length >= 10) {
-          // Flush batch — restore Date objects
-          for (var qi = 0; qi < queue.length; qi++) {
-            queue[qi][0] = new Date(queue[qi][0]);
-          }
-          auditSheet.getRange(auditSheet.getLastRow() + 1, 1, queue.length, queue[0].length).setValues(queue);
-          cache.remove(queueKey);
-        } else {
-          cache.put(queueKey, JSON.stringify(queue), 120);
-        }
-      } finally { batchLock.releaseLock(); }
-    } else {
-      // Fallback: direct append if lock unavailable
-      auditSheet.appendRow(auditRow);
-    }
+    // Direct append — every audit event is written immediately for reliability
+    auditSheet.appendRow(auditRow);
 
   } catch (auditError) {
     // Silently fail - don't break user's edit for audit logging
@@ -672,15 +648,21 @@ function flushEscalationEmailQueue() {
   if (!queue.length) return 0;
 
   var sent = 0;
+  var failed = [];
   for (var i = 0; i < queue.length; i++) {
     try {
       safeSendEmail_({ to: queue[i].to, subject: queue[i].subject, body: queue[i].body });
       sent++;
     } catch(e) {
-      log_('flushEscalationEmailQueue error', e.message);
+      log_('flushEscalationEmailQueue', 'Send failed: ' + e.message);
+      failed.push(queue[i]);
     }
   }
-  props.deleteProperty('ESCALATION_EMAIL_QUEUE');
+  if (failed.length > 0) {
+    props.setProperty('ESCALATION_EMAIL_QUEUE', JSON.stringify(failed));
+  } else {
+    props.deleteProperty('ESCALATION_EMAIL_QUEUE');
+  }
   return sent;
 }
 
@@ -704,7 +686,7 @@ function getConfigValue_(columnNum, fallback) {
 
     // Config values are typically in row 3 (row 1 = section headers, row 2 = column headers)
     var value = configSheet.getRange(3, columnNum).getValue();
-    return value ? String(value).trim() : fb;
+    return value != null && value !== '' ? String(value).trim() : fb;
   } catch (e) {
     log_('getConfigValue_', 'Error reading config value col ' + columnNum + ': ' + e.message);
     return fb;
@@ -726,7 +708,7 @@ function getEscalationStatuses_() {
       if (values.length > 0) return values;
     }
   } catch (e) {
-    log_('Error reading escalation statuses', e.message);
+    log_('getEscalationStatuses_', 'Error reading escalation statuses: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -761,7 +743,7 @@ function loadUnitCodes_() {
       COMMAND_CONFIG.UNIT_CODES = codes;
     }
   } catch (e) {
-    log_('Error loading unit codes', e.message);
+    log_('loadUnitCodes_', 'Error loading unit codes: ' + e.message);
   }
 }
 
@@ -809,7 +791,7 @@ function getEscalationSteps_() {
       if (values.length > 0) return values;
     }
   } catch (e) {
-    log_('Error reading escalation steps', e.message);
+    log_('getEscalationSteps_', 'Error reading escalation steps: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -933,8 +915,6 @@ function handleGrievanceEdit(e) {
       dependentCell.setNote('');
     }
   }
-
-  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
 
   // If step dates changed, recalculate deadlines (using dynamic column references)
   // H-36: Skip downstream recalculation if the edited column IS itself a deadline
@@ -1134,7 +1114,7 @@ function syncDropdownToConfig_(e, sheetName) {
   // (handles pastes, programmatic setValue, and multi-cell edits)
   var newValue = e.value;
   if (!newValue && e.range && e.range.getNumRows() === 1 && e.range.getNumColumns() === 1) {
-    try { newValue = e.range.getValue(); } catch (_) { log_('_', (_.message || _)); }
+    try { newValue = e.range.getValue(); } catch (_) { log_('syncDropdownToConfig_', 'Error: ' + (_.message || _)); }
   }
   if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
   newValue = newValue.trim();
@@ -1406,7 +1386,7 @@ function dailyTrigger() {
         if (!isNaN(aDays) && aDays > 0) auditArchiveDays = aDays;
       }
     } catch (e) {
-      log_('Could not read archive threshold from Config, using defaults', e.message);
+      log_('dailyTrigger', 'Could not read archive threshold from Config, using defaults: ' + e.message);
     }
 
     // Auto-archive closed grievances older than configured days
@@ -1420,7 +1400,7 @@ function dailyTrigger() {
         }
       }
     } catch (e) {
-      log_('Auto-archive grievances error', e.message);
+      log_('dailyTrigger', 'Auto-archive grievances error: ' + e.message);
     }
 
     // Archive old audit log entries to Drive CSV
@@ -1431,7 +1411,7 @@ function dailyTrigger() {
         auditArchiveResult = archiveOldAuditLogs_(auditArchiveDays) || auditArchiveResult;
       }
     } catch (e) {
-      log_('Audit log archive error', e.message);
+      log_('dailyTrigger', 'Audit log archive error: ' + e.message);
     }
 
     // Send daily security digest (batched HIGH/CRITICAL events from the last 24h)
@@ -1444,7 +1424,7 @@ function dailyTrigger() {
         sendDailySecurityDigest();
       }
     } catch (e) {
-      log_('Security digest error', e.message);
+      log_('dailyTrigger', 'Security digest error: ' + e.message);
     }
 
     // Cleanup expired auth session tokens (removes tokens older than TTL)
@@ -1454,7 +1434,7 @@ function dailyTrigger() {
         authCleanupExpiredTokens();
       }
     } catch (e) {
-      log_('Auth token cleanup error', e.message);
+      log_('dailyTrigger', 'Auth token cleanup error: ' + e.message);
     }
 
     // Log the trigger run
@@ -1472,7 +1452,7 @@ function dailyTrigger() {
     });
 
   } catch (error) {
-    log_('Error in dailyTrigger', error);
+    log_('dailyTrigger', 'Error: ' + (error.message || error));
   }
 }
 
@@ -2046,7 +2026,7 @@ function updateGrievance(grievanceId, updates) {
     return { success: true, message: 'Grievance updated successfully' };
 
   } catch (error) {
-    log_('Error updating grievance', error);
+    log_('updateGrievance', 'Error: ' + (error.message || error));
     return errorResponse(error.message);
   }
 }
@@ -2114,6 +2094,25 @@ function handleBulkStatusSelection(selectedIds) {
  * Shows new member dialog
  */
 function showNewMemberDialog() {
+  // Read Dues Status options from Config sheet (same pattern as _configList)
+  var duesStatusOptions = [];
+  try {
+    var cfgSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.CONFIG);
+    if (cfgSheet && CONFIG_COLS.DUES_STATUSES > 0) {
+      var lr = cfgSheet.getLastRow();
+      if (lr >= 3) {
+        duesStatusOptions = cfgSheet.getRange(3, CONFIG_COLS.DUES_STATUSES, lr - 2, 1)
+          .getValues().map(function(r) { return String(r[0]).trim(); })
+          .filter(function(v) { return v !== ''; });
+      }
+    }
+  } catch (_e) { /* fall through to hardcoded defaults */ }
+  if (!duesStatusOptions.length) {
+    duesStatusOptions = ['Current', 'Past Due', 'Inactive', 'Non Member'];
+  }
+  var duesStatusOptionsHtml = duesStatusOptions.map(function(v) {
+    return '<option value="' + v.replace(/"/g, '&quot;') + '">' + v.replace(/</g, '&lt;') + '</option>';
+  }).join('\n                ');
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -2175,14 +2174,9 @@ function showNewMemberDialog() {
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Union Status</label>
-              <!-- TODO: These options are hardcoded; they should match the values in the Config sheet.
-                   Dynamically injecting options would require a template evaluation refactor since
-                   this HTML is pre-generated server-side via HtmlService. -->
-              <select class="form-select" id="unionStatus">
-                <option value="Full Member">Full Member</option>
-                <option value="Agency Fee">Agency Fee</option>
-                <option value="Non-Member">Non-Member</option>
+              <label class="form-label">Dues Status</label>
+              <select class="form-select" id="duesStatus">
+                ${duesStatusOptionsHtml}
               </select>
             </div>
             <div class="form-group">
@@ -2233,7 +2227,7 @@ function showNewMemberDialog() {
             hireDate: document.getElementById('hireDate').value,
             email: document.getElementById('email').value,
             phone: document.getElementById('phone').value,
-            unionStatus: document.getElementById('unionStatus').value,
+            duesStatus: document.getElementById('duesStatus').value,
             status: document.getElementById('status').value
           };
 
@@ -2277,7 +2271,7 @@ function addNewMember(memberData) {
     // which may not be the last column).
     var maxMemberCol = 0;
     for (var colKey in MEMBER_COLS) {
-      if (MEMBER_COLS.hasOwnProperty(colKey) && MEMBER_COLS[colKey] > maxMemberCol) {
+      if (Object.prototype.hasOwnProperty.call(MEMBER_COLS, colKey) && MEMBER_COLS[colKey] > maxMemberCol) {
         maxMemberCol = MEMBER_COLS[colKey];
       }
     }
@@ -2296,6 +2290,7 @@ function addNewMember(memberData) {
     setCol_(rowData, MEMBER_COLS.EMPLOYEE_ID, escapeForFormula(memberData.employeeId || ''));
     setCol_(rowData, MEMBER_COLS.DEPARTMENT, escapeForFormula(memberData.department || ''));
     setCol_(rowData, MEMBER_COLS.HIRE_DATE, memberData.hireDate ? new Date(memberData.hireDate) : '');
+    setCol_(rowData, MEMBER_COLS.DUES_STATUS, escapeForFormula(memberData.duesStatus || ''));
 
     sheet.appendRow(rowData);
 
@@ -2312,7 +2307,7 @@ function addNewMember(memberData) {
     };
 
   } catch (error) {
-    log_('Error adding member', error);
+    log_('addNewMember', 'Error: ' + (error.message || error));
     return errorResponse(error.message);
   }
 }
@@ -2370,7 +2365,7 @@ function exportMemberDirectory(format) {
     case 'email':
       // Send email with summary
       const email = Session.getActiveUser().getEmail();
-      const subject = 'Member Directory Export - ' + new Date().toLocaleDateString();
+      const subject = 'Member Directory Export - ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy');
       let body = 'Member Directory Export\n\n';
       body += 'Total Members: ' + (data.length - 1) + '\n\n';
       body += 'Spreadsheet: ' + ss.getUrl();

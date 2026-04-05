@@ -128,15 +128,6 @@ describe('computeAverage_', () => {
 });
 
 // ============================================================================
-// getSheetLastRow
-// ============================================================================
-
-// getSheetLastRow wrapper was removed (trivial pass-through to sheet.getLastRow())
-describe('getSheetLastRow (removed)', () => {
-  test.skip('wrapper removed — use sheet.getLastRow() directly', () => {});
-});
-
-// ============================================================================
 // computeDashboardMetrics_ - data transform
 // ============================================================================
 

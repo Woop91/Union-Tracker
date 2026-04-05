@@ -34,7 +34,7 @@
  *   constants for verification). Used by menu items (Admin > Run Tests),
  *   daily trigger, and the SPA TestRunner tab.
  *
- * @version 4.43.1
+ * @version 4.51.0
  */
 
 /* ========================================================================
@@ -143,7 +143,7 @@ var TestRunner = (function () {
   }
 
   function assertHasKey(obj, key, label) {
-    if (!obj || !obj.hasOwnProperty(key)) {
+    if (!obj || !Object.prototype.hasOwnProperty.call(obj, key)) {
       throw _assertionError(
         (label || 'assertHasKey') + ': object missing key "' + key + '"'
       );

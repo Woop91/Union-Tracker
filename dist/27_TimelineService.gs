@@ -30,7 +30,7 @@
  *   Depends on 01_Core.gs (SHEETS), CalendarApp, DriveApp (GAS built-ins).
  *   Used by SPA timeline views and event management features.
  *
- * @version 4.43.1
+ * @version 4.51.0
  */
 
 var TimelineService = (function () {

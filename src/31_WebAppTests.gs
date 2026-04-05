@@ -28,7 +28,7 @@
  *   modules (19-28) for existence checks. Used by the test runner suite
  *   system.
  *
- * @version 4.43.1
+ * @version 4.51.0
  */
 
 /* ========================================================================
@@ -882,7 +882,7 @@ function test_endpoints_allWriteEndpointsRejectNull() {
     try {
       var result = this[ep.fn].apply(null, ep.args);
       // Result should indicate auth failure
-      if (result && typeof result === 'object' && result.hasOwnProperty('success')) {
+      if (result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'success')) {
         TestRunner.assertEquals(false, result.success,
           ep.fn + '(null) returns success:false');
       } else if (Array.isArray(result)) {

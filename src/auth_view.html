@@ -117,7 +117,7 @@ function _autoSubmitPIN(container, credentialValue) {
   function _onSuccess(result) {
     if (result && result.success && result.sessionToken) {
       if (WEB_APP_URL) {
-        window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
+        window.top.location.href = WEB_APP_URL + '#sessionToken=' + encodeURIComponent(result.sessionToken);
       } else {
         showAuthError(container, 'No app URL available. Contact admin.');
       }
@@ -247,6 +247,61 @@ function renderAuth(container) {
   // Inject page-level effects
   _injectAuthEffects();
 
+  // v4.51.1: Fragment-based magic link handling — extract #token= from URL hash.
+  // Magic link tokens are now transported via fragment instead of query string to
+  // prevent exposure in server logs, browser history, and Referer headers.
+  // The client extracts the token and validates it server-side via google.script.run.
+  var _fragToken = null;
+  var _fragRemember = false;
+  try {
+    var _hash = window.top.location.hash || window.location.hash || '';
+    // Parse fragment parameters — look specifically for 'token=' (magic link),
+    // NOT 'sessionToken=' (session restore — handled separately in index.html bootstrap)
+    if (_hash) {
+      var _fragParts = _hash.substring(1).split('&');
+      for (var _fi = 0; _fi < _fragParts.length; _fi++) {
+        var _kv = _fragParts[_fi].split('=');
+        if (_kv[0] === 'token' && _kv[1]) _fragToken = decodeURIComponent(_kv[1]);
+        if (_kv[0] === 'remember' && _kv[1] === '1') _fragRemember = true;
+      }
+      // Clean fragment from URL immediately (security: prevent token lingering in address bar)
+      try {
+        if (window.top.history && window.top.history.replaceState) {
+          window.top.history.replaceState(null, '', window.top.location.pathname + window.top.location.search);
+        }
+      } catch (_) { /* cross-origin iframe */ }
+    }
+  } catch (_fragErr) { /* cross-origin iframe — skip */ }
+
+  if (_fragToken) {
+    // Show a loading state while validating the magic link token
+    container.innerHTML = '';
+    var _mlWrap = el('div', { className: 'auth-container fade-in' });
+    var _mlCard = el('div', { className: 'auth-glass-card', style: { textAlign: 'center', padding: '40px 28px' } });
+    _mlCard.appendChild(el('div', { className: 'spinner', style: { marginBottom: '16px' } }));
+    _mlCard.appendChild(el('div', { className: 'auth-text', style: { fontSize: '14px' } }, 'Verifying your sign-in link\u2026'));
+    _mlWrap.appendChild(_mlCard);
+    container.appendChild(_mlWrap);
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.success && result.sessionToken) {
+          if (WEB_APP_URL) {
+            window.top.location.href = WEB_APP_URL + '#sessionToken=' + encodeURIComponent(result.sessionToken);
+          } else {
+            showAuthError(container, 'No app URL available. Contact admin.');
+          }
+        } else {
+          showAuthError(container, (result && result.message) || 'This link has expired or was already used. Please request a new one.');
+        }
+      })
+      .withFailureHandler(function(err) {
+        showAuthError(container, (err && err.message) || 'Could not verify sign-in link. Please try again.');
+      })
+      .authValidateMagicToken(_fragToken, _fragRemember);
+    return; // Don't show the login form while validating
+  }
+
   showAuthChoose(container);
 }
 
@@ -260,7 +315,7 @@ function showAuthChoose(container) {
   var card = el('div', { className: 'auth-glass-card' });
 
   // ── Brand title ──
-  card.appendChild(el('div', { className: 'auth-brand' }, CONFIG.logoInitials || CONFIG.orgAbbrev || 'DDS'));
+  card.appendChild(el('div', { className: 'auth-brand' }, CONFIG.logoInitials || CONFIG.orgAbbrev || 'App'));
 
   // ── Header ──
   var header = el('div', { style: { textAlign: 'center', marginBottom: '28px' } });
@@ -380,11 +435,6 @@ function showAuthChoose(container) {
 
   // Footer
   var footer = el('div', { className: 'auth-footer' });
-  var footLinks = el('div', { className: 'auth-footer-links' });
-  ['Privacy', 'Terms', 'Support'].forEach(function(label) {
-    footLinks.appendChild(el('span', { className: 'auth-footer-link' }, label));
-  });
-  footer.appendChild(footLinks);
   footer.appendChild(el('div', { className: 'auth-footer-copy' },
     '\u00A9 ' + new Date().getFullYear() + ' ' + (CONFIG.orgName || 'Solidarity Portal')));
   wrapper.appendChild(footer);
@@ -511,7 +561,7 @@ function showAuthPIN(container) {
           _trySaveCredential(credName, pin);
 
           if (WEB_APP_URL) {
-            window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
+            window.top.location.href = WEB_APP_URL + '#sessionToken=' + encodeURIComponent(result.sessionToken);
           } else {
             statusMsg.textContent = 'No app URL available. Contact admin.';
             statusMsg.style.color = '#dc2626';

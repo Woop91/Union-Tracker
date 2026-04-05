@@ -333,7 +333,7 @@ function _renderOnboardingWizard(container) {
   var pin = stepData._pinInput ? stepData._pinInput.value.trim() : '';
   var confirm = stepData._confirmInput ? stepData._confirmInput.value.trim() : '';
   if (!pin) { statusMsg.textContent = 'Please enter a PIN.'; statusMsg.style.color = 'var(--danger)'; return false; }
-  if (!/^\d{4,6}$/.test(pin)) { statusMsg.textContent = 'PIN must be 4\u20136 digits.'; statusMsg.style.color = 'var(--danger)'; return false; }
+  if (!/^\d{6}$/.test(pin)) { statusMsg.textContent = 'PIN must be exactly 6 digits.'; statusMsg.style.color = 'var(--danger)'; return false; }
   if (pin !== confirm) { statusMsg.textContent = 'PINs do not match.'; statusMsg.style.color = 'var(--danger)'; return false; }
   stepData.pin = pin;
   return true;
@@ -1323,7 +1323,11 @@ function _renderMemberWelcome(container) {
  { icon: '\uD83D\uDCDA', label: 'Resources', tab: 'resources' },
  { icon: '\uD83D\uDC64', label: 'My Profile', tab: 'profile' },
  { icon: '\uD83D\uDCCA', label: 'Workload', tab: 'workload' }
- ].forEach(function (qa) {
+ ].filter(function(qa) {
+ 
+ if (qa.tab === 'workload' && !CONFIG.hasWorkloadService) return false;
+ return true;
+ }).forEach(function (qa) {
  var actionCard = el('button', {
   type: 'button',
   className: 'card-clickable',
@@ -1828,7 +1832,7 @@ function renderMemberResources(appContainer) {
   { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
   { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
  ];
- if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+ if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: (CONFIG.orgAbbrev || 'Organization') + ' Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
  quickLinks.forEach(function(r) {
   if (!r.url) return;
@@ -2130,7 +2134,7 @@ function renderPINSetup(appContainer) {
  });
  header.appendChild(el('div', {
   style: { fontSize: '24px', fontWeight: '700', fontFamily: 'var(--fontDisplay)', marginBottom: '4px' }
- }, 'DDS Dashboard'));
+ }, (CONFIG.orgAbbrev || CONFIG.systemName || 'Dashboard') + ' Dashboard'));
  header.appendChild(el('div', {
   style: { fontSize: '12px', opacity: '0.85' }
  }, 'Set up your login PIN'));
@@ -2367,13 +2371,13 @@ function renderMemberMore(appContainer) {
  var menuItems = [
   { group: 'Manage' },
   { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', badge: AppState.memberTaskCount || 0, action: function() { _handleTabNav('member', 'mytasks'); } },
-  { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { _handleTabNav('member', 'workload'); } },
+  { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', _feat: 'workload', action: function() { _handleTabNav('member', 'workload'); } },
   { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
   { group: 'Reference' },
-  { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('member', 'poms'); } },
+  { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', _feat: 'poms', action: function() { _handleTabNav('member', 'poms'); } },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
-  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the SEIU 509 organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
-  { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'MassAbility agency structure & budget', locked: true, action: function() { _handleTabNav('member', 'maddsorgchart'); } },
+  { icon: '\uD83C\uDFDB', label: 'Union', desc: 'View the organization chart', locked: true, action: function() { _handleTabNav('member', 'orgchart'); } },
+  { icon: '\uD83C\uDFE2', label: 'Agency', desc: 'Agency structure & budget', locked: true, _feat: 'agency', action: function() { _handleTabNav('member', 'maddsorgchart'); } },
   { group: 'Community' },
   { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('member', 'qaforum'); } },
   { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on this week\'s anonymous polls', locked: true, action: function() { _handleTabNav('member', 'polls'); } },
@@ -2392,6 +2396,14 @@ function renderMemberMore(appContainer) {
   { icon: '\uD83D\uDD11', label: 'Set Up PIN', desc: 'Create or change your login PIN', action: function() { _handleTabNav('member', 'pinsetup'); } },
   { icon: '\uD83D\uDCCB', label: 'Report Card', desc: 'Your personal engagement score', action: function() { _handleTabNav('member', 'reportcard'); } },
  ];
+
+ 
+ menuItems = menuItems.filter(function(m) {
+  if (m._feat === 'workload' && !CONFIG.hasWorkloadService) return false;
+  if (m._feat === 'poms' && !CONFIG.hasPOMSReference) return false;
+  if (m._feat === 'agency' && !CONFIG.hasAgencyOrgChart) return false;
+  return true;
+ });
 
  menuItems.forEach(function(m) {
   if (m.group) {
@@ -3683,6 +3695,14 @@ function _surveyViewMeeting(vc, ctx) {
 }
 
 function renderWorkloadTracker(appContainer) {
+ 
+ if (!CONFIG.hasWorkloadService) {
+ var role0 = AppState.activeRole || 'member';
+ renderPageLayout(appContainer, role0, 'workload', function(container) {
+  container.appendChild(el('div', { className: 'empty-state' }, 'This feature is not available in this deployment.'));
+ });
+ return;
+ }
  var role = AppState.activeRole || 'member';
  var headerFn = role === 'steward' ? _stewardHeader : _memberHeader;
  renderPageLayout(appContainer, role, 'workload', function(container) {

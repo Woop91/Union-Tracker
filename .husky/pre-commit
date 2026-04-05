@@ -19,7 +19,7 @@ fi
 # TODO(human): Choose rebuild strategy for pre-commit hook
 echo ""
 echo "[2/3] Rebuilding dist/..."
-node build.js --prod --minify > /dev/null 2>&1
+node build.js --prod --minify > /dev/null
 
 if [ $? -ne 0 ]; then
   echo ""
@@ -28,12 +28,12 @@ if [ $? -ne 0 ]; then
 fi
 
 # Auto-stage rebuilt dist/ so the commit includes correct prod output
-git add dist/ > /dev/null 2>&1
+git add dist/*.gs dist/*.html dist/appsscript.json > /dev/null
 
 # Step 3: Deploy guards + SPA integrity (catches routing, auth, sheet, parity bugs)
 echo ""
 echo "[3/3] Running deploy guards..."
-npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail 2>&1
+npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail --silent 2>&1
 GUARD_EXIT=$?
 
 if [ $GUARD_EXIT -ne 0 ]; then

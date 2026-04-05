@@ -89,7 +89,7 @@ var DataService = (function () {
     grievanceSteward:['assigned steward', 'steward', 'steward email', 'assigned to'],
     grievanceUnit:   ['unit', 'workplace unit', 'work location', 'location'],
     grievancePriority: ['priority', 'urgency'],
-    grievanceNotes:  ['notes', 'description', 'summary'],
+    grievanceNotes:  ['notes', 'description', 'summary', 'resolution'],
     grievanceIssueCategory: ['issue category', 'category', 'issue type'],
     grievanceResolution: ['resolution', 'outcome', 'result'],
     grievanceDateClosed: ['date closed', 'closed date', 'closed', 'resolved date'],
@@ -241,12 +241,13 @@ var DataService = (function () {
       var c = cases[i];
       var status = String(c.status).toLowerCase();
 
-      if (status === 'resolved') {
+      if (_closedStatusesLower.indexOf(status) !== -1) {
         resolved++;
-      } else if (status === 'overdue') {
-        overdue++;
       } else {
         active++;
+        if (status === 'overdue') {
+          overdue++;
+        }
         if (c.deadlineDays !== null && c.deadlineDays <= 7 && c.deadlineDays >= 0) {
           dueSoon++;
         }
@@ -1439,7 +1440,7 @@ var DataService = (function () {
       try {
         var existing = DriveApp.getFolderById(storedId);
         return 'https://drive.google.com/drive/folders/' + existing.getId();
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('getOrCreateSheetFolder_', 'Error: ' + (_e.message || _e)); }
     }
 
     try {
@@ -1707,7 +1708,6 @@ var DataService = (function () {
    */
   function sendBroadcastMessage(stewardEmail, filter, message, customSubject) {
     try {
-    var auth = checkWebAppAuthorization('steward'); if (!auth || !auth.isAuthorized) return { success: false, sentCount: 0, message: 'Unauthorized' };
     if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
 
     // Scope: 'mine' = only members assigned to this steward, 'all' = all members
@@ -1919,7 +1919,7 @@ var DataService = (function () {
   function _findColumn(colMap, aliases) {
     for (var i = 0; i < aliases.length; i++) {
       var key = aliases[i].toLowerCase();
-      if (colMap.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(colMap, key)) {
         return colMap[key];
       }
     }
@@ -2307,7 +2307,7 @@ var DataService = (function () {
     // ── 1. Append to _Contact_Log hidden sheet (fast dashboard queries) ────
     var sheet = _ensureContactLog();
     var id = 'CL_' + Date.now().toString(36);
-    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), contactType, new Date(), (notes || '').substring(0, 500), duration || '', new Date(), resolvedName]);
+    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), escapeForFormula(contactType), new Date(), escapeForFormula((notes || '').substring(0, 500)), duration || '', new Date(), resolvedName]);
     if (typeof logAuditEvent === 'function') logAuditEvent('CONTACT_LOG', { steward: stewardEmail, member: memberEmail, type: contactType });
 
     // ── 2. Resolve steward display name once (used in both writeback and Drive sheet) ──
@@ -2322,17 +2322,24 @@ var DataService = (function () {
         if (memberDir) {
           var mData    = memberDir.getDataRange().getValues();
           // Use MEMBER_COLS constants (1-indexed, subtract 1 for array access)
-          var emailIdx          = MEMBER_COLS.EMAIL - 1;
-          var recentContactIdx  = MEMBER_COLS.RECENT_CONTACT_DATE - 1;
-          var contactStewardIdx = MEMBER_COLS.CONTACT_STEWARD - 1;
-          var contactNotesIdx   = MEMBER_COLS.CONTACT_NOTES - 1;
+          // Resolve contact columns from actual headers at write time (v4.51.1)
+          var _lmcCols = resolveColumnsByHeader_(memberDir, [
+            { key: 'EMAIL',    header: 'Email',                fallback: MEMBER_COLS.EMAIL },
+            { key: 'CONTACT',  header: 'Recent Contact Date',  fallback: MEMBER_COLS.RECENT_CONTACT_DATE },
+            { key: 'STEWARD',  header: 'Contact Steward',      fallback: MEMBER_COLS.CONTACT_STEWARD },
+            { key: 'NOTES',    header: 'Contact Notes',        fallback: MEMBER_COLS.CONTACT_NOTES }
+          ]);
+          var emailIdx          = _lmcCols.EMAIL - 1;
+          var recentContactIdx  = _lmcCols.CONTACT - 1;
+          var contactStewardIdx = _lmcCols.STEWARD - 1;
+          var contactNotesIdx   = _lmcCols.NOTES - 1;
           if (emailIdx >= 0) {
             var mEmailNorm = memberEmail.toLowerCase().trim();
             for (var r = 1; r < mData.length; r++) {
               if (String(mData[r][emailIdx]).toLowerCase().trim() === mEmailNorm) {
                 if (recentContactIdx  !== -1) memberDir.getRange(r + 1, recentContactIdx  + 1).setValue(new Date());
                 if (contactStewardIdx !== -1) memberDir.getRange(r + 1, contactStewardIdx + 1).setValue(sName);
-                if (contactNotesIdx   !== -1 && notes) memberDir.getRange(r + 1, contactNotesIdx + 1).setValue(String(notes).substring(0, 500));
+                if (contactNotesIdx   !== -1 && notes) memberDir.getRange(r + 1, contactNotesIdx + 1).setValue(escapeForFormula(String(notes).substring(0, 500)));
                 break;
               }
             }
@@ -2354,7 +2361,7 @@ var DataService = (function () {
         var contactSS = getOrCreateMemberContactSheet_(masterFolder, folderName);
         if (contactSS) {
           var logSheet = contactSS.getSheetByName(CONTACT_SHEET_TAB_) || contactSS.getActiveSheet();
-          logSheet.appendRow([new Date(), sName, contactType, (notes || '').substring(0, 500), duration || '']);
+          logSheet.appendRow([new Date(), sName, escapeForFormula(contactType), escapeForFormula((notes || '').substring(0, 500)), duration || '']);
         }
       }
     } catch (driveErr) {
@@ -2474,7 +2481,7 @@ var DataService = (function () {
     }
     var sheet = _ensureStewardTasks();
     var id = 'ST_' + Date.now().toString(36);
-    sheet.appendRow([id, ownerEmail, title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
+    sheet.appendRow([id, ownerEmail, escapeForFormula(title.substring(0, 200)), escapeForFormula((description || '').substring(0, 500)), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
     _invalidateSheetCache(SHEETS.STEWARD_TASKS);
     return { success: true, message: 'Task created.', taskId: id };
   }
@@ -2587,8 +2594,8 @@ var DataService = (function () {
     }
     var id = 'MT_' + Date.now().toString(36);
     sheet.appendRow([
-      id, memberEmail.toLowerCase().trim(), title.substring(0, 200),
-      (desc || '').substring(0, 500), memberEmail.toLowerCase().trim(),
+      id, memberEmail.toLowerCase().trim(), escapeForFormula(title.substring(0, 200)),
+      escapeForFormula((desc || '').substring(0, 500)), memberEmail.toLowerCase().trim(),
       priority || 'medium', 'open', dueDate || '', new Date(), '',
       'member', stewardEmail.toLowerCase().trim()
     ]);
@@ -3356,7 +3363,7 @@ var DataService = (function () {
         _sheetDataCache[sheetName] = parsed;
         return parsed;
       }
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getCachedSheetData', 'Error reading cache: ' + (_e.message || _e)); }
 
     var sheet = _getSheet(sheetName);
     if (!sheet) return null;
@@ -3401,7 +3408,7 @@ var DataService = (function () {
       });
       var json = JSON.stringify({ data: serializable, _cachedAt: Date.now() });
       _putChunkedCache(writeCache, cacheKey, json, smartTTL);
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getCachedSheetData', 'Error writing cache: ' + (_e.message || _e)); }
 
     return result;
   }
@@ -3424,7 +3431,7 @@ var DataService = (function () {
         var num = parseInt(n, 10);
         for (var i = 0; i < num; i++) cache.remove(cacheKey + '_' + i);
       }
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_invalidateSheetCache', 'Error: ' + (_e.message || _e)); }
   }
 
   // ═══════════════════════════════════════
@@ -3523,8 +3530,8 @@ var DataService = (function () {
    */
   function _getMemberBatchData(email) {
     // Pre-warm cache for sheets we'll read multiple times
-    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { log_('_', (_.message || _)); }
-    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { log_('_', (_.message || _)); }
+    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_e) { log_('_getMemberBatchData', 'Error pre-warming grievance cache: ' + (_e.message || _e)); }
+    try { _getCachedSheetData(MEMBER_SHEET); } catch (_e) { log_('_getMemberBatchData', 'Error pre-warming member cache: ' + (_e.message || _e)); }
 
     _checkExecTime('_getMemberBatchData:start');
     var grievances = [];
@@ -3547,13 +3554,13 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, 'member');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getMemberBatchData', 'Error getting notification count: ' + (_e.message || _e)); }
 
     var memberTaskCount = 0;
     try {
       var openTasks = getMemberTasks(email, 'not-completed');
       memberTaskCount = openTasks.length;
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getMemberBatchData', 'Error getting member tasks: ' + (_e.message || _e)); }
 
     return {
       grievances: grievances,
@@ -3574,9 +3581,9 @@ var DataService = (function () {
    */
   function _getStewardBatchData(email) {
     // Pre-warm cache for sheets we'll read multiple times
-    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_) { log_('_', (_.message || _)); }
-    try { _getCachedSheetData(MEMBER_SHEET); } catch (_) { log_('_', (_.message || _)); }
-    try { _getCachedSheetData(SHEETS.STEWARD_TASKS); } catch (_) { log_('_', (_.message || _)); }
+    try { _getCachedSheetData(GRIEVANCE_SHEET); } catch (_e) { log_('_getStewardBatchData', 'Error pre-warming grievance cache: ' + (_e.message || _e)); }
+    try { _getCachedSheetData(MEMBER_SHEET); } catch (_e) { log_('_getStewardBatchData', 'Error pre-warming member cache: ' + (_e.message || _e)); }
+    try { _getCachedSheetData(SHEETS.STEWARD_TASKS); } catch (_e) { log_('_getStewardBatchData', 'Error pre-warming tasks cache: ' + (_e.message || _e)); }
 
     _checkExecTime('_getStewardBatchData:start');
     // Read cases once and compute KPIs from same data (avoids double sheet read)
@@ -3596,7 +3603,7 @@ var DataService = (function () {
     try {
       memberCount = getStewardMembers(email).length;
       if (memberCount === 0) memberCount = getAllMembers().length;
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getStewardBatchData', 'Error getting member count: ' + (_e.message || _e)); }
 
     _checkExecTime('_getStewardBatchData:members');
     // Task counts — open tasks only; derive overdue from dueDays < 0.
@@ -3609,7 +3616,7 @@ var DataService = (function () {
       for (var t = 0; t < openTasks.length; t++) {
         if (openTasks[t].dueDays !== null && openTasks[t].dueDays < 0) overdueTaskCount++;
       }
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getStewardBatchData', 'Error getting tasks: ' + (_e.message || _e)); }
 
     var notifCount = 0;
     try {
@@ -3617,7 +3624,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, 'steward');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getStewardBatchData', 'Error getting notification count: ' + (_e.message || _e)); }
 
     var qaUnansweredCount = 0;
     try {
@@ -3625,7 +3632,7 @@ var DataService = (function () {
         // Use lightweight count — avoids building 999 full question objects
         qaUnansweredCount = QAForum.getUnansweredCount();
       }
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getStewardBatchData', 'Error getting QA count: ' + (_e.message || _e)); }
 
     return {
       cases: cases,
@@ -3647,10 +3654,11 @@ var DataService = (function () {
     var overdue = 0, dueSoon = 0, resolved = 0, active = 0;
     for (var i = 0; i < cases.length; i++) {
       var status = String(cases[i].status).toLowerCase();
-      if (status === 'resolved') resolved++;
-      else if (status === 'overdue') overdue++;
-      else {
+      if (_closedStatusesLower.indexOf(status) !== -1) {
+        resolved++;
+      } else {
         active++;
+        if (status === 'overdue') overdue++;
         if (cases[i].deadlineDays !== null && cases[i].deadlineDays <= 7 && cases[i].deadlineDays >= 0) dueSoon++;
       }
     }
@@ -3674,7 +3682,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, role || 'steward');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('getBadgeCounts', 'Error getting notification count: ' + (_e.message || _e)); }
 
     var taskCount = 0;
     var overdueTaskCount = 0;
@@ -3685,7 +3693,7 @@ var DataService = (function () {
         for (var t = 0; t < openTasks.length; t++) {
           if (openTasks[t].dueDays !== null && openTasks[t].dueDays < 0) overdueTaskCount++;
         }
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('getBadgeCounts', 'Error getting tasks: ' + (_e.message || _e)); }
     }
 
     var qaUnansweredCount = 0;
@@ -3694,7 +3702,7 @@ var DataService = (function () {
         if (typeof QAForum !== 'undefined') {
           qaUnansweredCount = QAForum.getUnansweredCount();
         }
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('getBadgeCounts', 'Error getting QA count: ' + (_e.message || _e)); }
     }
 
     return {
@@ -4004,8 +4012,8 @@ var DataService = (function () {
           actionType: String(col_(data[i], CHECKLIST_COLS.ACTION_TYPE) || ''),
           itemText: String(col_(data[i], CHECKLIST_COLS.ITEM_TEXT) || ''),
           category: String(col_(data[i], CHECKLIST_COLS.CATEGORY) || ''),
-          required: String(col_(data[i], CHECKLIST_COLS.REQUIRED)).toLowerCase() === 'true',
-          completed: String(col_(data[i], CHECKLIST_COLS.COMPLETED)).toLowerCase() === 'true',
+          required: isTruthyValue(col_(data[i], CHECKLIST_COLS.REQUIRED)),
+          completed: isTruthyValue(col_(data[i], CHECKLIST_COLS.COMPLETED)),
           completedBy: String(col_(data[i], CHECKLIST_COLS.COMPLETED_BY) || ''),
           completedDate: completedDate instanceof Date ? _formatDate(completedDate) : '',
           dueDate: dueDate instanceof Date ? _formatDate(dueDate) : String(dueDate || ''),
@@ -4073,7 +4081,7 @@ var DataService = (function () {
       for (var i = 1; i < data.length; i++) {
         if (String(col_(data[i], CHECKLIST_COLS.CHECKLIST_ID)).trim() !== String(checklistId).trim()) continue;
         var rowNum = i + 1;
-        sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED).setValue(completed ? 'true' : 'false');
+        sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED).setValue(completed ? true : false);
         sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED_BY).setValue(completed ? String(email || '').toLowerCase().trim() : '');
         sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED_DATE).setValue(completed ? new Date() : '');
 
@@ -4528,7 +4536,7 @@ var DataService = (function () {
           steward: c.steward,
           stewardName: stewardName,
           step: c.step,
-          closedDate: c.closedTimestamp ? new Date(c.closedTimestamp).toLocaleDateString() : '',
+          closedDate: c.closedTimestamp ? Utilities.formatDate(new Date(c.closedTimestamp), Session.getScriptTimeZone(), 'MM/dd/yyyy') : '',
           issueCategory: c.issueCategory,
           status: c.status
         };
@@ -4601,7 +4609,7 @@ var DataService = (function () {
       parseInt(ratings.communication, 10),
       parseInt(ratings.timeliness, 10),
       parseInt(ratings.fairness, 10),
-      safeComment,
+      escapeForFormula(safeComment),
       new Date()
     ]);
 
@@ -4734,7 +4742,7 @@ var DataService = (function () {
       if (comment) {
         var created = data[i][9];
         comments.push({
-          date: created instanceof Date ? created.toLocaleDateString() : '',
+          date: created instanceof Date ? Utilities.formatDate(created, Session.getScriptTimeZone(), 'MM/dd/yyyy') : '',
           comment: comment,
           grievanceId: String(data[i][1]).trim()
         });

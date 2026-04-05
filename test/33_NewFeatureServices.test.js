@@ -126,17 +126,16 @@ describe('NewFeatureServices module existence', () => {
 
 describe('NewFeatureServices global wrappers', () => {
   var wrappers = [
-    'dataGetHandoffNotes', 'dataAddHandoffNote', 'dataArchiveHandoffNote', 'dataInitHandoffNotes',
+    'dataGetHandoffNotes', 'dataAddHandoffNote', 'dataArchiveHandoffNote',
     'dataGetMentorshipPairings', 'dataCreateMentorshipPairing', 'dataUpdateMentorshipNotes',
     'dataCloseMentorshipPairing', 'dataGetMentorshipSuggestions', 'dataGetMemberLeaders',
     'dataLogCommunication', 'dataGetCommunicationLog',
-    'dataSearchKnowledgeBase', 'dataGetKnowledgeBaseArticle', 'dataGetRelatedArticles', 'dataAddKnowledgeBaseArticle',
-    'dataGetDigestPreferences', 'dataSetDigestPreferences', 'dataSendScheduledDigests',
+    'dataSearchKnowledgeBase', 'dataGetKnowledgeBaseArticle', 'dataAddKnowledgeBaseArticle',
+    'dataGetDigestPreferences', 'dataSetDigestPreferences',
     'dataGetDocumentChecklist',
     'dataGetEscalationRecommendation',
-    'dataGenerateMonthlyReport', 'dataGenerateReportHtml',
+    'dataGenerateMonthlyReport',
     'dataRequest2FACode', 'dataVerify2FACode',
-    'dataConfigureTwilio', 'dataSendSMS', 'dataGetSMSLog', 'dataTestSMS',
   ];
 
   wrappers.forEach(function(name) {
@@ -650,6 +649,185 @@ describe('SMSService.sendSMS', () => {
     var result = SMSService.sendSMS('user@test.com', '');
     expect(result.success).toBe(false);
     expect(result.error).toContain('required');
+  });
+});
+
+// ============================================================================
+// Global wrapper auth gating
+// ============================================================================
+
+// ============================================================================
+// Behavioral: RSVPService.getRSVPSummary
+// ============================================================================
+
+describe('RSVPService.getRSVPSummary (behavioral)', () => {
+  test('returns zero-count summary when no spreadsheet', () => {
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = RSVPService.getRSVPSummary('MTG-001');
+    expect(result.meetingId).toBe('MTG-001');
+    expect(result.invited).toBe(0);
+    expect(result.accepted).toBe(0);
+    expect(result.declined).toBe(0);
+    expect(result.noResponse).toBe(0);
+    expect(result.members).toEqual([]);
+  });
+
+  test('returns zero-count summary when RSVP sheet does not exist', () => {
+    var ss = createMockSpreadsheet([]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+    var result = RSVPService.getRSVPSummary('MTG-001');
+    expect(result.invited).toBe(0);
+    expect(result.members).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Behavioral: RSVPService.reconcileAttendance
+// ============================================================================
+
+describe('RSVPService.reconcileAttendance (behavioral)', () => {
+  test('returns failure when no spreadsheet', () => {
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = RSVPService.reconcileAttendance('MTG-001');
+    expect(result.success).toBe(false);
+    expect(result.reconciled).toBe(0);
+  });
+});
+
+// ============================================================================
+// Behavioral: SMSService.getProviderStatus
+// ============================================================================
+
+describe('SMSService.getProviderStatus (behavioral)', () => {
+  test('returns unconfigured status when no credentials', () => {
+    var result = SMSService.getProviderStatus();
+    expect(result).toHaveProperty('configured');
+    expect(result).toHaveProperty('accountSid');
+    expect(result).toHaveProperty('fromNumber');
+    expect(result.configured).toBe(false);
+  });
+
+  test('returns configured status with masked SID when credentials exist', () => {
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('TWILIO_ACCOUNT_SID', 'AC1234567890abcdef');
+    props.setProperty('TWILIO_AUTH_TOKEN', 'secret_token_123');
+    props.setProperty('TWILIO_FROM_NUMBER', '+15551234567');
+
+    var result = SMSService.getProviderStatus();
+    expect(result.configured).toBe(true);
+    expect(result.accountSid).toContain('AC123456');
+    expect(result.accountSid).toContain('...');
+    expect(result.fromNumber).toBe('+15551234567');
+  });
+});
+
+// ============================================================================
+// Behavioral: SMSService.getLog
+// ============================================================================
+
+describe('SMSService.getLog (behavioral)', () => {
+  test('returns empty array when no spreadsheet', () => {
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = SMSService.getLog();
+    expect(result).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Behavioral: DigestService.buildDigestContent
+// ============================================================================
+
+describe('DigestService.buildDigestContent (behavioral)', () => {
+  test('returns digest object with expected properties', () => {
+    var ss = createMockSpreadsheet([]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var result = DigestService.buildDigestContent('user@test.com');
+    expect(result).toHaveProperty('newCases');
+    expect(result).toHaveProperty('approachingDeadlines');
+    expect(result).toHaveProperty('overdueItems');
+    expect(result).toHaveProperty('qaActivity');
+    expect(typeof result.newCases).toBe('number');
+    expect(typeof result.overdueItems).toBe('number');
+  });
+});
+
+// ============================================================================
+// Behavioral: MentorshipService.suggestPairings
+// ============================================================================
+
+describe('MentorshipService.suggestPairings (behavioral)', () => {
+  test('returns array (possibly empty)', () => {
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = MentorshipService.suggestPairings();
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ============================================================================
+// Behavioral: HandoffService.archiveHandoffNote
+// ============================================================================
+
+describe('HandoffService.archiveHandoffNote (behavioral)', () => {
+  test('returns failure when note not found', () => {
+    var HEADERS = ['ID', 'Case ID', 'From Steward', 'To Steward', 'Note Text', 'Created', 'Status'];
+    var sheet = createMockSheet(SHEETS.HANDOFF_NOTES, [HEADERS]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    var result = HandoffService.archiveHandoffNote('NONEXISTENT');
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// Behavioral: RSVPService.processRSVP
+// ============================================================================
+
+describe('RSVPService.processRSVP (behavioral)', () => {
+  test('rejects invalid/empty token', () => {
+    var result = RSVPService.processRSVP('', 'accept');
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects null token', () => {
+    var result = RSVPService.processRSVP(null, 'accept');
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// Behavioral: global wrapper return shapes
+// ============================================================================
+
+describe('Global wrapper behavioral — return shapes', () => {
+  test('dataGetHandoffNotes returns array for valid auth', () => {
+    _requireStewardAuth.mockReturnValue('steward@example.com');
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = dataGetHandoffNotes('valid-token', 'CASE-1');
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('dataGetMentorshipPairings returns array for valid auth', () => {
+    _requireStewardAuth.mockReturnValue('steward@example.com');
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = dataGetMentorshipPairings('valid-token');
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('dataSearchKnowledgeBase returns array for valid auth', () => {
+    _resolveCallerEmail.mockReturnValue('user@example.com');
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = dataSearchKnowledgeBase('valid-token', 'test');
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('dataGetDigestPreferences returns object with frequency for valid auth', () => {
+    _resolveCallerEmail.mockReturnValue('user@example.com');
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(null);
+    var result = dataGetDigestPreferences('valid-token');
+    expect(result).toHaveProperty('frequency');
+    expect(typeof result.frequency).toBe('string');
   });
 });
 

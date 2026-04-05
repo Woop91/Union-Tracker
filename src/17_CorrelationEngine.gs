@@ -30,7 +30,7 @@
  *   Depends on 01_Core.gs (SHEETS, CONFIG_COLS), 10_Main.gs (getConfigValue_).
  *   Used by the SPA analytics views and dashboard enhancement features.
  *
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -258,7 +258,7 @@ function correlateLocationSatVsGrievance_(data) {
   var x = [], y = [], labels = [];
 
   for (var loc in satByLoc) {
-    if (!satByLoc.hasOwnProperty(loc)) continue;
+    if (!Object.prototype.hasOwnProperty.call(satByLoc, loc)) continue;
     var satScore = satByLoc[loc].score || 0;
     var memberCount = locBreakdown[loc] || 0;
     if (memberCount < 3) continue; // Need enough members
@@ -353,7 +353,7 @@ function correlateCategoryVsResolutionTime_(data) {
 
   var catData = {};
   for (var cat in drillDown) {
-    if (!drillDown.hasOwnProperty(cat)) continue;
+    if (!Object.prototype.hasOwnProperty.call(drillDown, cat)) continue;
     var cases = drillDown[cat];
     var resolvedDays = [];
     var winCount = 0;
@@ -418,7 +418,7 @@ function correlateEngagementVsSatisfaction_(data) {
   var x = [], y = [], labels = [];
 
   for (var loc in partByLoc) {
-    if (!partByLoc.hasOwnProperty(loc)) continue;
+    if (!Object.prototype.hasOwnProperty.call(partByLoc, loc)) continue;
     var part = partByLoc[loc];
     if (!part.count || part.count < 3) continue;
 
@@ -465,7 +465,7 @@ function correlateEngagementVsGrievance_(data) {
   var x = [], y = [], labels = [];
 
   for (var loc in partByLoc) {
-    if (!partByLoc.hasOwnProperty(loc)) continue;
+    if (!Object.prototype.hasOwnProperty.call(partByLoc, loc)) continue;
     var part = partByLoc[loc];
     if (!part.count || part.count < 3) continue;
 
@@ -642,7 +642,7 @@ function correlateUnitSizeVsSatisfaction_(data) {
   var x = [], y = [], labels = [];
 
   for (var unit in unitBreakdown) {
-    if (!unitBreakdown.hasOwnProperty(unit)) continue;
+    if (!Object.prototype.hasOwnProperty.call(unitBreakdown, unit)) continue;
     var count = unitBreakdown[unit] || 0;
     if (count < 2) continue;
 
@@ -728,7 +728,7 @@ function correlateVolunteerVsEngagement_(data) {
   var x = [], y = [], labels = [];
 
   for (var loc in partByLoc) {
-    if (!partByLoc.hasOwnProperty(loc)) continue;
+    if (!Object.prototype.hasOwnProperty.call(partByLoc, loc)) continue;
     var part = partByLoc[loc];
     if (!part.count || part.count < 3) continue;
 

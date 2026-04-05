@@ -1,4 +1,4 @@
-# AI REFERENCE DOCUMENT — SolidBase
+# AI REFERENCE DOCUMENT — DDS-Dashboard
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
 # Last updated: 2026-03-16
@@ -15,7 +15,7 @@ Read these files **in this order** when onboarding to this codebase:
 |-------|------|----------------|
 | 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
 | 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
-| 3 | **SYNC-LOG.md** | DDS→SolidBase sync flow, feature exclusion registry |
+| 3 | **SYNC-LOG.md** | DDS↔Union-Tracker sync flow, Workload Tracker exclusion registry |
 | 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
 | 5 | **FEATURES.md** | Detailed feature documentation |
 | 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
@@ -30,14 +30,13 @@ Read these files **in this order** when onboarding to this codebase:
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
 **Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
-**Upstream:** `Woop91/DDS-Dashboard` (private). See SYNC-LOG.md for exclusion rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users).
-**Architecture:** 42 source `.gs` files + 7 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
-**Current build:** 42 `.gs` + 7 `.html` files in `dist/` (individual file mode, NOT consolidated).
+**Architecture:** 43 source `.gs` files + 15 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
+**Current build:** 39 `.gs` + 14 `.html` files in `dist/` (prod build, individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** [REDACTED — see DDS repo]
-**SolidBase Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+**DDS Apps Script ID:** `[REDACTED]`
+**SB Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
@@ -77,7 +76,7 @@ src/*.gs (42 files) + src/*.html (7 files)
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
-| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets |
+| `19_-25_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, workload service |
 | `26_` | Q&A Forum | Steward-member Q&A with steward-only answers, resolve/reopen |
 | `27_` | Timeline Service | Activity feed with inline edit, pagination, calendar links |
 | `28_` | Failsafe Service | Security & reliability guardrails |
@@ -106,6 +105,7 @@ doGet(e)
 ├── ?page=links    → Links page
 ├── ?page=selfservice → Member self-service (Google auth or PIN)
 ├── ?page=portal   → Public portal
+├── ?page=workload → Workload tracker
 ├── ?page=checkin  → Meeting check-in (v4.11.0)
 ├── ?page=resources → SPA with resources tab pre-selected (v4.11.0)
 ├── ?page=notifications → SPA with notifications tab pre-selected (v4.12.0)
@@ -224,7 +224,7 @@ Records **why** architectural choices were made, so future LLMs don't undo them.
 | 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
 | 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
 | 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
-| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). 18_ later removed; 25_ is the sole workload module. **(Excluded from SolidBase)** |
+| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ was standalone portal (PIN auth). 18_ later removed; 25_ is the sole workload module. |
 
 ---
 
@@ -290,7 +290,7 @@ See `PHASE2_PLAN.md` for details.
 
 1. **Read CLAUDE.md first** — it has the most critical rules including column constant patterns, config write paths, and security patterns.
 2. **Read this file second** — it has architecture context, error history, and protected code.
-3. **Read SYNC-LOG.md if touching SolidBase sync** — full exclusion registry with line numbers.
+3. **Read SYNC-LOG.md if touching UT** — full exclusion registry with line numbers.
 4. **The `web-dashboard/` folder is dead code.** Do not deploy or integrate it.
 5. **Never edit `dist/` files directly.** Edit `src/*.gs` and run `npm run build` (copies individual files to dist).
 6. **Test with `npm run ci`** before pushing.
@@ -516,6 +516,19 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 ### Integration
 - Include in GAS SPA via: `<?= include('agency_org_chart') ?>`
 - No routing hook added yet — needs to be wired into SPA navigation manually
-- CSS variables are SELF-CONTAINED (separate from main theme variables) — no conflicts
+- CSS variables are SELF-CONTAINED (separate from DDS theme variables) — no conflicts
 
-**Note:** `agency_org_chart.html` is excluded from SolidBase builds. The org chart content is org-specific. A generic placeholder is served by the `getAgencyOrgChartHtml()` stub.
+### File features
+- 6 tabs: Org Chart, Budget Summary, Budget Tracking, Historical Budget, Historical Spending, Agency Info
+- Interactive salary history modal (10 staff/leadership records, 2017-2026)
+- Collapsible DDS internal org panel (expanded by default)
+- EOHHS sibling agencies toggle
+- Support Divisions group toggle (5 offices)
+- 5 collapsible sub-lists (Community Living, Voc Rehab, General Counsel, Financial, Learning/Dev, HR, Excellence & Innovation)
+- Position descriptions for VDE I/II/III/IV (DDS job grades and salary ranges)
+- Full budget tables: FY2023-FY2026 GAA, historical spending, budget tracking
+- Agency quick facts, EOHHS contacts
+
+### ⚠️ Pending
+- NOT yet wired into index.html SPA navigation — needs manual step
+- DDS internal org chart data is point-in-time (2025/2026 actual) — not dynamic from sheet

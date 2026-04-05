@@ -46,16 +46,37 @@
     var IS_ADMIN = PAGE_DATA.isAdmin || false;
     var IS_LEADER = PAGE_DATA.isLeader || false;
     var APP_VERSION = PAGE_DATA.appVersion || '';
-    var SESSION_TOKEN = PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
+    // v4.51.1: Fragment-based session token transport — extract #sessionToken= from URL hash.
+    // URL fragments are never sent to the server in HTTP requests, never logged in server
+    // access logs, and never leaked via Referer headers. This is the primary transport.
+    // Falls back to server-injected pageData.sessionToken for backward compatibility
+    // (e.g. old bookmarks or cached redirects still using ?sessionToken=).
+    var _fragSessionToken = null;
+    try {
+      var _hash = window.top.location.hash || window.location.hash || '';
+      if (_hash && _hash.indexOf('sessionToken=') !== -1) {
+        var _token = _hash.split('sessionToken=')[1];
+        if (_token) {
+          _token = _token.split('&')[0];
+          _fragSessionToken = decodeURIComponent(_token);
+        }
+      }
+    } catch (_fragErr) { /* cross-origin iframe — skip */ }
+
+    var SESSION_TOKEN = _fragSessionToken || PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
     var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
     // Web app URL for redirects (injected server-side, avoids iframe URL issues)
     var WEB_APP_URL = PAGE_DATA.webAppUrl || '';
 
-    // Strip sessionToken from URL bar after page loads (security: prevent token in browser history)
+    // Strip sessionToken from URL bar / fragment after page loads
+    // (security: prevent token lingering in browser history or address bar)
     try {
-      if (window.top === window && window.top.location.search.indexOf('sessionToken') > -1) {
-        var cleanUrl = window.top.location.href.split('?')[0];
+      var _loc = window.top.location;
+      var _needsClean = (_loc.search && _loc.search.indexOf('sessionToken') > -1) ||
+                        (_loc.hash && _loc.hash.indexOf('sessionToken') > -1);
+      if (window.top === window && _needsClean) {
+        var cleanUrl = _loc.pathname;
         if (window.top.history && window.top.history.replaceState) {
           window.top.history.replaceState(null, '', cleanUrl);
         }
@@ -142,7 +163,11 @@
               console.warn('Session restore: cleared stale token after ' + redirectCount + ' failed attempts');
             } else {
               safeLSSet('dashboardSessionRedirectCount', String(redirectCount + 1));
-              // Redirect to web app URL with stored session token so server can validate
+              // Redirect to server with session token in query string — server needs it for
+              // server-side rendering (role lookup, data injection). The token is stripped
+              // from the URL bar immediately after the dashboard page loads.
+              // Note: fragment-based (#) transport cannot be used here because the server
+              // must validate the session to determine which view to render.
               window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
             }
           }
@@ -2791,6 +2816,11 @@
     var _DEV_ONLY_TABS = { testrunner: 1 };
     // Grievance-related tabs hidden when CONFIG.showGrievances is false
     var _GRIEVANCE_TABS = { cases: 1, newgrievance: 1 };
+    // v4.51.1: Feature-excluded tabs — hidden when the backing service/file is absent (SolidBase isolation)
+    var _EXCLUDED_FEATURE_TABS = {};
+    if (!CONFIG.hasWorkloadService) _EXCLUDED_FEATURE_TABS.workload = 1;
+    if (!CONFIG.hasPOMSReference)   _EXCLUDED_FEATURE_TABS.poms = 1;
+    if (!CONFIG.hasAgencyOrgChart)  _EXCLUDED_FEATURE_TABS.maddsorgchart = 1;
 
     function _filterDevTabs(tabs) {
       var filtered = tabs;
@@ -2800,6 +2830,8 @@
       if (CONFIG.showGrievances === false) {
         filtered = filtered.filter(function(t) { return !t.id || !_GRIEVANCE_TABS[t.id]; });
       }
+      // v4.51.1: Hide tabs for features not present in this deployment
+      filtered = filtered.filter(function(t) { return !t.id || !_EXCLUDED_FEATURE_TABS[t.id]; });
       return filtered;
     }
 
@@ -2882,7 +2914,13 @@
           { id: 'leaderhub', icon: '\uD83C\uDFC5', label: 'Leader Hub' }
         );
       }
-      return memberTabs;
+      // v4.51.1: Filter out excluded features (SolidBase isolation) + grievance toggle
+      return memberTabs.filter(function(t) {
+        if (!t.id) return true;
+        if (_EXCLUDED_FEATURE_TABS[t.id]) return false;
+        if (CONFIG.showGrievances === false && _GRIEVANCE_TABS[t.id]) return false;
+        return true;
+      });
     }
 
     // ═══════════════════════════════════════
@@ -3190,9 +3228,16 @@
 
     /**
      * Agency Org Chart (MADDS) — loads agency_org_chart.html lazily.
-     * MassAbility agency structure, budget, personnel, DDS hierarchy.
+     * Agency organizational structure, budget, personnel hierarchy.
      */
     function renderAgencyOrgChart(appContainer, role) {
+      // v4.51.1: Graceful fallback if feature file is absent (SolidBase)
+      if (!CONFIG.hasAgencyOrgChart) {
+        renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
+          container.appendChild(el('div', { className: 'empty-state' }, 'This feature is not available in this deployment.'));
+        });
+        return;
+      }
       var mySwitch = _navSwitchId;
       var myGen = _renderGeneration;
       renderPageLayout(appContainer, role, 'maddsorgchart', function(container) {
@@ -3240,6 +3285,13 @@
      * Contains 78 POMS sections, 17 flowcharts, search, ratings, bookmarks, notes.
      */
     function renderPOMSReference(appContainer, role) {
+      // v4.51.1: Graceful fallback if feature file is absent (SolidBase)
+      if (!CONFIG.hasPOMSReference) {
+        renderPageLayout(appContainer, role, 'poms', function(container) {
+          container.appendChild(el('div', { className: 'empty-state' }, 'This feature is not available in this deployment.'));
+        });
+        return;
+      }
       var mySwitch = _navSwitchId;
       var myGen = _renderGeneration; // H7: capture render generation at request time
       renderPageLayout(appContainer, role, 'poms', function(container) {
@@ -3463,6 +3515,8 @@
         return;
       }
       if (tabId === 'maddsorgchart') {
+        // v4.51.1: Guard — feature not available in this deployment
+        if (!CONFIG.hasAgencyOrgChart) { _handleTabNav(role, 'home'); return; }
         if (role === 'member' && typeof _isDuesPaying === 'function' && !_isDuesPaying()) {
           if (typeof _renderDuesGate === 'function') {
             _renderDuesGate(app, 'Agency Org Chart', function() { _handleTabNav(role, 'home'); });
@@ -3478,6 +3532,8 @@
         return;
       }
       if (tabId === 'poms') {
+        // v4.51.1: Guard — feature not available in this deployment
+        if (!CONFIG.hasPOMSReference) { _handleTabNav(role, 'home'); return; }
         _hideAllVisiblePanes();
         _splitRenderTarget = 'primary';
         renderPOMSReference(app, role);
@@ -3617,6 +3673,10 @@
     function _getTabRenderFn(role, tabId) {
       // Guard: redirect grievance tabs to default when grievances disabled
       if (CONFIG.showGrievances === false && _GRIEVANCE_TABS[tabId]) {
+        tabId = role === 'member' ? 'home' : 'home';
+      }
+      // v4.51.1: Guard — redirect excluded feature tabs (SolidBase isolation)
+      if (_EXCLUDED_FEATURE_TABS[tabId]) {
         tabId = role === 'member' ? 'home' : 'home';
       }
       if (role === 'member') {

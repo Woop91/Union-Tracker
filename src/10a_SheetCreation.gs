@@ -236,7 +236,7 @@ function createConfigSheet(ss) {
 
   // ── Organization (A–J)
   seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['DDS'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_ABBREV, ['ORG'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.UNION_PARENT, ['Your Parent Union'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STATE_REGION, ['Your State'], isExistingSheet);
@@ -255,7 +255,7 @@ function createConfigSheet(ss) {
 
   // ── Employment (Q–W)
   seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.DUES_STATUSES, ['Current', 'Past Due', 'Inactive'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.DUES_STATUSES, ['Current', 'Past Due', 'Inactive', 'Non Member'], isExistingSheet);
 
   // ── People (X–AC)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
@@ -308,7 +308,7 @@ function createConfigSheet(ss) {
 
   // ── Branding & UX (BQ–BV)
   seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['DDS'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['ORG'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MEMBER_LABEL, ['Member'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
@@ -485,6 +485,138 @@ function repairConfigData() {
 }
 
 /**
+ * Repair Member Directory columns that have data under the wrong headers.
+ * Detects misalignment by comparing actual header positions against MEMBER_HEADER_MAP_
+ * canonical order, then re-syncs column positions and re-runs the grievance sync
+ * to write data to the correct (header-resolved) columns.
+ *
+ * Call this from Menu > Union Hub > Admin, or after discovering column misalignment.
+ * Safe to run multiple times — idempotent.
+ * @since v4.51.1
+ */
+function repairMemberDirectoryColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) {
+    SpreadsheetApp.getUi().alert('Member Directory has no columns.');
+    return;
+  }
+
+  // Pre-flight: verify Grievance Log exists BEFORE clearing anything
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!grievanceSheet) {
+    SpreadsheetApp.getUi().alert('Grievance Log sheet not found. Cannot re-sync grievance data.\n\nNo changes were made.');
+    return;
+  }
+
+  // Acquire script lock to prevent concurrent writes
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    SpreadsheetApp.getUi().alert('Another operation is in progress. Please try again in a moment.');
+    return;
+  }
+
+  try {
+    ss.toast('Analyzing column alignment...', '\uD83D\uDD27 Member Dir Repair', 3);
+
+    // Step 1: Read actual headers and detect misalignment
+    var actualHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var expectedHeaders = getHeadersFromMap_(MEMBER_HEADER_MAP_);
+
+    var headerToActualCol = {};
+    for (var i = 0; i < actualHeaders.length; i++) {
+      var h = String(actualHeaders[i]).trim();
+      if (h) headerToActualCol[h] = i + 1;
+    }
+
+    var misaligned = [];
+    for (var j = 0; j < expectedHeaders.length; j++) {
+      var expectedCol = j + 1;
+      var actualCol = headerToActualCol[expectedHeaders[j]];
+      if (actualCol && actualCol !== expectedCol) {
+        misaligned.push(expectedHeaders[j] + ': expected col ' + expectedCol + ', actual col ' + actualCol);
+      }
+    }
+
+    if (misaligned.length > 0) {
+      log_('repairMemberDirectoryColumns', misaligned.length + ' column(s) out of canonical order: ' + misaligned.join('; '));
+    }
+
+    // Step 2: Force syncColumnMaps to update global constants
+    ss.toast('Syncing column positions from headers...', '\uD83D\uDD27 Member Dir Repair', 3);
+    try {
+      var syncResult = syncColumnMaps();
+      if (syncResult && syncResult.warnings && syncResult.warnings.length > 0) {
+        log_('repairMemberDirectoryColumns', 'syncColumnMaps warnings: ' + syncResult.warnings.join('; '));
+      }
+    } catch (syncErr) {
+      log_('repairMemberDirectoryColumns', 'syncColumnMaps failed: ' + syncErr.message);
+      SpreadsheetApp.getUi().alert('Column sync failed: ' + syncErr.message + '\n\nNo data was modified.');
+      return;
+    }
+
+    // Step 3: Clear grievance columns and re-sync
+    ss.toast('Re-syncing grievance data to correct columns...', '\uD83D\uDD27 Member Dir Repair', 3);
+
+    var grievanceCols = resolveColumnsByHeader_(sheet, [
+      { key: 'HAS_OPEN',  header: 'Has Open Grievance?', fallback: MEMBER_COLS.HAS_OPEN_GRIEVANCE },
+      { key: 'STATUS',    header: 'Grievance Status',     fallback: MEMBER_COLS.GRIEVANCE_STATUS },
+      { key: 'DEADLINE',  header: 'Days to Deadline',     fallback: MEMBER_COLS.DAYS_TO_DEADLINE }
+    ]);
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      sheet.getRange(2, grievanceCols.HAS_OPEN, lastRow - 1, 1).clearContent();
+      sheet.getRange(2, grievanceCols.STATUS, lastRow - 1, 1).clearContent();
+      sheet.getRange(2, grievanceCols.DEADLINE, lastRow - 1, 1).clearContent();
+    }
+
+    // Re-run grievance sync inside try/catch — if it fails, columns are blank but recoverable
+    try {
+      syncGrievanceToMemberDirectory();
+    } catch (syncGErr) {
+      log_('repairMemberDirectoryColumns', 'grievance sync failed after clearing: ' + syncGErr.message);
+      SpreadsheetApp.getUi().alert(
+        'WARNING: Grievance columns were cleared but re-sync failed:\n' + syncGErr.message +
+        '\n\nThe grievance columns are now blank. To fix, run this repair again or use Menu > Sync All Data.'
+      );
+      return;
+    }
+
+    // Step 4: Re-apply checkboxes to Start Grievance column
+    var sgCol = resolveColumnByHeader_(sheet, 'Start Grievance', MEMBER_COLS.START_GRIEVANCE);
+    if (lastRow >= 2) {
+      sheet.getRange(2, sgCol, lastRow - 1, 1).insertCheckboxes();
+    }
+
+    // Step 5: Report
+    var summary = 'Member Directory column repair complete.\n\n' +
+      (misaligned.length > 0
+        ? '\u2022 ' + misaligned.length + ' column(s) out of canonical order (positions synced from headers)\n'
+        : '\u2022 All columns in canonical order\n') +
+      '\u2022 Column positions re-synced from actual headers\n' +
+      '\u2022 Grievance data cleared and re-synced to correct columns\n' +
+      '\u2022 Start Grievance checkboxes restored\n\n' +
+      'Note: Open Rate data cannot be auto-repaired \u2014 if dates are showing\n' +
+      'in the Open Rate column, run a Constant Contact sync to refresh it.';
+
+    SpreadsheetApp.getUi().alert('\u2705 Repair Complete', summary, SpreadsheetApp.getUi().ButtonSet.OK);
+    log_('repairMemberDirectoryColumns', 'repair complete \u2014 ' + misaligned.length + ' misaligned column(s) detected');
+
+  } catch (e) {
+    log_('repairMemberDirectoryColumns', 'unexpected error: ' + e.message);
+    SpreadsheetApp.getUi().alert('Repair failed: ' + e.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
  * Seeds default values into a Config column only if the column is currently empty.
  * For new sheets (isExisting=false), always writes. For existing sheets,
  * checks whether the column already has data and skips if so.
@@ -573,7 +705,7 @@ function populateConfigFromSheetData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!configSheet) {
-    try { SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.'); } catch (_) { log_('_', (_.message || _)); }
+    try { SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.'); } catch (_e) { log_('populateConfigFromSheetData', 'Error showing UI alert: ' + (_e.message || _e)); }
     return;
   }
 
@@ -720,64 +852,7 @@ function populateConfigFromSheetData() {
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
 }
 
-/**
- * Deduplicates and alphabetically sorts all dropdown/multi-select Config columns.
- * Preserves rows 1-2 (section/column headers). Only touches row 3+.
- * @param {Sheet} configSheet - The Config sheet
- * @private
- */
-function deduplicateAndSortConfigColumns_(configSheet) {
-  if (!configSheet) return;
-
-  // Gather all Config columns that are populated by dropdown/multi-select sync
-  var configColsToClean = {};
-  var ddMember = DROPDOWN_MAP.MEMBER_DIR;
-  var ddGriev = DROPDOWN_MAP.GRIEVANCE_LOG;
-  var msMember = MULTI_SELECT_COLS.MEMBER_DIR;
-  var msGriev = MULTI_SELECT_COLS.GRIEVANCE_LOG;
-
-  var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
-  for (var i = 0; i < allMaps.length; i++) {
-    var cc = allMaps[i].configCol;
-    if (cc) {
-      configColsToClean[cc] = true;
-    }
-  }
-
-  var lastRow = configSheet.getLastRow();
-  if (lastRow < 3) return;
-  var dataRows = lastRow - 2;
-
-  for (var colNum in configColsToClean) {
-    colNum = parseInt(colNum, 10);
-    var colData = configSheet.getRange(3, colNum, dataRows, 1).getValues();
-
-    // Collect unique non-empty values
-    var seen = {};
-    var unique = [];
-    for (var r = 0; r < colData.length; r++) {
-      var v = (colData[r][0] || '').toString().trim();
-      if (v && !seen[v]) {
-        // Also reject pure-numeric values during cleanup
-        if (/^\d+$/.test(v)) continue;
-        seen[v] = true;
-        unique.push(v);
-      }
-    }
-
-    // Sort alphabetically (case-insensitive)
-    unique.sort(function(a, b) {
-      return a.toLowerCase().localeCompare(b.toLowerCase());
-    });
-
-    // Write back: sorted values + blank fill for remaining rows
-    var writeData = [];
-    for (var w = 0; w < dataRows; w++) {
-      writeData.push([w < unique.length ? unique[w] : '']);
-    }
-    configSheet.getRange(3, colNum, dataRows, 1).setValues(writeData);
-  }
-}
+// Dead code removed: deduplicateAndSortConfigColumns_() — zero callers in src
 
 /**
  * Applies consistent styling to the entire Config sheet
@@ -1312,10 +1387,13 @@ function createMemberDirectory(ss) {
   sheet.hideColumns(MEMBER_COLS.CUBICLE);
 
   // Add checkbox for Start Grievance column (pre-allocate for future rows)
-  sheet.getRange(2, MEMBER_COLS.START_GRIEVANCE, 4999, 1).insertCheckboxes();
+  // Resolve from header at write time to prevent overwriting wrong column (v4.51.1)
+  var sgColResolved = resolveColumnByHeader_(sheet, 'Start Grievance', MEMBER_COLS.START_GRIEVANCE);
+  sheet.getRange(2, sgColResolved, 4999, 1).insertCheckboxes();
 
   // Add checkbox for Quick Actions column (opens quick actions dialog when checked)
-  sheet.getRange(2, MEMBER_COLS.QUICK_ACTIONS, 4999, 1).insertCheckboxes();
+  var qaColResolved = resolveColumnByHeader_(sheet, '\u26A1 Actions', MEMBER_COLS.QUICK_ACTIONS);
+  sheet.getRange(2, qaColResolved, 4999, 1).insertCheckboxes();
 
   // Dues Paying checkbox and conditional formatting are applied by _addMissingMemberHeaders_
   // when the column is first added to an existing sheet, or during new-sheet creation below.
@@ -1395,20 +1473,22 @@ function createMemberDirectory(ss) {
 
   // Share Phone column — Yes/No dropdown (steward opt-in for member phone visibility)
   if (MEMBER_COLS.SHARE_PHONE) {
-    sheet.setColumnWidth(MEMBER_COLS.SHARE_PHONE, 110);
+    var spColResolved = resolveColumnByHeader_(sheet, 'Share Phone', MEMBER_COLS.SHARE_PHONE);
+    sheet.setColumnWidth(spColResolved, 110);
     var sharePhoneRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['Yes', 'No'], true)
       .setAllowInvalid(false)
       .setHelpText('Yes = members can see this steward\'s phone number in the directory. No = phone is hidden from members.')
       .build();
-    sheet.getRange(2, MEMBER_COLS.SHARE_PHONE, 4999, 1).setDataValidation(sharePhoneRule);
+    sheet.getRange(2, spColResolved, 4999, 1).setDataValidation(sharePhoneRule);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances
   // ═══════════════════════════════════════════════════════════════════════════
   var _lastRow = Math.max(sheet.getLastRow(), 2);
-  var hasOpenGrievanceRange = sheet.getRange(2, MEMBER_COLS.HAS_OPEN_GRIEVANCE, 4999, 1);
+  var hogColResolved = resolveColumnByHeader_(sheet, 'Has Open Grievance?', MEMBER_COLS.HAS_OPEN_GRIEVANCE);
+  var hasOpenGrievanceRange = sheet.getRange(2, hogColResolved, 4999, 1);
 
   var redRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Yes')
@@ -1494,12 +1574,13 @@ function createMemberDirectory(ss) {
     delete sheet._duesCfRules;
   } else if (MEMBER_COLS.DUES_PAYING) {
     var duesPayingRange = sheet.getRange(2, MEMBER_COLS.DUES_PAYING, 4999, 1);
+    var duesCol = getColumnLetter(MEMBER_COLS.DUES_PAYING);
     var duesPayingTrueRule = SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + getColumnLetter(MEMBER_COLS.DUES_PAYING) + '2=TRUE')
+      .whenFormulaSatisfied('=OR(' + duesCol + '2=TRUE,' + duesCol + '2="Yes")')
       .setBackground(SHEET_COLORS.BG_LIGHT_GREEN).setFontColor(SHEET_COLORS.TEXT_GREEN)
       .setRanges([duesPayingRange]).build();
     var duesPayingFalseRule = SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + getColumnLetter(MEMBER_COLS.DUES_PAYING) + '2=FALSE')
+      .whenFormulaSatisfied('=OR(' + duesCol + '2=FALSE,' + duesCol + '2="No")')
       .setBackground(SHEET_COLORS.BG_CREAM).setFontColor(SHEET_COLORS.TEXT_YELLOW_DARK)
       .setRanges([duesPayingRange]).build();
     rules = rules.concat([duesPayingTrueRule, duesPayingFalseRule]);
@@ -1619,11 +1700,13 @@ function createGrievanceLog(ss) {
   sheet.setColumnWidth(GRIEVANCE_COLS.RESOLUTION, 250);
   sheet.setColumnWidth(GRIEVANCE_COLS.COORDINATOR_MESSAGE, 250);
 
-  // Add checkbox for Message Alert column (pre-allocate for future rows)
-  sheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, 4999, 1).insertCheckboxes();
+  // Add checkbox for Message Alert column — resolve from header (v4.51.1)
+  var gMaCol = resolveColumnByHeader_(sheet, 'Message Alert', GRIEVANCE_COLS.MESSAGE_ALERT);
+  sheet.getRange(2, gMaCol, 4999, 1).insertCheckboxes();
 
-  // Add checkbox for Quick Actions column (opens quick actions dialog when checked)
-  sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, 4999, 1).insertCheckboxes();
+  // Add checkbox for Quick Actions column — resolve from header (v4.51.1)
+  var gQaCol = resolveColumnByHeader_(sheet, '\u26A1 Actions', GRIEVANCE_COLS.QUICK_ACTIONS);
+  sheet.getRange(2, gQaCol, 4999, 1).insertCheckboxes();
 
   // Format date columns
   var dateColumns = [

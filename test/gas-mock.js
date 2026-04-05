@@ -152,7 +152,13 @@ function createMockRange(values) {
     setVerticalAlignment: jest.fn(function() { return this; }),
     setHorizontalAlignment: jest.fn(function() { return this; }),
     setDataValidation: jest.fn(),
-    insertCheckboxes: jest.fn()
+    clearDataValidations: jest.fn(),
+    insertCheckboxes: jest.fn(),
+    setNote: jest.fn(function() { return this; }),
+    setWrap: jest.fn(function() { return this; }),
+    setNumberFormat: jest.fn(function() { return this; }),
+    setBold: jest.fn(function() { return this; }),
+    shiftColumnGroupDepth: jest.fn(function() { return this; })
   };
 }
 
@@ -194,11 +200,19 @@ function createMockSheet(name, data) {
     getLastRow: jest.fn(() => (data ? data.length : 1)),
     getLastColumn: jest.fn(() => (data && data[0] ? data[0].length : 1)),
     getMaxColumns: jest.fn(() => (data && data[0] ? data[0].length : 10)),
+    getMaxRows: jest.fn(() => (data ? Math.max(data.length, 100) : 100)),
     appendRow: jest.fn(),
     deleteRow: jest.fn(),
     deleteRows: jest.fn(),
     deleteColumns: jest.fn(),
+    deleteColumn: jest.fn(),
     insertColumnsAfter: jest.fn(),
+    autoResizeColumns: jest.fn(),
+    hideColumns: jest.fn(),
+    collapseAllColumnGroups: jest.fn(),
+    setColumnGroupControlPosition: jest.fn(),
+    setConditionalFormatRules: jest.fn(),
+    getConditionalFormatRules: jest.fn(() => []),
     hideSheet: jest.fn(),
     showSheet: jest.fn(),
     setFrozenRows: jest.fn(),
@@ -269,6 +283,15 @@ global.SpreadsheetApp = {
     setHelpText: jest.fn(function() { return this; }),
     build: jest.fn(() => ({}))
   })),
+  newConditionalFormatRule: jest.fn(() => ({
+    whenFormulaSatisfied: jest.fn(function() { return this; }),
+    setBackground: jest.fn(function() { return this; }),
+    setFontColor: jest.fn(function() { return this; }),
+    setBold: jest.fn(function() { return this; }),
+    setRanges: jest.fn(function() { return this; }),
+    build: jest.fn(() => ({}))
+  })),
+  GroupControlTogglePosition: { BEFORE: 'BEFORE', AFTER: 'AFTER' },
   ProtectionType: { SHEET: 'SHEET', RANGE: 'RANGE' }
 };
 

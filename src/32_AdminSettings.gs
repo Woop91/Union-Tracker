@@ -32,7 +32,7 @@
  *   Used by:    AdminSettings.html (sidebar UI), 03_UIComponents.gs (menu item).
  *
  * @fileoverview Admin Settings sidebar server-side functions
- * @version 4.34.0
+ * @version 4.51.0
  * @requires 01_Core.gs
  * @requires 00_Security.gs
  */

@@ -103,22 +103,7 @@ describe('TestRunner registry consistency', () => {
       registeredNames.add(match[1]);
     }
 
-    // SolidBase: WorkloadService test functions exist in 31_WebAppTests.gs
-    // but are intentionally unregistered (WorkloadService excluded from SolidBase)
-    const solidBaseExcluded = new Set([
-      'test_workload_moduleExists',
-      'test_workload_publicAPIComplete',
-      'test_workload_subCategoriesExposed',
-      'test_workload_categoryLabelsExposed',
-      'test_workload_getSubCategoriesCallable',
-      'test_workload_globalWrappersExist',
-      'test_workload_triggerHandlersExist',
-      'test_workload_wrappersRejectNullToken',
-    ]);
-
-    const unregistered = definedFns.filter(fn =>
-      !registeredNames.has(fn) && !solidBaseExcluded.has(fn)
-    );
+    const unregistered = definedFns.filter(fn => !registeredNames.has(fn));
     expect(unregistered).toEqual([]);
   });
 });

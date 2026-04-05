@@ -44,7 +44,7 @@
  *     and form submission handlers.
  *
  * @fileoverview Member directory and grievance data operations
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 00_DataAccess.gs
  * @requires 00_Security.gs
  * @requires 01_Core.gs
@@ -846,20 +846,26 @@ function addToConfigDropdown_(configCol, value) {
  * @private
  */
 function removeFromConfigDropdown_(configCol, value) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  try {
+    withScriptLock_(function() {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
-  if (!configSheet) return;
+      if (!configSheet) return;
 
-  if (configSheet.getLastRow() < 3) return;
+      if (configSheet.getLastRow() < 3) return;
 
-  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+      var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
 
-  for (var i = 0; i < colData.length; i++) {
-    if (String(colData[i][0]).trim() === String(value).trim()) {
-      configSheet.getRange(i + 3, configCol).clearContent();
-      break;
-    }
+      for (var i = 0; i < colData.length; i++) {
+        if (String(colData[i][0]).trim() === String(value).trim()) {
+          configSheet.getRange(i + 3, configCol).clearContent();
+          break;
+        }
+      }
+    });
+  } catch (lockErr) {
+    log_('removeFromConfigDropdown_', 'lock unavailable for col ' + configCol + ': ' + lockErr.message);
   }
 }
 
@@ -997,69 +1003,6 @@ function compactConfigColumn_(configCol) {
   }
 
   range.setValues(compacted);
-}
-
-// ============================================================================
-// BATCH PROCESSING (Performance Optimization)
-// ============================================================================
-
-/**
- * Updates member data in batch mode for better performance
- * Reads all data once, modifies in memory, writes back in one operation
- * @param {string} memberId - The member ID to update
- * @param {Object} newValuesObj - Object with field values to update
- */
-function updateMemberDataBatch(memberId, newValuesObj) {
-  return withScriptLock_(function() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-    if (!sheet) {
-      throw new Error('Member Directory sheet not found');
-    }
-
-    var range = sheet.getDataRange();
-    var data = range.getValues();
-
-    for (var i = 1; i < data.length; i++) {
-      if (col_(data[i], MEMBER_COLS.MEMBER_ID) === memberId) {
-        // Modify array in memory
-        if (newValuesObj.email !== undefined) {
-          setCol_(data[i], MEMBER_COLS.EMAIL, typeof newValuesObj.email === 'string' ? escapeForFormula(newValuesObj.email) : newValuesObj.email);
-        }
-        if (newValuesObj.phone !== undefined) {
-          setCol_(data[i], MEMBER_COLS.PHONE, typeof newValuesObj.phone === 'string' ? escapeForFormula(newValuesObj.phone) : newValuesObj.phone);
-        }
-        if (newValuesObj.firstName !== undefined) {
-          setCol_(data[i], MEMBER_COLS.FIRST_NAME, typeof newValuesObj.firstName === 'string' ? escapeForFormula(newValuesObj.firstName) : newValuesObj.firstName);
-        }
-        if (newValuesObj.lastName !== undefined) {
-          setCol_(data[i], MEMBER_COLS.LAST_NAME, typeof newValuesObj.lastName === 'string' ? escapeForFormula(newValuesObj.lastName) : newValuesObj.lastName);
-        }
-        if (newValuesObj.unit !== undefined) {
-          setCol_(data[i], MEMBER_COLS.UNIT, typeof newValuesObj.unit === 'string' ? escapeForFormula(newValuesObj.unit) : newValuesObj.unit);
-        }
-        if (newValuesObj.workLocation !== undefined) {
-          setCol_(data[i], MEMBER_COLS.WORK_LOCATION, typeof newValuesObj.workLocation === 'string' ? escapeForFormula(newValuesObj.workLocation) : newValuesObj.workLocation);
-        }
-        if (newValuesObj.isSteward !== undefined) {
-          setCol_(data[i], MEMBER_COLS.IS_STEWARD, typeof newValuesObj.isSteward === 'string' ? escapeForFormula(newValuesObj.isSteward) : newValuesObj.isSteward);
-        }
-
-        // Write the specific row back in one shot
-        sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
-
-        SpreadsheetApp.getActiveSpreadsheet().toast(
-          'Member ' + memberId + ' updated via batch process',
-          COMMAND_CONFIG.SYSTEM_NAME,
-          3
-        );
-        return true;
-      }
-    }
-
-    return false;
-  });
 }
 
 // ============================================================================
@@ -1576,7 +1519,7 @@ function showExportMembersDialog() {
  * UI components are in 04a_UIMenus.gs, integrations in 05_Integrations.gs.
  *
  * @fileoverview Grievance lifecycle management
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Core.gs
  */
 
@@ -1632,12 +1575,12 @@ function startNewGrievance(grievanceData) {
         setCol_(rowData, GRIEVANCE_COLS.LAST_NAME, escapeForFormula(lastName));
       }
       setCol_(rowData, GRIEVANCE_COLS.STATUS, GRIEVANCE_STATUS.OPEN);
-      setCol_(rowData, GRIEVANCE_COLS.CURRENT_STEP, 1);
+      setCol_(rowData, GRIEVANCE_COLS.CURRENT_STEP, 'Informal');
       setCol_(rowData, GRIEVANCE_COLS.DATE_FILED, filingDate);
       setCol_(rowData, GRIEVANCE_COLS.STEP1_DUE, deadlines.step1Due);
       setCol_(rowData, GRIEVANCE_COLS.ARTICLES, escapeForFormula(grievanceData.articleViolated || ''));
       setCol_(rowData, GRIEVANCE_COLS.ISSUE_CATEGORY, escapeForFormula(grievanceData.grievanceType || ''));
-      setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormula(grievanceData.notes || ''));
+      setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormula(grievanceData.description || grievanceData.notes || ''));
       setCol_(rowData, GRIEVANCE_COLS.LAST_UPDATED, new Date());
 
       // Append to sheet
@@ -1650,7 +1593,6 @@ function startNewGrievance(grievanceData) {
         createdBy: Session.getActiveUser().getEmail()
       });
 
-      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
       return {
         success: true,
         grievanceId: grievanceId,
@@ -1658,7 +1600,7 @@ function startNewGrievance(grievanceData) {
       };
     });
   } catch (error) {
-    log_('Error creating grievance', error);
+    log_('startNewGrievance', 'Error: ' + (error.message || error));
     return errorResponse(error.message, 'createGrievance');
   }
 }
@@ -1693,6 +1635,7 @@ function handleGrievanceDialogSubmit(formData) {
         ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
         // Find the row with this grievance ID
         const lastRow = grievanceSheet.getLastRow();
+        if (lastRow < 2) throw new Error('No data rows');
         const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
         for (let i = 0; i < grievanceIds.length; i++) {
           if (grievanceIds[i][0] === result.grievanceId) {
@@ -1810,16 +1753,50 @@ function calculateInitialDeadlines(filingDate) {
   };
 }
 /**
+ * Normalizes a step value (string label or number) to its numeric equivalent.
+ * Dropdown labels: 'Informal', 'Step I', 'Step II', 'Step III', 'Mediation', 'Arbitration'
+ * @param {string|number} step - Step label or number
+ * @return {number} Numeric step (1-4), or 0 if unrecognized
+ * @private
+ */
+function normalizeStepToNumber_(step) {
+  if (typeof step === 'number') return step;
+  var s = String(step).trim().toLowerCase();
+  if (s === 'informal' || s === '1' || s === 'step i')   return 1;
+  if (s === 'step ii'  || s === '2')                      return 2;
+  if (s === 'step iii' || s === '3')                      return 3;
+  if (s === 'arbitration' || s === 'mediation' || s === '4') return 4;
+  return 0;
+}
+
+/**
+ * Maps a numeric step back to its dropdown label.
+ * @param {number} stepNum - Numeric step (1-4)
+ * @return {string} Dropdown label, or '' if unrecognized
+ * @private
+ */
+function stepNumberToLabel_(stepNum) {
+  switch (stepNum) {
+    case 1: return 'Informal';
+    case 2: return 'Step II';
+    case 3: return 'Step III';
+    case 4: return 'Arbitration';
+    default: return '';
+  }
+}
+
+/**
  * Calculates response deadline for a given step
- * @param {number} step - Grievance step
+ * @param {number|string} step - Grievance step (number or label)
  * @param {Date} stepDate - Date step was initiated
  * @return {Date} Response deadline
  */
 function calculateResponseDeadline(step, stepDate) {
   var rules = getDeadlineRules();
+  var stepNum = normalizeStepToNumber_(step);
   let daysToAdd;
 
-  switch (step) {
+  switch (stepNum) {
     case 1:
       daysToAdd = rules.STEP_1.DAYS_FOR_RESPONSE;
       break;
@@ -1887,26 +1864,26 @@ function advanceGrievanceStep(grievanceId, options) {
       return errorResponse('Grievance not found', 'advanceGrievanceStep');
     }
 
-    const currentStep = Number(col_(data[rowIndex - 1], GRIEVANCE_COLS.CURRENT_STEP));
-    if (isNaN(currentStep) || currentStep < 1) {
+    const currentStepNum = normalizeStepToNumber_(col_(data[rowIndex - 1], GRIEVANCE_COLS.CURRENT_STEP));
+    if (!currentStepNum || currentStepNum < 1) {
       return errorResponse('Invalid current step value for this grievance', 'advanceGrievanceStep');
     }
-    const nextStep = currentStep + 1;
+    const nextStepNum = currentStepNum + 1;
 
-    if (nextStep > 4) {
+    if (nextStepNum > 4) {
       return errorResponse('Grievance is already at arbitration level', 'advanceGrievanceStep');
     }
 
     const today = new Date();
-    const responseDue = calculateResponseDeadline(nextStep, today);
+    const responseDue = calculateResponseDeadline(nextStepNum, today);
 
     // Collect column updates to batch write (use GRIEVANCE_COLS, 1-indexed)
     var updates = [];
-    updates.push({ col: GRIEVANCE_COLS.CURRENT_STEP, val: nextStep });
-    updates.push({ col: GRIEVANCE_COLS.STATUS, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
+    updates.push({ col: GRIEVANCE_COLS.CURRENT_STEP, val: stepNumberToLabel_(nextStepNum) });
+    updates.push({ col: GRIEVANCE_COLS.STATUS, val: nextStepNum === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
     updates.push({ col: GRIEVANCE_COLS.LAST_UPDATED, val: today });
 
-    if (nextStep <= 3) {
+    if (nextStepNum <= 3) {
       // F137: Use explicit column map instead of +1/+2 arithmetic.
       // The old code wrote responseDue to DATE_CLOSED and 'Pending' to DAYS_OPEN for Step 3.
       // Verified: column map matches GRIEVANCE_HEADER_MAP_ in 01_Core.gs
@@ -1914,7 +1891,7 @@ function advanceGrievanceStep(grievanceId, options) {
         2: { date: GRIEVANCE_COLS.STEP2_APPEAL_FILED, due: GRIEVANCE_COLS.STEP2_DUE },
         3: { date: GRIEVANCE_COLS.STEP3_APPEAL_FILED, due: GRIEVANCE_COLS.STEP3_APPEAL_DUE }
       };
-      var stepCols = ADVANCE_STEP_COLS_[nextStep];
+      var stepCols = ADVANCE_STEP_COLS_[nextStepNum];
       if (stepCols) {
         updates.push({ col: stepCols.date, val: today });
         updates.push({ col: stepCols.due, val: responseDue });
@@ -1930,7 +1907,7 @@ function advanceGrievanceStep(grievanceId, options) {
       const existingResolution = col_(data[rowIndex - 1], GRIEVANCE_COLS.RESOLUTION) || '';
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
       const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                       `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${options.notes}`;
+                       `[${timestamp}] Step ${currentStepNum} -> ${nextStepNum}: ${options.notes}`;
       updates.push({ col: GRIEVANCE_COLS.RESOLUTION, val: escapeForFormula(newResolution) });
     }
 
@@ -1945,21 +1922,20 @@ function advanceGrievanceStep(grievanceId, options) {
     // Log the advancement
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_STEP_ADVANCED, {
       grievanceId: grievanceId,
-      fromStep: currentStep,
-      toStep: nextStep,
+      fromStep: stepNumberToLabel_(currentStepNum),
+      toStep: stepNumberToLabel_(nextStepNum),
       advancedBy: Session.getActiveUser().getEmail()
     });
 
-    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
     return {
       success: true,
       grievanceId: grievanceId,
-      newStep: nextStep,
-      message: `Grievance advanced to Step ${nextStep}`
+      newStep: stepNumberToLabel_(nextStepNum),
+      message: `Grievance advanced to ${stepNumberToLabel_(nextStepNum)}`
     };
     });
   } catch (error) {
-    log_('Error advancing grievance', error);
+    log_('advanceGrievanceStep', 'Error: ' + (error.message || error));
     return errorResponse(error.message, 'advanceGrievanceStep');
   }
 }
@@ -1970,7 +1946,8 @@ function advanceGrievanceStep(grievanceId, options) {
  * @return {Object|null} { filed, due, rcvd } column numbers (1-indexed), or null
  */
 function getStepColumnSet(step) {
-  switch (step) {
+  var stepNum = normalizeStepToNumber_(step);
+  switch (stepNum) {
     case 1: return {
       filed: GRIEVANCE_COLS.STEP1_RCVD,
       due:   GRIEVANCE_COLS.STEP1_DUE,
@@ -2111,14 +2088,18 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
         }
       }
 
-      // Write all columns back (2-3 calls total instead of 2-3 per matched row)
-      sheet.getRange(2, GRIEVANCE_COLS.STATUS, numRows, 1).setValues(statusCol);
-      sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, numRows, 1).setValues(lastUpdatedCol);
+      // Write all columns back — resolve from headers (v4.51.1)
+      var bsCols = resolveColumnsByHeader_(sheet, [
+        { key: 'STATUS',       header: 'Status',       fallback: GRIEVANCE_COLS.STATUS },
+        { key: 'LAST_UPDATED', header: 'Last Updated',  fallback: GRIEVANCE_COLS.LAST_UPDATED },
+        { key: 'RESOLUTION',   header: 'Resolution',    fallback: GRIEVANCE_COLS.RESOLUTION }
+      ]);
+      sheet.getRange(2, bsCols.STATUS, numRows, 1).setValues(statusCol);
+      sheet.getRange(2, bsCols.LAST_UPDATED, numRows, 1).setValues(lastUpdatedCol);
       if (notes && resolutionCol) {
-        sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, numRows, 1).setValues(resolutionCol);
+        sheet.getRange(2, bsCols.RESOLUTION, numRows, 1).setValues(resolutionCol);
       }
 
-      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
       return {
         success: true,
         updatedCount: updatedCount,
@@ -2126,7 +2107,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
       };
     });
   } catch (error) {
-    log_('Error in bulk status update', error);
+    log_('bulkUpdateGrievanceStatus', 'Error: ' + (error.message || error));
     return errorResponse(error.message, 'bulkUpdateGrievanceStatus');
   }
 }
@@ -2418,7 +2399,6 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
         resolvedBy: Session.getActiveUser().getEmail()
       });
 
-      if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
       return {
         success: true,
         grievanceId: grievanceId,
@@ -2426,7 +2406,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
       };
     });
   } catch (error) {
-    log_('Error resolving grievance', error);
+    log_('resolveGrievance', 'Error: ' + (error.message || error));
     return errorResponse(error.message);
   }
 }
@@ -2910,7 +2890,8 @@ function bulkFlagGrievances(rowNumbers) {
 
       // M-PERF: Batch write — read column, set matching rows, write back
       var lastRow = sheet.getLastRow();
-      var alertCol = lastRow > 1 ? sheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, lastRow - 1, 1).getValues() : [];
+      var bfmaCol = resolveColumnByHeader_(sheet, 'Message Alert', GRIEVANCE_COLS.MESSAGE_ALERT);
+      var alertCol = lastRow > 1 ? sheet.getRange(2, bfmaCol, lastRow - 1, 1).getValues() : [];
       var count = 0;
       for (var i = 0; i < rowNumbers.length; i++) {
         var row = rowNumbers[i];
@@ -2919,7 +2900,7 @@ function bulkFlagGrievances(rowNumbers) {
         count++;
       }
       if (count > 0) {
-        sheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, alertCol.length, 1).setValues(alertCol);
+        sheet.getRange(2, bfmaCol, alertCol.length, 1).setValues(alertCol);
       }
 
       logAuditEvent('BULK_FLAG_GRIEVANCES', { action: 'Flagged ' + count + ' grievances for message alert. Rows: ' + rowNumbers.join(', ') });
@@ -3088,7 +3069,8 @@ function selectAllOpenCases() {
         checkboxValues.push([isOpen]);
       }
 
-      sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).setValues(checkboxValues);
+      var soqaCol = resolveColumnByHeader_(sheet, '\u26A1 Actions', GRIEVANCE_COLS.QUICK_ACTIONS);
+      sheet.getRange(2, soqaCol, lastRow - 1, 1).setValues(checkboxValues);
 
       SpreadsheetApp.getActiveSpreadsheet().toast('Selected ' + count + ' open/pending cases', COMMAND_CONFIG.SYSTEM_NAME, 3);
       return successResponse({ count: count }, 'Selected ' + count + ' open/pending case(s)');
@@ -3118,7 +3100,8 @@ function clearAllSelections() {
         clearValues.push([false]);
       }
 
-      sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).setValues(clearValues);
+      var caQaCol = resolveColumnByHeader_(sheet, '\u26A1 Actions', GRIEVANCE_COLS.QUICK_ACTIONS);
+      sheet.getRange(2, caQaCol, lastRow - 1, 1).setValues(clearValues);
 
       SpreadsheetApp.getActiveSpreadsheet().toast('Selection cleared', COMMAND_CONFIG.SYSTEM_NAME, 3);
       return successResponse(null, 'All selections cleared');

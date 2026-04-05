@@ -30,7 +30,7 @@
  *   00_Security.gs (escapeForFormula).
  *   Used by menu items in 03_, daily trigger reminders, and the SPA.
  *
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -962,10 +962,12 @@ function setupActionTypeColumn() {
   var actionTypeCol = headers.indexOf('Action Type') + 1;
 
   if (actionTypeCol === 0) {
-    // Add the column header
-    grievanceSheet.getRange(1, GRIEVANCE_COLS.ACTION_TYPE).setValue('Action Type');
-    grievanceSheet.getRange(1, GRIEVANCE_COLS.CHECKLIST_PROGRESS).setValue('Checklist Progress');
-    actionTypeCol = GRIEVANCE_COLS.ACTION_TYPE;
+    // Add the column header — resolve from header map (v4.51.1)
+    var atCol = resolveColumnByHeader_(grievanceSheet, 'Action Type', GRIEVANCE_COLS.ACTION_TYPE);
+    var cpCol2 = resolveColumnByHeader_(grievanceSheet, 'Checklist Progress', GRIEVANCE_COLS.CHECKLIST_PROGRESS);
+    grievanceSheet.getRange(1, atCol).setValue('Action Type');
+    grievanceSheet.getRange(1, cpCol2).setValue('Checklist Progress');
+    actionTypeCol = atCol;
   }
 
   // Set up data validation for Action Type
@@ -1215,9 +1217,10 @@ function syncChecklistCalcToGrievanceLog() {
     }
   }
 
-  // Batch write progress values
+  // Batch write progress values — resolve from header (v4.51.1)
   if (progressValues.length > 0) {
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.CHECKLIST_PROGRESS, progressValues.length, 1)
+    var cpCol = resolveColumnByHeader_(grievanceSheet, 'Checklist Progress', GRIEVANCE_COLS.CHECKLIST_PROGRESS);
+    grievanceSheet.getRange(2, cpCol, progressValues.length, 1)
       .setValues(progressValues);
   }
 
@@ -1305,7 +1308,7 @@ function getHeaderMap(sheetName, forceRefresh) {
     if (cached) {
       try {
         return JSON.parse(cached);
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('getHeaderMap', 'Error parsing cached header map: ' + (_e.message || _e)); }
     }
   }
 
@@ -1328,19 +1331,9 @@ function getHeaderMap(sheetName, forceRefresh) {
   // Cache for 5 minutes
   try {
     cache.put(cacheKey, JSON.stringify(headerMap), EXTENSION_CONFIG.CACHE_TTL_SECONDS);
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('getHeaderMap', 'Error writing cache: ' + (_e.message || _e)); }
 
   return headerMap;
-}
-
-/**
- * Invalidates header map cache for a sheet.
- * Call after structural changes (adding/removing columns).
- * @param {string} sheetName - Sheet to invalidate
- */
-function invalidateHeaderCache(sheetName) {
-  const cacheKey = 'headerMap_' + sheetName.replace(/\s/g, '_');
-  CacheService.getScriptCache().remove(cacheKey);
 }
 
 // ============================================================================
@@ -1578,72 +1571,6 @@ function setupMemberLeaderRole() {
 // Allows users to set two reminder dates with notes for meetings/follow-ups
 
 /**
- * Sets a reminder for a grievance.
- * @param {string} grievanceId - The grievance ID
- * @param {number} reminderNum - Which reminder (1 or 2)
- * @param {Date|string} reminderDate - The reminder date
- * @param {string} reminderNote - Brief note about the reminder
- * @returns {Object} Result with success status
- */
-function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNote) {
-  if (!grievanceId || (reminderNum !== 1 && reminderNum !== 2)) {
-    return errorResponse('Invalid grievance ID or reminder number');
-  }
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!sheet) {
-    return errorResponse('Grievance Log sheet not found');
-  }
-
-  // Find the grievance row
-  const data = sheet.getDataRange().getValues();
-  let rowIndex = -1;
-
-  for (let i = 1; i < data.length; i++) {
-    if (col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID) === grievanceId) {
-      rowIndex = i + 1;
-      break;
-    }
-  }
-
-  if (rowIndex === -1) {
-    return errorResponse('Grievance not found: ' + grievanceId);
-  }
-
-  // Determine which columns to update
-  const dateCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_DATE : GRIEVANCE_COLS.REMINDER_2_DATE;
-  const _noteCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_NOTE : GRIEVANCE_COLS.REMINDER_2_NOTE;
-
-  // Parse date if string
-  let parsedDate = reminderDate;
-  if (typeof reminderDate === 'string' && reminderDate) {
-    parsedDate = new Date(reminderDate);
-    if (isNaN(parsedDate.getTime())) {
-      return errorResponse('Invalid date format');
-    }
-  }
-
-  // Batch update both columns
-  const updates = [[parsedDate || '', reminderNote || '']];
-  sheet.getRange(rowIndex, dateCol, 1, 2).setValues(updates);
-
-  // Log the action
-  if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
-    logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
-      grievanceId: grievanceId,
-      action: 'REMINDER_SET',
-      reminderNum: reminderNum,
-      reminderDate: parsedDate ? parsedDate.toISOString() : null,
-      performedBy: Session.getActiveUser().getEmail()
-    });
-  }
-
-  return { success: true, grievanceId: grievanceId, reminderNum: reminderNum };
-}
-
-/**
  * Gets all grievances with reminders due within specified days.
  * Optimized single-pass through grievance data.
  * @param {number} daysAhead - Number of days to look ahead (default 3)
@@ -1779,27 +1706,6 @@ var LOOKER_CONFIG = {
 // ============================================================================
 
 /**
- * Generates a deterministic anonymized hash from an ID.
- * Uses a per-project salt stored in Script Properties.
- * @param {string} id - The ID to hash
- * @returns {string} Anonymized hash starting with 'A'
- * @private
- */
-function generateAnonHash_(id) {
-  // Read salt from Script Properties; generate and store one if missing
-  var props = PropertiesService.getScriptProperties();
-  var salt = props.getProperty('ANON_HASH_SALT');
-  if (!salt) {
-    salt = Utilities.getUuid(); // Generate random salt on first run
-    props.setProperty('ANON_HASH_SALT', salt);
-  }
-  const combined = salt + String(id);
-  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
-  const encoded = Utilities.base64Encode(digest).substring(0, 12);
-  return 'A' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
-}
-
-/**
  * Categorizes days into buckets for privacy.
  * @param {number} days
  * @returns {string}
@@ -1831,20 +1737,6 @@ function getContactFrequencyCategory_(lastContact, now) {
 }
 
 /**
- * Categorizes volunteer hours into buckets.
- * @param {number} hours
- * @returns {string}
- * @private
- */
-function getVolunteerHoursBucket_(hours) {
-  if (hours === 0) return 'None';
-  if (hours <= 5) return '1-5 Hours';
-  if (hours <= 20) return '6-20 Hours';
-  if (hours <= 50) return '21-50 Hours';
-  return '50+ Hours';
-}
-
-/**
  * Calculates engagement level from multiple factors.
  * @param {number} volunteerHours
  * @param {Date|null} lastContact
@@ -1869,7 +1761,7 @@ function getEngagementLevel_(volunteerHours, lastContact, isSteward, grievanceCo
   }
 
   // Leadership role
-  if (isSteward === 'Yes' || isSteward === 'Member Leader') score += 2;
+  if (isTruthyValue(isSteward) || isSteward === 'Member Leader') score += 2;
 
   // Grievance involvement
   if (grievanceCount > 0) score += 1;
@@ -1880,73 +1772,6 @@ function getEngagementLevel_(volunteerHours, lastContact, isSteward, grievanceCo
   if (score >= 2) return 'Somewhat Engaged';
   if (score >= 1) return 'Low Engagement';
   return 'Not Engaged';
-}
-
-/**
- * Categorizes role into broader categories.
- * @param {string} role
- * @returns {string}
- * @private
- */
-function categorizeRole_(role) {
-  const roleLower = String(role).toLowerCase();
-  if (roleLower.includes('steward') || roleLower.includes('leader')) return 'Leadership';
-  if (roleLower.includes('nurse') || roleLower.includes('rn') || roleLower.includes('lpn')) return 'Nursing';
-  if (roleLower.includes('tech') || roleLower.includes('aide')) return 'Technical/Support';
-  if (roleLower.includes('admin') || roleLower.includes('clerk')) return 'Administrative';
-  return 'Other';
-}
-
-/**
- * Categorizes tenure into buckets.
- * @param {string} tenure
- * @returns {string}
- * @private
- */
-function categorizeTenure_(tenure) {
-  const tenureLower = String(tenure).toLowerCase();
-  if (tenureLower.includes('less than') || tenureLower.includes('< 1')) return 'New (< 1 year)';
-  if (tenureLower.includes('1-3') || tenureLower.includes('1 to 3')) return '1-3 Years';
-  if (tenureLower.includes('3-5') || tenureLower.includes('3 to 5')) return '3-5 Years';
-  if (tenureLower.includes('5-10') || tenureLower.includes('5 to 10')) return '5-10 Years';
-  return '10+ Years';
-}
-
-/**
- * Converts numeric score (1-10) to bucket.
- * @param {*} score
- * @returns {string}
- * @private
- */
-function getScoreBucket_(score) {
-  const num = parseFloat(score);
-  if (isNaN(num)) return 'No Response';
-  if (num >= 8) return 'High (8-10)';
-  if (num >= 5) return 'Medium (5-7)';
-  return 'Low (1-4)';
-}
-
-/**
- * Calculates average of numeric values in specified columns.
- * @param {Array} row - Data row
- * @param {number[]} colIndices - Column indices to average
- * @returns {number|string} Average or empty string if no valid values
- * @private
- */
-function calculateSectionAvg_(row, colIndices) {
-  let sum = 0;
-  let count = 0;
-
-  for (let i = 0; i < colIndices.length; i++) {
-    const val = row[colIndices[i]];
-    const num = parseFloat(val);
-    if (!isNaN(num) && num >= 1 && num <= 10) {
-      sum += num;
-      count++;
-    }
-  }
-
-  return count > 0 ? Math.round((sum / count) * 10) / 10 : '';
 }
 
 /**

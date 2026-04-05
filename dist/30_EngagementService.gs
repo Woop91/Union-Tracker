@@ -29,7 +29,7 @@
  *   Depends on: 01_Core.gs (SHEETS, MEMBER_COLS),
  *   00_Security.gs (escapeForFormula, maskEmail)
  *
- * @version 4.36.0
+ * @version 4.51.0
  */
 
 var EngagementService = (function () {
@@ -227,7 +227,7 @@ var EngagementService = (function () {
     var meetingIds = {};
     for (var ci = 0; ci < cachedData.checkInData.length; ci++) {
       var mDate = cachedData.checkInData[ci][2];
-      if (mDate instanceof Date && mDate >= day90ago && !cachedData.checkInData[ci][4]) {
+      if (mDate instanceof Date && mDate >= day90ago) {
         meetingIds[String(cachedData.checkInData[ci][0])] = true;
       }
     }
@@ -587,13 +587,6 @@ function dataGetEngagementScoreboard(sessionToken, options) {
   return EngagementService.getScoreboard(options);
 }
 
-/** @param {string} sessionToken @returns {Array} Unit-level engagement data. */
-function dataGetEngagementByUnit(sessionToken) {
-  var s = _requireStewardAuth(sessionToken);
-  if (!s) return [];
-  return EngagementService.getScoreByUnit();
-}
-
 /** @param {string} sessionToken @returns {Object} Computation summary. */
 function dataComputeEngagementScores(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
@@ -609,7 +602,4 @@ function dataGetMyReportCard(sessionToken) {
   return EngagementService.getMemberReportCard(e);
 }
 
-/** Initializes engagement sheet. Call once from setup. */
-function initEngagementSheet() {
-  EngagementService.initSheet();
-}
+

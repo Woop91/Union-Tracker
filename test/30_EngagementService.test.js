@@ -33,10 +33,8 @@ describe('EngagementService module existence', () => {
 
   test('global wrappers exist', () => {
     expect(typeof dataGetEngagementScoreboard).toBe('function');
-    expect(typeof dataGetEngagementByUnit).toBe('function');
     expect(typeof dataComputeEngagementScores).toBe('function');
     expect(typeof dataGetMyReportCard).toBe('function');
-    expect(typeof initEngagementSheet).toBe('function');
   });
 });
 
@@ -347,12 +345,6 @@ describe('Engagement global wrappers', () => {
     _requireStewardAuth.mockReturnValueOnce(null);
     var result = dataGetEngagementScoreboard('bad-token');
     expect(result.items).toEqual([]);
-  });
-
-  test('dataGetEngagementByUnit requires steward auth', () => {
-    _requireStewardAuth.mockReturnValueOnce(null);
-    var result = dataGetEngagementByUnit('bad-token');
-    expect(result).toEqual([]);
   });
 
   test('dataComputeEngagementScores requires steward auth', () => {

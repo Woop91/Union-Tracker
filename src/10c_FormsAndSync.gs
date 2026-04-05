@@ -139,7 +139,7 @@ function shareWithCoordinators_(folder) {
       }
     }
   } catch (e) {
-    log_('Error sharing with coordinators', e.message);
+    log_('shareWithCoordinators_', 'Error: ' + e.message);
   }
 }
 
@@ -636,10 +636,14 @@ function sortGrievanceLogByStatus() {
   dataRange.setValues(rows.map(function(r) { return r.d; }));
   dataRange.setNotes(rows.map(function(r) { return r.n; }));
 
-  // Re-apply checkboxes - setValues overwrites them
+  // Re-apply checkboxes - setValues overwrites them — resolve from headers (v4.51.1)
   if (lastRow >= 2) {
-    sheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, lastRow - 1, 1).insertCheckboxes();
-    sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).insertCheckboxes();
+    var gCbCols = resolveColumnsByHeader_(sheet, [
+      { key: 'ALERT',   header: 'Message Alert',  fallback: GRIEVANCE_COLS.MESSAGE_ALERT },
+      { key: 'ACTIONS', header: '\u26A1 Actions',  fallback: GRIEVANCE_COLS.QUICK_ACTIONS }
+    ]);
+    sheet.getRange(2, gCbCols.ALERT, lastRow - 1, 1).insertCheckboxes();
+    sheet.getRange(2, gCbCols.ACTIONS, lastRow - 1, 1).insertCheckboxes();
   }
 
   // Apply highlighting to Message Alert rows
@@ -980,8 +984,9 @@ function repairGrievanceCheckboxes() {
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) return;
 
-  // Re-apply checkboxes to Message Alert column (AC = column 29)
-  grievanceSheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, lastRow - 1, 1).insertCheckboxes();
+  // Re-apply checkboxes to Message Alert column — resolve from header (v4.51.1)
+  var maCol = resolveColumnByHeader_(grievanceSheet, 'Message Alert', GRIEVANCE_COLS.MESSAGE_ALERT);
+  grievanceSheet.getRange(2, maCol, lastRow - 1, 1).insertCheckboxes();
 
   log_('repairGrievanceCheckboxes', 'Repaired checkboxes for ' + (lastRow - 1) + ' grievance rows');
 }
@@ -998,8 +1003,9 @@ function repairMemberCheckboxes() {
   var lastRow = memberSheet.getLastRow();
   if (lastRow < 2) return;
 
-  // Re-apply checkboxes to Start Grievance column (AE = column 31)
-  memberSheet.getRange(2, MEMBER_COLS.START_GRIEVANCE, lastRow - 1, 1).insertCheckboxes();
+  // Re-apply checkboxes to Start Grievance column — resolve from header at runtime (v4.51.1)
+  var sgCol = resolveColumnByHeader_(memberSheet, 'Start Grievance', MEMBER_COLS.START_GRIEVANCE);
+  memberSheet.getRange(2, sgCol, lastRow - 1, 1).insertCheckboxes();
 
   log_('repairMemberCheckboxes', 'Repaired checkboxes for ' + (lastRow - 1) + ' member rows');
 }
@@ -1120,7 +1126,10 @@ function syncVolunteerHoursToMemberDirectory() {
       log_('syncVH', 'length mismatch updates=' + updates.length + ' expected=' + expected);
       return;
     }
-    if (updates.length > 0) memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, updates.length, 1).setValues(updates);
+    if (updates.length > 0) {
+      var vhCol = resolveColumnByHeader_(memberSheet, 'Volunteer Hours', MEMBER_COLS.VOLUNTEER_HOURS);
+      memberSheet.getRange(2, vhCol, updates.length, 1).setValues(updates);
+    }
 
     var totalSum = 0;
     for (var k in hoursLookup) totalSum += hoursLookup[k];
@@ -1128,7 +1137,7 @@ function syncVolunteerHoursToMemberDirectory() {
     log_('Synced VH', membersUpdated + ' members, ' + skipped + ' skipped');
   } catch (e) {
     log_('syncVH error', e.message);
-    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing volunteer hours: ' + e.message, '❌ Sync Error', 5); } catch (_) { log_('_', (_.message || _)); }
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing volunteer hours: ' + e.message, '❌ Sync Error', 5); } catch (_) { log_('syncVolunteerHoursToMemberDirectory', 'Error showing toast: ' + (_.message || _)); }
     throw e;
   } finally {
     lock.releaseLock();
@@ -1209,13 +1218,27 @@ function syncMeetingAttendanceToMemberDirectory() {
       log_('syncMA', 'length mismatch updates=' + updates.length + ' expected=' + expected);
       return;
     }
-    if (updates.length > 0) memberSheet.getRange(2, MEMBER_COLS.LAST_VIRTUAL_MTG, updates.length, 2).setValues(updates);
+    if (updates.length > 0) {
+      var maCols = resolveColumnsByHeader_(memberSheet, [
+        { key: 'VIRTUAL',   header: 'Last Virtual Mtg',   fallback: MEMBER_COLS.LAST_VIRTUAL_MTG },
+        { key: 'INPERSON',  header: 'Last In-Person Mtg', fallback: MEMBER_COLS.LAST_INPERSON_MTG }
+      ]);
+      var isConsecutive = maCols.INPERSON === maCols.VIRTUAL + 1;
+      if (isConsecutive) {
+        memberSheet.getRange(2, maCols.VIRTUAL, updates.length, 2).setValues(updates);
+      } else {
+        var vArr = [], ipArr = [];
+        for (var ua = 0; ua < updates.length; ua++) { vArr.push([updates[ua][0]]); ipArr.push([updates[ua][1]]); }
+        memberSheet.getRange(2, maCols.VIRTUAL, updates.length, 1).setValues(vArr);
+        memberSheet.getRange(2, maCols.INPERSON, updates.length, 1).setValues(ipArr);
+      }
+    }
 
     ss.toast('Synced attendance for ' + membersUpdated + ' members, ' + skipped + ' skipped.', '✅ Meeting Attendance', 4);
     log_('Synced MA', membersUpdated + ' members, ' + skipped + ' skipped');
   } catch (e) {
     log_('syncMA error', e.message);
-    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing attendance: ' + e.message, '❌ Sync Error', 5); } catch (_) { log_('_', (_.message || _)); }
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing attendance: ' + e.message, '❌ Sync Error', 5); } catch (_) { log_('syncMeetingAttendanceToMemberDirectory', 'Error showing toast: ' + (_.message || _)); }
     throw e;
   } finally {
     lock.releaseLock();

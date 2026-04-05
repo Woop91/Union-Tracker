@@ -31,7 +31,7 @@
  *   13_MemberSelfService.gs (PIN auth).
  *   Used by menu items in 03_.
  *
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -202,7 +202,7 @@ function getStewardEmailsForMeetingSetup() {
       }
     }
   } catch (e) {
-    log_('Error getting steward emails', e.message);
+    log_('getStewardEmailsForMeetingSetup', 'Error: ' + e.message);
   }
   return result;
 }
@@ -288,7 +288,7 @@ function getCheckInEligibleMeetings() {
       meetingsMap[meetingId] = {
         id: meetingId,
         name: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_NAME) || ''),
-        date: meetingDate.toLocaleDateString(),
+        date: Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
         type: String(col_(data[i], MEETING_CHECKIN_COLS.MEETING_TYPE) || ''),
         time: meetingTime
       };
@@ -297,7 +297,7 @@ function getCheckInEligibleMeetings() {
 
   var meetings = [];
   for (var key in meetingsMap) {
-    if (meetingsMap.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(meetingsMap, key)) {
       meetings.push(meetingsMap[key]);
     }
   }
@@ -644,18 +644,28 @@ function cleanupExpiredMeetings() {
   // descending row order (built from the bottom of the sheet upward), so
   // each deleteRow() call doesn't shift the indices of rows still to be
   // deleted.  Non-contiguous rows can't safely use deleteRows(start, count).
+  var deleteStart = Date.now();
+  var deletedCount = 0;
   for (var j = 0; j < rowsToDelete.length; j++) {
+    // Time guard: stop before GAS 6-minute execution limit
+    if (Date.now() - deleteStart > 270000) { // 4.5 min safety margin
+      log_('cleanupExpiredMeetings', 'Time limit approaching, deleted ' + deletedCount + ' of ' + rowsToDelete.length);
+      break;
+    }
     sheet.deleteRow(rowsToDelete[j]);
+    deletedCount++;
   }
 
-  if (rowsToDelete.length > 0 && typeof logAuditEvent === 'function') {
+  if (deletedCount > 0 && typeof logAuditEvent === 'function') {
     logAuditEvent('MEETING_CLEANUP', {
-      rowsRemoved: rowsToDelete.length,
+      rowsRemoved: deletedCount,
+      rowsTotal: rowsToDelete.length,
+      timeLimitReached: deletedCount < rowsToDelete.length,
       cutoffDate: cutoff.toISOString()
     });
   }
 
-  return rowsToDelete.length;
+  return deletedCount;
 }
 
 // ============================================================================
@@ -1215,9 +1225,6 @@ function processQRCheckIn(meetingId, phone, pin) {
     });
   }
 
-  // Badge refresh
-  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
-
   return {
     success: true,
     memberName: memberName.trim(),
@@ -1410,7 +1417,7 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
     if (!folderId) {
       folderId = PropertiesService.getScriptProperties().getProperty('EVENT_CHECKIN_FOLDER_ID') || '';
     }
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('saveAttendanceToDriveFolder_', 'Error reading folder config: ' + (_e.message || _e)); }
 
   if (!folderId) {
     log_('saveAttendanceToDriveFolder_', 'Event Check-In folder ID not configured — skipping Drive save for ' + meetingId);

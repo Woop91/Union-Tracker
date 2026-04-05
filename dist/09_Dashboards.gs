@@ -985,12 +985,12 @@ function getSatisfactionAnalyticsData() {
   var withoutContactSum = 0, withoutContactCount = 0;
 
   for (i = 0; i < numRows; i++) {
-    var contact = String(stewardContactData[i][0]).toLowerCase();
+    var contact = stewardContactData[i][0];
     if (scores[i] > 0) {
-      if (contact === 'yes') {
+      if (isTruthyValue(contact)) {
         withContactSum += scores[i];
         withContactCount++;
-      } else if (contact === 'no') {
+      } else if (String(contact).trim().toLowerCase() === 'no') {
         withoutContactSum += scores[i];
         withoutContactCount++;
       }
@@ -1287,12 +1287,14 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
     else if (ten.indexOf('15+') >= 0) tenure['15+']++;
 
     // Steward contact (Q5)
-    if (col_(row, SATISFACTION_COLS.Q5_STEWARD_CONTACT) === 'Yes') stewardContact.Yes++;
-    else if (col_(row, SATISFACTION_COLS.Q5_STEWARD_CONTACT) === 'No') stewardContact.No++;
+    var q5Val = col_(row, SATISFACTION_COLS.Q5_STEWARD_CONTACT);
+    if (isTruthyValue(q5Val)) stewardContact.Yes++;
+    else if (String(q5Val).trim().toLowerCase() === 'no') stewardContact.No++;
 
     // Filed grievance (Q36)
-    if (col_(row, SATISFACTION_COLS.Q36_FILED_GRIEVANCE) === 'Yes') filedGrievance.Yes++;
-    else if (col_(row, SATISFACTION_COLS.Q36_FILED_GRIEVANCE) === 'No') filedGrievance.No++;
+    var q36Val = col_(row, SATISFACTION_COLS.Q36_FILED_GRIEVANCE);
+    if (isTruthyValue(q36Val)) filedGrievance.Yes++;
+    else if (String(q36Val).trim().toLowerCase() === 'no') filedGrievance.No++;
   }
 
   // Write Demographics (rows 4-23, columns CH-CI)
@@ -1388,7 +1390,7 @@ function computeSatisfactionRowAverages(row) {
  * - 01_Utilities.gs (getColumnLetter, getConfigValues, getJobMetadataByMemberCol)
  *
  * @author Claude Code Assistant
- * @version 4.43.1
+ * @version 4.51.0
  * ============================================================================
  */
 
@@ -1479,7 +1481,21 @@ function syncGrievanceToMemberDirectory() {
   var memberData = memberSheet.getDataRange().getValues();
   if (memberData.length < 2) return;
 
-  // Update columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
+  // Resolve target columns from actual sheet headers at write time (v4.51.1)
+  // This prevents data corruption when columns are appended out of canonical order
+  // or when CacheService-backed MEMBER_COLS constants go stale.
+  var writeCols = resolveColumnsByHeader_(memberSheet, [
+    { key: 'HAS_OPEN',  header: 'Has Open Grievance?', fallback: MEMBER_COLS.HAS_OPEN_GRIEVANCE },
+    { key: 'STATUS',    header: 'Grievance Status',     fallback: MEMBER_COLS.GRIEVANCE_STATUS },
+    { key: 'DEADLINE',  header: 'Days to Deadline',     fallback: MEMBER_COLS.DAYS_TO_DEADLINE }
+  ]);
+
+  // Verify columns are actually consecutive — the old code assumed 3 adjacent columns.
+  // If they're not consecutive, we must write each column individually.
+  var isConsecutive = (writeCols.STATUS === writeCols.HAS_OPEN + 1) &&
+                      (writeCols.DEADLINE === writeCols.STATUS + 1);
+
+  // Build update arrays from member data + grievance lookup
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
     memberId = col_(memberData[j], MEMBER_COLS.MEMBER_ID);
@@ -1488,10 +1504,25 @@ function syncGrievanceToMemberDirectory() {
   }
 
   if (updates.length > 0) {
-    memberSheet.getRange(2, MEMBER_COLS.HAS_OPEN_GRIEVANCE, updates.length, 3).setValues(updates);
+    if (isConsecutive) {
+      // Fast path: single batch write when columns are adjacent
+      memberSheet.getRange(2, writeCols.HAS_OPEN, updates.length, 3).setValues(updates);
+    } else {
+      // Safe path: write each column individually when columns are not adjacent
+      var hasOpenArr = [], statusArr = [], deadlineArr = [];
+      for (var u = 0; u < updates.length; u++) {
+        hasOpenArr.push([updates[u][0]]);
+        statusArr.push([updates[u][1]]);
+        deadlineArr.push([updates[u][2]]);
+      }
+      memberSheet.getRange(2, writeCols.HAS_OPEN, updates.length, 1).setValues(hasOpenArr);
+      memberSheet.getRange(2, writeCols.STATUS, updates.length, 1).setValues(statusArr);
+      memberSheet.getRange(2, writeCols.DEADLINE, updates.length, 1).setValues(deadlineArr);
+    }
   }
 
-  log_('syncGrievanceToMemberDirectory', 'Synced grievance data to ' + updates.length + ' members');
+  log_('syncGrievanceToMemberDirectory', 'Synced grievance data to ' + updates.length + ' members (cols resolved: ' +
+    writeCols.HAS_OPEN + '/' + writeCols.STATUS + '/' + writeCols.DEADLINE + ')');
 }
 
 /**
@@ -1685,10 +1716,9 @@ function syncGrievanceFormulasToLog() {
     // Metrics (S, T, U)
     metricsUpdates.push(rowCalc.metrics);
 
-    // Contact info (X, Y, Z, AA)
+    // Contact info (X, Y, Z)
     contactUpdates.push([
       memberInfo.email || '',
-      memberInfo.unit || '',
       memberInfo.location || '',
       memberInfo.steward || ''
     ]);
@@ -1696,9 +1726,18 @@ function syncGrievanceFormulasToLog() {
 
   // Apply updates to Grievance Log
   if (nameUpdates.length > 0) {
+    // C-D: First Name, Last Name — resolve from headers at write time (v4.51.1)
+    var gNameCols = resolveColumnsByHeader_(grievanceSheet, [
+      { key: 'FIRST', header: 'First Name', fallback: GRIEVANCE_COLS.FIRST_NAME },
+      { key: 'LAST',  header: 'Last Name',  fallback: GRIEVANCE_COLS.LAST_NAME }
+    ]);
     // CR-10: Before writing names and contact info, check existing cell data.
     // Never overwrite a non-empty cell with an empty string (would blank manually entered data).
-    var existingNames = grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).getValues();
+    // Read existing names using header-resolved positions (v4.51.1)
+    var enFirst = grievanceSheet.getRange(2, gNameCols.FIRST, nameUpdates.length, 1).getValues();
+    var enLast = grievanceSheet.getRange(2, gNameCols.LAST, nameUpdates.length, 1).getValues();
+    var existingNames = [];
+    for (var en = 0; en < nameUpdates.length; en++) { existingNames.push([enFirst[en][0], enLast[en][0]]); }
     for (var ni = 0; ni < nameUpdates.length; ni++) {
       for (var nc = 0; nc < 2; nc++) {
         // Only write if: new value is non-empty, OR existing cell is empty
@@ -1707,16 +1746,29 @@ function syncGrievanceFormulasToLog() {
         }
       }
     }
-    // C-D: First Name, Last Name
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).setValues(nameUpdates);
+    if (gNameCols.LAST === gNameCols.FIRST + 1) {
+      grievanceSheet.getRange(2, gNameCols.FIRST, nameUpdates.length, 2).setValues(nameUpdates);
+    } else {
+      var fnArr = [], lnArr = [];
+      for (var na = 0; na < nameUpdates.length; na++) { fnArr.push([nameUpdates[na][0]]); lnArr.push([nameUpdates[na][1]]); }
+      grievanceSheet.getRange(2, gNameCols.FIRST, nameUpdates.length, 1).setValues(fnArr);
+      grievanceSheet.getRange(2, gNameCols.LAST, nameUpdates.length, 1).setValues(lnArr);
+    }
 
-    // Deadline columns: respect steward overrides (cells with "Steward override" note)
+    // Deadline columns: respect steward overrides — resolve from headers (v4.51.1)
+    var dlColMap = resolveColumnsByHeader_(grievanceSheet, [
+      { key: 'FILING',    header: 'Filing Deadline',     fallback: GRIEVANCE_COLS.FILING_DEADLINE },
+      { key: 'STEP1',     header: 'Step I Due',          fallback: GRIEVANCE_COLS.STEP1_DUE },
+      { key: 'STEP2_APP', header: 'Step II Appeal Due',  fallback: GRIEVANCE_COLS.STEP2_APPEAL_DUE },
+      { key: 'STEP2',     header: 'Step II Due',         fallback: GRIEVANCE_COLS.STEP2_DUE },
+      { key: 'STEP3_APP', header: 'Step III Appeal Due', fallback: GRIEVANCE_COLS.STEP3_APPEAL_DUE }
+    ]);
     var deadlineCols = [
-      { col: GRIEVANCE_COLS.FILING_DEADLINE, idx: 0 },
-      { col: GRIEVANCE_COLS.STEP1_DUE, idx: 1 },
-      { col: GRIEVANCE_COLS.STEP2_APPEAL_DUE, idx: 2 },
-      { col: GRIEVANCE_COLS.STEP2_DUE, idx: 3 },
-      { col: GRIEVANCE_COLS.STEP3_APPEAL_DUE, idx: 4 }
+      { col: dlColMap.FILING,    idx: 0 },
+      { col: dlColMap.STEP1,     idx: 1 },
+      { col: dlColMap.STEP2_APP, idx: 2 },
+      { col: dlColMap.STEP2,     idx: 3 },
+      { col: dlColMap.STEP3_APP, idx: 4 }
     ];
 
     for (var dc = 0; dc < deadlineCols.length; dc++) {
@@ -1738,26 +1790,67 @@ function syncGrievanceFormulasToLog() {
       dlRange.setNumberFormat('MM/dd/yyyy');
     }
 
-    // S, T, U: Days Open, Next Action Due, Days to Deadline
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.DAYS_OPEN, metricsUpdates.length, 3).setValues(metricsUpdates);
+    // S, T, U: Days Open, Next Action Due, Days to Deadline — resolve from headers (v4.51.1)
+    var gMetricCols = resolveColumnsByHeader_(grievanceSheet, [
+      { key: 'DAYS_OPEN',    header: 'Days Open',        fallback: GRIEVANCE_COLS.DAYS_OPEN },
+      { key: 'NEXT_ACTION',  header: 'Next Action Due',  fallback: GRIEVANCE_COLS.NEXT_ACTION_DUE },
+      { key: 'DAYS_DEADLINE', header: 'Days to Deadline', fallback: GRIEVANCE_COLS.DAYS_TO_DEADLINE }
+    ]);
+    if (gMetricCols.NEXT_ACTION === gMetricCols.DAYS_OPEN + 1 && gMetricCols.DAYS_DEADLINE === gMetricCols.NEXT_ACTION + 1) {
+      grievanceSheet.getRange(2, gMetricCols.DAYS_OPEN, metricsUpdates.length, 3).setValues(metricsUpdates);
+    } else {
+      var doArr = [], naArr = [], ddArr = [];
+      for (var mi = 0; mi < metricsUpdates.length; mi++) { doArr.push([metricsUpdates[mi][0]]); naArr.push([metricsUpdates[mi][1]]); ddArr.push([metricsUpdates[mi][2]]); }
+      grievanceSheet.getRange(2, gMetricCols.DAYS_OPEN, metricsUpdates.length, 1).setValues(doArr);
+      grievanceSheet.getRange(2, gMetricCols.NEXT_ACTION, metricsUpdates.length, 1).setValues(naArr);
+      grievanceSheet.getRange(2, gMetricCols.DAYS_DEADLINE, metricsUpdates.length, 1).setValues(ddArr);
+    }
 
     // Format Days Open (S) as whole numbers, Next Action Due (T) as date
     // Days to Deadline (U) uses General format to preserve "Overdue" text
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.DAYS_OPEN, metricsUpdates.length, 1).setNumberFormat('0');
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.NEXT_ACTION_DUE, metricsUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, metricsUpdates.length, 1).setNumberFormat('General');
+    grievanceSheet.getRange(2, gMetricCols.DAYS_OPEN, metricsUpdates.length, 1).setNumberFormat('0');
+    grievanceSheet.getRange(2, gMetricCols.NEXT_ACTION, metricsUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
+    grievanceSheet.getRange(2, gMetricCols.DAYS_DEADLINE, metricsUpdates.length, 1).setNumberFormat('General');
 
+    // X-Z: Email, Location, Steward — resolve from headers (v4.51.1)
+    var gContactCols = resolveColumnsByHeader_(grievanceSheet, [
+      { key: 'EMAIL',    header: 'Member Email',    fallback: GRIEVANCE_COLS.MEMBER_EMAIL },
+      { key: 'LOCATION', header: 'Work Location',   fallback: GRIEVANCE_COLS.LOCATION },
+      { key: 'STEWARD',  header: 'Assigned Steward', fallback: GRIEVANCE_COLS.STEWARD }
+    ]);
     // CR-10: Preserve existing contact info — never overwrite non-empty cells with empty strings
-    var existingContact = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_EMAIL, contactUpdates.length, 4).getValues();
+    // Read existing contact info using header-resolved positions (v4.51.1)
+    var ecEmail = grievanceSheet.getRange(2, gContactCols.EMAIL, contactUpdates.length, 1).getValues();
+    var ecLoc = grievanceSheet.getRange(2, gContactCols.LOCATION, contactUpdates.length, 1).getValues();
+    var ecStew = grievanceSheet.getRange(2, gContactCols.STEWARD, contactUpdates.length, 1).getValues();
+    var existingContact = [];
+    for (var ec = 0; ec < contactUpdates.length; ec++) {
+      existingContact.push([ecEmail[ec][0], ecLoc[ec][0], ecStew[ec][0]]);
+    }
     for (var ci = 0; ci < contactUpdates.length; ci++) {
-      for (var cc = 0; cc < 4; cc++) {
+      for (var cc = 0; cc < 3; cc++) {
         if (!contactUpdates[ci][cc] && existingContact[ci][cc]) {
           contactUpdates[ci][cc] = existingContact[ci][cc];
         }
       }
     }
-    // X, Y, Z, AA: Email, Unit, Location, Steward
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_EMAIL, contactUpdates.length, 4).setValues(contactUpdates);
+    // Check if all 3 are consecutive starting from EMAIL
+    var contactConsecutive = gContactCols.LOCATION === gContactCols.EMAIL + 1 &&
+                             gContactCols.STEWARD === gContactCols.LOCATION + 1;
+    if (contactConsecutive) {
+      grievanceSheet.getRange(2, gContactCols.EMAIL, contactUpdates.length, 3).setValues(contactUpdates);
+    } else {
+      // Write each column individually — contactUpdates is [email, location, steward]
+      var eArr = [], lArr = [], sArr = [];
+      for (var ci2 = 0; ci2 < contactUpdates.length; ci2++) {
+        eArr.push([contactUpdates[ci2][0]]);
+        lArr.push([contactUpdates[ci2][1]]);
+        sArr.push([contactUpdates[ci2][2]]);
+      }
+      grievanceSheet.getRange(2, gContactCols.EMAIL, contactUpdates.length, 1).setValues(eArr);
+      grievanceSheet.getRange(2, gContactCols.LOCATION, contactUpdates.length, 1).setValues(lArr);
+      grievanceSheet.getRange(2, gContactCols.STEWARD, contactUpdates.length, 1).setValues(sArr);
+    }
   }
 
   log_('syncGrievanceFormulasToLog', 'Synced grievance formulas to ' + nameUpdates.length + ' grievances');
@@ -1830,25 +1923,50 @@ function syncMemberToGrievanceLog() {
     var curFirst = col_(grievanceData[j], GRIEVANCE_COLS.FIRST_NAME);
     var curLast = col_(grievanceData[j], GRIEVANCE_COLS.LAST_NAME);
     var curEmail = col_(grievanceData[j], GRIEVANCE_COLS.MEMBER_EMAIL);
-    var curUnit = grievanceData[j][GRIEVANCE_COLS.MEMBER_EMAIL];
-    var curLoc = grievanceData[j][GRIEVANCE_COLS.MEMBER_EMAIL + 1];
-    var curSteward = grievanceData[j][GRIEVANCE_COLS.MEMBER_EMAIL + 2];
+    var curLoc = col_(grievanceData[j], GRIEVANCE_COLS.LOCATION);
+    var curSteward = col_(grievanceData[j], GRIEVANCE_COLS.STEWARD);
     if (!data) {
       // No lookup match — preserve existing grievance row values
       nameUpdates.push([curFirst, curLast]);
-      infoUpdates.push([curEmail, curUnit, curLoc, curSteward]);
+      infoUpdates.push([curEmail, curLoc, curSteward]);
     } else {
       // Only overwrite with non-empty source values
       nameUpdates.push([data.firstName || curFirst, data.lastName || curLast]);
-      infoUpdates.push([data.email || curEmail, data.unit || curUnit, data.location || curLoc, data.steward || curSteward]);
+      infoUpdates.push([data.email || curEmail, data.location || curLoc, data.steward || curSteward]);
     }
   }
 
   if (nameUpdates.length > 0) {
-    // Update C-D (First Name, Last Name)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).setValues(nameUpdates);
-    // Update X-AA (Email, Unit, Location, Steward)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_EMAIL, infoUpdates.length, 4).setValues(infoUpdates);
+    // Update C-D (First Name, Last Name) — resolve from headers (v4.51.1)
+    var smNameCols = resolveColumnsByHeader_(grievanceSheet, [
+      { key: 'FIRST', header: 'First Name', fallback: GRIEVANCE_COLS.FIRST_NAME },
+      { key: 'LAST',  header: 'Last Name',  fallback: GRIEVANCE_COLS.LAST_NAME }
+    ]);
+    if (smNameCols.LAST === smNameCols.FIRST + 1) {
+      grievanceSheet.getRange(2, smNameCols.FIRST, nameUpdates.length, 2).setValues(nameUpdates);
+    } else {
+      var fnA = [], lnA = [];
+      for (var sn = 0; sn < nameUpdates.length; sn++) { fnA.push([nameUpdates[sn][0]]); lnA.push([nameUpdates[sn][1]]); }
+      grievanceSheet.getRange(2, smNameCols.FIRST, nameUpdates.length, 1).setValues(fnA);
+      grievanceSheet.getRange(2, smNameCols.LAST, nameUpdates.length, 1).setValues(lnA);
+    }
+    // Update X-Z (Email, Location, Steward) — resolve from headers (v4.51.1)
+    var smInfoCols = resolveColumnsByHeader_(grievanceSheet, [
+      { key: 'EMAIL',    header: 'Member Email',     fallback: GRIEVANCE_COLS.MEMBER_EMAIL },
+      { key: 'LOCATION', header: 'Work Location',    fallback: GRIEVANCE_COLS.LOCATION },
+      { key: 'STEWARD',  header: 'Assigned Steward',  fallback: GRIEVANCE_COLS.STEWARD }
+    ]);
+    var infoConsecutive = smInfoCols.LOCATION === smInfoCols.EMAIL + 1 &&
+                          smInfoCols.STEWARD === smInfoCols.LOCATION + 1;
+    if (infoConsecutive) {
+      grievanceSheet.getRange(2, smInfoCols.EMAIL, infoUpdates.length, 3).setValues(infoUpdates);
+    } else {
+      var eA = [], lA = [], sA = [];
+      for (var si = 0; si < infoUpdates.length; si++) { eA.push([infoUpdates[si][0]]); lA.push([infoUpdates[si][1]]); sA.push([infoUpdates[si][2]]); }
+      grievanceSheet.getRange(2, smInfoCols.EMAIL, infoUpdates.length, 1).setValues(eA);
+      grievanceSheet.getRange(2, smInfoCols.LOCATION, infoUpdates.length, 1).setValues(lA);
+      grievanceSheet.getRange(2, smInfoCols.STEWARD, infoUpdates.length, 1).setValues(sA);
+    }
   }
 
   log_('syncMemberToGrievanceLog', 'Synced member data to ' + nameUpdates.length + ' grievances');
@@ -1908,7 +2026,7 @@ function onEditAutoSync(e) {
       try {
         openGrievanceFormForRow_(sheet, row);
       } catch (err) {
-        log_('Error opening grievance form', err.message);
+        log_('onEditAutoSync', 'Error opening grievance form: ' + err.message);
       }
       return; // Don't continue with sync for checkbox edits
     }
@@ -1922,7 +2040,7 @@ function onEditAutoSync(e) {
       try {
         showMemberQuickActions(row);
       } catch (err) {
-        log_('Error opening member quick actions', err.message);
+        log_('onEditAutoSync', 'Error opening member quick actions: ' + err.message);
       }
       return; // Don't continue with sync for checkbox edits
     }
@@ -1938,7 +2056,7 @@ function onEditAutoSync(e) {
       try {
         showGrievanceQuickActions(row);
       } catch (err) {
-        log_('Error opening grievance quick actions', err.message);
+        log_('onEditAutoSync', 'Error opening grievance quick actions: ' + err.message);
       }
       return; // Don't continue with sync for checkbox edits
     }
@@ -2040,7 +2158,7 @@ function syncAllData() {
  * Users can customize the sync behavior
  */
 function installAutoSyncTrigger() {
-  var ui = SpreadsheetApp.getUi();
+  var _ui = SpreadsheetApp.getUi();
   showDialog_(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
     'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
@@ -3230,7 +3348,7 @@ function getFlaggedSubmissionsData() {
 function approveFlaggedSubmission(rowNum) {
   // Verify caller is an authorized steward/admin
   var callerEmail = '';
-  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { log_('_e', (_e.message || _e)); }
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { log_('approveFlaggedSubmission', 'Error resolving caller: ' + (_e.message || _e)); }
   if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
   }
@@ -3265,7 +3383,7 @@ function approveFlaggedSubmission(rowNum) {
 function rejectFlaggedSubmission(rowNum) {
   // Verify caller is an authorized steward/admin
   var callerEmail = '';
-  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { log_('_e', (_e.message || _e)); }
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { log_('rejectFlaggedSubmission', 'Error resolving caller: ' + (_e.message || _e)); }
   if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
   }
@@ -4377,41 +4495,7 @@ function applyUnionThemeToAllTabs() {
   }
 }
 
-/**
- * Format a single tab by name (for debugging or selective formatting).
- * @param {string} sheetName - The tab name to format
- */
-function formatSingleTab(sheetName) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var formatters = {};
-  formatters[SHEETS.GETTING_STARTED] = formatGettingStartedTab_;
-  formatters[SHEETS.FAQ] = formatFAQTab_;
-  formatters[SHEETS.SURVEY_QUESTIONS] = formatSurveyQuestionsTab_;
-  formatters[SHEETS.NOTIFICATIONS] = formatNotificationsTab_;
-  formatters[SHEETS.RESOURCES] = formatResourcesTab_;
-  formatters[SHEETS.RESOURCE_CONFIG] = formatResourceConfigTab_;
-  formatters[SHEETS.FEEDBACK] = formatFeedbackTab_;
-  formatters[SHEETS.FUNCTION_CHECKLIST] = formatFunctionChecklistTab_;
-  formatters[SHEETS.SETTINGS_OVERVIEW] = formatSettingsOverviewTab_;
-  formatters[SHEETS.PORTAL_EVENTS] = formatEventsTab_;
-  formatters[SHEETS.PORTAL_MINUTES] = formatMeetingMinutesTab_;
-  formatters[SHEETS.WORKLOAD_REPORTING] = formatWorkloadReportingTab_;
-  formatters[SHEETS.NON_MEMBER_CONTACTS] = formatNonMemberContactsTab_;
-  formatters[SHEETS.CASE_CHECKLIST] = formatCaseChecklistTab_;
-  formatters[SHEETS.SATISFACTION] = formatMemberSatisfactionTab_;
-  formatters[SHEETS.FEATURES_REFERENCE] = formatFeaturesReferenceTab_;
-  formatters[SHEETS.VOLUNTEER_HOURS] = formatVolunteerHoursTab_;
-  formatters[SHEETS.MEETING_ATTENDANCE] = formatMeetingAttendanceTab_;
-  formatters[SHEETS.MEETING_CHECKIN_LOG] = formatMeetingCheckInLogTab_;
-
-  var fn = formatters[sheetName];
-  if (fn) {
-    fn(ss);
-    ss.toast('Formatted: ' + sheetName, '✅', 3);
-  } else {
-    ss.toast('No formatter found for: ' + sheetName, '⚠️', 3);
-  }
-}
+// Dead code removed: formatSingleTab() — zero callers in src
 
 // ============================================================================
 // DASHBOARD ENHANCEMENTS (merged from 16_DashboardEnhancements.gs)
@@ -4424,28 +4508,7 @@ function formatSingleTab(sheetName) {
 // 2. EXPORT INDIVIDUAL CHARTS AS IMAGES - Server-side download handler
 // ============================================================================
 
-/**
- * Saves an exported chart image (base64 PNG) to the user's Drive
- * @param {string} chartName - Name identifier for the chart
- * @param {string} base64Data - Base64-encoded PNG data (without data: prefix)
- * @returns {string} Drive file URL
- */
-function saveChartImageToDrive(chartName, base64Data) {
-  if (!chartName || typeof chartName !== 'string') throw new Error('Invalid chart name');
-  if (!base64Data || typeof base64Data !== 'string') throw new Error('Invalid image data');
-  chartName = chartName.replace(/[^a-zA-Z0-9_\- ]/g, '_').substring(0, 100);
-  if (base64Data.length > 10 * 1024 * 1024) throw new Error('Image data too large');
-
-  var blob = Utilities.newBlob(
-    Utilities.base64Decode(base64Data),
-    'image/png',
-    chartName + '_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd') + '.png'
-  );
-
-  var folder = getOrCreateExportFolder_();
-  var file = folder.createFile(blob);
-  return file.getUrl();
-}
+// Dead code removed: saveChartImageToDrive() — zero callers in src
 
 /**
  * Gets or creates the Dashboard Exports folder in Drive
@@ -4463,207 +4526,10 @@ function getOrCreateExportFolder_() {
 // ============================================================================
 // 3. SCHEDULED EMAIL REPORTS
 // ============================================================================
+// Dead code removed: scheduleEmailReport(), sendScheduledReports(),
+// sendDashboardReportEmail_(), installReportTrigger_(), getScheduledReports(),
+// removeScheduledReport() — entire scheduled reports subsystem, never wired up
 
-/**
- * Schedules a recurring dashboard email report
- * @param {Object} config - Report configuration
- * @param {string} config.email - Recipient email address
- * @param {string} config.frequency - 'daily', 'weekly', or 'monthly'
- * @param {string[]} config.sections - Sections to include ('summary','charts','trends','satisfaction')
- * @param {boolean} config.includePII - Whether to include PII data
- * @returns {Object} Schedule confirmation with trigger ID
- */
-function scheduleEmailReport(config) {
-  if (!config || !config.email) {
-    return { success: false, error: 'Email address is required' };
-  }
-
-  // Validate email format
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.email)) {
-    return { success: false, error: 'Invalid email address format' };
-  }
-
-  // Authorization check — PII reports may only be sent to stewards or admins
-  var recipientRole = typeof getUserRole_ === 'function' ? getUserRole_(config.email) : null;
-  if (recipientRole !== 'admin' && recipientRole !== 'steward') {
-    var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { log_('_e', (_e.message || _e)); }
-    // Allow sending to self even if not steward/admin (non-PII only)
-    if (config.includePII && callerEmail.toLowerCase() !== config.email.toLowerCase()) {
-      return { success: false, error: 'Reports containing PII can only be sent to stewards or admins.' };
-    }
-  }
-
-  // Store report config in script properties
-  var props = PropertiesService.getScriptProperties();
-  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
-
-  var schedule = {
-    id: 'rpt_' + Date.now(),
-    email: config.email,
-    frequency: config.frequency || 'weekly',
-    sections: config.sections || ['summary', 'charts'],
-    includePII: config.includePII || false,
-    createdBy: Session.getActiveUser().getEmail(),
-    createdAt: new Date().toISOString(),
-    active: true
-  };
-
-  schedules.push(schedule);
-  props.setProperty('report_schedules', JSON.stringify(schedules));
-
-  // Install trigger if not already installed
-  installReportTrigger_();
-
-  if (typeof EventBus !== 'undefined' && EventBus.emit) {
-    EventBus.emit('report:scheduled', schedule);
-  }
-
-  return { success: true, schedule: schedule };
-}
-
-/**
- * Sends all scheduled email reports (called by trigger)
- */
-function sendScheduledReports() {
-  var props = PropertiesService.getScriptProperties();
-  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
-
-  var now = new Date();
-  var dayOfWeek = now.getDay(); // 0=Sun
-  var dayOfMonth = now.getDate();
-
-  for (var i = 0; i < schedules.length; i++) {
-    var sched = schedules[i];
-    if (!sched.active) continue;
-
-    var shouldSend = false;
-    if (sched.frequency === 'daily') {
-      shouldSend = true;
-    } else if (sched.frequency === 'weekly' && dayOfWeek === 1) {
-      shouldSend = true;
-    } else if (sched.frequency === 'monthly' && dayOfMonth === 1) {
-      shouldSend = true;
-    }
-
-    if (shouldSend) {
-      try {
-        sendDashboardReportEmail_(sched);
-      } catch (e) {
-        log_('sendScheduledReports', 'Failed to send report to ' + sched.email + ': ' + e.message);
-      }
-    }
-  }
-}
-
-/**
- * Sends a single dashboard report email
- * @param {Object} schedule - The schedule config
- * @private
- */
-function sendDashboardReportEmail_(schedule) {
-  var data = JSON.parse(getUnifiedDashboardData(schedule.includePII));
-  var sections = schedule.sections;
-
-  var html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#1e293b;color:#f8fafc;padding:24px;border-radius:12px">';
-  html += '<h1 style="color:#3b82f6;font-size:20px;margin-bottom:16px">Dashboard Report</h1>';
-  html += '<p style="color:#94a3b8;font-size:12px">Generated ' + new Date().toLocaleDateString() + '</p>';
-
-  if (sections.indexOf('summary') >= 0) {
-    html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
-    html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Summary Metrics</h2>';
-    html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
-    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.totalMembers)) + '</td></tr>';
-    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.openCases)) + '</td></tr>';
-    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.winRate)) + '%</td></tr>';
-    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.moraleScore)) + '/10</td></tr>';
-    html += '</table></div>';
-  }
-
-  if (sections.indexOf('trends') >= 0 && data.monthlyFilings) {
-    html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
-    html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Monthly Filings Trend</h2>';
-    html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
-    for (var m = 0; m < data.monthlyFilings.length; m++) {
-      html += '<tr><td>' + escapeHtml(String(data.monthlyFilings[m].month)) + '</td><td style="text-align:right">' + escapeHtml(String(data.monthlyFilings[m].count)) + ' filed</td></tr>';
-    }
-    html += '</table></div>';
-  }
-
-  if (sections.indexOf('satisfaction') >= 0) {
-    html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
-    html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Satisfaction</h2>';
-    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + escapeHtml(String(data.moraleScore)) + '/10</strong></p>';
-    html += '</div>';
-  }
-
-  html += '<p style="color:#64748b;font-size:11px;margin-top:24px;text-align:center">This is an automated report. Manage your subscriptions in the dashboard settings.</p>';
-  html += '</div>';
-
-  MailApp.sendEmail({
-    to: schedule.email,
-    subject: 'Dashboard Report - ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMM d, yyyy'),
-    htmlBody: html
-  });
-
-}
-
-/**
- * Installs the daily trigger for report dispatch
- * @private
- */
-function installReportTrigger_() {
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'sendScheduledReports') {
-      return; // Already installed
-    }
-  }
-  ScriptApp.newTrigger('sendScheduledReports')
-    .timeBased()
-    .everyDays(1)
-    .atHour(7)
-    .create();
-}
-
-/**
- * Gets all scheduled reports for the current user
- * @returns {string} JSON array of schedules
- */
-function getScheduledReports() {
-  var props = PropertiesService.getScriptProperties();
-  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
-  var userEmail = Session.getActiveUser().getEmail();
-
-  var userSchedules = schedules.filter(function(s) {
-    return s.createdBy === userEmail;
-  });
-
-  return JSON.stringify(userSchedules);
-}
-
-/**
- * Removes a scheduled report
- * @param {string} scheduleId - The schedule ID to remove
- * @returns {Object} Removal confirmation
- */
-function removeScheduledReport(scheduleId) {
-  var props = PropertiesService.getScriptProperties();
-  var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
-  var userEmail = Session.getActiveUser().getEmail();
-
-  schedules = schedules.filter(function(s) {
-    return !(s.id === scheduleId && s.createdBy === userEmail);
-  });
-
-  props.setProperty('report_schedules', JSON.stringify(schedules));
-
-  if (typeof EventBus !== 'undefined' && EventBus.emit) {
-    EventBus.emit('report:removed', { scheduleId: scheduleId });
-  }
-
-  return { success: true };
-}
 // ============================================================================
 // 4. NOTIFICATIONS (v4.22.0 — rerouted to sheet-based system in 05_Integrations.gs)
 // ============================================================================
@@ -4672,7 +4538,8 @@ function removeScheduledReport(scheduleId) {
 // broadcastStewardNotification() removed — no active callers; steward compose
 // form handles broadcast directly via sendWebAppNotification().
 //
-// pushNotification() is kept because saveSharedView() (below) calls it.
+// pushNotification() is kept because saveSharedView() (below) calls it
+// and 05_Integrations.gs also calls it.
 // It now writes to the Notifications sheet instead of ScriptProperties.
 
 /**
@@ -4790,119 +4657,12 @@ function saveSharedView(view) {
   });
 }
 
-/**
- * Gets all shared views accessible to the current user
- * @returns {string} JSON array of shared views
- */
-function getSharedViews() {
-  var props = PropertiesService.getScriptProperties();
-  var views = JSON.parse(props.getProperty('shared_views') || '[]');
-  var userEmail = Session.getActiveUser().getEmail();
+// Dead code removed: getSharedViews(), deleteSharedView() — zero callers in src
 
-  var accessible = views.filter(function(v) {
-    return v.createdBy === userEmail ||
-           (v.sharedWith && v.sharedWith.indexOf(userEmail) >= 0);
-  });
-
-  return JSON.stringify(accessible);
-}
-
-
-/**
- * Deletes a shared view (only owner can delete)
- * @param {string} viewId - View ID to delete
- * @returns {Object} Deletion result
- */
-function deleteSharedView(viewId) {
-  var props = PropertiesService.getScriptProperties();
-  var views = JSON.parse(props.getProperty('shared_views') || '[]');
-  var userEmail = Session.getActiveUser().getEmail();
-
-  var filtered = views.filter(function(v) {
-    return !(v.id === viewId && v.createdBy === userEmail);
-  });
-
-  if (filtered.length === views.length) {
-    return { success: false, error: 'View not found or not authorized' };
-  }
-
-  props.setProperty('shared_views', JSON.stringify(filtered));
-
-  if (typeof EventBus !== 'undefined' && EventBus.emit) {
-    EventBus.emit('collaboration:viewDeleted', { viewId: viewId });
-  }
-
-  return { success: true };
-}
 // ============================================================================
 // 6. SAVED CHART CONFIGURATIONS (PRESETS)
 // ============================================================================
-
-/**
- * Saves a chart configuration preset
- * @param {Object} preset - Preset configuration
- * @param {string} preset.name - Preset display name
- * @param {string[]} preset.visibleCharts - Chart IDs to show
- * @param {Object} preset.chartOptions - Per-chart overrides (colors, types)
- * @param {Object} preset.layout - Layout configuration (grid columns, ordering)
- * @param {Object} preset.filters - Pre-applied filters
- * @returns {Object} Saved preset with ID
- */
-function saveChartPreset(preset) {
-  return withScriptLock_(function() {
-  var props = PropertiesService.getUserProperties();
-  var presets = JSON.parse(props.getProperty('chart_presets') || '[]');
-
-  var chartPreset = {
-    id: 'preset_' + Date.now(),
-    name: preset.name || 'Custom Preset',
-    visibleCharts: preset.visibleCharts || [],
-    chartOptions: preset.chartOptions || {},
-    layout: preset.layout || { columns: 2 },
-    filters: preset.filters || {},
-    dateRange: preset.dateRange || null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  presets.push(chartPreset);
-  props.setProperty('chart_presets', JSON.stringify(presets));
-
-  if (typeof EventBus !== 'undefined' && EventBus.emit) {
-    EventBus.emit('preset:saved', chartPreset);
-  }
-
-  return { success: true, preset: chartPreset };
-  });
-}
-
-/**
- * Gets all saved chart presets for the current user
- * @returns {string} JSON array of presets
- */
-function getChartPresets() {
-  var props = PropertiesService.getUserProperties();
-  return props.getProperty('chart_presets') || '[]';
-}
-
-/**
- * Deletes a chart preset
- * @param {string} presetId - Preset ID to delete
- * @returns {Object} Deletion result
- */
-function deleteChartPreset(presetId) {
-  var props = PropertiesService.getUserProperties();
-  var presets = JSON.parse(props.getProperty('chart_presets') || '[]');
-
-  presets = presets.filter(function(p) { return p.id !== presetId; });
-  props.setProperty('chart_presets', JSON.stringify(presets));
-
-  if (typeof EventBus !== 'undefined' && EventBus.emit) {
-    EventBus.emit('preset:deleted', { presetId: presetId });
-  }
-
-  return { success: true };
-}
+// Dead code removed: saveChartPreset(), getChartPresets(), deleteChartPreset() — never wired up
 
 // ============================================================================
 // 7. ADVANCED FILTERING OPTIONS
@@ -5161,7 +4921,7 @@ function getDashboardStats() {
         }
       }
     } catch(e) {
-      log_('Error reading satisfaction summary for morale score', e.message);
+      log_('getDashboardStats', 'Error reading satisfaction summary for morale score: ' + e.message);
     }
   }
 
@@ -5195,7 +4955,7 @@ function getExecutiveMetrics_() {
         if (data[i][0] === 'Overdue') metrics.overdueSteps = data[i][1] || 0;
       }
     } catch (e) {
-      log_('Error getting executive metrics', e.message);
+      log_('getExecutiveMetrics_', 'Error: ' + e.message);
     }
   }
 
@@ -5286,7 +5046,7 @@ function checkDashboardAlerts() {
       );
       SpreadsheetApp.getActiveSpreadsheet().toast("Alert email sent", "Notification");
     } catch (e) {
-      log_('Error sending alert email', e.message);
+      log_('checkDashboardAlerts', 'Error sending alert email: ' + e.message);
     }
   }
 }
@@ -5398,7 +5158,7 @@ function midnightAutoRefresh() {
     // and don't require midnight refresh - data is fetched on-demand
 
   } catch (e) {
-    log_('Midnight Auto-Refresh error', e.message);
+    log_('midnightAutoRefresh', 'Error: ' + e.message);
     // Optionally send error notification
     try {
       var adminEmail = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
@@ -5463,7 +5223,7 @@ function checkOverdueGrievances_() {
       }
     }
   } catch (e) {
-    log_('Error checking overdue grievances', e.message);
+    log_('checkOverdueGrievances_', 'Error: ' + e.message);
   }
 }
 

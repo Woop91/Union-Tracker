@@ -59,64 +59,6 @@ describe('showToast', () => {
 });
 
 // ============================================================================
-// showConfirmation
-// ============================================================================
-
-describe('showConfirmation', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('calls ui.alert with YES_NO button set', () => {
-    const mockAlert = jest.fn(() => 'YES');
-    const mockUi = {
-      alert: mockAlert,
-      ButtonSet: { YES_NO: 'YES_NO' },
-      Button: { YES: 'YES', NO: 'NO' }
-    };
-    SpreadsheetApp.getUi.mockReturnValue(mockUi);
-
-    showConfirmation('Are you sure?', 'Confirm');
-    expect(mockAlert).toHaveBeenCalledWith('Confirm', 'Are you sure?', 'YES_NO');
-  });
-
-  test('returns true when user clicks YES', () => {
-    const mockUi = {
-      alert: jest.fn(() => 'YES'),
-      ButtonSet: { YES_NO: 'YES_NO' },
-      Button: { YES: 'YES', NO: 'NO' }
-    };
-    SpreadsheetApp.getUi.mockReturnValue(mockUi);
-
-    const result = showConfirmation('Continue?', 'Confirm');
-    expect(result).toBe(true);
-  });
-
-  test('returns false when user clicks NO', () => {
-    const mockUi = {
-      alert: jest.fn(() => 'NO'),
-      ButtonSet: { YES_NO: 'YES_NO' },
-      Button: { YES: 'YES', NO: 'NO' }
-    };
-    SpreadsheetApp.getUi.mockReturnValue(mockUi);
-
-    const result = showConfirmation('Continue?', 'Confirm');
-    expect(result).toBe(false);
-  });
-
-  test('uses default title "Confirm" when title is not provided', () => {
-    const mockAlert = jest.fn(() => 'YES');
-    const mockUi = {
-      alert: mockAlert,
-      ButtonSet: { YES_NO: 'YES_NO' },
-      Button: { YES: 'YES', NO: 'NO' }
-    };
-    SpreadsheetApp.getUi.mockReturnValue(mockUi);
-
-    showConfirmation('Question?');
-    expect(mockAlert).toHaveBeenCalledWith('Confirm', 'Question?', 'YES_NO');
-  });
-});
-
-// ============================================================================
 // showAlert
 // ============================================================================
 
@@ -323,6 +265,48 @@ describe('createDashboardMenu', () => {
     createDashboardMenu();
     // Should have created menus including the Union Hub menu
     expect(menuNames.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ============================================================================
+// showDialog_ utility
+// ============================================================================
+
+describe('showDialog_ utility', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('showDialog_ calls showModalDialog with correct dimensions', () => {
+    const mockShowModalDialog = jest.fn();
+    const mockUi = {
+      alert: jest.fn(),
+      showModalDialog: mockShowModalDialog,
+      ButtonSet: { OK: 'OK', YES_NO: 'YES_NO' },
+      Button: { YES: 'YES', NO: 'NO' }
+    };
+    SpreadsheetApp.getUi.mockReturnValue(mockUi);
+
+    showDialog_('<h1>Test</h1>', 'Test Title', 400, 300);
+    expect(mockShowModalDialog).toHaveBeenCalled();
+    const [htmlArg, titleArg] = mockShowModalDialog.mock.calls[0];
+    expect(titleArg).toBe('Test Title');
+    // The HtmlOutput object is what gets passed (not the raw string)
+    expect(htmlArg).toBeDefined();
+  });
+
+  test('showDialog_ uses default dimensions when not provided', () => {
+    const mockShowModalDialog = jest.fn();
+    const mockUi = {
+      alert: jest.fn(),
+      showModalDialog: mockShowModalDialog,
+      ButtonSet: { OK: 'OK', YES_NO: 'YES_NO' },
+      Button: { YES: 'YES', NO: 'NO' }
+    };
+    SpreadsheetApp.getUi.mockReturnValue(mockUi);
+
+    showDialog_('<h1>Test</h1>', 'Default Title');
+    expect(mockShowModalDialog).toHaveBeenCalled();
+    const [, titleArg] = mockShowModalDialog.mock.calls[0];
+    expect(titleArg).toBe('Default Title');
   });
 });
 

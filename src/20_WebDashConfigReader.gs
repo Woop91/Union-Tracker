@@ -61,7 +61,7 @@ var ConfigReader = (function () {
         try {
           _memo = JSON.parse(cached);
           return _memo;
-        } catch (_e) { log_('_e', (_e.message || _e)); }
+        } catch (_e) { log_('ConfigReader.getConfig', 'Error parsing cached config: ' + (_e.message || _e)); }
       }
     }
 
@@ -90,7 +90,7 @@ var ConfigReader = (function () {
       orgName:             orgName,
       orgAbbrev:           _readRow(CONFIG_COLS.ORG_ABBREV) || _deriveAbbrev(orgName),
       logoInitials:        _readRow(CONFIG_COLS.LOGO_INITIALS) || _deriveInitials(orgName),
-      accentHue:           Number(_readRow(CONFIG_COLS.ACCENT_HUE)) || 250,
+      accentHue:           _readRow(CONFIG_COLS.ACCENT_HUE) !== '' ? Number(_readRow(CONFIG_COLS.ACCENT_HUE)) : 250,
       magicLinkExpiryDays: Number(_readRow(CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS)) || 7,
       cookieDurationDays:  Number(_readRow(CONFIG_COLS.COOKIE_DURATION_DAYS)) || 30,
       stewardLabel:        _readRow(CONFIG_COLS.STEWARD_LABEL) || 'Steward',

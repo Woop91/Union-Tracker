@@ -713,7 +713,7 @@ describe('startNewGrievance', () => {
 
     const appendedRow = sheet.appendRow.mock.calls[0][0];
     expect(appendedRow).toContain(GRIEVANCE_STATUS.OPEN);
-    expect(appendedRow[GRIEVANCE_COLS.CURRENT_STEP - 1]).toBe(1);
+    expect(appendedRow[GRIEVANCE_COLS.CURRENT_STEP - 1]).toBe('Informal');
   });
 
   test('returns error for invalid grievance data', () => {
@@ -933,35 +933,35 @@ describe('advanceGrievanceStep', () => {
   }
 
   test('advances from step 1 to step 2', () => {
-    setupAdvanceMock('GRV-2026-0001', 1);
+    setupAdvanceMock('GRV-2026-0001', 'Informal');
 
     const result = advanceGrievanceStep('GRV-2026-0001', {});
 
     expect(result.success).toBe(true);
-    expect(result.newStep).toBe(2);
-    expect(result.message).toContain('Step 2');
+    expect(result.newStep).toBe('Step II');
+    expect(result.message).toContain('Step II');
   });
 
   test('advances from step 2 to step 3', () => {
-    setupAdvanceMock('GRV-2026-0001', 2);
+    setupAdvanceMock('GRV-2026-0001', 'Step II');
 
     const result = advanceGrievanceStep('GRV-2026-0001', {});
 
     expect(result.success).toBe(true);
-    expect(result.newStep).toBe(3);
+    expect(result.newStep).toBe('Step III');
   });
 
   test('advances from step 3 to arbitration (step 4)', () => {
-    setupAdvanceMock('GRV-2026-0001', 3);
+    setupAdvanceMock('GRV-2026-0001', 'Step III');
 
     const result = advanceGrievanceStep('GRV-2026-0001', {});
 
     expect(result.success).toBe(true);
-    expect(result.newStep).toBe(4);
+    expect(result.newStep).toBe('Arbitration');
   });
 
   test('returns error when already at arbitration (step 4)', () => {
-    setupAdvanceMock('GRV-2026-0001', 4);
+    setupAdvanceMock('GRV-2026-0001', 'Arbitration');
 
     const result = advanceGrievanceStep('GRV-2026-0001', {});
 
@@ -999,7 +999,7 @@ describe('advanceGrievanceStep', () => {
   });
 
   test('logs audit event with step details', () => {
-    setupAdvanceMock('GRV-2026-0001', 2);
+    setupAdvanceMock('GRV-2026-0001', 'Step II');
 
     advanceGrievanceStep('GRV-2026-0001', { notes: 'Denied at step 2' });
 
@@ -1007,8 +1007,8 @@ describe('advanceGrievanceStep', () => {
       AUDIT_EVENTS.GRIEVANCE_STEP_ADVANCED,
       expect.objectContaining({
         grievanceId: 'GRV-2026-0001',
-        fromStep: 2,
-        toStep: 3
+        fromStep: 'Step II',
+        toStep: 'Step III'
       })
     );
   });
@@ -1315,23 +1315,36 @@ describe('LockService: syncMemberGrievanceData', () => {
   });
 });
 
-describe('LockService: updateMemberDataBatch', () => {
-  beforeEach(() => jest.clearAllMocks());
+// ============================================================================
+// applyFieldUpdates_ helper
+// ============================================================================
 
-  test('acquires script lock during execution', () => {
-    const mockLock = {
-      tryLock: jest.fn(() => true),
-      releaseLock: jest.fn()
-    };
-    LockService.getScriptLock.mockReturnValue(mockLock);
+describe('applyFieldUpdates_ helper', () => {
+  test('applies defined fields via field map', () => {
+    var row = new Array(Object.keys(MEMBER_COLS).length).fill('');
+    var updateData = { firstName: 'Alice', lastName: 'Smith', email: '' };
+    var fieldMap = [
+      ['firstName', MEMBER_COLS.FIRST_NAME],
+      ['lastName', MEMBER_COLS.LAST_NAME],
+      ['email', MEMBER_COLS.EMAIL],
+      ['phone', MEMBER_COLS.PHONE]
+    ];
+    applyFieldUpdates_(row, updateData, fieldMap);
+    expect(col_(row, MEMBER_COLS.FIRST_NAME)).toBe('Alice');
+    expect(col_(row, MEMBER_COLS.LAST_NAME)).toBe('Smith');
+    expect(col_(row, MEMBER_COLS.EMAIL)).toBe('');
+    expect(col_(row, MEMBER_COLS.PHONE)).toBe(''); // undefined → skipped
+  });
 
-    const memberData = [['Member ID'], ['M-001']];
-    const sheet = createMockSheet(SHEETS.MEMBER_DIR, memberData);
-    const mockSS = createMockSpreadsheet([sheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
-
-    updateMemberDataBatch('M-001', { email: 'new@test.com' });
-    expect(mockLock.tryLock).toHaveBeenCalled();
-    expect(mockLock.releaseLock).toHaveBeenCalled();
+  test('skips fields not present in updateData', () => {
+    var row = new Array(Object.keys(MEMBER_COLS).length).fill('ORIGINAL');
+    var updateData = { firstName: 'Bob' };
+    var fieldMap = [
+      ['firstName', MEMBER_COLS.FIRST_NAME],
+      ['lastName', MEMBER_COLS.LAST_NAME]
+    ];
+    applyFieldUpdates_(row, updateData, fieldMap);
+    expect(col_(row, MEMBER_COLS.FIRST_NAME)).toBe('Bob');
+    expect(col_(row, MEMBER_COLS.LAST_NAME)).toBe('ORIGINAL');
   });
 });

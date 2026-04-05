@@ -171,25 +171,7 @@ function getFormMultiValue_(responses, fieldName) {
   return '';
 }
 
-/**
- * Parse a date string from form submission
- * @param {string} dateStr - Date string to parse
- * @returns {Date|string} Parsed Date object or original string if parsing fails
- * @private
- */
-function parseFormDate_(dateStr) {
-  if (!dateStr) return '';
-
-  try {
-    var date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      return dateStr; // Return as-is if can't parse
-    }
-    return date;
-  } catch (_e) {
-    return dateStr;
-  }
-}
+// Dead code removed: parseFormDate_() — zero callers in src
 
 // sendContactInfoForm — removed (contact form deprecated)
 // onContactFormSubmit — removed (contact form deprecated)
@@ -297,7 +279,7 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * SEIU Local Dashboard including:
+ * Union Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -311,8 +293,8 @@ function auditAndRemoveSatisfactionTrigger(autoDelete) {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author SEIU Local
- * @version 4.43.1
+ * @author SolidBase
+ * @version 4.51.0
  */
 
 // ============================================================================
@@ -707,7 +689,7 @@ function executeSendRandomSurveyEmails(opts) {
         }
       });
     }
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('executeSendRandomSurveyEmails', 'Error reading survey log: ' + (_e.message || _e)); }
 
   var cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - opts.excludeDays);
@@ -755,7 +737,7 @@ function executeSendRandomSurveyEmails(opts) {
   if (configSheet && configSheet.getLastRow() >= 3) {
     try {
       surveyUrl = configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '';
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('executeSendRandomSurveyEmails', 'Error reading survey URL: ' + (_e.message || _e)); }
   }
   if (!surveyUrl) surveyUrl = SATISFACTION_FORM_CONFIG.FORM_URL; // legacy fallback
   var newLogEntries = [];
@@ -1073,7 +1055,7 @@ function startNewSurveyRound() {
     log_('startNewSurveyRound', 'No tracking data found');
     try {
       SpreadsheetApp.getUi().alert('No survey tracking data found. Run "Populate Survey Tracking" first.');
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('startNewSurveyRound', 'Error showing UI alert: ' + (_e.message || _e)); }
     return;
   }
 
@@ -1107,7 +1089,7 @@ function startNewSurveyRound() {
       'New survey round started. ' + updates.length + ' members reset to Not Completed.',
       'Survey Tracking', 5
     );
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('startNewSurveyRound', 'Error showing toast: ' + (_e.message || _e)); }
 }
 
 /**
@@ -1131,7 +1113,7 @@ function sendSurveyCompletionReminders() {
   if (configSheet && configSheet.getLastRow() >= 3) {
     try {
       surveyUrl = configSheet.getRange(3, CONFIG_COLS.MOBILE_DASHBOARD_URL).getValue() || '';
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('sendSurveyCompletionReminders', 'Error reading survey URL: ' + (_e.message || _e)); }
   }
 
   var data = trackingSheet.getDataRange().getValues();
@@ -1311,7 +1293,7 @@ function showSurveyTrackingDialog() {
  * - logAuditEvent() function (from core module)
  *
  * @author Union Membership System
- * @version 4.43.1
+ * @version 4.51.0
  * ============================================================================
  */
 
@@ -1396,6 +1378,7 @@ function getSurveyQuestions() {
     ];
 
     // Read all rows from Survey Questions sheet
+    if (qSheet.getLastRow() < 2) return { questions: [], sections: [], sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' }, period: null };
     var rawData = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, 16).getValues();
 
     var questions  = [];

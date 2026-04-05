@@ -30,7 +30,7 @@
  *   Depends on: 01_Core.gs (SHEETS), 00_Security.gs (escapeForFormula),
  *   21_WebDashDataService.gs (_resolveCallerEmail, _requireStewardAuth)
  *
- * @version 4.35.0
+ * @version 4.51.0
  */
 
 // ============================================================================
@@ -185,7 +185,6 @@ var MentorshipService = (function () {
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('MENTORSHIP_CREATED', { mentor: mentorEmail, mentee: menteeEmail });
     }
-    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
     return { success: true, id: id };
   }
 
@@ -199,7 +198,6 @@ var MentorshipService = (function () {
       if (String(data[i][0]) === String(pairingId)) {
         var safeNotes = typeof escapeForFormula === 'function' ? escapeForFormula(notes) : notes;
         sheet.getRange(i + 1, 7).setValue(safeNotes);
-        if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
         return { success: true };
       }
     }
@@ -218,7 +216,6 @@ var MentorshipService = (function () {
         if (typeof logAuditEvent === 'function') {
           logAuditEvent('MENTORSHIP_CLOSED', { pairingId: pairingId, mentor: String(data[i][1]), mentee: String(data[i][2]) });
         }
-        if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
         return { success: true };
       }
     }
@@ -275,7 +272,7 @@ var MentorshipService = (function () {
     experienced.forEach(function (s) { mentorLoad[s.email] = 0; });
     existing.forEach(function (p) {
       var me = p.mentorEmail.toLowerCase();
-      if (mentorLoad.hasOwnProperty(me)) mentorLoad[me]++;
+      if (Object.prototype.hasOwnProperty.call(mentorLoad, me)) mentorLoad[me]++;
     });
 
     newStewards.forEach(function (mentee) {
@@ -291,7 +288,7 @@ var MentorshipService = (function () {
         suggestions.push({
           mentorEmail: bestMentor.email,
           menteeEmail: mentee.email,
-          reason: 'New steward (joined ' + (mentee.joined ? mentee.joined.toLocaleDateString() : 'recently') + ')'
+          reason: 'New steward (joined ' + (mentee.joined ? Utilities.formatDate(mentee.joined, Session.getScriptTimeZone(), 'MM/dd/yyyy') : 'recently') + ')'
         });
       }
     });
@@ -607,7 +604,7 @@ var DigestService = (function () {
 
     // Count unanswered Q&A
     if (typeof QAForum !== 'undefined' && typeof QAForum.getUnansweredCount === 'function') {
-      try { digest.qaActivity = QAForum.getUnansweredCount(); } catch (_) { log_('_', (_.message || _)); }
+      try { digest.qaActivity = QAForum.getUnansweredCount(); } catch (_e) { log_('buildDigestContent', 'Error getting QA count: ' + (_e.message || _e)); }
     }
 
     return digest;
@@ -650,7 +647,7 @@ var DigestService = (function () {
 
       try {
         if (typeof safeSendEmail_ === 'function') {
-          safeSendEmail_(email, subject, body);
+          safeSendEmail_({ to: email, subject: subject, body: body });
         } else if (MailApp.getRemainingDailyQuota() > 5) {
           MailApp.sendEmail({ to: email, subject: subject, htmlBody: body });
         }
@@ -856,7 +853,7 @@ var ReportService = (function () {
 
     var report = {
       title: 'Monthly Grievance Summary',
-      period: startDate.toLocaleDateString() + ' — ' + endDate.toLocaleDateString(),
+      period: Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'MM/dd/yyyy') + ' — ' + Utilities.formatDate(endDate, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
       generated: now.toISOString(),
       summary: { totalCases: 0, newCases: 0, resolved: 0, pending: 0, overdue: 0 },
       byCategory: {},
@@ -959,8 +956,7 @@ function dataGetHandoffNotes(sessionToken, caseId) { var s = _requireStewardAuth
 function dataAddHandoffNote(sessionToken, caseId, noteText, toSteward) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.addHandoffNote(s, caseId, noteText, toSteward); }
 /** @param {string} sessionToken @param {string} noteId @returns {Object} Archive result. */
 function dataArchiveHandoffNote(sessionToken, noteId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.archiveHandoffNote(noteId); }
-/** @returns {void} Initializes handoff notes sheet. Steward-only. */
-function dataInitHandoffNotes(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.initSheet(); }
+
 
 // --- Mentorship (steward-only) ---
 /** @param {string} sessionToken @returns {Array} Active mentorship pairings. */
@@ -1011,8 +1007,7 @@ function dataGetCommunicationLog(sessionToken, memberEmail) { var s = _requireSt
 function dataSearchKnowledgeBase(sessionToken, query) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return KnowledgeBaseService.searchArticles(query); }
 /** @param {string} sessionToken @param {string} articleId @returns {Object|null} Full article. */
 function dataGetKnowledgeBaseArticle(sessionToken, articleId) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return KnowledgeBaseService.getArticle(articleId); }
-/** @param {string} sessionToken @param {string} grievanceType @returns {Array} Related articles. */
-function dataGetRelatedArticles(sessionToken, grievanceType) { var e = _resolveCallerEmail(sessionToken); if (!e) return []; return KnowledgeBaseService.getRelatedArticles(grievanceType); }
+
 /** @param {string} sessionToken @param {string} articleNumber @param {string} title @param {string} summary @param {string} fullText @param {string} relatedTypes @param {string} tags @returns {Object} Result (steward-only). */
 function dataAddKnowledgeBaseArticle(sessionToken, articleNumber, title, summary, fullText, relatedTypes, tags) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return KnowledgeBaseService.addArticle(articleNumber, title, summary, fullText, relatedTypes, tags); }
 
@@ -1021,8 +1016,7 @@ function dataAddKnowledgeBaseArticle(sessionToken, articleNumber, title, summary
 function dataGetDigestPreferences(sessionToken) { var e = _resolveCallerEmail(sessionToken); if (!e) return { frequency: 'immediate', types: 'all' }; return DigestService.getPreferences(e); }
 /** @param {string} sessionToken @param {string} frequency @param {string} types @returns {Object} Result. */
 function dataSetDigestPreferences(sessionToken, frequency, types) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return DigestService.setPreferences(e, frequency, types); }
-/** Scheduled trigger — sends digest emails to all users with daily/weekly preference. */
-function dataSendScheduledDigests() { return DigestService.sendScheduledDigests(); }
+
 
 // --- Document Checklist (steward-only) ---
 /** @param {string} sessionToken @param {string} caseId @param {string} currentStep @param {string} driveFolderId @returns {Array} Document checklist. */
@@ -1035,8 +1029,8 @@ function dataGetEscalationRecommendation(sessionToken, caseId) { var s = _requir
 // --- Report Generation (steward-only) ---
 /** @param {string} sessionToken @param {Object} [dateRange] @returns {Object} Generated report data. */
 function dataGenerateMonthlyReport(sessionToken, dateRange) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return ReportService.generateMonthlyReport(dateRange); }
-/** @param {string} sessionToken @param {Object} report @returns {string} HTML report string (steward-only). */
-function dataGenerateReportHtml(sessionToken, report) { var s = _requireStewardAuth(sessionToken); if (!s) return ''; return ReportService.generateReportHtml(report); }
+
+
 
 // ============================================================================
 // TWO-FACTOR AUTHENTICATION SERVICE (v4.36.0)
@@ -1044,7 +1038,7 @@ function dataGenerateReportHtml(sessionToken, report) { var s = _requireStewardA
 
 var TwoFactorService = (function () {
 
-  var CODE_LENGTH = 6;
+  var _CODE_LENGTH = 6;
   var CODE_TTL_SECONDS = 300; // 5 minutes
   var RATE_LIMIT_MAX = 3;
   var RATE_LIMIT_WINDOW = 900; // 15 minutes
@@ -1054,10 +1048,7 @@ var TwoFactorService = (function () {
    * @returns {string} 6-digit code
    */
   function _generateCode() {
-    var code = '';
-    for (var i = 0; i < CODE_LENGTH; i++) {
-      code += Math.floor(Math.random() * 10).toString();
-    }
+    var code = String(parseInt(Utilities.getUuid().replace(/[^0-9]/g, '').substring(0, 6), 10)).padStart(6, '0');
     return code;
   }
 
@@ -1647,7 +1638,17 @@ var RSVPService = (function () {
       if (typeof getConfigValue_ === 'function') orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || '';
     } catch (_) { /* ignore */ }
 
+    var rsvpRows = []; // Collect rows for batch write
+    var sendStartTime = Date.now();
+
     for (var i = 1; i < members.length; i++) {
+      // Time guard: stop before GAS 6-minute execution limit
+      if (Date.now() - sendStartTime > 270000) { // 4.5 min safety margin
+        log_('sendInvitations', 'Time limit approaching, sent ' + invitedCount + ' of ' + members.length);
+        errors.push('Time limit reached — sent ' + invitedCount + ' invitations. Remaining members were not processed.');
+        break;
+      }
+
       var email = String(col_(members[i], MEMBER_COLS.EMAIL) || '').trim();
       if (!email) continue;
       if (existingRsvps[email.toLowerCase()]) continue;
@@ -1671,7 +1672,7 @@ var RSVPService = (function () {
       var meetingDateStr = '';
       try {
         var md = new Date(meeting.date);
-        meetingDateStr = md.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        meetingDateStr = Utilities.formatDate(md, Session.getScriptTimeZone(), 'EEEE, MMMM d, yyyy');
       } catch (_) {
         meetingDateStr = String(meeting.date);
       }
@@ -1711,8 +1712,8 @@ var RSVPService = (function () {
         if (smsResult.success) smsCount++;
       }
 
-      // Write RSVP row
-      rsvpSheet.appendRow([
+      // Collect RSVP row for batch write
+      rsvpRows.push([
         Utilities.getUuid().substring(0, 8),
         escapeForFormula(meetingId),
         escapeForFormula(email),
@@ -1724,6 +1725,12 @@ var RSVPService = (function () {
         ''
       ]);
       invitedCount++;
+    }
+
+    // Batch-write all RSVP rows at once instead of per-member appendRow()
+    if (rsvpRows.length > 0) {
+      var rsvpLastRow = rsvpSheet.getLastRow();
+      rsvpSheet.getRange(rsvpLastRow + 1, 1, rsvpRows.length, rsvpRows[0].length).setValues(rsvpRows);
     }
 
     if (typeof logAuditEvent === 'function') {
@@ -1905,20 +1912,8 @@ var RSVPService = (function () {
 })();
 
 // ============================================================================
-// SMS & RSVP GLOBAL WRAPPERS (v4.36.0)
+// RSVP GLOBAL WRAPPERS (v4.36.0)
 // ============================================================================
-
-// --- SMS (steward-only) ---
-/** @param {string} sessionToken @param {string} accountSid @param {string} authToken @param {string} fromNumber @returns {Object} Result. */
-function dataConfigureTwilio(sessionToken, accountSid, authToken, fromNumber) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return SMSService.configureProvider(accountSid, authToken, fromNumber); }
-/** @param {string} sessionToken @param {string} recipientEmail @param {string} message @returns {Object} Result. */
-function dataSendSMS(sessionToken, recipientEmail, message) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return SMSService.sendSMS(recipientEmail, message); }
-/** @param {string} sessionToken @param {number} [limit] @returns {Array} SMS log. */
-function dataGetSMSLog(sessionToken, limit) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return SMSService.getLog(limit); }
-/** @param {string} sessionToken @param {string} toPhone @returns {Object} Test result. */
-function dataTestSMS(sessionToken, toPhone) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return SMSService.testSMS(toPhone); }
-/** @param {string} sessionToken @returns {Object} Provider status (never exposes auth token). */
-function dataGetSMSStatus(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { configured: false }; return SMSService.getProviderStatus(); }
 
 // --- RSVP (steward for management, token-auth for responding) ---
 /** @param {string} sessionToken @param {string} meetingId @param {Object} [options] @returns {Object} Invitation result. */
@@ -1927,17 +1922,3 @@ function dataSendMeetingInvitations(sessionToken, meetingId, options) { var s = 
 function dataGetRSVPSummary(sessionToken, meetingId) { var s = _requireStewardAuth(sessionToken); if (!s) return { meetingId: meetingId, invited: 0, accepted: 0, declined: 0, noResponse: 0, attended: 0, members: [] }; return RSVPService.getRSVPSummary(meetingId); }
 /** @param {string} sessionToken @param {string} meetingId @returns {Object} Reconciliation result. */
 function dataReconcileAttendance(sessionToken, meetingId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return RSVPService.reconcileAttendance(meetingId); }
-/** @param {string} token @param {string} response @returns {Object} RSVP result. Token-authenticated (no session needed). */
-function dataProcessRSVP(token, response) { return RSVPService.processRSVP(token, response); }
-
-// --- Sheet Initialization (no auth — setup only) ---
-/** Initializes all new feature sheets. Call once from Apps Script editor or setup flow. */
-function initNewFeatureSheets() {
-  HandoffService.initSheet();
-  MentorshipService.initSheet();
-  CommunicationLogService.initSheet();
-  KnowledgeBaseService.initSheet();
-  DigestService.initSheet();
-  SMSService.initSheet();
-  RSVPService.initSheet();
-}

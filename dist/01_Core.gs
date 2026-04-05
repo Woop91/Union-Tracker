@@ -17,7 +17,7 @@
  * - Version management
  *
  * @fileoverview Core constants, error handling, and configuration
- * @version 4.48.0
+ * @version 4.51.0
  */
 
 // ============================================================================
@@ -84,7 +84,7 @@ var ERROR_CONFIG = {
  * @returns {{success: true, data: *, message: string}}
  */
 function successResponse(data, message) {
-  return { success: true, data: data || null, message: message || '' };
+  return { success: true, data: data !== undefined ? data : null, message: message || '' };
 }
 
 /**
@@ -431,13 +431,14 @@ function _readConfigCell(cacheKey, colConst, fallback) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet && colConst) {
-      var val = String(configSheet.getRange(3, colConst).getValue() || '').trim();
-      if (val) {
+      var raw = configSheet.getRange(3, colConst).getValue();
+      var val = (raw != null && raw !== '') ? String(raw).trim() : '';
+      if (val !== '') {
         _configCellCache[cacheKey] = val;
         return _configCellCache[cacheKey];
       }
     }
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('_readConfigCell', 'Error: ' + (_e.message || _e)); }
   _configCellCache[cacheKey] = fallback;
   return _configCellCache[cacheKey];
 }
@@ -445,7 +446,7 @@ function _readConfigCell(cacheKey, colConst, fallback) {
 /**
  * Returns the root Drive folder name for this deployment.
  * Derived from the ORG_NAME value in the Config sheet (row 3).
- * Example: "SEIU Local 509" → "SEIU Local 509 Dashboard"
+ * Example: "My Union Local" → "My Union Local Dashboard"
  * Falls back to DRIVE_CONFIG.ROOT_FOLDER_FALLBACK if Config is not yet set up.
  * Memoized per script execution.
  * @returns {string} Root folder name
@@ -459,7 +460,7 @@ function getDriveRootFolderName_() {
  * Get organization name from Config sheet, falling back to default.
  * Single source of truth for the org name used across the system.
  * @private
- * @returns {string} Organization name (e.g., "SEIU Local")
+ * @returns {string} Organization name (e.g., "My Union Local")
  */
 function getOrgNameFromConfig_() {
   return _readConfigCell('orgName', CONFIG_COLS.ORG_NAME, 'Union Dashboard');
@@ -586,7 +587,7 @@ function getVersionHistory_() {
   { version: '4.23.1', date: '2026-03-07', codename: 'System-Wide Session Token Auth Fix', changes: 'SYSTEMIC FIX: All 42+ server wrapper functions that call _requireStewardAuth() or _resolveCallerEmail() now accept sessionToken as first parameter. Root cause: getActiveUser() returns empty in Execute-as-Me webapp for magic link / session token users — every steward operation was silently broken for non-SSO auth. Server: sessionToken param added to all wrappers across 21_WebDashDataService.gs (36 functions), 08e_SurveyEngine.gs (2), 24_WeeklyQuestions.gs (8), 26_QAForum.gs (4), 27_TimelineService.gs (5). Direct Session.getActiveUser() calls in wq wrappers replaced with _resolveCallerEmail(sessionToken). Client: steward_view.html + member_view.html updated to pass SESSION_TOKEN instead of CURRENT_USER.email to all server calls. Q1 fix: server echoes back session token in pageData for method=session users (22_WebDashApp.gs). CLIENT: SESSION_TOKEN now reads PAGE_DATA.sessionToken || localStorage fallback. dataToggleChecklistItem double-paren syntax error fixed.' },
   { version: '4.23.0', date: '2026-03-07', codename: 'Dynamic Survey Schema', changes: 'Option B fully dynamic survey schema. New sheet: 📋 Survey Questions (16 cols: Question ID, Section, Section Key, Section Title, Question Text, Type, Required, Active, Options, Branch Parent, Branch Value, Branch Target, Max Selections, Slider Min/Max, Notes). Owner edits Question Text, Active, Options, Slider Labels, Notes directly — no deployment needed. Adding a new row to Survey Questions auto-creates a new column in 📊 Member Satisfaction on next submission. Setting Active=N deactivates a question. Satisfaction sheet rebuilt with dynamic headers: Timestamp | Period ID | Survey Version | q1 | q2 … qN. New functions: createSurveyQuestionsSheet() (seeds 67 questions, color-coded by section, non-destructive on re-run), getSatisfactionColMap_() (runtime header→col lookup, 5-min cache), syncSatisfactionSheetColumns_() (auto-appends missing question columns), clearSurveyQuestionsCache() (menu-callable). Rewrites: getSurveyQuestions() reads from sheet with 5-min cache; submitSurveyResponse() builds row via col map not hardcoded positions; getSatisfactionSummary() groups questions dynamically by Section Key. 04c and 04d updated to use getSatisfactionColMap_(). SATISFACTION_COLS kept as deprecated reference. New constants: SHEETS.SURVEY_QUESTIONS, SURVEY_QUESTIONS_COLS, SATISFACTION_PREFIX. Wired into CREATE_DASHBOARD setup and initSurveyEngine().' },
   { version: '4.22.7', date: '2026-03-07', codename: 'Survey Form URL Deprecation Cleanup', changes: 'Full removal of SATISFACTION_FORM_URL / satisfactionFormUrl / surveyFormUrl across 8 files. Deprecated since v4.21.0 (Google Form integration replaced by native webapp survey), now fully removed. 01_Core.gs: constant replaced with comment. 08c: satisfaction case removed from getFormUrlFromConfig(); saveFormUrlsToConfig_silent() no longer writes/formats satisfaction URL; sendSurveyCompletionReminders() now reads MOBILE_DASHBOARD_URL (member portal) instead of form URL. 04c: satisfactionForm removed from resource links; range now stops at ORG_WEBSITE. 04e: surveyUrl now reads MOBILE_DASHBOARD_URL. 05_Integrations: satisfactionForm removed from resource links, double-semicolon typo fixed. 11_CommandHub: Form Links color section removed. 20_WebDashConfigReader: satisfactionFormUrl line removed. 21_WebDashDataService: surveyFormUrl removed from resource links response. 22_WebDashApp: surveyFormUrl removed from sanitized config. member_view.html: dead else-if fallback branch removed from survey banner onClick handler.' },
-  { version: '4.22.6', date: '2026-03-06', codename: 'MADDS Org Chart Default', changes: 'Replace org_chart.html with MADDS chart sourced from 509d repo (Woop91/509d). Full Local 509 org chart (SEIU Local 509 — Main Internal Breakout Chart, updated 2026-03-01) is now default in both DDS-Dashboard and Union-Tracker. Conversion: CSS scoped to .madds-embed wrapper, :root vars moved into .madds-embed scope, body/body.light → .madds-embed/.madds-embed.light, #mode-toggle renamed #madds-mode-toggle, toggleMode() renamed maddstoggleMode() to avoid SPA collisions, Google Fonts loaded dynamically. Serves same HTML fragment via existing getOrgChartHtml() in 22_WebDashApp.gs — no server-side changes required.' },
+  { version: '4.22.6', date: '2026-03-06', codename: 'Org Chart Default', changes: 'Replace org_chart.html with agency org chart. Conversion: CSS scoped to .madds-embed wrapper, :root vars moved into .madds-embed scope, body/body.light → .madds-embed/.madds-embed.light, #mode-toggle renamed #madds-mode-toggle, toggleMode() renamed maddstoggleMode() to avoid SPA collisions, Google Fonts loaded dynamically. Serves same HTML fragment via existing getOrgChartHtml() in 22_WebDashApp.gs — no server-side changes required.' },
   { version: '4.22.6', date: '2026-03-06', codename: 'Events Sentinel Propagation Fix', changes: 'Bug fix: home widget events section crashed when getUpcomingEvents returned a sentinel object ({_notConfigured} or {_calNotFound}) — events.length on a plain object returns undefined, rendering "undefined" in KPI counter and crashing forEach. Added Array.isArray guard before rendering and before DataCache.set. DataCache.set now only caches actual arrays; sentinel objects are dropped, preventing the bad value from poisoning the client-side cache on subsequent home re-renders.' },
   { version: '4.22.4', date: '2026-03-06', codename: 'Events Access & Calendar Targeting', changes: 'Events tab dues gate removed — any authenticated member can view events regardless of dues status. More menu Events item lock icon removed. Create Event button URL now includes &src=calendarId param so new events land on the union calendar, not the steward personal calendar. No structural changes to backend auth — dataGetUpcomingEvents still requires valid session.' },
   { version: '4.22.3', date: '2026-03-06', codename: 'Events Tab Hardening', changes: 'Bug fix: ISO date formatter in Add-to-Calendar URLs changed from .replace(\".000Z\",\"Z\") to .replace(/\\.\\d+Z$/,\"Z\") — handles any millisecond value (was silently broken for non-.000 ms values). Bug fix: CalendarApp.getCalendarById() returning null now returns {_calNotFound:true} sentinel instead of [] — distinguishes typo/permission error from genuinely empty calendar. Frontend handles _calNotFound with diagnostic message. Bug fix: Add-to-Calendar URL now includes &details= param (ev.description) in both home widget and Events page — was silently omitted. Feature: Steward Events page now shows \"Manage in Google Calendar\" and \"Create Event\" action buttons when a calendarId is configured. _sanitizeConfig in 22_WebDashApp.gs now exposes calendarId (non-sensitive) so frontend can conditionally show management links.' },
@@ -598,7 +599,7 @@ function getVersionHistory_() {
   { version: '4.21.0', date: '2026-03-05', codename: 'Native Survey Engine', changes: 'Deprecate Google Form integration entirely. Full webapp-native satisfaction survey: getSurveyQuestions() returns all 67 questions with types (slider-10, dropdown, radio, checkbox, paragraph), branching rules (Q5→3A/3B, Q36→6A), and slider labels. submitSurveyResponse() maps all 67 SATISFACTION_COLS, period-aware vault dedup per SURVEY_PERIODS sheet. New: getSurveyPeriod(), autoTriggerQuarterlyPeriod(), archiveSurveyPeriod_() (Drive export to Past Survey Questions/), getPendingSurveyMembers(), getSatisfactionSummary() (section averages as plain values). New hidden sheet _Survey_Periods (SURVEY_PERIODS_COLS, 8 cols). New Config cols: Survey Priority Options (Q64 dynamic), Past Surveys Folder ID. Quarterly time trigger installed via setupQuarterlyTrigger(). Survey-open notifications pushed to all active members on period start. Slider label: 1=Strongly Disagree / 10=Strongly Agree (universal across all 52 scale questions). Anonymity architecture preserved: three-layer separation (Satisfaction sheet=anonymous scores, _Survey_Vault=hashed PII only, _Survey_Tracking=completion status only).' },
   { version: '4.20.15', date: '2026-03-05', codename: 'FULL_CODE_REVIEW Final Fixes', changes: 'C-XSS-18: Fix el() boolean attribute handling — el() now uses property assignment (elem[key]=value) for boolean attrs (selected, disabled, checked) instead of setAttribute which would set attr="false" (truthy in DOM). C-XSS-6: Replace escapeHtml() with JSON.stringify() for memberId in onclick JS string context in 03_UIComponents.gs — HTML entities decoded by parser before JS executes, JSON.stringify produces correct escape sequences. LOW: Remove 6 unused _-prefixed variables (_lastRow, _pdfFile, _headers×2, _stepDays, _mgmtResponseDays, _mode, _ss×2) from 04b/04d/04e/05_Integrations.' },
   { version: '4.20.14', date: '2026-03-05', codename: 'Trigger Null Guards', changes: 'onOpenDeferred_ (10_Main.gs): add null guard after getActiveSpreadsheet() — returns null in web app context, would crash ss.toast(). onEditWithAuditLogging (06_Maintenance.gs): add !e || !e.range early return guard and wrap body in try/catch — trigger functions must not throw or GAS silently drops all subsequent edits.' },
-  { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names (SEIU 509, MassAbility DDS, SEIU Local in titles/survey subject/vCard ORG) with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
+  { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
   { version: '4.20.12', date: '2026-03-04', codename: 'Dead Code Removal — Testing Stubs', changes: 'Remove duplicate testing framework section from 06_Maintenance.gs (~84 lines): TEST_RESULTS var (zero callers), TEST_MAX_EXECUTION_MS/TEST_LARGE_DATASET_THRESHOLD (duplicates of 07_DevTools.gs), Assert object (duplicate of 07_DevTools.gs), 4 empty section headers, VALIDATION_PATTERNS/VALIDATION_MESSAGES (duplicates of 07_DevTools.gs), 2 orphaned JSDoc stubs with no function bodies. Active versions of all these remain in 07_DevTools.gs. 16 corresponding test assertions removed from 06_Maintenance.test.js.' },
   { version: '4.20.11', date: '2026-03-04', codename: 'Security & Logic Fixes', changes: 'H-12: Replace vault/reminders/userMeta/archive hideSheet() with setSheetVeryHidden_() in 25_WorkloadService.gs — API-level hide that persists on Google Sheets mobile (previously only UI-layer hide). H-16: Fix contact log sort in getMemberContactHistory and getStewardContactLog (21_WebDashDataService.gs) — was sorting by formatted date string (wrong alphabetical order); now stores _ts timestamp field, sorts numerically, deletes _ts before returning. H-20: Fix win rate denominator in getStewardWorkloadDetailed (02_DataManagers.gs) — was dividing wonCases by totalCases (includes active cases); now uses resolvedCases = Won+Denied+Settled+Withdrawn, matching the formula in getDashboardStats.' },
   { version: '4.20.10', date: '2026-03-04', codename: 'Performance & Data Integrity Fixes', changes: 'H-7: Batch 4 individual configSheet.getValue() calls in getDeadlineRules() into a single getValues() range read — 4 API calls → 1. H-2: sortGrievanceLogByStatus now captures cell notes via getNotes() before sort and restores them via setNotes() after setValues() — preserves user-added notes that would otherwise be silently discarded by the sort.' },
@@ -2058,7 +2059,7 @@ function buildColsFromMap_(headerMap, aliases) {
   }
   if (aliases) {
     for (var alias in aliases) {
-      if (aliases.hasOwnProperty(alias)) {
+      if (Object.prototype.hasOwnProperty.call(aliases, alias)) {
         cols[alias] = cols[aliases[alias]];
       }
     }
@@ -2111,9 +2112,73 @@ function resolveColumnsFromSheet_(sheetName, headerMap, options) {
 
     return cols;
   } catch (_e) {
-    log_('detectColumnLayout_ error', _e.message);
+    log_('detectColumnLayout_', 'Error: ' + _e.message);
     return null;
   }
+}
+
+/**
+ * Resolve a single column position by reading actual sheet headers at runtime.
+ * Returns the 1-indexed column position of headerName in row 1 of the sheet,
+ * or fallback if the header is not found (or the sheet is null/empty/errored).
+ * @param {Sheet|null} sheet - The sheet to read headers from
+ * @param {string} headerName - The header text to search for
+ * @param {number} [fallback] - Value to return if not found (default: 1)
+ * @returns {number} 1-indexed column position
+ */
+function resolveColumnByHeader_(sheet, headerName, fallback) {
+  var fb = (fallback !== undefined && fallback !== null) ? fallback : 1;
+  try {
+    if (!sheet) return fb;
+    var lastCol = sheet.getLastColumn();
+    if (lastCol < 1) return fb;
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var needle = String(headerName).trim();
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i]).trim() === needle) return i + 1;
+    }
+    return fb;
+  } catch (_e) {
+    return fb;
+  }
+}
+
+/**
+ * Resolve multiple column positions in a single call by reading actual sheet
+ * headers once. Each entry specifies a key, header name, and fallback.
+ * @param {Sheet|null} sheet - The sheet to read headers from
+ * @param {Array<{key: string, header: string, fallback: number}>} entries
+ * @returns {Object} Map of key → 1-indexed column position
+ */
+function resolveColumnsByHeader_(sheet, entries) {
+  var result = {};
+  var headers = null;
+  try {
+    if (sheet) {
+      var lastCol = sheet.getLastColumn();
+      if (lastCol >= 1) {
+        headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      }
+    }
+  } catch (_e) {
+    headers = null;
+  }
+  for (var e = 0; e < entries.length; e++) {
+    var entry = entries[e];
+    var fb = (entry.fallback !== undefined && entry.fallback !== null) ? entry.fallback : 1;
+    if (!headers) { result[entry.key] = fb; continue; }
+    var needle = String(entry.header).trim();
+    var found = false;
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i]).trim() === needle) {
+        result[entry.key] = i + 1;
+        found = true;
+        break;
+      }
+    }
+    if (!found) result[entry.key] = fb;
+  }
+  return result;
 }
 
 /**
@@ -2210,7 +2275,7 @@ function syncColumnMaps() {
 
     var moved = false;
     for (var key in resolved) {
-      if (resolved.hasOwnProperty(key) && entry.target[key] !== resolved[key]) {
+      if (Object.prototype.hasOwnProperty.call(resolved, key) && entry.target[key] !== resolved[key]) {
         result.warnings.push(entry.name + '.' + key + ': expected col ' + entry.target[key] + ', found col ' + resolved[key]);
         entry.target[key] = resolved[key];
         moved = true;
@@ -2220,7 +2285,7 @@ function syncColumnMaps() {
     // Re-apply aliases after sync
     if (entry.aliases) {
       for (var alias in entry.aliases) {
-        if (entry.aliases.hasOwnProperty(alias)) {
+        if (Object.prototype.hasOwnProperty.call(entry.aliases, alias)) {
           entry.target[alias] = entry.target[entry.aliases[alias]];
         }
       }
@@ -2336,7 +2401,7 @@ function loadCachedColumnMaps_() {
     for (var name in targets) {
       if (data[name]) {
         for (var key in data[name]) {
-          if (data[name].hasOwnProperty(key) && targets[name].hasOwnProperty(key)
+          if (Object.prototype.hasOwnProperty.call(data[name], key) && Object.prototype.hasOwnProperty.call(targets[name], key)
               && targets[name][key] !== data[name][key]) {
             targets[name][key] = data[name][key];
             changed = true;
@@ -2569,7 +2634,7 @@ var GRIEVANCE_OUTCOMES = {
  * Default deadline rules for grievance step calculations (fallback values).
  * Actual values are loaded from Config sheet at runtime via getDeadlineRules().
  *
- * SOURCE: SEIU Local 509 Unit 8 CBA (2024–2026), Article 23 / MA DOC Grievance
+ * SOURCE: Sample CBA deadlines — customize per your collective bargaining agreement.
  * Policy 270.03 for Bargaining Units 8 & 10 (July 2025 edition).
  *
  * CONTRACT SUMMARY FOR UNIT 8 (only 2 steps + arbitration):
@@ -2633,7 +2698,7 @@ function getDeadlineRules() {
       };
     }
   } catch (e) {
-    log_('Error reading deadline config', e.message);
+    log_('getDeadlineRules', 'Error reading deadline config: ' + e.message);
   }
   // Fallback to defaults
   return {
@@ -2918,7 +2983,7 @@ try {
     // onEdit) not just doGetWebDashboard and onOpen.
     syncColumnMaps();
   }
-} catch (_initCache) { try { log_('Column map cold-cache init failed', (_initCache.message || _initCache)); } catch(_) {} }
+} catch (_initCache) { try { log_('loadCachedColumnMaps_', 'Column map cold-cache init failed: ' + (_initCache.message || _initCache)); } catch(_) {} }
 
 // ============================================================================
 // ID GENERATION

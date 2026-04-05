@@ -21,6 +21,31 @@ const GRIEVANCE_COLUMNS = Object.fromEntries(
 );
 
 // ============================================================================
+// log_ utility
+// ============================================================================
+
+describe('log_ utility', () => {
+  beforeEach(() => {
+    Logger.log.mockClear();
+  });
+
+  test('log_ formats message with INFO level by default', () => {
+    log_('myFunction', 'something happened');
+    expect(Logger.log).toHaveBeenCalledWith('[INFO] myFunction: something happened');
+  });
+
+  test('log_ uses provided level', () => {
+    log_('myFunction', 'bad thing', 'ERROR');
+    expect(Logger.log).toHaveBeenCalledWith('[ERROR] myFunction: bad thing');
+  });
+
+  test('log_ handles empty message', () => {
+    log_('myFunction', '');
+    expect(Logger.log).toHaveBeenCalledWith('[INFO] myFunction: ');
+  });
+});
+
+// ============================================================================
 // Version consistency
 // ============================================================================
 
@@ -247,5 +272,36 @@ describe('GRIEVANCE_OUTCOMES', () => {
   test('GRIEVANCE_STATUS and GRIEVANCE_OUTCOMES are both defined', () => {
     expect(GRIEVANCE_STATUS).toBeDefined();
     expect(GRIEVANCE_OUTCOMES).toBeDefined();
+  });
+});
+
+// ============================================================================
+// col_ and setCol_ helpers
+// ============================================================================
+
+describe('col_ and setCol_ helpers', () => {
+  test('col_ reads correct 0-indexed position from 1-indexed column ref', () => {
+    var row = ['Alice', 'Bob', 'Charlie'];
+    expect(col_(row, 1)).toBe('Alice');
+    expect(col_(row, 2)).toBe('Bob');
+    expect(col_(row, 3)).toBe('Charlie');
+  });
+
+  test('col_ returns undefined for out-of-bounds column', () => {
+    var row = ['Alice', 'Bob'];
+    expect(col_(row, 5)).toBeUndefined();
+  });
+
+  test('setCol_ writes to correct 0-indexed position', () => {
+    var row = ['Alice', 'Bob', 'Charlie'];
+    setCol_(row, 2, 'David');
+    expect(row).toEqual(['Alice', 'David', 'Charlie']);
+  });
+
+  test('setCol_ works with MEMBER_COLS constants', () => {
+    var row = new Array(Object.keys(MEMBER_COLS).length).fill('');
+    setCol_(row, MEMBER_COLS.FIRST_NAME, 'Jane');
+    expect(row[MEMBER_COLS.FIRST_NAME - 1]).toBe('Jane');
+    expect(col_(row, MEMBER_COLS.FIRST_NAME)).toBe('Jane');
   });
 });

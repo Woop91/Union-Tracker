@@ -593,7 +593,7 @@ function getPendingSurveyMembers() {
               memberMap[mEmail] = {
                 cubicle: mCubicleCol !== -1 ? String(mData[mi][mCubicleCol] || '').trim() : '',
                 officeDays: mOfficeDaysCol !== -1 ? String(mData[mi][mOfficeDaysCol] || '').trim() : '',
-                hireDate: mHireDateCol !== -1 ? (mData[mi][mHireDateCol] instanceof Date ? mData[mi][mHireDateCol].toLocaleDateString() : String(mData[mi][mHireDateCol] || '').trim()) : '',
+                hireDate: mHireDateCol !== -1 ? (mData[mi][mHireDateCol] instanceof Date ? Utilities.formatDate(mData[mi][mHireDateCol], Session.getScriptTimeZone(), 'MM/dd/yyyy') : String(mData[mi][mHireDateCol] || '').trim()) : '',
               };
             }
           }

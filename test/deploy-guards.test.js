@@ -423,7 +423,9 @@ describe('G6: dist/ files are in sync with src/', () => {
   });
 
   test('every src .html file has identical copy in dist', () => {
-    const htmlFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html'));
+    // org_chart.html is intentionally excluded from SolidBase builds
+    const SB_HTML_EXCLUDE = ['org_chart.html'];
+    const htmlFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html') && !SB_HTML_EXCLUDE.includes(f));
     const stale = [];
 
     for (const f of htmlFiles) {
@@ -496,7 +498,10 @@ describe('G8: build.js file arrays match src/ contents', () => {
     : [];
 
   test('every .html file in src/ is registered in HTML_FILES', () => {
-    const srcHtml = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html'));
+    // org_chart.html is intentionally excluded from SolidBase builds
+    // (generic placeholder in src/ for reference only, not deployed)
+    const SB_HTML_EXCLUDE = ['org_chart.html'];
+    const srcHtml = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.html') && !SB_HTML_EXCLUDE.includes(f));
     const missing = srcHtml.filter(f => !registeredHtml.includes(f));
     expect(missing).toEqual([]);
   });

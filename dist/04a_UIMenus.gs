@@ -13,7 +13,7 @@
  * All business logic should remain in their respective modules.
  *
  * @fileoverview Menu system, navigation, and dialog management
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Core.gs
  */
 

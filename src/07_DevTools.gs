@@ -397,7 +397,7 @@ function seedConfigData() {
 
   // Dues Statuses — valid values for Member Directory "Dues Status" column
   if (seedIfEmpty(CONFIG_COLS.DUES_STATUSES, [
-    'Current', 'Past Due', 'Inactive'
+    'Current', 'Past Due', 'Inactive', 'Non Member'
   ])) seededAny = true;
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2120,7 +2120,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds DDS/SEIU 509-specific content including
+ * by createResourcesSheet(). Adds additional content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -2183,8 +2183,8 @@ function seedResourcesData() {
       'New to the bargaining unit? Here is what you need to know about your rights and benefits.',
       'As a new bargaining unit member you should:\\n\\n1. Know your steward — check the dashboard for contact info\\n2. Read your contract — ask your steward for a copy\\n3. Understand your probation period and what it means\\n4. Set up your PIN for the union dashboard\\n5. Attend new member orientation\\n6. Know your Weingarten rights from day one\\n7. Understand the grievance process\\n8. Complete your workload tracker weekly\\n9. Attend union meetings when possible\\n10. Report any contract violations to your steward\\n\\nYour union is here for you from day one.',
       '', '✅', nextId - 1, 'Yes', 'Members', today, 'System'],
-    ['RES-' + String(nextId++).padStart(3, '0'), 'DDS Collective Bargaining Agreement Summary', 'Contract Article',
-      'Key provisions of the current collective bargaining agreement between SEIU 509 and DDS.',
+    ['RES-' + String(nextId++).padStart(3, '0'), 'Collective Bargaining Agreement Summary', 'Contract Article',
+      'Key provisions of the current collective bargaining agreement.',
       'The CBA covers:\\n- Wages and step increases\\n- Health insurance and benefits\\n- Work schedules and overtime\\n- Grievance and arbitration procedures\\n- Seniority rights\\n- Transfers and promotions\\n- Discipline and discharge (just cause)\\n- Leave policies (sick, personal, vacation)\\n- Workplace safety\\n- Union rights and representation\\n\\nThe full contract is available from your steward or union office. Key articles are referenced in grievance filings — your steward will identify the specific articles that apply to your situation.',
       '', '📜', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Caseload Standards & Workload Rights', 'Policy',
@@ -2251,7 +2251,7 @@ function seedNotificationsData() {
       'Contract Negotiations Update',
       'The bargaining committee met with management on ' + fmt(threeDaysAgo) + '. Key topics discussed: wage increases, telecommuting policy, and caseload limits. A full update will be shared at the next general membership meeting. Your support matters — please attend.',
       'Normal',
-      'bargaining@seiu509.org',
+      'bargaining@example.org',
       'Bargaining Committee',
       fmt(threeDaysAgo),
       fmt(inOneMonth),
@@ -2266,7 +2266,7 @@ function seedNotificationsData() {
       'Workload Survey Due This Friday',
       'Please submit your weekly workload tracker by end of day Friday. Your data helps the union build the case for adequate staffing. Submissions are anonymous and take less than 2 minutes.',
       'Urgent',
-      'workload@seiu509.org',
+      'workload@example.org',
       'Workload Committee',
       today,
       fmt(inOneWeek),
@@ -2281,7 +2281,7 @@ function seedNotificationsData() {
       'New Know Your Rights Resources Available',
       'We have added new educational resources to the Learn tab including FMLA rights, ADA accommodations, anti-retaliation protections, and caseload standards. Check them out and know your rights!',
       'Normal',
-      'education@seiu509.org',
+      'education@example.org',
       'Education Committee',
       today,
       fmt(inOneMonth),
@@ -2296,7 +2296,7 @@ function seedNotificationsData() {
       'Steward Office Hours This Week',
       'Your stewards will be available for drop-in office hours this week: Tuesday 12-1pm and Thursday 3-4pm in the break room. No appointment needed. Bring your questions about the contract, grievances, or any workplace concerns.',
       'Normal',
-      'stewards@seiu509.org',
+      'stewards@example.org',
       'Steward Team',
       today,
       fmt(inTwoWeeks),
@@ -3512,7 +3512,7 @@ function NUKE_SEEDED_DATA() {
       ui.ButtonSet.OK);
 
   } catch (error) {
-    log_('Error in NUKE_SEEDED_DATA', error.message);
+    log_('NUKE_SEEDED_DATA', 'Error: ' + error.message);
     ui.alert('❌ Error', 'Nuke failed: ' + error.message, ui.ButtonSet.OK);
   }
 }
@@ -4050,7 +4050,7 @@ function onEditValidation(e) {
  *   runModuleTests()  - Run tests for specific module
  *
  * @fileoverview Unit testing framework and comprehensive test cases
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 

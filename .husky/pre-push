@@ -5,11 +5,13 @@
 
 # Detect if pushing to a protected branch
 PROTECTED_PUSH=false
+PROTECTED_BRANCHES=""
 while read local_ref local_sha remote_ref remote_sha; do
-  case "$remote_ref" in
-    refs/heads/Main|refs/heads/staging)
+  REMOTE_BRANCH="${remote_ref#refs/heads/}"
+  case "$REMOTE_BRANCH" in
+    Main|main|master|staging)
       PROTECTED_PUSH=true
-      PROTECTED_BRANCH=$(echo "$remote_ref" | sed 's|refs/heads/||')
+      PROTECTED_BRANCHES="${PROTECTED_BRANCHES:+$PROTECTED_BRANCHES, }$REMOTE_BRANCH"
       ;;
   esac
 done
@@ -29,19 +31,28 @@ fi
 
 if [ "$PROTECTED_PUSH" = true ]; then
   echo ""
-  echo "[2/2] Pushing to $PROTECTED_BRANCH — running full test suite..."
+  echo "[2/2] Pushing to $PROTECTED_BRANCHES — running full test suite..."
   echo ""
   npm run test:unit
 
   if [ $? -ne 0 ]; then
     echo ""
-    echo "Push to $PROTECTED_BRANCH blocked: unit tests failed."
-    echo "Fix failing tests before pushing to $PROTECTED_BRANCH."
+    echo "Push to $PROTECTED_BRANCHES blocked: unit tests failed."
+    echo "Fix failing tests before pushing to $PROTECTED_BRANCHES."
     exit 1
   fi
 else
   echo ""
-  echo "[2/2] Feature branch push — skipping full test suite."
+  echo "[2/2] Feature branch push — running deploy guards..."
+  echo ""
+  npx jest test/deploy-guards.test.js --no-coverage --bail --silent
+
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "Feature branch push blocked: deploy guards failed."
+    echo "Run 'npm run test:guards' for details."
+    exit 1
+  fi
 fi
 
 echo ""

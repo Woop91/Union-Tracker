@@ -4,7 +4,7 @@
  * HMAC computation, and formula sheet creation.
  */
 
-require('./gas-mock');
+const { createMockSheet, createMockSpreadsheet, createMockRange } = require('./gas-mock');
 const { loadSources } = require('./load-source');
 
 loadSources([
@@ -19,7 +19,6 @@ loadSources([
 describe('08d function existence', () => {
   const required = [
     'setupAuditLogSheet', 'protectAuditLogSheet_', 'onEditAudit',
-    'removeAuditTrigger',
     'setupLiveGrievanceFormulas', 'setupGrievanceMemberDropdown',
     'setupGrievanceCalcSheet', 'setupGrievanceFormulasSheet',
     'setupMemberLookupSheet', 'setupStewardContactCalcSheet',
@@ -80,6 +79,241 @@ describe('computeAuditRowHash_', () => {
     const row = ['2026-03-11', 'test@example.com', 'EDIT', 'Changed field X'];
     const result = computeAuditRowHash_(row);
     expect(typeof result).toBe('string');
+  });
+});
+
+// ============================================================================
+// Hidden sheets constants
+// ============================================================================
+
+// ============================================================================
+// Behavioral: setupAuditLogSheet
+// ============================================================================
+
+describe('setupAuditLogSheet (behavioral)', () => {
+  test('creates the audit log sheet when it does not exist', () => {
+    var ss = createMockSpreadsheet([]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    setupAuditLogSheet();
+
+    // insertSheet should have been called with the audit log name
+    expect(ss.insertSheet).toHaveBeenCalledWith(SHEETS.AUDIT_LOG);
+  });
+
+  test('writes headers to row 1 when sheet is new', () => {
+    var sheet = createMockSheet(SHEETS.AUDIT_LOG, [['header']]);
+    sheet.getLastRow.mockReturnValue(1); // only header row
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    setupAuditLogSheet();
+
+    // clear() should be called on an empty/header-only sheet
+    expect(sheet.clear).toHaveBeenCalled();
+    // setFrozenRows(1) should be called for the header row
+    expect(sheet.setFrozenRows).toHaveBeenCalledWith(1);
+  });
+
+  test('does NOT clear a sheet with existing audit data (compliance)', () => {
+    var data = [
+      ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column', 'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type'],
+      ['2026-01-01', 'user@test.com', 'Members', '2', '3', 'Name', 'Old', 'New', 'M001', 'Edit']
+    ];
+    var sheet = createMockSheet(SHEETS.AUDIT_LOG, data);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    setupAuditLogSheet();
+
+    // Should NOT call clear when data exists (compliance requirement)
+    expect(sheet.clear).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Behavioral: setupGrievanceMemberDropdown
+// ============================================================================
+
+describe('setupGrievanceMemberDropdown (behavioral)', () => {
+  test('does not throw when grievance sheet exists', () => {
+    var grievanceData = [['Grievance ID', 'Member ID'], ['G-001', 'M-001']];
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, grievanceData);
+    // Add clearDataValidations mock to the range
+    var mockRange = {
+      clearDataValidations: jest.fn(),
+      getValues: jest.fn(() => []),
+      getValue: jest.fn(() => ''),
+      setValue: jest.fn(),
+      setValues: jest.fn(),
+      setDataValidation: jest.fn(),
+      setFontWeight: jest.fn(function() { return this; }),
+      setBackground: jest.fn(function() { return this; })
+    };
+    sheet.getRange.mockReturnValue(mockRange);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    expect(() => setupGrievanceMemberDropdown()).not.toThrow();
+  });
+});
+
+// ============================================================================
+// Behavioral: onEditAudit
+// ============================================================================
+
+describe('onEditAudit (behavioral)', () => {
+  test('returns silently for null event', () => {
+    expect(() => onEditAudit(null)).not.toThrow();
+  });
+
+  test('returns silently for event without range', () => {
+    expect(() => onEditAudit({ range: null })).not.toThrow();
+  });
+
+  test('skips header row edits (row < 2)', () => {
+    // logAuditEvent should NOT be called for header edits
+    var origLog = global.logAuditEvent;
+    global.logAuditEvent = jest.fn();
+
+    var mockSheet = createMockSheet(SHEETS.MEMBER_DIR, [['Header']]);
+    var mockRange = {
+      getSheet: jest.fn(() => mockSheet),
+      getRow: jest.fn(() => 1),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 1),
+      getA1Notation: jest.fn(() => 'A1'),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => [['']])
+    };
+
+    onEditAudit({ range: mockRange, oldValue: 'a', value: 'b' });
+
+    expect(global.logAuditEvent).not.toHaveBeenCalled();
+    global.logAuditEvent = origLog;
+  });
+
+  test('skips edits on non-tracked sheets', () => {
+    var origLog = global.logAuditEvent;
+    global.logAuditEvent = jest.fn();
+
+    var mockSheet = createMockSheet('Random Sheet', [['Header']]);
+    var mockRange = {
+      getSheet: jest.fn(() => mockSheet),
+      getRow: jest.fn(() => 2),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 1),
+      getA1Notation: jest.fn(() => 'A2'),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => [['']])
+    };
+
+    onEditAudit({ range: mockRange, oldValue: 'a', value: 'b' });
+
+    expect(global.logAuditEvent).not.toHaveBeenCalled();
+    global.logAuditEvent = origLog;
+  });
+
+  test('logs audit event for a valid edit on Member Directory', () => {
+    var origLog = global.logAuditEvent;
+    global.logAuditEvent = jest.fn();
+
+    var memberData = [
+      ['Member ID', 'First Name', 'Last Name'],
+      ['M-001', 'John', 'Doe']
+    ];
+    var mockSheet = createMockSheet(SHEETS.MEMBER_DIR, memberData);
+    var mockRange = {
+      getSheet: jest.fn(() => mockSheet),
+      getRow: jest.fn(() => 2),
+      getColumn: jest.fn(() => 2),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 1),
+      getA1Notation: jest.fn(() => 'B2'),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => [['']])
+    };
+
+    onEditAudit({
+      range: mockRange,
+      oldValue: 'John',
+      value: 'Jane'
+    });
+
+    expect(global.logAuditEvent).toHaveBeenCalled();
+    var callArgs = global.logAuditEvent.mock.calls[0];
+    // First argument is the event type string
+    expect(callArgs[0]).toContain('MEMBER_DIRECTORY');
+    // Second argument contains field details
+    expect(callArgs[1]).toHaveProperty('oldValue', 'John');
+    expect(callArgs[1]).toHaveProperty('newValue', 'Jane');
+
+    global.logAuditEvent = origLog;
+  });
+
+  test('skips audit when old and new values are identical', () => {
+    var origLog = global.logAuditEvent;
+    global.logAuditEvent = jest.fn();
+
+    var mockSheet = createMockSheet(SHEETS.MEMBER_DIR, [['Header'], ['val']]);
+    var mockRange = {
+      getSheet: jest.fn(() => mockSheet),
+      getRow: jest.fn(() => 2),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 1),
+      getA1Notation: jest.fn(() => 'A2'),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => [['']])
+    };
+
+    onEditAudit({
+      range: mockRange,
+      oldValue: 'same',
+      value: 'same'
+    });
+
+    expect(global.logAuditEvent).not.toHaveBeenCalled();
+    global.logAuditEvent = origLog;
+  });
+});
+
+// ============================================================================
+// Behavioral: setupGrievanceCalcSheet
+// ============================================================================
+
+describe('setupGrievanceCalcSheet (behavioral)', () => {
+  test('creates hidden sheet and sets formulas', () => {
+    // Create a sheet whose getRange returns a chainable mock
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_CALC, [['header']]);
+    // Override getRange to return chainable ranges (setValues chains to setFontWeight etc.)
+    var chainableRange = {
+      setValues: jest.fn(function() { return this; }),
+      setValue: jest.fn(function() { return this; }),
+      setFormula: jest.fn(function() { return this; }),
+      setFontWeight: jest.fn(function() { return this; }),
+      setBackground: jest.fn(function() { return this; }),
+      setFontColor: jest.fn(function() { return this; }),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => [['']])
+    };
+    sheet.getRange.mockReturnValue(chainableRange);
+
+    var ss = createMockSpreadsheet([]);
+    ss.insertSheet.mockReturnValue(sheet);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+
+    setupGrievanceCalcSheet();
+
+    // insertSheet should have been called
+    expect(ss.insertSheet).toHaveBeenCalledWith(SHEETS.GRIEVANCE_CALC);
+    // The sheet should have been cleared
+    expect(sheet.clear).toHaveBeenCalled();
+    // Formulas should have been set (at least the header row + 7 formula columns)
+    expect(chainableRange.setFormula).toHaveBeenCalled();
+    expect(chainableRange.setFormula.mock.calls.length).toBeGreaterThanOrEqual(5);
   });
 });
 

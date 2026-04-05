@@ -353,6 +353,7 @@ function createDashboardMenu() {
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
       .addItem('🔧 Repair Config Data Alignment', 'repairConfigData')
+      .addItem('🔧 Repair Member Directory Columns', 'repairMemberDirectoryColumns')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
       .addSeparator()
@@ -434,17 +435,7 @@ function showToast(message, title) {
   ss.toast(message, title || 'Info', 3);
 }
 
-/**
- * Shows a confirmation dialog
- * @param {string} message - The message to display
- * @param {string} title - The dialog title
- * @returns {boolean} True if user clicked Yes
- */
-function showConfirmation(message, title) {
-  var ui = SpreadsheetApp.getUi();
-  var result = ui.alert(title || 'Confirm', message, ui.ButtonSet.YES_NO);
-  return result === ui.Button.YES;
-}
+// Dead code removed: showConfirmation() — zero callers in src
 
 /**
  * Opens Google Calendar in a new browser tab
@@ -547,7 +538,7 @@ function navigateToRecord(id, type) {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Theme management and visual settings functions
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 
@@ -1151,7 +1142,7 @@ function refreshAllVisuals() {
         applyThemeToSheet_(sheets[i]);
         processed++;
       } catch (_e) {
-        log_('Skipped theme for sheet', sheetName + ': ' + _e.message);
+        log_('refreshAllVisuals', 'Skipped theme for sheet ' + sheetName + ': ' + _e.message);
       }
     }
 
@@ -1164,7 +1155,7 @@ function refreshAllVisuals() {
     ss.toast('All visuals refreshed! (' + processed + ' sheets)', 'Refresh', 3);
   } catch (e) {
     ss.toast('Refresh error: ' + e.message, 'Error', 5);
-    log_('refreshAllVisuals error', e.toString());
+    log_('refreshAllVisuals', 'Error: ' + e.toString());
   }
 }
 
@@ -1182,7 +1173,7 @@ function refreshAllVisuals() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Mobile interface components and dashboard functions
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 
@@ -1458,7 +1449,7 @@ function showMyAssignedGrievances() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Quick actions menu and member email functions
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 
@@ -1713,7 +1704,6 @@ function quickUpdateGrievanceStatus(row, newStatus) {
     var closeCol = GRIEVANCE_COLS.DATE_CLOSED;
     if (!sheet.getRange(row, closeCol).getValue()) sheet.getRange(row, closeCol).setValue(new Date());
   }
-  if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
   ss.toast('Grievance status updated to: ' + newStatus, 'Status Updated', 3);
 }
 
@@ -1774,7 +1764,7 @@ function sendQuickEmail(to, subject, body, memberId) {
     // Rate limiting: max 10 emails per minute per user
     var cache = CacheService.getScriptCache();
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { log_('_e', (_e.message || _e)); }
+    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { log_('sendQuickEmail', 'Error: ' + (_e.message || _e)); }
     var rateLimitKey = 'email_rate_' + (callerEmail || 'unknown');
     var emailCount = parseInt(cache.get(rateLimitKey) || '0', 10);
     if (emailCount >= 10) {
@@ -2164,7 +2154,7 @@ function sendMemberDashboardLink() {
  * - UIService.gs (getCommonStyles)
  *
  * @fileoverview Search dialog UI components
- * @version 4.43.1
+ * @version 4.51.0
  */
 
 // ============================================================================
@@ -3073,7 +3063,7 @@ function modalSubmitFeedback(category, priority, title, description) {
 
     return { success: true, id: id };
   } catch (e) {
-    log_('modalSubmitFeedback error', e.message);
+    log_('modalSubmitFeedback', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -3153,7 +3143,7 @@ function modalAddEvent(data) {
 
     return { success: true, id: id };
   } catch (e) {
-    log_('modalAddEvent error', e.message);
+    log_('modalAddEvent', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -3218,7 +3208,7 @@ function modalAddMinutes(data) {
 
     return { success: true, id: id };
   } catch (e) {
-    log_('modalAddMinutes error', e.message);
+    log_('modalAddMinutes', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -3318,7 +3308,7 @@ function modalLogVolunteerHours(data) {
 
     return { success: true, id: id };
   } catch (e) {
-    log_('modalLogVolunteerHours error', e.message);
+    log_('modalLogVolunteerHours', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -3399,7 +3389,7 @@ function modalAddContact(data) {
 
     return { success: true };
   } catch (e) {
-    log_('modalAddContact error', e.message);
+    log_('modalAddContact', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -3487,7 +3477,7 @@ function modalGetMemberList() {
     }
     return members;
   } catch (e) {
-    log_('modalGetMemberList error', e.message);
+    log_('modalGetMemberList', 'Error: ' + e.message);
     return [];
   }
 }
@@ -3527,7 +3517,7 @@ function modalSaveAttendance(data) {
 
     return { success: true, count: count };
   } catch (e) {
-    log_('modalSaveAttendance error', e.message);
+    log_('modalSaveAttendance', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -3631,7 +3621,7 @@ function modalGetCaseChecklist(caseId) {
     }
     return items;
   } catch (e) {
-    log_('modalGetCaseChecklist error', e.message);
+    log_('modalGetCaseChecklist', 'Error: ' + e.message);
     return [];
   }
 }
@@ -3657,7 +3647,7 @@ function modalSaveCaseChecklist(updates) {
 
     return { success: true };
   } catch (e) {
-    log_('modalSaveCaseChecklist error', e.message);
+    log_('modalSaveCaseChecklist', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -3745,7 +3735,7 @@ function modalGetSurveyResponses() {
 
     return { headers: headers, responses: responses };
   } catch (e) {
-    log_('modalGetSurveyResponses error', e.message);
+    log_('modalGetSurveyResponses', 'Error: ' + e.message);
     return { headers: [], responses: [] };
   }
 }
@@ -3894,7 +3884,7 @@ function modalGetHelpContent() {
 
     return items;
   } catch (e) {
-    log_('modalGetHelpContent error', e.message);
+    log_('modalGetHelpContent', 'Error: ' + e.message);
     return [];
   }
 }
@@ -4008,7 +3998,7 @@ function modalSaveQuestion(data) {
 
     return { success: true };
   } catch (e) {
-    log_('modalSaveQuestion error', e.message);
+    log_('modalSaveQuestion', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -4085,7 +4075,7 @@ function modalCreateWeeklyQuestion(question, options, active) {
 
     return { success: true };
   } catch (e) {
-    log_('modalCreateWeeklyQuestion error', e.message);
+    log_('modalCreateWeeklyQuestion', 'Error: ' + e.message);
     return { success: false, error: e.message };
   }
 }

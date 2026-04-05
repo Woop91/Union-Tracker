@@ -30,7 +30,7 @@
  *   Used by 14_MeetingCheckIn.gs (authenticateMember, verifyPIN, hashPIN),
  *   the SPA self-service view, and menu items.
  *
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -95,10 +95,16 @@ var MEMBER_PIN_COLS = {
  * @returns {string} 6-digit PIN
  */
 function generateMemberPIN() {
-  var uuid = Utilities.getUuid().replace(/-/g, '');
   var pin = '';
-  for (var j = 0; j < 6; j++) {
-    pin += (parseInt(uuid.charAt(j), 16) % 10).toString();
+  while (pin.length < 6) {
+    var hex = Utilities.getUuid().replace(/-/g, '');
+    for (var j = 0; j + 1 < hex.length && pin.length < 6; j += 2) {
+      var byte = parseInt(hex.charAt(j) + hex.charAt(j + 1), 16);
+      // Rejection sampling: discard 250-255 so 0-249 maps uniformly to 0-9
+      if (byte < 250) {
+        pin += (byte % 10).toString();
+      }
+    }
   }
   return pin;
 }
@@ -205,7 +211,7 @@ function assignMemberPIN(memberId, options) {
   var memberRow = -1;
   var memberEmail = null;
   var memberName = null;
-  var memberPhone = null;
+  var _memberPhone = null;
 
   for (var i = 1; i < data.length; i++) {
     var rowId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
@@ -213,7 +219,7 @@ function assignMemberPIN(memberId, options) {
       memberRow = i + 1;
       memberEmail = col_(data[i], MEMBER_COLS.EMAIL);
       memberName = ((col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || '')).trim();
-      memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
+      _memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
       break;
     }
   }
@@ -469,9 +475,8 @@ function completePINReset(memberId, token, newPin) {
   // Reset token already consumed above (props.deleteProperty)
 
   // Clear any lockouts for this member
-  var lockoutCache = CacheService.getScriptCache();
-  lockoutCache.remove('pin_lockout_' + memberId);
-  lockoutCache.remove('pin_attempts_' + memberId);
+  _clearRateCount('pin_lockout_' + memberId);
+  _clearRateCount('pin_attempts_' + memberId);
 
   if (typeof secureLog === 'function') {
     secureLog('PINResetComplete', 'PIN successfully reset via email token', { memberId: memberId });
@@ -490,11 +495,9 @@ function completePINReset(memberId, token, newPin) {
  * @returns {Object} { isLocked: boolean, remainingMinutes: number }
  */
 function checkPINLockout(memberId) {
-  var cache = CacheService.getScriptCache();
   var lockoutKey = 'pin_lockout_' + memberId;
-  var lockoutTime = cache.get(lockoutKey);
-  if (lockoutTime) {
-    var lockoutEnd = parseInt(lockoutTime, 10);
+  var lockoutEnd = _getRateCount(lockoutKey);
+  if (lockoutEnd > 0) {
     var now = Date.now();
     if (now < lockoutEnd) {
       var remainingMs = lockoutEnd - now;
@@ -503,6 +506,8 @@ function checkPINLockout(memberId) {
         remainingMinutes: Math.ceil(remainingMs / 60000)
       };
     }
+    // Expired — clean up
+    _clearRateCount(lockoutKey);
   }
 
   return { isLocked: false, remainingMinutes: 0 };
@@ -514,17 +519,17 @@ function checkPINLockout(memberId) {
  * @returns {Object} { attemptsRemaining: number, isNowLocked: boolean }
  */
 function recordFailedPINAttempt(memberId) {
-  var cache = CacheService.getScriptCache();
   var attemptsKey = 'pin_attempts_' + memberId;
   var lockoutKey = 'pin_lockout_' + memberId;
+  var lockoutTtl = PIN_CONFIG.LOCKOUT_MINUTES * 60;
 
-  var attempts = parseInt(cache.get(attemptsKey) || '0', 10) + 1;
+  var attempts = _getRateCount(attemptsKey) + 1;
 
   if (attempts >= PIN_CONFIG.MAX_ATTEMPTS) {
-    // Lock out the member
+    // Lock out the member — store lockout-end timestamp as the "count"
     var lockoutEnd = Date.now() + (PIN_CONFIG.LOCKOUT_MINUTES * 60 * 1000);
-    cache.put(lockoutKey, lockoutEnd.toString(), PIN_CONFIG.LOCKOUT_MINUTES * 60);
-    cache.remove(attemptsKey);
+    _setRateCount(lockoutKey, lockoutEnd, lockoutTtl);
+    _clearRateCount(attemptsKey);
 
     // Log security event
     if (typeof logAuditEvent === 'function') {
@@ -546,7 +551,7 @@ function recordFailedPINAttempt(memberId) {
   }
 
   // Store attempt count (expires after lockout period)
-  cache.put(attemptsKey, attempts.toString(), PIN_CONFIG.LOCKOUT_MINUTES * 60);
+  _setRateCount(attemptsKey, attempts, lockoutTtl);
 
   return {
     attemptsRemaining: PIN_CONFIG.MAX_ATTEMPTS - attempts,
@@ -559,9 +564,8 @@ function recordFailedPINAttempt(memberId) {
  * @param {string} memberId - The member ID
  */
 function clearPINAttempts(memberId) {
-  var cache = CacheService.getScriptCache();
-  cache.remove('pin_attempts_' + memberId);
-  cache.remove('pin_lockout_' + memberId);
+  _clearRateCount('pin_attempts_' + memberId);
+  _clearRateCount('pin_lockout_' + memberId);
 }
 
 // ============================================================================
@@ -721,15 +725,7 @@ function validateMemberSession(token) {
   }
 }
 
-/**
- * Invalidate a member session on the server side (called on logout)
- * @param {string} token - The session token to invalidate
- */
-function invalidateMemberSession(token) {
-  if (!token) return;
-  var cache = CacheService.getScriptCache();
-  cache.remove('member_session_' + token);
-}
+// Dead code removed: invalidateMemberSession() — zero callers in src
 
 // ============================================================================
 // PIN MANAGEMENT (Steward Functions)
@@ -769,14 +765,14 @@ function generateMemberPINForSteward(memberId) {
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
   var memberName = '';
-  var memberPhone = '';
+  var _memberPhone = '';
 
   for (var i = 1; i < data.length; i++) {
     var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
       memberName = (col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || '');
-      memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
+      _memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
       break;
     }
   }
@@ -1158,96 +1154,6 @@ function getMemberProfileBySession(sessionToken) {
 }
 
 /**
- * Update member's own contact information
- * @param {string} sessionToken - Valid session token
- * @param {Object} updates - Fields to update
- * @returns {Object} Result
- */
-function updateMemberContact(sessionToken, updates) {
-  var session = validateMemberSession(sessionToken);
-  if (!session.valid) {
-    return errorResponse('Session expired. Please log in again.');
-  }
-
-  var memberId = session.memberId;
-
-  // Validate updates - only allow contact fields
-  var allowedFields = ['email', 'phone', 'preferredComm', 'bestTime', 'state'];
-  var fieldMapping = {
-    email: MEMBER_COLS.EMAIL,
-    phone: MEMBER_COLS.PHONE,
-    preferredComm: MEMBER_COLS.PREFERRED_COMM,
-    bestTime: MEMBER_COLS.BEST_TIME,
-    state: MEMBER_COLS.STATE
-  };
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) {
-    return errorResponse('System error');
-  }
-
-  var data = sheet.getDataRange().getValues();
-  var memberRow = -1;
-
-  for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
-    if (rowMemberId === memberId) {
-      memberRow = i + 1;
-      break;
-    }
-  }
-
-  if (memberRow === -1) {
-    return errorResponse('Member not found');
-  }
-
-  // Apply updates
-  var updated = [];
-  for (var field in updates) {
-    if (allowedFields.indexOf(field) >= 0 && fieldMapping[field]) {
-      var value = String(updates[field] || '').trim();
-
-      // F58: Validate input using isValidSafeString
-      var inputCheck = validateSelfServiceInput_(field, value, 200);
-      if (!inputCheck.valid) {
-        return errorResponse(inputCheck.error);
-      }
-
-      // Basic validation
-      if (field === 'email' && value && !isValidEmailMSS_(value)) {
-        return errorResponse('Invalid email format');
-      }
-      if (field === 'phone' && value) {
-        value = formatPhoneNumber_(value);
-      }
-
-      sheet.getRange(memberRow, fieldMapping[field]).setValue(escapeForFormula(value));
-      updated.push(field);
-    }
-  }
-
-  if (updated.length === 0) {
-    return errorResponse('No valid fields to update');
-  }
-
-  // Log the update
-  if (typeof logAuditEvent === 'function') {
-    logAuditEvent('MEMBER_SELF_UPDATE', {
-      memberId: memberId,
-      fields: updated.join(', ')
-    });
-  }
-
-  return {
-    success: true,
-    message: 'Contact information updated',
-    updatedFields: updated
-  };
-}
-
-/**
  * Simple email validation (Member Self Service module)
  * @private
  */
@@ -1332,7 +1238,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
     // Email-based lookup (SPA context) — verify caller authorization
     var email = String(sessionTokenOrEmail).trim().toLowerCase();
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { log_('_e', (_e.message || _e)); }
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { log_('getMemberGrievanceHistory', 'Error resolving caller: ' + (_e.message || _e)); }
 
     // Verify caller authorization — if we can't identify the caller in
     // Execute-as-Me context, deny access (prevents unauthenticated lookups)
@@ -1497,8 +1403,8 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
   if (step === 'pin' && data && data.pin) {
     // Member self-set PIN: look up member ID from email, hash supplied PIN, store it
     var pin = String(data.pin).trim();
-    if (!/^\d{4,6}$/.test(pin)) {
-      return { success: false, message: 'PIN must be 4–6 digits.' };
+    if (!/^\d{6}$/.test(pin)) {
+      return { success: false, message: 'PIN must be exactly 6 digits.' };
     }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return { success: false, message: 'System error.' };
@@ -1514,17 +1420,15 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
         break;
       }
     }
-    // Separate conditions: row not found vs. found but Member ID is empty.
-    // If Member ID is blank, fall back to email as hash seed so PIN still works
-    // for members who haven't yet been assigned an ID (e.g. newly added).
     if (memberRow === -1) return { success: false, message: 'Account not found. Please contact your steward.' };
-    var hashSeed = memberId || e; // email fallback keeps PIN functional without a Member ID
+    if (!memberId) return { success: false, message: 'Member ID required before setting PIN.' };
+    var hashSeed = memberId;
     var existingHash = mData[memberRow - 1][PIN_CONFIG.PIN_COLUMN - 1];
     if (existingHash) return { success: false, message: 'PIN already set. Use PIN reset instead.' };
     var hashedPin = hashPIN(pin, hashSeed);
     mSheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
     if (typeof logAuditEvent === 'function') {
-      logAuditEvent('PIN_SELF_SET', { memberId: memberId || '(no-id)', hashSeed: memberId ? 'memberId' : 'email', email: e });
+      logAuditEvent('PIN_SELF_SET', { memberId: memberId, email: e });
     }
     return { success: true, message: 'PIN set successfully.' };
   }
@@ -1578,15 +1482,14 @@ function devAuthLoginByPIN(pin) {
   var startTime = Date.now();
 
   // ── Global rate limit — prevent blind brute-force before any row is matched ─
-  var cache = CacheService.getScriptCache();
   var globalRateKey = 'DEV_PIN_SCAN_RATE';
-  var globalAttempts = parseInt(cache.get(globalRateKey) || '0', 10);
+  var globalAttempts = _getRateCount(globalRateKey);
   var lockoutMinutes = (typeof PIN_CONFIG !== 'undefined' && PIN_CONFIG.LOCKOUT_MINUTES) || 15;
   if (globalAttempts >= 10) {
     Utilities.sleep(500 + Math.floor(Math.random() * 500));
     return { success: false, message: 'Too many attempts. Try again in ' + lockoutMinutes + ' minutes.' };
   }
-  cache.put(globalRateKey, String(globalAttempts + 1), 900); // 15 min window
+  _setRateCount(globalRateKey, globalAttempts + 1, 900); // 15 min window
 
   // ── Sheet scan ────────────────────────────────────────────────────────────
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1650,7 +1553,7 @@ function devAuthLoginByPIN(pin) {
     }
 
     // Clear rate counters on success
-    try { cache.remove(globalRateKey); } catch (_) {}
+    try { _clearRateCount(globalRateKey); } catch (_) {}
     try { if (typeof clearPINAttempts === 'function') clearPINAttempts(matchResult.memberId); } catch (_) {}
 
     // Create session token
@@ -1696,23 +1599,22 @@ function devRequestPINReset(email) {
   }
 
   // Rate limit — 2 per email per hour
-  var cache = CacheService.getScriptCache();
   var rateKey = 'PIN_RESET_RATE_' + email;
-  var count = parseInt(cache.get(rateKey) || '0', 10);
+  var count = _getRateCount(rateKey);
   if (count >= 2) {
     Utilities.sleep(500 + Math.floor(Math.random() * 500));
     return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
   }
-  cache.put(rateKey, String(count + 1), 3600);
+  _setRateCount(rateKey, count + 1, 3600);
 
   // Global rate limit — 10 resets per hour across all users
   var globalKey = 'PIN_RESET_GLOBAL';
-  var globalCount = parseInt(cache.get(globalKey) || '0', 10);
+  var globalCount = _getRateCount(globalKey);
   if (globalCount >= 10) {
     Utilities.sleep(500 + Math.floor(Math.random() * 500));
     return { success: true, message: 'If this email is in our directory, you will receive a new PIN.' };
   }
-  cache.put(globalKey, String(globalCount + 1), 3600);
+  _setRateCount(globalKey, globalCount + 1, 3600);
 
   // Look up member
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1847,8 +1749,8 @@ function memberSetOwnPIN(sessionToken, pin, idemKey) {
   }
 
   if (memberRow === -1) return { success: false, message: 'Account not found. Please contact your steward.' };
-  // If Member ID is blank, fall back to email as hash seed so PIN still works
-  var hashSeed = memberId || email;
+  if (!memberId) return { success: false, message: 'Member ID required before setting PIN.' };
+  var hashSeed = memberId;
 
   // ── Hash and store ────────────────────────────────────────────────────────
   var hashedPin = hashPIN(pin, hashSeed);

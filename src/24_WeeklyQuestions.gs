@@ -96,8 +96,21 @@ var WeeklyQuestions = (function () {
     try {
       var val = PropertiesService.getScriptProperties().getProperty('POLL_FREQUENCY');
       if (val === 'biweekly' || val === 'monthly') return val;
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('_getFrequency', 'Error: ' + (_e.message || _e)); }
     return 'weekly';
+  }
+
+  /**
+   * Returns the ISO 8601 week number for a given date.
+   * @param {Date} date - Date to compute the week number for.
+   * @returns {number} ISO week number (1-53).
+   */
+  function _getISOWeek(date) {
+    var d = new Date(date.getTime());
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+    var week1 = new Date(d.getFullYear(), 0, 4);
+    return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
   }
 
   /**
@@ -121,9 +134,7 @@ var WeeklyQuestions = (function () {
     monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
 
     if (freq === 'biweekly') {
-      // ISO week number
-      var jan4 = new Date(monday.getFullYear(), 0, 4);
-      var weekNum = Math.ceil(((monday - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+      var weekNum = _getISOWeek(monday);
       // If odd week, step back one week to land on even-week anchor
       if (weekNum % 2 !== 0) {
         monday.setDate(monday.getDate() - 7);
@@ -316,7 +327,7 @@ var WeeklyQuestions = (function () {
 
     // Role check — belt-and-suspenders (wrapper already calls _requireStewardAuth)
     var callerEmail = '';
-    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_e) { log_('_e', (_e.message || _e)); }
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase().trim(); } catch (_e) { log_('setStewardQuestion', 'Error resolving caller: ' + (_e.message || _e)); }
     if (!callerEmail) return { success: false, message: 'Unable to verify identity.' };
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
@@ -522,7 +533,7 @@ var WeeklyQuestions = (function () {
       }
       q.stats = { total: total, counts: counts };
       q.weekStr = q.weekStart instanceof Date
-        ? q.weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        ? Utilities.formatDate(q.weekStart, Session.getScriptTimeZone(), 'MMM d, yyyy')
         : String(q.weekStart || '');
     });
 
@@ -590,6 +601,7 @@ var WeeklyQuestions = (function () {
     getPollFrequency:         getPollFrequency,
     setPollFrequency:         setPollFrequency,
     Q_COLS:                   Q_COLS,  // v4.24.4 — exposed so autoSelectCommunityPoll avoids duplicating indices
+    _getISOWeek:              _getISOWeek,  // v4.51.1 — exposed for autoSelectCommunityPoll biweekly check
   };
 
 })();
@@ -766,8 +778,7 @@ function autoSelectCommunityPoll() {
 
     // Biweekly: only draw on even-week Mondays
     if (freq === 'biweekly') {
-      var jan4 = new Date(today.getFullYear(), 0, 4);
-      var weekNum = Math.ceil(((today - jan4) / 86400000 + jan4.getDay() + 1) / 7);
+      var weekNum = WeeklyQuestions._getISOWeek(today);
       if (weekNum % 2 !== 0) {
         log_('autoSelectCommunityPoll', 'biweekly — odd week ' + weekNum + ', skipping draw.');
         return;
@@ -797,8 +808,7 @@ function autoSelectCommunityPoll() {
         } else {
           periodStart.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); // Monday
           if (freq === 'biweekly') {
-            var jan4b = new Date(periodStart.getFullYear(), 0, 4);
-            var wn = Math.ceil(((periodStart - jan4b) / 86400000 + jan4b.getDay() + 1) / 7);
+            var wn = WeeklyQuestions._getISOWeek(periodStart);
             if (wn % 2 !== 0) periodStart.setDate(periodStart.getDate() - 7);
           }
         }
@@ -847,5 +857,5 @@ function setupCommunityPollTrigger() {
   try {
     SpreadsheetApp.getActiveSpreadsheet()
       .toast('Community poll draw trigger installed — fires every Monday at 7 AM.', 'Polls', 5);
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('setupCommunityPollTrigger', 'Error showing toast: ' + (_e.message || _e)); }
 }

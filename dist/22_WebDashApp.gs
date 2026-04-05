@@ -95,7 +95,7 @@ function doGet(e) {
         ', Auth=' + (typeof Auth) +
         ', DataService=' + (typeof DataService) +
         ', SHEETS=' + (typeof SHEETS));
-    } catch (_) { log_('_', (_.message || _)); }
+    } catch (_e) { log_('doGet', 'Error logging fatal context: ' + (_e.message || _e)); }
     return _serveFatalError(fatalErr.message);
   }
 }

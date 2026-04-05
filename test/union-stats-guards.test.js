@@ -192,8 +192,7 @@ describe('G18: Stats renderers use all backend data fields', () => {
     expect(body).toMatch(/resourceDownloads/);
   });
 
-  // SolidBase: WorkloadService + workload stats UI excluded
-  test.skip('workload stats renderer references all summary fields', () => {
+  test('workload stats renderer references all summary fields', () => {
     const body = extractFunctionBody(memberCode, '_renderWorkloadStatsContent');
     expect(body.length).toBeGreaterThan(0);
 
@@ -232,12 +231,12 @@ describe('G19: Stats pages have client-side caching', () => {
 
   test('all Union Stats sub-tab renderers accept cache functions', () => {
     // Each sub-tab renderer should accept getCached/setCache parameters
-    // SolidBase: _renderWorkloadSummaryStats excluded (WorkloadService not in SolidBase)
     const renderers = [
       '_renderGrievanceStats',
       '_renderHotSpots',
       '_renderMembershipStats',
       '_renderEngagementStats',
+      '_renderWorkloadSummaryStats',
     ];
     const missing = [];
     for (const fn of renderers) {
@@ -267,12 +266,12 @@ describe('G19: Stats pages have client-side caching', () => {
 describe('G20: Stats sub-tab renderers separate fetch from content render', () => {
   const memberCode = read('member_view.html');
 
-  // SolidBase: workload sub-tab excluded (WorkloadService not in SolidBase)
   const subTabs = [
     { fetch: '_renderGrievanceStats', render: '_renderGrievanceStatsContent' },
     { fetch: '_renderHotSpots', render: '_renderHotSpotsContent' },
     { fetch: '_renderMembershipStats', render: '_renderMembershipStatsContent' },
     { fetch: '_renderEngagementStats', render: '_renderEngagementStatsContent' },
+    { fetch: '_renderWorkloadSummaryStats', render: '_renderWorkloadStatsContent' },
   ];
 
   subTabs.forEach(({ fetch: fetchFn, render: renderFn }) => {
@@ -396,12 +395,12 @@ describe('G23: dataGetEngagementStats has no redundant sheet reads', () => {
 describe('G24: Stats sub-tab renderers specify showLoading skeleton types', () => {
   const memberCode = read('member_view.html');
 
-  // SolidBase: _renderWorkloadSummaryStats excluded (WorkloadService not in SolidBase)
   const renderers = [
     '_renderGrievanceStats',
     '_renderHotSpots',
     '_renderMembershipStats',
     '_renderEngagementStats',
+    '_renderWorkloadSummaryStats',
   ];
 
   renderers.forEach(fn => {

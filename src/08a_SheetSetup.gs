@@ -364,7 +364,7 @@ function CREATE_DASHBOARD() {
     }
 
   } catch (error) {
-    log_('Error in CREATE_DASHBOARD', error.message);
+    log_('CREATE_DASHBOARD', 'Error: ' + error.message);
     if (ui) {
       ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
     }
@@ -717,7 +717,7 @@ function migrateSheetTabTitles() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Data validation and multi-select functions
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 
@@ -733,7 +733,7 @@ function migrateSheetTabTitles() {
 function setupDataValidations() {
   // Re-sync column maps from actual sheet headers before applying validations.
   // This guarantees dropdowns land on the correct columns even if the layout changed.
-  try { syncColumnMaps(); } catch (_e) { log_('_e', (_e.message || _e)); }
+  try { syncColumnMaps(); } catch (_e) { log_('setupDataValidations', 'Error syncing column maps: ' + (_e.message || _e)); }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -1086,7 +1086,7 @@ function removeMultiSelectTrigger() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Search and navigation functions
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 

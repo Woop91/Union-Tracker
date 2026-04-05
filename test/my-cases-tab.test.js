@@ -33,7 +33,7 @@ loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '21_WebDashData
 function makeMemberData() {
   return [
     ['Email', 'Name', 'First Name', 'Last Name', 'Role', 'Unit', 'Phone', 'Join Date', 'Dues Status', 'Member ID', 'Work Location', 'Office Days', 'Assigned Steward', 'Is Steward'],
-    ['member@test.com', 'Jane Doe', 'Jane', 'Doe', 'Member', 'Unit A', '555-0001', new Date('2023-01-15'), 'Active', 'MEM-001', 'HQ', 'Mon,Tue', '', false],
+    ['member@test.com', 'Jane Doe', 'Jane', 'Doe', 'Member', 'Unit A', '555-0001', new Date('2023-01-15'), 'Active', 'MEM-001', 'HQ', 'Mon,Tue', 'steward@test.com', false],
     ['steward@test.com', 'John Smith', 'John', 'Smith', 'Steward', 'Unit A', '555-0002', new Date('2022-06-01'), 'Active', 'MEM-002', 'HQ', 'Mon-Fri', '', true],
   ];
 }
@@ -137,7 +137,12 @@ describe('BUG 1: getMemberGrievances excludes terminal statuses', () => {
 // ============================================================================
 
 describe('BUG 2: dataGetStewardContact passes stewardEmail to DataService', () => {
-  beforeEach(setupWithMixedStatuses);
+  beforeEach(() => {
+    setupWithMixedStatuses();
+    // Caller must be member@test.com so the security check passes
+    // (member's assignedSteward === target steward email)
+    global._resolveCallerEmail = jest.fn(() => 'member@test.com');
+  });
 
   test('wrapper function accepts two parameters', () => {
     expect(typeof dataGetStewardContact).toBe('function');
@@ -152,11 +157,11 @@ describe('BUG 2: dataGetStewardContact passes stewardEmail to DataService', () =
     expect(result.email).toBe('steward@test.com');
   });
 
-  test('returns null when session is invalid', () => {
+  test('returns auth error object when session is invalid', () => {
     const origResolve = global._resolveCallerEmail;
     global._resolveCallerEmail = jest.fn(() => null);
     const result = dataGetStewardContact('bad-token', 'steward@test.com');
-    expect(result).toBeNull();
+    expect(result).toEqual(expect.objectContaining({ success: false, authError: true }));
     global._resolveCallerEmail = origResolve;
   });
 

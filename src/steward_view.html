@@ -3030,7 +3030,7 @@ function renderStewardResources(appContainer) {
         { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
         { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
       ];
-      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: (CONFIG.orgAbbrev || 'Organization') + ' Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
       quickLinks.forEach(function(r) {
         if (!r.url) return;
@@ -4446,10 +4446,10 @@ function renderStewardMore(appContainer) {
     var menuItems = [
       { group: 'Manage' },
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
-      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', action: function() { _handleTabNav('steward', 'workload'); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', _feat: 'workload', action: function() { _handleTabNav('steward', 'workload'); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
       { group: 'Reference' },
-      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', action: function() { _handleTabNav('steward', 'poms'); } },
+      { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', _feat: 'poms', action: function() { _handleTabNav('steward', 'poms'); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
       { group: 'Community' },
       { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { _handleTabNav('steward', 'qaforum'); } },
@@ -4466,6 +4466,13 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { _handleTabNav('steward', 'failsafe'); } },
       { icon: '\uD83E\uDDEA', label: 'Test Runner', desc: 'Run integration tests', action: function() { _handleTabNav('steward', 'testrunner'); } },
     ];
+
+    // v4.51.1: Filter out features not present in this deployment (SolidBase isolation)
+    menuItems = menuItems.filter(function(m) {
+      if (m._feat === 'workload' && !CONFIG.hasWorkloadService) return false;
+      if (m._feat === 'poms' && !CONFIG.hasPOMSReference) return false;
+      return true;
+    });
 
     menuItems.forEach(function(m) {
       if (m.group) {
@@ -6299,7 +6306,7 @@ function _buildExplorerUI(container, allMembers) {
 // ═══════════════════════════════════════
 
 function renderSearchPage(appContainer) {
-  var role = AppState.userRole || 'steward';
+  var role = AppState.activeRole || 'steward';
   renderPageLayout(appContainer, role, 'search', function(container) {
     _stewardHeader(container, 'Search', 'Find members and grievances');
     var content = el('div', { className: 'content' });
@@ -10511,7 +10518,7 @@ function _loadLeaderMentees(leaderList) {
     leaderList.innerHTML = '';
     if (!leaders || leaders.length === 0) {
       leaderList.appendChild(el('div', { className: 'card', style: { padding: '16px', color: 'var(--text-secondary)', fontStyle: 'italic' } },
-        'No Member Leaders found. Use the DDS menu > Setup Member Leader Role to enable this feature.'));
+        'No Member Leaders found. Use the menu > Setup Member Leader Role to enable this feature.'));
       return;
     }
     var myEmail = (CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email.toLowerCase() : '';

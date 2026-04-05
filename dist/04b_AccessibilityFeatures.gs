@@ -644,13 +644,7 @@ function mapImportColumns_(headers) {
   return map;
 }
 
-/**
- * Displays a toast notification reminding the user to take a break.
- * @returns {void}
- */
-function showBreakReminder() {
-  SpreadsheetApp.getActiveSpreadsheet().toast('💆 Time for a break! Stretch and rest your eyes.', 'Break Reminder', 10);
-}
+// Dead code removed: showBreakReminder() — zero callers in src
 
 // ==================== THEME MANAGEMENT ====================
 
@@ -711,13 +705,7 @@ function showThemeManager() {
 // ==================== DEVICE DETECTION ====================
 // Note: MOBILE_CONFIG is now defined in 01_Core.gs as a shared constant
 
-/**
- * Shows a smart dashboard that automatically detects the device type
- * and displays the appropriate interface (mobile or desktop)
- */
-function showSmartDashboard() {
-  showDialog_(getSmartDashboardHtml(), '📋 Dashboard Pend', 800, 700);
-}
+// Dead code removed: showSmartDashboard() — zero callers in src
 
 /**
  * Returns the HTML for the smart dashboard with device detection

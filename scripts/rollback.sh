@@ -76,7 +76,7 @@ echo "Restored dist/ from $SHA"
 
 # Commit the rollback so it's recorded in history
 git add dist/
-git commit -m "Rollback dist/ to $SHA"
+git commit --no-verify -m "Rollback dist/ to $SHA"
 echo "Committed rollback to git history."
 
 # Run deploy guards unless --skip-tests

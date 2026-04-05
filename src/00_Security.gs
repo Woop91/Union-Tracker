@@ -56,7 +56,7 @@
  *                21_WebDashDataService.gs, 22_WebDashApp.gs, all HTML templates.
  *
  * @fileoverview Security utilities — XSS, formula injection, RBAC, PII masking
- * @version 4.43.1
+ * @version 4.51.0
  */
 
 // ============================================================================
@@ -323,7 +323,7 @@ function checkWebAppAuthorization(requiredRole, sessionToken) {
 
   } catch (e) {
     result.message = 'Authorization check failed: ' + e.message;
-    log_('Authorization error', e.message);
+    log_('checkWebAppAuthorization', 'Authorization error: ' + e.message);
     return result;
   }
 }
@@ -339,7 +339,12 @@ function getUserRole_(email) {
 
   // Check cache first to avoid reading entire Member Directory on every call
   var cacheKey = 'user_role_' + email.toLowerCase();
-  var cached = CacheService.getScriptCache().get(cacheKey);
+  var cached;
+  try {
+    cached = CacheService.getScriptCache().get(cacheKey);
+  } catch (_cacheErr) {
+    cached = null;
+  }
   if (cached) return cached;
 
   try {
@@ -395,7 +400,7 @@ function getUserRole_(email) {
 
     return 'anonymous';
   } catch (e) {
-    log_('Error getting user role', e.message);
+    log_('getUserRole_', 'Error: ' + e.message);
     return 'anonymous';
   }
 }
@@ -466,7 +471,7 @@ function maskObjectPII_(obj, skipInternal) {
   if (!obj || typeof obj !== 'object') return {};
   var masked = {};
   for (var key in obj) {
-    if (!obj.hasOwnProperty(key)) continue;
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
     if (skipInternal && key.charAt(0) === '_') continue;
     var val = obj[key];
     var keyLower = key.toLowerCase();
@@ -654,7 +659,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       try {
         chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
         adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('sendSecurityAlertEmail_', 'Error reading config: ' + (_e.message || _e)); }
 
       if (chiefEmail) recipients.push(chiefEmail);
       if (adminEmails) {
@@ -670,7 +675,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
       try {
         var ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
         if (ownerEmail) recipients.push(ownerEmail);
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('sendSecurityAlertEmail_', 'Error getting owner email: ' + (_e.message || _e)); }
     }
 
     // FIX-SEC-01 (cont): Quota check removed — safeSendEmail_() handles this internally.
@@ -779,10 +784,10 @@ function sendDailySecurityDigest() {
     var auditIntegrity = null;
     var vaultIntegrity = null;
     if (typeof verifyAuditLogIntegrity === 'function') {
-      try { auditIntegrity = verifyAuditLogIntegrity(); } catch (_e) { log_('_e', (_e.message || _e)); }
+      try { auditIntegrity = verifyAuditLogIntegrity(); } catch (_e) { log_('sendDailySecurityDigest', 'Error verifying audit log: ' + (_e.message || _e)); }
     }
     if (typeof verifySurveyVaultIntegrity === 'function') {
-      try { vaultIntegrity = verifySurveyVaultIntegrity(); } catch (_e) { log_('_e', (_e.message || _e)); }
+      try { vaultIntegrity = verifySurveyVaultIntegrity(); } catch (_e) { log_('sendDailySecurityDigest', 'Error verifying survey vault: ' + (_e.message || _e)); }
     }
 
     // Gather recipients
@@ -798,13 +803,13 @@ function sendDailySecurityDigest() {
             if (trimmed && recipients.indexOf(trimmed) === -1) recipients.push(trimmed);
           });
         }
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('sendDailySecurityDigest', 'Error reading config: ' + (_e.message || _e)); }
     }
     if (recipients.length === 0) {
       try {
         var ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
         if (ownerEmail) recipients.push(ownerEmail);
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('sendDailySecurityDigest', 'Error getting owner email: ' + (_e.message || _e)); }
     }
 
     if (recipients.length === 0) return;
@@ -823,7 +828,7 @@ function sendDailySecurityDigest() {
     var body = 'DAILY SECURITY DIGEST\n' +
       'System: ' + systemName + '\n' +
       'Period: Last 24 hours\n' +
-      'Date: ' + new Date().toLocaleDateString() + '\n' +
+      'Date: ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy') + '\n' +
       'Events: ' + queue.length + '\n\n';
 
     body += '═══════════════════════════════════════\n';
@@ -892,6 +897,67 @@ function sendDailySecurityDigest() {
 // ============================================================================
 // SAFE EMAIL WRAPPER
 // ============================================================================
+
+// ============================================================================
+// DURABLE RATE LIMITING (CacheService + PropertiesService fallback)
+// ============================================================================
+
+/**
+ * Get a rate limit counter value. Tries CacheService first (fast), falls back
+ * to PropertiesService (durable — survives cache eviction under memory pressure).
+ *
+ * @param {string} key - Rate limit key (e.g. 'DEV_PIN_SCAN_RATE')
+ * @returns {number} Current count (0 if not set or expired)
+ */
+function _getRateCount(key) {
+  var cache = CacheService.getScriptCache();
+  var val = cache.get(key);
+  if (val != null) return parseInt(val, 10) || 0;
+  // Fallback to PropertiesService
+  try {
+    var pVal = PropertiesService.getScriptProperties().getProperty('RATE_' + key);
+    if (pVal) {
+      var parsed = JSON.parse(pVal);
+      if (parsed.expires > Date.now()) {
+        // Re-warm cache from durable store (remaining TTL)
+        var remainingTtl = Math.max(1, Math.ceil((parsed.expires - Date.now()) / 1000));
+        try { cache.put(key, String(parsed.count), remainingTtl); } catch (_) {}
+        return parsed.count;
+      }
+      // Expired — clean up
+      PropertiesService.getScriptProperties().deleteProperty('RATE_' + key);
+    }
+  } catch (_) {}
+  return 0;
+}
+
+/**
+ * Set a rate limit counter value. Writes to both CacheService (fast reads) and
+ * PropertiesService (durable — survives cache eviction).
+ *
+ * @param {string} key - Rate limit key
+ * @param {number} count - Counter value to store
+ * @param {number} ttlSeconds - Time-to-live in seconds
+ */
+function _setRateCount(key, count, ttlSeconds) {
+  try { CacheService.getScriptCache().put(key, String(count), ttlSeconds); } catch (_) {}
+  try {
+    PropertiesService.getScriptProperties().setProperty('RATE_' + key, JSON.stringify({
+      count: count,
+      expires: Date.now() + ttlSeconds * 1000
+    }));
+  } catch (_) {}
+}
+
+/**
+ * Clear a rate limit counter from both CacheService and PropertiesService.
+ *
+ * @param {string} key - Rate limit key to clear
+ */
+function _clearRateCount(key) {
+  try { CacheService.getScriptCache().remove(key); } catch (_) {}
+  try { PropertiesService.getScriptProperties().deleteProperty('RATE_' + key); } catch (_) {}
+}
 
 /**
  * Sends an email with quota check and basic validation.

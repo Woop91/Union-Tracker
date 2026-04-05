@@ -7,3 +7,5 @@ dist/*.gs text eol=lf
 src/*.html text eol=lf
 src/*.gs text eol=lf
 build.js text eol=lf
+*.sh text eol=lf
+.husky/* text eol=lf

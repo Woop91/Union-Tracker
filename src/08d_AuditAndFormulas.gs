@@ -216,20 +216,7 @@ function onEditAudit(e) {
   });
   } catch (err) { log_('onEditAudit error', (err.message || err)); }
 }
-/**
- * Remove the audit trigger
- * Disables automatic change tracking
- */
-function removeAuditTrigger() {
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'onEditAudit') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
-
-  SpreadsheetApp.getActiveSpreadsheet().toast('Audit tracking disabled.', '🚫 Disabled', 3);
-}
+// Dead code removed: removeAuditTrigger() — zero callers in src
 
 /**
  * ============================================================================
@@ -256,7 +243,7 @@ function removeAuditTrigger() {
  * - _CalcFormulas: Named formula references
  *
  * @fileoverview Hidden sheet and formula management for Dashboard
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -2024,7 +2011,7 @@ function verifySurveyVaultIntegrity() {
 
   // Check for duplicate "Is Latest" entries
   for (var mapKey in latestMap) {
-    if (latestMap.hasOwnProperty(mapKey) && latestMap[mapKey].length > 1) {
+    if (Object.prototype.hasOwnProperty.call(latestMap, mapKey) && latestMap[mapKey].length > 1) {
       issues.push('Duplicate "Is Latest" entries for hash+quarter ' + mapKey.split('|')[1] +
         ' in rows: ' + latestMap[mapKey].join(', '));
     }

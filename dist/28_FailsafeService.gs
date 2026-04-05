@@ -30,7 +30,7 @@
  *   CacheService. Used by weekly backup trigger and member digest
  *   preferences in the SPA.
  *
- * @version 4.43.1
+ * @version 4.51.0
  */
 
 var FailsafeService = (function () {
@@ -79,7 +79,7 @@ var FailsafeService = (function () {
       var cacheKey = 'fs_sheet_' + sheetName;
       var cached = cache.get(cacheKey);
       if (cached) return JSON.parse(cached);
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('FailsafeService._getCachedSheetData', 'Error reading cache: ' + (_e.message || _e)); }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
     var sheet = ss.getSheetByName(sheetName);
@@ -87,7 +87,7 @@ var FailsafeService = (function () {
     var data = sheet.getDataRange().getValues();
     try {
       cache.put(cacheKey, JSON.stringify(data), maxAgeSec);
-    } catch (_e) { log_('_e', (_e.message || _e)); }
+    } catch (_e) { log_('FailsafeService._getCachedSheetData', 'Error writing cache: ' + (_e.message || _e)); }
     return data;
   }
 
@@ -114,7 +114,7 @@ var FailsafeService = (function () {
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][0]).toLowerCase().trim() === eml) {
         return {
-          enabled: data[i][1] === true || data[i][1] === 'TRUE',
+          enabled: isTruthyValue(data[i][1]),
           frequency: String(data[i][2] || 'weekly').toLowerCase(),
           lastSent: data[i][3] instanceof Date ? _fmtDate(data[i][3]) : '',
           includeGrievances: data[i][4] !== false && data[i][4] !== 'FALSE',
@@ -189,7 +189,7 @@ var FailsafeService = (function () {
     var processed = 0;
 
     for (var i = 1; i < data.length; i++) {
-      var enabled = data[i][1] === true || data[i][1] === 'TRUE';
+      var enabled = isTruthyValue(data[i][1]);
       if (!enabled) continue;
 
       var email = String(data[i][0]).toLowerCase().trim();
@@ -459,7 +459,7 @@ var FailsafeService = (function () {
       allFiles.sort(function(a, b) { return b.name < a.name ? -1 : b.name > a.name ? 1 : 0; });
       // Delete everything beyond MAX_BACKUP_FILES
       for (var i = MAX_BACKUP_FILES; i < allFiles.length; i++) {
-        try { allFiles[i].file.setTrashed(true); } catch (_e) { log_('_e', (_e.message || _e)); }
+        try { allFiles[i].file.setTrashed(true); } catch (_e) { log_('_pruneOldBackups', 'Error trashing backup: ' + (_e.message || _e)); }
       }
     });
   }
@@ -783,7 +783,7 @@ function fsDiagnostic(sessionToken) {
   try {
     var testAuth = checkWebAppAuthorization('steward', sessionToken);
     authOk = testAuth && testAuth.isAuthorized;
-  } catch (_) { log_('_', (_.message || _)); }
+  } catch (_e) { log_('fsDiagnostic', 'Error checking auth: ' + (_e.message || _e)); }
 
   return {
     success: true,

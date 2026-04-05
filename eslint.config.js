@@ -212,6 +212,9 @@ module.exports = [
         queueSecurityDigestEvent_: 'readonly',
         sendSecurityAlertEmail_: 'readonly',
         sendDailySecurityDigest: 'readonly',
+        _getRateCount: 'readonly',
+        _setRateCount: 'readonly',
+        _clearRateCount: 'readonly',
 
         // Cross-file functions (00_DataAccess.gs)
         logError_: 'readonly',
@@ -227,6 +230,9 @@ module.exports = [
         ensureMinimumColumns: 'readonly',
         loadCachedColumnMaps_: 'readonly',
         syncColumnMaps: 'readonly',
+        resolveColumnsFromSheet_: 'readonly',
+        resolveColumnByHeader_: 'readonly',
+        resolveColumnsByHeader_: 'readonly',
         showToast: 'readonly',
         showAlert: 'readonly',
         withScriptLock_: 'readonly',

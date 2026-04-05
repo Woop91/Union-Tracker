@@ -29,7 +29,7 @@
  *   Used by 10_Main.gs (onEdit dispatches events), and any module that
  *   subscribes to sheet edit events.
  *
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */

@@ -89,27 +89,26 @@ var Auth = (function () {
     try {
     email = String(email).trim().toLowerCase();
 
-    // Cache reference — needed for both rate limiters below
+    // Durable rate limiters — CacheService (fast) + PropertiesService fallback (survives eviction)
     step = 'cache';
-    var cache = CacheService.getScriptCache();
 
     // Global session rate limit — prevent email enumeration via rapid attempts
     var sessionId = Session.getTemporaryActiveUserKey() || 'anon';
     var globalMagicKey = 'MAGIC_GLOBAL_' + sessionId;
-    var globalMagicCount = parseInt(cache.get(globalMagicKey) || '0', 10);
+    var globalMagicCount = _getRateCount(globalMagicKey);
     if (globalMagicCount >= 5) {
       Utilities.sleep(500 + Math.floor(Math.random() * 500));
       return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
     }
-    cache.put(globalMagicKey, String(globalMagicCount + 1), 900);
+    _setRateCount(globalMagicKey, globalMagicCount + 1, 900);
 
     // Rate limiting — max 3 magic links per email per 15 minutes
     var rateKey = 'MAGIC_RATE_' + email;
-    var count = parseInt(cache.get(rateKey) || '0', 10);
+    var count = _getRateCount(rateKey);
     if (count >= 3) {
       return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
     }
-    cache.put(rateKey, String(count + 1), 900);
+    _setRateCount(rateKey, count + 1, 900);
 
     // Validate email exists in directory
     step = 'lookup';
@@ -135,7 +134,7 @@ var Auth = (function () {
     } catch (cfgErr) {
       log_('Auth.sendMagicLink', 'ConfigReader config fetch failed (' + cfgErr.message + ') — using defaults');
       config = {
-        orgName: 'DDS',
+        orgName: 'Dashboard',
         logoInitials: '',
         accentHue: 250,
         magicLinkExpiryMs: 7 * 24 * 60 * 60 * 1000,
@@ -155,7 +154,11 @@ var Auth = (function () {
       return { success: false, message: 'Web app URL could not be resolved. Please contact your administrator.' };
     }
 
-    var linkParams = '?token=' + encodeURIComponent(token);
+    // v4.51.1: Fragment-based transport — tokens in URL fragments (#) are never
+    // sent to the server in HTTP requests, never logged in server access logs,
+    // and never leaked via Referer headers. The client-side JS extracts the
+    // token from the fragment and validates it via google.script.run.
+    var linkParams = '#token=' + encodeURIComponent(token);
     if (rememberMe) {
       linkParams += '&remember=1';
     }
@@ -291,6 +294,19 @@ var Auth = (function () {
           }
         } catch (_e) {
           // Malformed entry — delete it
+          props.deleteProperty(key);
+          cleaned++;
+        }
+      }
+      // Clean up expired durable rate limit entries (written by _setRateCount)
+      if (key.indexOf('RATE_') === 0) {
+        try {
+          var rateData = JSON.parse(all[key]);
+          if (rateData.expires && rateData.expires < now) {
+            props.deleteProperty(key);
+            cleaned++;
+          }
+        } catch (_re) {
           props.deleteProperty(key);
           cleaned++;
         }
@@ -681,7 +697,7 @@ function authCreateSessionToken() {
   var email = '';
   try {
     email = Session.getActiveUser().getEmail();
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('authCreateSessionToken', 'Error resolving user email: ' + (_e.message || _e)); }
   if (!email) {
     return { error: 'Unable to resolve authenticated user. Please sign in again.' };
   }
@@ -740,7 +756,7 @@ function authCleanupExpiredTokens() {
  */
 function testAuthEmailSend(testEmail) {
   var to = testEmail || Session.getEffectiveUser().getEmail();
-  var subject = '[DDS-Dashboard] Magic Link Email Test';
+  var subject = '[Dashboard] Magic Link Email Test';
   var htmlBody = '<p>This is a test of the magic link email system.</p>'
     + '<p>If you received this, email sending is working correctly.</p>'
     + '<p>Sent at: ' + new Date().toISOString() + '</p>';
@@ -748,7 +764,7 @@ function testAuthEmailSend(testEmail) {
   var results = { to: to, gmail: null, mailapp: null };
 
   try {
-    GmailApp.sendEmail(to, subject + ' (GmailApp)', '', { htmlBody: htmlBody, name: 'DDS-Dashboard Test' });
+    GmailApp.sendEmail(to, subject + ' (GmailApp)', '', { htmlBody: htmlBody, name: 'Dashboard Test' });
     results.gmail = 'SUCCESS';
     log_('testAuthEmailSend', 'GmailApp → SUCCESS');
   } catch (e) {
@@ -767,4 +783,63 @@ function testAuthEmailSend(testEmail) {
 
   log_('testAuthEmailSend results', JSON.stringify(results));
   return results;
+}
+
+/**
+ * Client-callable: Validate a magic link token from fragment-based transport.
+ * v4.51.1: Magic link tokens are now transported via URL fragment (#token=...) instead
+ * of query string (?token=...) to prevent exposure in server logs and Referer headers.
+ * The client extracts the token from the fragment and calls this function via
+ * google.script.run to validate it server-side.
+ * @param {string} token - Magic link token from URL fragment
+ * @param {boolean} rememberMe - Whether user requested "remember me"
+ * @returns {Object} { success, sessionToken, email } or { success: false, message }
+ */
+function authValidateMagicToken(token, rememberMe) {
+  if (!token) return { success: false, message: 'No token provided.' };
+  token = String(token).trim();
+
+  // Validate the magic token server-side (same logic as Auth.resolveUser path 3)
+  // _validateMagicToken is private, so we go through resolveUser with a synthetic event
+  var syntheticEvent = { parameter: { token: token } };
+  var user = Auth.resolveUser(syntheticEvent);
+
+  if (!user || !user.email) {
+    return { success: false, message: 'This link has expired or was already used. Please request a new one.' };
+  }
+
+  // Look up user in directory (same check as doGetWebDashboard)
+  var userRecord = DataService.findUserByEmail(user.email);
+  if (!userRecord) {
+    // Check bootstrap admin
+    var allowBootstrapAdmin = true;
+    try {
+      var config = ConfigReader.getConfig();
+      allowBootstrapAdmin = config.allowBootstrapAdmin !== false;
+    } catch (_) {}
+    try {
+      var ownerEmail = Session.getEffectiveUser().getEmail().toLowerCase();
+      if (allowBootstrapAdmin && user.email.toLowerCase() === ownerEmail) {
+        userRecord = { email: user.email, name: 'Admin', role: 'both' };
+      }
+    } catch (_) {}
+  }
+  if (!userRecord) {
+    return { success: false, message: 'Email not found in directory.' };
+  }
+
+  // Create session token — always needed (remember-me or not) for the redirect
+  var tokenResult = Auth.createSessionToken(user.email, 'magic');
+  var sessionToken = null;
+  if (tokenResult && typeof tokenResult === 'object' && tokenResult.error) {
+    log_('authValidateMagicToken', 'session storage failed: ' + tokenResult.message);
+  } else {
+    sessionToken = tokenResult;
+  }
+
+  if (!sessionToken) {
+    return { success: false, message: 'Session creation failed. Please try again.' };
+  }
+
+  return { success: true, sessionToken: sessionToken, email: user.email };
 }

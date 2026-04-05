@@ -706,7 +706,6 @@ describe('A11: Server-exposed functions have auth checks', () => {
     'dataGetWorkloadSummaryStats',
     'dataGetActivePolls', 'dataSubmitPollVote', 'dataAddPoll',
     'dataGetGrievanceForSigning', 'dataSubmitGrievanceSignature', // sigToken auth, not session
-    'dataGetPomsReference',             // stub — POMS excluded from this edition, returns static empty data
   ];
 
   // Functions that are init/admin only (not called from client google.script.run)
@@ -772,8 +771,7 @@ describe('A11b: Client-callable HTML endpoints have error handling', () => {
   // HTML-serving endpoints — serve static content, auth enforced by doGet().
   // No per-function auth check: Session.getActiveUser().getEmail() returns empty
   // for magic-link/session-token users (Execute-as-Me), breaking lazy-load.
-  // getPOMSReferenceHtml excluded — now a stub returning a static string (no try/catch needed)
-  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml'];
+  const htmlEndpoints = ['getMemberViewHtml', 'getOrgChartHtml', 'getPOMSReferenceHtml'];
 
   htmlEndpoints.forEach(fn => {
     test(`${fn}() has try/catch error handling`, () => {

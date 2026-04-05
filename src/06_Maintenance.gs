@@ -270,7 +270,7 @@ function REPAIR_DASHBOARD() {
     });
 
   } catch (error) {
-    log_('Error in REPAIR_DASHBOARD', error.message);
+    log_('REPAIR_DASHBOARD', 'Error: ' + error.message);
     ui.alert('❌ Error', 'Repair failed: ' + error.message, ui.ButtonSet.OK);
 
     logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
@@ -399,7 +399,7 @@ function _updateStep_featureSheets(ss, summary) {
       }
     } catch (e) {
       summary.errors.push(featureSteps[i].name + ': ' + e.message);
-      log_('fn', 'UPDATE_ALL_SHEETS feature "' + featureSteps[i].name + '": ' + e.message);
+      log_('_updateStep_featureSheets', 'UPDATE_ALL_SHEETS feature "' + featureSteps[i].name + '": ' + e.message);
     }
   }
   ss.toast('Feature sheets ready', '🔄 Step 3/8', 2);
@@ -639,7 +639,7 @@ function removeDeprecatedTabs() {
         ss.deleteSheet(sheet);
         removed.push(name);
       } catch (_e) {
-        log_('Could not delete sheet', name);
+        log_('removeDeprecatedTabs', 'Could not delete sheet: ' + name);
       }
     }
   }
@@ -895,7 +895,7 @@ function getDiagnosticsDialogHtml_(results) {
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview Caching and performance optimization functions
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 
@@ -949,14 +949,14 @@ function getCachedData(key, loader, ttl) {
     var cached = null;
     try {
       cached = memCache.get(key);
-    } catch (_memErr) { log_('_memErr', (_memErr.message || _memErr)); }
+    } catch (_memErr) { log_('getCachedData', 'Memory cache read error: ' + (_memErr.message || _memErr)); }
     if (cached) {
       try {
         if (CACHE_CONFIG.ENABLE_LOGGING) log_('getCachedData', '[CACHE HIT - Memory] ' + key);
         return JSON.parse(cached);
       } catch (_parseErr) {
         // Corrupted cache entry, remove it
-        try { memCache.remove(key); } catch (_e) { log_('_e', (_e.message || _e)); }
+        try { memCache.remove(key); } catch (_e) { log_('getCachedData', 'Memory cache remove error: ' + (_e.message || _e)); }
       }
     }
 
@@ -970,16 +970,16 @@ function getCachedData(key, loader, ttl) {
           // Refresh memory cache from properties
           var str = JSON.stringify(obj.data);
           if (str.length < 100000) {
-            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) { log_('_e', (_e.message || _e)); }
+            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) { log_('getCachedData', 'Memory cache write error: ' + (_e.message || _e)); }
           }
           if (CACHE_CONFIG.ENABLE_LOGGING) log_('getCachedData', '[CACHE HIT - Props] ' + key);
           return obj.data;
         } else {
           // Expired - clean up stale property
-          try { propsCache.deleteProperty(key); } catch (_e) { log_('_e', (_e.message || _e)); }
+          try { propsCache.deleteProperty(key); } catch (_e) { log_('getCachedData', 'Props cache delete error: ' + (_e.message || _e)); }
         }
       }
-    } catch (_propsErr) { log_('_propsErr', (_propsErr.message || _propsErr)); }
+    } catch (_propsErr) { log_('getCachedData', 'Props cache read error: ' + (_propsErr.message || _propsErr)); }
 
     // Cache miss - load fresh data
     if (CACHE_CONFIG.ENABLE_LOGGING) log_('getCachedData', '[CACHE MISS] ' + key);
@@ -1051,7 +1051,7 @@ function invalidateAllCaches() {
 
     SpreadsheetApp.getActiveSpreadsheet().toast('All caches cleared', 'Cache', 3);
   } catch (e) {
-    log_('Clear all caches error', e.message);
+    log_('invalidateAllCaches', 'Error: ' + e.message);
   }
 }
 
@@ -1071,7 +1071,7 @@ function warmUpCaches() {
     warmWebAppCaches_();
     SpreadsheetApp.getActiveSpreadsheet().toast('Caches warmed successfully', 'Cache', 3);
   } catch (e) {
-    log_('Cache warmup error', e.message);
+    log_('warmUpCaches', 'Error: ' + e.message);
     SpreadsheetApp.getActiveSpreadsheet().toast('Cache warmup failed: ' + e.message, 'Error', 5);
   }
 }
@@ -1237,7 +1237,7 @@ function showCacheStatusDashboard() {
         if (obj.timestamp) {
           age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
         }
-      } catch (_e) { log_('_e', (_e.message || _e)); }
+      } catch (_e) { log_('showCacheStatusDashboard', 'Error: ' + (_e.message || _e)); }
     }
 
     // M-13: Apply escapeHtml() to dynamic values embedded in HTML
@@ -1292,7 +1292,7 @@ function showCacheStatusDashboard() {
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview Undo/redo system functions
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  */
 
@@ -1355,46 +1355,8 @@ function saveUndoHistory(history) {
   props.setProperty(UNDO_CONFIG.STORAGE_KEY, json);
 }
 
-/**
- * Clears all undo history
- * @returns {void}
- */
-function clearUndoHistory() {
-  PropertiesService.getUserProperties().deleteProperty(UNDO_CONFIG.STORAGE_KEY);
-  SpreadsheetApp.getActiveSpreadsheet().toast('History cleared', 'Undo/Redo', 3);
-}
+// Dead code removed: clearUndoHistory(), recordAction() — zero callers in src
 
-// ============================================================================
-// ACTION RECORDING
-// ============================================================================
-
-/**
- * Records an action for undo/redo
- * @param {string} type - Action type (EDIT_CELL, ADD_ROW, DELETE_ROW, etc.)
- * @param {string} description - Human-readable description
- * @param {Object} beforeState - State before the action
- * @param {Object} afterState - State after the action
- * @returns {void}
- */
-function recordAction(type, description, beforeState, afterState) {
-  var history = getUndoHistory();
-
-  // Clear any redo history when new action is recorded
-  if (history.currentIndex < history.actions.length) {
-    history.actions = history.actions.slice(0, history.currentIndex);
-  }
-
-  history.actions.push({
-    type: type,
-    description: description,
-    timestamp: new Date().toISOString(),
-    beforeState: beforeState,
-    afterState: afterState
-  });
-
-  history.currentIndex = history.actions.length;
-  saveUndoHistory(history);
-}
 // ============================================================================
 // UNDO/REDO OPERATIONS
 // ============================================================================
@@ -1579,10 +1541,10 @@ function restoreFromSnapshot(snapshot, confirmed) {
       } catch (_hideErr) {
         backupSheet.hideSheet();
       }
-      log_('Pre-restore backup saved to hidden sheet', backupSheetName);
+      log_('restoreFromSnapshot', 'Pre-restore backup saved to hidden sheet: ' + backupSheetName);
     }
   } catch (_backupErr) {
-    log_('Warning', 'Could not create pre-restore backup sheet: ' + _backupErr.message);
+    log_('restoreFromSnapshot', 'Warning: Could not create pre-restore backup sheet: ' + _backupErr.message);
     // Continue with restore — backup failure should not block the operation,
     // but log a warning for audit trail
   }
@@ -1674,7 +1636,7 @@ function exportUndoHistoryToSheet() {
  * from accidentally triggering high-intensity system scans.
  *
  * @fileoverview Administrative and maintenance utilities
- * @version 4.43.1
+ * @version 4.51.0
  * @requires Constants.gs
  */
 
@@ -1807,13 +1769,13 @@ function logAuditEvent(eventType, details) {
           );
         }
       } catch (cpErr) {
-        log_('Warning', 'Could not save audit chain checkpoint: ' + cpErr.message);
+        log_('logAuditEvent', 'Warning: Could not save audit chain checkpoint: ' + cpErr.message);
       }
       auditSheet.deleteRows(2, rowsToDelete);
     }
 
   } catch (error) {
-    log_('Error logging audit event', error);
+    log_('logAuditEvent', 'Error: ' + (error.message || error));
     // Don't throw - audit logging shouldn't break main functionality
   }
 }
@@ -1948,7 +1910,7 @@ function NUCLEAR_WIPE_GRIEVANCES() {
     } catch (_hideErr) {
       snapshotSheet.hideSheet();
     }
-    log_('Pre-wipe snapshot saved to hidden sheet', snapshotName);
+    log_('NUCLEAR_WIPE_GRIEVANCES', 'Pre-wipe snapshot saved to hidden sheet: ' + snapshotName);
   }
 
   if (lastRow > 1) {
@@ -1984,7 +1946,7 @@ function createWeeklySnapshot() {
   var archiveFolderId = '';
   try {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('createWeeklySnapshot', 'Error: ' + (_e.message || _e)); }
 
   var folder;
   if (!archiveFolderId) {
@@ -2004,7 +1966,7 @@ function createWeeklySnapshot() {
           configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).setValue(archiveFolderId);
         }
       } catch (_saveErr) {
-        log_('Could not save archive folder ID to config', _saveErr.message);
+        log_('createWeeklySnapshot', 'Could not save archive folder ID to config: ' + _saveErr.message);
       }
       ss.toast('Auto-created archive folder in Google Drive.', 'Archive Setup', 3);
     } catch (createErr) {
@@ -2053,7 +2015,7 @@ function createAutomatedSnapshot() {
   try {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
   } catch (e) {
-    log_('Could not get archive folder ID', e.message);
+    log_('createAutomatedSnapshot', 'Could not get archive folder ID: ' + e.message);
     return errorResponse('Archive folder not configured');
   }
 
@@ -2077,7 +2039,7 @@ function createAutomatedSnapshot() {
     return { success: true, snapshotName: snapshotName };
 
   } catch (e) {
-    log_('Failed to create automated snapshot', e.message);
+    log_('createAutomatedSnapshot', 'Failed to create automated snapshot: ' + e.message);
     return errorResponse(e.message);
   }
 }
@@ -2369,7 +2331,7 @@ function saveSettings(settings) {
   // Only write whitelisted keys, validate types
   var savedKeys = [];
   for (var key in ALLOWED_SETTINGS) {
-    if (ALLOWED_SETTINGS.hasOwnProperty(key) && settings.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(ALLOWED_SETTINGS, key) && Object.prototype.hasOwnProperty.call(settings, key)) {
       var expectedType = ALLOWED_SETTINGS[key];
       var value = settings[key];
       // Coerce to expected type for safety
@@ -2418,7 +2380,7 @@ function saveSettings(settings) {
  * - Enhanced audit logging
  * - Auto-archive for closed grievances
  *
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -2605,114 +2567,7 @@ function validateMemberIdOnEdit(e) {
   }
 }
 
-// ============================================================================
-// GHOST VALIDATION FOR ORPHANED GRIEVANCES
-// ============================================================================
-
-/**
- * Find grievances with Member IDs that don't exist in Member Directory
- * @returns {Array<Object>} Array of orphaned grievance info
- */
-function findOrphanedGrievances() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!memberSheet || !grievanceSheet) {
-    return [];
-  }
-
-  if (memberSheet.getLastRow() < 2 || grievanceSheet.getLastRow() < 2) {
-    return [];
-  }
-
-  // Build set of valid member IDs
-  var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
-  var validMemberIds = {};
-  memberIds.forEach(function(row) {
-    if (row[0]) validMemberIds[row[0]] = true;
-  });
-
-  // Check grievance member IDs
-  var lastCol = Math.max(GRIEVANCE_COLS.GRIEVANCE_ID, GRIEVANCE_COLS.MEMBER_ID,
-                         GRIEVANCE_COLS.FIRST_NAME, GRIEVANCE_COLS.LAST_NAME);
-  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, lastCol).getValues();
-  var orphaned = [];
-
-  grievanceData.forEach(function(row, index) {
-    var grievanceId = col_(row, GRIEVANCE_COLS.GRIEVANCE_ID);
-    var memberId = col_(row, GRIEVANCE_COLS.MEMBER_ID);
-
-    if (memberId && !validMemberIds[memberId]) {
-      orphaned.push({
-        row: index + 2,
-        grievanceId: grievanceId,
-        memberId: memberId,
-        memberName: (col_(row, GRIEVANCE_COLS.FIRST_NAME) || '') + ' ' + (col_(row, GRIEVANCE_COLS.LAST_NAME) || '')
-      });
-    }
-  });
-
-  return orphaned;
-}
-
-// ============================================================================
-// STEWARD LOAD BALANCING METRICS
-// ============================================================================
-
-/**
- * Calculate steward workload metrics
- * @returns {Array<Object>} Array of steward workload data
- */
-function calculateStewardWorkload() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) return [];
-
-  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.STEWARD).getValues();
-
-  // Count active grievances per steward
-  var stewardCounts = {};
-  var activeStatuses = ['Open', 'Pending Info', 'In Arbitration', 'Appealed'];
-
-  grievanceData.forEach(function(row) {
-    var status = col_(row, GRIEVANCE_COLS.STATUS);
-    var steward = col_(row, GRIEVANCE_COLS.STEWARD);
-
-    if (steward && activeStatuses.indexOf(status) !== -1) {
-      if (!stewardCounts[steward]) {
-        stewardCounts[steward] = {
-          name: steward,
-          activeCount: 0,
-          urgentCount: 0,
-          totalAssigned: 0
-        };
-      }
-      stewardCounts[steward].activeCount++;
-      stewardCounts[steward].totalAssigned++;
-
-      // Check if urgent (days to deadline <= 7)
-      var daysToDeadline = col_(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
-      if (typeof daysToDeadline === 'number' && daysToDeadline <= 7) {
-        stewardCounts[steward].urgentCount++;
-      }
-    }
-  });
-
-  // Convert to array and calculate load scores
-  var stewards = Object.keys(stewardCounts).map(function(name) {
-    var data = stewardCounts[name];
-    // Load score: active cases + (urgent cases * 2)
-    data.loadScore = data.activeCount + (data.urgentCount * 2);
-    return data;
-  });
-
-  // Sort by load score descending
-  stewards.sort(function(a, b) { return b.loadScore - a.loadScore; });
-
-  return stewards;
-}
+// Dead code removed: findOrphanedGrievances(), calculateStewardWorkload() — zero callers in src
 
 // ============================================================================
 // SELF-HEALING CONFIG VALIDATION TOOL
@@ -2748,7 +2603,8 @@ function findMissingConfigValues() {
 
   fieldsToCheck.forEach(function(field) {
     // Get valid config values
-    var configValues = configSheet.getRange(3, field.configCol, 100, 1).getValues()
+    var numRows = Math.max(1, configSheet.getLastRow() - 2);
+    var configValues = configSheet.getRange(3, field.configCol, numRows, 1).getValues()
       .filter(function(row) { return row[0] !== ''; })
       .map(function(row) { return row[0]; });
 
@@ -2787,45 +2643,7 @@ function findMissingConfigValues() {
 }
 
 
-/**
- * Auto-add missing values to Config sheet
- */
-function autoFixMissingConfigValues() {
-  var report = findMissingConfigValues();
-
-  if (report.error || report.autoFixable.length === 0) {
-    return;
-  }
-
-  // Group by config column
-  var byColumn = {};
-  report.autoFixable.forEach(function(item) {
-    if (!byColumn[item.configCol]) {
-      byColumn[item.configCol] = [];
-    }
-    byColumn[item.configCol].push(item.value);
-  });
-
-  // Add values to each column using the canonical write path
-  Object.keys(byColumn).forEach(function(colStr) {
-    var col = parseInt(colStr);
-    var values = byColumn[col];
-
-    values.forEach(function(value) {
-      addToConfigDropdown_(col, value);
-    });
-  });
-
-  // Log the fix
-  logIntegrityEvent('CONFIG_AUTO_FIX', 'Added ' + report.autoFixable.length + ' missing values to Config');
-
-  SpreadsheetApp.getUi().alert(
-    '✅ Config Updated',
-    'Successfully added ' + report.autoFixable.length + ' missing values to the Config sheet.\n\n' +
-    'Please run "Setup Data Validations" from the Settings menu to refresh dropdowns.',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
-}
+// Dead code removed: autoFixMissingConfigValues() — zero callers in src
 
 // ============================================================================
 // ENHANCED AUDIT LOGGING
@@ -2849,7 +2667,7 @@ function logIntegrityEvent(eventType, details, additionalInfo) {
   if (additionalInfo) {
     if (typeof additionalInfo === 'object') {
       for (var key in additionalInfo) {
-        if (additionalInfo.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(additionalInfo, key)) {
           combinedDetails[key] = additionalInfo[key];
         }
       }
@@ -2963,7 +2781,7 @@ function archiveClosedGrievances(daysOld) {
     });
     if (failedDeletes.length > 0) {
       var failedRows = failedDeletes.map(function(f) { return f.row; });
-      log_('Warning', failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));
+      log_('archiveClosedGrievances', 'Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));
     }
 
     // Log the archive operation
@@ -3043,7 +2861,7 @@ function onEditWithAuditLogging(e) {
       validateMemberIdOnEdit(e);
     }
   } catch (err) {
-    log_('onEditWithAuditLogging error', err.message);
+    log_('onEditWithAuditLogging', 'Error: ' + err.message);
   }
 }
 
@@ -3194,6 +3012,7 @@ function archiveOldAuditLogs_(daysOld) {
     cutoff.setDate(cutoff.getDate() - daysOld);
 
     var lastRow = auditSheet.getLastRow();
+    if (lastRow < 2) return { archived: 0 };
     var data = auditSheet.getRange(2, 1, lastRow - 1, auditSheet.getLastColumn()).getValues();
     var rowsToArchive = [];
     var deleteIndices = [];

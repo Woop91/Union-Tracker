@@ -29,7 +29,7 @@
  *   Used by 00_Security.gs (COMMAND_CONFIG for email templates), menu items
  *   in 03_, and strategic analysis features.
  *
- * @version 4.43.1
+ * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
  */
@@ -421,7 +421,7 @@ function addRepoLinkToFAQ_(ss) {
 
     log_('addRepoLinkToFAQ_', 'Added repo link to FAQ sheet');
   } catch (e) {
-    log_('Error adding repo link to FAQ', e.message);
+    log_('addRepoLinkToFAQ_', 'Error: ' + e.message);
   }
 }
 
@@ -519,25 +519,6 @@ function applyTabColors() {
   applyTabColors_(ss);
   ss.toast('Tab colors applied!', 'Success', 3);
 }
-/**
- * Darkens a hex color by a percentage
- * @param {string} color - Hex color (e.g., '#e3f2fd')
- * @param {number} percent - Percentage to darken (0-100)
- * @returns {string} Darkened hex color
- * @private
- */
-function darkenColor_(color, percent) {
-  var num = parseInt(color.replace('#', ''), 16);
-  var amt = Math.round(2.55 * percent);
-  var R = (num >> 16) - amt;
-  var G = (num >> 8 & 0x00FF) - amt;
-  var B = (num & 0x0000FF) - amt;
-  R = Math.max(0, R);
-  G = Math.max(0, G);
-  B = Math.max(0, B);
-  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
-}
-
 // ============================================================================
 // DIAGNOSTIC & REPAIR FUNCTIONS
 // ============================================================================
@@ -763,7 +744,7 @@ function createGrievancePDF(folder, data) {
   // Replace placeholders with data
   body.replaceText('{{MemberName}}', data.name);
   body.replaceText('{{MemberID}}', data.id);
-  body.replaceText('{{Date}}', new Date().toLocaleDateString());
+  body.replaceText('{{Date}}', Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy'));
   body.replaceText('{{Details}}', data.details);
 
   // Add signature blocks
@@ -1186,7 +1167,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
 
     // Store the full OCR text in resolution notes for reference
     var existingResolution = sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).getValue() || '';
-    var ocrNote = '[OCR Extract ' + new Date().toLocaleDateString() + ']: ' + text.substring(0, 500);
+    var ocrNote = '[OCR Extract ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy') + ']: ' + text.substring(0, 500);
     if (text.length > 500) ocrNote += '...';
 
     if (existingResolution) {
@@ -2024,7 +2005,7 @@ function searchPrecedentsData(query, outcomeFilter) {
  * - PII safety utilities
  *
  * @fileoverview Member portal service with PII protection
- * @version 4.43.1
+ * @version 4.51.0
  * @requires 01_Constants.gs
  * ============================================================================
  */
@@ -2033,29 +2014,6 @@ function searchPrecedentsData(query, outcomeFilter) {
 // SAFETY VALVE - PII AUTO-REDACTION
 // ============================================================================
 
-/**
- * Scans and masks PII patterns (Phone numbers, SSNs) from strings.
- * Used to ensure accidental data entry doesn't leak to the Member Dashboard.
- *
- * @param {*} data - Input data to scrub
- * @returns {*} Scrubbed data with PII masked
- */
-function safetyValveScrub(data) {
-  if (typeof data !== 'string') return data;
-
-  // Mask Phone Numbers: (123) 456-7890 or 123-456-7890 or +1 123-456-7890
-  var phoneRegex = /(\+?\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g;
-
-  // Mask SSN-like patterns: 000-00-0000
-  var ssnRegex = /\b\d{3}-\d{2}-\d{4}\b/g;
-
-  // Mask email addresses
-  var emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-
-  return data.replace(phoneRegex, "[REDACTED CONTACT]")
-             .replace(ssnRegex, "[REDACTED ID]")
-             .replace(emailRegex, "[REDACTED EMAIL]");
-}
 // ============================================================================
 // DATA FETCHING FUNCTIONS - Portal Support
 // ============================================================================
@@ -2124,7 +2082,7 @@ function getSecureAllStewards_() {
   var stewards = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (col_(data[i], MEMBER_COLS.IS_STEWARD) === 'Yes') {
+    if (isTruthyValue(col_(data[i], MEMBER_COLS.IS_STEWARD))) {
       stewards.push({
         'First Name': col_(data[i], MEMBER_COLS.FIRST_NAME) || '',
         'Last Name': col_(data[i], MEMBER_COLS.LAST_NAME) || '',
@@ -2187,7 +2145,7 @@ function getSecureSatisfactionStats_() {
       result.recentTrend = recent > previous + 0.2 ? 'improving' : (recent < previous - 0.2 ? 'declining' : 'stable');
     }
   } catch (e) {
-    log_('Error in getSecureSatisfactionStats_', e.message);
+    log_('getSecureSatisfactionStats_', 'Error: ' + e.message);
   }
 
   return result;
@@ -2209,7 +2167,7 @@ function getStewardWorkload() {
   // Get all stewards first
   var memberData = memberSheet.getDataRange().getValues();
   for (var i = 1; i < memberData.length; i++) {
-    if (col_(memberData[i], MEMBER_COLS.IS_STEWARD) === 'Yes') {
+    if (isTruthyValue(col_(memberData[i], MEMBER_COLS.IS_STEWARD))) {
       var name = (col_(memberData[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' +
                  (col_(memberData[i], MEMBER_COLS.LAST_NAME) || '');
       workload[name.trim()] = { name: name.trim(), openCases: 0, totalCases: 0 };
@@ -2245,7 +2203,7 @@ function getContractPdfUrl_() {
       var url = configSheet.getRange(3, CONFIG_COLS.ORG_WEBSITE).getValue();
       if (url) return url;
     }
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('getContractPdfUrl_', 'Error: ' + (_e.message || _e)); }
   return '#';
 }
 
@@ -2261,7 +2219,7 @@ function getResourceDriveUrl_() {
       var folderId = configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).getValue();
       if (folderId) return 'https://drive.google.com/drive/folders/' + folderId;
     }
-  } catch (_e) { log_('_e', (_e.message || _e)); }
+  } catch (_e) { log_('getResourceDriveUrl_', 'Error: ' + (_e.message || _e)); }
   return '#';
 }
 
@@ -2413,8 +2371,14 @@ function getMemberProfile(memberId) {
         lastName: col_(data[i], MEMBER_COLS.LAST_NAME) || '',
         unit: col_(data[i], MEMBER_COLS.UNIT) || 'General',
         workLocation: col_(data[i], MEMBER_COLS.WORK_LOCATION) || '',
-        duesPaying: true,
-        isSteward: col_(data[i], MEMBER_COLS.IS_STEWARD) === 'Yes',
+        duesPaying: (function() {
+          var ds = String(col_(data[i], MEMBER_COLS.DUES_STATUS) || '').trim().toLowerCase();
+          if (ds === '') return null;
+          var NON_PAYING = ['past due', 'inactive', 'delinquent', 'lapsed', 'non-paying', 'no', 'non-member'];
+          for (var np = 0; np < NON_PAYING.length; np++) { if (ds === NON_PAYING[np]) return false; }
+          return true;
+        })(),
+        isSteward: isTruthyValue(col_(data[i], MEMBER_COLS.IS_STEWARD)),
         volunteerHours: parseFloat(col_(data[i], MEMBER_COLS.VOLUNTEER_HOURS)) || 0
       };
     }
