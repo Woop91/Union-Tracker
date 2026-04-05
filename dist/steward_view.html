@@ -5933,7 +5933,7 @@ function _buildExplorerUI(container, allMembers) {
   return;
  }
 
- var table = el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
+ var table = el('table', { style: { width: '100%', minWidth: '860px', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
  var thead = el('thead');
  var headRow = el('tr');
  _EXP_EDIT_COLS.forEach(function(c) {
@@ -5956,7 +5956,7 @@ function _buildExplorerUI(container, allMembers) {
    type: 'text',
    value: String(m[c.key] || ''),
    className: _TI,
-   style: { width: '100%', fontSize: '12px', padding: '3px 6px', border: '1px solid transparent', borderRadius: '4px', background: 'transparent', color: 'var(--text)', minWidth: '80px', boxSizing: 'border-box' },
+   style: { width: '100%', fontSize: '12px', padding: '3px 6px', border: '1px solid transparent', borderRadius: '4px', background: 'transparent', color: 'var(--text)', minWidth: '100px', boxSizing: 'border-box' },
    'aria-label': c.label + ' for ' + (m.name || m.email)
    });
    inp.addEventListener('focus', function() { inp.style.border = '1px solid var(--accent)'; inp.style.background = 'var(--inputBg, rgba(255,255,255,0.05))'; });
@@ -5976,7 +5976,7 @@ function _buildExplorerUI(container, allMembers) {
   } else {
    td.textContent = String(m[c.key] || '\u2014');
    td.style.whiteSpace = 'nowrap';
-   td.style.maxWidth = '160px';
+   td.style.maxWidth = '200px';
    td.style.overflow = 'hidden';
    td.style.textOverflow = 'ellipsis';
    if (c.key === 'email' && !m.email) {
