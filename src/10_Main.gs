@@ -88,8 +88,14 @@ function onOpenDeferred_() {
   // REL-04: Wrap entire deferred init in try/catch so trigger failures are logged
   // and don't silently disappear (GAS only logs trigger errors to Stackdriver).
   try {
+    var _columnsChanged = false;
+
     try {
-      syncColumnMaps();
+      var syncResult = syncColumnMaps();
+      if (syncResult && syncResult.synced && syncResult.synced.length > 0) {
+        _columnsChanged = true;
+        log_('onOpenDeferred_', 'columns shifted: ' + syncResult.synced.join(', '));
+      }
     } catch (syncError) {
       log_('onOpenDeferred_', 'Column sync skipped: ' + syncError.message);
     }
@@ -98,6 +104,20 @@ function onOpenDeferred_() {
       ensureAllSheetColumns_();
     } catch (colError) {
       log_('onOpenDeferred_', 'Column check skipped: ' + colError.message);
+    }
+
+    // When columns were backfilled or shifted, re-apply ALL validations so
+    // dropdowns/checkboxes land on the correct (freshly-resolved) columns.
+    // Without this, stale validations persist on old column positions until
+    // the user manually runs a repair — the gap that caused phantom dropdowns
+    // on Member ID, Contact Notes, PIN Hash, etc.
+    if (_columnsChanged) {
+      try {
+        setupDataValidations();
+        log_('onOpenDeferred_', 'validations re-applied after column shift');
+      } catch (valError) {
+        log_('onOpenDeferred_', 'Validation re-apply skipped: ' + valError.message);
+      }
     }
 
     try {
@@ -334,6 +354,11 @@ function onTabSwitch_(sheetName) {
  */
 function showCurrentTabModal() {
   try {
+    // T5-1: Respect ENABLE_TAB_MODALS toggle for manual menu path too
+    if (typeof isTabModalsEnabled_ === 'function' && !isTabModalsEnabled_()) {
+      SpreadsheetApp.getUi().alert('Tab modals are currently disabled. Enable them in Admin Settings.');
+      return;
+    }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return;
     var sheetName = ss.getActiveSheet().getName();

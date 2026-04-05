@@ -745,6 +745,51 @@ function setupDataValidations() {
     return;
   }
 
+  // ── Step 0: Clear ALL existing data validations from data ranges ──
+  // This removes stale validations left on wrong columns after column positions
+  // shifted (e.g. backfill appended columns to the end, changing physical order).
+  // Without this, old dropdowns/checkboxes persist on Member ID, Contact Notes,
+  // PIN Hash, etc. even after syncColumnMaps resolves correct positions.
+  try {
+    var memberLastRow = memberSheet.getMaxRows();
+    var memberLastCol = memberSheet.getLastColumn();
+    if (memberLastRow > 1 && memberLastCol > 0) {
+      memberSheet.getRange(2, 1, memberLastRow - 1, memberLastCol).clearDataValidations();
+    }
+    var grievLastRow = grievanceSheet.getMaxRows();
+    var grievLastCol = grievanceSheet.getLastColumn();
+    if (grievLastRow > 1 && grievLastCol > 0) {
+      grievanceSheet.getRange(2, 1, grievLastRow - 1, grievLastCol).clearDataValidations();
+    }
+    log_('setupDataValidations', 'cleared stale validations from Member Dir (' + memberLastCol + ' cols) and Grievance Log (' + grievLastCol + ' cols)');
+  } catch (_clearErr) {
+    log_('setupDataValidations', 'validation clear failed (non-fatal): ' + (_clearErr.message || _clearErr));
+  }
+
+  // ── Step 1: Re-apply checkboxes that were cleared above ──
+  // Start Grievance and ⚡ Actions columns need checkboxes, not dropdowns.
+  // Resolve from actual headers to avoid stale MEMBER_COLS positions.
+  try {
+    var sgCol = resolveColumnByHeader_(memberSheet, 'Start Grievance', MEMBER_COLS.START_GRIEVANCE);
+    var qaCol = resolveColumnByHeader_(memberSheet, '\u26A1 Actions', MEMBER_COLS.QUICK_ACTIONS);
+    var cbRows = Math.max(1, memberSheet.getMaxRows() - 1);
+    memberSheet.getRange(2, sgCol, cbRows, 1).insertCheckboxes();
+    memberSheet.getRange(2, qaCol, cbRows, 1).insertCheckboxes();
+  } catch (_cbErr) {
+    log_('setupDataValidations', 'checkbox restore failed (non-fatal): ' + (_cbErr.message || _cbErr));
+  }
+
+  // ── Step 2: Re-apply Grievance Log checkboxes ──
+  try {
+    var gMaCol = resolveColumnByHeader_(grievanceSheet, 'Message Alert', GRIEVANCE_COLS.MESSAGE_ALERT);
+    var gQaCol = resolveColumnByHeader_(grievanceSheet, '\u26A1 Actions', GRIEVANCE_COLS.QUICK_ACTIONS);
+    var gCbRows = Math.max(1, grievanceSheet.getMaxRows() - 1);
+    grievanceSheet.getRange(2, gMaCol, gCbRows, 1).insertCheckboxes();
+    grievanceSheet.getRange(2, gQaCol, gCbRows, 1).insertCheckboxes();
+  } catch (_gCbErr) {
+    log_('setupDataValidations', 'grievance checkbox restore failed (non-fatal): ' + (_gCbErr.message || _gCbErr));
+  }
+
   // Member Directory Validations — driven by DROPDOWN_MAP (single-select)
   var memberDD = DROPDOWN_MAP.MEMBER_DIR;
   for (var m = 0; m < memberDD.length; m++) {
@@ -756,7 +801,8 @@ function setupDataValidations() {
   // The YES_NO Config column was removed to eliminate contamination risk.
   // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
   var yesNoValues = ['Yes', 'No'];
-  var yesNoCols = [MEMBER_COLS.IS_STEWARD, MEMBER_COLS.INTEREST_LOCAL,
+  var yesNoCols = [MEMBER_COLS.IS_STEWARD, MEMBER_COLS.SHARE_PHONE,
+                   MEMBER_COLS.INTEREST_LOCAL,
                    MEMBER_COLS.INTEREST_CHAPTER, MEMBER_COLS.INTEREST_ALLIED];
   var yesNoRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(yesNoValues, true)

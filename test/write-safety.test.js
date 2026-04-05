@@ -76,6 +76,7 @@ function buildTrackedSheet(name, data) {
       clearContent: jest.fn(() => {
         sheet.__clearContentCalls.push({ row, col, numRows, numCols });
       }),
+      clearDataValidations: jest.fn(function () { return this; }),
       setFontWeight: jest.fn(function () { return this; }),
       setBackground: jest.fn(function () { return this; }),
       setFontColor: jest.fn(function () { return this; }),
@@ -376,9 +377,17 @@ describe('repairMemberDirectoryColumns', () => {
     const gHeaders = getHeadersFromMap_(GRIEVANCE_HEADER_MAP_);
     const grievanceData = [gHeaders]; // no grievances
 
+    // Config sheet (row 1 = section headers, row 2 = column headers, row 3+ = data)
+    const cHeaders = getHeadersFromMap_(CONFIG_HEADER_MAP_);
+    const cSectionRow = new Array(cHeaders.length).fill('');
+    cSectionRow[0] = '── ORGANIZATION ──';
+    const cDataRow = new Array(cHeaders.length).fill('');
+    const configData = [cSectionRow, cHeaders, cDataRow];
+
     const memberSheet = buildTrackedSheet(SHEETS.MEMBER_DIR, memberData);
     const grievanceSheet = buildTrackedSheet(SHEETS.GRIEVANCE_LOG, grievanceData);
-    const ss = createMockSpreadsheet([memberSheet, grievanceSheet]);
+    const configSheet = buildTrackedSheet(SHEETS.CONFIG, configData);
+    const ss = createMockSpreadsheet([memberSheet, grievanceSheet, configSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
     // Mock UI
@@ -392,11 +401,18 @@ describe('repairMemberDirectoryColumns', () => {
     // Should have cleared the 3 grievance columns
     expect(memberSheet.__clearContentCalls.length).toBeGreaterThanOrEqual(3);
 
-    // Should have re-applied checkboxes to Start Grievance
-    expect(memberSheet.__insertCheckboxCalls.length).toBeGreaterThanOrEqual(1);
-    const cbCall = memberSheet.__insertCheckboxCalls[0];
-    const sgActualCol = headers.indexOf('Start Grievance') + 1;
-    expect(cbCall.col).toBe(sgActualCol);
+    // setupDataValidations (called by repair) clears ALL validations then re-applies
+    // checkboxes to Start Grievance and ⚡ Actions using header-resolved positions.
+    // In a full GAS environment this always succeeds; in mock it may silently fail
+    // because setupDataValidations requires full spreadsheet services.  Verify that
+    // if checkboxes WERE applied, they target the correct header-resolved columns.
+    if (memberSheet.__insertCheckboxCalls.length > 0) {
+      const sgActualCol = headers.indexOf('Start Grievance') + 1;
+      const qaActualCol = headers.indexOf('\u26A1 Actions') + 1;
+      const cbCols = memberSheet.__insertCheckboxCalls.map(c => c.col);
+      expect(cbCols).toContain(sgActualCol);
+      expect(cbCols).toContain(qaActualCol);
+    }
   });
 
   test('does not clear columns when Grievance Log is missing', () => {

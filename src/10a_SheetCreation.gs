@@ -461,27 +461,50 @@ function repairConfigData() {
     }
   }
 
-  // Step 2: clear ALL data rows (row 3+) — a full reset
+  // Step 2: rebuild Config headers (headers + default seeds + toggle validations).
+  // Must run BEFORE selective clear so CONFIG_COLS are resolved from fresh headers.
+  createConfigSheet(ss);
+  SpreadsheetApp.flush();
+
+  // Step 3: selectively clear ONLY dropdown-list columns that
+  // populateConfigFromSheetData() will repopulate from Member Dir / Grievance Log.
+  // Organization, Contact Info, Branding, Deadlines, Links, Drive, Notifications,
+  // Feature Toggles, Retention, and other user-entered data are PRESERVED.
+  var repopulableCols = [
+    CONFIG_COLS.JOB_TITLES, CONFIG_COLS.OFFICE_LOCATIONS,
+    CONFIG_COLS.OFFICE_DAYS, CONFIG_COLS.UNITS,
+    CONFIG_COLS.DUES_STATUSES,
+    CONFIG_COLS.SUPERVISORS, CONFIG_COLS.MANAGERS,
+    CONFIG_COLS.STEWARDS, CONFIG_COLS.STEWARD_COMMITTEES,
+    CONFIG_COLS.COMM_METHODS, CONFIG_COLS.BEST_TIMES,
+    CONFIG_COLS.GRIEVANCE_STATUS, CONFIG_COLS.GRIEVANCE_STEP,
+    CONFIG_COLS.ISSUE_CATEGORY, CONFIG_COLS.ARTICLES
+  ];
+
   var lastRow = sheet.getLastRow();
   if (lastRow >= 3) {
-    sheet.getRange(3, 1, lastRow - 2, Math.max(expected.length, maxCol)).clearContent();
+    var dataHeight = lastRow - 2;
+    for (var rc = 0; rc < repopulableCols.length; rc++) {
+      var col = repopulableCols[rc];
+      if (col && col > 0 && col <= maxCol) {
+        sheet.getRange(3, col, dataHeight, 1).clearContent();
+      }
+    }
+    log_('repairConfigData', 'cleared ' + repopulableCols.length +
+      ' dropdown columns (rows 3-' + lastRow + '), preserved all user-entered data');
   }
-
-  // Step 3: rebuild Config from scratch (headers + default seeds + toggle validations)
-  createConfigSheet(ss);
-  SpreadsheetApp.flush();  // ensure writes are visible to subsequent reads
 
   // Step 4: backfill Config dropdown columns from existing sheet data
   // (Job Titles, Locations, Stewards, Statuses, etc. from Member Dir & Grievance Log)
-  ss.toast('Populating Config from existing sheet data...', '🔧 Repair', 3);
+  ss.toast('Populating Config from existing sheet data...', '\uD83D\uDD27 Repair', 3);
   populateConfigFromSheetData();
   SpreadsheetApp.flush();
 
   // Step 5: reapply data validations so dropdowns reflect new Config values
-  ss.toast('Reapplying dropdown validations...', '🔧 Repair', 3);
+  ss.toast('Reapplying dropdown validations...', '\uD83D\uDD27 Repair', 3);
   setupDataValidations();
 
-  ss.toast('Config fully repaired — defaults seeded, sheet data imported, validations applied.', '✅ Repair Complete', 5);
+  ss.toast('Config repaired — dropdowns refreshed, user data preserved, validations applied.', '\u2705 Repair Complete', 5);
 }
 
 /**
@@ -588,10 +611,16 @@ function repairMemberDirectoryColumns() {
       return;
     }
 
-    // Step 4: Re-apply checkboxes to Start Grievance column
-    var sgCol = resolveColumnByHeader_(sheet, 'Start Grievance', MEMBER_COLS.START_GRIEVANCE);
-    if (lastRow >= 2) {
-      sheet.getRange(2, sgCol, lastRow - 1, 1).insertCheckboxes();
+    // Step 4: Re-apply all data validations (dropdowns, Yes/No, checkboxes)
+    // setupDataValidations clears ALL stale validations first, then applies
+    // fresh ones using the just-synced column positions. This fixes phantom
+    // dropdowns on Member ID, Contact Notes, PIN Hash, etc.
+    ss.toast('Re-applying all data validations...', '\uD83D\uDD27 Member Dir Repair', 3);
+    try {
+      setupDataValidations();
+    } catch (valErr) {
+      log_('repairMemberDirectoryColumns', 'setupDataValidations failed: ' + valErr.message);
+      ss.toast('Validation repair failed: ' + valErr.message, '\u26A0\uFE0F Warning', 5);
     }
 
     // Step 5: Report
@@ -601,7 +630,7 @@ function repairMemberDirectoryColumns() {
         : '\u2022 All columns in canonical order\n') +
       '\u2022 Column positions re-synced from actual headers\n' +
       '\u2022 Grievance data cleared and re-synced to correct columns\n' +
-      '\u2022 Start Grievance checkboxes restored\n\n' +
+      '\u2022 All data validations cleared and re-applied (dropdowns, checkboxes, Yes/No)\n\n' +
       'Note: Open Rate data cannot be auto-repaired \u2014 if dates are showing\n' +
       'in the Open Rate column, run a Constant Contact sync to refresh it.';
 
