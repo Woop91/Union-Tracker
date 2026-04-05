@@ -70,7 +70,7 @@ function buildAlertSheet(rows) {
  * @returns {Object} Mock sheet
  */
 function buildGrievanceSheet(rowDefs) {
-  var headerCount = 30; // GRIEVANCE_HEADER_MAP_ has 30 entries
+  var headerCount = GRIEVANCE_HEADER_MAP_.length;
   var headers = [];
   for (var h = 0; h < headerCount; h++) headers.push('Header' + (h + 1));
   var data = [headers];
@@ -1125,6 +1125,12 @@ describe('TrendAlertService.runDetection', () => {
 // ============================================================================
 
 describe('Global wrappers', () => {
+  beforeEach(() => {
+    // v4.51.1: gas-mock defaults to deny — explicitly opt in for wrapper tests
+    global._resolveCallerEmail = jest.fn(() => 'test@example.com');
+    global._requireStewardAuth = jest.fn(() => 'steward@example.com');
+  });
+
   test('dataGetTrendAlerts delegates to getActiveAlerts with auth', () => {
     var alertSheet = buildAlertSheet([
       ['a1', 'GRIEVANCE_SPIKE', 'HIGH', 'Spike', 'msg', 'data', new Date(), 'Active', '', '', '', '']

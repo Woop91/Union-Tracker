@@ -494,6 +494,20 @@ function repairConfigData() {
       ' dropdown columns (rows 3-' + lastRow + '), preserved all user-entered data');
   }
 
+  // Step 3b: Re-seed critical defaults that the clear just wiped.
+  // createConfigSheet (Step 2) skipped seeding because the columns had data;
+  // the clear (Step 3) then emptied them.  populateConfigFromSheetData (Step 4)
+  // only writes values that already exist in the Member Dir / Grievance Log,
+  // so values like "Inactive" or "Non Member" that aren't in any member row
+  // would be permanently lost without this re-seed.
+  seedConfigDefault_(sheet, CONFIG_COLS.DUES_STATUSES, ['Current', 'Past Due', 'Inactive', 'Non Member'], true);
+  seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, true);
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS, true);
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP, true);
+  seedConfigDefault_(sheet, CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY, true);
+  seedConfigDefault_(sheet, CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES, true);
+  seedConfigDefault_(sheet, CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS, true);
+
   // Step 4: backfill Config dropdown columns from existing sheet data
   // (Job Titles, Locations, Stewards, Statuses, etc. from Member Dir & Grievance Log)
   ss.toast('Populating Config from existing sheet data...', '\uD83D\uDD27 Repair', 3);

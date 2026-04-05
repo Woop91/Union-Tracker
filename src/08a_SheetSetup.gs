@@ -765,6 +765,10 @@ function setupDataValidations() {
   } catch (_clearErr) {
     log_('setupDataValidations', 'validation clear failed (non-fatal): ' + (_clearErr.message || _clearErr));
   }
+  // Flush so the blanket clear commits before new validations are applied.
+  // Without this, GAS can batch the clear and subsequent setDataValidation calls
+  // together, causing the clear to override freshly-applied dropdowns.
+  SpreadsheetApp.flush();
 
   // ── Step 1: Re-apply checkboxes that were cleared above ──
   // Start Grievance and ⚡ Actions columns need checkboxes, not dropdowns.

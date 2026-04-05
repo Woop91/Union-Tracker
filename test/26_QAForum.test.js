@@ -1011,6 +1011,12 @@ describe('QAForum.getFlaggedContent', () => {
 // ============================================================================
 
 describe('Global wrappers', () => {
+  beforeEach(() => {
+    // v4.51.1: gas-mock defaults to deny — explicitly opt in for wrapper tests
+    global._resolveCallerEmail = jest.fn(() => 'test@example.com');
+    global._requireStewardAuth = jest.fn(() => 'steward@example.com');
+  });
+
   test('qaGetQuestions delegates to QAForum.getQuestions', () => {
     var forumSheet = createMockSheet(SHEETS.QA_FORUM, [FORUM_HEADERS]);
     var ss = createMockSpreadsheet([forumSheet]);

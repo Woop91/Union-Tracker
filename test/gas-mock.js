@@ -142,8 +142,8 @@ function createMockRange(values) {
     getA1Notation: jest.fn(() => 'A2'),
     getValue: jest.fn(() => (values && values[0] && values[0][0]) || ''),
     getValues: jest.fn(() => values || [['']]),
-    setValue: jest.fn(),
-    setValues: jest.fn(),
+    setValue: jest.fn(function() { return this; }),
+    setValues: jest.fn(function() { return this; }),
     setFontWeight: jest.fn(function() { return this; }),
     setBackground: jest.fn(function() { return this; }),
     setFontColor: jest.fn(function() { return this; }),
@@ -158,7 +158,9 @@ function createMockRange(values) {
     setWrap: jest.fn(function() { return this; }),
     setNumberFormat: jest.fn(function() { return this; }),
     setBold: jest.fn(function() { return this; }),
-    shiftColumnGroupDepth: jest.fn(function() { return this; })
+    shiftColumnGroupDepth: jest.fn(function() { return this; }),
+    createFilter: jest.fn(function() { return this; }),
+    remove: jest.fn(function() { return this; })
   };
 }
 
@@ -277,6 +279,7 @@ global.SpreadsheetApp = {
       addToUi: jest.fn()
     }))
   })),
+  flush: jest.fn(),
   newDataValidation: jest.fn(() => ({
     requireValueInList: jest.fn(function() { return this; }),
     setAllowInvalid: jest.fn(function() { return this; }),
@@ -285,6 +288,8 @@ global.SpreadsheetApp = {
   })),
   newConditionalFormatRule: jest.fn(() => ({
     whenFormulaSatisfied: jest.fn(function() { return this; }),
+    whenTextEqualTo: jest.fn(function() { return this; }),
+    whenTextContains: jest.fn(function() { return this; }),
     setBackground: jest.fn(function() { return this; }),
     setFontColor: jest.fn(function() { return this; }),
     setBold: jest.fn(function() { return this; }),
@@ -433,8 +438,10 @@ global.log_ = function(context, message, level) {
 // --- Auth helpers (defined in 21_WebDashDataService.gs) ---
 // Mocked globally so test files that don't load WebDashDataService can still
 // test wrapper functions in 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.
-global._resolveCallerEmail = jest.fn(() => 'test@example.com');
-global._requireStewardAuth = jest.fn(() => 'steward@example.com');
+// v4.51.1: Auth defaults deny (return null) — tests must explicitly opt in.
+// This prevents auth-bypass bugs from passing tests green because the mock auto-approved.
+global._resolveCallerEmail = jest.fn(() => null);
+global._requireStewardAuth = jest.fn(() => null);
 
 // --- Retry helper (defined in 06_Maintenance.gs) ---
 // In tests, executeWithRetry just calls the function directly (no retry delay).
