@@ -7744,6 +7744,14 @@ function _renderMinutesList(container) {
  showLoading(container, 'list');
  serverCall().withSuccessHandler(function(minutes) {
  container.innerHTML = '';
+ 
+ var _canDeleteMinutes = false;
+ if (CONFIG && CONFIG.minutesDeleteEnabled) {
+  serverCall().withSuccessHandler(function(isChief) {
+  _canDeleteMinutes = !!isChief;
+  if (_canDeleteMinutes) renderPage(currentPage); 
+  }).withFailureHandler(function() {}).dataIsChiefSteward(SESSION_TOKEN);
+ }
  if (!minutes || minutes.length === 0) {
   container.appendChild(el('div', { className: 'empty-state-13' }, 'No meeting minutes yet.'));
   return;
@@ -7810,6 +7818,49 @@ function _renderMinutesList(container) {
    linksRow.appendChild(attLink);
   }
   if (linksRow.children.length) card.appendChild(linksRow);
+
+  
+  if (_canDeleteMinutes) {
+   var deleteArea = el('div', { style: { marginTop: '6px' } });
+   var deleteBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '11px', color: 'var(--danger)', padding: '3px 8px' } }, '\uD83D\uDDD1\uFE0F Delete');
+   var confirmArea = el('div', { style: { display: 'none', fontSize: '11px', color: 'var(--danger)', marginTop: '4px' } });
+   confirmArea.appendChild(document.createTextNode('Delete this entry and its Drive files? '));
+   var confirmYes = el('button', { className: 'btn btn-ghost', style: { fontSize: '11px', color: 'var(--danger)', border: '1px solid var(--danger)', padding: '2px 8px', marginRight: '4px' } }, 'Yes, delete');
+   var confirmNo = el('button', { className: 'btn btn-ghost', style: { fontSize: '11px', padding: '2px 8px' } }, 'Cancel');
+   confirmArea.appendChild(confirmYes);
+   confirmArea.appendChild(confirmNo);
+
+   deleteBtn.addEventListener('click', function(e) {
+   e.stopPropagation();
+   deleteBtn.style.display = 'none';
+   confirmArea.style.display = '';
+   });
+   confirmNo.addEventListener('click', function(e) {
+   e.stopPropagation();
+   confirmArea.style.display = 'none';
+   deleteBtn.style.display = '';
+   });
+   confirmYes.addEventListener('click', function(e) {
+   e.stopPropagation();
+   confirmYes.disabled = true;
+   confirmYes.textContent = 'Deleting...';
+   serverCall().withSuccessHandler(function(result) {
+    if (result && result.success) {
+    card.style.opacity = '0.3';
+    card.style.transition = 'opacity 0.3s';
+    setTimeout(function() { card.remove(); }, 300);
+    } else {
+    confirmArea.textContent = (result && result.message) || 'Delete failed.';
+    }
+   }).withFailureHandler(function() {
+    confirmArea.textContent = 'Delete failed.';
+   }).dataDeleteMeetingMinutes(SESSION_TOKEN, m.id);
+   });
+
+   deleteArea.appendChild(deleteBtn);
+   deleteArea.appendChild(confirmArea);
+   card.appendChild(deleteArea);
+  }
 
   if (hasExpandable) {
    var chevron = rightSide.lastChild;

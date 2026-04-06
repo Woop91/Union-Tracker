@@ -416,6 +416,13 @@ function _sanitizeConfig(config) {
     hasWorkloadService: typeof WorkloadService !== 'undefined',
     hasPOMSReference: (function() { try { HtmlService.createHtmlOutputFromFile('poms_reference'); return true; } catch (_) { return false; } })(),
     hasAgencyOrgChart: (function() { try { HtmlService.createHtmlOutputFromFile('agency_org_chart'); return true; } catch (_) { return false; } })(),
+    // v4.52.1: Time-limited delete mode — enabled via enableMinutesDelete() from script editor
+    minutesDeleteEnabled: (function() {
+      try {
+        var until = PropertiesService.getScriptProperties().getProperty('MINUTES_DELETE_ENABLED_UNTIL');
+        return until ? new Date(until).getTime() > Date.now() : false;
+      } catch (_) { return false; }
+    })(),
   };
 }
 
@@ -828,7 +835,7 @@ function getMemberViewHtml(sessionToken) {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content, or error message
+ * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
  */
 function getOrgChartHtml() {
   try {
@@ -852,7 +859,7 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the Agency Org Chart tab.
+ * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
  * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
  */
 function getAgencyOrgChartHtml() {

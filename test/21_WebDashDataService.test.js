@@ -1522,3 +1522,118 @@ describe('getMeetingMinutes', () => {
     expect(result[0].createdBy).toBe('steward@test.com');
   });
 });
+
+// ============================================================================
+// Meeting Minutes — deleteMeetingMinutes (v4.52.1)
+// ============================================================================
+
+describe('extractDriveFileId_', () => {
+  test('extracts ID from Google Doc URL', () => {
+    expect(DataService.extractDriveFileId_('https://docs.google.com/document/d/abc123_XYZ/edit'))
+      .toBe('abc123_XYZ');
+  });
+
+  test('extracts ID from Drive file URL', () => {
+    expect(DataService.extractDriveFileId_('https://drive.google.com/file/d/def456-GHI/view'))
+      .toBe('def456-GHI');
+  });
+
+  test('returns empty string for invalid URL', () => {
+    expect(DataService.extractDriveFileId_('not-a-url')).toBe('');
+  });
+
+  test('returns empty string for empty/null input', () => {
+    expect(DataService.extractDriveFileId_('')).toBe('');
+    expect(DataService.extractDriveFileId_(null)).toBe('');
+  });
+});
+
+describe('deleteMeetingMinutes', () => {
+  let mockSheet;
+
+  beforeEach(() => {
+    var mockData = [
+      ['ID', 'MeetingDate', 'Title', 'Bullets', 'FullMinutes', 'CreatedBy', 'CreatedDate', 'DriveDocUrl', 'AttachmentUrl', 'AttachmentName'],
+      ['MIN_abc_12345', new Date(), 'Test Meeting', '', '', 'steward@test.com', new Date(), 'https://docs.google.com/document/d/doc111/edit', 'https://drive.google.com/file/d/att222/view', 'notes.pdf'],
+      ['MIN_def_67890', new Date(), 'Other Meeting', '', '', 'steward@test.com', new Date(), '', '', '']
+    ];
+    mockSheet = {
+      getLastRow: jest.fn(() => mockData.length),
+      getDataRange: jest.fn(() => ({ getValues: jest.fn(() => mockData) })),
+      deleteRow: jest.fn()
+    };
+    global.getOrCreateMinutesSheet = jest.fn(() => mockSheet);
+    global.log_ = jest.fn();
+    global.logAuditEvent = jest.fn();
+    global.DriveApp = {
+      getFileById: jest.fn(() => ({ setTrashed: jest.fn() }))
+    };
+    global.PropertiesService = {
+      getScriptProperties: () => ({
+        getProperty: jest.fn(function(key) {
+          if (key === 'MINUTES_DELETE_ENABLED_UNTIL') return new Date(Date.now() + 1800000).toISOString();
+          return '';
+        }),
+        setProperty: jest.fn()
+      })
+    };
+    // isChiefSteward() inside the IIFE resolves via _getChiefStewardEmail(), which falls back
+    // to COMMAND_CONFIG.CHIEF_STEWARD_EMAIL when no config sheet is wired up.
+    global.COMMAND_CONFIG.CHIEF_STEWARD_EMAIL = 'chief@test.com';
+  });
+
+  afterEach(() => {
+    // Restore so other test suites are unaffected
+    global.COMMAND_CONFIG.CHIEF_STEWARD_EMAIL = '';
+  });
+
+  test('deletes row and trashes Drive files for valid ID', () => {
+    var result = DataService.deleteMeetingMinutes('chief@test.com', 'MIN_abc_12345');
+    expect(result.success).toBe(true);
+    expect(mockSheet.deleteRow).toHaveBeenCalledWith(2);
+    expect(global.DriveApp.getFileById).toHaveBeenCalledWith('doc111');
+    expect(global.DriveApp.getFileById).toHaveBeenCalledWith('att222');
+    expect(global.logAuditEvent).toHaveBeenCalledWith('MINUTES_DELETED', expect.objectContaining({ minuteId: 'MIN_abc_12345' }));
+  });
+
+  test('deletes row without Drive calls when no URLs', () => {
+    var result = DataService.deleteMeetingMinutes('chief@test.com', 'MIN_def_67890');
+    expect(result.success).toBe(true);
+    expect(mockSheet.deleteRow).toHaveBeenCalledWith(3);
+    expect(global.DriveApp.getFileById).not.toHaveBeenCalled();
+  });
+
+  test('returns failure for non-existent minute ID', () => {
+    var result = DataService.deleteMeetingMinutes('chief@test.com', 'MIN_nonexistent');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/not found/i);
+  });
+
+  test('rejects when delete window has expired', () => {
+    global.PropertiesService = {
+      getScriptProperties: () => ({
+        getProperty: jest.fn(function() { return new Date(Date.now() - 1000).toISOString(); }),
+        setProperty: jest.fn()
+      })
+    };
+    var result = DataService.deleteMeetingMinutes('chief@test.com', 'MIN_abc_12345');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/expired/i);
+  });
+
+  test('rejects when caller is not chief steward', () => {
+    // Use an email that does NOT match COMMAND_CONFIG.CHIEF_STEWARD_EMAIL
+    var result = DataService.deleteMeetingMinutes('regular@test.com', 'MIN_abc_12345');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/not authorized/i);
+  });
+
+  test('still deletes row if Drive trash fails', () => {
+    global.DriveApp = {
+      getFileById: jest.fn(() => { throw new Error('file not found'); })
+    };
+    var result = DataService.deleteMeetingMinutes('chief@test.com', 'MIN_abc_12345');
+    expect(result.success).toBe(true);
+    expect(mockSheet.deleteRow).toHaveBeenCalled();
+  });
+});

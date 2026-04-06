@@ -3851,6 +3851,79 @@ var DataService = (function () {
     return { docUrl: docUrl };
   }
 
+  /**
+   * Extracts a Google Drive file ID from a Docs or Drive URL.
+   * @param {string} url
+   * @returns {string} File ID or empty string
+   */
+  function extractDriveFileId_(url) {
+    var match = String(url || '').match(/\/d\/([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : '';
+  }
+
+  /**
+   * Deletes a meeting minutes entry, trashing associated Drive files.
+   * Requires chief steward authorization AND an active delete window.
+   * @param {string} callerEmail
+   * @param {string} minuteId - The MIN_xxx_xxxxx ID to delete
+   * @returns {Object} { success, message }
+   */
+  function deleteMeetingMinutes(callerEmail, minuteId) {
+    if (!isChiefSteward(callerEmail)) {
+      return { success: false, message: 'Not authorized. Chief steward or admin access required.' };
+    }
+
+    try {
+      var until = PropertiesService.getScriptProperties().getProperty('MINUTES_DELETE_ENABLED_UNTIL');
+      if (!until || new Date(until).getTime() <= Date.now()) {
+        return { success: false, message: 'Delete window has expired. Re-run enableMinutesDelete() from the script editor.' };
+      }
+    } catch (_e) {
+      return { success: false, message: 'Could not verify delete window.' };
+    }
+
+    var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
+    if (!sheet) return { success: false, message: 'Minutes sheet unavailable.' };
+
+    var data = sheet.getDataRange().getValues();
+    var rowNum = -1;
+    var driveDocUrl = '';
+    var attachmentUrl = '';
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][PORTAL_MINUTES_COLS.ID]) === minuteId) {
+        rowNum = i + 1;
+        driveDocUrl = String(data[i][PORTAL_MINUTES_COLS.DRIVE_DOC_URL] || '');
+        attachmentUrl = String(data[i][PORTAL_MINUTES_COLS.ATTACHMENT_URL] || '');
+        break;
+      }
+    }
+
+    if (rowNum === -1) {
+      return { success: false, message: 'Minutes entry not found.' };
+    }
+
+    var docFileId = extractDriveFileId_(driveDocUrl);
+    if (docFileId) {
+      try { DriveApp.getFileById(docFileId).setTrashed(true); } catch (e) {
+        log_('deleteMeetingMinutes', 'Could not trash Google Doc ' + docFileId + ': ' + e.message);
+      }
+    }
+    var attFileId = extractDriveFileId_(attachmentUrl);
+    if (attFileId) {
+      try { DriveApp.getFileById(attFileId).setTrashed(true); } catch (e) {
+        log_('deleteMeetingMinutes', 'Could not trash attachment ' + attFileId + ': ' + e.message);
+      }
+    }
+
+    sheet.deleteRow(rowNum);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('MINUTES_DELETED', { caller: callerEmail, minuteId: minuteId });
+    }
+
+    return { success: true, message: 'Minutes entry deleted.' };
+  }
+
   // ═══════════════════════════════════════
   // PUBLIC: Meeting Minutes (v4.16.0)
   // ═══════════════════════════════════════
@@ -5103,6 +5176,9 @@ var DataService = (function () {
     // v4.17.0 - Minutes (Polls removed v4.24.0 — use wq* wrappers)
     getMeetingMinutes: getMeetingMinutes,
     addMeetingMinutes: addMeetingMinutes,
+    // v4.52.1 - Minutes delete
+    extractDriveFileId_: extractDriveFileId_,
+    deleteMeetingMinutes: deleteMeetingMinutes,
     // v4.52.0 - Minutes helpers (exposed for BACKFILL wrapper)
     createMinutesDoc_: createMinutesDoc_,
     // v4.18.0 - Performance, Checklists, Meetings, Satisfaction, Feedback

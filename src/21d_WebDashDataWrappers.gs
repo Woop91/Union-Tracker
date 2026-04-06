@@ -634,6 +634,12 @@ function dataGetMeetingMinutes(sessionToken, limit) {
 }
 /** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Adds meeting minutes. Requires steward auth. Lock is scoped inside addMeetingMinutes(). */
 function dataAddMeetingMinutes(sessionToken, data, idemKey) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data, idemKey); }
+/** @param {string} sessionToken @param {string} minuteId @returns {Object} Deletes meeting minutes. Requires chief steward auth + active delete window. */
+function dataDeleteMeetingMinutes(sessionToken, minuteId) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  return withScriptLock_(function() { return DataService.deleteMeetingMinutes(s, minuteId); });
+}
 
 /**
  * BACKFILL: Generates Drive docs for any existing MeetingMinutes rows

@@ -264,4 +264,13 @@ describe('v4.31.0 H8: _sanitizeConfig output', () => {
     });
     expect(result.hasGrievancesFolder).toBe(false);
   });
+
+  test('includes minutesDeleteEnabled flag', () => {
+    var result = _sanitizeConfig({
+      orgName: 'Test', orgAbbrev: 'T', logoInitials: 'T',
+      accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member'
+    });
+    expect(result).toHaveProperty('minutesDeleteEnabled');
+    expect(typeof result.minutesDeleteEnabled).toBe('boolean');
+  });
 });

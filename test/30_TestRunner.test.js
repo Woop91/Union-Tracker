@@ -200,8 +200,9 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
     // non-member contacts — v4.48.0,
     // add member from webapp — v4.49.0,
     // directory explorer steward update — v4.51.0,
-    // leader unit mentorships — v4.51.1)
-    expect(untested.length).toBeLessThanOrEqual(66);
+    // leader unit mentorships — v4.51.1,
+    // minutes delete wrapper — v4.52.1)
+    expect(untested.length).toBeLessThanOrEqual(67);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {

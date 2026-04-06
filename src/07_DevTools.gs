@@ -4137,6 +4137,26 @@ var TestSuite = {
 
 // NOTE: Assert object is defined once at line 1677 with both API styles merged
 
+// ════════════════════════════════════════════════════════════════════════
+// ADMIN: Enable Minutes Delete (v4.52.1)
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * Enables the delete button on meeting minutes cards for 30 minutes.
+ * Run from the Apps Script editor — only accessible to users with script access.
+ * The web app checks this timestamp on page load and on every delete request.
+ */
+function enableMinutesDelete() {
+  var until = new Date(Date.now() + 30 * 60 * 1000);
+  PropertiesService.getScriptProperties().setProperty(
+    'MINUTES_DELETE_ENABLED_UNTIL', until.toISOString()
+  );
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Minutes delete enabled until ' + Utilities.formatDate(until, Session.getScriptTimeZone(), 'h:mm a') + '. Reload the web app to see delete buttons.',
+    '\uD83D\uDDD1\uFE0F Delete Mode', 10
+  );
+}
+
 // ============================================================================
 // TEST CASES - CONSTANTS
 // ============================================================================
