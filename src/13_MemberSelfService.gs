@@ -1106,74 +1106,6 @@ function showBulkGeneratePINDialog() {
 // ============================================================================
 
 /**
- * Get member's own profile data via session token (Member Self Service)
- * @param {string} sessionToken - Valid session token
- * @returns {Object} Member profile data
- */
-function getMemberProfileBySession(sessionToken) {
-  var session = validateMemberSession(sessionToken);
-  if (!session.valid) {
-    return errorResponse('Session expired. Please log in again.');
-  }
-
-  var memberId = session.memberId;
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) {
-    return errorResponse('System error');
-  }
-
-  var data = sheet.getDataRange().getValues();
-
-  for (var i = 1; i < data.length; i++) {
-    var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
-    if (rowMemberId === memberId) {
-      return {
-        success: true,
-        profile: {
-          memberId: col_(data[i], MEMBER_COLS.MEMBER_ID) || '',
-          firstName: col_(data[i], MEMBER_COLS.FIRST_NAME) || '',
-          lastName: col_(data[i], MEMBER_COLS.LAST_NAME) || '',
-          jobTitle: col_(data[i], MEMBER_COLS.JOB_TITLE) || '',
-          workLocation: col_(data[i], MEMBER_COLS.WORK_LOCATION) || '',
-          unit: col_(data[i], MEMBER_COLS.UNIT) || '',
-          email: col_(data[i], MEMBER_COLS.EMAIL) || '',
-          phone: col_(data[i], MEMBER_COLS.PHONE) || '',
-          preferredComm: col_(data[i], MEMBER_COLS.PREFERRED_COMM) || '',
-          bestTime: col_(data[i], MEMBER_COLS.BEST_TIME) || '',
-          state: col_(data[i], MEMBER_COLS.STATE) || '',
-          assignedSteward: col_(data[i], MEMBER_COLS.ASSIGNED_STEWARD) || '',
-          hasOpenGrievance: col_(data[i], MEMBER_COLS.HAS_OPEN_GRIEVANCE) || 'No'
-        }
-      };
-    }
-  }
-
-  return errorResponse('Member not found');
-}
-
-/**
- * Simple email validation (Member Self Service module)
- * @private
- */
-function isValidEmailMSS_(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-/**
- * Format phone number
- * @private
- */
-function formatPhoneNumber_(phone) {
-  var digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) {
-    return '(' + digits.slice(0,3) + ') ' + digits.slice(3,6) + '-' + digits.slice(6);
-  }
-  return phone;
-}
-
-/**
  * Get member's own grievances
  * @param {string} sessionToken - Valid session token
  * @returns {Object} Member's grievances
@@ -1489,10 +1421,14 @@ function devAuthLoginByPIN(pin) {
   var startTime = Date.now();
 
   // ── Global rate limit — prevent blind brute-force before any row is matched ─
+  // SECURITY NOTE: This function scans ALL members against a single PIN. Each guess
+  // effectively tests against the entire population (N members = N× attack surface).
+  // The global rate limit is the primary defense — keep it low. With 200 members and
+  // 5 attempts/15min, expected brute-force time is ~10+ days.
   var globalRateKey = 'DEV_PIN_SCAN_RATE';
   var globalAttempts = _getRateCount(globalRateKey);
   var lockoutMinutes = (typeof PIN_CONFIG !== 'undefined' && PIN_CONFIG.LOCKOUT_MINUTES) || 15;
-  if (globalAttempts >= 10) {
+  if (globalAttempts >= 5) {
     Utilities.sleep(500 + Math.floor(Math.random() * 500));
     return { success: false, message: 'Too many attempts. Try again in ' + lockoutMinutes + ' minutes.' };
   }

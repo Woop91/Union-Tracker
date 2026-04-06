@@ -219,26 +219,3 @@ describe('saveSharedView', () => {
   });
 });
 
-// ============================================================================
-// 11. getFilteredDashboardData
-// ============================================================================
-
-describe('getFilteredDashboardData', () => {
-  test('returns full data when no filters provided', () => {
-    const result = JSON.parse(getFilteredDashboardData(false, null));
-    expect(result.totalMembers).toBe(100);
-    expect(result.statusDistribution).toEqual({ Open: 5, Closed: 3 });
-  });
-
-  test('applies status filters', () => {
-    const result = JSON.parse(getFilteredDashboardData(false, { statuses: ['Open'] }));
-    expect(result.statusDistribution).toEqual({ Open: 5 });
-    expect(result.statusDistribution.Closed).toBeUndefined();
-  });
-
-  test('applies location filters', () => {
-    const result = JSON.parse(getFilteredDashboardData(false, { locations: ['HQ'] }));
-    expect(result.locationBreakdown).toEqual({ 'HQ': 50 });
-    expect(result.locationBreakdown['Branch']).toBeUndefined();
-  });
-});

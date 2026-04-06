@@ -96,6 +96,9 @@ describe('G17: member_view.html never calls steward-only endpoints', () => {
       'dataGetRSVPSummary',         // Gated by if (role === 'steward') in renderEventsPage
       'dataReconcileAttendance',    // Gated by if (role === 'steward') in renderEventsPage
       'dataSendMeetingInvitations', // Gated by if (role === 'steward') in renderEventsPage
+      'dataGetGrievanceFeedbackStats', // Uses _resolveCallerEmail (member auth); bySteward stripped for non-stewards
+      'dataGetCaseChecklist',       // Uses _resolveCallerEmail (member auth); members see own case checklists
+      'dataGetMeetingMinutes',      // Uses _resolveCallerEmail (member auth); calls _requireStewardAuth only to strip createdBy PII for non-stewards
     ]);
 
     const violations = [];

@@ -5196,6 +5196,11 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     setCol_(rowData, GRIEVANCE_COLS.MEMBER_EMAIL, escapeForFormula(memberData.email));
     setCol_(rowData, GRIEVANCE_COLS.LOCATION, escapeForFormula(memberData.workLocation));
     setCol_(rowData, GRIEVANCE_COLS.STEWARD, escapeForFormula(stewardEmail));
+    // Write description to DESCRIPTION column (primary), and RESOLUTION as initial value
+    // so legacy code that reads RESOLUTION still sees the original complaint text.
+    if (GRIEVANCE_COLS.DESCRIPTION) {
+      setCol_(rowData, GRIEVANCE_COLS.DESCRIPTION, escapeForFormula(data.description || ''));
+    }
     setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormula(data.description || ''));
     setCol_(rowData, GRIEVANCE_COLS.LAST_UPDATED, new Date());
     if (GRIEVANCE_COLS.ACTION_TYPE) {

@@ -183,8 +183,8 @@ describe('calculateInitialDeadlines', () => {
     const filingDate = new Date(2025, 0, 6); // Monday
     const result = calculateInitialDeadlines(filingDate);
     expect(result).toHaveProperty('step1Due');
-    // 7 business days from Jan 6 = Jan 15 (Wednesday)
-    const expected = addBusinessDays(filingDate, getDeadlineRules().STEP_1.DAYS_FOR_RESPONSE);
+    // Calendar days from Jan 6 (response deadlines use calendar days per Art. 23)
+    const expected = addCalendarDays(filingDate, getDeadlineRules().STEP_1.DAYS_FOR_RESPONSE);
     expect(result.step1Due.getTime()).toBe(expected.getTime());
   });
 
@@ -208,24 +208,24 @@ describe('calculateInitialDeadlines', () => {
 describe('calculateResponseDeadline', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('step 1 uses STEP_1.DAYS_FOR_RESPONSE (7 business days)', () => {
+  test('step 1 uses STEP_1.DAYS_FOR_RESPONSE (calendar days per Art. 23)', () => {
     const stepDate = new Date(2025, 0, 6);
     const result = calculateResponseDeadline(1, stepDate);
-    const expected = addBusinessDays(stepDate, getDeadlineRules().STEP_1.DAYS_FOR_RESPONSE);
+    const expected = addCalendarDays(stepDate, getDeadlineRules().STEP_1.DAYS_FOR_RESPONSE);
     expect(result.getTime()).toBe(expected.getTime());
   });
 
-  test('step 2 uses STEP_2.DAYS_FOR_RESPONSE (14 business days)', () => {
+  test('step 2 uses STEP_2.DAYS_FOR_RESPONSE (calendar days per Art. 23)', () => {
     const stepDate = new Date(2025, 0, 6);
     const result = calculateResponseDeadline(2, stepDate);
-    const expected = addBusinessDays(stepDate, getDeadlineRules().STEP_2.DAYS_FOR_RESPONSE);
+    const expected = addCalendarDays(stepDate, getDeadlineRules().STEP_2.DAYS_FOR_RESPONSE);
     expect(result.getTime()).toBe(expected.getTime());
   });
 
-  test('step 3 uses STEP_3.DAYS_FOR_RESPONSE (21 business days)', () => {
+  test('step 3 uses STEP_3.DAYS_FOR_RESPONSE (calendar days per Art. 23)', () => {
     const stepDate = new Date(2025, 0, 6);
     const result = calculateResponseDeadline(3, stepDate);
-    const expected = addBusinessDays(stepDate, getDeadlineRules().STEP_3.DAYS_FOR_RESPONSE);
+    const expected = addCalendarDays(stepDate, getDeadlineRules().STEP_3.DAYS_FOR_RESPONSE);
     expect(result.getTime()).toBe(expected.getTime());
   });
 

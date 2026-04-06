@@ -128,7 +128,7 @@ function doGetWebDashboard(e) {
     config = _coldSync ? ConfigReader.refreshConfig() : ConfigReader.getConfig();
   } catch (cfgErr) {
     log_('doGetWebDashboard', 'config load failed: ' + cfgErr.message);
-    config = { orgName: 'DDS', orgAbbrev: 'DDS', logoInitials: 'DDS', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    config = { orgName: 'Dashboard', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
   }
 
   var _doGetStart = Date.now();
@@ -828,7 +828,7 @@ function getMemberViewHtml(sessionToken) {
 /**
  * Client-callable: Returns the org chart HTML content for lazy-loading.
  * Loaded on-demand when the user navigates to the Org Chart tab.
- * @returns {string} Raw HTML content (CSS-scoped under .madds-embed), or error message
+ * @returns {string} Raw HTML content, or error message
  */
 function getOrgChartHtml() {
   try {
@@ -852,7 +852,7 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
+ * Loaded on-demand when the user navigates to the Agency Org Chart tab.
  * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
  */
 function getAgencyOrgChartHtml() {

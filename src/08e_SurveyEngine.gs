@@ -863,7 +863,7 @@ function dataGetSatisfactionSummary(sessionToken) {
  */
 function dataOpenNewSurveyPeriod(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, message: 'Not authorized.' };
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   return openNewSurveyPeriod(s);
 }
 

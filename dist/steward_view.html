@@ -5646,8 +5646,9 @@ var _EXP_SLICERS = [
  { id: 'unit',         label: 'Unit',       field: 'unit' },
  { id: 'supervisor',   label: 'Supervisor', field: 'supervisor' },
  { id: 'jobTitle',     label: 'Job Title',  field: 'jobTitle' },
- { id: 'assignedSteward', label: 'Steward', field: 'assignedSteward' },
+ { id: 'assignedSteward', label: (typeof CONFIG !== 'undefined' && CONFIG.stewardLabel ? CONFIG.stewardLabel : 'Steward'), field: 'assignedSteward' },
 ];
+var _expUnsavedCount = 0; 
 
 var _EXP_EDIT_COLS = [
  { key: 'name',         label: 'Name',       editable: false },
@@ -5881,6 +5882,8 @@ function _buildExplorerUI(container, allMembers) {
 
  
  function _fireChange() {
+ if (_expUnsavedCount > 0 && !confirm('You have unsaved edits that will be lost. Continue?')) return;
+ _expUnsavedCount = 0;
  _refreshSlicerOptions();
  filtered = _applySlicers(allMembers);
  var activeCount = 0;
@@ -5937,8 +5940,8 @@ function _buildExplorerUI(container, allMembers) {
  var PAD = 4, NW = 18, MIN_H = 3;
  var maxN = Math.max(data.leftNodes.length, data.midNodes.length, data.rightNodes.length);
  var svgH = Math.max(280, maxN * 28 + 40);
- var svgW = 900;
- var colX = [30, svgW / 2 - NW / 2, svgW - NW - 30];
+ var svgW = 1100;
+ var colX = [170, svgW / 2 - NW / 2, svgW - NW - 170];
  var ns = 'http://www.w3.org/2000/svg';
 
  function _layout(nodes, totals) {
@@ -6048,7 +6051,7 @@ function _buildExplorerUI(container, allMembers) {
   return;
  }
 
- var table = el('table', { style: { width: '100%', minWidth: '860px', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
+ var table = el('table', { style: { width: '100%', minWidth: '1200px', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
  var thead = el('thead');
  var headRow = el('tr');
  _EXP_EDIT_COLS.forEach(function(c) {
@@ -6071,7 +6074,7 @@ function _buildExplorerUI(container, allMembers) {
    type: 'text',
    value: String(m[c.key] || ''),
    className: _TI,
-   style: { width: '100%', fontSize: '12px', padding: '3px 6px', border: '1px solid transparent', borderRadius: '4px', background: 'transparent', color: 'var(--text)', minWidth: '100px', boxSizing: 'border-box' },
+   style: { width: '100%', fontSize: '12px', padding: '3px 6px', border: '1px solid transparent', borderRadius: '4px', background: 'transparent', color: 'var(--text)', minWidth: '140px', boxSizing: 'border-box' },
    'aria-label': c.label + ' for ' + (m.name || m.email)
    });
    inp.addEventListener('focus', function() { inp.style.border = '1px solid var(--accent)'; inp.style.background = 'var(--inputBg, rgba(255,255,255,0.05))'; });
@@ -6081,17 +6084,21 @@ function _buildExplorerUI(container, allMembers) {
    if (!changed) inp.style.background = 'transparent';
    });
    inp.addEventListener('input', function() {
+   var hadEdits = Object.keys(edits).length > 0;
    var newVal = inp.value.trim();
    if (newVal !== String(m[c.key] || '')) { edits[c.key] = newVal; }
    else { delete edits[c.key]; }
-   saveBtn.style.display = Object.keys(edits).length > 0 ? '' : 'none';
+   var hasEdits = Object.keys(edits).length > 0;
+   saveBtn.style.display = hasEdits ? '' : 'none';
+   if (!hadEdits && hasEdits) _expUnsavedCount++;
+   if (hadEdits && !hasEdits) _expUnsavedCount = Math.max(0, _expUnsavedCount - 1);
    });
    inputEls[c.key] = inp;
    td.appendChild(inp);
   } else {
    td.textContent = String(m[c.key] || '\u2014');
    td.style.whiteSpace = 'nowrap';
-   td.style.maxWidth = '200px';
+   td.style.maxWidth = '280px';
    td.style.overflow = 'hidden';
    td.style.textOverflow = 'ellipsis';
    if (c.key === 'email' && !m.email) {
@@ -6134,6 +6141,7 @@ function _buildExplorerUI(container, allMembers) {
     
     for (var k in _pendingEdits) { m[k] = _pendingEdits[k]; }
     edits = {};
+    _expUnsavedCount = Math.max(0, _expUnsavedCount - 1);
     saveBtn.style.display = 'none';
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save';
@@ -7774,21 +7782,42 @@ function _renderMinutesList(container) {
   }
 
   slice.forEach(function(m) {
-  var card = el('div', { className: 'card card-glass card-clickable ' + _TC, style: { padding: '14px', marginBottom: '8px' } });
-  var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
+  var hasExpandable = !!(m.fullMinutes);
+  var card = el('div', { className: 'card card-glass ' + (hasExpandable ? 'card-clickable ' : '') + _TC, style: { padding: '14px', marginBottom: '8px' } });
+  var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } });
   header.appendChild(el('span', { className: 'display-title-sm' }, m.title));
-  header.appendChild(el('span', { className: 'text-xs-muted' }, m.meetingDate));
+  var rightSide = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } });
+  rightSide.appendChild(el('span', { className: 'text-xs-muted' }, m.meetingDate));
+  if (hasExpandable) rightSide.appendChild(el('span', { className: 'text-xs-muted', style: { transition: 'transform 0.2s' } }, '\u25B8'));
+  header.appendChild(rightSide);
   card.appendChild(header);
   if (m.bullets) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5', whiteSpace: 'pre-wrap' } }, m.bullets));
 
   var expanded = false;
   var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes || '');
   card.appendChild(fullDiv);
+
+  
+  var linksRow = el('div', { style: { display: 'flex', gap: '12px', marginTop: '6px', flexWrap: 'wrap' } });
   if (m.driveDocUrl && /^https?:\/\//i.test(m.driveDocUrl)) {
-   card.appendChild(el('a', { href: m.driveDocUrl, target: '_blank', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', marginTop: '6px', textDecoration: 'none' } }, '\uD83D\uDCC4 Open Google Doc'));
+   var docLink = el('a', { href: m.driveDocUrl, target: '_blank', rel: 'noopener', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCC4 Google Doc');
+   docLink.addEventListener('click', function(e) { e.stopPropagation(); });
+   linksRow.appendChild(docLink);
   }
-  if (m.fullMinutes) {
-   card.addEventListener('click', function() { expanded = !expanded; fullDiv.style.display = expanded ? 'block' : 'none'; });
+  if (m.attachmentUrl && /^https?:\/\//i.test(m.attachmentUrl)) {
+   var attLink = el('a', { href: m.attachmentUrl, target: '_blank', rel: 'noopener', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCCE ' + (m.attachmentName || 'Attachment'));
+   attLink.addEventListener('click', function(e) { e.stopPropagation(); });
+   linksRow.appendChild(attLink);
+  }
+  if (linksRow.children.length) card.appendChild(linksRow);
+
+  if (hasExpandable) {
+   var chevron = rightSide.lastChild;
+   card.addEventListener('click', function() {
+   expanded = !expanded;
+   fullDiv.style.display = expanded ? 'block' : 'none';
+   chevron.style.transform = expanded ? 'rotate(90deg)' : '';
+   });
   }
   listArea.appendChild(card);
   });
@@ -7851,11 +7880,12 @@ function _renderAddMinutes(container, onSaveSuccess) {
  var todayStr = today.getFullYear() + '-' +
  String(today.getMonth() + 1).padStart(2, '0') + '-' +
  String(today.getDate()).padStart(2, '0');
+ formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Meeting Date'));
  var dateInput = el('input', { type: 'date', className: 'msg-textarea', value: todayStr, style: { marginBottom: '8px', minHeight: '36px' } });
  formCard.appendChild(dateInput);
 
- formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Key points (bullet format)'));
- var bulletsInput = el('textarea', { className: 'msg-textarea', placeholder: '- Point 1\n- Point 2\n- Point 3', maxLength: BULLETS_MAX, style: { marginBottom: '2px', minHeight: '80px' } });
+ formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Key points (auto-bulleted \u2014 press Enter for new bullet)'));
+ var bulletsInput = el('textarea', { className: 'msg-textarea', placeholder: '\u2022 First key point...', maxLength: BULLETS_MAX, style: { marginBottom: '2px', minHeight: '80px' } });
  formCard.appendChild(bulletsInput);
  var bulletsCount = el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'right', marginBottom: '8px' } }, '0 / ' + BULLETS_MAX);
  formCard.appendChild(bulletsCount);
@@ -7865,7 +7895,58 @@ function _renderAddMinutes(container, onSaveSuccess) {
  bulletsCount.style.color = len >= BULLETS_MAX ? 'var(--danger)' : 'var(--muted)';
  });
 
- formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Full minutes (optional)'));
+ 
+ bulletsInput.addEventListener('keydown', function(e) {
+ if (e.key === 'Enter') {
+  e.preventDefault();
+  var start = bulletsInput.selectionStart;
+  var val = bulletsInput.value;
+  var insert = '\n\u2022 ';
+  bulletsInput.value = val.substring(0, start) + insert + val.substring(bulletsInput.selectionEnd);
+  bulletsInput.selectionStart = bulletsInput.selectionEnd = start + insert.length;
+  bulletsInput.dispatchEvent(new Event('input')); 
+ }
+ 
+ if (e.key === 'Backspace') {
+  var s = bulletsInput.selectionStart;
+  var v = bulletsInput.value;
+  // Check if cursor is right after "• " at a line start
+  if (s >= 2 && v.substring(s - 2, s) === '\u2022 ' && (s === 2 || v[s - 3] === '\n')) {
+  e.preventDefault();
+  var removeFrom = (s > 2) ? s - 3 : 0; 
+  var removeLen = (s > 2) ? 3 : 2;
+  bulletsInput.value = v.substring(0, removeFrom) + v.substring(s);
+  bulletsInput.selectionStart = bulletsInput.selectionEnd = removeFrom;
+  bulletsInput.dispatchEvent(new Event('input'));
+  }
+ }
+ });
+
+ 
+ bulletsInput.addEventListener('focus', function() {
+ if (!bulletsInput.value) {
+  bulletsInput.value = '\u2022 ';
+  bulletsInput.selectionStart = bulletsInput.selectionEnd = 2;
+  bulletsInput.dispatchEvent(new Event('input'));
+ }
+ });
+
+ 
+ bulletsInput.addEventListener('paste', function(e) {
+ e.preventDefault();
+ var pasted = (e.clipboardData || window.clipboardData).getData('text');
+ var lines = pasted.split('\n').map(function(line) {
+  var trimmed = line.replace(/^[-\u2022*]\s*/, '').trim();
+  return trimmed ? '\u2022 ' + trimmed : '';
+ }).filter(Boolean).join('\n');
+ var start = bulletsInput.selectionStart;
+ var val = bulletsInput.value;
+ bulletsInput.value = val.substring(0, start) + lines + val.substring(bulletsInput.selectionEnd);
+ bulletsInput.selectionStart = bulletsInput.selectionEnd = start + lines.length;
+ bulletsInput.dispatchEvent(new Event('input'));
+ });
+
+ formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Full minutes (optional \u2014 or attach a document below)'));
  var fullInput = el('textarea', { className: 'msg-textarea', placeholder: 'Detailed meeting notes...', maxLength: FULL_MAX, style: { marginBottom: '2px', minHeight: '120px' } });
  formCard.appendChild(fullInput);
  var fullCount = el('div', { style: { fontSize: '10px', color: 'var(--muted)', textAlign: 'right', marginBottom: '10px' } }, '0 / ' + FULL_MAX);
@@ -7876,29 +7957,171 @@ function _renderAddMinutes(container, onSaveSuccess) {
  fullCount.style.color = len >= FULL_MAX ? 'var(--danger)' : 'var(--muted)';
  });
 
+ 
+ formCard.appendChild(el('div', { className: 'text-xs-muted-mb-4' }, 'Attach document (optional, max 10MB)'));
+ var ALLOWED_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,.png,.jpg,.jpeg,.gif';
+ var selectedFile = null;
+
+ var fileInput = el('input', { type: 'file', accept: ALLOWED_ACCEPT, style: { display: 'none' } });
+ formCard.appendChild(fileInput);
+
+ var dropZone = el('div', { style: { background: 'var(--card-bg)', border: '2px dashed var(--border)', borderRadius: '8px', padding: '20px', textAlign: 'center', cursor: 'pointer', marginBottom: '2px', transition: 'border-color 0.2s' } });
+ dropZone.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '6px' } }, '\uD83D\uDCCE'));
+ dropZone.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'Click to browse or drag & drop'));
+ dropZone.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'PDF, Word, Excel, PowerPoint, images, text'));
+
+ var filePreview = el('div', { style: { display: 'none', background: 'var(--card-bg)', border: '1px solid var(--success)', borderRadius: '8px', padding: '10px 12px', marginBottom: '2px' } });
+
+ var fileError = el('div', { style: { fontSize: '11px', color: 'var(--danger)', minHeight: '16px', marginBottom: '8px' } });
+
+ formCard.appendChild(dropZone);
+ formCard.appendChild(filePreview);
+ formCard.appendChild(fileError);
+
+ function showSelectedFile(file) {
+ fileError.textContent = '';
+ var ALLOWED_EXT = /\.(pdf|docx?|xlsx?|pptx?|txt|rtf|csv|png|jpe?g|gif)$/i;
+ if (!ALLOWED_EXT.test(file.name)) {
+  fileError.textContent = 'File type not supported.';
+  selectedFile = null; return;
+ }
+ if (file.size > 10485760) {
+  fileError.textContent = 'File too large. Maximum size is 10MB.';
+  selectedFile = null; return;
+ }
+ selectedFile = file;
+ var sizeMB = (file.size / 1048576).toFixed(1);
+ dropZone.style.display = 'none';
+ filePreview.style.display = 'flex';
+ filePreview.style.alignItems = 'center';
+ filePreview.style.gap = '10px';
+ filePreview.innerHTML = '';
+ filePreview.appendChild(el('div', { style: { fontSize: '22px' } }, '\uD83D\uDCC4'));
+ var info = el('div', { style: { flex: '1' } });
+ info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)' } }, file.name));
+ info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, sizeMB + ' MB'));
+ filePreview.appendChild(info);
+ filePreview.appendChild(el('button', { className: 'btn btn-ghost', style: { fontSize: '11px', color: 'var(--danger)', border: '1px solid var(--danger)', padding: '3px 8px' },
+  onClick: function(ev) { ev.stopPropagation(); selectedFile = null; fileInput.value = ''; dropZone.style.display = ''; filePreview.style.display = 'none'; fileError.textContent = ''; }
+ }, '\u2715 Remove'));
+ }
+
+ dropZone.addEventListener('click', function() { fileInput.click(); });
+ fileInput.addEventListener('change', function() { if (fileInput.files[0]) showSelectedFile(fileInput.files[0]); });
+ dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--accent)'; });
+ dropZone.addEventListener('dragleave', function() { dropZone.style.borderColor = 'var(--border)'; });
+ dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; if (e.dataTransfer.files[0]) showSelectedFile(e.dataTransfer.files[0]); });
+
+ 
+ var DRAFT_KEY = 'minutes_draft';
+ function saveDraft() {
+ try {
+  sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+  title: titleInput.value, date: dateInput.value,
+  bullets: bulletsInput.value, fullMinutes: fullInput.value
+  }));
+ } catch (_) {}
+ }
+ function restoreDraft() {
+ try {
+  var d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null');
+  if (d) {
+  if (d.title) titleInput.value = d.title;
+  if (d.date) dateInput.value = d.date;
+  if (d.bullets) bulletsInput.value = d.bullets;
+  if (d.fullMinutes) fullInput.value = d.fullMinutes;
+  [titleInput, bulletsInput, fullInput].forEach(function(inp) { inp.dispatchEvent(new Event('input')); });
+  }
+ } catch (_) {}
+ }
+ restoreDraft();
+ [titleInput, dateInput, bulletsInput, fullInput].forEach(function(inp) {
+ inp.addEventListener('input', saveDraft);
+ });
+
  var statusMsg = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '8px' } });
  formCard.appendChild(statusMsg);
 
- formCard.appendChild(el('button', { className: 'btn btn-primary',
- onClick: function() {
-  var title = titleInput.value.trim();
-  if (!title) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
-  if (!confirm('Save these meeting minutes? A Google Doc will also be created in Drive.')) return;
-  statusMsg.textContent = 'Saving...'; statusMsg.style.color = 'var(--muted)';
+ var saveBtn = el('button', { className: 'btn btn-primary' }, 'Save Minutes');
+ var cancelBtn = el('button', { className: 'btn btn-ghost', style: { display: 'none', marginLeft: '8px' } }, 'Cancel');
+ var btnRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+ btnRow.appendChild(saveBtn);
+ btnRow.appendChild(cancelBtn);
+ formCard.appendChild(btnRow);
+
+ var confirmMode = false;
+
+ saveBtn.addEventListener('click', function() {
+ var title = titleInput.value.trim();
+ if (!title) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
+
+ if (!confirmMode) {
+  
+  confirmMode = true;
+  saveBtn.textContent = 'Confirm Save';
+  saveBtn.style.background = 'var(--success)';
+  cancelBtn.style.display = '';
+  statusMsg.textContent = 'A Google Doc will be created in Drive.' + (selectedFile ? ' Attachment will be uploaded.' : '');
+  statusMsg.style.color = 'var(--muted)';
+  return;
+ }
+
+ 
+ saveBtn.disabled = true;
+ saveBtn.textContent = selectedFile ? 'Uploading...' : 'Saving...';
+ cancelBtn.style.display = 'none';
+ statusMsg.textContent = '';
+
+ function doSave(minutesData) {
   serverCall().withSuccessHandler(function(result) {
   if (result && result.success) {
    if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
    
-   if (typeof onSaveSuccess === 'function') { onSaveSuccess(); return; }
-   statusMsg.textContent = 'Minutes saved!'; statusMsg.style.color = 'var(--success)';
+   statusMsg.style.color = 'var(--success)';
+   statusMsg.textContent = 'Minutes saved!';
+   if (result.driveDocUrl) {
+   var docLink = el('a', { href: result.driveDocUrl, target: '_blank', style: { marginLeft: '6px', fontSize: '12px', color: 'var(--accent)' } }, '\uD83D\uDCC4 Open Google Doc');
+   statusMsg.appendChild(docLink);
+   }
+   try { sessionStorage.removeItem(DRAFT_KEY); } catch (_) {}
+   setTimeout(function() { if (typeof onSaveSuccess === 'function') onSaveSuccess(); }, 2000);
   } else {
    statusMsg.textContent = (result && result.message) || 'Failed to save.'; statusMsg.style.color = 'var(--danger)';
+   saveBtn.disabled = false; saveBtn.textContent = 'Save Minutes'; saveBtn.style.background = ''; confirmMode = false;
   }
   }).withFailureHandler(function() {
   statusMsg.textContent = 'Failed to save minutes.'; statusMsg.style.color = 'var(--danger)';
-  }).dataAddMeetingMinutes(SESSION_TOKEN, { title: title, meetingDate: dateInput.value, bullets: bulletsInput.value.trim(), fullMinutes: fullInput.value.trim() }, _genIdemKey());
+  saveBtn.disabled = false; saveBtn.textContent = 'Save Minutes'; saveBtn.style.background = ''; confirmMode = false;
+  }).dataAddMeetingMinutes(SESSION_TOKEN, minutesData, _genIdemKey());
  }
- }, 'Save Minutes'));
+
+ var minutesData = { title: title, meetingDate: dateInput.value, bullets: bulletsInput.value.trim(), fullMinutes: fullInput.value.trim() };
+
+ if (selectedFile) {
+  var reader = new FileReader();
+  reader.onload = function() {
+  var base64 = reader.result.split(',')[1]; 
+  minutesData.attachmentData = base64;
+  minutesData.attachmentName = selectedFile.name;
+  doSave(minutesData);
+  };
+  reader.onerror = function() {
+  statusMsg.textContent = 'Failed to read file.'; statusMsg.style.color = 'var(--danger)';
+  saveBtn.disabled = false; saveBtn.textContent = 'Save Minutes'; saveBtn.style.background = ''; confirmMode = false;
+  };
+  reader.readAsDataURL(selectedFile);
+ } else {
+  doSave(minutesData);
+ }
+ });
+
+ cancelBtn.addEventListener('click', function() {
+ confirmMode = false;
+ saveBtn.textContent = 'Save Minutes';
+ saveBtn.style.background = '';
+ cancelBtn.style.display = 'none';
+ statusMsg.textContent = '';
+ });
 
  container.appendChild(formCard);
 }

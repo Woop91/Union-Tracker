@@ -287,7 +287,11 @@ function adminGetSettings() {
           if (field.sensitive && !isOwner && strVal) {
             settings[field.key] = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
           } else {
-            settings[field.key] = escapeHtml(strVal);
+            // Do NOT escapeHtml here — the client displays values via textContent
+            // (which already prevents XSS) and input.value (which doesn't interpret
+            // entities). Applying escapeHtml causes escalating entity corruption:
+            // R&D → R&amp;D → R&amp;amp;D on each save-load cycle.
+            settings[field.key] = strVal;
           }
         }
       }

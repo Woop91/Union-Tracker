@@ -984,7 +984,7 @@ var ReportService = (function () {
     html += '<p>Period: ' + (typeof escapeHtml === 'function' ? escapeHtml(report.period) : report.period) + '</p>';
     html += '<h2>Summary</h2>';
     html += '<table border="1" cellpadding="8" style="border-collapse:collapse;">';
-    html += '<tr><td>Total Cases</td><td>' + report.summary.totalCases + '</td></tr>';
+    html += '<tr><td>Active Caseload</td><td>' + report.summary.totalCases + '</td></tr>';
     html += '<tr><td>New Cases</td><td>' + report.summary.newCases + '</td></tr>';
     html += '<tr><td>Resolved</td><td>' + report.summary.resolved + '</td></tr>';
     html += '<tr><td>Pending</td><td>' + report.summary.pending + '</td></tr>';
@@ -1014,30 +1014,30 @@ var ReportService = (function () {
 
 // --- Handoff Notes (steward-only) ---
 /** @param {string} sessionToken @param {string} caseId @returns {Array} Handoff notes for case. */
-function dataGetHandoffNotes(sessionToken, caseId) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return HandoffService.getHandoffNotes(caseId); }
+function dataGetHandoffNotes(sessionToken, caseId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return HandoffService.getHandoffNotes(caseId); }
 /** @param {string} sessionToken @param {string} caseId @param {string} noteText @param {string} [toSteward] @returns {Object} Result. */
-function dataAddHandoffNote(sessionToken, caseId, noteText, toSteward) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.addHandoffNote(s, caseId, noteText, toSteward); }
+function dataAddHandoffNote(sessionToken, caseId, noteText, toSteward) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return HandoffService.addHandoffNote(s, caseId, noteText, toSteward); }
 /** @param {string} sessionToken @param {string} noteId @returns {Object} Archive result. */
-function dataArchiveHandoffNote(sessionToken, noteId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return HandoffService.archiveHandoffNote(noteId); }
+function dataArchiveHandoffNote(sessionToken, noteId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return HandoffService.archiveHandoffNote(noteId); }
 
 
 // --- Mentorship (steward-only) ---
 /** @param {string} sessionToken @returns {Array} Active mentorship pairings. */
-function dataGetMentorshipPairings(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return MentorshipService.getPairings(); }
+function dataGetMentorshipPairings(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return MentorshipService.getPairings(); }
 /** @param {string} sessionToken @param {string} mentorEmail @param {string} menteeEmail @param {string} [caseTypes] @returns {Object} Result. */
-function dataCreateMentorshipPairing(sessionToken, mentorEmail, menteeEmail, caseTypes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return MentorshipService.createPairing(mentorEmail, menteeEmail, caseTypes); }
+function dataCreateMentorshipPairing(sessionToken, mentorEmail, menteeEmail, caseTypes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return MentorshipService.createPairing(mentorEmail, menteeEmail, caseTypes); }
 /** @param {string} sessionToken @param {string} pairingId @param {string} notes @returns {Object} Result. */
-function dataUpdateMentorshipNotes(sessionToken, pairingId, notes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return MentorshipService.updatePairingNotes(pairingId, notes); }
+function dataUpdateMentorshipNotes(sessionToken, pairingId, notes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return MentorshipService.updatePairingNotes(pairingId, notes); }
 /** @param {string} sessionToken @param {string} pairingId @returns {Object} Result. */
-function dataCloseMentorshipPairing(sessionToken, pairingId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return MentorshipService.closePairing(pairingId); }
+function dataCloseMentorshipPairing(sessionToken, pairingId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return MentorshipService.closePairing(pairingId); }
 /** @param {string} sessionToken @returns {Array} Suggested mentor-mentee pairings. */
-function dataGetMentorshipSuggestions(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return MentorshipService.suggestPairings(); }
+function dataGetMentorshipSuggestions(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return MentorshipService.suggestPairings(); }
 
 // --- Leader Mentorship (steward-only) ---
 /** @param {string} sessionToken @returns {Array} All Member Leaders with mentor info. */
 function dataGetMemberLeaders(sessionToken) {
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return [];
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   var leaders = (typeof loadMemberData_ === 'function') ? loadMemberData_().leaders : [];
   // Enrich with mentorship pairing info
   var pairings = (typeof MentorshipService !== 'undefined' && typeof MentorshipService.getPairings === 'function') ? MentorshipService.getPairings() : [];
@@ -1061,10 +1061,9 @@ function dataGetMemberLeaders(sessionToken) {
 
 // --- Communication Log (steward-only) ---
 /** @param {string} sessionToken @param {string} memberEmail @param {string} type @param {string} subject @param {string} notes @returns {Object} Result. */
-function dataLogCommunication(sessionToken, memberEmail, type, subject, notes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return CommunicationLogService.logCommunication(s, memberEmail, type, subject, notes); }
-function dataUpdateCommunication(sessionToken, entryId, updates) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return CommunicationLogService.updateCommunication(s, entryId, updates); }
+function dataLogCommunication(sessionToken, memberEmail, type, subject, notes) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return CommunicationLogService.logCommunication(s, memberEmail, type, subject, notes); }
 /** @param {string} sessionToken @param {string} memberEmail @returns {Array} Communication history. */
-function dataGetCommunicationLog(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return CommunicationLogService.getCommunicationLog(memberEmail); }
+function dataGetCommunicationLog(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return CommunicationLogService.getCommunicationLog(memberEmail); }
 
 // --- Knowledge Base (any authenticated user) ---
 /** @param {string} sessionToken @param {string} query @returns {Array} Matching articles. */
@@ -1073,7 +1072,7 @@ function dataSearchKnowledgeBase(sessionToken, query) { var e = _resolveCallerEm
 function dataGetKnowledgeBaseArticle(sessionToken, articleId) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return KnowledgeBaseService.getArticle(articleId); }
 
 /** @param {string} sessionToken @param {string} articleNumber @param {string} title @param {string} summary @param {string} fullText @param {string} relatedTypes @param {string} tags @returns {Object} Result (steward-only). */
-function dataAddKnowledgeBaseArticle(sessionToken, articleNumber, title, summary, fullText, relatedTypes, tags) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return KnowledgeBaseService.addArticle(articleNumber, title, summary, fullText, relatedTypes, tags); }
+function dataAddKnowledgeBaseArticle(sessionToken, articleNumber, title, summary, fullText, relatedTypes, tags) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return KnowledgeBaseService.addArticle(articleNumber, title, summary, fullText, relatedTypes, tags); }
 
 // --- Digest Preferences (any authenticated user for own prefs) ---
 /** @param {string} sessionToken @returns {Object} Notification preferences. */
@@ -1084,7 +1083,7 @@ function dataSetDigestPreferences(sessionToken, frequency, types) { var e = _res
 
 // --- Document Checklist (steward-only) ---
 /** @param {string} sessionToken @param {string} caseId @param {string} currentStep @param {string} driveFolderId @returns {Array} Document checklist. */
-function dataGetDocumentChecklist(sessionToken, caseId, currentStep, driveFolderId) { var s = _requireStewardAuth(sessionToken); if (!s) return []; return DocumentChecklistService.getChecklist(caseId, currentStep, driveFolderId); }
+function dataGetDocumentChecklist(sessionToken, caseId, currentStep, driveFolderId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DocumentChecklistService.getChecklist(caseId, currentStep, driveFolderId); }
 
 // --- Escalation Recommendations (steward-only) ---
 /** @param {string} sessionToken @param {string} caseId @returns {Object|null} Escalation recommendation. */
@@ -1092,7 +1091,7 @@ function dataGetEscalationRecommendation(sessionToken, caseId) { var s = _requir
 
 // --- Report Generation (steward-only) ---
 /** @param {string} sessionToken @param {Object} [dateRange] @returns {Object} Generated report data. */
-function dataGenerateMonthlyReport(sessionToken, dateRange) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return ReportService.generateMonthlyReport(dateRange); }
+function dataGenerateMonthlyReport(sessionToken, dateRange) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return ReportService.generateMonthlyReport(dateRange); }
 
 
 
@@ -1157,7 +1156,7 @@ var TwoFactorService = (function () {
    * @returns {Object} { success, message, error }
    */
   function generateCode(email) {
-    if (!email) return { success: false, error: 'Email required.' };
+    if (!email) return { success: false, message: 'Email required.' };
 
     if (_isRateLimited(email)) {
       if (typeof recordSecurityEvent === 'function') {
@@ -1165,7 +1164,7 @@ var TwoFactorService = (function () {
           '2FA code request rate limited',
           { email: typeof maskEmail === 'function' ? maskEmail(email) : email });
       }
-      return { success: false, error: 'Too many verification requests. Please wait 15 minutes.' };
+      return { success: false, message: 'Too many verification requests. Please wait 15 minutes.' };
     }
 
     var code = _generateCode();
@@ -1198,12 +1197,12 @@ var TwoFactorService = (function () {
     try {
       if (typeof safeSendEmail_ === 'function') {
         var result = safeSendEmail_({ to: email, subject: subject, htmlBody: htmlBody });
-        if (!result.success) return { success: false, error: result.error || 'Failed to send email.' };
+        if (!result.success) return { success: false, message: result.error || 'Failed to send email.' };
       } else {
         MailApp.sendEmail({ to: email, subject: subject, htmlBody: htmlBody });
       }
     } catch (_sendErr) {
-      return { success: false, error: 'Failed to send verification email.' };
+      return { success: false, message: 'Failed to send verification email.' };
     }
 
     if (typeof logAuditEvent === 'function') {
@@ -1220,7 +1219,7 @@ var TwoFactorService = (function () {
    * @returns {Object} { success, error }
    */
   function verifyCode(email, code) {
-    if (!email || !code) return { success: false, error: 'Email and code are required.' };
+    if (!email || !code) return { success: false, message: 'Email and code are required.' };
 
     var cache = CacheService.getScriptCache();
     var cacheKey = '2fa_code_' + email.toLowerCase().trim();
@@ -1234,12 +1233,12 @@ var TwoFactorService = (function () {
           '2FA verification locked out after 5 failures',
           { email: typeof maskEmail === 'function' ? maskEmail(email) : email });
       }
-      return { success: false, error: 'Too many failed attempts. Request a new code.' };
+      return { success: false, message: 'Too many failed attempts. Request a new code.' };
     }
 
     var storedHash = cache.get(cacheKey);
     if (!storedHash) {
-      return { success: false, error: 'Code expired or not requested. Please request a new code.' };
+      return { success: false, message: 'Code expired or not requested. Please request a new code.' };
     }
 
     var inputHash = _hashCode(String(code).trim(), email);
@@ -1253,7 +1252,7 @@ var TwoFactorService = (function () {
       if (typeof logAuditEvent === 'function') {
         logAuditEvent('2FA_VERIFY_FAILED', { email: typeof maskEmail === 'function' ? maskEmail(email) : email, attempts: failures + 1 });
       }
-      return { success: false, error: 'Invalid code. ' + (4 - failures) + ' attempts remaining.' };
+      return { success: false, message: 'Invalid code. ' + (4 - failures) + ' attempts remaining.' };
     }
 
     // Success — delete code to prevent replay
@@ -1296,14 +1295,14 @@ var TwoFactorService = (function () {
 /** @param {string} sessionToken @returns {Object} Result with message. */
 function dataRequest2FACode(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
-  if (!e) return { success: false, error: 'Not authenticated.' };
+  if (!e) return { success: false, message: 'Not authenticated.' };
   return TwoFactorService.generateCode(e);
 }
 
 /** @param {string} sessionToken @param {string} code @returns {Object} Verification result. */
 function dataVerify2FACode(sessionToken, code) {
   var e = _resolveCallerEmail(sessionToken);
-  if (!e) return { success: false, error: 'Not authenticated.' };
+  if (!e) return { success: false, message: 'Not authenticated.' };
   return TwoFactorService.verifyCode(e, code);
 }
 
@@ -1393,7 +1392,7 @@ var SMSService = (function () {
     var token = props.getProperty(PROP_AUTH_TOKEN);
     var from  = props.getProperty(PROP_FROM_NUMBER);
     if (!sid || !token || !from) {
-      return { success: false, error: 'Twilio not configured.' };
+      return { success: false, message: 'Twilio not configured.' };
     }
 
     var url = 'https://api.twilio.com/2010-04-01/Accounts/' + encodeURIComponent(sid) + '/Messages.json';
@@ -1419,9 +1418,9 @@ var SMSService = (function () {
       if (code === 201 || code === 200) {
         return { success: true, sid: body.sid || '' };
       }
-      return { success: false, error: (body.message || 'Twilio error ' + code) };
+      return { success: false, message: (body.message || 'Twilio error ' + code) };
     } catch (fetchErr) {
-      return { success: false, error: fetchErr.message };
+      return { success: false, message: fetchErr.message };
     }
   }
 
@@ -1461,15 +1460,15 @@ var SMSService = (function () {
    */
   function sendSMS(recipientEmail, message) {
     if (!recipientEmail || !message) {
-      return { success: false, error: 'Recipient and message are required.' };
+      return { success: false, message: 'Recipient and message are required.' };
     }
     if (!isConfigured()) {
-      return { success: false, error: 'SMS not configured. Set up Twilio in Admin Settings.' };
+      return { success: false, message: 'SMS not configured. Set up Twilio in Admin Settings.' };
     }
 
     var phone = _lookupPhone(recipientEmail);
     if (!phone) {
-      return { success: false, error: 'No valid phone number found for this member.' };
+      return { success: false, message: 'No valid phone number found for this member.' };
     }
 
     // Rate limit: max 5 SMS per recipient per day
@@ -1477,7 +1476,7 @@ var SMSService = (function () {
     var cache = CacheService.getScriptCache();
     var count = parseInt(cache.get(cacheKey) || '0', 10);
     if (count >= 5) {
-      return { success: false, error: 'Daily SMS limit reached for this recipient.' };
+      return { success: false, message: 'Daily SMS limit reached for this recipient.' };
     }
 
     var result = _sendViaTwilio(phone, message);
@@ -1493,7 +1492,7 @@ var SMSService = (function () {
         result.success ? 'Sent' : 'Failed',
         result.sid || '',
         new Date(),
-        result.error || ''
+        result.message || ''
       ]);
     } catch (logErr) {
       log_('SMSService.sendSMS log error', logErr.message);
@@ -1508,8 +1507,7 @@ var SMSService = (function () {
 
     return {
       success: result.success,
-      message: result.success ? 'SMS sent successfully.' : undefined,
-      error: result.error
+      message: result.success ? 'SMS sent successfully.' : result.message
     };
   }
 
@@ -1536,7 +1534,7 @@ var SMSService = (function () {
    */
   function testSMS(toPhone) {
     if (!isConfigured()) {
-      return { success: false, error: 'Twilio not configured.' };
+      return { success: false, message: 'Twilio not configured.' };
     }
     var orgName = typeof getConfigValue_ === 'function' ? (getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Dashboard') : 'Dashboard';
     return _sendViaTwilio(toPhone, 'Test message from ' + orgName + '. If you received this, SMS is working!');
@@ -1816,16 +1814,16 @@ var RSVPService = (function () {
       if (typeof recordSecurityEvent === 'function') {
         recordSecurityEvent('RSVP_INVALID_TOKEN', SECURITY_SEVERITY.LOW, 'Invalid or expired RSVP token', { token: token ? token.substring(0, 4) + '...' : 'null' });
       }
-      return { success: false, error: 'This RSVP link has expired or is invalid.' };
+      return { success: false, message: 'This RSVP link has expired or is invalid.' };
     }
 
     var newStatus = (response === 'accept') ? RSVP_STATUS.ACCEPTED : RSVP_STATUS.DECLINED;
 
     // Update the RSVP row
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) return { success: false, error: 'System unavailable.' };
+    if (!ss) return { success: false, message: 'System unavailable.' };
     var sheet = ss.getSheetByName(SHEETS.RSVP_LOG);
-    if (!sheet || sheet.getLastRow() < 2) return { success: false, error: 'RSVP record not found.' };
+    if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'RSVP record not found.' };
 
     var data = sheet.getDataRange().getValues();
     var meetingName = '';
@@ -1981,8 +1979,8 @@ var RSVPService = (function () {
 
 // --- RSVP (steward for management, token-auth for responding) ---
 /** @param {string} sessionToken @param {string} meetingId @param {Object} [options] @returns {Object} Invitation result. */
-function dataSendMeetingInvitations(sessionToken, meetingId, options) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return RSVPService.sendInvitations(meetingId, options); }
+function dataSendMeetingInvitations(sessionToken, meetingId, options) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return RSVPService.sendInvitations(meetingId, options); }
 /** @param {string} sessionToken @param {string} meetingId @returns {Object} RSVP summary. */
 function dataGetRSVPSummary(sessionToken, meetingId) { var s = _requireStewardAuth(sessionToken); if (!s) return { meetingId: meetingId, invited: 0, accepted: 0, declined: 0, noResponse: 0, attended: 0, members: [] }; return RSVPService.getRSVPSummary(meetingId); }
 /** @param {string} sessionToken @param {string} meetingId @returns {Object} Reconciliation result. */
-function dataReconcileAttendance(sessionToken, meetingId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, message: 'Steward access required.' }; return RSVPService.reconcileAttendance(meetingId); }
+function dataReconcileAttendance(sessionToken, meetingId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return RSVPService.reconcileAttendance(meetingId); }

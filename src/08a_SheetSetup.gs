@@ -1035,7 +1035,11 @@ function onSelectionChangeMultiSelect(e) {
     if (lastCell === currentCell) return;
 
     props.setProperty('lastMultiSelectCell', currentCell);
-    openCellMultiSelectEditor();
+    // Cannot call showModalDialog from simple trigger (GAS restriction).
+    // Show a toast hint instead; user can open via menu: Tools > Multi-Select Editor.
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Multi-select available for this cell. Use menu: Tools \u25B8 Multi-Select Editor',
+      '\u2611 Multi-Select', 4);
   } catch (err) {
     log_('onSelectionChangeMultiSelect error', err.message);
   }

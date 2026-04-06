@@ -984,17 +984,17 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
   // their OWN source dates already entered - those will recalculate from their own source.
   // We only cascade when downstream source dates are empty.
 
-  // FIX-MAIN-01: v4.25.8 — Read deadline days from getDeadlineRules() (Config sheet)
-  // instead of hardcoding. Uses addBusinessDays() for consistency with all other deadline
-  // calculations. Previously used raw * 86400000 ms math (calendar days, not business days).
+  // FIX-MAIN-01: v4.25.8 — Read deadline days from getDeadlineRules() (Config sheet).
+  // v4.51.2: Uses addCalendarDays for response/filing deadlines (Art. 23 calendar days),
+  // addBusinessDays only for appeal deadlines (Art. 23 business days).
   var rules = getDeadlineRules();
 
   var deadlineChain = [
-    { calcCol: GRIEVANCE_COLS.FILING_DEADLINE,  sourceCol: GRIEVANCE_COLS.INCIDENT_DATE,       days: rules.FILING_DAYS },
-    { calcCol: GRIEVANCE_COLS.STEP1_DUE,        sourceCol: GRIEVANCE_COLS.DATE_FILED,           days: rules.STEP_1.DAYS_FOR_RESPONSE },
-    { calcCol: GRIEVANCE_COLS.STEP2_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP1_RCVD,          days: rules.STEP_2.DAYS_TO_APPEAL },
-    { calcCol: GRIEVANCE_COLS.STEP2_DUE,        sourceCol: GRIEVANCE_COLS.STEP2_APPEAL_FILED,  days: rules.STEP_2.DAYS_FOR_RESPONSE },
-    { calcCol: GRIEVANCE_COLS.STEP3_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP2_RCVD,          days: rules.STEP_3.DAYS_TO_APPEAL }
+    { calcCol: GRIEVANCE_COLS.FILING_DEADLINE,  sourceCol: GRIEVANCE_COLS.INCIDENT_DATE,       days: rules.FILING_DAYS,                 business: false },
+    { calcCol: GRIEVANCE_COLS.STEP1_DUE,        sourceCol: GRIEVANCE_COLS.DATE_FILED,           days: rules.STEP_1.DAYS_FOR_RESPONSE,    business: false },
+    { calcCol: GRIEVANCE_COLS.STEP2_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP1_RCVD,          days: rules.STEP_2.DAYS_TO_APPEAL,       business: true },
+    { calcCol: GRIEVANCE_COLS.STEP2_DUE,        sourceCol: GRIEVANCE_COLS.STEP2_APPEAL_FILED,  days: rules.STEP_2.DAYS_FOR_RESPONSE,    business: false },
+    { calcCol: GRIEVANCE_COLS.STEP3_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP2_RCVD,          days: rules.STEP_3.DAYS_TO_APPEAL,       business: true }
   ];
 
   // Find position of overridden column in the chain
@@ -1018,7 +1018,8 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
     // If the downstream step has its own source date, it will be calculated from that
     // source by syncGrievanceFormulasToLog — skip it.
     if (sourceValue instanceof Date) {
-      previousDate = addBusinessDays(sourceValue, downstream.days);
+      var _addDays = downstream.business ? addBusinessDays : addCalendarDays;
+      previousDate = _addDays(sourceValue, downstream.days);
       continue;
     }
 
@@ -1030,7 +1031,8 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
       if (previousDate instanceof Date) continue;
     }
 
-    var newDeadline = addBusinessDays(previousDate, downstream.days);
+    var _addDaysFn = downstream.business ? addBusinessDays : addCalendarDays;
+    var newDeadline = _addDaysFn(previousDate, downstream.days);
     sheet.getRange(row, downstream.calcCol).setValue(newDeadline);
     previousDate = newDeadline;
   }
@@ -2029,7 +2031,7 @@ function updateGrievance(grievanceId, updates) {
 
     // Update each provided field (use canonical GRIEVANCE_COLS, 1-indexed)
     if (updates.description !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(escapeForFormula(updates.description));
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.DESCRIPTION).setValue(escapeForFormula(updates.description));
     }
     if (updates.notes !== undefined) {
       sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(updates.notes));
@@ -2407,89 +2409,6 @@ function exportMemberDirectory(format) {
     default:
       throw new Error('Unknown export format: ' + format);
   }
-}
-
-/**
- * Shows a search dialog to find existing members
- * Menu wrapper - calls the backend findExistingMember() with user input
- */
-function showFindMemberDialog() {
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <base target="_top">
-      ${getMobileOptimizedHead()}
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-        .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
-        h2 { color: ${SHEET_COLORS.DIALOG_ACCENT}; margin-top: 0; }
-        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
-        .field { margin: 15px 0; }
-        .field label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
-        .field input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
-        .primary { background: ${SHEET_COLORS.DIALOG_ACCENT}; color: white; }
-        .secondary { background: #e0e0e0; color: #333; }
-        .button-row { margin-top: 20px; }
-        .results { margin-top: 15px; max-height: 200px; overflow-y: auto; }
-        .result-item { padding: 10px; background: #f8f9fa; margin: 5px 0; border-radius: 4px; cursor: pointer; }
-        .result-item:hover { background: #e8f0fe; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h2>🔍 Find Member</h2>
-        <div class="info">
-          💡 Search by name, email, or member ID to find existing members.
-        </div>
-        <div class="field">
-          <label>Search Term</label>
-          <input type="text" id="searchTerm" placeholder="Enter name, email, or member ID..." autofocus>
-        </div>
-        <div class="button-row">
-          <button class="primary" onclick="searchMembers()">🔍 Search</button>
-          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
-        </div>
-        <div id="results" class="results"></div>
-      </div>
-      <script>
-        ${getClientSideEscapeHtml()}
-        document.getElementById('searchTerm').addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') searchMembers();
-        });
-        function searchMembers() {
-          var term = document.getElementById('searchTerm').value.trim();
-          if (!term) { alert('Please enter a search term'); return; }
-          google.script.run
-            .withSuccessHandler(function(results) {
-              var html = '';
-              if (results.length === 0) {
-                html = '<div class="result-item">No members found</div>';
-              } else {
-                results.forEach(function(m) {
-                  html += '<div class="result-item" onclick="goToMember(' + m.row + ')">' +
-                    '<strong>' + escapeHtml(m.name) + '</strong><br>' +
-                    '<small>' + escapeHtml(m.id || 'No ID') + ' • ' + escapeHtml(m.email || 'No email') + '</small>' +
-                    '</div>';
-                });
-              }
-              document.getElementById('results').innerHTML = html;
-            })
-            .withFailureHandler(function(e) {
-              document.getElementById('results').innerHTML = '<div class="result-item">Error: ' + escapeHtml(e.message) + '</div>';
-            })
-            .searchMembersForDialog(term);
-        }
-        function goToMember(row) {
-          google.script.run.navigateToMemberRow(row);
-          google.script.host.close();
-        }
-      </script>
-    </body>
-    </html>
-  `;
-  showDialog_(htmlContent, '🔍 Find Member', 500, 450);
 }
 
 /**

@@ -28,9 +28,9 @@ describe('TIME_CONSTANTS.DEADLINE_DAYS', () => {
   const dd = TIME_CONSTANTS.DEADLINE_DAYS;
 
   test('FILING is 21 days', () => { expect(dd.FILING).toBe(21); });
-  test('STEP1_RESPONSE is 7 days', () => { expect(dd.STEP1_RESPONSE).toBe(7); });
-  test('STEP2_APPEAL is 7 days', () => { expect(dd.STEP2_APPEAL).toBe(7); });
-  test('STEP2_RESPONSE is 14 days', () => { expect(dd.STEP2_RESPONSE).toBe(14); });
+  test('STEP1_RESPONSE is 30 days', () => { expect(dd.STEP1_RESPONSE).toBe(30); });
+  test('STEP2_APPEAL is 10 days', () => { expect(dd.STEP2_APPEAL).toBe(10); });
+  test('STEP2_RESPONSE is 30 days', () => { expect(dd.STEP2_RESPONSE).toBe(30); });
   test('STEP3_APPEAL is 10 days', () => { expect(dd.STEP3_APPEAL).toBe(10); });
   test('WARNING_THRESHOLD is 5', () => { expect(dd.WARNING_THRESHOLD).toBe(5); });
   test('CRITICAL_THRESHOLD is 2', () => { expect(dd.CRITICAL_THRESHOLD).toBe(2); });

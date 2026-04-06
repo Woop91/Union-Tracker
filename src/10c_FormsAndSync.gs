@@ -322,24 +322,6 @@ function syncAllDashboardData() {
 }
 
 // ============================================================================
-// TESTING FUNCTIONS
-// ============================================================================
-
-/**
- * Activates the Test Results sheet, or alerts the user if none exists yet.
- * @returns {void}
- */
-function viewTestResults() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.TEST_RESULTS);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  } else {
-    SpreadsheetApp.getUi().alert('No test results yet. Run tests first using 🧪 Testing menu.');
-  }
-}
-
-// ============================================================================
 // GOOGLE DRIVE INTEGRATION
 // ============================================================================
 
@@ -519,57 +501,6 @@ function buildGrievanceMemberLookup() {
 // GRIEVANCE TOOLS - ADDITIONAL FUNCTIONS
 // ============================================================================
 
-/**
- * Fix existing "Overdue" text in Days to Deadline column
- * Converts text back to negative numbers for proper counting
- */
-function fixOverdueTextToNumbers() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Grievance Log not found.');
-    return;
-  }
-
-  ss.toast('Fixing overdue data...', '🔧 Fix', 3);
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-
-  var daysCol = GRIEVANCE_COLS.DAYS_TO_DEADLINE;
-  var nextActionCol = GRIEVANCE_COLS.NEXT_ACTION_DUE;
-
-  var daysData = sheet.getRange(2, daysCol, lastRow - 1, 1).getValues();
-  var nextActionData = sheet.getRange(2, nextActionCol, lastRow - 1, 1).getValues();
-
-  var today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  var updates = [];
-  var fixCount = 0;
-
-  for (var i = 0; i < daysData.length; i++) {
-    var currentValue = daysData[i][0];
-    var nextAction = nextActionData[i][0];
-
-    if (currentValue === 'Overdue' && nextAction instanceof Date) {
-      var days = Math.floor((nextAction - today) / (1000 * 60 * 60 * 24));
-      updates.push([days]);
-      fixCount++;
-    } else {
-      updates.push([currentValue]);
-    }
-  }
-
-  if (fixCount > 0) {
-    sheet.getRange(2, daysCol, updates.length, 1).setValues(updates);
-    ss.toast('Fixed ' + fixCount + ' overdue entries!', '✅ Success', 3);
-  } else {
-    ss.toast('No "Overdue" text found to fix.', '✅ All Good', 3);
-  }
-}
-
 // ============================================================================
 // GRIEVANCE LOG SORTING
 // ============================================================================
@@ -581,6 +512,14 @@ function fixOverdueTextToNumbers() {
  * then resolved cases (Settled, Won, Denied, Withdrawn, Closed) appear last
  */
 function sortGrievanceLogByStatus() {
+  // Debounce: skip if sorted within the last 30 seconds (expensive full-sheet rewrite)
+  var _sortCache = CacheService.getScriptCache();
+  if (_sortCache) {
+    var _lastSort = _sortCache.get('_grievance_sort_debounce');
+    if (_lastSort) return;
+    _sortCache.put('_grievance_sort_debounce', '1', 30);
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 

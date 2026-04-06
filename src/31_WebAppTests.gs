@@ -271,6 +271,8 @@ function test_portal_minutesColsDefined() {
   TestRunner.assertHasKey(PORTAL_MINUTES_COLS, 'MEETING_DATE', 'MEETING_DATE');
   TestRunner.assertHasKey(PORTAL_MINUTES_COLS, 'TITLE', 'TITLE');
   TestRunner.assertHasKey(PORTAL_MINUTES_COLS, 'DRIVE_DOC_URL', 'DRIVE_DOC_URL');
+  TestRunner.assertHasKey(PORTAL_MINUTES_COLS, 'ATTACHMENT_URL', 'ATTACHMENT_URL');
+  TestRunner.assertHasKey(PORTAL_MINUTES_COLS, 'ATTACHMENT_NAME', 'ATTACHMENT_NAME');
 }
 
 /** Tests portal: grievance cols defined. */
@@ -875,7 +877,8 @@ function test_endpoints_allWriteEndpointsRejectNull() {
     { fn: 'dataCreateTask', args: [null, {}] },
     { fn: 'dataSubmitFeedback', args: [null, {}] },
     { fn: 'dataSendBroadcast', args: [null, '', '', ''] },
-    { fn: 'dataLogMemberContact', args: [null, '', '', ''] }
+    { fn: 'dataLogMemberContact', args: [null, '', '', ''] },
+    { fn: 'dataAddMeetingMinutes', args: [null, {}, ''] }
   ];
   for (var i = 0; i < writeEndpoints.length; i++) {
     var ep = writeEndpoints[i];

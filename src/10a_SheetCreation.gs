@@ -675,8 +675,8 @@ function seedConfigDefault_(sheet, col, values, isExisting) {
     if (lastRow >= 3) {
       var existing = sheet.getRange(3, col, lastRow - 2, 1).getValues();
       for (var i = 0; i < existing.length; i++) {
-        // Truthiness check covers '', null, undefined, and 0 (no valid config default is 0)
-        if (existing[i][0]) {
+        // Check for non-empty: must allow 0 and false as valid config values (e.g., ACCENT_HUE=0)
+        if (existing[i][0] !== '' && existing[i][0] !== null && existing[i][0] !== undefined) {
           return; // Column already has data, don't overwrite
         }
       }

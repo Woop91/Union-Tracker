@@ -640,7 +640,7 @@ describe('TwoFactorService.generateCode', () => {
   test('rejects empty email', () => {
     var result = TwoFactorService.generateCode('');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Email required');
+    expect(result.message).toContain('Email required');
   });
 
   test('sends code for valid email', () => {
@@ -654,13 +654,13 @@ describe('TwoFactorService.verifyCode', () => {
   test('rejects empty inputs', () => {
     var result = TwoFactorService.verifyCode('', '');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('required');
+    expect(result.message).toContain('required');
   });
 
   test('rejects expired or non-existent code', () => {
     var result = TwoFactorService.verifyCode('user@test.com', '123456');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('expired');
+    expect(result.message).toContain('expired');
   });
 });
 
@@ -715,13 +715,13 @@ describe('SMSService.sendSMS', () => {
   test('rejects missing recipient', () => {
     var result = SMSService.sendSMS('', 'Hello');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('required');
+    expect(result.message).toContain('required');
   });
 
   test('rejects missing message', () => {
     var result = SMSService.sendSMS('user@test.com', '');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('required');
+    expect(result.message).toContain('required');
   });
 });
 
@@ -912,12 +912,12 @@ describe('NewFeatureServices global wrappers — auth gating', () => {
   test('steward wrappers reject null auth', () => {
     _requireStewardAuth.mockReturnValue(null);
 
-    expect(dataGetHandoffNotes('bad', 'CASE-1')).toEqual([]);
+    expect(dataGetHandoffNotes('bad', 'CASE-1')).toEqual({ success: false, authError: true, message: 'Steward access required.' });
     expect(dataAddHandoffNote('bad', 'CASE-1', 'note').success).toBe(false);
-    expect(dataGetMentorshipPairings('bad')).toEqual([]);
+    expect(dataGetMentorshipPairings('bad')).toEqual({ success: false, authError: true, message: 'Steward access required.' });
     expect(dataLogCommunication('bad', 'e', 't', 's', 'n').success).toBe(false);
-    expect(dataGetCommunicationLog('bad', 'e')).toEqual([]);
-    expect(dataGetDocumentChecklist('bad', 'c', 's', 'f')).toEqual([]);
+    expect(dataGetCommunicationLog('bad', 'e')).toEqual({ success: false, authError: true, message: 'Steward access required.' });
+    expect(dataGetDocumentChecklist('bad', 'c', 's', 'f')).toEqual({ success: false, authError: true, message: 'Steward access required.' });
     expect(dataGetEscalationRecommendation('bad', 'c')).toBeNull();
     expect(dataGenerateMonthlyReport('bad').success).toBe(false);
 

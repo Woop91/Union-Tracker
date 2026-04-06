@@ -9,6 +9,8 @@
  *      Called everywhere user data is rendered into HTML dialogs or the SPA.
  *   2. escapeForFormula(input) — formula injection prevention for sheet writes.
  *      Prefixes dangerous characters (=, +, -, @) that Sheets interprets as formulas.
+ *   2a. escapeForFormulaPreserveNewlines(input) — variant that preserves newlines;
+ *       use for multiline fields (bullets, fullMinutes) where line breaks are meaningful.
  *   3. checkWebAppAuthorization(role) — role-based access control for the web app.
  *      Resolves the caller's role (admin/steward/member/anonymous) from the Member Directory.
  *   4. maskEmail/maskPhone/maskName — PII masking for safe logging.
@@ -238,6 +240,33 @@ function escapeForFormula(input) {
       // so no multiline flag needed — just re-check after tab→space replacement.
       return "'" + match;
     });
+}
+
+/**
+ * Formula-injection escaper that preserves newlines.
+ * Use for multiline fields (bullets, fullMinutes) where line breaks are meaningful.
+ * Escapes formula-trigger characters (=, +, -, @) at the start of EACH line,
+ * replaces tabs with spaces, strips carriage returns, and escapes backslashes.
+ *
+ * @param {*} input - Value to sanitize
+ * @returns {string} Formula-safe string with newlines preserved
+ */
+function escapeForFormulaPreserveNewlines(input) {
+  if (input === null || input === undefined) return '';
+  var str = String(input);
+  return str
+    .replace(/\r\n/g, '\n')      // Normalize CRLF to LF
+    .replace(/\r/g, '\n')        // Normalize lone CR to LF
+    .split('\n')
+    .map(function(line) {
+      return line
+        .replace(/\\/g, '\\\\')
+        .replace(/\t/g, ' ')
+        .replace(/^(\s*)[=+\-@]/, function(match) {
+          return "'" + match;
+        });
+    })
+    .join('\n');
 }
 
 /**

@@ -159,6 +159,40 @@ describe('getOrCreateMinutesSheet', () => {
   });
 });
 
+describe('PORTAL_MINUTES_COLS', () => {
+  test('has all 10 column indices', () => {
+    var required = ['ID', 'MEETING_DATE', 'TITLE', 'BULLETS', 'FULL_MINUTES',
+      'CREATED_BY', 'CREATED_DATE', 'DRIVE_DOC_URL', 'ATTACHMENT_URL', 'ATTACHMENT_NAME'];
+    required.forEach(function(key) {
+      expect(PORTAL_MINUTES_COLS).toHaveProperty(key);
+      expect(typeof PORTAL_MINUTES_COLS[key]).toBe('number');
+      expect(PORTAL_MINUTES_COLS[key]).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  test('ATTACHMENT_URL is contiguous after DRIVE_DOC_URL', () => {
+    expect(PORTAL_MINUTES_COLS.ATTACHMENT_URL).toBe(PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1);
+  });
+
+  test('ATTACHMENT_NAME is contiguous after ATTACHMENT_URL', () => {
+    expect(PORTAL_MINUTES_COLS.ATTACHMENT_NAME).toBe(PORTAL_MINUTES_COLS.ATTACHMENT_URL + 1);
+  });
+
+  test('no duplicate column indices', () => {
+    var values = Object.values(PORTAL_MINUTES_COLS);
+    expect(new Set(values).size).toBe(values.length);
+  });
+});
+
+describe('MINUTES_LIMITS', () => {
+  test('has all limit constants', () => {
+    expect(MINUTES_LIMITS.TITLE_MAX).toBe(200);
+    expect(MINUTES_LIMITS.BULLETS_MAX).toBe(2000);
+    expect(MINUTES_LIMITS.FULL_MINUTES_MAX).toBe(5000);
+    expect(MINUTES_LIMITS.ATTACHMENT_MAX_BYTES).toBe(10485760);
+  });
+});
+
 describe('getOrCreatePortalGrievanceSheet', () => {
   test('creates hidden PortalGrievances sheet', () => {
     getOrCreatePortalGrievanceSheet();

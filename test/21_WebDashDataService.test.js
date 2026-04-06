@@ -9,7 +9,7 @@ require('./gas-mock');
 const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
 const { loadSources } = require('./load-source');
 
-loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '21_WebDashDataService.gs', '21d_WebDashDataWrappers.gs']);
+loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '23_PortalSheets.gs', '21_WebDashDataService.gs', '21d_WebDashDataWrappers.gs']);
 
 let mockMemberSheet;
 let mockGrievanceSheet;
@@ -1339,5 +1339,186 @@ describe('sendBroadcastMessage security', () => {
       var sentMessage = MailApp.sendEmail.mock.calls[0][2];
       expect(sentMessage).not.toBe('=CMD("malicious")');
     }
+  });
+});
+
+// ============================================================================
+// Meeting Minutes — addMeetingMinutes (v4.52.0)
+// ============================================================================
+
+describe('addMeetingMinutes', () => {
+  let mockSheet;
+
+  beforeEach(() => {
+    mockSheet = {
+      appendRow: jest.fn(),
+      getLastRow: jest.fn(() => 5),
+      getRange: jest.fn(() => ({
+        setValue: jest.fn(() => ({ setValue: jest.fn() }))
+      }))
+    };
+    global.getOrCreateMinutesSheet = jest.fn(() => mockSheet);
+    global.CacheService = { getScriptCache: () => ({ get: jest.fn(() => null), put: jest.fn() }) };
+    global.DocumentApp = { create: jest.fn(() => ({ getBody: () => ({ appendParagraph: jest.fn(() => ({ setHeading: jest.fn() })), appendListItem: jest.fn() }), saveAndClose: jest.fn(), getId: () => 'doc123' })), ParagraphHeading: { HEADING1: 'H1', HEADING2: 'H2' } };
+    global.DriveApp = { getFileById: jest.fn(() => ({ getUrl: () => 'https://docs.google.com/doc123', moveTo: jest.fn() })), getFolderById: jest.fn(() => ({})), createFile: jest.fn(() => ({ getUrl: () => 'https://drive.google.com/att', moveTo: jest.fn() })) };
+    global.Session = { getScriptTimeZone: () => 'America/New_York' };
+    global.Utilities = { formatDate: jest.fn(() => '2026-04-06'), base64Decode: jest.fn(() => [1, 2, 3]), newBlob: jest.fn(() => ({})) };
+    global.logAuditEvent = jest.fn();
+    global.log_ = jest.fn();
+    global.getConfigValue_ = jest.fn(() => '');
+    global.PropertiesService = { getScriptProperties: () => ({ getProperty: () => '' }) };
+    global.CONFIG_COLS = { MINUTES_FOLDER_ID: 'MINUTES_FOLDER_ID' };
+    global.LockService = { getScriptLock: () => ({ tryLock: jest.fn(() => true), releaseLock: jest.fn() }) };
+  });
+
+  test('returns success with id and driveDocUrl', () => {
+    var result = DataService.addMeetingMinutes('steward@test.com', {
+      title: 'Test Meeting', meetingDate: '2026-04-06', bullets: '• Point 1', fullMinutes: 'Details'
+    });
+    expect(result.success).toBe(true);
+    expect(result.id).toMatch(/^MIN_[a-z0-9]+_[a-z0-9]+$/);
+    expect(result.driveDocUrl).toBeTruthy();
+  });
+
+  test('rejects when title is missing', () => {
+    var result = DataService.addMeetingMinutes('steward@test.com', { title: '' });
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects when minutesData is null', () => {
+    var result = DataService.addMeetingMinutes('steward@test.com', null);
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects whitespace-only title', () => {
+    var result = DataService.addMeetingMinutes('steward@test.com', { title: '   ' });
+    expect(result.success).toBe(false);
+  });
+
+  test('ID includes random suffix for collision prevention', () => {
+    var r1 = DataService.addMeetingMinutes('s@t.com', { title: 'A' });
+    var r2 = DataService.addMeetingMinutes('s@t.com', { title: 'B' });
+    expect(r1.id).not.toBe(r2.id);
+    expect(r1.id).toMatch(/^MIN_[a-z0-9]+_[a-z0-9]{5}$/);
+  });
+
+  test('appends 10 columns to sheet', () => {
+    DataService.addMeetingMinutes('s@t.com', { title: 'Test' });
+    var appendArgs = mockSheet.appendRow.mock.calls[0][0];
+    expect(appendArgs.length).toBe(10);
+  });
+
+  test('returns duplicate:true for repeated idemKey', () => {
+    var cache = { get: jest.fn(() => null), put: jest.fn() };
+    global.CacheService = { getScriptCache: () => cache };
+    DataService.addMeetingMinutes('s@t.com', { title: 'A' }, 'key1');
+    cache.get = jest.fn(() => '1');
+    var r2 = DataService.addMeetingMinutes('s@t.com', { title: 'B' }, 'key1');
+    expect(r2.duplicate).toBe(true);
+  });
+
+  test('handles attachment data when provided', () => {
+    DataService.addMeetingMinutes('s@t.com', {
+      title: 'Test', attachmentData: 'AQID', attachmentName: 'file.pdf'
+    });
+    expect(global.Utilities.base64Decode).toHaveBeenCalledWith('AQID');
+    expect(global.DriveApp.createFile).toHaveBeenCalled();
+  });
+
+  test('rejects attachment with disallowed extension', () => {
+    var result = DataService.addMeetingMinutes('s@t.com', {
+      title: 'Test', attachmentData: 'AQID', attachmentName: 'virus.exe'
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/not supported/i);
+  });
+
+  test('rejects attachment exceeding 10MB', () => {
+    var bigData = 'A'.repeat(14000000);
+    var result = DataService.addMeetingMinutes('s@t.com', {
+      title: 'Test', attachmentData: bigData, attachmentName: 'big.pdf'
+    });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/too large/i);
+  });
+
+  test('rejects attachment with data but no name', () => {
+    var result = DataService.addMeetingMinutes('s@t.com', {
+      title: 'Test', attachmentData: 'AQID'
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// Meeting Minutes — getMeetingMinutes (v4.52.0)
+// ============================================================================
+
+describe('getMeetingMinutes', () => {
+  let mockSheet;
+
+  beforeEach(() => {
+    var mockData = [
+      ['ID', 'MeetingDate', 'Title', 'Bullets', 'FullMinutes', 'CreatedBy', 'CreatedDate', 'DriveDocUrl', 'AttachmentUrl', 'AttachmentName'],
+      ['MIN_1', new Date('2026-03-01T12:00:00'), 'March Meeting', '• Point A', 'Full text', 'steward@test.com', new Date('2026-03-01'), 'https://docs.google.com/1', 'https://drive.google.com/att1', 'march_notes.pdf'],
+      ['MIN_2', new Date('2026-04-01T12:00:00'), 'April Meeting', '• Point B', 'Details', 'steward@test.com', new Date('2026-04-01'), '', '', ''],
+      ['MIN_3', new Date('2026-02-01T12:00:00'), 'Feb Meeting', '', '', 'other@test.com', new Date('2026-02-01'), '', '', '']
+    ];
+    mockSheet = {
+      getLastRow: jest.fn(() => mockData.length),
+      getDataRange: jest.fn(() => ({ getValues: jest.fn(() => mockData) }))
+    };
+    global.getOrCreateMinutesSheet = jest.fn(() => mockSheet);
+    global._formatDate = jest.fn((d) => d.toLocaleDateString());
+    global.log_ = jest.fn();
+  });
+
+  test('returns records sorted newest-first', () => {
+    var result = DataService.getMeetingMinutes();
+    expect(result[0].title).toBe('April Meeting');
+    expect(result[1].title).toBe('March Meeting');
+    expect(result[2].title).toBe('Feb Meeting');
+  });
+
+  test('respects limit parameter', () => {
+    var result = DataService.getMeetingMinutes(2);
+    expect(result.length).toBe(2);
+  });
+
+  test('defaults to limit of 20', () => {
+    var result = DataService.getMeetingMinutes();
+    expect(result.length).toBeLessThanOrEqual(20);
+  });
+
+  test('returns empty array for empty sheet', () => {
+    mockSheet.getLastRow.mockReturnValue(1);
+    var result = DataService.getMeetingMinutes();
+    expect(result).toEqual([]);
+  });
+
+  test('includes attachmentUrl and attachmentName in response', () => {
+    var result = DataService.getMeetingMinutes();
+    var march = result.find(function(m) { return m.title === 'March Meeting'; });
+    expect(march.attachmentUrl).toBe('https://drive.google.com/att1');
+    expect(march.attachmentName).toBe('march_notes.pdf');
+  });
+
+  test('returns empty strings for records without attachments', () => {
+    var result = DataService.getMeetingMinutes();
+    var april = result.find(function(m) { return m.title === 'April Meeting'; });
+    expect(april.attachmentUrl).toBe('');
+    expect(april.attachmentName).toBe('');
+  });
+
+  test('does not leak meetingDateTs in response', () => {
+    var result = DataService.getMeetingMinutes();
+    result.forEach(function(m) {
+      expect(m).not.toHaveProperty('meetingDateTs');
+    });
+  });
+
+  test('includes createdBy in response', () => {
+    var result = DataService.getMeetingMinutes();
+    expect(result[0].createdBy).toBe('steward@test.com');
   });
 });

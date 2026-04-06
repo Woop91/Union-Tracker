@@ -2686,74 +2686,7 @@ function validateMemberIdOnEdit(e) {
 // SELF-HEALING CONFIG VALIDATION TOOL
 // ============================================================================
 
-/**
- * Scan all data sheets for values not in Config dropdowns
- * @returns {Object} Report of missing config values by column
- */
-function findMissingConfigValues() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!configSheet || !memberSheet || !grievanceSheet) {
-    return { error: 'Required sheets not found' };
-  }
-
-  var report = { missingValues: [], autoFixable: [] };
-
-  // Define field mappings to check
-  var fieldsToCheck = [
-    { sheet: memberSheet, col: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, name: 'Job Title' },
-    { sheet: memberSheet, col: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, name: 'Work Location' },
-    { sheet: memberSheet, col: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, name: 'Unit' },
-    { sheet: memberSheet, col: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, name: 'Supervisor' },
-    { sheet: memberSheet, col: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, name: 'Director' },
-    { sheet: grievanceSheet, col: GRIEVANCE_COLS.STATUS, configCol: CONFIG_COLS.GRIEVANCE_STATUS, name: 'Grievance Status' },
-    { sheet: grievanceSheet, col: GRIEVANCE_COLS.CURRENT_STEP, configCol: CONFIG_COLS.GRIEVANCE_STEP, name: 'Grievance Step' },
-    { sheet: grievanceSheet, col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, name: 'Issue Category' }
-  ];
-
-  fieldsToCheck.forEach(function(field) {
-    // Get valid config values
-    var numRows = Math.max(1, configSheet.getLastRow() - 2);
-    var configValues = configSheet.getRange(3, field.configCol, numRows, 1).getValues()
-      .filter(function(row) { return row[0] !== ''; })
-      .map(function(row) { return row[0]; });
-
-    var validSet = {};
-    configValues.forEach(function(v) { validSet[v] = true; });
-
-    // Get data values
-    var lastRow = field.sheet.getLastRow();
-    if (lastRow < 2) return;
-
-    var dataValues = field.sheet.getRange(2, field.col, lastRow - 1, 1).getValues();
-
-    // Find values not in config
-    var missing = {};
-    dataValues.forEach(function(row, index) {
-      var value = row[0];
-      // Skip pure-numeric values — they're data-entry errors, not text labels
-      if (value && /^\d+$/.test(String(value).trim())) return;
-      if (value && !validSet[value] && !missing[value]) {
-        missing[value] = {
-          field: field.name,
-          value: value,
-          configCol: field.configCol,
-          exampleRow: index + 2
-        };
-      }
-    });
-
-    Object.values(missing).forEach(function(item) {
-      report.missingValues.push(item);
-      report.autoFixable.push(item);
-    });
-  });
-
-  return report;
-}
+// Dead code removed: findMissingConfigValues() — zero callers in src
 
 
 // Dead code removed: autoFixMissingConfigValues() — zero callers in src
@@ -2879,19 +2812,30 @@ function archiveClosedGrievances(daysOld) {
     archiveSheet.getRange(archiveLastRow + 1, 1, rowsToArchive.length, rowsToArchive[0].length)
       .setValues(rowsToArchive);
 
-    // Delete from main sheet (in reverse order to maintain row indices)
-    // Transaction pattern: track individual failures and report at the end
+    // Delete from main sheet — batch contiguous rows for performance (v4.51.2)
+    // Single deleteRow calls are ~500ms each; batching reduces N calls to ~N/k calls
     var failedDeletes = [];
     var _successfulDeletes = 0;
-    rowIndicesToDelete.reverse().forEach(function(rowIndex) {
-      try {
-        grievanceSheet.deleteRow(rowIndex);
-        _successfulDeletes++;
-      } catch (deleteErr) {
-        failedDeletes.push({ row: rowIndex, error: deleteErr.message });
-        log_('archiveClosedGrievances', 'Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
+    var sorted = rowIndicesToDelete.slice().sort(function(a, b) { return b - a; }); // descending
+    var i = 0;
+    while (i < sorted.length) {
+      var start = sorted[i];
+      var count = 1;
+      // Group contiguous rows (descending: 10, 9, 8 → deleteRows(8, 3))
+      while (i + count < sorted.length && sorted[i + count] === start - count) {
+        count++;
       }
-    });
+      try {
+        grievanceSheet.deleteRows(start - count + 1, count);
+        _successfulDeletes += count;
+      } catch (deleteErr) {
+        for (var d = 0; d < count; d++) {
+          failedDeletes.push({ row: sorted[i + d], error: deleteErr.message });
+        }
+        log_('archiveClosedGrievances', 'Failed to delete rows ' + (start - count + 1) + '-' + start + ': ' + deleteErr.message);
+      }
+      i += count;
+    }
     if (failedDeletes.length > 0) {
       var failedRows = failedDeletes.map(function(f) { return f.row; });
       log_('archiveClosedGrievances', 'Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));

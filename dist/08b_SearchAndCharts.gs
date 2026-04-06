@@ -186,17 +186,7 @@ function navigateToSearchResult(type, id, row) {
   }
 }
 
-/**
- * Navigates to active grievances view
- * @returns {void}
- */
-function viewActiveGrievances() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  }
-}
+// Dead code removed: viewActiveGrievances() — zero callers in src
 
 /**
  * Searches the dashboard for matching records

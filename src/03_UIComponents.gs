@@ -813,14 +813,6 @@ function getColorThemeList() {
 }
 
 /**
- * Applies global styling to the spreadsheet
- * @returns {void}
- */
-function applyGlobalStyling() {
-  APPLY_SYSTEM_THEME();
-}
-
-/**
  * Resets all sheets to default theme
  * @returns {void}
  */
@@ -1094,14 +1086,6 @@ function applyTheme(themeKey, scope) {
 }
 
 /**
- * Quick toggle for dark mode
- * @returns {void}
- */
-function quickToggleDarkMode() {
-  toggleDarkMode();
-}
-
-/**
  * Sets up Comfort View defaults
  * @returns {void}
  */
@@ -1176,71 +1160,6 @@ function refreshAllVisuals() {
  */
 
 // ============================================================================
-// MOBILE DASHBOARD
-// ============================================================================
-
-/**
- * Shows the mobile-optimized dashboard interface
- * Features:
- * - Touch-friendly stat cards
- * - Quick action buttons
- * - Responsive layout
- * @returns {void}
- */
-function showMobileDashboard() {
-  var stats = getMobileDashboardStats();
-  var accent = SHEET_COLORS.DIALOG_ACCENT;
-  var accentDark = SHEET_COLORS.DIALOG_ACCENT_DARK;
-  var touchSize = MOBILE_CONFIG.TOUCH_TARGET_SIZE;
-  showDialog_(
-    `<!DOCTYPE html><html><head><base target="_top">${getMobileOptimizedHead()}<style>*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;padding:0;margin:0;background:#f5f5f5}` +
-    `.header{background:linear-gradient(135deg,${accent},${accentDark});color:white;padding:clamp(14px,4vw,20px);padding-top:calc(clamp(14px,4vw,20px) + env(safe-area-inset-top,0px))}` +
-    `.header h1{margin:0;font-size:clamp(20px,5vw,24px)}.header .subtitle{font-size:clamp(12px,3vw,14px);opacity:0.9}` +
-    `.container{padding:clamp(10px,3vw,15px);padding-bottom:80px}` +
-    `.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(8px,2vw,12px);margin-bottom:20px}` +
-    `.stat-card{background:white;padding:clamp(14px,3.5vw,20px);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center}` +
-    `.stat-value{font-size:clamp(24px,7vw,32px);font-weight:bold;color:${accent}}` +
-    `.stat-label{font-size:clamp(10px,2.8vw,13px);color:#666;text-transform:uppercase;margin-top:4px}` +
-    `.section-title{font-size:clamp(14px,3.8vw,16px);font-weight:600;color:#333;margin:20px 0 12px;padding-left:5px}` +
-    `.action-btn{background:white;border:none;padding:clamp(12px,3.5vw,16px);margin-bottom:10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);width:100%;text-align:left;display:flex;align-items:center;gap:clamp(10px,3vw,15px);font-size:clamp(13px,3.5vw,15px);cursor:pointer;min-height:${touchSize}}` +
-    `.action-btn:active{transform:scale(0.98)}` +
-    `.action-icon{font-size:clamp(20px,5vw,24px);width:clamp(36px,9vw,40px);height:clamp(36px,9vw,40px);display:flex;align-items:center;justify-content:center;background:#e8f0fe;border-radius:10px;flex-shrink:0}` +
-    `.action-label{font-weight:500}.action-desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}` +
-    `.fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));right:20px;width:56px;height:56px;background:${accent};color:white;border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:100}` +
-    `@media(max-width:360px){.stats{grid-template-columns:1fr 1fr;gap:6px}.stat-card{padding:10px}.container{padding:8px;padding-bottom:80px}}` +
-    `</style></head><body>` +
-    `<div class="header"><h1>\u{1F4F1} Dashboard</h1><div class="subtitle">Mobile View</div></div>` +
-    `<div class="container"><div class="stats"><div class="stat-card"><div class="stat-value">${stats.totalGrievances}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.activeGrievances}</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">${stats.pendingGrievances}</div><div class="stat-label">Pending</div></div><div class="stat-card"><div class="stat-value">${stats.overdueGrievances}</div><div class="stat-label">Overdue</div></div></div><div class="section-title">\u26A1 Quick Actions</div><button class="action-btn" onclick="google.script.run.showMobileGrievanceList()"><div class="action-icon">\u{1F4CB}</div><div><div class="action-label">View Grievances</div><div class="action-desc">Browse all grievances</div></div></button><button class="action-btn" onclick="google.script.run.showMobileUnifiedSearch()"><div class="action-icon">\u{1F50D}</div><div><div class="action-label">Search</div><div class="action-desc">Find grievances or members</div></div></button><button class="action-btn" onclick="google.script.run.showMyAssignedGrievances()"><div class="action-icon">\u{1F464}</div><div><div class="action-label">My Cases</div><div class="action-desc">View assigned grievances</div></div></button></div><button class="fab" onclick="location.reload()">\u{1F504}</button></body></html>`,
-    '\u{1F4F1} Mobile Dashboard', 400, 700);
-}
-
-/**
- * Gets dashboard statistics for mobile display
- * @returns {Object} Statistics object with totalGrievances, activeGrievances, pendingGrievances, overdueGrievances
- */
-function getMobileDashboardStats() {
-  var cache = CacheService.getScriptCache();
-  var cached = cache.get('mobile_dash_stats');
-  if (cached) return JSON.parse(cached);
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (!sheet || sheet.getLastRow() <= 1) return { totalGrievances: 0, activeGrievances: 0, pendingGrievances: 0, overdueGrievances: 0 };
-  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.DAYS_TO_DEADLINE).getValues();
-  var stats = { totalGrievances: data.length, activeGrievances: 0, pendingGrievances: 0, overdueGrievances: 0 };
-  var today = new Date(); today.setHours(0, 0, 0, 0);
-  data.forEach(function(row) {
-    var status = col_(row, GRIEVANCE_COLS.STATUS);
-    var daysTo = col_(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
-    if (status && status !== GRIEVANCE_STATUS.RESOLVED && status !== GRIEVANCE_STATUS.WITHDRAWN) stats.activeGrievances++;
-    if (status === GRIEVANCE_STATUS.PENDING) stats.pendingGrievances++;
-    if ((daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0)) && status === GRIEVANCE_STATUS.OPEN) stats.overdueGrievances++;
-  });
-  try { cache.put('mobile_dash_stats', JSON.stringify(stats), 30); } catch (_) {}
-  return stats;
-}
-
-// ============================================================================
 // MOBILE GRIEVANCE DATA
 // ============================================================================
 
@@ -1272,100 +1191,6 @@ function getRecentGrievancesForMobile(limit) {
     var db = b.filedDateObj instanceof Date ? b.filedDateObj : new Date(0);
     return db - da;
   }).slice(0, limit);
-}
-
-// ============================================================================
-// MOBILE GRIEVANCE LIST (with client-side pagination)
-// ============================================================================
-
-/**
- * Shows mobile-optimized grievance list interface
- * Features:
- * - Card-based layout with pagination (20 per page)
- * - Status filters
- * - Search functionality
- * - Responsive grid
- * @returns {void}
- */
-function showMobileGrievanceList() {
-  var accent = SHEET_COLORS.DIALOG_ACCENT;
-  var touchSize = MOBILE_CONFIG.TOUCH_TARGET_SIZE;
-  showDialog_(
-    `<!DOCTYPE html><html><head><base target="_top">` +
-    `${getMobileOptimizedHead()}` +
-    `<style>` +
-    `*{box-sizing:border-box}` +
-    `body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}` +
-    `.header{background:${accent};color:white;padding:15px;position:sticky;top:0;z-index:100}` +
-    `.header h2{margin:0;font-size:clamp(18px,4vw,24px)}` +
-    `.search{width:100%;padding:clamp(10px,2.5vw,14px);border:none;border-radius:8px;font-size:clamp(14px,3vw,16px);margin-top:10px}` +
-    `.filters{display:flex;overflow-x:auto;padding:10px;background:white;gap:8px;-webkit-overflow-scrolling:touch}` +
-    `.filter{padding:clamp(6px,1.5vw,10px) clamp(12px,3vw,18px);border-radius:20px;background:#f0f0f0;white-space:nowrap;cursor:pointer;font-size:clamp(12px,2.5vw,14px);border:none;min-height:${touchSize};display:flex;align-items:center}` +
-    `.filter.active{background:${accent};color:white}` +
-    `.list{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}` +
-    `.card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}` +
-    `.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}` +
-    `.card-id{font-weight:bold;color:${accent};font-size:clamp(14px,3vw,16px)}` +
-    `.card-status{padding:4px 10px;border-radius:12px;font-size:clamp(10px,2vw,12px);font-weight:bold;background:#e8f0fe}` +
-    `.card-row{font-size:clamp(12px,2.5vw,14px);margin:5px 0;color:#666}` +
-    `.pagination{display:flex;justify-content:center;align-items:center;gap:12px;padding:16px;background:white;border-top:1px solid #e0e0e0;position:sticky;bottom:0}` +
-    `.pg-btn{padding:10px 20px;border-radius:8px;border:1px solid ${accent};color:${accent};background:white;font-size:14px;cursor:pointer;min-height:44px}` +
-    `.pg-btn:disabled{opacity:.4;cursor:default}` +
-    `.pg-info{font-size:13px;color:#666}` +
-    `@media (min-width:768px){.list{grid-template-columns:repeat(2,1fr)}}` +
-    `@media (min-width:1024px){.list{grid-template-columns:repeat(3,1fr)}}` +
-    `</style></head><body>` +
-    `<div class="header"><h2>\u{1F4CB} Grievances</h2><input type="text" class="search" placeholder="Search..." oninput="filter(this.value)"></div>` +
-    `<div class="filters"><button class="filter active" onclick="filterStatus('all',this)">All</button><button class="filter" onclick="filterStatus('Open',this)">Open</button><button class="filter" onclick="filterStatus('Pending Info',this)">Pending</button><button class="filter" onclick="filterStatus('Resolved',this)">Resolved</button></div>` +
-    `<div class="list" id="list"><div style="text-align:center;padding:40px;color:#666;grid-column:1/-1">Loading...</div></div>` +
-    `<div class="pagination" id="pager" style="display:none"><button class="pg-btn" id="prevBtn" onclick="changePage(-1)">Prev</button><span class="pg-info" id="pgInfo"></span><button class="pg-btn" id="nextBtn" onclick="changePage(1)">Next</button></div>` +
-    `<script>${getClientSideEscapeHtml()}var all=[],filtered=[],PAGE_SIZE=20,curPage=0;google.script.run.withSuccessHandler(function(data){all=data;filtered=data;curPage=0;renderPage()}).getRecentGrievancesForMobile(500);function renderPage(){var c=document.getElementById("list");var pg=document.getElementById("pager");if(!filtered||filtered.length===0){c.innerHTML="<div style='text-align:center;padding:40px;color:#999;grid-column:1/-1'>No grievances</div>";pg.style.display="none";return}var totalPages=Math.ceil(filtered.length/PAGE_SIZE);if(curPage>=totalPages)curPage=totalPages-1;if(curPage<0)curPage=0;var start=curPage*PAGE_SIZE;var page=filtered.slice(start,start+PAGE_SIZE);c.innerHTML=page.map(function(g){return"<div class='card'><div class='card-header'><div class='card-id'>#"+escapeHtml(g.id)+"</div><div class='card-status'>"+escapeHtml(g.status||"Filed")+"</div></div><div class='card-row'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class='card-row'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class='card-row'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("");if(filtered.length>PAGE_SIZE){pg.style.display="flex";document.getElementById("prevBtn").disabled=curPage===0;document.getElementById("nextBtn").disabled=curPage>=totalPages-1;document.getElementById("pgInfo").textContent="Page "+(curPage+1)+" of "+totalPages+" ("+filtered.length+" results)"}else{pg.style.display="none"}}function changePage(dir){curPage+=dir;renderPage();document.getElementById("list").scrollIntoView({behavior:"smooth"})}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");filtered=s==="all"?all:all.filter(function(g){return g.status===s});curPage=0;renderPage()}function filter(q){q=q.toLowerCase();filtered=all.filter(function(g){return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0});curPage=0;renderPage()}</script></body></html>`,
-    '\u{1F4CB} Grievance List', 800, 700);
-}
-
-// ============================================================================
-// MOBILE UNIFIED SEARCH
-// ============================================================================
-
-/**
- * Shows mobile-optimized unified search interface
- * Features:
- * - Tabbed search (All, Members, Grievances)
- * - Real-time search results
- * - Touch-friendly result cards
- * @returns {void}
- */
-function showMobileUnifiedSearch() {
-  var accent = SHEET_COLORS.DIALOG_ACCENT;
-  var accentDark = SHEET_COLORS.DIALOG_ACCENT_DARK;
-  var touchSize = MOBILE_CONFIG.TOUCH_TARGET_SIZE;
-  showDialog_(
-    `<!DOCTYPE html><html><head><base target="_top">` +
-    `${getMobileOptimizedHead()}` +
-    `<style>` +
-    `*{box-sizing:border-box}` +
-    `body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;margin:0;padding:0;background:#f5f5f5}` +
-    `.header{background:linear-gradient(135deg,${accent},${accentDark});color:white;padding:15px}` +
-    `.header h2{margin:0 0 12px 0;font-size:clamp(18px,4vw,22px)}` +
-    `.search-container{position:relative}` +
-    `.search-input{width:100%;padding:clamp(12px,3vw,16px) clamp(12px,3vw,16px) clamp(12px,3vw,16px) 45px;border:none;border-radius:10px;font-size:clamp(14px,3vw,16px);background:white}` +
-    `.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px}` +
-    `.tabs{display:flex;background:white;border-bottom:1px solid #e0e0e0}` +
-    `.tab{flex:1;padding:clamp(10px,2.5vw,14px);text-align:center;font-size:clamp(12px,2.5vw,14px);font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;min-height:${touchSize}}` +
-    `.tab.active{color:${accent};border-bottom-color:${accent}}` +
-    `.results{padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}` +
-    `.result-card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 4px rgba(0,0,0,0.08)}` +
-    `.result-title{font-weight:bold;color:${accent};margin-bottom:5px;font-size:clamp(14px,3vw,16px)}` +
-    `.result-detail{font-size:clamp(11px,2.5vw,13px);color:#666;margin:3px 0}` +
-    `.empty-state{text-align:center;padding:60px;color:#999;grid-column:1/-1}` +
-    `@media (min-width:768px){.results{grid-template-columns:repeat(2,1fr)}}` +
-    `@media (min-width:1024px){.results{grid-template-columns:repeat(3,1fr)}}` +
-    `</style></head><body>` +
-    `<div class="header"><h2>\u{1F50D} Search</h2><div class="search-container"><span class="search-icon">\u{1F50D}</span><input type="text" class="search-input" id="q" placeholder="Search members or grievances..." oninput="search(this.value)"></div></div>` +
-    `<div class="tabs"><button class="tab active" onclick="setTab('all',this)">All</button><button class="tab" onclick="setTab('members',this)">Members</button><button class="tab" onclick="setTab('grievances',this)">Grievances</button></div>` +
-    `<div class="results" id="results"><div class="empty-state">Type to search...</div></div>` +
-    `<script>${getClientSideEscapeHtml()}var tab="all";function setTab(t,btn){tab=t;document.querySelectorAll(".tab").forEach(function(tb){tb.classList.remove("active")});btn.classList.add("active");search(document.getElementById("q").value)}function search(q){if(!q||q.length<2){document.getElementById("results").innerHTML="<div class='empty-state'>Type to search...</div>";return}google.script.run.withSuccessHandler(function(data){render(data)}).getMobileSearchData(q,tab)}function render(data){var c=document.getElementById("results");if(!data||data.length===0){c.innerHTML="<div class='empty-state'>No results</div>";return}c.innerHTML=data.map(function(r){return"<div class='result-card'><div class='result-title'>"+(r.type==="member"?"\u{1F464} ":"\u{1F4CB} ")+escapeHtml(r.title)+"</div><div class='result-detail'>"+escapeHtml(r.subtitle)+"</div>"+(r.detail?"<div class='result-detail'>"+escapeHtml(r.detail)+"</div>":"")+"</div>"}).join("")}</script></body></html>`,
-    '\u{1F50D} Search', 800, 700);
 }
 
 /**
@@ -2074,67 +1899,6 @@ function syncSingleGrievanceToCalendar(grievanceId) {
   if (typeof syncDeadlinesToCalendar === 'function') syncDeadlinesToCalendar(grievanceId);
 }
 
-// ============================================================================
-// DASHBOARD LINK AND STEWARD TOOLKIT EMAILS
-// ============================================================================
-
-/**
- * Prompts for email and sends member dashboard link
- * Opens a prompt dialog to enter email address and sends the dashboard URL
- */
-function sendMemberDashboardLink() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var url = ss.getUrl();
-
-  // Rate limit: check daily email quota before prompting
-  if (MailApp.getRemainingDailyQuota() < 1) {
-    ui.alert('Email quota exceeded for today. Try again tomorrow.');
-    return;
-  }
-
-  var response = ui.prompt('Send Report', 'Enter Member Email:', ui.ButtonSet.OK_CANCEL);
-
-  if (response.getSelectedButton() === ui.Button.OK) {
-    var email = response.getResponseText();
-
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      ui.alert('Please enter a valid email address.');
-      return;
-    }
-
-    // Per-recipient cooldown: prevent spam to the same address
-    var cache = CacheService.getScriptCache();
-    var cacheKey = 'dashlink_' + email.toLowerCase();
-    if (cache.get(cacheKey)) {
-      ui.alert('A dashboard link was recently sent to this address. Please wait before sending again.');
-      return;
-    }
-
-    var body = "Hello,\n\n" +
-      "Access your Union Member Dashboard:\n" + url + "\n\n" +
-      "HOW TO ACCESS:\n" +
-      "1. Open the spreadsheet using the link above\n" +
-      "2. Go to: Command > Command Center > Member Dashboard (No PII)\n" +
-      "3. The dashboard shows aggregate union metrics (no personal info visible)\n\n" +
-      "WHAT YOU'LL SEE:\n" +
-      "- Morale & Trust Scores\n" +
-      "- Leadership Pipeline\n" +
-      "- Grievance Statistics\n" +
-      "- Steward Contact Search\n" +
-      "- Emergency Weingarten Rights\n\n" +
-      "In Solidarity,\n" +
-      COMMAND_CONFIG.SYSTEM_NAME;
-
-    try {
-      MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
-      cache.put(cacheKey, '1', 300); // 5-minute cooldown per recipient
-      ui.alert('Dashboard access link sent to ' + email);
-    } catch (e) {
-      ui.alert('Error sending email: ' + e.message);
-    }
-  }
-}
 /**
  * ============================================================================
  * SearchDialogs.gs - Search Dialog Components
@@ -3086,7 +2850,6 @@ function getAddMinutesHtml_() {
     '<div class="form-group"><label>Title</label><input id="title" placeholder="Monthly General Meeting"></div></div>' +
     '<div class="form-group"><label>Bullet Points (one per line)</label><textarea id="bullets" rows="5" placeholder="Motion to approve budget passed unanimously\nCommittee reports presented\nNext meeting scheduled for..."></textarea></div>' +
     '<div class="form-group"><label>Full Minutes</label><textarea id="fullMinutes" rows="6" placeholder="Detailed meeting minutes..."></textarea></div>' +
-    '<div class="form-group"><label>Google Drive Doc URL (optional)</label><input id="driveUrl" placeholder="https://docs.google.com/..."></div>' +
     '<div class="actions"><button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
     '<button class="btn btn-primary" id="submitBtn" onclick="submitMinutes()">Save Minutes</button></div>' +
     '<script>' +
@@ -3096,8 +2859,7 @@ function getAddMinutesHtml_() {
     '  if (!date || !title) { showMsg("Date and Title are required.", "error"); return; }' +
     '  document.getElementById("submitBtn").disabled = true;' +
     '  var data = { meetingDate: date, title: title,' +
-    '    bullets: document.getElementById("bullets").value, fullMinutes: document.getElementById("fullMinutes").value,' +
-    '    driveUrl: document.getElementById("driveUrl").value };' +
+    '    bullets: document.getElementById("bullets").value, fullMinutes: document.getElementById("fullMinutes").value };' +
     '  google.script.run.withSuccessHandler(function(r) {' +
     '    if (r && r.success) { showMsg("Minutes saved!", "success"); setTimeout(function() { google.script.host.close(); }, 1500); }' +
     '    else { showMsg(r && r.error || "Failed", "error"); document.getElementById("submitBtn").disabled = false; }' +
@@ -3110,25 +2872,15 @@ function getAddMinutesHtml_() {
 
 function modalAddMinutes(data) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.PORTAL_MINUTES) || ss.getSheetByName('MeetingMinutes');
-    if (!sheet) return { success: false, error: 'MeetingMinutes sheet not found' };
-
-    var id = 'MIN-' + Date.now();
-    var user = Session.getActiveUser().getEmail() || 'Unknown';
-
-    sheet.appendRow([
-      escapeForFormula(id),
-      escapeForFormula(data.meetingDate),
-      escapeForFormula(data.title),
-      escapeForFormula(data.bullets || ''),
-      escapeForFormula(data.fullMinutes || ''),
-      escapeForFormula(user),
-      new Date(),
-      escapeForFormula(data.driveUrl || '')
-    ]);
-
-    return { success: true, id: id };
+    var email = '';
+    try { email = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
+    if (!email) return { success: false, error: 'Could not determine user email.' };
+    return DataService.addMeetingMinutes(email, {
+      title: data.title,
+      meetingDate: data.meetingDate || data.date,
+      bullets: data.bullets,
+      fullMinutes: data.fullMinutes
+    });
   } catch (e) {
     log_('modalAddMinutes', 'Error: ' + e.message);
     return { success: false, error: e.message };
@@ -3289,9 +3041,9 @@ function modalAddContact(data) {
     // Duplicate check: same first+last name at same location
     var existing = sheet.getDataRange().getValues();
     for (var r = 1; r < existing.length; r++) {
-      if (String(existing[r][0]).trim().toLowerCase() === data.firstName.trim().toLowerCase() &&
-          String(existing[r][1]).trim().toLowerCase() === data.lastName.trim().toLowerCase() &&
-          String(existing[r][3]).trim().toLowerCase() === data.workLocation.trim().toLowerCase()) {
+      if (String(existing[r][1]).trim().toLowerCase() === data.firstName.trim().toLowerCase() &&
+          String(existing[r][2]).trim().toLowerCase() === data.lastName.trim().toLowerCase() &&
+          String(existing[r][4]).trim().toLowerCase() === data.workLocation.trim().toLowerCase()) {
         return { success: false, error: 'Duplicate: ' + data.firstName + ' ' + data.lastName + ' at ' + data.workLocation + ' already exists.' };
       }
     }
@@ -3563,6 +3315,9 @@ function modalSaveCaseChecklist(updates) {
       if (u.completed) {
         rowValues.push(escapeForFormula(user));  // Completed By
         rowValues.push(now);                     // Completed Date
+      } else {
+        rowValues.push('');  // Clear Completed By
+        rowValues.push('');  // Clear Completed Date
       }
       sheet.getRange(u.row, 7, 1, rowValues.length).setValues([rowValues]);
     }

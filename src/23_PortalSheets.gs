@@ -61,7 +61,16 @@ var PORTAL_EVENT_COLS = {
 var PORTAL_MINUTES_COLS = {
   ID: 0, MEETING_DATE: 1, TITLE: 2, BULLETS: 3, FULL_MINUTES: 4,
   CREATED_BY: 5, CREATED_DATE: 6,
-  DRIVE_DOC_URL: 7  // v4.20.18 — Google Doc URL saved to Minutes/ Drive folder
+  DRIVE_DOC_URL: 7,   // v4.20.18 — Google Doc URL saved to Minutes/ Drive folder
+  ATTACHMENT_URL: 8,   // v4.52.0 — uploaded file URL in Minutes/ Drive folder
+  ATTACHMENT_NAME: 9   // v4.52.0 — original filename for display
+};
+
+var MINUTES_LIMITS = {
+  TITLE_MAX: 200,
+  BULLETS_MAX: 2000,
+  FULL_MINUTES_MAX: 5000,
+  ATTACHMENT_MAX_BYTES: 10485760  // 10MB
 };
 
 var PORTAL_GRIEVANCE_COLS = {
@@ -149,26 +158,33 @@ function getOrCreateEventsSheet() {
 }
 
 /**
- * Returns (or creates) the Portal Minutes sheet, migrating DriveDocUrl header if needed.
+ * Returns (or creates) the Portal Minutes sheet, migrating headers if needed.
  * @returns {GoogleAppsScript.Spreadsheet.Sheet} The minutes sheet
  */
 function getOrCreateMinutesSheet() {
   var sheet = portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MINUTES, [
     'ID', 'MeetingDate', 'Title', 'Bullets', 'FullMinutes',
-    'CreatedBy', 'CreatedDate', 'DriveDocUrl'  // col 8 — v4.20.18 fix: matches PORTAL_MINUTES_COLS.DRIVE_DOC_URL=7
+    'CreatedBy', 'CreatedDate', 'DriveDocUrl', 'AttachmentUrl', 'AttachmentName'
   ], false);
 
-  // Migration (v4.20.18): existing sheets created before v4.20.18 have only 7 headers.
-  // Add DriveDocUrl header to col H if missing — safe to re-run.
+  // Migration: add missing headers for upgrades from earlier versions.
+  // Safe to re-run — only writes if the header cell is empty.
+  var newHeaders = [
+    { col: PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1, name: 'DriveDocUrl', since: 'v4.20.18' },
+    { col: PORTAL_MINUTES_COLS.ATTACHMENT_URL + 1, name: 'AttachmentUrl', since: 'v4.52.0' },
+    { col: PORTAL_MINUTES_COLS.ATTACHMENT_NAME + 1, name: 'AttachmentName', since: 'v4.52.0' }
+  ];
   try {
-    var headerRange = sheet.getRange(1, PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1); // col 8
-    if (!headerRange.getValue()) {
-      headerRange.setValue('DriveDocUrl')
-        .setFontWeight('bold')
-        .setBackground(SHEET_COLORS.HEADER_NAVY)
-        .setFontColor(SHEET_COLORS.BG_WHITE);
-      log_('getOrCreateMinutesSheet', 'migrated — added DriveDocUrl header to col 8');
-    }
+    newHeaders.forEach(function(h) {
+      var headerCell = sheet.getRange(1, h.col);
+      if (!headerCell.getValue()) {
+        headerCell.setValue(h.name)
+          .setFontWeight('bold')
+          .setBackground(SHEET_COLORS.HEADER_NAVY)
+          .setFontColor(SHEET_COLORS.BG_WHITE);
+        log_('getOrCreateMinutesSheet', 'migrated — added ' + h.name + ' header to col ' + h.col + ' (' + h.since + ')');
+      }
+    });
   } catch (migErr) {
     log_('getOrCreateMinutesSheet', 'migration check failed (non-fatal): ' + migErr.message);
   }

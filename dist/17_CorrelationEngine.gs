@@ -30,6 +30,21 @@
  *   Depends on 01_Core.gs (SHEETS, CONFIG_COLS), 10_Main.gs (getConfigValue_).
  *   Used by the SPA analytics views and dashboard enhancement features.
  *
+ * STATUS: AWAITING DATA PROVIDER
+ *   The engine requires getUnifiedDashboardData(isPII) to return a JSON string
+ *   containing a unified data object with these properties:
+ *     - satisfactionByLocation: {location: avgScore}
+ *     - satisfactionByUnit: {unit: avgScore}
+ *     - locationBreakdown: {location: grievanceCount}
+ *     - unitBreakdown: {unit: grievanceCount}
+ *     - participationByLocation: {location: participationRate}
+ *     - stewardPerformance: [{name, winRate, caseCount, ...}]
+ *     - chartDrillDown: {locationByCase: {}, categoryByCase: {}, statusByCase: {}}
+ *     - avgDaysAtStep: {step: avgDays}
+ *     - stepProgression: {s1, s2, s3, s1to2, s2to3}
+ *   Until this function is implemented, all correlation endpoints return empty
+ *   results with a clear error log. See getCorrelationInsights() typeof guard.
+ *
  * @version 4.51.0
  * @license Free for use by non-profit collective bargaining groups and unions
  * ============================================================================
@@ -201,6 +216,7 @@ function getCorrelationInsights(isPII, cachedData) {
   if (!_isCorrelationEnabled()) return _CORRELATION_DISABLED_INSIGHTS;
   var data;
   try {
+    if (typeof getUnifiedDashboardData !== 'function') throw new Error('getUnifiedDashboardData not implemented');
     data = cachedData || JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   } catch (_e) {
     log_('getCorrelationInsights', 'failed to load dashboard data — ' + (_e.message || _e));
@@ -847,6 +863,7 @@ function getCorrelationAlerts(isPII) {
   // Fetch data once and reuse for insights to avoid redundant dashboard fetches
   var dashboardData;
   try {
+    if (typeof getUnifiedDashboardData !== 'function') throw new Error('getUnifiedDashboardData not implemented');
     dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   } catch (_e) {
     log_('getCorrelationAlerts', 'failed to load dashboard data — ' + (_e.message || _e));
@@ -897,6 +914,7 @@ function getCorrelationSummary(isPII) {
   // Fetch data once and reuse for insights to avoid redundant dashboard fetches
   var dashboardData;
   try {
+    if (typeof getUnifiedDashboardData !== 'function') throw new Error('getUnifiedDashboardData not implemented');
     dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   } catch (_e) {
     log_('getCorrelationSummary', 'failed to load dashboard data — ' + (_e.message || _e));

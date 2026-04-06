@@ -64,6 +64,7 @@ module.exports = [
         escapeHtml: 'readonly',
         sanitizeObjectForHtml: 'readonly',
         escapeForFormula: 'readonly',
+        escapeForFormulaPreserveNewlines: 'readonly',
         safeSheetNameForFormula: 'readonly',
         buildSafeQuery: 'readonly',
         checkWebAppAuthorization: 'readonly',
@@ -167,6 +168,7 @@ module.exports = [
         PORTAL_MEMBER_DIR_COLS: 'readonly',
         PORTAL_MINUTES_COLS: 'readonly',
         PORTAL_STEWARD_LOG_COLS: 'readonly',
+        MINUTES_LIMITS: 'readonly',
 
         // Satisfaction / survey constants
         SATISFACTION_FORM_CONFIG: 'readonly',
@@ -251,6 +253,7 @@ module.exports = [
         hashEmail_: 'readonly',
         hashForVault_: 'readonly',
         addBusinessDays: 'readonly',
+        addCalendarDays: 'readonly',
         generateNameBasedId: 'readonly',
         isMemberId_: 'readonly',
         isGrievanceId_: 'readonly',

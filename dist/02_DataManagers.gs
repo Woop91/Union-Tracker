@@ -1580,7 +1580,7 @@ function startNewGrievance(grievanceData) {
       setCol_(rowData, GRIEVANCE_COLS.STEP1_DUE, deadlines.step1Due);
       setCol_(rowData, GRIEVANCE_COLS.ARTICLES, escapeForFormula(grievanceData.articleViolated || ''));
       setCol_(rowData, GRIEVANCE_COLS.ISSUE_CATEGORY, escapeForFormula(grievanceData.grievanceType || ''));
-      setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormula(grievanceData.description || grievanceData.notes || ''));
+      setCol_(rowData, GRIEVANCE_COLS.DESCRIPTION, escapeForFormula(grievanceData.description || grievanceData.notes || ''));
       setCol_(rowData, GRIEVANCE_COLS.LAST_UPDATED, new Date());
 
       // Append to sheet
@@ -1746,7 +1746,7 @@ function getNextGrievanceId(sheet) {
  */
 function calculateInitialDeadlines(filingDate) {
   var rules = getDeadlineRules();
-  const step1Due = addBusinessDays(filingDate, rules.STEP_1.DAYS_FOR_RESPONSE);
+  const step1Due = addCalendarDays(filingDate, rules.STEP_1.DAYS_FOR_RESPONSE);
 
   return {
     step1Due: step1Due
@@ -1810,7 +1810,7 @@ function calculateResponseDeadline(step, stepDate) {
       return null;
   }
 
-  return addBusinessDays(stepDate, daysToAdd);
+  return addCalendarDays(stepDate, daysToAdd);
 }
 
 /**
@@ -1832,6 +1832,18 @@ function addBusinessDays(startDate, days) {
     }
   }
 
+  return result;
+}
+/**
+ * Adds calendar days to a date (includes weekends).
+ * Use for deadlines specified as calendar days in the CBA (filing, response).
+ * @param {Date} startDate - Starting date
+ * @param {number} days - Number of calendar days to add
+ * @return {Date} New date
+ */
+function addCalendarDays(startDate, days) {
+  var result = new Date(startDate);
+  result.setDate(result.getDate() + days);
   return result;
 }
 // ============================================================================

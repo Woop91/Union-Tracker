@@ -36,7 +36,6 @@ const WRAPPER_FILES = [
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
-  '25_WorkloadService.gs',
   '08e_SurveyEngine.gs',
 ];
 
@@ -392,6 +391,7 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 describe('G6: dist/ files are in sync with src/', () => {
 
   test('dist/ does not contain dev-only files (must be built with --prod)', () => {
+    // Test runner included in prod — tab gated by IS_DEV_MODE, endpoints by steward auth
     const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
     const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
     expect(found).toEqual([]);
@@ -618,11 +618,9 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 // and injected into the SPA. If its <script> block has syntax errors, the entire
 // POMS tab fails silently.
 
-// SB-skip: poms_reference.html is excluded from SolidBase
-const _hasPoms = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
-const describePoms = _hasPoms ? describe : describe.skip;
-
-describePoms('G11: poms_reference.html integrity', () => {
+// G11: poms_reference.html — SKIPPED when file absent (SolidBase excludes POMS)
+const pomsExists = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
+(pomsExists ? describe : describe.skip)('G11: poms_reference.html integrity', () => {
   const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
 
   test('poms_reference.html exists', () => {
@@ -754,31 +752,22 @@ describe('G13: Module load order is safe', () => {
 });
 
 
-// SB-skip: 25_WorkloadService.gs is excluded from SolidBase
-const _hasWorkloadService = fs.existsSync(path.join(SRC_DIR, '25_WorkloadService.gs'));
-const describeWS = _hasWorkloadService ? describe : describe.skip;
-
-describeWS('G14: WorkloadService crash-safe patterns', () => {
-  const wsCode = _hasWorkloadService ? fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8') : '';
+// G14: WorkloadService crash-safe patterns — SKIPPED (SolidBase excludes 25_WorkloadService.gs)
+const wsExists = fs.existsSync(path.join(SRC_DIR, '25_WorkloadService.gs'));
+(wsExists ? describe : describe.skip)('G14: WorkloadService crash-safe patterns', () => {
+  const wsCode = wsExists ? fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8') : '';
 
   test('_refreshReportingData does NOT clearContents before writing', () => {
-    // Extract the _refreshReportingData function body
     const funcStart = wsCode.indexOf('function _refreshReportingData()');
     expect(funcStart).toBeGreaterThan(-1);
     const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
     const funcBody = wsCode.substring(funcStart, funcEnd);
-
-    // The old antipattern: report.clearContents() before setValues
-    // New pattern: setValues first, then clearContent only for stale rows
     expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
   });
 
   test('rate limit uses atomic check-and-record pattern', () => {
-    // _checkAndRecordRateLimit should exist (replaces separate check + record)
     expect(wsCode).toContain('function _checkAndRecordRateLimit');
-    // Old separate _recordRateLimitAttempt should NOT exist
     expect(wsCode).not.toContain('function _recordRateLimitAttempt');
-    // No separate _recordSubmission call
     expect(wsCode).not.toContain('function _recordSubmission');
   });
 

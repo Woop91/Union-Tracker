@@ -106,7 +106,7 @@ function dataGetStewardContact(sessionToken, stewardEmail) {
   if (!callerRec) return null;
   var target = (stewardEmail || e).toLowerCase().trim();
   if (!callerRec.isSteward && callerRec.assignedSteward !== target) {
-    secureLog('dataGetStewardContact', 'unauthorized lookup attempt', { caller: e, target: target });
+    secureLog('dataGetStewardContact', 'unauthorized lookup attempt', { callerEmail: e, targetEmail: target });
     return null;
   }
   return DataService.getStewardContact(target);
@@ -190,9 +190,9 @@ function dataSubmitSurveyResponse(sessionToken, responses) { var e = _resolveCal
 /** @param {string} sessionToken @param {string} memberEmail @param {string} type @param {string} notes @param {string} duration @param {string} memberName @returns {Object} Logs member contact. Requires steward auth. */
 function dataLogMemberContact(sessionToken, memberEmail, type, notes, duration, memberName) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.logMemberContact(s, memberEmail, type, notes, duration, memberName); }); }
 /** @param {string} sessionToken @param {string} memberEmail @returns {Object[]} Contact history for a member. Requires steward auth. */
-function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) { log_('dataGetMemberContactHistory', 'auth failed'); return []; } return DataService.getMemberContactHistory(s, memberEmail); }
+function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getMemberContactHistory(s, memberEmail); }
 /** @param {string} sessionToken @returns {Object[]} Full contact log for a steward. Requires steward auth. */
-function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) { log_('dataGetStewardContactLog', 'auth failed'); return []; } return DataService.getStewardContactLog(s); }
+function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardContactLog(s); }
 
 // S2: Batch badge counts — replaces 3 serial client calls with 1 round-trip
 /**
@@ -352,11 +352,11 @@ function dataGetStewardDirectory(sessionToken) {
 /** @param {string} sessionToken @returns {Object[]} Non-member contacts. Steward-only. */
 function dataGetNonMemberContacts(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; try { return DataService.getNonMemberContacts(); } catch (err) { log_('dataGetNonMemberContacts error', err.message); return []; } }
 /** @param {string} sessionToken @param {Object} data @returns {Object} Add non-member contact. Steward-only. */
-function dataAddNonMemberContact(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { try { return DataService.addNonMemberContact(data); } catch (err) { log_('dataAddNonMemberContact error', err.message); return { success: false, error: err.message }; } }); }
+function dataAddNonMemberContact(sessionToken, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { try { return DataService.addNonMemberContact(data); } catch (err) { log_('dataAddNonMemberContact error', err.message); return { success: false, message: err.message }; } }); }
 /** @param {string} sessionToken @param {string} contactId @param {Object} data @returns {Object} Update non-member contact. Steward-only. */
-function dataUpdateNonMemberContact(sessionToken, contactId, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { try { return DataService.updateNonMemberContact(contactId, data); } catch (err) { log_('dataUpdateNonMemberContact error', err.message); return { success: false, error: err.message }; } }); }
+function dataUpdateNonMemberContact(sessionToken, contactId, data) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { try { return DataService.updateNonMemberContact(contactId, data); } catch (err) { log_('dataUpdateNonMemberContact error', err.message); return { success: false, message: err.message }; } }); }
 /** @param {string} sessionToken @param {string} contactId @returns {Object} Delete non-member contact. Steward-only. */
-function dataDeleteNonMemberContact(sessionToken, contactId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { try { return DataService.deleteNonMemberContact(contactId); } catch (err) { log_('dataDeleteNonMemberContact error', err.message); return { success: false, error: err.message }; } }); }
+function dataDeleteNonMemberContact(sessionToken, contactId) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { try { return DataService.deleteNonMemberContact(contactId); } catch (err) { log_('dataDeleteNonMemberContact error', err.message); return { success: false, message: err.message }; } }); }
 
 // ─── ADD MEMBER (webapp) ──────────────────────────────────────────────────────
 /** @param {string} sessionToken @returns {Object} Config-driven dropdown options for the Add Member form. Steward-only. */
@@ -365,7 +365,7 @@ function dataGetAddMemberOptions(sessionToken) {
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) return { success: false, error: 'Spreadsheet not found.' };
+    if (!ss) return { success: false, message: 'Spreadsheet not found.' };
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     function _configList(col) {
       if (!configSheet || !col || col < 1) return [];
@@ -388,7 +388,7 @@ function dataGetAddMemberOptions(sessionToken) {
     };
   } catch (err) {
     log_('dataGetAddMemberOptions error', err.message);
-    return { success: false, error: err.message };
+    return { success: false, message: err.message };
   }
 }
 
@@ -403,21 +403,21 @@ function dataAddMemberFromWebapp(sessionToken, memberData) {
   var s = _requireStewardAuth(sessionToken);
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   if (!memberData || !memberData.firstName || !memberData.lastName) {
-    return { success: false, error: 'First and Last Name are required.' };
+    return { success: false, message: 'First and Last Name are required.' };
   }
 
   // Input validation — reject bad data before touching the sheet
   if (!memberData.firstName.trim()) {
-    return { success: false, error: 'First name is required.' };
+    return { success: false, message: 'First name is required.' };
   }
   if (!memberData.lastName.trim()) {
-    return { success: false, error: 'Last name is required.' };
+    return { success: false, message: 'Last name is required.' };
   }
   if (memberData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(memberData.email).trim())) {
-    return { success: false, error: 'Valid email address is required.' };
+    return { success: false, message: 'Valid email address is required.' };
   }
   if (memberData.email && String(memberData.email).trim().length > 254) {
-    return { success: false, error: 'Email address too long.' };
+    return { success: false, message: 'Email address too long.' };
   }
   // Sanitize string lengths to prevent oversized cell writes
   if (memberData.firstName.length > 100) memberData.firstName = memberData.firstName.substring(0, 100);
@@ -466,7 +466,7 @@ function dataAddMemberFromWebapp(sessionToken, memberData) {
       return { success: true, memberId: memberId, message: 'Member added successfully.' };
     } catch (err) {
       log_('dataAddMemberFromWebapp error', err.message);
-      return { success: false, error: err.message };
+      return { success: false, message: err.message };
     }
   });
 }
@@ -494,8 +494,8 @@ function dataGetMemberGrievanceHotSpots(sessionToken) { if (!_isGrievancesEnable
 function dataGetPendingGrievanceFeedback(sessionToken) { if (!_isGrievancesEnabled()) return null; var e = _resolveCallerEmail(sessionToken); return e ? DataService.getPendingGrievanceFeedback(e) : { success: false, authError: true, message: 'Authentication required.' }; }
 /** @param {string} sessionToken @param {string} grievanceId @param {Object} ratings @param {string} comment @returns {Object} Submits grievance feedback. Requires auth. */
 function dataSubmitGrievanceFeedback(sessionToken, grievanceId, ratings, comment) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Authentication required.' }; if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances disabled.' }; return withScriptLock_(function() { return DataService.submitGrievanceFeedback(e, grievanceId, ratings, comment); }); }
-/** @param {string} sessionToken @returns {Object|null} Aggregate grievance feedback stats. Requires auth. */
-function dataGetGrievanceFeedbackStats(sessionToken) { if (!_isGrievancesEnabled()) return null; var e = _resolveCallerEmail(sessionToken); return e ? DataService.getGrievanceFeedbackStats() : { success: false, authError: true, message: 'Authentication required.' }; }
+/** @param {string} sessionToken @returns {Object|null} Aggregate grievance feedback stats. Members see aggregate only; bySteward stripped for non-stewards. */
+function dataGetGrievanceFeedbackStats(sessionToken) { if (!_isGrievancesEnabled()) return null; var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Authentication required.' }; var stats = DataService.getGrievanceFeedbackStats(); if (stats && !_requireStewardAuth(sessionToken)) { delete stats.bySteward; } return stats; }
 /** @param {string} sessionToken @returns {Object|null} Feedback summary for calling steward. Requires steward auth. */
 function dataGetStewardFeedbackSummary(sessionToken) { var s = _requireStewardAuth(sessionToken); return s ? DataService.getStewardFeedbackSummary(s) : { success: false, authError: true, message: 'Steward access required.' }; }
 /** @param {string} sessionToken @param {number} [limit] @returns {Object[]} Upcoming events. Requires auth. */
@@ -524,7 +524,7 @@ function dataUpdateTask(sessionToken, taskId, updates) { var s = _requireSteward
 /** @param {string} sessionToken @returns {Object[]} All steward performance metrics. Requires steward auth. */
 function dataGetAllStewardPerformance(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getAllStewardPerformance(); }
 /** @param {string} sessionToken @param {string} caseId @returns {Object[]} Checklist items for a case. Requires auth. */
-function dataGetCaseChecklist(sessionToken, caseId) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getCaseChecklist(caseId) : { success: false, authError: true, message: 'Authentication required.' }; }
+function dataGetCaseChecklist(sessionToken, caseId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Authentication required.' }; /* TODO: add ownership check — member should only see their own case's checklist */ return DataService.getCaseChecklist(caseId); }
 /** @param {string} sessionToken @param {string} checklistId @param {boolean} completed @returns {Object} Toggles checklist item. Requires auth. */
 function dataToggleChecklistItem(sessionToken, checklistId, completed) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.toggleChecklistItem(checklistId, completed, s); }
 /** @param {string} sessionToken @returns {Object[]} Meetings the caller has attended. Requires auth. */
@@ -621,10 +621,19 @@ function dataInitiateGrievance(sessionToken, data, idemKey) {
   return withScriptLock_(function() { return initiateGrievance(s, data, idemKey); });
 }
 
-/** @param {string} sessionToken @param {number} [limit] @returns {Object[]} Meeting minutes. Requires auth. */
-function dataGetMeetingMinutes(sessionToken, limit) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMeetingMinutes(limit) : { success: false, authError: true, message: 'Authentication required.' }; }
-/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Adds meeting minutes. Requires steward auth. */
-function dataAddMeetingMinutes(sessionToken, data, idemKey) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.addMeetingMinutes(s, data, idemKey); }); }
+/** @param {string} sessionToken @param {number} [limit] @returns {Object[]} Meeting minutes. Requires auth. Strips createdBy for non-steward callers. */
+function dataGetMeetingMinutes(sessionToken, limit) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { success: false, authError: true, message: 'Authentication required.' };
+  var minutes = DataService.getMeetingMinutes(limit);
+  var isSteward = !!_requireStewardAuth(sessionToken);
+  if (!isSteward) {
+    minutes.forEach(function(m) { delete m.createdBy; });
+  }
+  return minutes;
+}
+/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Adds meeting minutes. Requires steward auth. Lock is scoped inside addMeetingMinutes(). */
+function dataAddMeetingMinutes(sessionToken, data, idemKey) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.addMeetingMinutes(s, data, idemKey); }
 
 /**
  * BACKFILL: Generates Drive docs for any existing MeetingMinutes rows
@@ -649,19 +658,7 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
     return { processed: 0, skipped: 0, errors: 0, message: msg };
   }
 
-  // Resolve Minutes/ Drive folder ID
-  var minutesFolderId = '';
-  try {
-    if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.MINUTES_FOLDER_ID) {
-      minutesFolderId = getConfigValue_(CONFIG_COLS.MINUTES_FOLDER_ID) || '';
-    }
-    if (!minutesFolderId) {
-      minutesFolderId = PropertiesService.getScriptProperties().getProperty('MINUTES_FOLDER_ID') || '';
-    }
-  } catch (_re) { log_('_re', (_re.message || _re)); }
-
   var data      = sheet.getDataRange().getValues();
-  var tz        = Session.getScriptTimeZone();
   var totalRows = data.length - 1; // rows excluding header
 
   // Pre-scan: count rows that still need a doc so progress toasts show X of Y
@@ -696,43 +693,17 @@ function BACKFILL_MINUTES_DRIVE_DOCS() {
     var createdBy   = String(data[i][PORTAL_MINUTES_COLS.CREATED_BY]   || 'unknown');
 
     if (isNaN(new Date(meetingDate).getTime())) meetingDate = new Date();
-    var dateStr  = Utilities.formatDate(new Date(meetingDate), tz, 'yyyy-MM-dd');
-    var docTitle = title + ' \u2014 ' + dateStr;
 
     try {
-      var doc  = DocumentApp.create(docTitle);
-      var body = doc.getBody();
-      body.appendParagraph(docTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-      body.appendParagraph('Recorded by: ' + createdBy);
-      body.appendParagraph('Date: ' + Utilities.formatDate(new Date(meetingDate), tz, 'MMMM d, yyyy'));
-      body.appendParagraph('');
-      if (bullets) {
-        body.appendParagraph('Key Points').setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        bullets.split('\n').forEach(function(line) {
-          if (line.trim()) body.appendListItem(line.replace(/^[-\u2022*]\s*/, '').trim());
-        });
-        body.appendParagraph('');
-      }
-      if (fullMins) {
-        body.appendParagraph('Full Minutes').setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        body.appendParagraph(fullMins);
-      }
-      doc.saveAndClose();
+      var result = DataService.createMinutesDoc_(title, new Date(meetingDate), createdBy, bullets, fullMins);
 
-      var docFile = DriveApp.getFileById(doc.getId());
-      if (minutesFolderId) {
-        try {
-          DriveApp.getFolderById(minutesFolderId).addFile(docFile);
-          DriveApp.getRootFolder().removeFile(docFile);
-        } catch (_mv) { log_('_mv', (_mv.message || _mv)); }
+      if (result.docUrl) {
+        sheet.getRange(i + 1, PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1).setValue(result.docUrl);
+        processed++;
+      } else {
+        errors++;
       }
 
-      // Write URL back to sheet immediately (0-indexed col + 1 = 1-indexed for getRange)
-      sheet.getRange(i + 1, PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1).setValue(docFile.getUrl());
-      processed++;
-
-      // Progress checkpoint: flush writes + show X-of-Y toast every FLUSH_EVERY docs.
-      // SpreadsheetApp.flush() ensures partial progress survives a GAS 6-min timeout.
       if (processed % FLUSH_EVERY === 0) {
         SpreadsheetApp.flush();
         ss.toast('Created ' + processed + ' of ' + needsDoc + ' docs\u2026', '\uD83D\uDCC4 Minutes Backfill', 3);
@@ -1433,7 +1404,7 @@ function dataGetMyEngagementScore(sessionToken) {
       if (stSheet && stSheet.getLastRow() >= 2) {
         var stData = stSheet.getRange(2, 1, stSheet.getLastRow() - 1, stSheet.getLastColumn()).getValues();
         for (var si = 0; si < stData.length; si++) {
-          if (String(stData[si][1]).toLowerCase().trim() === email) { // col 2 = email (0-indexed: 1)
+          if (String(stData[si][2]).toLowerCase().trim() === email) { // col 3 = email (0-indexed: 2)
             var status = String(stData[si][5]).toLowerCase().trim(); // col 6 = status
             if (status === 'completed') { score += 25; breakdown.push({ label: 'Survey Completed', points: 25, max: 25 }); }
             else if (status === 'in progress') { score += 10; breakdown.push({ label: 'Survey In Progress', points: 10, max: 25 }); }
@@ -2060,7 +2031,7 @@ function dataGetCorrelationAlerts(sessionToken) {
     return { success: true, alerts: JSON.parse(getCorrelationAlerts(false)) };
   } catch (e) {
     log_('dataGetCorrelationAlerts error', e.message);
-    return { success: true, alerts: [] };
+    return { success: false, alerts: [], message: e.message };
   }
 }
 
@@ -2076,7 +2047,7 @@ function dataGetCorrelationSummary(sessionToken) {
     return { success: true, summary: JSON.parse(getCorrelationSummary(false)) };
   } catch (e) {
     log_('dataGetCorrelationSummary error', e.message);
-    return { success: true, summary: { total: 0, strong: 0, moderate: 0, weak: 0, negligible: 0, insufficientData: 0, topInsights: [], actionableCount: 0, disabled: true } };
+    return { success: false, summary: null, message: e.message };
   }
 }
 
@@ -2944,7 +2915,7 @@ function _getActiveMeetingForCheckIn(email) {
  */
 function dataWebAppCheckIn(sessionToken, meetingId) {
   var email = _resolveCallerEmail(sessionToken);
-  if (!email) return { success: false, error: 'Please log in to check in.', authError: true };
+  if (!email) return { success: false, message: 'Please log in to check in.', authError: true };
 
   if (!meetingId) return errorResponse('Meeting ID is required');
 

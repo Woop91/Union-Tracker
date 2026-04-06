@@ -15,7 +15,7 @@ loadSources([
 describe('08b function existence', () => {
   const required = [
     'getDesktopSearchLocations', 'getDesktopSearchData',
-    'navigateToSearchResult', 'viewActiveGrievances',
+    'navigateToSearchResult',
     'searchDashboard', 'quickSearchDashboard', 'advancedSearch',
     'getDepartmentList', 'getMemberList',
     'generateSelectedChart',

@@ -19,7 +19,6 @@ loadSources([
 describe('08d function existence', () => {
   const required = [
     'setupAuditLogSheet', 'protectAuditLogSheet_', 'onEditAudit',
-    'setupLiveGrievanceFormulas', 'setupGrievanceMemberDropdown',
     'setupGrievanceCalcSheet', 'setupGrievanceFormulasSheet',
     'setupMemberLookupSheet', 'setupStewardContactCalcSheet',
     'setupDashboardCalcSheet', 'setupStewardPerformanceCalcSheet',
@@ -30,7 +29,7 @@ describe('08d function existence', () => {
     'setupCalcSyncSheet', 'setupCalcFormulasSheet',
     'setupSurveyTrackingSheet', 'setupSurveyVaultSheet',
     'getVaultDataMap_', 'getVaultDataFull_',
-    'writeVaultEntry_', 'supersedePreviousVaultEntry_',
+    'supersedePreviousVaultEntry_',
     'hashForVault_', 'hashForVaultLegacy_',
     'computeHmacSha256_', 'computeAuditRowHash_',
     'verifyAuditLogIntegrity', 'verifySurveyVaultIntegrity'
@@ -128,33 +127,6 @@ describe('setupAuditLogSheet (behavioral)', () => {
 
     // Should NOT call clear when data exists (compliance requirement)
     expect(sheet.clear).not.toHaveBeenCalled();
-  });
-});
-
-// ============================================================================
-// Behavioral: setupGrievanceMemberDropdown
-// ============================================================================
-
-describe('setupGrievanceMemberDropdown (behavioral)', () => {
-  test('does not throw when grievance sheet exists', () => {
-    var grievanceData = [['Grievance ID', 'Member ID'], ['G-001', 'M-001']];
-    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, grievanceData);
-    // Add clearDataValidations mock to the range
-    var mockRange = {
-      clearDataValidations: jest.fn(),
-      getValues: jest.fn(() => []),
-      getValue: jest.fn(() => ''),
-      setValue: jest.fn(),
-      setValues: jest.fn(),
-      setDataValidation: jest.fn(),
-      setFontWeight: jest.fn(function() { return this; }),
-      setBackground: jest.fn(function() { return this; })
-    };
-    sheet.getRange.mockReturnValue(mockRange);
-    var ss = createMockSpreadsheet([sheet]);
-    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
-
-    expect(() => setupGrievanceMemberDropdown()).not.toThrow();
   });
 });
 

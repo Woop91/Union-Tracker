@@ -1262,8 +1262,6 @@
  
  
  var AppState = {
-  view: CURRENT_VIEW,
-  role: CURRENT_USER ? CURRENT_USER.role : null,
   activeRole: CURRENT_VIEW, 
   isDark: (function() {
   try {
@@ -1278,9 +1276,6 @@
   })(),
   navTheme: (function() { try { return localStorage.getItem('dds_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
   cyberNeon: (function() { try { return localStorage.getItem('dds_cyberNeon') || 'red'; } catch(e) { return 'red'; } })(),
-  colorTheme: (PAGE_DATA.colorTheme || 'default'),
-  colorThemes: (PAGE_DATA.colorThemes || []),
-  user: CURRENT_USER,
   cases: [],
   kpis: null,
   grievances: [],
@@ -4942,7 +4937,6 @@
     <?!= include('auth_view') ?>
   <? } else if (view === 'steward' || view === 'both') { ?>
     <?!= include('steward_view') ?>
-    <?!= include('member_view') ?>
   <? } else if (view === 'member') { ?>
     <?!= include('member_view') ?>
   <? } else { ?>

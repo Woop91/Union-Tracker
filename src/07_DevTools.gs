@@ -472,10 +472,6 @@ function seedConfigData() {
   }
 }
 
-// seedFeedbackData removed v4.52.0 (Feedback sheet removed)
-
-function _seedFeedbackData_REMOVED() { /* removed v4.52.0 */ }
-
 /**
  * Seed survey tracking data from existing Member Directory.
  * Populates _Survey_Tracking with all members and simulates
@@ -2382,25 +2378,25 @@ function seedMinutesData() {
 
   var minutes = [
     ['MIN_SEED_1', new Date(now.getTime() - 28 * 86400000), 'January General Membership Meeting',
-      '• Contract update: management counter-proposal received\n• Workload committee report: caseloads up 12%\n• New steward training scheduled for Feb\n• Vote: approved $500 solidarity fund donation',
+      '\u2022 Contract update: management counter-proposal received\n\u2022 Workload committee report: caseloads up 12%\n\u2022 New steward training scheduled for Feb\n\u2022 Vote: approved $500 solidarity fund donation',
       'Full discussion notes available in the shared drive. 42 members attended. Next meeting scheduled for February.',
-      ownerEmail, new Date(now.getTime() - 27 * 86400000)],
+      ownerEmail, new Date(now.getTime() - 27 * 86400000), '', '', ''],
     ['MIN_SEED_2', new Date(now.getTime() - 14 * 86400000), 'Executive Board Meeting',
-      '• Budget review: Q4 spending on track\n• Grievance backlog discussed: 8 cases pending Step II\n• Legislative action day planning\n• Steward appreciation dinner logistics',
+      '\u2022 Budget review: Q4 spending on track\n\u2022 Grievance backlog discussed: 8 cases pending Step II\n\u2022 Legislative action day planning\n\u2022 Steward appreciation dinner logistics',
       'Board unanimously approved the legislative action day budget. Steward dinner set for next month.',
-      ownerEmail, new Date(now.getTime() - 13 * 86400000)],
+      ownerEmail, new Date(now.getTime() - 13 * 86400000), '', 'https://drive.google.com/file/d/sample1', 'board_agenda.pdf'],
     ['MIN_SEED_3', new Date(now.getTime() - 7 * 86400000), 'Workplace Safety Committee',
-      '• Building B HVAC complaint filed with management\n• New ergonomic equipment request approved\n• Incident report review: 2 slip-and-fall reports\n• Emergency exit signage audit complete',
+      '\u2022 Building B HVAC complaint filed with management\n\u2022 New ergonomic equipment request approved\n\u2022 Incident report review: 2 slip-and-fall reports\n\u2022 Emergency exit signage audit complete',
       'Management has 14 days to respond to the HVAC complaint per the contract. Follow-up scheduled.',
-      ownerEmail, new Date(now.getTime() - 6 * 86400000)],
+      ownerEmail, new Date(now.getTime() - 6 * 86400000), '', '', ''],
     ['MIN_SEED_4', new Date(now.getTime() - 2 * 86400000), 'Steward Training: Documentation Best Practices',
-      '• Reviewed proper grievance documentation techniques\n• Discussed Weingarten rights scenarios\n• Practiced investigatory interview role-plays\n• Shared template for witness statements',
+      '\u2022 Reviewed proper grievance documentation techniques\n\u2022 Discussed Weingarten rights scenarios\n\u2022 Practiced investigatory interview role-plays\n\u2022 Shared template for witness statements',
       '15 stewards attended. Training materials uploaded to Resources section.',
-      ownerEmail, new Date(now.getTime() - 1 * 86400000)],
+      ownerEmail, new Date(now.getTime() - 1 * 86400000), '', 'https://drive.google.com/file/d/sample2', 'training_materials.docx'],
   ];
 
-  sheet.getRange(2, 1, minutes.length, 7).setValues(minutes);
-  log_('seedMinutesData', 'Seeded ' + minutes.length + ' meeting minutes');
+  sheet.getRange(2, 1, minutes.length, 10).setValues(minutes);
+  log_('seedMinutesData', 'Seeded ' + minutes.length + ' meeting minutes (10 cols)');
 }
 
 // ============================================================================
@@ -4497,14 +4493,16 @@ function test_MenuBuilder_Functions() {
 // ============================================================================
 
 /**
- * Verifies PORTAL_MINUTES_COLS has all required keys including DRIVE_DOC_URL.
- * Failing here means getMeetingMinutes() would silently return empty driveDocUrl.
+ * Verifies PORTAL_MINUTES_COLS has all required keys including DRIVE_DOC_URL,
+ * ATTACHMENT_URL, and ATTACHMENT_NAME (v4.52.0).
+ * Failing here means getMeetingMinutes() would silently return empty driveDocUrl/attachmentUrl.
  */
 function test_PortalMinutesCols_Complete() {
   Assert.isDefined(typeof PORTAL_MINUTES_COLS, 'PORTAL_MINUTES_COLS should be defined');
 
   var required = ['ID', 'MEETING_DATE', 'TITLE', 'BULLETS', 'FULL_MINUTES',
-                  'CREATED_BY', 'CREATED_DATE', 'DRIVE_DOC_URL'];
+                  'CREATED_BY', 'CREATED_DATE', 'DRIVE_DOC_URL',
+                  'ATTACHMENT_URL', 'ATTACHMENT_NAME'];
   required.forEach(function(key) {
     Assert.isTrue(key in PORTAL_MINUTES_COLS, 'PORTAL_MINUTES_COLS.' + key + ' must exist');
     Assert.isTrue(typeof PORTAL_MINUTES_COLS[key] === 'number',
@@ -4516,6 +4514,11 @@ function test_PortalMinutesCols_Complete() {
   // Ensure DRIVE_DOC_URL is one beyond CREATED_DATE (cols are contiguous)
   Assert.assertEquals(PORTAL_MINUTES_COLS.CREATED_DATE + 1, PORTAL_MINUTES_COLS.DRIVE_DOC_URL,
     'DRIVE_DOC_URL must be exactly one column after CREATED_DATE');
+
+  Assert.assertEquals(PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1, PORTAL_MINUTES_COLS.ATTACHMENT_URL,
+    'ATTACHMENT_URL must be exactly one column after DRIVE_DOC_URL');
+  Assert.assertEquals(PORTAL_MINUTES_COLS.ATTACHMENT_URL + 1, PORTAL_MINUTES_COLS.ATTACHMENT_NAME,
+    'ATTACHMENT_NAME must be exactly one column after ATTACHMENT_URL');
 
   // Spot-check other portal col objects for existence (full coverage in test_PortalColsNoHardcodedIndices)
   Assert.isDefined(typeof PORTAL_EVENT_COLS,          'PORTAL_EVENT_COLS must exist');

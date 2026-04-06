@@ -1,4 +1,4 @@
-# AI REFERENCE DOCUMENT — DDS-Dashboard
+# AI REFERENCE DOCUMENT — SolidBase
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
 # Last updated: 2026-03-16
@@ -32,10 +32,9 @@ Read these files **in this order** when onboarding to this codebase:
 **Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users).
-**Architecture:** 43 source `.gs` files + 15 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
-**Current build:** 39 `.gs` + 14 `.html` files in `dist/` (prod build, individual file mode, NOT consolidated).
+**Architecture:** 39 source `.gs` files + 15 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
+**Current build:** 39 `.gs` + 15 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
-**DDS Apps Script ID:** `[REDACTED]`
 **SB Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 
 ### ⚠️ Key Reminders
@@ -494,41 +493,6 @@ The duplicates were removed — only `dataInitiateGrievance` was genuinely missi
 
 
 ---
-## [2026-03-24] agency_org_chart.html — Added (New File)
+## [2026-03-24] agency_org_chart.html — DDS-only (excluded from SolidBase)
 
-### What was done
-- Prepped standalone Agency Org Chart HTML file for GAS SPA integration
-- Converted from full standalone HTML document to a GAS include partial
-
-### Source
-- Input: `Agency_Org_Chart.html` (936 lines, standalone)
-- Output: `src/agency_org_chart.html` + `dist/agency_org_chart.html` (1056 lines, GAS partial)
-
-### Transformations applied
-1. **Stripped** outer HTML shell (`<!DOCTYPE>`, `<html>`, `<head>`, `<body>` tags)
-2. **CSS scoped** — all selectors prefixed with `.agency-oc`, variables moved from `:root` to `.agency-oc` block
-3. **JS namespaced** — all 11 functions prefixed `agencyOC_`: `showTab`, `toggleEOHHS`, `toggleSupportDivs`, `ddsSetOpen`, `togSub`, `toggleSec`, `togJD`, `openSal`, `closeSal`, `fmt`, `pf`
-4. **SAL data** — namespaced as `window.agencyOC_SAL`
-5. **All onclick handlers** updated to use `agencyOC_` prefix
-6. **Google Fonts** (Source Serif 4 + DM Sans) loaded dynamically with existence check
-7. **Wrapper div** added: `<div class="agency-oc" id="agency-oc-embed">`
-
-### Integration
-- Include in GAS SPA via: `<?= include('agency_org_chart') ?>`
-- No routing hook added yet — needs to be wired into SPA navigation manually
-- CSS variables are SELF-CONTAINED (separate from DDS theme variables) — no conflicts
-
-### File features
-- 6 tabs: Org Chart, Budget Summary, Budget Tracking, Historical Budget, Historical Spending, Agency Info
-- Interactive salary history modal (10 staff/leadership records, 2017-2026)
-- Collapsible DDS internal org panel (expanded by default)
-- EOHHS sibling agencies toggle
-- Support Divisions group toggle (5 offices)
-- 5 collapsible sub-lists (Community Living, Voc Rehab, General Counsel, Financial, Learning/Dev, HR, Excellence & Innovation)
-- Position descriptions for VDE I/II/III/IV (DDS job grades and salary ranges)
-- Full budget tables: FY2023-FY2026 GAA, historical spending, budget tracking
-- Agency quick facts, EOHHS contacts
-
-### ⚠️ Pending
-- NOT yet wired into index.html SPA navigation — needs manual step
-- DDS internal org chart data is point-in-time (2025/2026 actual) — not dynamic from sheet
+This file is excluded from SolidBase. See SYNC-LOG.md for exclusion rules.

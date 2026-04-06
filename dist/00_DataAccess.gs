@@ -77,13 +77,13 @@ var TIME_CONSTANTS = {
     get FILING() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.FILING_DAYS : 21; },
 
     /** Days for Step I response */
-    get STEP1_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : 7; },
+    get STEP1_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : 30; },
 
     /** Days to appeal to Step II */
-    get STEP2_APPEAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_APPEAL : 7; },
+    get STEP2_APPEAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_APPEAL : 10; },
 
     /** Days for Step II response */
-    get STEP2_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : 14; },
+    get STEP2_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : 30; },
 
     /** Days to appeal to Step III */
     get STEP3_APPEAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_3_APPEAL : 10; },

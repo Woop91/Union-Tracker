@@ -251,48 +251,7 @@ function onEditAudit(e) {
 // LIVE FORMULA SYNC FUNCTIONS
 // ============================================================================
 
-/**
- * Syncs grievance data to Member Directory using static values
- * Menu Location: Dashboard menu
- */
-function setupLiveGrievanceFormulas() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Error: Member Directory not found.');
-    return;
-  }
-
-  ss.toast('Syncing grievance data to Member Directory...', '🔄 Sync', 3);
-
-  // Use sync function to populate with static values (no formulas)
-  syncGrievanceToMemberDirectory();
-
-  ss.toast('Grievance data synced! Columns AB-AD updated with static values.', '✅ Success', 3);
-}
-
-/**
- * Remove Member ID dropdown from Grievance Log
- * Clears any existing data validation to allow free text entry
- */
-function setupGrievanceMemberDropdown() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!grievanceSheet) {
-    SpreadsheetApp.getUi().alert('Error: Grievance Log not found.');
-    return;
-  }
-
-  ss.toast('Removing Member ID dropdown...', '🔄 Setup', 3);
-
-  // Clear any existing data validation from Member ID column (column B, rows 2-1000)
-  // This allows free text entry for Member ID
-  grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_ID, 998, 1).clearDataValidations();
-
-  ss.toast('Member ID dropdown removed - free text entry enabled!', '✅ Success', 3);
-}
+// Dead code removed: setupLiveGrievanceFormulas(), setupGrievanceMemberDropdown() — zero callers in src
 
 // ============================================================================
 // HIDDEN SHEET 1: _Grievance_Calc
@@ -1638,44 +1597,7 @@ function getVaultDataFull_() {
   return rows;
 }
 
-/**
- * Writes a new vault entry for a survey response.
- * Email and member ID are SHA-256 hashed before storage — no plaintext PII
- * is ever written to any sheet.
- *
- * Called by onSatisfactionFormSubmit() after appending the anonymous
- * response to the Satisfaction sheet.
- *
- * @param {number} responseRow - Row number in Satisfaction sheet
- * @param {string} email - Respondent email (hashed before storage)
- * @param {string} verified - 'Yes' | 'Pending Review'
- * @param {string} memberId - Matched member ID or '' (hashed before storage)
- * @param {string} quarter - Quarter string e.g. '2026-Q1'
- * @private
- */
-function writeVaultEntry_(responseRow, email, verified, memberId, quarter) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
-  if (!vault) {
-    setupSurveyVaultSheet();
-    vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
-  }
-
-  // Hash email and member ID — plaintext never touches the sheet
-  var emailHash = email ? hashForVault_(email) : '';
-  var memberIdHash = memberId ? hashForVault_(memberId) : '';
-
-  vault.appendRow([
-    responseRow,
-    emailHash,
-    verified,
-    memberIdHash,
-    quarter,
-    'Yes',   // Is Latest
-    '',      // Superseded By
-    ''       // Reviewer Notes
-  ]);
-}
+// Dead code removed: writeVaultEntry_() — zero callers in src
 
 /**
  * Marks an existing vault entry as superseded by a newer response.

@@ -18,10 +18,9 @@ describe('04b function existence', () => {
     'getQuickCaptureNotes', 'saveQuickCaptureNotes',
     'clearQuickCaptureNotes',
     'showQuickCaptureNotepad',
-    'getImportDialogHtml_', 'processMemberImport',
+    'processMemberImport',
     'parseCSVLine_', 'mapImportColumns_',
-    'showComfortViewControlPanel',
-    'showThemeManager', 'getSmartDashboardHtml'
+    'showThemeManager'
   ];
 
   required.forEach(fn => {

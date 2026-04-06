@@ -347,3 +347,57 @@ describe('sendDailySecurityDigest', () => {
   });
 });
 
+// ============================================================================
+// escapeForFormulaPreserveNewlines
+// ============================================================================
+
+describe('escapeForFormulaPreserveNewlines', () => {
+  test('preserves newlines in multiline text', () => {
+    expect(escapeForFormulaPreserveNewlines('line 1\nline 2\nline 3'))
+      .toBe('line 1\nline 2\nline 3');
+  });
+
+  test('escapes formula chars at start of each line', () => {
+    expect(escapeForFormulaPreserveNewlines('=SUM(A1)\n+B2\n-C3\n@D4'))
+      .toBe("'=SUM(A1)\n'+B2\n'-C3\n'@D4");
+  });
+
+  test('escapes formula chars after leading whitespace on each line', () => {
+    expect(escapeForFormulaPreserveNewlines('  =IMPORTRANGE()\n  +123'))
+      .toBe("'  =IMPORTRANGE()\n'  +123");
+  });
+
+  test('strips carriage returns but preserves line feeds', () => {
+    expect(escapeForFormulaPreserveNewlines('line 1\r\nline 2\rline 3'))
+      .toBe('line 1\nline 2\nline 3');
+  });
+
+  test('replaces tabs with spaces per line', () => {
+    expect(escapeForFormulaPreserveNewlines('col1\tcol2\ncol3\tcol4'))
+      .toBe('col1 col2\ncol3 col4');
+  });
+
+  test('escapes backslashes per line', () => {
+    expect(escapeForFormulaPreserveNewlines('path\\to\\file\nsecond\\line'))
+      .toBe('path\\\\to\\\\file\nsecond\\\\line');
+  });
+
+  test('returns empty string for null/undefined', () => {
+    expect(escapeForFormulaPreserveNewlines(null)).toBe('');
+    expect(escapeForFormulaPreserveNewlines(undefined)).toBe('');
+  });
+
+  test('handles empty string', () => {
+    expect(escapeForFormulaPreserveNewlines('')).toBe('');
+  });
+
+  test('handles single line without newlines', () => {
+    expect(escapeForFormulaPreserveNewlines('Normal text')).toBe('Normal text');
+  });
+
+  test('handles bullet-formatted text (real-world use case)', () => {
+    var input = '• Budget approved\n• 15 stewards attended\n• Next meeting May 4';
+    expect(escapeForFormulaPreserveNewlines(input)).toBe(input);
+  });
+});
+

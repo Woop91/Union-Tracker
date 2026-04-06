@@ -541,9 +541,7 @@ describe('isSyncDebounced_', () => {
     // isSyncDebounced_ uses CacheService to check if a sync was recently run
     // On first call, cache is empty so it should return false
     if (typeof isSyncDebounced_ !== 'function') {
-      // Function may not exist yet (pre-overhaul); skip gracefully
-      expect(true).toBe(true);
-      return;
+      return; // Function not loaded — test is a no-op (Jest counts as passed)
     }
 
     const result = isSyncDebounced_('volunteerHoursSync');
@@ -552,9 +550,7 @@ describe('isSyncDebounced_', () => {
 
   test('returns true on subsequent call within debounce window', () => {
     if (typeof isSyncDebounced_ !== 'function') {
-      // Function may not exist yet (pre-overhaul); skip gracefully
-      expect(true).toBe(true);
-      return;
+      return; // Function not loaded — test is a no-op (Jest counts as passed)
     }
 
     // First call should return false and set the cache
@@ -576,9 +572,7 @@ describe('findColumnsByHeader_', () => {
 
   test('finds columns by header name', () => {
     if (typeof findColumnsByHeader_ !== 'function') {
-      // Function may not exist yet (pre-overhaul); skip gracefully
-      expect(true).toBe(true);
-      return;
+      return; // Function not loaded — test is a no-op (Jest counts as passed)
     }
 
     const data = [
@@ -597,8 +591,7 @@ describe('findColumnsByHeader_', () => {
 
   test('is case-insensitive', () => {
     if (typeof findColumnsByHeader_ !== 'function') {
-      expect(true).toBe(true);
-      return;
+      return; // Function not loaded — test is a no-op
     }
 
     const data = [
@@ -617,8 +610,7 @@ describe('findColumnsByHeader_', () => {
 
   test('handles missing headers gracefully', () => {
     if (typeof findColumnsByHeader_ !== 'function') {
-      expect(true).toBe(true);
-      return;
+      return; // Function not loaded — test is a no-op
     }
 
     const data = [['']];

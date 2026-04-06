@@ -506,14 +506,14 @@ function dataGetTrendAlerts(sessionToken) {
 /** @param {string} sessionToken @param {string} alertId @returns {Object} Result. */
 function dataAcknowledgeTrendAlert(sessionToken, alertId) {
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, message: 'Steward access required.' };
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   return TrendAlertService.acknowledgeAlert(alertId, s);
 }
 
 /** @param {string} sessionToken @param {string} alertId @returns {Object} Result. */
 function dataResolveTrendAlert(sessionToken, alertId) {
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, message: 'Steward access required.' };
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   return TrendAlertService.resolveAlert(alertId, s);
 }
 

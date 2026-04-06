@@ -664,11 +664,11 @@ function removeTestTriggerFromMenu() {
  */
 function dataRunTests(sessionToken, filterSuite) {
   var e = _resolveCallerEmail(sessionToken);
-  if (!e) return { success: false, error: 'Not authenticated' };
+  if (!e) return { success: false, message: 'Not authenticated' };
 
   // Steward-only check
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, error: 'Steward access required' };
+  if (!s) return { success: false, message: 'Steward access required' };
 
   var results = TestRunner.runAll(filterSuite || null);
   return { success: true, results: results };
@@ -681,10 +681,10 @@ function dataRunTests(sessionToken, filterSuite) {
  */
 function dataGetTestResults(sessionToken) {
   var e = _resolveCallerEmail(sessionToken);
-  if (!e) return { success: false, error: 'Not authenticated' };
+  if (!e) return { success: false, message: 'Not authenticated' };
 
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, error: 'Steward access required' };
+  if (!s) return { success: false, message: 'Steward access required' };
 
   var results = TestRunner.getResults();
   var status = TestRunner.getStatus();
@@ -698,11 +698,11 @@ function dataGetTestResults(sessionToken) {
  */
 function dataManageTestTrigger(sessionToken, action) {
   var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, error: 'Steward access required' };
+  if (!s) return { success: false, message: 'Steward access required' };
 
   if (action === 'setup') return TestRunner.setupDailyTrigger();
   if (action === 'remove') return TestRunner.removeTrigger();
-  return { success: false, error: 'Unknown action: ' + action };
+  return { success: false, message: 'Unknown action: ' + action };
 }
 /* ========================================================================
  * TEST REGISTRY — All test functions listed here for discovery

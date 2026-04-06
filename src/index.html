@@ -1318,8 +1318,6 @@
     // APP STATE
     // ═══════════════════════════════════════
     var AppState = {
-      view: CURRENT_VIEW,
-      role: CURRENT_USER ? CURRENT_USER.role : null,
       activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
       isDark: (function() {
         try {
@@ -1334,9 +1332,6 @@
       })(),
       navTheme: (function() { try { return localStorage.getItem('dds_navTheme') || 'default'; } catch(e) { return 'default'; } })(),
       cyberNeon: (function() { try { return localStorage.getItem('dds_cyberNeon') || 'red'; } catch(e) { return 'red'; } })(),
-      colorTheme: (PAGE_DATA.colorTheme || 'default'),
-      colorThemes: (PAGE_DATA.colorThemes || []),
-      user: CURRENT_USER,
       cases: [],
       kpis: null,
       grievances: [],
@@ -3323,8 +3318,8 @@
     }
 
     /**
-     * Agency Org Chart (MADDS) — loads agency_org_chart.html lazily.
-     * Agency organizational structure, budget, personnel hierarchy.
+     * Agency Org Chart — loads agency_org_chart.html lazily.
+     * Agency structure, budget, personnel hierarchy.
      */
     function renderAgencyOrgChart(appContainer, role) {
       // v4.51.1: Graceful fallback if feature file is absent (SolidBase)
@@ -5031,7 +5026,6 @@
     <?!= include('auth_view') ?>
   <? } else if (view === 'steward' || view === 'both') { ?>
     <?!= include('steward_view') ?>
-    <?!= include('member_view') ?>
   <? } else if (view === 'member') { ?>
     <?!= include('member_view') ?>
   <? } else { ?>

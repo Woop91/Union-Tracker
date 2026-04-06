@@ -1582,19 +1582,19 @@ function _calculateRowDeadlines_(rowData, rules, closedStatuses, today) {
   var step3AppealDue = '';
 
   if (incidentDate instanceof Date) {
-    filingDeadline = addBusinessDays(incidentDate, rules.FILING_DAYS);
+    filingDeadline = addCalendarDays(incidentDate, rules.FILING_DAYS);
   }
   if (dateFiled instanceof Date) {
-    step1Due = addBusinessDays(dateFiled, rules.STEP_1.DAYS_FOR_RESPONSE);
+    step1Due = addCalendarDays(dateFiled, rules.STEP_1.DAYS_FOR_RESPONSE);
   }
   if (step1Rcvd instanceof Date) {
-    step2AppealDue = addBusinessDays(step1Rcvd, rules.STEP_2.DAYS_TO_APPEAL);
+    step2AppealDue = addBusinessDays(step1Rcvd, rules.STEP_2.DAYS_TO_APPEAL); // Art. 23: business days for appeals
   }
   if (step2AppealFiled instanceof Date) {
-    step2Due = addBusinessDays(step2AppealFiled, rules.STEP_2.DAYS_FOR_RESPONSE);
+    step2Due = addCalendarDays(step2AppealFiled, rules.STEP_2.DAYS_FOR_RESPONSE);
   }
   if (step2Rcvd instanceof Date) {
-    step3AppealDue = addBusinessDays(step2Rcvd, rules.STEP_3.DAYS_TO_APPEAL);
+    step3AppealDue = addBusinessDays(step2Rcvd, rules.STEP_3.DAYS_TO_APPEAL); // Art. 23: business days for appeals
   }
 
   // Calculate Days Open directly
@@ -3212,52 +3212,7 @@ function applyDashboardGradients_(sheet) {
 // FEEDBACK SHEET SYNC
 // ============================================================================
 
-/**
- * Get data for flagged submissions review
- * @returns {Object} Pending submissions data (email, date, row number - NO survey answers)
- */
-function getFlaggedSubmissionsData() {
-  var SATISFACTION_COLS = _getCachedSatisfactionCols();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
-
-  var result = {
-    pendingCount: 0,
-    verifiedCount: 0,
-    pendingEmails: []
-  };
-
-  if (!satSheet) return result;
-
-  // Read from vault — all emails are hashed, no plaintext PII exists
-  var vaultRows = getVaultDataFull_();
-
-  for (var i = 0; i < vaultRows.length; i++) {
-    var entry = vaultRows[i];
-    var satRow = entry.responseRow;
-    var timestamp = '';
-    try {
-      timestamp = satSheet.getRange(satRow, SATISFACTION_COLS.TIMESTAMP).getValue();
-    } catch (_e) { log_('Satisfaction row read skipped', _e.message); }
-
-    if (entry.verified === 'Yes') {
-      result.verifiedCount++;
-    } else if (entry.verified === 'Pending Review') {
-      result.pendingCount++;
-      result.pendingEmails.push({
-        email: 'Anonymous submission #' + satRow,
-        date: timestamp ? Utilities.formatDate(new Date(timestamp), Session.getScriptTimeZone(), 'MMM d, yyyy') : 'Unknown',
-        quarter: entry.quarter,
-        row: satRow  // Satisfaction sheet row for approve/reject
-      });
-    }
-  }
-
-  // Sort by most recent first
-  result.pendingEmails.sort(function(a, b) { return b.row - a.row; });
-
-  return result;
-}
+// Dead code removed: getFlaggedSubmissionsData() — zero callers in src
 
 /**
  * Approve a flagged submission - mark as Verified
@@ -4331,19 +4286,8 @@ function applyUnionThemeToAllTabs() {
 
 // Dead code removed: saveChartImageToDrive() — zero callers in src
 
-/**
- * Gets or creates the Dashboard Exports folder in Drive
- * @returns {Folder} Google Drive folder
- * @private
- */
-function getOrCreateExportFolder_() {
-  var folderName = 'Dashboard Exports';
-  var folders = DriveApp.getFoldersByName(folderName);
-  if (folders.hasNext()) {
-    return folders.next();
-  }
-  return DriveApp.createFolder(folderName);
-}
+// Dead code removed: getOrCreateExportFolder_() — zero callers in src
+
 // ============================================================================
 // 3. SCHEDULED EMAIL REPORTS
 // ============================================================================
@@ -4489,119 +4433,8 @@ function saveSharedView(view) {
 // 7. ADVANCED FILTERING OPTIONS
 // ============================================================================
 
-/**
- * Applies advanced filters to dashboard data and returns filtered results
- * @param {boolean} isPII - Whether to include PII data
- * @param {Object} filters - Filter configuration
- * @param {string[]} [filters.statuses] - Filter by grievance statuses
- * @param {string[]} [filters.locations] - Filter by locations
- * @param {string[]} [filters.stewards] - Filter by steward names
- * @param {string[]} [filters.categories] - Filter by grievance categories
- * @param {string[]} [filters.units] - Filter by units
- * @param {string} [filters.dateFrom] - Start date (ISO)
- * @param {string} [filters.dateTo] - End date (ISO)
- * @param {string} [filters.searchText] - Text search across all fields
- * @param {number[]} [filters.steps] - Filter by grievance steps (1,2,3,4)
- * @param {number} [filters.minMorale] - Minimum morale score
- * @param {number} [filters.maxMorale] - Maximum morale score
- * @returns {string} JSON filtered dashboard data
- */
-function getFilteredDashboardData(isPII, filters) {
-  var fullData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+// Dead code removed: getFilteredDashboardData() — zero callers in src
 
-  if (!filters || Object.keys(filters).length === 0) {
-    return JSON.stringify(fullData);
-  }
-
-  // Apply date range filter first (reuse existing function)
-  if (filters.dateFrom || filters.dateTo) {
-    fullData = JSON.parse(getUnifiedDashboardDataWithDateRange(
-      isPII, 0, filters.dateFrom || '2000-01-01', filters.dateTo || new Date().toISOString()
-    ));
-  }
-
-  // Filter status distribution to only selected statuses
-  if (filters.statuses && filters.statuses.length > 0) {
-    var filteredStatus = {};
-    for (var sKey in fullData.statusDistribution) {
-      if (filters.statuses.indexOf(sKey) >= 0) {
-        filteredStatus[sKey] = fullData.statusDistribution[sKey];
-      }
-    }
-    fullData.statusDistribution = filteredStatus;
-  }
-
-  // Filter location breakdown
-  if (filters.locations && filters.locations.length > 0) {
-    var filteredLocations = {};
-    for (var locKey in fullData.locationBreakdown) {
-      if (filters.locations.indexOf(locKey) >= 0) {
-        filteredLocations[locKey] = fullData.locationBreakdown[locKey];
-      }
-    }
-    fullData.locationBreakdown = filteredLocations;
-  }
-
-  // Filter unit breakdown
-  if (filters.units && filters.units.length > 0) {
-    var filteredUnits = {};
-    for (var uKey in fullData.unitBreakdown) {
-      if (filters.units.indexOf(uKey) >= 0) {
-        filteredUnits[uKey] = fullData.unitBreakdown[uKey];
-      }
-    }
-    fullData.unitBreakdown = filteredUnits;
-  }
-
-  // Filter grievances by category
-  if (filters.categories && filters.categories.length > 0 && fullData.grievancesByCategory) {
-    var filteredCats = {};
-    for (var catKey in fullData.grievancesByCategory) {
-      if (filters.categories.indexOf(catKey) >= 0) {
-        filteredCats[catKey] = fullData.grievancesByCategory[catKey];
-      }
-    }
-    fullData.grievancesByCategory = filteredCats;
-  }
-
-  // Filter drill-down data by steward
-  if (filters.stewards && filters.stewards.length > 0 && fullData.chartDrillDown) {
-    for (var ddKey in fullData.chartDrillDown.statusByCase) {
-      fullData.chartDrillDown.statusByCase[ddKey] = fullData.chartDrillDown.statusByCase[ddKey].filter(function(c) {
-        return !c.steward || filters.stewards.indexOf(c.steward) >= 0;
-      });
-    }
-  }
-
-  // Filter by step progression
-  if (filters.steps && filters.steps.length > 0) {
-    var filteredSteps = { step1: 0, step2: 0, step3: 0, arb: 0 };
-    if (filters.steps.indexOf(1) >= 0) filteredSteps.step1 = fullData.stepProgression.step1;
-    if (filters.steps.indexOf(2) >= 0) filteredSteps.step2 = fullData.stepProgression.step2;
-    if (filters.steps.indexOf(3) >= 0) filteredSteps.step3 = fullData.stepProgression.step3;
-    if (filters.steps.indexOf(4) >= 0) filteredSteps.arb = fullData.stepProgression.arb;
-    fullData.stepProgression = filteredSteps;
-  }
-
-  // Text search filter on drill-down case data
-  if (filters.searchText) {
-    var searchLower = filters.searchText.toLowerCase();
-    if (fullData.chartDrillDown) {
-      for (var drillKey in fullData.chartDrillDown) {
-        var drillGroup = fullData.chartDrillDown[drillKey];
-        for (var gKey in drillGroup) {
-          drillGroup[gKey] = drillGroup[gKey].filter(function(item) {
-            var searchable = JSON.stringify(item).toLowerCase();
-            return searchable.indexOf(searchLower) >= 0;
-          });
-        }
-      }
-    }
-  }
-
-  fullData.filtersApplied = filters;
-  return JSON.stringify(fullData);
-}
 // ============================================================================
 // 8. DRILL-DOWN CAPABILITIES (Multi-level hierarchical)
 // ============================================================================

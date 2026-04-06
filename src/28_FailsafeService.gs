@@ -35,7 +35,7 @@
 
 var FailsafeService = (function () {
 
-  var BACKUP_FOLDER_NAME = 'DDS_Dashboard_Backups';
+  var BACKUP_FOLDER_NAME = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME ? COMMAND_CONFIG.SYSTEM_NAME.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Dashboard') + '_Backups';
   var MAX_BACKUP_FILES = 52; // ~1 year of weekly backups per sheet
 
   // ═══════════════════════════════════════

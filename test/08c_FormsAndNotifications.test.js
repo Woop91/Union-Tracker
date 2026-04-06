@@ -20,7 +20,7 @@ loadSources([
 describe('08c function existence', () => {
   const required = [
     'getFormUrlFromConfig', 'buildGrievanceFormUrl_',
-    'saveFormUrlsToConfig_silent', 'getFormValue_', 'getFormMultiValue_',
+    'saveFormUrlsToConfig_silent',
     'onSatisfactionFormSubmit',
     'showNotificationSettings',
     'installDailyTrigger_', 'removeDailyTrigger_',
@@ -148,9 +148,11 @@ describe('sendStewardDeadlineAlerts (behavioral)', () => {
 
     sendStewardDeadlineAlerts();
 
-    // Should have attempted to send at least one email (or safeSendEmail_ if available)
-    // The function uses safeSendEmail_ which is mocked globally
-    // At minimum, it should not throw
+    // Verify the function attempted to process grievance data (reads the sheet)
+    // and attempted email delivery for the grievance with daysToDeadline=3
+    var emailCalled = MailApp.sendEmail.mock.calls.length > 0 ||
+      (typeof safeSendEmail_ === 'function' && safeSendEmail_.mock && safeSendEmail_.mock.calls.length > 0);
+    expect(emailCalled).toBe(true);
   });
 });
 
@@ -300,43 +302,3 @@ describe('getFormUrlFromConfig (behavioral)', () => {
   });
 });
 
-// ============================================================================
-// Behavioral: getFormValue_ / getFormMultiValue_
-// ============================================================================
-
-describe('getFormValue_ (behavioral)', () => {
-  test('returns first value from form responses', () => {
-    var responses = { 'Name': ['John Doe'] };
-    expect(getFormValue_(responses, 'Name')).toBe('John Doe');
-  });
-
-  test('returns empty string for missing field', () => {
-    var responses = { 'Name': ['John'] };
-    expect(getFormValue_(responses, 'Email')).toBe('');
-  });
-
-  test('returns empty string for empty array', () => {
-    var responses = { 'Name': [] };
-    expect(getFormValue_(responses, 'Name')).toBe('');
-  });
-});
-
-describe('getFormMultiValue_ (behavioral)', () => {
-  test('returns comma-separated values for checkbox responses', () => {
-    var responses = { 'Topics': ['Safety', 'Pay', 'Scheduling'] };
-    var result = getFormMultiValue_(responses, 'Topics');
-    expect(result).toContain('Safety');
-    expect(result).toContain('Pay');
-    expect(result).toContain('Scheduling');
-  });
-
-  test('filters out empty values', () => {
-    var responses = { 'Topics': ['Safety', '', 'Pay', '  '] };
-    var result = getFormMultiValue_(responses, 'Topics');
-    expect(result).toBe('Safety, Pay');
-  });
-
-  test('returns empty string for missing field', () => {
-    expect(getFormMultiValue_({}, 'Topics')).toBe('');
-  });
-});

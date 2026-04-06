@@ -116,6 +116,9 @@ var DataService = (function () {
     grievanceStep2AppealDue: ['step ii appeal due', 'step 2 appeal due'],
     grievanceStep2Due: ['step ii due', 'step 2 due'],
     grievanceStep2Rcvd: ['step ii rcvd', 'step 2 rcvd', 'step ii received'],
+    grievanceSignatureStatus: ['signature status'],
+    grievanceSignatureToken: ['signature token'],
+    grievanceSignedDate: ['signed date'],
   };
 
   // ═══════════════════════════════════════
@@ -542,7 +545,6 @@ var DataService = (function () {
       if (rowEmail !== email) continue;
 
       var rowNum = i + 1;
-      var rowData = data[i].slice();
       var oldValues = {};
       for (var _f in updates) {
         if (!editableFields[_f]) continue;
@@ -2214,6 +2216,9 @@ var DataService = (function () {
       // UI degrades gracefully: "No Drive folder linked to this case" message shown.
       driveFolderUrl: String(_getVal(row, colMap, HEADERS.grievanceDriveFolderUrl, '')).trim() || null,
       driveFolderId: String(_getVal(row, colMap, HEADERS.grievanceDriveFolderId, '')).trim() || null,
+      signatureStatus: String(_getVal(row, colMap, HEADERS.grievanceSignatureStatus, '')).trim() || null,
+      signatureToken: String(_getVal(row, colMap, HEADERS.grievanceSignatureToken, '')).trim() || null,
+      signedDate: _getVal(row, colMap, HEADERS.grievanceSignedDate, null),
     };
   }
 
@@ -3768,6 +3773,85 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   // ═══════════════════════════════════════
+  // HELPERS: Meeting Minutes (v4.52.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Resolves the Drive folder ID for meeting minutes documents.
+   * Checks Config sheet first, falls back to ScriptProperties.
+   * @returns {string} Folder ID or empty string if not configured.
+   */
+  function resolveMinutesFolderId_() {
+    var folderId = '';
+    try {
+      if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.MINUTES_FOLDER_ID) {
+        folderId = getConfigValue_(CONFIG_COLS.MINUTES_FOLDER_ID) || '';
+      }
+      if (!folderId && typeof PropertiesService !== 'undefined') {
+        folderId = PropertiesService.getScriptProperties().getProperty('MINUTES_FOLDER_ID') || '';
+      }
+    } catch (_e) { log_('resolveMinutesFolderId_', _e.message || _e); }
+    return folderId;
+  }
+
+  /**
+   * Creates a formatted Google Doc for meeting minutes and moves it to the Minutes folder.
+   * @param {string} title - Meeting title (will be sanitized)
+   * @param {Date} meetingDate - Meeting date
+   * @param {string} createdBy - Steward email
+   * @param {string} bullets - Key points (newline-separated)
+   * @param {string} fullMinutes - Detailed notes
+   * @returns {{ docUrl: string }} URL of created doc, or empty string on failure
+   */
+  function createMinutesDoc_(title, meetingDate, createdBy, bullets, fullMinutes) {
+    var docUrl = '';
+    try {
+      // Sanitize title for Doc name: strip control chars, enforce length
+      var safeTitle = String(title)
+        .substring(0, MINUTES_LIMITS.TITLE_MAX)
+        .replace(/[\x00-\x1F\x7F]/g, '')
+        .trim() || '(Untitled)';
+      var tz = Session.getScriptTimeZone();
+      var docTitle = safeTitle + ' \u2014 ' + Utilities.formatDate(meetingDate, tz, 'yyyy-MM-dd');
+
+      var doc = DocumentApp.create(docTitle);
+      var body = doc.getBody();
+      body.appendParagraph(docTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+      body.appendParagraph('Recorded by: ' + createdBy);
+      body.appendParagraph('Date: ' + Utilities.formatDate(meetingDate, tz, 'MMMM d, yyyy'));
+      body.appendParagraph('');
+
+      if (bullets) {
+        body.appendParagraph('Key Points').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        String(bullets).split('\n').forEach(function(line) {
+          if (line.trim()) body.appendListItem(line.replace(/^[-\u2022*]\s*/, '').trim());
+        });
+        body.appendParagraph('');
+      }
+      if (fullMinutes) {
+        body.appendParagraph('Full Minutes').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        body.appendParagraph(String(fullMinutes));
+      }
+      doc.saveAndClose();
+
+      // Move to Minutes folder using file.moveTo() (replaces deprecated addFile/removeFile)
+      var docFile = DriveApp.getFileById(doc.getId());
+      var minutesFolderId = resolveMinutesFolderId_();
+      if (minutesFolderId) {
+        try {
+          docFile.moveTo(DriveApp.getFolderById(minutesFolderId));
+        } catch (moveErr) {
+          log_('createMinutesDoc_', 'could not move doc to Minutes folder: ' + moveErr.message);
+        }
+      }
+      docUrl = docFile.getUrl();
+    } catch (docErr) {
+      log_('createMinutesDoc_', 'Drive doc creation failed (non-fatal): ' + docErr.message);
+    }
+    return { docUrl: docUrl };
+  }
+
+  // ═══════════════════════════════════════
   // PUBLIC: Meeting Minutes (v4.16.0)
   // ═══════════════════════════════════════
 
@@ -3799,7 +3883,9 @@ var DataService = (function () {
         createdBy: String(data[i][PORTAL_MINUTES_COLS.CREATED_BY] || ''),
         createdDate: data[i][PORTAL_MINUTES_COLS.CREATED_DATE] instanceof Date
           ? _formatDate(data[i][PORTAL_MINUTES_COLS.CREATED_DATE]) : '',
-        driveDocUrl: String(data[i][PORTAL_MINUTES_COLS.DRIVE_DOC_URL] || '')  // col 8 — Google Doc in Minutes/ folder
+        driveDocUrl: String(data[i][PORTAL_MINUTES_COLS.DRIVE_DOC_URL] || ''),
+        attachmentUrl: String(data[i][PORTAL_MINUTES_COLS.ATTACHMENT_URL] || ''),
+        attachmentName: String(data[i][PORTAL_MINUTES_COLS.ATTACHMENT_NAME] || '')
       });
     }
     minutes.sort(function(a, b) { return (b.meetingDateTs || 0) - (a.meetingDateTs || 0); });
@@ -3812,104 +3898,142 @@ var DataService = (function () {
   }
 
   /**
-   * Adds new meeting minutes (steward-only).
+   * Adds new meeting minutes with optional file attachment (steward-only).
+   * Three-phase design: validate outside lock, fast sheet write inside lock,
+   * slow Drive operations outside lock (idempotent).
+   *
    * @param {string} stewardEmail
-   * @param {Object} data - { title, meetingDate, bullets, fullMinutes }
+   * @param {Object} minutesData - { title, meetingDate, bullets, fullMinutes, attachmentData?, attachmentName? }
+   * @param {string} [idemKey] - Idempotency key (10-min TTL)
    * @returns {Object}
    */
   function addMeetingMinutes(stewardEmail, minutesData, idemKey) {
-    if (idemKey) {
-      var idemCache = CacheService.getScriptCache();
-      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
-      idemCache.put('IDEM_' + idemKey, '1', 600); // 10-minute TTL to reduce duplicate mutation risk
-    }
-    if (!stewardEmail || !minutesData || !minutesData.title) {
+    // ── Phase 1: Validate + prepare (outside lock) ──────────────────────────
+    if (!stewardEmail || !minutesData || !minutesData.title || !String(minutesData.title).trim()) {
       return { success: false, message: 'Missing required fields.' };
     }
+
+    // Attachment validation (before any expensive work)
+    var ALLOWED_EXT = /\.(pdf|docx?|xlsx?|pptx?|txt|rtf|csv|png|jpe?g|gif)$/i;
+    var hasAttachment = !!(minutesData.attachmentData && minutesData.attachmentName);
+    if (minutesData.attachmentData && !minutesData.attachmentName) {
+      return { success: false, message: 'Attachment filename is required.' };
+    }
+    if (hasAttachment) {
+      if (!ALLOWED_EXT.test(minutesData.attachmentName)) {
+        return { success: false, message: 'File type not supported. Allowed: PDF, Word, Excel, PowerPoint, images, text.' };
+      }
+      if (minutesData.attachmentData.length * 0.75 > MINUTES_LIMITS.ATTACHMENT_MAX_BYTES) {
+        return { success: false, message: 'File too large. Maximum size is 10MB.' };
+      }
+    }
+
     var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
     if (!sheet) return { success: false, message: 'Minutes sheet unavailable.' };
 
-    var id = 'MIN_' + Date.now().toString(36);
-    // Append T12:00:00 to YYYY-MM-DD strings to avoid UTC midnight → previous-day shift in America/New_York
+    var id = 'MIN_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+
+    // Date parsing: append T12:00:00 to YYYY-MM-DD to avoid UTC midnight timezone shift
     var rawDate = minutesData.meetingDate;
     var meetingDate = rawDate
       ? new Date(typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate + 'T12:00:00' : rawDate)
       : new Date();
     if (isNaN(meetingDate.getTime())) meetingDate = new Date();
 
-    // ── Save Google Doc to Minutes/ Drive folder ─────────────────────────────
-    // Stores a formatted Google Doc alongside the spreadsheet record so stewards
-    // can share a clean link. Falls back gracefully if Drive setup hasn't run.
-    var driveDocUrl = '';
+    // Escape + truncate text fields
+    var safeTitle = escapeForFormula(String(minutesData.title).substring(0, MINUTES_LIMITS.TITLE_MAX));
+    var safeBullets = escapeForFormulaPreserveNewlines(String(minutesData.bullets || '').substring(0, MINUTES_LIMITS.BULLETS_MAX));
+    var safeFullMinutes = escapeForFormulaPreserveNewlines(String(minutesData.fullMinutes || '').substring(0, MINUTES_LIMITS.FULL_MINUTES_MAX));
+
+    // Decode attachment blob (before lock, so decode time doesn't hold the lock)
+    var attachmentBlob = null;
+    if (hasAttachment) {
+      try {
+        var bytes = Utilities.base64Decode(minutesData.attachmentData);
+        attachmentBlob = Utilities.newBlob(bytes, '', minutesData.attachmentName);
+      } catch (decodeErr) {
+        return { success: false, message: 'Failed to decode attachment: ' + decodeErr.message };
+      }
+    }
+
+    // ── Phase 2: Sheet write (inside lock — fast, ~100ms) ───────────────────
+    var rowNum;
     try {
-      var minutesFolderId = (typeof getConfigValue_ === 'function')
-        ? getConfigValue_(CONFIG_COLS.MINUTES_FOLDER_ID)
-        : '';
-      if (!minutesFolderId && typeof PropertiesService !== 'undefined') {
-        minutesFolderId = PropertiesService.getScriptProperties().getProperty('MINUTES_FOLDER_ID') || '';
-      }
-
-      var docTitle = minutesData.title + ' — ' +
-        Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-
-      var doc = DocumentApp.create(docTitle);
-      var body = doc.getBody();
-      body.appendParagraph(docTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-      body.appendParagraph('Recorded by: ' + stewardEmail);
-      body.appendParagraph('Date: ' + Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'MMMM d, yyyy'));
-      body.appendParagraph('');
-
-      if (minutesData.bullets) {
-        body.appendParagraph('Key Points').setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        String(minutesData.bullets).split('\n').forEach(function(line) {
-          if (line.trim()) body.appendListItem(line.replace(/^[-•*]\s*/, '').trim());
-        });
-        body.appendParagraph('');
-      }
-      if (minutesData.fullMinutes) {
-        body.appendParagraph('Full Minutes').setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        body.appendParagraph(String(minutesData.fullMinutes));
-      }
-      doc.saveAndClose();
-
-      // Move the doc into the Minutes/ subfolder if it exists
-      var docFile = DriveApp.getFileById(doc.getId());
-      if (minutesFolderId) {
-        try {
-          var minutesFolder = DriveApp.getFolderById(minutesFolderId);
-          minutesFolder.addFile(docFile);
-          DriveApp.getRootFolder().removeFile(docFile);
-        } catch (moveErr) {
-          log_('addMeetingMinutes', 'could not move doc to Minutes folder: ' + moveErr.message);
+      rowNum = withScriptLock_(function() {
+        // Idempotency check (inside lock for atomicity with the write)
+        if (idemKey) {
+          var idemCache = CacheService.getScriptCache();
+          if (idemCache.get('IDEM_' + idemKey)) return -1; // signal: duplicate
+          idemCache.put('IDEM_' + idemKey, '1', 600);
         }
+        sheet.appendRow([
+          id,
+          meetingDate,
+          safeTitle,
+          safeBullets,
+          safeFullMinutes,
+          String(stewardEmail).trim().toLowerCase(),
+          new Date(),
+          '',  // driveDocUrl — filled in Phase 3
+          '',  // attachmentUrl — filled in Phase 3
+          ''   // attachmentName — filled in Phase 3
+        ]);
+        return sheet.getLastRow();
+      });
+    } catch (_lockErr) {
+      return { success: false, message: 'Could not save — another operation in progress. Please try again.' };
+    }
+
+    if (rowNum === -1) {
+      return { duplicate: true, message: 'Duplicate request ignored' };
+    }
+
+    // ── Phase 3: Drive operations (outside lock — slow but idempotent) ──────
+    var driveDocUrl = '';
+    var attachmentUrl = '';
+    var attachmentName = '';
+
+    // Create Google Doc
+    var docResult = createMinutesDoc_(minutesData.title, meetingDate, stewardEmail, minutesData.bullets || '', minutesData.fullMinutes || '');
+    driveDocUrl = docResult.docUrl;
+
+    // Upload attachment
+    if (attachmentBlob) {
+      try {
+        var attFile = DriveApp.createFile(attachmentBlob);
+        var minutesFolderId = resolveMinutesFolderId_();
+        if (minutesFolderId) {
+          try { attFile.moveTo(DriveApp.getFolderById(minutesFolderId)); } catch (_mv) { log_('addMeetingMinutes', 'attach move failed: ' + _mv.message); }
+        }
+        attachmentUrl = attFile.getUrl();
+        attachmentName = minutesData.attachmentName;
+      } catch (attErr) {
+        log_('addMeetingMinutes', 'Attachment upload failed (non-fatal): ' + attErr.message);
       }
-      driveDocUrl = docFile.getUrl();
-    } catch (driveErr) {
-      log_('addMeetingMinutes', 'Drive doc creation failed (non-fatal): ' + driveErr.message);
     }
 
-    // ── Write to sheet (8 columns: add DriveDocUrl at end) ──────────────────
-    sheet.appendRow([
-      id,
-      meetingDate,
-      String(minutesData.title).substring(0, 200),
-      String(minutesData.bullets || '').substring(0, 2000),
-      String(minutesData.fullMinutes || '').substring(0, 5000),
-      String(stewardEmail).trim().toLowerCase(),
-      new Date(),
-      driveDocUrl
-    ]);
+    // Update row with Drive URLs
+    if (driveDocUrl || attachmentUrl) {
+      try {
+        if (driveDocUrl) sheet.getRange(rowNum, PORTAL_MINUTES_COLS.DRIVE_DOC_URL + 1).setValue(escapeForFormula(driveDocUrl));
+        if (attachmentUrl) {
+          sheet.getRange(rowNum, PORTAL_MINUTES_COLS.ATTACHMENT_URL + 1).setValue(escapeForFormula(attachmentUrl));
+          sheet.getRange(rowNum, PORTAL_MINUTES_COLS.ATTACHMENT_NAME + 1).setValue(escapeForFormula(attachmentName));
+        }
+      } catch (updateErr) {
+        log_('addMeetingMinutes', 'Row URL update failed (non-fatal): ' + updateErr.message);
+      }
+    }
 
-    // Ensure DriveDocUrl header exists in col 8
-    try {
-      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      if (!headers[7]) sheet.getRange(1, 8).setValue('DriveDocUrl');
-    } catch (_he) { log_('_he', (_he.message || _he)); }
-
+    // Audit
     if (typeof logAuditEvent === 'function') {
-      logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title, driveDocUrl: driveDocUrl });
+      logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title, driveDocUrl: driveDocUrl, attachmentName: attachmentName });
     }
-    return { success: true, message: 'Minutes added.' + (driveDocUrl ? ' Google Doc saved.' : ''), id: id, driveDocUrl: driveDocUrl };
+
+    var msg = 'Minutes added.';
+    if (driveDocUrl) msg += ' Google Doc saved.';
+    if (attachmentUrl) msg += ' Attachment uploaded.';
+    return { success: true, message: msg, id: id, driveDocUrl: driveDocUrl, attachmentUrl: attachmentUrl, attachmentName: attachmentName };
   }
 
   // addPoll removed v4.24.0 — was FlashPolls-based. Use wqSetStewardQuestion() instead.
@@ -4979,6 +5103,8 @@ var DataService = (function () {
     // v4.17.0 - Minutes (Polls removed v4.24.0 — use wq* wrappers)
     getMeetingMinutes: getMeetingMinutes,
     addMeetingMinutes: addMeetingMinutes,
+    // v4.52.0 - Minutes helpers (exposed for BACKFILL wrapper)
+    createMinutesDoc_: createMinutesDoc_,
     // v4.18.0 - Performance, Checklists, Meetings, Satisfaction, Feedback
     getStewardPerformance: getStewardPerformance,
     getAllStewardPerformance: getAllStewardPerformance,

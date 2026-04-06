@@ -136,42 +136,7 @@ function saveFormUrlsToConfig_silent(ss) {
   configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor(SHEET_COLORS.LINK_SECONDARY).setFontLine('underline');
 }
 
-// ============================================================================
-// FORM VALUE PARSING UTILITIES
-// ============================================================================
-
-/**
- * Get a value from form named responses
- * @param {Object} responses - Form named values object
- * @param {string} fieldName - Name of the field to retrieve
- * @returns {string} The field value or empty string
- * @private
- */
-function getFormValue_(responses, fieldName) {
-  if (responses[fieldName] && responses[fieldName].length > 0) {
-    return responses[fieldName][0];
-  }
-  return '';
-}
-
-/**
- * Get multiple values from form response (for checkbox questions)
- * Returns comma-separated string
- * @param {Object} responses - Form named values object
- * @param {string} fieldName - Name of the field to retrieve
- * @returns {string} Comma-separated values or empty string
- * @private
- */
-function getFormMultiValue_(responses, fieldName) {
-  if (responses[fieldName] && responses[fieldName].length > 0) {
-    // Filter out empty values and join with comma
-    var values = responses[fieldName].filter(function(v) { return v && v.trim() !== ''; });
-    return values.join(', ');
-  }
-  return '';
-}
-
-// Dead code removed: parseFormDate_() — zero callers in src
+// Dead code removed: getFormValue_(), getFormMultiValue_(), parseFormDate_() — zero callers in src
 
 // sendContactInfoForm — removed (contact form deprecated)
 // onContactFormSubmit — removed (contact form deprecated)

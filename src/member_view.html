@@ -3312,7 +3312,7 @@ function _renderSurveyWizard(container, questions, sectionMeta, sliderLabels, pe
       stepContainer.innerHTML = '';
       navRow.style.display = '';
       _showSurveyError(stepContainer, navRow, err.message || 'Network error. Your progress is saved.', responses, appContainer);
-    }).dataSubmitSurveyResponse(null, responses);
+    }).dataSubmitSurveyResponse(SESSION_TOKEN, responses);
   }
 
   renderStep();
@@ -3346,7 +3346,7 @@ function _showSurveyError(stepContainer, navRow, message, responses, appContaine
       }
     }).withFailureHandler(function(err2) {
       _showSurveyError(stepContainer, navRow, err2.message || 'Still failing. Your responses are saved locally.', responses, appContainer);
-    }).dataSubmitSurveyResponse(null, responses);
+    }).dataSubmitSurveyResponse(SESSION_TOKEN, responses);
   } }, 'Retry'));
   errCard.appendChild(el('button', { className: 'btn btn-secondary', style: { maxWidth: '200px', margin: '0 auto' }, onClick: function() { _handleTabNav('member', 'surveyform'); } }, 'Back to Survey'));
   stepContainer.appendChild(errCard);
@@ -6512,19 +6512,42 @@ function renderMinutesPage(appContainer) {
         pageSize: 10,
         emptyText: 'No matching minutes.',
         renderItem: function(listArea, m) {
-          var card = el('div', { className: 'card card-glass card-clickable ' + _TC, style: { padding: '14px', marginBottom: '8px' } });
-          var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
+          var hasExpandable = !!(m.fullMinutes);
+          var card = el('div', { className: 'card card-glass ' + (hasExpandable ? 'card-clickable ' : '') + _TC, style: { padding: '14px', marginBottom: '8px' } });
+          var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } });
           header.appendChild(el('span', { className: 'display-title-sm' }, m.title));
-          header.appendChild(el('span', { className: 'text-xs-muted' }, m.meetingDate));
+          var rightSide = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } });
+          rightSide.appendChild(el('span', { className: 'text-xs-muted' }, m.meetingDate));
+          if (hasExpandable) rightSide.appendChild(el('span', { className: 'text-xs-muted', style: { transition: 'transform 0.2s' } }, '\u25B8'));
+          header.appendChild(rightSide);
           card.appendChild(header);
           if (m.bullets) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5', whiteSpace: 'pre-wrap' } }, m.bullets));
-          if (m.fullMinutes) {
+
+          if (hasExpandable) {
             var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes);
             card.appendChild(fullDiv);
+            var chevron = rightSide.lastChild;
             card.addEventListener('click', function() {
-              fullDiv.style.display = fullDiv.style.display === 'none' ? 'block' : 'none';
+              var isOpen = fullDiv.style.display !== 'none';
+              fullDiv.style.display = isOpen ? 'none' : 'block';
+              chevron.style.transform = isOpen ? '' : 'rotate(90deg)';
             });
           }
+
+          // Links row
+          var linksRow = el('div', { style: { display: 'flex', gap: '12px', marginTop: '6px', flexWrap: 'wrap' } });
+          if (m.driveDocUrl && /^https?:\/\//i.test(m.driveDocUrl)) {
+            var docLink = el('a', { href: m.driveDocUrl, target: '_blank', rel: 'noopener', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCC4 Google Doc');
+            docLink.addEventListener('click', function(e) { e.stopPropagation(); });
+            linksRow.appendChild(docLink);
+          }
+          if (m.attachmentUrl && /^https?:\/\//i.test(m.attachmentUrl)) {
+            var attLink = el('a', { href: m.attachmentUrl, target: '_blank', rel: 'noopener', style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', textDecoration: 'none' } }, '\uD83D\uDCCE ' + (m.attachmentName || 'Attachment'));
+            attLink.addEventListener('click', function(e) { e.stopPropagation(); });
+            linksRow.appendChild(attLink);
+          }
+          if (linksRow.children.length) card.appendChild(linksRow);
+
           listArea.appendChild(card);
         }
       });
@@ -6579,6 +6602,17 @@ function renderMinutesPage(appContainer) {
 // - _refreshNavBadges call after completion updates steward-side badge counts
 //   since completing a member task changes the steward's open task totals.
 //   If missing, steward sees stale badge counts until next page load.
+
+// Lightweight badge refresh for member view — invalidates cached tab data
+// so that the next tab switch (or role switch for dual-role users) fetches fresh counts.
+var _refreshNavBadgesTimer = null;
+function _refreshNavBadges() {
+  if (_refreshNavBadgesTimer) clearTimeout(_refreshNavBadgesTimer);
+  _refreshNavBadgesTimer = setTimeout(function() {
+    _refreshNavBadgesTimer = null;
+    if (typeof _invalidateTabCache === 'function') _invalidateTabCache();
+  }, 300);
+}
 
 function renderMemberTasks(appContainer) {
   renderPageLayout(appContainer, 'member', 'mytasks', function(container) {

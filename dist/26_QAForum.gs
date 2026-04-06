@@ -252,7 +252,7 @@ var QAForum = (function () {
       var id = 'QA_' + Date.now().toString(36);
       var now = new Date();
       sheet.appendRow([
-        id, email.toLowerCase().trim(), name || 'Member',
+        id, email.toLowerCase().trim(), escapeForFormula(name || 'Member'),
         isAnonymous ? true : false, text,
         'active', 0, '', 0, now, now
       ]);
@@ -305,7 +305,7 @@ var QAForum = (function () {
     try {
       var id = 'ANS_' + Date.now().toString(36);
       ansSheet.appendRow([
-        id, questionId, email.toLowerCase().trim(), name || 'Steward',
+        id, questionId, email.toLowerCase().trim(), escapeForFormula(name || 'Steward'),
         true, text, 'active', new Date()
       ]);
 
