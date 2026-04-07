@@ -237,7 +237,7 @@ function renderStewardDashboard(appContainer) {
    if (cards[3]) cards[3].textContent = '0';
    return;
   }
-  if (cards[0]) cards[0].textContent = String(stats.openCount || 0);
+  if (cards[0]) cards[0].textContent = String(stats.activeOpenCount || 0);
   if (cards[1]) { cards[1].textContent = String(stats.overdueCount || 0); if (stats.overdueCount > 0) cards[1].style.color = 'var(--danger)'; }
   if (cards[2]) { cards[2].textContent = String(stats.dueSoonCount || 0); if (stats.dueSoonCount > 0) cards[2].style.color = 'var(--warning)'; }
   if (cards[3]) cards[3].textContent = String(stats.favorableCount || 0);

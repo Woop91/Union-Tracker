@@ -3112,11 +3112,24 @@ var DataService = (function () {
       });
     }
 
+    // Active-only open count for KPI card (excludes archive rows with stale/blank status)
+    var activeOpenCount = 0;
+    var activeData = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (activeData && activeData.data && activeData.data.length > 1) {
+      for (var ai = 1; ai < activeData.data.length; ai++) {
+        try {
+          var aRec = _buildGrievanceRecord(activeData.data[ai], activeData.colMap);
+          var aStatus = aRec.status || 'unknown';
+          if (_closedStatusesLower.indexOf(aStatus) === -1 && aStatus !== 'resolved') activeOpenCount++;
+        } catch (_ae) { /* skip */ }
+      }
+    }
+
     return {
       available: true, total: total,
       byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory,
       monthly: monthlyArr, monthlyResolved: monthlyResolvedArr,
-      openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount, withdrawnCount: withdrawnCount,
+      openCount: openCount, activeOpenCount: activeOpenCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount, withdrawnCount: withdrawnCount,
       overdueCount: overdueCount, dueSoonCount: dueSoonCount,
       // Outcome & resolution metrics (v4.31.4)
       winRate: winRate, favorableCount: favorableCount, closedTotal: closedTotal,
