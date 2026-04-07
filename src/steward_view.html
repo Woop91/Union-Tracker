@@ -250,7 +250,7 @@ function renderStewardDashboard(appContainer) {
     if (isOrgFallback) {
       // Fetch org-wide stats asynchronously, update KPIs when ready
       var kpiGrid = renderKPIStrip(container, [
-        { label: 'Org Cases', value: '...' },
+        { label: 'Org Open', value: '...' },
         { label: 'Org Overdue', value: '...' },
         { label: 'Org Due <7d', value: '...' },
         { label: 'Org Resolved', value: '...', color: 'var(--success)' },
@@ -269,10 +269,10 @@ function renderStewardDashboard(appContainer) {
           if (cards[3]) cards[3].textContent = '0';
           return;
         }
-        if (cards[0]) cards[0].textContent = String(stats.total || 0);
+        if (cards[0]) cards[0].textContent = String(stats.openCount || 0);
         if (cards[1]) { cards[1].textContent = String(stats.overdueCount || 0); if (stats.overdueCount > 0) cards[1].style.color = 'var(--danger)'; }
         if (cards[2]) { cards[2].textContent = String(stats.dueSoonCount || 0); if (stats.dueSoonCount > 0) cards[2].style.color = 'var(--warning)'; }
-        if (cards[3]) cards[3].textContent = String(stats.settledCount || stats.wonCount || 0);
+        if (cards[3]) cards[3].textContent = String(stats.favorableCount || 0);
       }).withFailureHandler(function(err) {
         console.error('Org KPI stats failed:', err && err.message);
         var cards = kpiGrid.querySelectorAll('.kpi-value');
@@ -8502,6 +8502,7 @@ function _renderAddMinutes(container, onSaveSuccess) {
       serverCall().withSuccessHandler(function(result) {
         if (result && result.success) {
           if (typeof _refreshNavBadges === 'function') _refreshNavBadges();
+          showToast('Meeting minutes saved!', 'success');
           // Show success with Doc link before navigating
           statusMsg.style.color = 'var(--success)';
           statusMsg.textContent = 'Minutes saved!';

@@ -1547,6 +1547,26 @@
  }
 
  
+ 
+ var _toastContainer = null;
+ 
+ function showToast(message, type, duration) {
+  if (!_toastContainer) {
+  _toastContainer = document.createElement('div');
+  _toastContainer.className = 'toast-container';
+  document.body.appendChild(_toastContainer);
+  }
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + (type || 'info');
+  t.textContent = message;
+  _toastContainer.appendChild(t);
+  setTimeout(function() {
+  t.classList.add('toast-out');
+  t.addEventListener('animationend', function() { t.remove(); });
+  }, duration || 3500);
+ }
+
+ 
  function showLoading(container, variant) {
   container.innerHTML = '';
   container.setAttribute('aria-busy', 'true');
