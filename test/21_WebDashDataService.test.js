@@ -896,7 +896,7 @@ describe('getGrievanceStats error resilience', () => {
     const stats = DataService.getGrievanceStats();
     // Should not throw; should process the 2 good rows (may or may not count the short row)
     expect(stats.available).toBe(true);
-    expect(stats.total).toBe(3); // total includes all data rows
+    expect(stats.total).toBe(2); // blank-status rows (including short rows) are skipped
   });
 
   test('survives a row with null/undefined values in date columns', () => {

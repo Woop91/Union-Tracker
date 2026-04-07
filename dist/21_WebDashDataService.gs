@@ -2900,18 +2900,21 @@ var DataService = (function () {
     var data = cached.data;
     if (data.length <= 1) return { available: false };
     var colMap = cached.colMap;
-    var total = data.length - 1;
-
     var byStatus = {};
     var byStep = {};
     var byUnit = {};
     var byCategory = {};
     var monthly = {};
     var monthlyResolved = {};
+    var total = 0;
     var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0, withdrawnCount = 0;
     var overdueCount = 0, dueSoonCount = 0;
     for (var i = 1; i < data.length; i++) {
       try {
+      // Skip blank rows — a real grievance always has a status value
+      var _rawStatus = String(_getVal(data[i], colMap, HEADERS.grievanceStatus, '')).trim();
+      if (!_rawStatus) continue;
+      total++;
       var rec = _buildGrievanceRecord(data[i], colMap);
       var s = rec.status || 'unknown';
       byStatus[s] = (byStatus[s] || 0) + 1;
@@ -2981,6 +2984,7 @@ var DataService = (function () {
 
     for (var ri = 1; ri < data.length; ri++) {
       try {
+        if (!String(_getVal(data[ri], colMap, HEADERS.grievanceStatus, '')).trim()) continue;
         var rRec = _buildGrievanceRecord(data[ri], colMap);
         var rStatus = rRec.status;
         var CLOSED = ['won', 'denied', 'settled', 'resolved', 'closed', 'withdrawn'];
@@ -3112,18 +3116,14 @@ var DataService = (function () {
       });
     }
 
-    // Active-only open count for KPI card — skip empty rows (GAS getDataRange includes blanks)
+    // Active-only open count for KPI card — skip blank rows (no raw status = not a real case)
     var activeOpenCount = 0;
     var activeData = _getCachedSheetData(GRIEVANCE_SHEET);
     if (activeData && activeData.data && activeData.data.length > 1) {
       for (var ai = 1; ai < activeData.data.length; ai++) {
         try {
-          var aRow = activeData.data[ai];
-          // Skip empty rows: require at least a grievance ID or member email
-          var aId = String(_getVal(aRow, activeData.colMap, HEADERS.grievanceId, '')).trim();
-          var aEmail = String(_getVal(aRow, activeData.colMap, HEADERS.grievanceMemberEmail, '')).trim();
-          if (!aId && !aEmail) continue;
-          var aRec = _buildGrievanceRecord(aRow, activeData.colMap);
+          if (!String(_getVal(activeData.data[ai], activeData.colMap, HEADERS.grievanceStatus, '')).trim()) continue;
+          var aRec = _buildGrievanceRecord(activeData.data[ai], activeData.colMap);
           var aStatus = aRec.status || 'unknown';
           if (_closedStatusesLower.indexOf(aStatus) === -1 && aStatus !== 'resolved') activeOpenCount++;
         } catch (_ae) { /* skip */ }
