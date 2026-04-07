@@ -3112,13 +3112,18 @@ var DataService = (function () {
       });
     }
 
-    // Active-only open count for KPI card (excludes archive rows with stale/blank status)
+    // Active-only open count for KPI card — skip empty rows (GAS getDataRange includes blanks)
     var activeOpenCount = 0;
     var activeData = _getCachedSheetData(GRIEVANCE_SHEET);
     if (activeData && activeData.data && activeData.data.length > 1) {
       for (var ai = 1; ai < activeData.data.length; ai++) {
         try {
-          var aRec = _buildGrievanceRecord(activeData.data[ai], activeData.colMap);
+          var aRow = activeData.data[ai];
+          // Skip empty rows: require at least a grievance ID or member email
+          var aId = String(_getVal(aRow, activeData.colMap, HEADERS.grievanceId, '')).trim();
+          var aEmail = String(_getVal(aRow, activeData.colMap, HEADERS.grievanceMemberEmail, '')).trim();
+          if (!aId && !aEmail) continue;
+          var aRec = _buildGrievanceRecord(aRow, activeData.colMap);
           var aStatus = aRec.status || 'unknown';
           if (_closedStatusesLower.indexOf(aStatus) === -1 && aStatus !== 'resolved') activeOpenCount++;
         } catch (_ae) { /* skip */ }
