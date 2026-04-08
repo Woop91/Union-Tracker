@@ -69,7 +69,7 @@ function _autoSubmitPIN(container, credentialValue) {
  function _onSuccess(result) {
  if (result && result.success && result.sessionToken) {
   if (WEB_APP_URL) {
-  window.top.location.href = WEB_APP_URL + '#sessionToken=' + encodeURIComponent(result.sessionToken);
+  window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
   } else {
   showAuthError(container, 'No app URL available. Contact admin.');
   }
@@ -202,8 +202,8 @@ function renderAuth(container) {
  var _fragRemember = false;
  try {
  var _hash = window.top.location.hash || window.location.hash || '';
- // Parse fragment parameters — look specifically for 'token=' (magic link),
- // NOT 'sessionToken=' (session restore — handled separately in index.html bootstrap)
+ // Parse fragment parameters — look specifically for 'token=' (magic link).
+ 
  if (_hash) {
   var _fragParts = _hash.substring(1).split('&');
   for (var _fi = 0; _fi < _fragParts.length; _fi++) {
@@ -234,7 +234,7 @@ function renderAuth(container) {
   .withSuccessHandler(function(result) {
   if (result && result.success && result.sessionToken) {
    if (WEB_APP_URL) {
-   window.top.location.href = WEB_APP_URL + '#sessionToken=' + encodeURIComponent(result.sessionToken);
+   window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
    } else {
    showAuthError(container, 'No app URL available. Contact admin.');
    }
@@ -502,7 +502,7 @@ function showAuthPIN(container) {
    _trySaveCredential(credName, pin);
 
    if (WEB_APP_URL) {
-   window.top.location.href = WEB_APP_URL + '#sessionToken=' + encodeURIComponent(result.sessionToken);
+   window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
    } else {
    statusMsg.textContent = 'No app URL available. Contact admin.';
    statusMsg.style.color = '#dc2626';

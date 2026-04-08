@@ -310,16 +310,21 @@ function checkWebAppAuthorization(requiredRole, sessionToken) {
   };
 
   try {
+    // Session token first — matches Auth.resolveUser() priority.
+    // The session token represents the identity they authenticated with for this app,
+    // which may differ from their Google SSO email (e.g. magic link users).
+    var user = null;
+    var email = null;
+    if (sessionToken && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
+      email = Auth.resolveEmailFromToken(sessionToken) || null;
+    }
+
+    // Fallback: Google SSO for same-domain users without a session token.
     // Use getActiveUser() — NOT getEffectiveUser(). In "Execute as me" web apps,
     // getEffectiveUser() returns the script owner, not the actual accessing user.
-    // getActiveUser() returns the real user who is making the request.
-    var user = Session.getActiveUser();
-    var email = user ? user.getEmail() : null;
-
-    // Fallback for magic link / session token users (getActiveUser() is empty in Execute-as-Me)
-    if (!email && sessionToken && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
-      email = Auth.resolveEmailFromToken(sessionToken) || null;
-      user = null; // no GAS user object available for token-based auth
+    if (!email) {
+      user = Session.getActiveUser();
+      email = user ? user.getEmail() : null;
     }
 
     if (!email) {
@@ -722,7 +727,7 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     // Mask PII in details before including in email
     var safeDetails = maskObjectPII_(details, true);
 
-    var systemName = 'Union Dashboard';
+    var systemName = 'SolidBase';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }
@@ -852,7 +857,7 @@ function sendDailySecurityDigest() {
 
     if (recipients.length === 0) return;
 
-    var systemName = 'Union Dashboard';
+    var systemName = 'SolidBase';
     if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     }

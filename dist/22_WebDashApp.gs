@@ -218,9 +218,10 @@ function doGetWebDashboard(e) {
       } else {
         sessionToken = tokenResult;
       }
-    } else if ((user.method === 'session' || user.method === 'pin') && e.parameter.sessionToken) {
+    } else if ((user.method === 'session' || user.method === 'pin' || user.method === 'magic') && e.parameter.sessionToken) {
       // Echo back the already-validated session token so the client can use it
-      // PIN sessions use the same echo-back — token was created during devAuthLoginByPIN()
+      // Covers: returning session users, PIN login, and magic link redirect (v4.51.1+
+      // magic link validation in auth_view creates session then redirects with ?sessionToken=)
       sessionToken = e.parameter.sessionToken;
     }
 
@@ -859,7 +860,7 @@ function getOrgChartHtml() {
 
 /**
  * Client-callable: Returns the Agency Org Chart HTML for lazy-loading.
- * Loaded on-demand when the user navigates to the MADDS Org Chart tab.
+ * Loaded on-demand when the user navigates to the Agency Org Chart tab.
  * @returns {string} Raw HTML content (CSS-scoped under .agency-oc), or error message
  */
 function getAgencyOrgChartHtml() {

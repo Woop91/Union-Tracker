@@ -20,29 +20,29 @@
 
 /**
  * Resolves the caller's verified email server-side (never trust client-supplied email).
- * Priority: (1) Session.getActiveUser() for Google SSO, (2) sessionToken for magic link auth.
+ * Priority: (1) sessionToken (app's own auth identity), (2) Session.getActiveUser() for SSO.
  *
- * Design: SSO email takes precedence over session token. In "Execute as: Me" deployment,
- * getActiveUser() returns the visitor's Google account (if signed in). This means a user
- * who authenticates via magic link as alice@union.org but is signed into Google as
- * bob@personal.com will resolve as bob@personal.com. This is intentional — their Google
- * identity IS their identity for SSO users. Non-Google users get empty from getActiveUser()
- * and fall through to token-based resolution.
+ * Design: Session token takes precedence over SSO — matches Auth.resolveUser() priority.
+ * A user who authenticated via magic link as alice@union.org should resolve as alice@union.org
+ * even if their browser is signed into Google as bob@personal.com. The session token
+ * represents the identity they authenticated with for THIS app. SSO is the fallback for
+ * users who don't have a session token (e.g. same-domain Google users on first load).
  *
  * @param {string=} sessionToken - Optional client-supplied session token
- * @returns {string} Verified email or empty string
+ * @returns {string} Verified email or null
  * @private
  */
 function _resolveCallerEmail(sessionToken) {
-  try {
-    var email = Session.getActiveUser().getEmail();
-    if (email) return email.toLowerCase().trim();
-  } catch (_e) { log_('_resolveCallerEmail', 'Error resolving active user: ' + (_e.message || _e)); }
-  // Fallback: verify session token server-side — never trust plain email from client
+  // 1. Session token — the app's own authenticated identity (matches Auth.resolveUser priority)
   if (sessionToken && typeof Auth !== 'undefined' && typeof Auth.resolveEmailFromToken === 'function') {
     var tokenEmail = Auth.resolveEmailFromToken(sessionToken);
     if (tokenEmail) return tokenEmail.toLowerCase().trim();
   }
+  // 2. Fallback: Google SSO for same-domain users without a session token
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (email) return email.toLowerCase().trim();
+  } catch (_e) { log_('_resolveCallerEmail', 'Error resolving active user: ' + (_e.message || _e)); }
   return null;
 }
 

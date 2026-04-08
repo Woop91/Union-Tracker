@@ -853,7 +853,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -948,7 +948,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -1017,7 +1017,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
@@ -1350,11 +1350,23 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
     var mSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!mSheet) return { success: false, message: 'System configuration error.' };
     var mData = mSheet.getDataRange().getValues();
+    // Dynamic header-based lookup (matches getOnboardingStatus_ pattern) —
+    // immune to column reorder, unlike static MEMBER_COLS constants which
+    // depend on syncColumnMaps cache being warm.
+    var headers = mData[0];
+    var emailCol = -1, memberIdCol = -1, pinHashCol = -1;
+    for (var ci = 0; ci < headers.length; ci++) {
+      var h = String(headers[ci]).toLowerCase().trim();
+      if (h === 'email' || h === 'email address') emailCol = ci;
+      if (h === 'member id') memberIdCol = ci;
+      if (h === 'pin hash' || h === 'pin') pinHashCol = ci;
+    }
+    if (emailCol === -1) return { success: false, message: 'System configuration error.' };
     var memberId = null;
     var memberRow = -1;
     for (var mi = 1; mi < mData.length; mi++) {
-      if (String(col_(mData[mi], MEMBER_COLS.EMAIL) || '').toLowerCase().trim() === e.toLowerCase().trim()) {
-        memberId = String(col_(mData[mi], MEMBER_COLS.MEMBER_ID) || '').trim();
+      if (String(mData[mi][emailCol] || '').toLowerCase().trim() === e.toLowerCase().trim()) {
+        memberId = memberIdCol >= 0 ? String(mData[mi][memberIdCol] || '').trim() : '';
         memberRow = mi + 1;
         break;
       }
@@ -1362,10 +1374,11 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
     if (memberRow === -1) return { success: false, message: 'Account not found. Please contact your steward.' };
     if (!memberId) return { success: false, message: 'Member ID required before setting PIN.' };
     var hashSeed = memberId;
-    var existingHash = mData[memberRow - 1][PIN_CONFIG.PIN_COLUMN - 1];
+    var pinCol = pinHashCol >= 0 ? pinHashCol + 1 : PIN_CONFIG.PIN_COLUMN;
+    var existingHash = mData[memberRow - 1][pinCol - 1];
     if (existingHash) return { success: false, message: 'PIN already set. Use PIN reset instead.' };
     var hashedPin = hashPIN(pin, hashSeed);
-    mSheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
+    mSheet.getRange(memberRow, pinCol).setValue(hashedPin);
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('PIN_SELF_SET', { memberId: memberId, email: e });
     }
