@@ -8,6 +8,7 @@
  *   G4: Client-server parameter mismatches (client sends args server doesn't expect)
  *   G5: Unescaped quotes in JS strings inside HTML (the Week's apostrophe)
  *   G6: dist/ parity with src/ (stale dist = deploying old code)
+ *   G15: Menu .addItem() references resolve to prod-defined functions
  *
  * Run: npm test (included in default test suite)
  * Run standalone: npx jest test/deploy-guards.test.js --verbose
@@ -36,6 +37,7 @@ const WRAPPER_FILES = [
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
+  '25_WorkloadService.gs',
   '08e_SurveyEngine.gs',
 ];
 
@@ -392,7 +394,7 @@ describe('G6: dist/ files are in sync with src/', () => {
 
   test('dist/ does not contain dev-only files (must be built with --prod)', () => {
     // Test runner included in prod — tab gated by IS_DEV_MODE, endpoints by steward auth
-    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
+    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs'];
     const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
     expect(found).toEqual([]);
   });
@@ -618,16 +620,16 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 // and injected into the SPA. If its <script> block has syntax errors, the entire
 // POMS tab fails silently.
 
-// G11: poms_reference.html — SKIPPED when file absent (SolidBase excludes POMS)
-const pomsExists = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
-(pomsExists ? describe : describe.skip)('G11: poms_reference.html integrity', () => {
+describe('G11: poms_reference.html integrity', () => {
   const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
+  const pomsExists = fs.existsSync(pomsPath);
+  const pomsFn = pomsExists ? test : test.skip;
 
-  test('poms_reference.html exists', () => {
-    expect(fs.existsSync(pomsPath)).toBe(true);
+  pomsFn('poms_reference.html exists', () => {
+    expect(pomsExists).toBe(true);
   });
 
-  test('POMS_DATA is available (lazy-loaded from server or inline)', () => {
+  pomsFn('POMS_DATA is available (lazy-loaded from server or inline)', () => {
     const code = fs.readFileSync(pomsPath, 'utf8');
     // POMS_DATA may be inline (const POMS_DATA = [...]) or lazy-loaded (var POMS_DATA = [])
     const match = code.match(/POMS_DATA\s*=\s*\[/);
@@ -643,7 +645,7 @@ const pomsExists = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
     }
   });
 
-  test('contains FLOWS object with flowcharts', () => {
+  pomsFn('contains FLOWS object with flowcharts', () => {
     const code = fs.readFileSync(pomsPath, 'utf8');
     const match = code.match(/FLOWS\s*=\s*\{/);
     expect(match).not.toBeNull();
@@ -652,14 +654,14 @@ const pomsExists = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
     expect(charts).toBeGreaterThanOrEqual(17);
   });
 
-  test('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
+  pomsFn('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
     const code = fs.readFileSync(pomsPath, 'utf8');
     ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
       expect(code).toContain(`P.tab==='${tab}'`);
     });
   });
 
-  test('<script> block parses without syntax errors', () => {
+  pomsFn('<script> block parses without syntax errors', () => {
     const code = fs.readFileSync(pomsPath, 'utf8');
     const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
     expect(scriptMatch).not.toBeNull();
@@ -668,7 +670,7 @@ const pomsExists = fs.existsSync(path.join(SRC_DIR, 'poms_reference.html'));
     }).not.toThrow();
   });
 
-  test('no DDS Apps Script ID present', () => {
+  pomsFn('no DDS Apps Script ID present', () => {
     const code = fs.readFileSync(pomsPath, 'utf8');
     expect(code).not.toContain('18hHHX');
   });
@@ -752,26 +754,35 @@ describe('G13: Module load order is safe', () => {
 });
 
 
-// G14: WorkloadService crash-safe patterns — SKIPPED (SolidBase excludes 25_WorkloadService.gs)
-const wsExists = fs.existsSync(path.join(SRC_DIR, '25_WorkloadService.gs'));
-(wsExists ? describe : describe.skip)('G14: WorkloadService crash-safe patterns', () => {
-  const wsCode = wsExists ? fs.readFileSync(path.join(SRC_DIR, '25_WorkloadService.gs'), 'utf8') : '';
+describe('G14: WorkloadService crash-safe patterns', () => {
+  const wsPath = path.join(SRC_DIR, '25_WorkloadService.gs');
+  const wsExists = fs.existsSync(wsPath);
+  const wsCode = wsExists ? fs.readFileSync(wsPath, 'utf8') : '';
 
-  test('_refreshReportingData does NOT clearContents before writing', () => {
+  const testFn = wsExists ? test : test.skip;
+
+  testFn('_refreshReportingData does NOT clearContents before writing', () => {
+    // Extract the _refreshReportingData function body
     const funcStart = wsCode.indexOf('function _refreshReportingData()');
     expect(funcStart).toBeGreaterThan(-1);
     const funcEnd = wsCode.indexOf('\n  }', funcStart + 100);
     const funcBody = wsCode.substring(funcStart, funcEnd);
+
+    // The old antipattern: report.clearContents() before setValues
+    // New pattern: setValues first, then clearContent only for stale rows
     expect(funcBody).not.toMatch(/clearContents\(\)[\s\S]*?setValues/);
   });
 
-  test('rate limit uses atomic check-and-record pattern', () => {
+  testFn('rate limit uses atomic check-and-record pattern', () => {
+    // _checkAndRecordRateLimit should exist (replaces separate check + record)
     expect(wsCode).toContain('function _checkAndRecordRateLimit');
+    // Old separate _recordRateLimitAttempt should NOT exist
     expect(wsCode).not.toContain('function _recordRateLimitAttempt');
+    // No separate _recordSubmission call
     expect(wsCode).not.toContain('function _recordSubmission');
   });
 
-  test('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
+  testFn('_checkSubmissionRateLimit delegates to _checkAndRecordRateLimit', () => {
     expect(wsCode).toMatch(/_checkAndRecordRateLimit\('SUBMIT_'/);
   });
 });
@@ -934,3 +945,95 @@ function countTopLevelArgs(str) {
 
   return count;
 }
+
+
+// ============================================================================
+// G15: MENU addItem REFERENCES RESOLVE IN PROD BUILD
+// ============================================================================
+// Reason: restoreConfigAndDropdowns was defined only in 07_DevTools.gs
+// (PROD_EXCLUDE) but referenced from 03_UIComponents.gs menu items and
+// quick-action HTML — causing "Script function not found" in production.
+
+describe('G15: Menu .addItem() function references exist in prod files', () => {
+  const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
+  const prodGsFiles = fs.readdirSync(SRC_DIR)
+    .filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
+
+  // Collect all top-level function definitions from prod-included .gs files
+  const prodFunctions = new Set();
+  prodGsFiles.forEach(file => {
+    const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
+    const regex = /^function\s+(\w+)\s*\(/gm;
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      prodFunctions.add(match[1]);
+    }
+  });
+
+  test('all .addItem() menu references resolve to prod-defined functions', () => {
+    const missing = [];
+
+    prodGsFiles.forEach(file => {
+      const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
+      const lines = code.split('\n');
+
+      // Track whether we're inside an !isProductionMode() block (dev-only code).
+      // These blocks contain menu items for dev-only functions that are
+      // intentionally excluded from prod builds.
+      let devOnlyDepth = 0;
+      let inDevBlock = false;
+
+      lines.forEach((line, idx) => {
+        // Detect entering guarded blocks — set flag but don't increment
+        // depth; the brace counter below handles the opening {
+        // Guards: !isProductionMode() (dev-only) and typeof X === 'function' (optional feature)
+        if (/if\s*\(\s*!isProductionMode\(\)\s*\)/.test(line) ||
+            /if\s*\(\s*typeof\s+\w+\s*===\s*'function'\s*\)/.test(line)) {
+          inDevBlock = true;
+        }
+        // Track braces for block scope
+        if (inDevBlock || devOnlyDepth > 0) {
+          const opens = (line.match(/\{/g) || []).length;
+          const closes = (line.match(/\}/g) || []).length;
+          devOnlyDepth += opens - closes;
+          if (devOnlyDepth <= 0) { devOnlyDepth = 0; inDevBlock = false; return; }
+          return; // Skip lines inside dev-only blocks
+        }
+
+        // Match .addItem('Label', 'functionName') patterns
+        const addItemMatch = line.match(/\.addItem\([^,]+,\s*'(\w+)'\s*\)/);
+        if (addItemMatch) {
+          const fnName = addItemMatch[1];
+          if (!prodFunctions.has(fnName)) {
+            missing.push(`${file}:${idx + 1} — .addItem references '${fnName}' which is not defined in any prod .gs file`);
+          }
+        }
+      });
+    });
+
+    expect(missing).toEqual([]);
+  });
+
+  test('all runAction() quick-action references resolve to prod-defined functions', () => {
+    const missing = [];
+
+    prodGsFiles.forEach(file => {
+      const code = fs.readFileSync(path.join(SRC_DIR, file), 'utf8');
+      const lines = code.split('\n');
+
+      lines.forEach((line, idx) => {
+        // Match runAction('functionName') patterns in HTML strings
+        const regex = /runAction\(\\?'(\w+)\\?'\)/g;
+        let match;
+        while ((match = regex.exec(line)) !== null) {
+          const fnName = match[1];
+          if (!prodFunctions.has(fnName)) {
+            missing.push(`${file}:${idx + 1} — runAction references '${fnName}' which is not defined in any prod .gs file`);
+          }
+        }
+      });
+    });
+
+    expect(missing).toEqual([]);
+  });
+});

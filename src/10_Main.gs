@@ -1300,51 +1300,57 @@ function syncConfigToSheetValidation_(e) {
   var configSheet = e.range.getSheet();
   var refreshed = false;
 
-  // Member Directory dropdowns
-  var memberDD = DROPDOWN_MAP.MEMBER_DIR;
-  for (var m = 0; m < memberDD.length; m++) {
-    if (memberDD[m].configCol === col) {
-      var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-      if (memberSheet) setDropdownValidation(memberSheet, memberDD[m].col, configSheet, col);
-      refreshed = true;
-      break;
-    }
-  }
-
-  // Grievance Log dropdowns
-  if (!refreshed) {
-    var grievDD = DROPDOWN_MAP.GRIEVANCE_LOG;
-    for (var g = 0; g < grievDD.length; g++) {
-      if (grievDD[g].configCol === col) {
-        var grievSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-        if (grievSheet) setDropdownValidation(grievSheet, grievDD[g].col, configSheet, col);
+  // Wrap validation refresh in try/catch — if a Config column exceeds 500 items,
+  // the validation call must not crash the onEdit handler.
+  try {
+    // Member Directory dropdowns
+    var memberDD = DROPDOWN_MAP.MEMBER_DIR;
+    for (var m = 0; m < memberDD.length; m++) {
+      if (memberDD[m].configCol === col) {
+        var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+        if (memberSheet) setDropdownValidation(memberSheet, memberDD[m].col, configSheet, col);
+        refreshed = true;
         break;
       }
     }
-  }
 
-  // Multi-select columns (Member Directory)
-  var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
-  for (var mm = 0; mm < memberMS.length; mm++) {
-    if (memberMS[mm].configCol === col) {
-      var msSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-      if (msSheet && typeof setMultiSelectValidation === 'function') {
-        setMultiSelectValidation(msSheet, memberMS[mm].col, configSheet, col);
+    // Grievance Log dropdowns
+    if (!refreshed) {
+      var grievDD = DROPDOWN_MAP.GRIEVANCE_LOG;
+      for (var g = 0; g < grievDD.length; g++) {
+        if (grievDD[g].configCol === col) {
+          var grievSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+          if (grievSheet) setDropdownValidation(grievSheet, grievDD[g].col, configSheet, col);
+          break;
+        }
       }
-      break;
     }
-  }
 
-  // Multi-select columns (Grievance Log)
-  var grievMS = MULTI_SELECT_COLS.GRIEVANCE_LOG;
-  for (var gm = 0; gm < grievMS.length; gm++) {
-    if (grievMS[gm].configCol === col) {
-      var gmsSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-      if (gmsSheet && typeof setMultiSelectValidation === 'function') {
-        setMultiSelectValidation(gmsSheet, grievMS[gm].col, configSheet, col);
+    // Multi-select columns (Member Directory)
+    var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
+    for (var mm = 0; mm < memberMS.length; mm++) {
+      if (memberMS[mm].configCol === col) {
+        var msSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+        if (msSheet && typeof setMultiSelectValidation === 'function') {
+          setMultiSelectValidation(msSheet, memberMS[mm].col, configSheet, col);
+        }
+        break;
       }
-      break;
     }
+
+    // Multi-select columns (Grievance Log)
+    var grievMS = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+    for (var gm = 0; gm < grievMS.length; gm++) {
+      if (grievMS[gm].configCol === col) {
+        var gmsSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+        if (gmsSheet && typeof setMultiSelectValidation === 'function') {
+          setMultiSelectValidation(gmsSheet, grievMS[gm].col, configSheet, col);
+        }
+        break;
+      }
+    }
+  } catch (_validationErr) {
+    log_('syncConfigToSheetValidation_', 'validation refresh failed: ' + (_validationErr.message || _validationErr));
   }
 }
 

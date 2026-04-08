@@ -589,10 +589,8 @@ describe('Dues status seed defaults', () => {
     expect(content).toContain("'Non Member'");
   });
 
-  test('07_DevTools.gs seeds include Non Member', () => {
-    const filePath = path.join(srcDir, '07_DevTools.gs');
-    if (!fs.existsSync(filePath)) return; // SolidBase may exclude
-    const content = fs.readFileSync(filePath, 'utf8');
+  test('06_Maintenance.gs seeds include Non Member', () => {
+    const content = fs.readFileSync(path.join(srcDir, '06_Maintenance.gs'), 'utf8');
     expect(content).toContain("'Non Member'");
   });
 });

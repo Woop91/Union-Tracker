@@ -259,6 +259,8 @@ module.exports = [
         isGrievanceId_: 'readonly',
         emitEditEvent: 'readonly',
         populateConfigFromSheetData: 'readonly',
+        seedConfigData: 'readonly',
+        restoreConfigAndDropdowns: 'readonly',
         restoreConfigFromSheetData_: 'readonly',
         _sanitizeConfig: 'readonly',
 

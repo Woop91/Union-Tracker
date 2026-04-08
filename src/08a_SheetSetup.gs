@@ -827,8 +827,7 @@ function setupDataValidations() {
  * @returns {void}
  */
 function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  // Get actual values from Config column (skip blanks) and use requireValueInList
-  // This avoids the 500-row fixed range issue that can cause empty entries in dropdowns
+  // Get actual values from Config column (skip blanks)
   var lastRow = configSheet.getLastRow();
   var values = [];
   if (lastRow >= 3) {
@@ -848,10 +847,24 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     return;
   }
 
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(values, true)
-    .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
-    .build();
+  // GAS requireValueInList has a hard 500-item limit.  Use it when under the
+  // limit (clean dropdown, no blank entries).  Fall back to requireValueInRange
+  // for larger lists — this references the Config range directly (no item cap)
+  // but may show blank entries if there are gaps in the Config column.
+  var rule;
+  if (values.length <= 500) {
+    rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(values, true)
+      .setAllowInvalid(true)
+      .build();
+  } else {
+    log_('setDropdownValidation', 'col ' + sourceCol + ' has ' + values.length + ' items (>500), using range reference');
+    var configRange = configSheet.getRange(3, sourceCol, lastRow - 2, 1);
+    rule = SpreadsheetApp.newDataValidation()
+      .requireValueInRange(configRange, true)
+      .setAllowInvalid(true)
+      .build();
+  }
 
   targetRange.setDataValidation(rule);
 }
@@ -865,7 +878,7 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
  * @returns {void}
  */
 function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  // Get actual values from Config column (skip blanks) and use requireValueInList
+  // Get actual values from Config column (skip blanks)
   var lastRow = configSheet.getLastRow();
   var values = [];
   if (lastRow >= 3) {
@@ -885,10 +898,21 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     return;
   }
 
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(values, true)
-    .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
-    .build();
+  // GAS requireValueInList has a hard 500-item limit (same guard as setDropdownValidation)
+  var rule;
+  if (values.length <= 500) {
+    rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(values, true)
+      .setAllowInvalid(true)
+      .build();
+  } else {
+    log_('setMultiSelectValidation', 'col ' + sourceCol + ' has ' + values.length + ' items (>500), using range reference');
+    var configRange = configSheet.getRange(3, sourceCol, lastRow - 2, 1);
+    rule = SpreadsheetApp.newDataValidation()
+      .requireValueInRange(configRange, true)
+      .setAllowInvalid(true)
+      .build();
+  }
 
   targetRange.setDataValidation(rule);
 }

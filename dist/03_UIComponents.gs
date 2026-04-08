@@ -126,8 +126,8 @@ function createDashboardMenu() {
   // ============================================================================
   // MENU 2: Tools — Features Used While Working
   // ============================================================================
-  ui.createMenu('🔧 Tools')
-    .addSubMenu(ui.createMenu('📧 Email & Notifications')
+  var toolsMenu = ui.createMenu('🔧 Tools');
+  toolsMenu.addSubMenu(ui.createMenu('📧 Email & Notifications')
       .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember')
       .addSeparator()
       .addItem('⚙️ Notification Settings', 'showNotificationSettings')
@@ -151,17 +151,20 @@ function createDashboardMenu() {
       .addItem('📁 View Grievance Files', 'showGrievanceFiles')
       .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders')
       .addSeparator()
-      .addItem('📁 Open Google Drive', 'openGoogleDrive'))
+      .addItem('📁 Open Google Drive', 'openGoogleDrive'));
 
-    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+  // Workload Tracker submenu — only if WorkloadService is available
+  if (typeof refreshWorkloadLedger === 'function') {
+    toolsMenu.addSubMenu(ui.createMenu('📊 Workload Tracker')
       .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
       .addItem('💾 Create Backup', 'createWorkloadBackup')
       .addItem('🗄️ Archive Old Data', 'wtArchiveOldData')
       .addItem('🧹 Clean Vault Dedup', 'wtCleanVault')
       .addSeparator()
-      .addItem('🩺 Health Status', 'showWorkloadHealthStatus'))
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus'));
+  }
 
-    .addSubMenu(ui.createMenu('📋 Surveys & Polls')
+  toolsMenu.addSubMenu(ui.createMenu('📋 Surveys & Polls')
       .addItem('📂 Open New Survey Period', 'menuOpenNewSurveyPeriod')
       .addItem('📊 View Current Period Status', 'menuShowSurveyPeriodStatus')
       .addItem('📊 View Survey Responses', 'showSurveyResponseViewer')
@@ -245,14 +248,18 @@ function createDashboardMenu() {
       .addItem('🔌 CC Disconnect', 'disconnectConstantContact')
       .addSeparator()
       .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
-      .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
+      .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'));
 
-    .addSubMenu(ui.createMenu('✅ Validation')
+  // Validation submenu — functions are in 07_DevTools.gs (dev-only)
+  if (!isProductionMode()) {
+    adminMenu.addSubMenu(ui.createMenu('✅ Validation')
       .addItem('🔍 Run Bulk Validation', 'runBulkValidation')
       .addItem('⚙️ Validation Settings', 'showValidationSettings')
       .addItem('🧹 Clear Indicators', 'clearValidationIndicators')
-      .addItem('⚡ Install Validation Trigger', 'installValidationTrigger'))
+      .addItem('⚡ Install Validation Trigger', 'installValidationTrigger'));
+  }
 
+  adminMenu
     .addSubMenu(ui.createMenu('⚙️ Automation')
       .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
       .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
@@ -282,7 +289,6 @@ function createDashboardMenu() {
       .addItem('--- INITIALIZE ALL ---', 'initializeDashboard')
       .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
       .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets')
-      .addItem('⚙️ Workload: Initialize Sheets', 'initWorkloadTrackerSheets')
       .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addSeparator()
@@ -291,12 +297,10 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
-      .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem')
       .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
       .addSeparator()
       .addItem('--- SYNC & REFRESH ---', 'syncAllData')
       .addItem('🔄 Sync All Data Now', 'syncAllData')
-      .addItem('🔍 Run Bulk Validation', 'runBulkValidation')
       .addItem('🔥 Force Global Refresh', 'refreshAllFormulas')
       .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
       .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
@@ -322,7 +326,6 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('🚀 Initialize Survey Engine', 'initSurveyEngine')
       .addItem('🏗️ Initialize Poll Sheets', 'wqInitSheets')
-      .addItem('⚙️ Workload: Initialize Sheets', 'initWorkloadTrackerSheets')
       .addItem('📝 Create Meeting Check-In Sheet', 'setupMeetingCheckInSheet')
       .addSeparator()
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
@@ -338,9 +341,7 @@ function createDashboardMenu() {
       .addItem('⏱️ Install Quarterly Trigger', 'setupQuarterlyTrigger')
       .addItem('⏱️ Install Weekly Reminder Trigger', 'setupWeeklyReminderTrigger')
       .addItem('⏱️ Install Community Poll Draw Trigger', 'setupCommunityPollTrigger')
-      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger')
-      .addSeparator()
-      .addItem('🔔 Workload: Setup Reminders', 'setupWorkloadReminderSystem'))
+      .addItem('🔓 Install onOpen Deferred Trigger', 'setupOpenDeferredTrigger'))
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
