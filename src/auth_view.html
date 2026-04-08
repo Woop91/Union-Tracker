@@ -251,29 +251,65 @@ function renderAuth(container) {
   // Magic link tokens are now transported via fragment instead of query string to
   // prevent exposure in server logs, browser history, and Referer headers.
   // The client extracts the token and validates it server-side via google.script.run.
-  var _fragToken = null;
-  var _fragRemember = false;
-  try {
-    var _hash = window.top.location.hash || window.location.hash || '';
-    // Parse fragment parameters — look specifically for 'token=' (magic link).
-    // Session tokens use query string (?sessionToken=) so the server can route correctly.
-    if (_hash) {
-      var _fragParts = _hash.substring(1).split('&');
-      for (var _fi = 0; _fi < _fragParts.length; _fi++) {
-        var _kv = _fragParts[_fi].split('=');
-        if (_kv[0] === 'token' && _kv[1]) _fragToken = decodeURIComponent(_kv[1]);
-        if (_kv[0] === 'remember' && _kv[1] === '1') _fragRemember = true;
-      }
-      // Clean fragment from URL immediately (security: prevent token lingering in address bar)
-      try {
-        if (window.top.history && window.top.history.replaceState) {
-          window.top.history.replaceState(null, '', window.top.location.pathname + window.top.location.search);
+  //
+  // IMPORTANT: GAS serves HtmlService pages inside a cross-origin sandboxed iframe
+  // (*.googleusercontent.com), so window.top.location.hash throws SecurityError.
+  // Use google.script.url.getLocation() — the GAS-sanctioned API for reading URL
+  // fragments from within the iframe sandbox.
+  if (typeof google !== 'undefined' && google.script && google.script.url) {
+    console.log('[Auth] Using google.script.url.getLocation() for fragment extraction');
+    google.script.url.getLocation(function(_location) {
+      console.log('[Auth] getLocation callback — hash:', _location.hash ? '(present, length=' + _location.hash.length + ')' : '(empty)');
+      var _fragToken = null;
+      var _fragRemember = false;
+      if (_location.hash) {
+        var _fragParts = _location.hash.split('&');
+        for (var _fi = 0; _fi < _fragParts.length; _fi++) {
+          var _kv = _fragParts[_fi].split('=');
+          if (_kv[0] === 'token' && _kv[1]) _fragToken = decodeURIComponent(_kv[1]);
+          if (_kv[0] === 'remember' && _kv[1] === '1') _fragRemember = true;
         }
-      } catch (_) { /* cross-origin iframe */ }
+      }
+      console.log('[Auth] Fragment token:', _fragToken ? '(found)' : '(none)', 'remember:', _fragRemember);
+      _renderAuthWithFragment(container, _fragToken, _fragRemember);
+    });
+  } else {
+    // Fallback for test/dev environments where google.script.url is unavailable
+    console.warn('[Auth] google.script.url unavailable — falling back to window.top.location.hash');
+    var _fragToken = null;
+    var _fragRemember = false;
+    try {
+      var _hash = window.top.location.hash || window.location.hash || '';
+      console.log('[Auth] Fallback hash:', _hash ? '(present)' : '(empty)');
+      if (_hash) {
+        var _fragParts = _hash.substring(1).split('&');
+        for (var _fi = 0; _fi < _fragParts.length; _fi++) {
+          var _kv = _fragParts[_fi].split('=');
+          if (_kv[0] === 'token' && _kv[1]) _fragToken = decodeURIComponent(_kv[1]);
+          if (_kv[0] === 'remember' && _kv[1] === '1') _fragRemember = true;
+        }
+      }
+    } catch (_fragErr) {
+      console.error('[Auth] Cross-origin hash read failed:', _fragErr.message);
     }
-  } catch (_fragErr) { /* cross-origin iframe — skip */ }
+    _renderAuthWithFragment(container, _fragToken, _fragRemember);
+  }
+}
+
+/**
+ * Continues auth rendering after fragment extraction.
+ * Separated from renderAuth because google.script.url.getLocation() is async.
+ */
+function _renderAuthWithFragment(container, _fragToken, _fragRemember) {
+  // Clean fragment from URL (security: prevent token lingering in address bar)
+  try {
+    if (window.top.history && window.top.history.replaceState) {
+      window.top.history.replaceState(null, '', window.top.location.pathname + window.top.location.search);
+    }
+  } catch (_) { /* cross-origin iframe */ }
 
   if (_fragToken) {
+    console.log('[Auth] Magic link token found — showing spinner and validating server-side');
     // Show a loading state while validating the magic link token
     container.innerHTML = '';
     var _mlWrap = el('div', { className: 'auth-container fade-in' });
@@ -285,23 +321,29 @@ function renderAuth(container) {
 
     google.script.run
       .withSuccessHandler(function(result) {
+        console.log('[Auth] authValidateMagicToken response:', result ? 'success=' + result.success + ', hasToken=' + !!(result.sessionToken) : '(null)');
         if (result && result.success && result.sessionToken) {
           if (WEB_APP_URL) {
+            console.log('[Auth] Redirecting to dashboard with session token');
             window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
           } else {
+            console.error('[Auth] WEB_APP_URL is empty — cannot redirect');
             showAuthError(container, 'No app URL available. Contact admin.');
           }
         } else {
+          console.warn('[Auth] Token validation failed:', result && result.message);
           showAuthError(container, (result && result.message) || 'This link has expired or was already used. Please request a new one.');
         }
       })
       .withFailureHandler(function(err) {
+        console.error('[Auth] authValidateMagicToken server error:', err && err.message);
         showAuthError(container, (err && err.message) || 'Could not verify sign-in link. Please try again.');
       })
       .authValidateMagicToken(_fragToken, _fragRemember);
     return; // Don't show the login form while validating
   }
 
+  console.log('[Auth] No magic link token — showing login form');
   showAuthChoose(container);
 }
 

@@ -154,11 +154,16 @@ var Auth = (function () {
       return { success: false, message: 'Web app URL could not be resolved. Please contact your administrator.' };
     }
 
-    // v4.51.1: Fragment-based transport — tokens in URL fragments (#) are never
-    // sent to the server in HTTP requests, never logged in server access logs,
-    // and never leaked via Referer headers. The client-side JS extracts the
-    // token from the fragment and validates it via google.script.run.
-    var linkParams = '#token=' + encodeURIComponent(token);
+    // Use query-string transport (?token=) so the server can validate the token
+    // directly in doGet → Auth.resolveUser (path 3) without any client-side JS.
+    // This is the most reliable approach — no dependency on iframe sandbox APIs
+    // or fragment preservation through GAS internal redirects.
+    //
+    // Previously used fragment-based transport (#token=) to avoid server logs /
+    // Referer leakage, but GAS serves pages inside a cross-origin sandboxed iframe
+    // where fragment access is unreliable, causing an auth redirect loop.
+    // The token is single-use and expires, so query-string exposure is acceptable.
+    var linkParams = '?token=' + encodeURIComponent(token);
     if (rememberMe) {
       linkParams += '&remember=1';
     }
