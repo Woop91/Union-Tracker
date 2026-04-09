@@ -21,7 +21,7 @@ function renderOrgHealthTree(appRoot) {
     container.appendChild(loadingDiv);
 
     // Fetch data
-    serverCall('dataGetOrgHealthScores', [SESSION_TOKEN], function(result) {
+    serverCall().withSuccessHandler(function(result) {
       container.innerHTML = '';
       if (!result || !result.success) {
         container.appendChild(el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px' } },
@@ -361,11 +361,11 @@ function renderOrgHealthTree(appRoot) {
       legend.appendChild(orgScoreEl);
       container.appendChild(legend);
 
-    }, function(err) {
+    }).withFailureHandler(function(err) {
       container.innerHTML = '';
       container.appendChild(el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px' } },
         'Failed to load org health data: ' + (err && err.message || String(err))));
-    });
+    }).dataGetOrgHealthScores(SESSION_TOKEN);
   });
 }
 </script>
