@@ -424,6 +424,9 @@ function _sanitizeConfig(config) {
         return until ? new Date(until).getTime() > Date.now() : false;
       } catch (_) { return false; }
     })(),
+    // v4.54.0: Org Health Tree + scoring config
+    enableOrgHealthTree: config.enableOrgHealthTree !== false,
+    blockedEmailDomains: config.blockedEmailDomains || ['.gov', '.us', '.ma'],
   };
 }
 
