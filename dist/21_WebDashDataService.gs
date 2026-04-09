@@ -5299,18 +5299,20 @@ var DataService = (function () {
       var composite       = ScoringService.calculateCompositeScore(engagementScore, profileScore, grievanceScore);
       var color           = ScoringService.getScoreColor(composite);
 
+      var displayName = showName ? (displayFirst + ' ' + (displayLast ? displayLast.charAt(0) + '.' : '')).trim() : null;
       scoredMembers.push({
-        email:          email,
-        firstName:      displayFirst,
-        lastName:       displayLast,
-        assignedSteward: assignedSteward,
+        id:             String(_col(row, memberIdCol)).trim() || email,
+        name:           displayName,
         score:          composite,
         color:          color,
-        memberId:       String(_col(row, memberIdCol)).trim(),
+        engagement:     Math.round(engagementScore),
+        profile:        Math.round(profileScore),
+        grievance:      Math.round(grievanceScore),
+        assignedSteward: assignedSteward,
       });
 
       if (!stewardGroups[assignedStewardLc]) {
-        stewardGroups[assignedStewardLc] = { steward: assignedSteward, members: [], avgScore: 0 };
+        stewardGroups[assignedStewardLc] = { name: assignedSteward, members: [], avgScore: 0 };
       }
       stewardGroups[assignedStewardLc].members.push(scoredMembers[scoredMembers.length - 1]);
     }
@@ -5330,7 +5332,7 @@ var DataService = (function () {
       stewardsArr.push(grp);
     }
 
-    stewardsArr.sort(function(a, b) { return (a.steward || '').localeCompare(b.steward || ''); });
+    stewardsArr.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
 
     var orgScore = totalCount > 0 ? Math.round(totalScore / totalCount) : 0;
     var thresholds = {

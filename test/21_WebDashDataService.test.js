@@ -1893,7 +1893,7 @@ describe('DataService.getOrgHealthScores', () => {
 
     const result = DataService.getOrgHealthScores('steward1@test.com', true);
     // steward1 has alice + bob, steward2 has carol, no-steward group has steward1 row
-    const stewardKeys = result.stewards.map(g => g.steward.toLowerCase());
+    const stewardKeys = result.stewards.map(g => g.name.toLowerCase());
     expect(stewardKeys).toContain('steward1@test.com');
     expect(stewardKeys).toContain('steward2@test.com');
   });
@@ -1908,12 +1908,12 @@ describe('DataService.getOrgHealthScores', () => {
 
     const result = DataService.getOrgHealthScores('steward1@test.com', true);
     // Find steward1's group
-    const grp = result.stewards.find(g => g.steward.toLowerCase() === 'steward1@test.com');
+    const grp = result.stewards.find(g => g.name.toLowerCase() === 'steward1@test.com');
     expect(grp).toBeDefined();
-    const alice = grp.members.find(m => m.email === 'alice@test.com');
+    // Steward sees names — should be non-null
+    const alice = grp.members.find(m => m.name && m.name.startsWith('Alice'));
     expect(alice).toBeDefined();
-    expect(alice.firstName).toBe('Alice');
-    expect(alice.lastName).toBe('A');
+    expect(alice.name).toContain('Alice');
   });
 
   test('member sees names only on own steward branch (isSteward=false)', () => {
@@ -1926,19 +1926,18 @@ describe('DataService.getOrgHealthScores', () => {
 
     // alice is assigned to steward1, so as alice she should see names in steward1's group
     const result = DataService.getOrgHealthScores('alice@test.com', false);
-    const grp1 = result.stewards.find(g => g.steward.toLowerCase() === 'steward1@test.com');
-    const grp2 = result.stewards.find(g => g.steward.toLowerCase() === 'steward2@test.com');
+    const grp1 = result.stewards.find(g => g.name.toLowerCase() === 'steward1@test.com');
+    const grp2 = result.stewards.find(g => g.name.toLowerCase() === 'steward2@test.com');
 
-    // alice's group: names visible
+    // alice's group: names visible (non-null)
     if (grp1) {
-      const aliceRec = grp1.members.find(m => m.email === 'alice@test.com');
-      if (aliceRec) expect(aliceRec.firstName).toBe('Alice');
+      const aliceRec = grp1.members.find(m => m.name && m.name.startsWith('Alice'));
+      if (aliceRec) expect(aliceRec.name).toContain('Alice');
     }
-    // steward2's group: names redacted
+    // steward2's group: names redacted (null)
     if (grp2) {
       grp2.members.forEach(function(m) {
-        expect(m.firstName).toBe('');
-        expect(m.lastName).toBe('');
+        expect(m.name).toBeNull();
       });
     }
   });
