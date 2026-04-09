@@ -1,5 +1,30 @@
 <script>
 
+function _validateContactFieldsClient(email, phone) {
+ var blocked = CONFIG.blockedEmailDomains || ['.gov', '.us', '.ma'];
+ if (typeof blocked === 'string') blocked = blocked.split(',').map(function(d) { return d.trim().toLowerCase(); });
+ if (email && email.trim()) {
+ var emailLower = email.trim().toLowerCase();
+ var atIdx = emailLower.lastIndexOf('@');
+ if (atIdx > -1) {
+  var domain = emailLower.substring(atIdx + 1);
+  for (var i = 0; i < blocked.length; i++) {
+  var suffix = blocked[i].toLowerCase();
+  if (domain === suffix.replace(/^\./, '') || domain.endsWith(suffix)) {
+   return { valid: false, field: 'email', error: 'Government email addresses (' + blocked.join(', ') + ') cannot be used. Please enter a personal email.' };
+  }
+  }
+ }
+ }
+ if (phone && phone.trim()) {
+ var digits = phone.replace(/[\s\-\(\)\.]/g, '');
+ if (digits.indexOf('617654') === 0) {
+  return { valid: false, field: 'phone', error: 'This phone number cannot be used. Please enter a personal phone number.' };
+ }
+ }
+ return { valid: true };
+}
+
 function initStewardView(container) {
  
  if (typeof _cleanupAuthEffects === 'function') _cleanupAuthEffects();
@@ -1888,6 +1913,10 @@ function _showMemberDetail(container, itemEl, member) {
  var panel = el('div', { className: 'member-detail-panel', style: { background: 'var(--raised)', padding: '12px 16px', borderRadius: '8px', marginBottom: '8px', borderLeft: '3px solid var(--accent)' } });
 
  
+ panel.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic', marginBottom: '8px', padding: '6px 8px', background: 'rgba(0,0,0,0.04)', borderRadius: '4px' } },
+ 'Member contact info is for internal chapter use only. Do not share phone, email, or address with third parties.'));
+
+ 
  var infoRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px 20px', marginBottom: '12px' } });
  var infoFields = [
  { label: 'Email', value: member.email || '—', missing: !member.email },
@@ -1936,6 +1965,13 @@ function _showMemberDetail(container, itemEl, member) {
    pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
    extraRow.appendChild(pair);
    });
+   
+   var consentPair = el('div', { style: { minWidth: '100px' } });
+   consentPair.appendChild(el('div', { className: 'text-label' }, 'Address Consent'));
+   var consentStatus = profile.shareAddressUnion === 'Yes' ? '\u2705 Consented to share with union' : '\u274C Has not consented';
+   consentPair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, consentStatus));
+   extraRow.appendChild(consentPair);
+
    
    
    if (profile.memberAdminFolderUrl) {
@@ -4311,6 +4347,7 @@ function renderStewardMore(appContainer) {
   { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { _handleTabNav('steward', 'tasks'); } },
   { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Steward caseload overview', _feat: 'workload', action: function() { _handleTabNav('steward', 'workload'); } },
   { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { _handleTabNav('steward', 'contactlog'); } },
+  { icon: '\uD83C\uDF33', label: 'Org Health', desc: 'Visual org health tree', _feat: 'orghealth', action: function() { _handleTabNav('steward', 'orghealth'); } },
   { group: 'Reference' },
   { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', _feat: 'poms', action: function() { _handleTabNav('steward', 'poms'); } },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { _handleTabNav('steward', 'resources'); } },
@@ -4334,6 +4371,7 @@ function renderStewardMore(appContainer) {
  menuItems = menuItems.filter(function(m) {
   if (m._feat === 'workload' && !CONFIG.hasWorkloadService) return false;
   if (m._feat === 'poms' && !CONFIG.hasPOMSReference) return false;
+  if (m._feat === 'orghealth' && !CONFIG.enableOrgHealthTree) return false;
   return true;
  });
 
@@ -6741,8 +6779,43 @@ function showAddMemberModal(onSuccess) {
  formArea.appendChild(_row(gFirst, gLast));
 
  
- var gEmail = _field('email', 'Email', false); gEmail.appendChild(_textInput('email', 'work@email.com', 'email'));
- var gPhone = _field('phone', 'Phone', false); gPhone.appendChild(_textInput('phone', '555-123-4567', 'tel'));
+ formArea.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic', marginBottom: '10px', padding: '6px 8px', background: 'rgba(0,0,0,0.04)', borderRadius: '4px' } },
+  'Phone and email are for internal chapter communication only and will not be shared outside the chapter.'));
+
+ 
+ var gEmail = _field('email', 'Email', false);
+ var emailInp = _textInput('email', 'work@email.com', 'email');
+ gEmail.appendChild(emailInp);
+ var addMbrEmailError = el('div', { className: 'field-error', style: { color: 'var(--danger, #f44336)', fontSize: '11px', marginTop: '2px', display: 'none' } });
+ gEmail.appendChild(addMbrEmailError);
+ emailInp.addEventListener('blur', function() {
+  var check = _validateContactFieldsClient(emailInp.value, '');
+  if (!check.valid && check.field === 'email') {
+  addMbrEmailError.textContent = check.error;
+  addMbrEmailError.style.display = '';
+  emailInp.style.borderColor = 'var(--danger, #f44336)';
+  } else {
+  addMbrEmailError.style.display = 'none';
+  emailInp.style.borderColor = '';
+  }
+ });
+
+ var gPhone = _field('phone', 'Phone', false);
+ var phoneInp = _textInput('phone', '555-123-4567', 'tel');
+ gPhone.appendChild(phoneInp);
+ var addMbrPhoneError = el('div', { className: 'field-error', style: { color: 'var(--danger, #f44336)', fontSize: '11px', marginTop: '2px', display: 'none' } });
+ gPhone.appendChild(addMbrPhoneError);
+ phoneInp.addEventListener('blur', function() {
+  var check = _validateContactFieldsClient('', phoneInp.value);
+  if (!check.valid && check.field === 'phone') {
+  addMbrPhoneError.textContent = check.error;
+  addMbrPhoneError.style.display = '';
+  phoneInp.style.borderColor = 'var(--danger, #f44336)';
+  } else {
+  addMbrPhoneError.style.display = 'none';
+  phoneInp.style.borderColor = '';
+  }
+ });
  formArea.appendChild(_row(gEmail, gPhone));
 
  
@@ -6785,6 +6858,13 @@ function showAddMemberModal(onSuccess) {
   var ln = inputs['lastName'].value.trim();
   if (!fn || !ln) {
    statusMsg.textContent = 'First and Last Name are required.';
+   statusMsg.style.color = 'var(--danger)';
+   return;
+  }
+  
+  var addMbrContactCheck = _validateContactFieldsClient(inputs['email'].value.trim(), inputs['phone'].value.trim());
+  if (!addMbrContactCheck.valid) {
+   statusMsg.textContent = addMbrContactCheck.error;
    statusMsg.style.color = 'var(--danger)';
    return;
   }
@@ -7001,6 +7081,26 @@ function showNMCModal(existing) {
  });
  inputs[f.id] = inp;
  group.appendChild(inp);
+ 
+ if (f.id === 'nmc-email' || f.id === 'nmc-phone') {
+  var nmcFieldError = el('div', { className: 'field-error', style: { color: 'var(--danger, #f44336)', fontSize: '11px', marginTop: '2px', display: 'none' } });
+  group.appendChild(nmcFieldError);
+  (function(input, errDiv, fieldId) {
+  input.addEventListener('blur', function() {
+   var checkEmail = fieldId === 'nmc-email' ? input.value : '';
+   var checkPhone = fieldId === 'nmc-phone' ? input.value : '';
+   var check = _validateContactFieldsClient(checkEmail, checkPhone);
+   if (!check.valid) {
+   errDiv.textContent = check.error;
+   errDiv.style.display = '';
+   input.style.borderColor = 'var(--danger, #f44336)';
+   } else {
+   errDiv.style.display = 'none';
+   input.style.borderColor = '';
+   }
+  });
+  })(inp, nmcFieldError, f.id);
+ }
  modal.appendChild(group);
  });
 
@@ -7084,6 +7184,12 @@ function showNMCModal(existing) {
   };
   if (!contactData.firstName && !contactData.lastName) {
   showToast('Name is required.', 'error');
+  return;
+  }
+  
+  var nmcContactCheck = _validateContactFieldsClient(contactData.email, contactData.phone);
+  if (!nmcContactCheck.valid) {
+  showToast(nmcContactCheck.error, 'error');
   return;
   }
   document.body.removeChild(overlay);

@@ -1,0 +1,371 @@
+<script>
+/**
+ * org_health_tree.html — Org Health Tree Visualization (v4.54.0)
+ *
+ * Renders an SVG tree where: trunk = org, branches = stewards, leaves = members.
+ * Leaf color reflects member health score (green/yellow/red).
+ * Leaf position is deterministic (hash of member ID).
+ */
+
+/* exported renderOrgHealthTree */
+function renderOrgHealthTree(appRoot) {
+  'use strict';
+
+  renderPageLayout(appRoot, AppState.activeRole, 'orghealth', function(container) {
+    container.innerHTML = '';
+
+    // Loading state
+    var loadingDiv = el('div', { className: 'loading-spinner', style: { textAlign: 'center', padding: '60px' } });
+    loadingDiv.appendChild(el('div', { style: { fontSize: '40px', marginBottom: '12px' } }, '\uD83C\uDF33'));
+    loadingDiv.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'Growing your org tree...'));
+    container.appendChild(loadingDiv);
+
+    // Fetch data
+    serverCall('dataGetOrgHealthScores', [SESSION_TOKEN], function(result) {
+      container.innerHTML = '';
+      if (!result || !result.success) {
+        container.appendChild(el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px' } },
+          'Unable to load org health data.'));
+        return;
+      }
+
+      var stewards = result.stewards || [];
+      var orgScore = result.orgScore || 0;
+      var thresholds = result.thresholds || { green: 70, yellow: 40 };
+      var totalMembers = stewards.reduce(function(sum, s) { return sum + s.members.length; }, 0);
+
+      if (totalMembers === 0) {
+        container.appendChild(el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px' } },
+          'No member data available for the org health tree.'));
+        return;
+      }
+
+      // ── Tree container ──
+      var treeWrap = el('div', { style: { position: 'relative', width: '100%', overflow: 'hidden' } });
+      container.appendChild(treeWrap);
+
+      // SVG dimensions
+      var width = Math.max(container.offsetWidth || 800, 600);
+      var height = Math.max(400, 200 + totalMembers * 3);
+      height = Math.min(height, 800); // cap
+
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', height + 'px');
+      svg.style.display = 'block';
+      treeWrap.appendChild(svg);
+
+      // ── Deterministic hash for leaf positioning ──
+      function hashId(id) {
+        var hash = 0;
+        var str = String(id);
+        for (var i = 0; i < str.length; i++) {
+          hash = ((hash << 5) - hash) + str.charCodeAt(i);
+          hash |= 0;
+        }
+        return Math.abs(hash);
+      }
+
+      // ── Draw trunk ──
+      var trunkX = width / 2;
+      var trunkY = height - 40;
+      var trunkW = Math.max(20, Math.min(40, totalMembers / 3));
+      var trunk = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      trunk.setAttribute('x', trunkX - trunkW / 2);
+      trunk.setAttribute('y', trunkY - 60);
+      trunk.setAttribute('width', trunkW);
+      trunk.setAttribute('height', 60);
+      trunk.setAttribute('rx', 5);
+      trunk.setAttribute('fill', '#6B4E13');
+      svg.appendChild(trunk);
+
+      // ── Ground ellipse ──
+      var ground = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      ground.setAttribute('cx', trunkX);
+      ground.setAttribute('cy', trunkY);
+      ground.setAttribute('rx', width * 0.4);
+      ground.setAttribute('ry', 12);
+      ground.setAttribute('fill', 'rgba(107,142,35,0.1)');
+      svg.appendChild(ground);
+
+      // ── Tooltip element ──
+      var tooltip = el('div', { style: {
+        position: 'absolute', display: 'none', padding: '8px 12px', background: 'rgba(0,0,0,0.9)',
+        borderRadius: '6px', fontSize: '11px', color: '#fff', pointerEvents: 'none', zIndex: '10',
+        maxWidth: '200px', lineHeight: '1.4', border: '1px solid rgba(255,255,255,0.15)'
+      }});
+      treeWrap.appendChild(tooltip);
+
+      // ── Determine caller's branch ──
+      var callerSteward = '';
+      if (CURRENT_USER && CURRENT_USER.assignedSteward) {
+        callerSteward = CURRENT_USER.assignedSteward.toLowerCase();
+      } else if (CURRENT_USER && CURRENT_USER.email) {
+        // Steward — find their own branch
+        for (var si = 0; si < stewards.length; si++) {
+          if (stewards[si].name.toLowerCase() === CURRENT_USER.email.toLowerCase()) {
+            callerSteward = stewards[si].name.toLowerCase();
+            break;
+          }
+        }
+      }
+
+      // ── Draw branches + leaves ──
+      var branchCount = stewards.length;
+      var angleSpread = Math.PI * 0.75; // 135 degrees total fan
+      var startAngle = Math.PI / 2 + angleSpread / 2; // start from upper-left
+
+      // Back button (hidden initially)
+      var backBtn = el('button', {
+        className: 'btn-secondary',
+        style: { display: 'none', position: 'absolute', top: '8px', left: '8px', fontSize: '12px', padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', zIndex: '5' },
+        onClick: function() { drawFullTree(); }
+      }, '\u2190 Back to full tree');
+      treeWrap.appendChild(backBtn);
+
+      var branchGroups = []; // Store SVG groups for zoom interaction
+
+      function drawFullTree() {
+        // Clear and redraw
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        svg.appendChild(ground);
+        svg.appendChild(trunk);
+        backBtn.style.display = 'none';
+        branchGroups = [];
+
+        for (var bi = 0; bi < branchCount; bi++) {
+          var steward = stewards[bi];
+          var angle = startAngle - (branchCount > 1 ? (bi / (branchCount - 1)) * angleSpread : 0);
+          var branchLen = Math.min(height * 0.5, 150 + steward.members.length * 5);
+          var bx = trunkX + Math.cos(angle) * branchLen;
+          var by = (trunkY - 60) - Math.sin(angle) * branchLen;
+
+          var isOwnBranch = steward.name.toLowerCase() === callerSteward;
+          var opacity = isOwnBranch ? 1 : 0.6;
+          var strokeW = Math.max(3, Math.min(8, steward.members.length / 2));
+
+          // Branch group
+          var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.setAttribute('opacity', opacity);
+          g.style.cursor = 'pointer';
+
+          // Branch line
+          var branchLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          branchLine.setAttribute('x1', trunkX);
+          branchLine.setAttribute('y1', trunkY - 60);
+          branchLine.setAttribute('x2', bx);
+          branchLine.setAttribute('y2', by);
+          branchLine.setAttribute('stroke', isOwnBranch ? '#8BC34A' : '#6B8E23');
+          branchLine.setAttribute('stroke-width', strokeW);
+          branchLine.setAttribute('stroke-linecap', 'round');
+          g.appendChild(branchLine);
+
+          // Branch label (steward name)
+          var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', bx);
+          label.setAttribute('y', by + 16);
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('fill', isOwnBranch ? '#8BC34A' : '#6B8E23');
+          label.setAttribute('font-size', '9');
+          label.setAttribute('font-family', 'sans-serif');
+          label.textContent = steward.name.split('@')[0]; // show name part before @
+          g.appendChild(label);
+
+          // Leaves
+          for (var li = 0; li < steward.members.length; li++) {
+            var m = steward.members[li];
+            var leafHash = hashId(m.id);
+            var leafAngle = angle + ((leafHash % 60) - 30) * (Math.PI / 180);
+            var leafDist = branchLen * 0.5 + (leafHash % Math.floor(branchLen * 0.5));
+            var lx = trunkX + Math.cos(leafAngle) * leafDist;
+            var ly = (trunkY - 60) - Math.sin(leafAngle) * leafDist;
+
+            var leaf = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            leaf.setAttribute('cx', lx);
+            leaf.setAttribute('cy', ly);
+            leaf.setAttribute('r', 10);
+            leaf.setAttribute('fill', m.color);
+            if (isOwnBranch) {
+              leaf.setAttribute('stroke', '#fff');
+              leaf.setAttribute('stroke-width', '1.5');
+            }
+            leaf.style.cursor = 'pointer';
+
+            // Tooltip on hover
+            (function(member, leafEl, leafX, leafY) {
+              leafEl.addEventListener('mouseenter', function(e) {
+                var lines = [];
+                if (member.name) lines.push('<strong>' + member.name + '</strong>');
+                lines.push('Score: ' + member.score);
+                lines.push('Engage: ' + member.engagement + ' | Profile: ' + member.profile + ' | Griev: ' + member.grievance);
+                tooltip.innerHTML = lines.join('<br>');
+                tooltip.style.display = '';
+                tooltip.style.left = (leafX - 60) + 'px';
+                tooltip.style.top = (leafY - 50) + 'px';
+              });
+              leafEl.addEventListener('mouseleave', function() {
+                tooltip.style.display = 'none';
+              });
+              // Touch support
+              leafEl.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                leafEl.dispatchEvent(new Event('mouseenter'));
+                setTimeout(function() { tooltip.style.display = 'none'; }, 3000);
+              });
+            })(m, leaf, lx, ly);
+
+            // Name label for own branch
+            if (isOwnBranch && m.name) {
+              var nameLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+              nameLabel.setAttribute('x', lx);
+              nameLabel.setAttribute('y', ly - 14);
+              nameLabel.setAttribute('text-anchor', 'middle');
+              nameLabel.setAttribute('fill', '#fff');
+              nameLabel.setAttribute('font-size', '8');
+              nameLabel.setAttribute('font-family', 'sans-serif');
+              nameLabel.textContent = m.name;
+              g.appendChild(nameLabel);
+            }
+
+            g.appendChild(leaf);
+          }
+
+          // Click branch to zoom
+          (function(group, stewardData, brIdx) {
+            group.addEventListener('click', function(e) {
+              if (e.target.tagName === 'circle') return; // leaf click = tooltip only
+              zoomToBranch(stewardData, brIdx);
+            });
+          })(g, steward, bi);
+
+          svg.appendChild(g);
+          branchGroups.push(g);
+        }
+      }
+
+      function zoomToBranch(steward, branchIdx) {
+        backBtn.style.display = '';
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+        // Zoomed branch: spread leaves out more
+        var centerX = width / 2;
+        var baseY = height - 80;
+        var branchTopY = 60;
+
+        // Trunk stub
+        var stub = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        stub.setAttribute('x', centerX - 15);
+        stub.setAttribute('y', baseY);
+        stub.setAttribute('width', 30);
+        stub.setAttribute('height', 40);
+        stub.setAttribute('rx', 5);
+        stub.setAttribute('fill', '#6B4E13');
+        svg.appendChild(stub);
+
+        // Main branch line
+        var bl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        bl.setAttribute('x1', centerX);
+        bl.setAttribute('y1', baseY);
+        bl.setAttribute('x2', centerX);
+        bl.setAttribute('y2', branchTopY);
+        bl.setAttribute('stroke', '#8BC34A');
+        bl.setAttribute('stroke-width', 8);
+        bl.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(bl);
+
+        // Steward label
+        var sl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        sl.setAttribute('x', centerX);
+        sl.setAttribute('y', baseY + 55);
+        sl.setAttribute('text-anchor', 'middle');
+        sl.setAttribute('fill', '#8BC34A');
+        sl.setAttribute('font-size', '13');
+        sl.setAttribute('font-weight', 'bold');
+        sl.setAttribute('font-family', 'sans-serif');
+        sl.textContent = steward.name.split('@')[0] + ' (' + steward.members.length + ' members, avg ' + steward.avgScore + ')';
+        svg.appendChild(sl);
+
+        // Spread leaves evenly
+        var memberCount = steward.members.length;
+        var availWidth = width * 0.7;
+        var cols = Math.ceil(Math.sqrt(memberCount * 1.5));
+        var rows = Math.ceil(memberCount / cols);
+        var cellW = availWidth / cols;
+        var cellH = (baseY - branchTopY - 60) / Math.max(rows, 1);
+        var startX = (width - availWidth) / 2;
+
+        for (var mi = 0; mi < memberCount; mi++) {
+          var m = steward.members[mi];
+          var col = mi % cols;
+          var row = Math.floor(mi / cols);
+          var lx = startX + col * cellW + cellW / 2;
+          var ly = branchTopY + 30 + row * cellH + cellH / 2;
+
+          var leaf = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          leaf.setAttribute('cx', lx);
+          leaf.setAttribute('cy', ly);
+          leaf.setAttribute('r', 14);
+          leaf.setAttribute('fill', m.color);
+          leaf.setAttribute('stroke', '#fff');
+          leaf.setAttribute('stroke-width', '2');
+          leaf.style.cursor = 'pointer';
+
+          // Tooltip
+          (function(member, leafEl, leafX, leafY) {
+            leafEl.addEventListener('mouseenter', function() {
+              var lines = [];
+              if (member.name) lines.push('<strong>' + member.name + '</strong>');
+              lines.push('Score: ' + member.score);
+              lines.push('Engage: ' + member.engagement + ' | Profile: ' + member.profile + ' | Griev: ' + member.grievance);
+              tooltip.innerHTML = lines.join('<br>');
+              tooltip.style.display = '';
+              tooltip.style.left = (leafX - 60) + 'px';
+              tooltip.style.top = (leafY - 55) + 'px';
+            });
+            leafEl.addEventListener('mouseleave', function() { tooltip.style.display = 'none'; });
+          })(m, leaf, lx, ly);
+
+          svg.appendChild(leaf);
+
+          // Name label (always shown in zoom for permitted names)
+          if (m.name) {
+            var nl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            nl.setAttribute('x', lx);
+            nl.setAttribute('y', ly + 24);
+            nl.setAttribute('text-anchor', 'middle');
+            nl.setAttribute('fill', '#ccc');
+            nl.setAttribute('font-size', '9');
+            nl.setAttribute('font-family', 'sans-serif');
+            nl.textContent = m.name;
+            svg.appendChild(nl);
+          }
+        }
+      }
+
+      // Draw initial full tree
+      drawFullTree();
+
+      // ── Legend + Org Score ──
+      var legend = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', marginTop: '8px' } });
+      var colorLegend = el('div', { style: { display: 'flex', gap: '16px', flexWrap: 'wrap' } });
+      colorLegend.appendChild(el('span', { style: { color: '#4CAF50', fontSize: '12px' } }, '\u25CF Healthy (' + thresholds.green + '\u2013100)'));
+      colorLegend.appendChild(el('span', { style: { color: '#FFC107', fontSize: '12px' } }, '\u25CF Moderate (' + thresholds.yellow + '\u2013' + (thresholds.green - 1) + ')'));
+      colorLegend.appendChild(el('span', { style: { color: '#f44336', fontSize: '12px' } }, '\u25CF Needs Attention (0\u2013' + (thresholds.yellow - 1) + ')'));
+      legend.appendChild(colorLegend);
+
+      var scoreColor = orgScore >= thresholds.green ? '#4CAF50' : orgScore >= thresholds.yellow ? '#FFC107' : '#f44336';
+      var orgScoreEl = el('div', { style: { textAlign: 'right' } });
+      orgScoreEl.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '12px' } }, 'Org Score: '));
+      orgScoreEl.appendChild(el('span', { style: { color: scoreColor, fontSize: '22px', fontWeight: 'bold' } }, String(orgScore)));
+      legend.appendChild(orgScoreEl);
+      container.appendChild(legend);
+
+    }, function(err) {
+      container.innerHTML = '';
+      container.appendChild(el('div', { className: 'empty-state', style: { textAlign: 'center', padding: '40px' } },
+        'Failed to load org health data: ' + (err && err.message || String(err))));
+    });
+  });
+}
+</script>

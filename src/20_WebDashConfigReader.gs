@@ -99,6 +99,21 @@ var ConfigReader = (function () {
       insightsCacheTTLMin: Number(_readRow(CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN) || 5) || 5,
       // Broadcast scope: 'yes' = stewards can send to all members, 'no' (default) = assigned only
       broadcastScopeAll:   _readRow(CONFIG_COLS.BROADCAST_SCOPE_ALL) || 'no',
+      // Blocked email domains for contact validation (comma-separated, e.g. '.gov,.us,.ma')
+      blockedEmailDomains: (_readRow(CONFIG_COLS.BLOCKED_EMAIL_DOMAINS) || '.gov,.us,.ma')
+        .split(',').map(function(d) { return d.trim().toLowerCase(); }).filter(Boolean),
+      // Scoring engine config (v4.54.0)
+      scoreWeightEngagement:   Number(_readRow(CONFIG_COLS.SCORE_WEIGHT_ENGAGEMENT)) || 70,
+      scoreWeightProfile:      Number(_readRow(CONFIG_COLS.SCORE_WEIGHT_PROFILE)) || 20,
+      scoreWeightGrievance:    Number(_readRow(CONFIG_COLS.SCORE_WEIGHT_GRIEVANCE)) || 10,
+      scoreThresholdGreen:     Number(_readRow(CONFIG_COLS.SCORE_THRESHOLD_GREEN)) || 70,
+      scoreThresholdYellow:    Number(_readRow(CONFIG_COLS.SCORE_THRESHOLD_YELLOW)) || 40,
+      grievanceScoreDirection: _readRow(CONFIG_COLS.GRIEVANCE_SCORE_DIRECTION) || 'Negative',
+      maxVolunteerHours:       Number(_readRow(CONFIG_COLS.MAX_VOLUNTEER_HOURS)) || 20,
+      // Org Health Tree config (v4.54.0)
+      enableOrgHealthTree:     (_readRow(CONFIG_COLS.ENABLE_ORG_HEALTH_TREE) || 'yes').toLowerCase() !== 'no',
+      memberBranchAssignment:  _readRow(CONFIG_COLS.MEMBER_BRANCH_ASSIGNMENT) || 'Manual',
+      stewardLocationMap:      _readRow(CONFIG_COLS.STEWARD_LOCATION_MAP) || '',
       // Org links — from Config tab columns
       calendarId:          _readRow(CONFIG_COLS.CALENDAR_ID) || '',
       driveFolderId:       _readRow(CONFIG_COLS.DRIVE_FOLDER_ID) || '',

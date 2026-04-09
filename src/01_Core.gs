@@ -333,7 +333,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.52.1",
+  VERSION: "4.54.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -511,8 +511,8 @@ var VERSION_INFO = (function() {
     PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 0,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-04-05',
-    codename: 'Agent Audit'
+    BUILD_DATE: '2026-04-09',
+    codename: 'Org Health Tree'
   };
 })();
 
@@ -1195,6 +1195,7 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'MANAGER',            header: 'Director' },
   { key: 'IS_STEWARD',         header: 'Is Steward' },
   { key: 'SHARE_PHONE',        header: 'Share Phone' },       // Opt-in: steward allows members to see their phone number (Yes/No)
+  { key: 'SHARE_ADDRESS_UNION', header: 'Share Address With Union' },  // Opt-in: member consents to share mailing address with parent union for election ballots (Yes/No)
   { key: 'COMMITTEES',         header: 'Committees' },
   { key: 'ASSIGNED_STEWARD',   header: 'Assigned Steward' },
   { key: 'LAST_VIRTUAL_MTG',   header: 'Last Virtual Mtg' },
@@ -1486,7 +1487,20 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'BROADCAST_SCOPE_ALL',   header: 'Broadcast: Allow All Members Scope', type: 'boolean' },
   { key: 'ENABLE_CORRELATION',    header: 'Enable Correlation Engine',         type: 'boolean' },
   { key: 'ENABLE_TAB_MODALS',     header: 'Enable Tab Modals',                type: 'boolean' },
+  { key: 'BLOCKED_EMAIL_DOMAINS', header: 'Blocked Email Domains',            type: 'text' },
   { key: 'INSIGHTS_CACHE_TTL_MIN', header: 'Insights Cache TTL (Minutes)',    type: 'number' },
+  // ── SCORING ENGINE (v4.54.0) ──
+  { key: 'SCORE_WEIGHT_ENGAGEMENT',   header: 'Score Weight: Engagement',        type: 'number' },
+  { key: 'SCORE_WEIGHT_PROFILE',      header: 'Score Weight: Profile',           type: 'number' },
+  { key: 'SCORE_WEIGHT_GRIEVANCE',    header: 'Score Weight: Grievance',         type: 'number' },
+  { key: 'SCORE_THRESHOLD_GREEN',     header: 'Score Threshold: Green',          type: 'number' },
+  { key: 'SCORE_THRESHOLD_YELLOW',    header: 'Score Threshold: Yellow',         type: 'number' },
+  { key: 'GRIEVANCE_SCORE_DIRECTION', header: 'Grievance Score Direction',       type: 'text' },
+  { key: 'MAX_VOLUNTEER_HOURS',       header: 'Max Volunteer Hours',             type: 'number' },
+  // ── ORG HEALTH TREE (v4.54.0) ──
+  { key: 'ENABLE_ORG_HEALTH_TREE',    header: 'Enable Org Health Tree',          type: 'boolean' },
+  { key: 'MEMBER_BRANCH_ASSIGNMENT',  header: 'Member Branch Assignment',        type: 'text' },
+  { key: 'STEWARD_LOCATION_MAP',      header: 'Steward Location Map',            type: 'text' },
 
   // ── RETENTION (CB–CC) ── auto-archival thresholds
   { key: 'GRIEVANCE_ARCHIVE_DAYS', header: 'Grievance Archive Days',           type: 'days' },

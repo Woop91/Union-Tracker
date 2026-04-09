@@ -190,7 +190,7 @@ describe('_migrateOrphanedColumns', () => {
 
   test('detects extra trailing columns when headers match', () => {
     const headers = getHeadersFromMap_(CONFIG_HEADER_MAP_);
-    headers.push('Old Orphan 1', 'Old Orphan 2'); // 81 columns
+    headers.push('Old Orphan 1', 'Old Orphan 2'); // 82 columns (after BLOCKED_EMAIL_DOMAINS added)
     let deletedCols = [];
     let batchDeleted = [];
     const mockSheet = {
@@ -409,7 +409,7 @@ describe('createMemberDirectory creates sheet with correct headers', () => {
 
     expect(() => createMemberDirectory(ss)).not.toThrow();
     expect(capturedHeaders).not.toBeNull();
-    expect(capturedHeaders.length).toBe(45);
+    expect(capturedHeaders.length).toBe(46);
     expect(capturedHeaders[0]).toBe('Member ID');
     expect(capturedHeaders[1]).toBe('First Name');
     expect(capturedHeaders[2]).toBe('Last Name');
@@ -499,7 +499,7 @@ describe('_addMissingMemberHeaders_ behavioral', () => {
     const partialHeaders = getMemberHeaders().slice(0, 3);
     const sheet = createMockSheet(SHEETS.MEMBER_DIR, [partialHeaders]);
     const result = _addMissingMemberHeaders_(sheet);
-    expect(result.length).toBe(42); // 45 - 3 = 42 missing
+    expect(result.length).toBe(43); // 46 - 3 = 43 missing
     expect(result).toContain('Email');
     expect(result).toContain('Phone');
     expect(result).toContain('Is Steward');
@@ -514,7 +514,7 @@ describe('_addMissingMemberHeaders_ behavioral', () => {
     expect(result).not.toContain('Member ID');
     expect(result).not.toContain('First Name');
     expect(result).not.toContain('Last Name');
-    expect(result.length).toBe(42); // 45 - 3 = 42 missing
+    expect(result.length).toBe(43); // 46 - 3 = 43 missing
   });
 });
 

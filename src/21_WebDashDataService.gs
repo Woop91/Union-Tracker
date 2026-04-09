@@ -70,6 +70,7 @@ var DataService = (function () {
     memberJobTitle:  ['job title', 'title', 'position'],
     memberAdminFolderUrl: ['member admin folder url', 'member admin folder', 'contact log folder url'],  // 'contact log folder url' retained as fallback alias for backward compat
     memberSharePhone:    ['share phone', 'share phone number', 'phone visible', 'public phone', 'share contact'],
+    memberShareAddressUnion: ['share address with union'],
     memberCubicle:       ['cubicle', 'cube', 'workstation'],
     memberEmployeeId:    ['employee id', 'employee number', 'emp id', 'emp no'],
     memberHireDate:      ['hire date', 'date hired', 'start date'],
@@ -438,6 +439,7 @@ var DataService = (function () {
       hireDate: user.hireDate || '',
       openRate: user.openRate || '',
       shirtSize: user.shirtSize || '',
+      shareAddressUnion: user.shareAddressUnion || 'No',
     };
   }
 
@@ -463,16 +465,20 @@ var DataService = (function () {
 
     // Editable field mappings
     var editableFields = {
-      phone:        HEADERS.memberPhone,        // v4.51.1: member can update phone (BUG-3-001)
-      street:       HEADERS.memberStreet,
-      city:         HEADERS.memberCity,
-      state:        HEADERS.memberState,
-      zip:          HEADERS.memberZip,
-      workLocation: HEADERS.memberWorkLocation,
-      officeDays:   HEADERS.memberOfficeDays,
-      sharePhone:   HEADERS.memberSharePhone,   // steward opt-in: phone visible to members
-      shirtSize:    HEADERS.memberShirtSize,    // member shirt size (self-service)
+      phone:             HEADERS.memberPhone,        // v4.51.1: member can update phone (BUG-3-001)
+      street:            HEADERS.memberStreet,
+      city:              HEADERS.memberCity,
+      state:             HEADERS.memberState,
+      zip:               HEADERS.memberZip,
+      workLocation:      HEADERS.memberWorkLocation,
+      officeDays:        HEADERS.memberOfficeDays,
+      sharePhone:        HEADERS.memberSharePhone,        // steward opt-in: phone visible to members
+      shareAddressUnion: HEADERS.memberShareAddressUnion, // v4.53.0: mailing address opt-in for parent union
+      shirtSize:         HEADERS.memberShirtSize,    // member shirt size (self-service)
     };
+
+    var contactCheck = _validateContactFields(updates.email, updates.phone);
+    if (!contactCheck.valid) { return { success: false, message: contactCheck.error }; }
 
     for (var i = 1; i < data.length; i++) {
       var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
@@ -538,7 +544,12 @@ var DataService = (function () {
       workLocation: HEADERS.memberWorkLocation,
       jobTitle:     HEADERS.memberJobTitle,
       officeDays:   HEADERS.memberOfficeDays,
+      email:        HEADERS.memberEmail,    // v4.53.0: steward can correct member email
+      phone:        HEADERS.memberPhone,    // v4.53.0: steward can correct member phone
     };
+
+    var contactCheck = _validateContactFields(updates.email, updates.phone);
+    if (!contactCheck.valid) { return { success: false, message: contactCheck.error }; }
 
     for (var i = 1; i < data.length; i++) {
       var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
@@ -1575,7 +1586,7 @@ var DataService = (function () {
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
       if (!rec.email && !rec.name) continue;
-      members.push({
+      members.push(_stripAddressFields({
         name: rec.name,
         email: rec.email,
         role: rec.role,
@@ -1591,7 +1602,7 @@ var DataService = (function () {
         supervisor: rec.supervisor,
         jobTitle: rec.jobTitle,
         assignedSteward: stewardCol !== -1 ? String(data[i][stewardCol]).trim() : '',
-      });
+      }));
     }
     members.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
     return members;
@@ -2066,6 +2077,11 @@ var DataService = (function () {
       })(),
       openRate: String(_getVal(row, colMap, HEADERS.memberOpenRate, '')).trim(),
       shirtSize: String(_getVal(row, colMap, HEADERS.memberShirtSize, '')).trim(),
+      shareAddressUnion: (function() {
+        var raw = _getVal(row, colMap, HEADERS.memberShareAddressUnion, null);
+        if (raw === null || raw === '') return 'No';
+        return String(raw).trim();
+      })(),
     };
   }
 
@@ -4556,7 +4572,7 @@ var DataService = (function () {
 
     var items = pageIndices.map(function(rowIdx) {
       var rec = _buildUserRecord(data[rowIdx], colMap);
-      return {
+      return _stripAddressFields({
         name: rec.name,
         email: rec.email,
         workLocation: rec.workLocation,
@@ -4566,7 +4582,7 @@ var DataService = (function () {
         duesStatus: rec.duesStatus,
         hasOpenGrievance: rec.hasOpenGrievance,
         assignedSteward: stewardCol !== -1 ? String(data[rowIdx][stewardCol]).trim() : ''
-      };
+      });
     });
 
     return { items: items, total: total, page: page, pageSize: pageSize, totalPages: totalPages };
@@ -5134,6 +5150,197 @@ var DataService = (function () {
     return { success: false, error: 'Contact not found.' };
   }
 
+  /**
+   * Validates email and phone fields against blocked-domain and phone-prefix rules.
+   * Returns {valid:true} when both fields pass, or {valid:false, field, error} on the
+   * first failure so callers can surface a targeted error to the user.
+   * @param {string|undefined} email
+   * @param {string|undefined} phone
+   * @returns {{ valid: boolean, field?: string, error?: string }}
+   */
+  /**
+   * Strips mailing address fields from a member object before bulk export.
+   * Ensures street, city, state, and zip are never included in getAllMembers /
+   * getMembersPaginated responses that may be consumed by client-side exports.
+   * @param {Object} obj
+   * @returns {Object} obj (mutated in-place for convenience)
+   */
+  function _stripAddressFields(obj) {
+    if (!obj) return obj;
+    delete obj.street; delete obj.streetAddress;
+    delete obj.city;   delete obj.state;
+    delete obj.zip;    delete obj.zipCode;
+    return obj;
+  }
+
+  function _validateContactFields(email, phone) {
+    if (email && typeof email === 'string' && email.trim()) {
+      var emailLower = email.trim().toLowerCase();
+      var atIdx = emailLower.lastIndexOf('@');
+      if (atIdx > -1) {
+        var domain = emailLower.substring(atIdx + 1);
+        var blocked = [];
+        try { blocked = ConfigReader.getConfig().blockedEmailDomains || []; } catch (_e) { blocked = ['.gov', '.us', '.ma']; }
+        for (var i = 0; i < blocked.length; i++) {
+          var suffix = blocked[i].toLowerCase();
+          if (domain === suffix.replace(/^\./, '') || domain.endsWith(suffix)) {
+            return { valid: false, field: 'email', error: 'Government email addresses (' + blocked.join(', ') + ') cannot be used. Please enter a personal email.' };
+          }
+        }
+      }
+    }
+    if (phone && typeof phone === 'string' && phone.trim()) {
+      var digits = phone.replace(/[\s\-\(\)\.]/g, '');
+      if (digits.indexOf('617654') === 0) {
+        return { valid: false, field: 'phone', error: 'This phone number cannot be used. Please enter a personal phone number.' };
+      }
+    }
+    return { valid: true };
+  }
+
+  // ── v4.54.0: Org Health Scores ──────────────────────────────────────────────
+  /**
+   * Returns org health scores grouped by steward.
+   * Role-based name filtering: stewards see all names; members see names only
+   * for their own assigned steward's group.
+   *
+   * @param {string} callerEmail - Email of the calling user
+   * @param {boolean} isSteward - Whether caller has steward role
+   * @returns {{ stewards: Array, orgScore: number, thresholds: Object }}
+   */
+  function getOrgHealthScores(callerEmail, isSteward) {
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return { stewards: [], orgScore: 0, thresholds: {} };
+
+    var data = cached.data;
+    var colMap = cached.colMap;
+    var config = ConfigReader.getConfig();
+
+    // Column lookups
+    var emailCol      = _findColumn(colMap, HEADERS.memberEmail);
+    var firstNameCol  = _findColumn(colMap, HEADERS.memberFirstName);
+    var lastNameCol   = _findColumn(colMap, HEADERS.memberLastName);
+    var stewardCol    = _findColumn(colMap, HEADERS.memberAssignedSteward);
+    var phoneCol      = _findColumn(colMap, HEADERS.memberPhone);
+    var streetCol     = _findColumn(colMap, HEADERS.memberStreet);
+    var cityCol       = _findColumn(colMap, HEADERS.memberCity);
+    var stateCol      = _findColumn(colMap, HEADERS.memberState);
+    var zipCol        = _findColumn(colMap, HEADERS.memberZip);
+    var shirtCol      = _findColumn(colMap, HEADERS.memberShirtSize);
+    var officeDaysCol = _findColumn(colMap, HEADERS.memberOfficeDays);
+    var openRateCol   = _findColumn(colMap, HEADERS.memberOpenRate);
+    var grievanceCol  = _findColumn(colMap, HEADERS.memberHasOpenGrievance);
+    var memberIdCol   = _findColumn(colMap, HEADERS.memberId);
+    // Columns without HEADERS aliases
+    var volunteerHoursCol = _findColumn(colMap, ['volunteer hours', 'volunteer_hours']);
+    var committeesCol     = _findColumn(colMap, ['committees', 'committee']);
+    var preferredCommCol  = _findColumn(colMap, ['preferred communication', 'preferred comm', 'preferred_communication']);
+    var bestTimeCol       = _findColumn(colMap, ['best time to contact', 'best time', 'best_time']);
+
+    function _col(row, col) {
+      return (col !== -1 && col < row.length) ? row[col] : '';
+    }
+
+    var stewardGroups = {};
+    var callerLc = String(callerEmail || '').trim().toLowerCase();
+
+    // Determine which steward group the caller belongs to (for member role filtering)
+    var callerSteward = '';
+    if (!isSteward) {
+      for (var r = 1; r < data.length; r++) {
+        var rowEmail = String(_col(data[r], emailCol)).trim().toLowerCase();
+        if (rowEmail === callerLc) {
+          callerSteward = String(_col(data[r], stewardCol)).trim().toLowerCase();
+          break;
+        }
+      }
+    }
+
+    var scoredMembers = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var email = String(_col(row, emailCol)).trim().toLowerCase();
+      if (!email) continue;
+
+      var assignedSteward = String(_col(row, stewardCol)).trim();
+      var assignedStewardLc = assignedSteward.toLowerCase();
+      var firstName = String(_col(row, firstNameCol)).trim();
+      var lastName = String(_col(row, lastNameCol)).trim();
+
+      // Role-based name filtering
+      var showName = isSteward || (assignedStewardLc === callerSteward && callerSteward !== '');
+      var displayFirst = showName ? firstName : '';
+      var displayLast  = showName ? lastName  : '';
+
+      // Build profile fields object
+      var profileFields = {
+        phone:         String(_col(row, phoneCol)).trim(),
+        email:         email,
+        street:        String(_col(row, streetCol)).trim(),
+        city:          String(_col(row, cityCol)).trim(),
+        state:         String(_col(row, stateCol)).trim(),
+        zip:           String(_col(row, zipCol)).trim(),
+        shirtSize:     String(_col(row, shirtCol)).trim(),
+        preferredComm: String(_col(row, preferredCommCol)).trim(),
+        bestTime:      String(_col(row, bestTimeCol)).trim(),
+        officeDays:    String(_col(row, officeDaysCol)).trim(),
+      };
+
+      var volunteerHours = _col(row, volunteerHoursCol);
+      var openRate       = _col(row, openRateCol);
+      var committees     = _col(row, committeesCol);
+      var hasGrievanceRaw = String(_col(row, grievanceCol)).trim().toLowerCase();
+      var hasOpenGrievance = (hasGrievanceRaw === 'yes' || hasGrievanceRaw === 'true' || hasGrievanceRaw === '1');
+
+      var engagementScore = ScoringService.calculateEngagementScore(volunteerHours, openRate, committees);
+      var profileScore    = ScoringService.calculateProfileScore(profileFields);
+      var grievanceScore  = ScoringService.calculateGrievanceScore(hasOpenGrievance, '', 30, config.grievanceScoreDirection || 'Negative');
+      var composite       = ScoringService.calculateCompositeScore(engagementScore, profileScore, grievanceScore);
+      var color           = ScoringService.getScoreColor(composite);
+
+      scoredMembers.push({
+        email:          email,
+        firstName:      displayFirst,
+        lastName:       displayLast,
+        assignedSteward: assignedSteward,
+        score:          composite,
+        color:          color,
+        memberId:       String(_col(row, memberIdCol)).trim(),
+      });
+
+      if (!stewardGroups[assignedStewardLc]) {
+        stewardGroups[assignedStewardLc] = { steward: assignedSteward, members: [], avgScore: 0 };
+      }
+      stewardGroups[assignedStewardLc].members.push(scoredMembers[scoredMembers.length - 1]);
+    }
+
+    // Compute per-steward avg scores
+    var stewardsArr = [];
+    var totalScore = 0;
+    var totalCount = 0;
+    for (var s in stewardGroups) {
+      if (!Object.prototype.hasOwnProperty.call(stewardGroups, s)) continue;
+      var grp = stewardGroups[s];
+      var grpTotal = 0;
+      for (var m = 0; m < grp.members.length; m++) { grpTotal += grp.members[m].score; }
+      grp.avgScore = grp.members.length > 0 ? Math.round(grpTotal / grp.members.length) : 0;
+      totalScore += grpTotal;
+      totalCount += grp.members.length;
+      stewardsArr.push(grp);
+    }
+
+    stewardsArr.sort(function(a, b) { return (a.steward || '').localeCompare(b.steward || ''); });
+
+    var orgScore = totalCount > 0 ? Math.round(totalScore / totalCount) : 0;
+    var thresholds = {
+      green: config.scoreThresholdGreen || 70,
+      yellow: config.scoreThresholdYellow || 40,
+    };
+
+    return { stewards: stewardsArr, orgScore: orgScore, thresholds: thresholds };
+  }
+
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -5231,6 +5438,12 @@ var DataService = (function () {
     addNonMemberContact: addNonMemberContact,
     updateNonMemberContact: updateNonMemberContact,
     deleteNonMemberContact: deleteNonMemberContact,
+    // v4.53.0 — Contact field validation
+    _validateContactFields: _validateContactFields,
+    // v4.53.0 — Export protection: strip mailing address fields from bulk returns
+    _stripAddressFields: _stripAddressFields,
+    // v4.54.0 — Org Health Scores batch endpoint
+    getOrgHealthScores: getOrgHealthScores,
   };
 
 })();

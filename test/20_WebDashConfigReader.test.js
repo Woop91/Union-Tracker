@@ -228,6 +228,78 @@ describe('ConfigReader.getConfig', function () {
     var cfg = ConfigReader.getConfig(true);
     expect(cfg.orgName).toBe('Test Organization');
   });
+
+  // ── Scoring engine config defaults (v4.54.0) ──
+
+  test('scoreWeightEngagement defaults to 70', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.scoreWeightEngagement).toBe(70);
+  });
+
+  test('scoreWeightProfile defaults to 20', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.scoreWeightProfile).toBe(20);
+  });
+
+  test('scoreWeightGrievance defaults to 10', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.scoreWeightGrievance).toBe(10);
+  });
+
+  test('scoreThresholdGreen defaults to 70', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.scoreThresholdGreen).toBe(70);
+  });
+
+  test('scoreThresholdYellow defaults to 40', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.scoreThresholdYellow).toBe(40);
+  });
+
+  test('grievanceScoreDirection defaults to Negative', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.grievanceScoreDirection).toBe('Negative');
+  });
+
+  test('maxVolunteerHours defaults to 20', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.maxVolunteerHours).toBe(20);
+  });
+
+  // ── Org Health Tree config defaults (v4.54.0) ──
+
+  test('enableOrgHealthTree defaults to true when empty', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.enableOrgHealthTree).toBe(true);
+  });
+
+  test('enableOrgHealthTree is false when config value is no', function () {
+    var configSheet = buildMockConfigSheet({
+      [CONFIG_COLS.ENABLE_ORG_HEALTH_TREE]: 'no'
+    });
+    installMockSpreadsheet(configSheet);
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.enableOrgHealthTree).toBe(false);
+  });
+
+  test('memberBranchAssignment defaults to Manual', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.memberBranchAssignment).toBe('Manual');
+  });
+
+  test('stewardLocationMap defaults to empty string', function () {
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.stewardLocationMap).toBe('');
+  });
+
+  test('reads scoreWeightEngagement from config when set', function () {
+    var configSheet = buildMockConfigSheet({
+      [CONFIG_COLS.SCORE_WEIGHT_ENGAGEMENT]: '80'
+    });
+    installMockSpreadsheet(configSheet);
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.scoreWeightEngagement).toBe(80);
+  });
 });
 
 // ============================================================================
@@ -425,5 +497,67 @@ describe('_deriveAbbrev (via getConfig)', function () {
 
     var cfg = ConfigReader.getConfig(true);
     expect(cfg.orgAbbrev).toBe('My Organization');
+  });
+});
+
+// ============================================================================
+// blockedEmailDomains
+// ============================================================================
+
+describe('ConfigReader.getConfig — blockedEmailDomains', function () {
+
+  test('returns default domains when config row is empty', function () {
+    var configSheet = buildMockConfigSheet({
+      [CONFIG_COLS.ORG_NAME]: 'Test Org'
+    });
+    installMockSpreadsheet(configSheet);
+
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.blockedEmailDomains).toEqual(['.gov', '.us', '.ma']);
+  });
+
+  test('parses comma-separated domain list from config', function () {
+    var configSheet = buildMockConfigSheet({
+      [CONFIG_COLS.ORG_NAME]: 'Test Org',
+      [CONFIG_COLS.BLOCKED_EMAIL_DOMAINS]: '.gov, .state, .mil'
+    });
+    installMockSpreadsheet(configSheet);
+
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.blockedEmailDomains).toEqual(['.gov', '.state', '.mil']);
+  });
+
+  test('normalises to lowercase and trims whitespace', function () {
+    var configSheet = buildMockConfigSheet({
+      [CONFIG_COLS.ORG_NAME]: 'Test Org',
+      [CONFIG_COLS.BLOCKED_EMAIL_DOMAINS]: ' .GOV ,  .US , .MA '
+    });
+    installMockSpreadsheet(configSheet);
+
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.blockedEmailDomains).toEqual(['.gov', '.us', '.ma']);
+  });
+
+  test('filters out empty entries from malformed CSV', function () {
+    var configSheet = buildMockConfigSheet({
+      [CONFIG_COLS.ORG_NAME]: 'Test Org',
+      [CONFIG_COLS.BLOCKED_EMAIL_DOMAINS]: '.gov,,,.us,'
+    });
+    installMockSpreadsheet(configSheet);
+
+    var cfg = ConfigReader.getConfig(true);
+    expect(cfg.blockedEmailDomains).toEqual(['.gov', '.us']);
+  });
+
+  test('returns array type even for a single domain', function () {
+    var configSheet = buildMockConfigSheet({
+      [CONFIG_COLS.ORG_NAME]: 'Test Org',
+      [CONFIG_COLS.BLOCKED_EMAIL_DOMAINS]: '.gov'
+    });
+    installMockSpreadsheet(configSheet);
+
+    var cfg = ConfigReader.getConfig(true);
+    expect(Array.isArray(cfg.blockedEmailDomains)).toBe(true);
+    expect(cfg.blockedEmailDomains).toEqual(['.gov']);
   });
 });

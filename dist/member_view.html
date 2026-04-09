@@ -1,5 +1,30 @@
 <script>
 
+function _validateContactFieldsClient(email, phone) {
+ var blocked = CONFIG.blockedEmailDomains || ['.gov', '.us', '.ma'];
+ if (typeof blocked === 'string') blocked = blocked.split(',').map(function(d) { return d.trim().toLowerCase(); });
+ if (email && email.trim()) {
+ var emailLower = email.trim().toLowerCase();
+ var atIdx = emailLower.lastIndexOf('@');
+ if (atIdx > -1) {
+  var domain = emailLower.substring(atIdx + 1);
+  for (var i = 0; i < blocked.length; i++) {
+  var suffix = blocked[i].toLowerCase();
+  if (domain === suffix.replace(/^\./, '') || domain.endsWith(suffix)) {
+   return { valid: false, field: 'email', error: 'Government email addresses (' + blocked.join(', ') + ') cannot be used. Please enter a personal email.' };
+  }
+  }
+ }
+ }
+ if (phone && phone.trim()) {
+ var digits = phone.replace(/[\s\-\(\)\.]/g, '');
+ if (digits.indexOf('617654') === 0) {
+  return { valid: false, field: 'phone', error: 'This phone number cannot be used. Please enter a personal phone number.' };
+ }
+ }
+ return { valid: true };
+}
+
 function _renderPINRestricted(appContainer, sectionLabel) {
  if (typeof IS_PIN_SESSION === 'undefined' || !IS_PIN_SESSION) return false;
  renderPageLayout(appContainer, 'member', AppState.activeTab || 'home', function(container) {
@@ -278,14 +303,27 @@ function _renderOnboardingWizard(container) {
   phoneGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-phone' }, 'Phone Number'));
   var phoneInput = el('input', { id: 'onboard-phone', className: 'form-input ' + _TI, type: 'tel', placeholder: '(555) 123-4567' });
   phoneGroup.appendChild(phoneInput);
-  phoneGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Only visible to your assigned steward'));
+  phoneGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '4px' } }, 'For internal chapter communication only. Will not be shared outside the chapter.'));
+  var onboardPhoneError = el('div', { className: 'field-error', style: { color: 'var(--danger, #f44336)', fontSize: '11px', marginTop: '2px', display: 'none' } });
+  phoneGroup.appendChild(onboardPhoneError);
+  phoneInput.addEventListener('blur', function() {
+  var check = _validateContactFieldsClient('', phoneInput.value);
+  if (!check.valid && check.field === 'phone') {
+   onboardPhoneError.textContent = check.error;
+   onboardPhoneError.style.display = '';
+   phoneInput.style.borderColor = 'var(--danger, #f44336)';
+  } else {
+   onboardPhoneError.style.display = 'none';
+   phoneInput.style.borderColor = '';
+  }
+  });
   stepContent.appendChild(phoneGroup);
 
   var addrGroup = el('div', { className: 'form-group' });
   addrGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'onboard-address' }, 'Street Address'));
   var addrInput = el('input', { id: 'onboard-address', className: 'form-input ' + _TI, type: 'text', placeholder: '123 Main St' });
   addrGroup.appendChild(addrInput);
-  addrGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, 'Used for union mailing purposes only'));
+  addrGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '4px' } }, 'Helps stewards understand membership distribution and commutes. Will not be exported or shared externally.'));
   stepContent.appendChild(addrGroup);
 
   stepData._phoneInput = phoneInput;
@@ -363,6 +401,8 @@ function _renderOnboardingWizard(container) {
   var addr = stepData._addrInput ? stepData._addrInput.value.trim() : '';
   if (!phone && !addr) { statusMsg.textContent = 'Please enter a phone number or address.'; statusMsg.style.color = 'var(--danger)'; return false; }
   if (phone && !/^[\d\s\-\(\)\+]{7,15}$/.test(phone)) { statusMsg.textContent = 'Please enter a valid phone number.'; statusMsg.style.color = 'var(--danger)'; return false; }
+  var contactCheck = _validateContactFieldsClient('', phone);
+  if (!contactCheck.valid) { statusMsg.textContent = contactCheck.error; statusMsg.style.color = 'var(--danger)'; return false; }
   stepData.phone = phone;
   stepData.street = addr;
   return true;
@@ -2107,9 +2147,44 @@ function renderUpdateProfile(appContainer) {
   { key: 'officeDays', label: 'Office Days', value: profile.officeDays },
   ];
 
+  
+  var privDisclosure = el('div', { style: { marginBottom: '14px', borderRadius: '8px', border: '1px solid var(--border)', overflow: 'hidden' } });
+  var privHeader = el('div', {
+  style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface)', cursor: 'pointer', userSelect: 'none' },
+  onClick: function() {
+   var isOpen = privBody.style.display !== 'none';
+   privBody.style.display = isOpen ? 'none' : 'block';
+   privChevron.textContent = isOpen ? '\u25B6' : '\u25BC';
+  }
+  });
+  privHeader.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, 'How Your Information Is Used'));
+  var privChevron = el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, '\u25B6');
+  privHeader.appendChild(privChevron);
+  privDisclosure.appendChild(privHeader);
+  var privBody = el('div', { style: { display: 'none', padding: '12px 14px', background: 'var(--card)', borderTop: '1px solid var(--border)' } });
+  var privLines = [
+  { label: 'Phone & Email', text: 'For internal chapter communication only. Will not be shared outside the chapter.' },
+  { label: 'Address', text: 'Helps stewards understand membership distribution and commutes. Will not be exported or shared externally.' },
+  { label: 'Shirt Size', text: 'Used for distributing union t-shirts at events and actions.' },
+  { label: 'General', text: 'All personal information is stored securely in the chapter\'s Google Workspace and is accessible only to authorised stewards and officers. No data is sold or shared with third parties.' }
+  ];
+  privLines.forEach(function(line) {
+  var row = el('div', { style: { marginBottom: '8px', fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5' } });
+  row.appendChild(el('strong', { style: { color: 'var(--text)', marginRight: '4px' } }, line.label + ':'));
+  row.appendChild(document.createTextNode(line.text));
+  privBody.appendChild(row);
+  });
+  privDisclosure.appendChild(privBody);
+  content.appendChild(privDisclosure);
+
   var form = el('div');
   var inputs = {};
   var _profileIdMap = { street: 'profile-street', city: 'profile-city', state: 'profile-state', zip: 'profile-zip', workLocation: 'profile-location', officeDays: 'profile-officedays' };
+  var profilePhoneError = null;
+  var _privHints = {
+  phone: 'For internal chapter communication only. Will not be shared outside the chapter.',
+  zip:   'Helps stewards understand membership distribution and commutes. Will not be exported or shared externally.'
+  };
   fields.forEach(function(f) {
   var fieldId = _profileIdMap[f.key] || ('profile-' + f.key);
   var group = el('div', { className: 'form-group' });
@@ -2117,8 +2192,36 @@ function renderUpdateProfile(appContainer) {
   var input = el('input', { id: fieldId, className: 'form-input ' + _TI, value: f.value || '', placeholder: f.label });
   inputs[f.key] = input;
   group.appendChild(input);
+  if (f.key === 'phone') {
+   profilePhoneError = el('div', { className: 'field-error', style: { color: 'var(--danger, #f44336)', fontSize: '11px', marginTop: '2px', display: 'none' } });
+   group.appendChild(profilePhoneError);
+   input.addEventListener('blur', function() {
+   var check = _validateContactFieldsClient('', input.value);
+   if (!check.valid && check.field === 'phone') {
+    profilePhoneError.textContent = check.error;
+    profilePhoneError.style.display = '';
+    input.style.borderColor = 'var(--danger, #f44336)';
+   } else {
+    profilePhoneError.style.display = 'none';
+    input.style.borderColor = '';
+   }
+   });
+  }
+  if (_privHints[f.key]) {
+   group.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '2px' } }, _privHints[f.key]));
+  }
   form.appendChild(group);
   });
+
+  
+  var consentWrap = el('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '10px', marginBottom: '10px', padding: '10px 12px', background: 'rgba(var(--accent-rgb, 100,180,100), 0.08)', borderRadius: '8px', border: '1px solid rgba(var(--accent-rgb, 100,180,100), 0.2)' } });
+  var consentCheckbox = el('input', { type: 'checkbox', id: 'share-address-union', style: { marginTop: '2px', flexShrink: '0' } });
+  if ((profile.shareAddressUnion || '') === 'Yes') consentCheckbox.checked = true;
+  var unionName = (CONFIG && CONFIG.orgName) || 'the union';
+  consentWrap.appendChild(consentCheckbox);
+  consentWrap.appendChild(el('label', { htmlFor: 'share-address-union', style: { fontSize: '12px', color: 'var(--text)', cursor: 'pointer', lineHeight: '1.4' } },
+  'I consent to share my mailing address with ' + unionName + ' to receive election ballots'));
+  form.appendChild(consentWrap);
 
   
   var shirtGroup = el('div', { className: 'form-group' });
@@ -2132,6 +2235,7 @@ function renderUpdateProfile(appContainer) {
   });
   inputs.shirtSize = shirtSelect;
   shirtGroup.appendChild(shirtSelect);
+  shirtGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '2px' } }, 'Used for distributing union t-shirts at events and actions.'));
   form.appendChild(shirtGroup);
 
   var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', minHeight: '20px' } });
@@ -2141,9 +2245,18 @@ function renderUpdateProfile(appContainer) {
   var updates = {};
   for (var k in inputs) updates[k] = inputs[k].value.trim();
   
+  updates.shareAddressUnion = consentCheckbox.checked ? 'Yes' : 'No';
+  
   if (updates.phone && !/^[\d\s\-\(\)\+]{7,15}$/.test(updates.phone)) {
    statusMsg.textContent = 'Please enter a valid phone number.'; statusMsg.style.color = 'var(--danger)';
    inputs.phone.style.borderColor = 'var(--danger)'; return;
+  }
+  
+  var profileContactCheck = _validateContactFieldsClient(updates.email || '', updates.phone || '');
+  if (!profileContactCheck.valid) {
+   statusMsg.textContent = profileContactCheck.error; statusMsg.style.color = 'var(--danger)';
+   if (profileContactCheck.field === 'phone') { inputs.phone.style.borderColor = 'var(--danger)'; }
+   return;
   }
   
   if (updates.zip && !/^\d{5}(-\d{4})?$/.test(updates.zip)) {
@@ -2439,6 +2552,7 @@ function renderMemberMore(appContainer) {
   { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', badge: AppState.memberTaskCount || 0, action: function() { _handleTabNav('member', 'mytasks'); } },
   { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', _feat: 'workload', action: function() { _handleTabNav('member', 'workload'); } },
   { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', locked: true, action: function() { _handleTabNav('member', 'unionstats'); } },
+  { icon: '\uD83C\uDF33', label: 'Org Health', desc: 'Visual org health tree', _feat: 'orghealth', action: function() { _handleTabNav('member', 'orghealth'); } },
   { group: 'Reference' },
   { icon: '\uD83D\uDCD8', label: 'POMS Ref.', desc: 'Program Operations Manual System reference', _feat: 'poms', action: function() { _handleTabNav('member', 'poms'); } },
   { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', locked: true, action: function() { _handleTabNav('member', 'resources'); } },
@@ -2467,6 +2581,7 @@ function renderMemberMore(appContainer) {
   if (m._feat === 'workload' && !CONFIG.hasWorkloadService) return false;
   if (m._feat === 'poms' && !CONFIG.hasPOMSReference) return false;
   if (m._feat === 'agency' && !CONFIG.hasAgencyOrgChart) return false;
+  if (m._feat === 'orghealth' && !CONFIG.enableOrgHealthTree) return false;
   return true;
  });
 
@@ -4763,7 +4878,7 @@ function renderEventsPage(appContainer) {
    var _pad2 = function(n) { return n < 10 ? '0' + n : '' + n; };
    var _toICS = function(d) { return d.getUTCFullYear() + _pad2(d.getUTCMonth() + 1) + _pad2(d.getUTCDate()) + 'T' + _pad2(d.getUTCHours()) + _pad2(d.getUTCMinutes()) + _pad2(d.getUTCSeconds()) + 'Z'; };
    var icsContent = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SolidBase//EN', 'BEGIN:VEVENT',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DDS-Dashboard//EN', 'BEGIN:VEVENT',
     'DTSTART:' + _toICS(startDate), 'DTEND:' + _toICS(endDate),
     'SUMMARY:' + (ev.title || '').replace(/[,;\\]/g, function(c) { return '\\' + c; }),
     ev.location ? 'LOCATION:' + ev.location.replace(/[,;\\]/g, function(c) { return '\\' + c; }) : '',

@@ -16,6 +16,8 @@
  *   Excludes development/test files that should not be deployed:
  *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
  *   - DevMenu.gs (dev-only quick deploy menu, guarded by typeof in onOpen)
+ *   - 30_TestRunner.gs (SolidBase-only exclusion: test runner excluded from prod)
+ *   - 31_WebAppTests.gs (SolidBase-only exclusion: web app tests excluded from prod)
  */
 
 const fs = require('fs');
@@ -65,6 +67,7 @@ const BUILD_ORDER = [
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
@@ -74,10 +77,12 @@ const BUILD_ORDER = [
   '31_WebAppTests.gs',
   '32_AdminSettings.gs',
   '33_NewFeatureServices.gs',
+  '34_ScoringService.gs',
   'DevMenu.gs',
 ];
 
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)
+// SolidBase: excludes poms_reference.html and agency_org_chart.html (DDS-only files)
 const HTML_FILES = [
   // Web-dashboard SPA templates
   'index.html',
@@ -96,6 +101,7 @@ const HTML_FILES = [
   'negotiation_knowledge.html',
   'member_hub_styles.html',
   'member_hub_view.html',
+  'org_health_tree.html',
 ];
 
 /**
@@ -331,7 +337,7 @@ const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
 
 // Files to exclude in production builds.
-// Test runner (.gs) is included in prod — tab is gated by IS_DEV_MODE, endpoints by steward auth.
+// SolidBase excludes 4 files (vs DDS's 2): test runner files are also excluded here.
 const PROD_EXCLUDE = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
 
 if (validateOnly) {
@@ -351,7 +357,7 @@ if (validateOnly) {
 
   // BUILD-03: Validate total file count stays within safe GAS deployment range.
   // GAS supports many files but performance degrades and clasp push slows above ~55.
-  // Current prod capacity: 42 .gs + 17 .html + 1 appsscript.json = 60 files
+  // Current SolidBase prod capacity: 41 .gs + 16 .html + 1 appsscript.json = 58 files
   const GAS_FILE_WARN = 55;
   const GAS_FILE_LIMIT = 65;
   const gsFileCount = fileList.length;

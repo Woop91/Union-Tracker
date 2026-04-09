@@ -3206,3 +3206,18 @@ function dataGetLeaderUnitMentorships(sessionToken) {
   }
   return { success: true, pairings: results };
 }
+
+/**
+ * Returns org health scores for all members grouped by assigned steward.
+ * Role-based: stewards see all names; members see names only on their own branch.
+ * @param {string} sessionToken
+ * @returns {{ success: boolean, stewards: Array, orgScore: number, thresholds: Object }}
+ */
+function dataGetOrgHealthScores(sessionToken) {
+  var caller = _resolveCallerEmail(sessionToken);
+  if (!caller) return { success: false, authError: true, message: 'Authentication required.' };
+  var isSteward = checkWebAppAuthorization('steward', sessionToken).isAuthorized;
+  var result = DataService.getOrgHealthScores(caller, isSteward);
+  result.success = true;
+  return result;
+}

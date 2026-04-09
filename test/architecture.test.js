@@ -57,6 +57,7 @@ loadSources([
   '22_WebDashApp.gs',
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs',
   '26_QAForum.gs',
   '27_TimelineService.gs',
   '28_FailsafeService.gs',
@@ -198,9 +199,9 @@ describe('A1: Build order integrity', () => {
     '17_CorrelationEngine.gs', '19_WebDashAuth.gs',
     '20_WebDashConfigReader.gs', '21_WebDashDataService.gs', '21d_WebDashDataWrappers.gs',
     '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
-    '26_QAForum.gs', '27_TimelineService.gs',
+    '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
     '28_FailsafeService.gs', '29_TrendAlertService.gs', '30_EngagementService.gs', '30_TestRunner.gs',
-    '31_WebAppTests.gs', '32_AdminSettings.gs', '33_NewFeatureServices.gs', 'DevMenu.gs'
+    '31_WebAppTests.gs', '32_AdminSettings.gs', '33_NewFeatureServices.gs', '34_ScoringService.gs', 'DevMenu.gs'
   ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {
@@ -440,6 +441,7 @@ describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
     '21_WebDashDataService.gs',
     '23_PortalSheets.gs',
     '24_WeeklyQuestions.gs',
+    '25_WorkloadService.gs',
   ];
 
   webAppFiles.forEach(file => {
@@ -588,7 +590,7 @@ describe('A9: UI tab routes have matching render functions', () => {
 
   // Each routed function must be defined SOMEWHERE in the HTML files
   // (any of the SPA HTML files, including auth_view.html and error_view.html)
-  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html', 'member_hub_view.html'].map(f =>
+  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html', 'member_hub_view.html', 'org_health_tree.html'].map(f =>
     fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
   ).join('\n');
 
@@ -1005,6 +1007,7 @@ describe('A14: GAS API enum validation', () => {
 describe('A16: LockService.getScriptLock() acquisitions release in finally blocks', () => {
   const lockFiles = [
     '02_DataManagers.gs',
+    '25_WorkloadService.gs',
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
@@ -1065,6 +1068,7 @@ describe('A17: Lock-acquiring mutations in service files log audit events', () =
     '26_QAForum.gs',
     '27_TimelineService.gs',
     '28_FailsafeService.gs',
+    '25_WorkloadService.gs',
   ];
   const srcDir = path.resolve(__dirname, '..', 'src');
 

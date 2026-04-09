@@ -32,8 +32,8 @@ Read these files **in this order** when onboarding to this codebase:
 **Repo:** `Woop91/SolidBase` (public). Default branch: `Main` (capital M).
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users).
-**Architecture:** 39 source `.gs` files + 15 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
-**Current build:** 39 `.gs` + 15 `.html` files in `dist/` (individual file mode, NOT consolidated).
+**Architecture:** 41 source `.gs` files + 16 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
+**Current build:** 37 `.gs` + 16 `.html` files in prod `dist/` (4 dev/test files excluded; individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
 **SB Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 

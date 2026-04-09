@@ -85,7 +85,7 @@ function createConfigSheet(ss) {
     var _migrated = _migrateOrphanedColumns(sheet);
   }
 
-  // Row 1: Section Headers (grouped categories) — must match CONFIG_HEADER_MAP_ length (81 cols)
+  // Row 1: Section Headers (grouped categories) — must match CONFIG_HEADER_MAP_ length (92 cols)
   var sectionHeaders = [
     '── ORGANIZATION ──', '', '', '', '', '', '', '', '', '',     // cols 1-10 (10)
     '── CONTACT INFO ──', '', '', '', '', '',                     // cols 11-16 (6)
@@ -98,8 +98,10 @@ function createConfigSheet(ss) {
     '── DRIVE & CALENDAR ��─', '', '', '', '', '', '', '', '', '', '', // cols 55-65 (11)
     '── SURVEY ──', '', '',                                       // cols 66-68 (3)
     '── BRANDING & UX ──', '', '', '', '', '',                    // cols 69-74 (6)
-    '── FEATURE TOGGLES ──', '', '', '', '',                      // cols 75-79 (5)
-    '── RETENTION ──', ''                                         // cols 80-81 (2)
+    '── FEATURE TOGGLES ──', '', '', '', '', '',                   // cols 75-80 (6)
+    '── SCORING ENGINE ──', '', '', '', '', '', '',               // cols 81-87 (7)
+    '── ORG HEALTH TREE ──', '', '',                              // cols 88-90 (3)
+    '── RETENTION ──', ''                                         // cols 91-92 (2)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -978,7 +980,7 @@ function applyConfigSheetStyling(sheet) {
  * @private
  */
 function applySectionColors_(sheet, lastCol) {
-  // Section color definitions (13 sections, columns A-CC = 81 cols)
+  // Section color definitions (15 sections, columns A-CP = 92 cols)
   var SECTION_COLORS = {
     ORGANIZATION:    { bg: '#22c55e', text: SHEET_COLORS.TEXT_WHITE },     // Green
     CONTACT:         { bg: '#0ea5e9', text: SHEET_COLORS.TEXT_WHITE },     // Sky
@@ -992,11 +994,13 @@ function applySectionColors_(sheet, lastCol) {
     SURVEY:          { bg: '#7c3aed', text: SHEET_COLORS.TEXT_WHITE },     // Violet-dark
     BRANDING:        { bg: '#10b981', text: SHEET_COLORS.TEXT_WHITE },     // Emerald
     FEATURE_TOGGLES: { bg: '#ea580c', text: SHEET_COLORS.TEXT_WHITE },     // Orange-dark
+    SCORING:         { bg: '#0284c7', text: SHEET_COLORS.TEXT_WHITE },     // Blue-dark (v4.54.0)
+    ORG_HEALTH_TREE: { bg: '#16a34a', text: SHEET_COLORS.TEXT_WHITE },     // Green-dark (v4.54.0)
     RETENTION:       { bg: '#dc2626', text: SHEET_COLORS.TEXT_WHITE }      // Red-dark
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
-  // Total: 81 columns (A-CC) — must match CONFIG_HEADER_MAP_ order
+  // Total: 92 columns (A-CP) — must match CONFIG_HEADER_MAP_ order
   var sections = [
     { start: 1,  end: 10, color: SECTION_COLORS.ORGANIZATION },     // A–J   Organization
     { start: 11, end: 16, color: SECTION_COLORS.CONTACT },          // K–P   Contact Info
@@ -1009,8 +1013,10 @@ function applySectionColors_(sheet, lastCol) {
     { start: 55, end: 65, color: SECTION_COLORS.DRIVE_CALENDAR },   // BC–BM Drive & Calendar
     { start: 66, end: 68, color: SECTION_COLORS.SURVEY },           // BN–BP Survey
     { start: 69, end: 74, color: SECTION_COLORS.BRANDING },         // BQ–BV Branding & UX
-    { start: 75, end: 79, color: SECTION_COLORS.FEATURE_TOGGLES },  // BW–CA Feature Toggles
-    { start: 80, end: 81, color: SECTION_COLORS.RETENTION }         // CB–CC Retention
+    { start: 75, end: 80, color: SECTION_COLORS.FEATURE_TOGGLES },  // BW–CB Feature Toggles
+    { start: 81, end: 87, color: SECTION_COLORS.SCORING },          // CC–CI Scoring Engine (v4.54.0)
+    { start: 88, end: 90, color: SECTION_COLORS.ORG_HEALTH_TREE },  // CJ–CL Org Health Tree (v4.54.0)
+    { start: 91, end: 92, color: SECTION_COLORS.RETENTION }         // CM–CN Retention
   ];
 
   sections.forEach(function(section) {
@@ -1364,6 +1370,13 @@ function createMemberDirectory(ss) {
       // Rules array will be extended below with the rest of the conditional formatting
       // Store these for later application (setConditionalFormatRules is called once at end)
       sheet._duesCfRules = [dpTrueRule, dpFalseRule];
+    }
+    // v4.53.0: Privacy note on Street Address column header
+    var streetAddrIdx = headers.indexOf('Street Address');
+    if (streetAddrIdx !== -1) {
+      sheet.getRange(1, streetAddrIdx + 1).setNote(
+        '\u26A0\uFE0F DO NOT include mailing address fields (Street, City, State, Zip) in any data export. For internal steward use only.'
+      );
     }
   } else {
     // Existing sheet: rename any columns whose headers changed between versions.

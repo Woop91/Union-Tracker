@@ -2933,6 +2933,7 @@
         { id: 'explorer', icon: '\uD83D\uDD2C', label: 'Explorer' },
         { id: 'accesslog', icon: '\uD83D\uDD0D', label: 'Access Log' },
         { id: 'engagement', icon: '\uD83C\uDFAF', label: 'Engagement' },
+        { id: 'orghealth', icon: '\uD83C\uDF33', label: 'Org Health' },
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2958,6 +2959,9 @@
         stewardTabs.push({ group: 'Admin' });
         stewardTabs.push({ id: 'analytics', icon: '\uD83D\uDCC8', label: 'Usage Analytics' });
       }
+      if (!CONFIG.enableOrgHealthTree) {
+        stewardTabs = stewardTabs.filter(function(t) { return t.id !== 'orghealth'; });
+      }
       return _filterDevTabs(stewardTabs);
       }
       var memberTabs = [
@@ -2968,6 +2972,7 @@
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
+        { id: 'orghealth', icon: '\uD83C\uDF33', label: 'Org Health' },
         { group: 'Community' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -2999,6 +3004,10 @@
         );
       }
       // v4.51.1: Filter out excluded features (SolidBase isolation) + grievance toggle
+      // Filter orghealth if disabled
+      if (!CONFIG.enableOrgHealthTree) {
+        memberTabs = memberTabs.filter(function(t) { return t.id !== 'orghealth'; });
+      }
       return memberTabs.filter(function(t) {
         if (!t.id) return true;
         if (_EXCLUDED_FEATURE_TABS[t.id]) return false;
@@ -3343,8 +3352,8 @@
     }
 
     /**
-     * Agency Org Chart — loads agency_org_chart.html lazily.
-     * Agency structure, budget, personnel hierarchy.
+     * Agency Org Chart (MADDS) — loads agency_org_chart.html lazily.
+     * MassAbility agency structure, budget, personnel, DDS hierarchy.
      */
     function renderAgencyOrgChart(appContainer, role) {
       // v4.51.1: Graceful fallback if feature file is absent (SolidBase)
@@ -3842,6 +3851,7 @@
           case 'reportcard': return renderReportCard;
           case 'pinsetup': return renderPINSetup;
           case 'leaderhub': return renderLeaderHub;
+          case 'orghealth': return renderOrgHealthTree;
           default: return renderMemberHome;
         }
       } else {
@@ -3870,6 +3880,7 @@
           case 'workload': return renderWorkloadTracker;
           case 'accesslog': return renderAccessLogPage;
           case 'engagement': return renderEngagementDashboard;
+          case 'orghealth': return renderOrgHealthTree;
           case 'failsafe': return renderFailsafePage;
           case 'search': return renderSearchPage;
           case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
@@ -5046,6 +5057,7 @@
   <?!= include('auth_manifesto') ?>
   <?!= include('negotiation_knowledge') ?>
   <?!= include('member_hub_view') ?>
+  <?!= include('org_health_tree') ?>
 
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>

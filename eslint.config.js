@@ -183,6 +183,7 @@ module.exports = [
         // Service modules (IIFEs)
         DataService: 'readonly',
         ConfigReader: 'readonly',
+        ScoringService: 'readonly',
         Auth: 'readonly',
         EventBus: 'readonly',
         DigestService: 'readonly',

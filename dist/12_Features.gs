@@ -1512,6 +1512,23 @@ function setupMemberLeaderRole() {
   return { success: true };
 }
 
+/**
+ * Applies Yes/No dropdown validation to the SHARE_ADDRESS_UNION column in the
+ * Member Directory sheet. Called during sheet setup and repair flows.
+ * @param {Sheet} sheet - The Member Directory sheet
+ */
+function applyShareAddressUnionValidation_(sheet) {
+  if (!sheet) return;
+  var shareAddrCol = MEMBER_COLS.SHARE_ADDRESS_UNION;
+  if (shareAddrCol && shareAddrCol <= sheet.getLastColumn()) {
+    sheet.getRange(2, shareAddrCol, Math.max(sheet.getLastRow() - 1, 1), 1)
+      .setDataValidation(SpreadsheetApp.newDataValidation()
+        .requireValueInList(['Yes', 'No'], true)
+        .setAllowInvalid(false)
+        .build());
+  }
+}
+
 // ============================================================================
 // TRIGGERS & AUTOMATION
 // ============================================================================

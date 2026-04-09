@@ -1637,3 +1637,324 @@ describe('deleteMeetingMinutes', () => {
     expect(mockSheet.deleteRow).toHaveBeenCalled();
   });
 });
+
+// ============================================================================
+// updateMemberProfile — contact validation wired
+// ============================================================================
+
+describe('updateMemberProfile contact validation', () => {
+  function makeMemberSheet() {
+    var headers = ['Email', 'Phone', 'Street Address', 'City', 'State', 'Zip Code',
+      'Work Location', 'Office Days', 'Share Phone', 'Share Address With Union', 'Shirt Size'];
+    var row = ['member@test.com', '555-1234', '123 Main St', 'Springfield', 'MA', '01001',
+      'HQ', 'Mon-Fri', 'No', 'No', 'M'];
+    var sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', [headers, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+    return sheet;
+  }
+
+  beforeEach(() => {
+    global.ConfigReader = {
+      getConfig: jest.fn(() => ({ blockedEmailDomains: ['.gov', '.us', '.ma'] }))
+    };
+    makeMemberSheet();
+  });
+
+  test('rejects gov email in updateMemberProfile', () => {
+    var result = DataService.updateMemberProfile('member@test.com', { email: 'worker@state.gov' });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/government/i);
+  });
+
+  test('rejects blocked phone prefix in updateMemberProfile', () => {
+    var result = DataService.updateMemberProfile('member@test.com', { phone: '617-654-0000' });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/personal phone/i);
+  });
+
+  test('allows valid personal email and phone in updateMemberProfile', () => {
+    var result = DataService.updateMemberProfile('member@test.com', {
+      phone: '617-555-9999',
+      city: 'Boston'
+    });
+    // Should succeed (member found and update applied)
+    expect(result.success).toBe(true);
+  });
+});
+
+// ============================================================================
+// updateMemberBySteward — contact validation wired
+// ============================================================================
+
+describe('updateMemberBySteward contact validation', () => {
+  function makeStewardMemberSheet() {
+    var headers = ['Email', 'Phone', 'Director', 'Supervisor', 'Unit',
+      'Work Location', 'Job Title', 'Office Days'];
+    var row = ['member@test.com', '555-1234', 'Director A', 'Super B', 'Unit A',
+      'HQ', 'Analyst', 'Mon-Fri'];
+    var sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', [headers, row]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+    return sheet;
+  }
+
+  beforeEach(() => {
+    global.ConfigReader = {
+      getConfig: jest.fn(() => ({ blockedEmailDomains: ['.gov', '.us', '.ma'] }))
+    };
+    makeStewardMemberSheet();
+  });
+
+  test('rejects gov email in updateMemberBySteward', () => {
+    var result = DataService.updateMemberBySteward('member@test.com', { email: 'worker@dept.state.gov' });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/government/i);
+  });
+
+  test('rejects blocked phone prefix in updateMemberBySteward', () => {
+    var result = DataService.updateMemberBySteward('member@test.com', { phone: '(617) 654-1111' });
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/personal phone/i);
+  });
+
+  test('allows valid updates in updateMemberBySteward', () => {
+    var result = DataService.updateMemberBySteward('member@test.com', { director: 'NewDirector' });
+    expect(result.success).toBe(true);
+  });
+});
+
+// ============================================================================
+// _validateContactFields
+// ============================================================================
+
+describe('_validateContactFields', () => {
+  beforeEach(() => {
+    global.ConfigReader = {
+      getConfig: jest.fn(() => ({ blockedEmailDomains: ['.gov', '.us', '.ma'] }))
+    };
+  });
+
+  test('returns valid:true for a plain personal email', () => {
+    var result = DataService._validateContactFields('worker@gmail.com', '');
+    expect(result.valid).toBe(true);
+  });
+
+  test('rejects .gov email', () => {
+    var result = DataService._validateContactFields('worker@state.gov', '');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('email');
+    expect(result.error).toMatch(/government/i);
+  });
+
+  test('rejects .us email', () => {
+    var result = DataService._validateContactFields('worker@agency.us', '');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('email');
+  });
+
+  test('rejects .ma email', () => {
+    var result = DataService._validateContactFields('worker@state.ma', '');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('email');
+  });
+
+  test('email check is case-insensitive', () => {
+    var result = DataService._validateContactFields('Worker@STATE.GOV', '');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('email');
+  });
+
+  test('rejects subdomain of blocked TLD (e.g. dept.state.gov)', () => {
+    var result = DataService._validateContactFields('worker@dept.state.gov', '');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('email');
+  });
+
+  test('accepts email with blocked string in local part (not domain)', () => {
+    var result = DataService._validateContactFields('gov.worker@gmail.com', '');
+    expect(result.valid).toBe(true);
+  });
+
+  test('rejects phone starting with 617654 (bare digits)', () => {
+    var result = DataService._validateContactFields('', '6176540000');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('phone');
+    expect(result.error).toMatch(/personal phone/i);
+  });
+
+  test('rejects 617-654 phone formatted with dashes', () => {
+    var result = DataService._validateContactFields('', '617-654-0000');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('phone');
+  });
+
+  test('rejects (617) 654-0000 format', () => {
+    var result = DataService._validateContactFields('', '(617) 654-0000');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('phone');
+  });
+
+  test('accepts a valid personal phone number', () => {
+    var result = DataService._validateContactFields('', '617-555-1234');
+    expect(result.valid).toBe(true);
+  });
+
+  test('returns valid:true when both email and phone are undefined', () => {
+    var result = DataService._validateContactFields(undefined, undefined);
+    expect(result.valid).toBe(true);
+  });
+
+  test('returns valid:true when both are empty strings', () => {
+    var result = DataService._validateContactFields('', '');
+    expect(result.valid).toBe(true);
+  });
+
+  test('falls back to hardcoded defaults when ConfigReader throws', () => {
+    global.ConfigReader = {
+      getConfig: jest.fn(() => { throw new Error('config unavailable'); })
+    };
+    // .gov should still be blocked via the fallback
+    var result = DataService._validateContactFields('worker@state.gov', '');
+    expect(result.valid).toBe(false);
+    expect(result.field).toBe('email');
+  });
+});
+
+// ============================================================================
+// DataService.getOrgHealthScores
+// ============================================================================
+
+describe('DataService.getOrgHealthScores', () => {
+  // Stub ScoringService before each test
+  beforeEach(() => {
+    global.ScoringService = {
+      calculateEngagementScore: jest.fn(() => 60),
+      calculateProfileScore: jest.fn(() => 50),
+      calculateGrievanceScore: jest.fn(() => 100),
+      calculateCompositeScore: jest.fn(() => 72),
+      getScoreColor: jest.fn(() => '#4CAF50'),
+    };
+    global.ConfigReader = {
+      getConfig: jest.fn(() => ({
+        maxVolunteerHours: 20,
+        scoreWeightEngagement: 70,
+        scoreWeightProfile: 20,
+        scoreWeightGrievance: 10,
+        scoreThresholdGreen: 70,
+        scoreThresholdYellow: 40,
+        grievanceScoreDirection: 'Negative',
+      }))
+    };
+  });
+
+  function makeScoredMemberData() {
+    // Headers include Assigned Steward so grouping can work
+    return [
+      ['Email', 'Name', 'First Name', 'Last Name', 'Role', 'Unit', 'Phone',
+       'Join Date', 'Dues Status', 'Member ID', 'Work Location', 'Office Days',
+       'Assigned Steward', 'Is Steward', 'Has Open Grievance?', 'Open Rate %'],
+      ['alice@test.com',   'Alice A', 'Alice', 'A', 'Member',  'Unit A', '555-1111',
+       new Date(), 'Active', 'M-001', 'HQ', 'Mon', 'steward1@test.com', false, 'No',  '80'],
+      ['bob@test.com',     'Bob B',   'Bob',   'B', 'Member',  'Unit A', '555-2222',
+       new Date(), 'Active', 'M-002', 'HQ', 'Tue', 'steward1@test.com', false, 'No',  '60'],
+      ['carol@test.com',   'Carol C', 'Carol', 'C', 'Member',  'Unit B', '555-3333',
+       new Date(), 'Active', 'M-003', 'HQ', 'Wed', 'steward2@test.com', false, 'Yes', '40'],
+      ['steward1@test.com','S1 One',  'S1',    'One','Steward','Unit A', '555-0001',
+       new Date(), 'Active', 'M-004', 'HQ', 'Mon', '',                  true,  'No',  '90'],
+    ];
+  }
+
+  test('returns success:true, stewards array, orgScore, and thresholds', () => {
+    const data = makeScoredMemberData();
+    const sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', data);
+    const ss = createMockSpreadsheet([sheet, mockGrievanceSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
+    DataService._resetSSCache();
+
+    const result = DataService.getOrgHealthScores('steward1@test.com', true);
+    expect(result).toHaveProperty('stewards');
+    expect(result).toHaveProperty('orgScore');
+    expect(result).toHaveProperty('thresholds');
+    expect(Array.isArray(result.stewards)).toBe(true);
+    expect(typeof result.orgScore).toBe('number');
+    expect(result.thresholds).toHaveProperty('green');
+    expect(result.thresholds).toHaveProperty('yellow');
+  });
+
+  test('groups members by assigned steward', () => {
+    const data = makeScoredMemberData();
+    const sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', data);
+    const ss = createMockSpreadsheet([sheet, mockGrievanceSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
+    DataService._resetSSCache();
+
+    const result = DataService.getOrgHealthScores('steward1@test.com', true);
+    // steward1 has alice + bob, steward2 has carol, no-steward group has steward1 row
+    const stewardKeys = result.stewards.map(g => g.steward.toLowerCase());
+    expect(stewardKeys).toContain('steward1@test.com');
+    expect(stewardKeys).toContain('steward2@test.com');
+  });
+
+  test('steward sees member names (isSteward=true)', () => {
+    const data = makeScoredMemberData();
+    const sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', data);
+    const ss = createMockSpreadsheet([sheet, mockGrievanceSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
+    DataService._resetSSCache();
+
+    const result = DataService.getOrgHealthScores('steward1@test.com', true);
+    // Find steward1's group
+    const grp = result.stewards.find(g => g.steward.toLowerCase() === 'steward1@test.com');
+    expect(grp).toBeDefined();
+    const alice = grp.members.find(m => m.email === 'alice@test.com');
+    expect(alice).toBeDefined();
+    expect(alice.firstName).toBe('Alice');
+    expect(alice.lastName).toBe('A');
+  });
+
+  test('member sees names only on own steward branch (isSteward=false)', () => {
+    const data = makeScoredMemberData();
+    const sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', data);
+    const ss = createMockSpreadsheet([sheet, mockGrievanceSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
+    DataService._resetSSCache();
+
+    // alice is assigned to steward1, so as alice she should see names in steward1's group
+    const result = DataService.getOrgHealthScores('alice@test.com', false);
+    const grp1 = result.stewards.find(g => g.steward.toLowerCase() === 'steward1@test.com');
+    const grp2 = result.stewards.find(g => g.steward.toLowerCase() === 'steward2@test.com');
+
+    // alice's group: names visible
+    if (grp1) {
+      const aliceRec = grp1.members.find(m => m.email === 'alice@test.com');
+      if (aliceRec) expect(aliceRec.firstName).toBe('Alice');
+    }
+    // steward2's group: names redacted
+    if (grp2) {
+      grp2.members.forEach(function(m) {
+        expect(m.firstName).toBe('');
+        expect(m.lastName).toBe('');
+      });
+    }
+  });
+
+  test('returns empty stewards array when sheet has no data', () => {
+    const emptyData = [
+      ['Email', 'Name', 'First Name', 'Last Name', 'Assigned Steward']
+    ];
+    const sheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', emptyData);
+    const ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    DataService._invalidateSheetCache(SHEETS.MEMBER_DIR);
+    DataService._resetSSCache();
+
+    const result = DataService.getOrgHealthScores('s@test.com', true);
+    expect(result.stewards).toEqual([]);
+    expect(result.orgScore).toBe(0);
+  });
+});
