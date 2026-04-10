@@ -3221,3 +3221,17 @@ function dataGetOrgHealthScores(sessionToken) {
   result.success = true;
   return result;
 }
+
+/** @param {string} sessionToken @returns {Object} Director overrides from Config. Any authenticated user. */
+function dataGetAgencyDirectorOverrides(sessionToken) {
+  var email = _resolveCallerEmail(sessionToken);
+  if (!email) return { success: false, authError: true, message: 'Authentication required.' };
+  return { success: true, data: getAgencyDirectorOverrides() };
+}
+
+/** @param {string} sessionToken @param {Object} overrides @returns {Object} Steward updates director overrides. */
+function dataUpdateAgencyDirectorOverrides(sessionToken, overrides) {
+  var s = _requireStewardAuth(sessionToken);
+  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
+  return withScriptLock_(function() { return updateAgencyDirectorOverrides(overrides); });
+}

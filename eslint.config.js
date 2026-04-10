@@ -554,6 +554,10 @@ module.exports = [
         initWorkloadTrackerSheets: 'readonly',
         getWorkloadHistorySSO: 'readonly',
 
+        // Cross-file functions (21_WebDashDataService.gs — v4.55.0)
+        getAgencyDirectorOverrides: 'readonly',
+        updateAgencyDirectorOverrides: 'readonly',
+
         // Data wrappers (21d_WebDashDataWrappers.gs)
         dataGetBatchData: 'readonly',
         dataGetMemberContactHistory: 'readonly',

@@ -333,7 +333,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.54.0",
+  VERSION: "4.55.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -1504,7 +1504,10 @@ var CONFIG_HEADER_MAP_ = [
 
   // ── RETENTION (CB–CC) ── auto-archival thresholds
   { key: 'GRIEVANCE_ARCHIVE_DAYS', header: 'Grievance Archive Days',           type: 'days' },
-  { key: 'AUDIT_ARCHIVE_DAYS',    header: 'Audit Log Archive Days',            type: 'days' }
+  { key: 'AUDIT_ARCHIVE_DAYS',    header: 'Audit Log Archive Days',            type: 'days' },
+
+  // ── AGENCY DIRECTOR OVERRIDES (v4.55.0) ──
+  { key: 'AGENCY_DIRECTOR_OVERRIDES', header: 'Agency Director Overrides',     type: 'text' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_, { DIRECTORS: 'MANAGERS' });

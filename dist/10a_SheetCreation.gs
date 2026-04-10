@@ -101,7 +101,8 @@ function createConfigSheet(ss) {
     '── FEATURE TOGGLES ──', '', '', '', '', '',                   // cols 75-80 (6)
     '── SCORING ENGINE ──', '', '', '', '', '', '',               // cols 81-87 (7)
     '── ORG HEALTH TREE ──', '', '',                              // cols 88-90 (3)
-    '── RETENTION ──', ''                                         // cols 91-92 (2)
+    '── RETENTION ──', '',                                        // cols 91-92 (2)
+    '── DIRECTOR OVERRIDES ──'                                    // col  93 (1)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_

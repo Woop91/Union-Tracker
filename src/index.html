@@ -341,6 +341,7 @@
             border: '#1a1a1a', radius: '10px',
             fontBody: "'JetBrains Mono', monospace",
             fontDisplay: "'JetBrains Mono', monospace",
+            catFill: '#9ca3af',
             mode: 'dark',
           },
           light: {
@@ -351,6 +352,7 @@
             border: '#e2e2ea', radius: '10px',
             fontBody: "'JetBrains Mono', monospace",
             fontDisplay: "'JetBrains Mono', monospace",
+            catFill: '#1a1a1a',
             mode: 'light',
           }
         },
@@ -363,6 +365,7 @@
             border: 'rgba(255,255,255,0.08)', radius: '20px',
             fontBody: "'JetBrains Mono', monospace",
             fontDisplay: "'JetBrains Mono', monospace",
+            catFill: '#9ca3af',
             mode: 'dark',
           },
           light: {
@@ -373,6 +376,7 @@
             border: 'rgba(0,0,0,0.08)', radius: '20px',
             fontBody: "'JetBrains Mono', monospace",
             fontDisplay: "'JetBrains Mono', monospace",
+            catFill: '#1a1a1a',
             mode: 'light',
           }
         }
@@ -432,6 +436,7 @@
             accentBg: 'rgba(182,160,255,0.08)', accentBorder: 'rgba(182,160,255,0.25)',
             fontBody: "'Manrope', sans-serif",
             fontDisplay: "'Manrope', sans-serif",
+            catFill: '#9ca3af',
             mode: 'dark',
             // MD3 surface hierarchy
             'surface-container': '#181827', 'surface-container-low': '#121220',
@@ -462,6 +467,7 @@
             accentBg: 'rgba(101,54,232,0.06)', accentBorder: 'rgba(101,54,232,0.15)',
             fontBody: "'Manrope', sans-serif",
             fontDisplay: "'Manrope', sans-serif",
+            catFill: '#1a1a1a',
             mode: 'light',
             // MD3 surface hierarchy
             'surface-container': '#eceef0', 'surface-container-low': '#f2f4f6',
@@ -492,6 +498,7 @@
             accentBg: 'rgba(202,253,0,0.06)', accentBorder: 'rgba(202,253,0,0.2)',
             fontBody: "'Space Grotesk', sans-serif",
             fontDisplay: "'Space Grotesk', sans-serif",
+            catFill: '#9ca3af',
             mode: 'dark',
             // MD3 surface hierarchy
             'surface-container': '#191919', 'surface-container-low': '#131313',
@@ -520,6 +527,7 @@
             accentBg: 'rgba(81,103,0,0.06)', accentBorder: 'rgba(81,103,0,0.15)',
             fontBody: "'Space Grotesk', sans-serif",
             fontDisplay: "'Space Grotesk', sans-serif",
+            catFill: '#1a1a1a',
             mode: 'light',
             // MD3 surface hierarchy (light)
             'surface-container': '#e8e8e8', 'surface-container-low': '#efefef',
@@ -1768,31 +1776,31 @@
       c.innerHTML =
         '<span class="cat-wrap">' +
         '<svg class="nav-cat cat-lazy" viewBox="0 0 24 12" width="20" height="10">' +
-          '<ellipse cx="11" cy="8.5" rx="7" ry="3" fill="currentColor"/>' +
-          '<circle cx="17" cy="6" r="2.8" fill="currentColor"/>' +
-          '<polygon points="15,4 14.5,1 16.5,3" fill="currentColor"/>' +
-          '<polygon points="18,3 20,1 19.5,4" fill="currentColor"/>' +
-          '<path d="M4,7.5 Q1,3.5 2.5,1.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+          '<ellipse cx="11" cy="8.5" rx="7" ry="3" fill="var(--catFill, currentColor)"/>' +
+          '<circle cx="17" cy="6" r="2.8" fill="var(--catFill, currentColor)"/>' +
+          '<polygon points="15,4 14.5,1 16.5,3" fill="var(--catFill, currentColor)"/>' +
+          '<polygon points="18,3 20,1 19.5,4" fill="var(--catFill, currentColor)"/>' +
+          '<path d="M4,7.5 Q1,3.5 2.5,1.5" stroke="var(--catFill, currentColor)" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
           '<line x1="15.5" y1="5.5" x2="16.2" y2="5.5" stroke="#4ade80" stroke-width="0.7" opacity="0.7"/>' +
           '<line x1="17.5" y1="5.5" x2="18.2" y2="5.5" stroke="#4ade80" stroke-width="0.7" opacity="0.7"/>' +
         '</svg></span>' +
         '<span class="cat-wrap">' +
         '<svg class="nav-cat cat-play1" viewBox="0 0 14 18" width="11" height="14">' +
-          '<polygon points="3,6 2,2 5,5" fill="currentColor"/>' +
-          '<polygon points="9,5 12,2 11,6" fill="currentColor"/>' +
-          '<circle cx="7" cy="6.5" r="3.5" fill="currentColor"/>' +
-          '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="currentColor"/>' +
-          '<path d="M11,12 Q14,8 13,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+          '<polygon points="3,6 2,2 5,5" fill="var(--catFill, currentColor)"/>' +
+          '<polygon points="9,5 12,2 11,6" fill="var(--catFill, currentColor)"/>' +
+          '<circle cx="7" cy="6.5" r="3.5" fill="var(--catFill, currentColor)"/>' +
+          '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="var(--catFill, currentColor)"/>' +
+          '<path d="M11,12 Q14,8 13,5" stroke="var(--catFill, currentColor)" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
           '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
           '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
         '</svg></span>' +
         '<span class="cat-wrap">' +
         '<svg class="nav-cat cat-play2" viewBox="0 0 14 18" width="11" height="14">' +
-          '<polygon points="3,6 1.5,2 5,5" fill="currentColor"/>' +
-          '<polygon points="9,5 12.5,2 11,6" fill="currentColor"/>' +
-          '<circle cx="7" cy="6.5" r="3.5" fill="currentColor"/>' +
-          '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="currentColor"/>' +
-          '<path d="M11,12 Q15,9 12,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+          '<polygon points="3,6 1.5,2 5,5" fill="var(--catFill, currentColor)"/>' +
+          '<polygon points="9,5 12.5,2 11,6" fill="var(--catFill, currentColor)"/>' +
+          '<circle cx="7" cy="6.5" r="3.5" fill="var(--catFill, currentColor)"/>' +
+          '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="var(--catFill, currentColor)"/>' +
+          '<path d="M11,12 Q15,9 12,5" stroke="var(--catFill, currentColor)" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
           '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
           '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
         '</svg></span>';
@@ -1907,11 +1915,11 @@
     function _ensureScatterCats() {
       if (_scatterCatEls.length) return _scatterCatEls;
       var svg = '<svg class="nav-cat cat-play1" viewBox="0 0 14 18" width="13" height="16">' +
-        '<polygon points="3,6 2,2 5,5" fill="currentColor"/>' +
-        '<polygon points="9,5 12,2 11,6" fill="currentColor"/>' +
-        '<circle cx="7" cy="6.5" r="3.5" fill="currentColor"/>' +
-        '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="currentColor"/>' +
-        '<path d="M11,12 Q14,8 13,5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+        '<polygon points="3,6 2,2 5,5" fill="var(--catFill, currentColor)"/>' +
+        '<polygon points="9,5 12,2 11,6" fill="var(--catFill, currentColor)"/>' +
+        '<circle cx="7" cy="6.5" r="3.5" fill="var(--catFill, currentColor)"/>' +
+        '<ellipse cx="7" cy="13" rx="4" ry="4.5" fill="var(--catFill, currentColor)"/>' +
+        '<path d="M11,12 Q14,8 13,5" stroke="var(--catFill, currentColor)" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
         '<circle cx="5.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/>' +
         '<circle cx="8.5" cy="6" r="0.6" fill="#4ade80" opacity="0.7"/></svg>';
       for (var i = 0; i < _SC_POSITIONS.length; i++) {
@@ -3395,6 +3403,9 @@
             // Run init if available
             if (typeof window.agencyOC_init === 'function') {
               try { window.agencyOC_init(); } catch (_e) { /* already ran */ }
+            }
+            if (typeof window.agencyOC_initDirectorEditing === 'function') {
+              try { window.agencyOC_initDirectorEditing(); } catch (_e) {}
             }
             // Fallback rebind: if CSP blocked inline onclick and _rebindOCHandlers
             // didn't run, manually rebind any remaining onclick handlers

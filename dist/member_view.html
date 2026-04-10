@@ -2144,7 +2144,6 @@ function renderUpdateProfile(appContainer) {
   { key: 'state', label: 'State', value: profile.state },
   { key: 'zip', label: 'Zip Code', value: profile.zip },
   { key: 'workLocation', label: 'Work Location', value: profile.workLocation },
-  { key: 'officeDays', label: 'Office Days', value: profile.officeDays },
   ];
 
   
@@ -2223,20 +2222,62 @@ function renderUpdateProfile(appContainer) {
   'I consent to share my mailing address with ' + unionName + ' to receive election ballots'));
   form.appendChild(consentWrap);
 
+  var chipStyle = el('style');
+  chipStyle.textContent = '.chip-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}' +
+  '.chip-btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;' +
+  'padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;' +
+  'color:var(--text-secondary);font-family:var(--fontBody);font-size:0.8125rem;cursor:pointer;' +
+  'user-select:none;transition:background .15s,color .15s,border-color .15s;-webkit-tap-highlight-color:transparent;}' +
+  '.chip-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}' +
+  '.chip-btn:hover:not(.active){background:var(--surfaceAlt,rgba(0,0,0,.04));}';
+  form.appendChild(chipStyle);
+
   
   var shirtGroup = el('div', { className: 'form-group' });
-  shirtGroup.appendChild(el('label', { className: 'form-label', htmlFor: 'profile-shirtsize' }, 'Shirt Size'));
-  var shirtSizes = ['', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
-  var shirtSelect = el('select', { id: 'profile-shirtsize', className: 'form-input ' + _TI });
+  shirtGroup.appendChild(el('label', { className: 'form-label' }, 'Shirt Size'));
+  var shirtSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+  var shirtWrap = el('div', { className: 'chip-wrap' });
+  var shirtValue = { value: profile.shirtSize || '' };
   shirtSizes.forEach(function(sz) {
-  var opt = el('option', { value: sz }, sz || '— Select —');
-  if (sz === (profile.shirtSize || '')) opt.selected = true;
-  shirtSelect.appendChild(opt);
+  var chip = el('div', { className: 'chip-btn' + (sz === shirtValue.value ? ' active' : '') }, sz);
+  chip.addEventListener('click', function() {
+   shirtWrap.querySelectorAll('.chip-btn').forEach(function(c) { c.classList.remove('active'); });
+   if (shirtValue.value === sz) { shirtValue.value = ''; }
+   else { chip.classList.add('active'); shirtValue.value = sz; }
   });
-  inputs.shirtSize = shirtSelect;
-  shirtGroup.appendChild(shirtSelect);
+  shirtWrap.appendChild(chip);
+  });
+  inputs.shirtSize = shirtValue;
+  shirtGroup.appendChild(shirtWrap);
   shirtGroup.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '2px' } }, 'Used for distributing union t-shirts at events and actions.'));
   form.appendChild(shirtGroup);
+
+  
+  var daysGroup = el('div', { className: 'form-group' });
+  daysGroup.appendChild(el('label', { className: 'form-label' }, 'Office Days'));
+  var dayOptions = [
+  { val: 'Monday', label: 'Mon' }, { val: 'Tuesday', label: 'Tue' },
+  { val: 'Wednesday', label: 'Wed' }, { val: 'Thursday', label: 'Thu' },
+  { val: 'Friday', label: 'Fri' }, { val: 'Saturday', label: 'Sat' },
+  { val: 'Sunday', label: 'Sun' }, { val: 'Remote', label: 'Remote' }
+  ];
+  var daysWrap = el('div', { className: 'chip-wrap' });
+  var selectedDays = new Set(
+  (profile.officeDays || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean)
+  );
+  var daysValue = { value: Array.from(selectedDays).join(',') };
+  dayOptions.forEach(function(d) {
+  var chip = el('div', { className: 'chip-btn' + (selectedDays.has(d.val) ? ' active' : '') }, d.label);
+  chip.addEventListener('click', function() {
+   if (selectedDays.has(d.val)) { selectedDays.delete(d.val); chip.classList.remove('active'); }
+   else { selectedDays.add(d.val); chip.classList.add('active'); }
+   daysValue.value = Array.from(selectedDays).join(',');
+  });
+  daysWrap.appendChild(chip);
+  });
+  inputs.officeDays = daysValue;
+  daysGroup.appendChild(daysWrap);
+  form.appendChild(daysGroup);
 
   var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', minHeight: '20px' } });
   form.appendChild(statusMsg);

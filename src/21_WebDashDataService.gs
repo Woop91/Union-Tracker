@@ -5446,6 +5446,77 @@ var DataService = (function () {
     _stripAddressFields: _stripAddressFields,
     // v4.54.0 — Org Health Scores batch endpoint
     getOrgHealthScores: getOrgHealthScores,
+    // v4.55.0 — Agency Director Overrides
+    getAgencyDirectorOverrides: getAgencyDirectorOverrides,
+    updateAgencyDirectorOverrides: updateAgencyDirectorOverrides,
   };
 
 })();
+
+/**
+ * Reads agency director overrides from Config sheet.
+ * @returns {Object} Parsed overrides or empty object.
+ */
+function getAgencyDirectorOverrides() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return {};
+    var sheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (!sheet || !CONFIG_COLS.AGENCY_DIRECTOR_OVERRIDES) return {};
+    var raw = sheet.getRange(3, CONFIG_COLS.AGENCY_DIRECTOR_OVERRIDES).getValue();
+    if (!raw) return {};
+    return JSON.parse(String(raw));
+  } catch (e) {
+    log_('getAgencyDirectorOverrides', e.message);
+    return {};
+  }
+}
+
+/**
+ * Writes agency director overrides to Config sheet. Steward-only.
+ * @param {Object} overrides — { posId: { name?, removedPayHx? } }
+ * @returns {Object} { success, message }
+ */
+function updateAgencyDirectorOverrides(overrides) {
+  var VALID_POS_IDS = [
+    'eohhs_secretary', 'massability_commissioner', 'dds_commissioner',
+    'dds_regional_director_west', 'dds_regional_director_metro', 'dds_regional_director_east',
+    'dds_asst_commissioner', 'cl_director', 'vr_director',
+    'dds_dep_commissioner', 'massability_dep_commissioner',
+  ];
+  if (!overrides || typeof overrides !== 'object') return { success: false, message: 'Invalid overrides.' };
+  for (var posId in overrides) {
+    if (!Object.prototype.hasOwnProperty.call(overrides, posId)) continue;
+    if (VALID_POS_IDS.indexOf(posId) === -1) return { success: false, message: 'Unknown position: ' + posId };
+    var entry = overrides[posId];
+    if (entry.name !== undefined) {
+      if (typeof entry.name !== 'string' || entry.name.trim().length === 0) return { success: false, message: 'Name must be non-empty string.' };
+      if (entry.name.length > 100) return { success: false, message: 'Name too long (max 100).' };
+      if (/<[^>]+>/.test(entry.name)) return { success: false, message: 'HTML not allowed in name.' };
+    }
+    if (entry.removedPayHx !== undefined) {
+      if (!Array.isArray(entry.removedPayHx)) return { success: false, message: 'removedPayHx must be array.' };
+      for (var i = 0; i < entry.removedPayHx.length; i++) {
+        if (!/^\d{4}$/.test(String(entry.removedPayHx[i]))) return { success: false, message: 'removedPayHx entries must be 4-digit years.' };
+      }
+    }
+  }
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Config sheet unavailable.' };
+    var sheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (!sheet || !CONFIG_COLS.AGENCY_DIRECTOR_OVERRIDES) return { success: false, message: 'Config sheet unavailable.' };
+    var json = JSON.stringify(overrides);
+    sheet.getRange(3, CONFIG_COLS.AGENCY_DIRECTOR_OVERRIDES).setValue(escapeForFormula(json));
+    if (typeof ConfigReader !== 'undefined' && ConfigReader.refreshConfig) {
+      try { ConfigReader.refreshConfig(); } catch (_) {}
+    }
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('AGENCY_DIRECTOR_OVERRIDE', { overrides: overrides });
+    }
+    return { success: true, message: 'Director overrides saved.' };
+  } catch (e) {
+    log_('updateAgencyDirectorOverrides', e.message);
+    return { success: false, message: 'Error saving overrides.' };
+  }
+}

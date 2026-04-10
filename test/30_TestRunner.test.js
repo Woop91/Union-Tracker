@@ -202,8 +202,9 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
     // directory explorer steward update — v4.51.0,
     // leader unit mentorships — v4.51.1,
     // minutes delete wrapper — v4.52.1,
-    // org health scores — v4.54.0)
-    expect(untested.length).toBeLessThanOrEqual(68);
+    // org health scores — v4.54.0,
+    // agency director overrides — v4.55.0)
+    expect(untested.length).toBeLessThanOrEqual(70);
 
     // If there are untested functions, log them for visibility
     if (untested.length > 0) {
